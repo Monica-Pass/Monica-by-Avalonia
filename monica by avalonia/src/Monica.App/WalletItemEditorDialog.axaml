@@ -1,0 +1,75 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.WalletItemEditorDialog"
+             x:DataType="vm:WalletItemEditorViewModel"
+             mc:Ignorable="d"
+             d:DesignWidth="560"
+             d:DesignHeight="640">
+    <ScrollViewer MaxHeight="640">
+        <StackPanel Width="520" Spacing="12">
+            <ComboBox ItemsSource="{Binding WalletTypeOptions}"
+                      SelectedItem="{Binding SelectedWalletType}"
+                      HorizontalAlignment="Stretch">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:WalletTypeChoice">
+                        <TextBlock Text="{Binding Label}" />
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+
+            <TextBox Text="{Binding Title}" PlaceholderText="{Binding L.PasswordTitle}" />
+            <CheckBox Content="{Binding L.Favorite}" IsChecked="{Binding IsFavorite}" />
+
+            <StackPanel Spacing="10" IsVisible="{Binding IsDocument}">
+                <ComboBox ItemsSource="{Binding DocumentTypeOptions}"
+                          SelectedItem="{Binding SelectedDocumentType}"
+                          HorizontalAlignment="Stretch">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:WalletChoice">
+                            <TextBlock Text="{Binding Label}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="10">
+                    <TextBox Text="{Binding DocumentNumber}" PlaceholderText="{Binding L.DocumentNumber}" />
+                    <TextBox Grid.Column="1" Text="{Binding FullName}" PlaceholderText="{Binding L.FullName}" />
+                    <TextBox Grid.Row="1" Text="{Binding IssuedDate}" PlaceholderText="{Binding L.IssuedDate}" />
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ExpiryDate}" PlaceholderText="{Binding L.ExpiryDate}" />
+                    <TextBox Grid.Row="2" Text="{Binding IssuedBy}" PlaceholderText="{Binding L.IssuedBy}" />
+                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Nationality}" PlaceholderText="{Binding L.Nationality}" />
+                </Grid>
+                <TextBox Text="{Binding AdditionalInfo}" PlaceholderText="{Binding L.AdditionalInfo}" AcceptsReturn="True" MinHeight="64" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <StackPanel Spacing="10" IsVisible="{Binding IsBankCard}">
+                <ComboBox ItemsSource="{Binding CardTypeOptions}"
+                          SelectedItem="{Binding SelectedCardType}"
+                          HorizontalAlignment="Stretch">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:WalletChoice">
+                            <TextBlock Text="{Binding Label}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBox Text="{Binding CardNumber}" PlaceholderText="{Binding L.CardNumber}" />
+                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="10">
+                    <TextBox Text="{Binding CardholderName}" PlaceholderText="{Binding L.CardholderName}" />
+                    <TextBox Grid.Column="1" Text="{Binding BankName}" PlaceholderText="{Binding L.BankName}" />
+                    <TextBox Grid.Row="1" Text="{Binding ExpiryMonth}" PlaceholderText="{Binding L.ExpiryMonth}" />
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ExpiryYear}" PlaceholderText="{Binding L.ExpiryYear}" />
+                    <TextBox Grid.Row="2" Text="{Binding Cvv}" PlaceholderText="CVV" />
+                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Brand}" PlaceholderText="{Binding L.CardBrand}" />
+                </Grid>
+                <TextBox Text="{Binding BillingAddress}" PlaceholderText="{Binding L.BillingAddress}" AcceptsReturn="True" MinHeight="64" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <TextBox Text="{Binding ImagePathsText}" PlaceholderText="{Binding L.ImagePathsWatermark}" AcceptsReturn="True" MinHeight="72" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding L.ImagePathsDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" TextWrapping="Wrap" />
+            <TextBox Text="{Binding Notes}" PlaceholderText="{Binding L.Notes}" AcceptsReturn="True" MinHeight="72" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding ValidationMessage}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

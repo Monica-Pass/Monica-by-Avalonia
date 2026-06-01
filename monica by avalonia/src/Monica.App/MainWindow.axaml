@@ -13,23 +13,30 @@
         x:Class="Monica.App.MainWindow"
         x:Name="Root"
         Title="Monica"
-        Width="1200"
-        Height="760"
-        MinWidth="940"
-        MinHeight="620">
+        Icon="/Assets/AppIcon.ico"
+        Width="1000"
+        Height="650"
+        MinWidth="800"
+        MinHeight="500">
 
     <Window.Resources>
-        <SolidColorBrush x:Key="CardBackgroundBrush" Color="#0FFFFFFF" />
-        <SolidColorBrush x:Key="CardBorderBrush" Color="#1F000000" />
-        <SolidColorBrush x:Key="MutedTextBrush" Color="#99000000" />
+        <SolidColorBrush x:Key="CardBackgroundBrush" Color="#2B2B2B" />
+        <SolidColorBrush x:Key="CardBorderBrush" Color="#3A3A3A" />
+        <SolidColorBrush x:Key="MutedTextBrush" Color="#9D9D9D" />
     </Window.Resources>
 
-    <Grid RowDefinitions="36,*">
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,*" Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
-            <Border Width="20" Height="20" CornerRadius="5" Margin="14,0,10,0" VerticalAlignment="Center" Background="#2F7DFF">
-                <TextBlock Text="M" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" />
-            </Border>
-            <TextBlock Grid.Column="1" Text="Monica" VerticalAlignment="Center" FontWeight="SemiBold" />
+    <Grid RowDefinitions="32,*,24" Background="{DynamicResource LayerFillColorDefaultBrush}">
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*" Background="{DynamicResource LayerFillColorDefaultBrush}">
+            <Image Source="/Assets/Logo.png"
+                   Width="16"
+                   Height="16"
+                   Margin="16,0,16,0"
+                   VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1"
+                       Text="Monica"
+                       VerticalAlignment="Center"
+                       FontSize="12"
+                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
         </Grid>
 
         <Grid Grid.Row="1">
@@ -38,6 +45,12 @@
                     <ic:FluentIcon Icon="LockClosed" FontSize="48" HorizontalAlignment="Center" />
                     <TextBlock Text="{Binding LoginTitle}" FontSize="28" FontWeight="SemiBold" HorizontalAlignment="Center" />
                     <TextBlock Text="{Binding LoginDescription}" TextWrapping="Wrap" TextAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <Border IsVisible="{Binding HasLegacyVaultImportPrompt}" Padding="12" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="{Binding L.LegacyVaultDetected}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding LegacyVaultImportPromptText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                    </Border>
                     <TextBox PasswordChar="*" PlaceholderText="{Binding L.MasterPasswordWatermark}" Text="{Binding MasterPassword}" />
                     <TextBox IsVisible="{Binding !IsVaultInitialized}" PasswordChar="*" PlaceholderText="{Binding L.ConfirmMasterPasswordWatermark}" Text="{Binding ConfirmMasterPassword}" />
                     <Button Command="{Binding UnlockCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
@@ -52,9 +65,10 @@
 
             <fa:FANavigationView IsVisible="{Binding IsUnlocked}"
                                  PaneDisplayMode="Left"
+                                 IsPaneOpen="False"
                                  IsBackButtonVisible="False"
                                  IsSettingsVisible="False"
-                                 OpenPaneLength="236"
+                                 OpenPaneLength="240"
                                  SelectionChanged="NavigationView_OnSelectionChanged">
                 <fa:FANavigationView.MenuItems>
                     <fa:FANavigationViewItem Content="{Binding L.Passwords}" Tag="Passwords">
@@ -102,16 +116,14 @@
                             <fa:FASymbolIconSource Symbol="Clock" />
                         </fa:FANavigationViewItem.IconSource>
                     </fa:FANavigationViewItem>
-                    <fa:FANavigationViewItemSeparator />
-                    <fa:FANavigationViewItemHeader Content="{Binding L.Folders}" />
-                    <fa:FANavigationViewItem Content="{Binding L.Personal}" Tag="Passwords">
-                        <fa:FANavigationViewItem.IconSource>
-                            <fa:FASymbolIconSource Symbol="Folder" />
-                        </fa:FANavigationViewItem.IconSource>
-                    </fa:FANavigationViewItem>
                 </fa:FANavigationView.MenuItems>
 
                 <fa:FANavigationView.FooterMenuItems>
+                    <fa:FANavigationViewItem Content="{Binding L.DatabaseManagement}" Tag="DatabaseManagement">
+                        <fa:FANavigationViewItem.IconSource>
+                            <fa:FASymbolIconSource Symbol="Library" />
+                        </fa:FANavigationViewItem.IconSource>
+                    </fa:FANavigationViewItem>
                     <fa:FANavigationViewItem Content="{Binding L.SyncAndBackup}" Tag="Sync">
                         <fa:FANavigationViewItem.IconSource>
                             <fa:FASymbolIconSource Symbol="Sync" />
@@ -124,18 +136,18 @@
                     </fa:FANavigationViewItem>
                 </fa:FANavigationView.FooterMenuItems>
 
-                <Grid Margin="22" RowDefinitions="Auto,*">
+                <Grid Margin="18" RowDefinitions="Auto,*">
                     <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,18">
                         <StackPanel>
-                            <TextBlock Text="{Binding SelectedSectionTitle}" FontSize="28" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding SelectedSectionTitle}" FontSize="24" FontWeight="SemiBold" />
                             <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <Button Command="{Binding LoadCommand}" ToolTip.Tip="{Binding L.Refresh}">
-                            <ic:FluentIcon Icon="ArrowClockwise" FontSize="20" />
+                            <Button Classes="IconButton" Command="{Binding LoadCommand}" ToolTip.Tip="{Binding L.Refresh}">
+                                <ic:FluentIcon Icon="ArrowClockwise" FontSize="20" />
                             </Button>
-                            <Button Command="{Binding ExportDataCommand}" ToolTip.Tip="{Binding L.Export}">
-                            <ic:FluentIcon Icon="ArrowDownload" FontSize="20" />
+                            <Button Classes="IconButton" Command="{Binding ExportDataCommand}" ToolTip.Tip="{Binding L.Export}">
+                                <ic:FluentIcon Icon="ArrowDownload" FontSize="20" />
                             </Button>
                         </StackPanel>
                     </Grid>
@@ -566,6 +578,7 @@
                                 <StackPanel>
                                     <TextBlock Text="{Binding L.TwoStepVerification}" FontSize="20" FontWeight="SemiBold" />
                                     <TextBlock Text="{Binding TotpCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="{Binding L.TotpPageDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
                                 </StackPanel>
                                 <Button Grid.Column="1" Command="{Binding AddTotpCommand}">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -574,25 +587,104 @@
                                     </StackPanel>
                                 </Button>
                             </Grid>
-                            <ListBox Grid.Row="1" ItemsSource="{Binding TotpItems}">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate x:DataType="models:SecureItem">
-                                        <Border Margin="0,0,0,8" Padding="16" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}">
-                                            <Grid ColumnDefinitions="Auto,*,Auto,Auto" MinHeight="58">
-                                                <ProgressBar Width="54" Height="8" Value="{Binding TotpProgress}" Minimum="0" Maximum="100" VerticalAlignment="Center" />
-                                                <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
-                                                    <TextBlock Text="{Binding Notes}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                </StackPanel>
-                                                <TextBlock Grid.Column="2" Text="{Binding TotpCode}" FontSize="28" FontFamily="Consolas" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,12,0" />
-                                                <Button Grid.Column="3" Command="{Binding #Root.DataContext.CopyTotpCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding #Root.DataContext.L.CopyCode}">
-                                                    <ic:FluentIcon Icon="Copy" FontSize="18" />
-                                                </Button>
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
+                            <Grid Grid.Row="1">
+                                <ListBox ItemsSource="{Binding TotpItems}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="models:SecureItem">
+                                            <Border Margin="0,0,0,8" Padding="16" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}">
+                                                <Border.ContextMenu>
+                                                    <ContextMenu>
+                                                        <MenuItem Header="{Binding #Root.DataContext.L.Copy}" Command="{Binding #Root.DataContext.CopyTotpCommand}" CommandParameter="{Binding}">
+                                                            <MenuItem.Icon>
+                                                                <ic:FluentIcon Icon="Copy" FontSize="16" />
+                                                            </MenuItem.Icon>
+                                                        </MenuItem>
+                                                        <MenuItem Header="{Binding #Root.DataContext.L.Edit}" Command="{Binding #Root.DataContext.EditTotpCommand}" CommandParameter="{Binding}">
+                                                            <MenuItem.Icon>
+                                                                <ic:FluentIcon Icon="Edit" FontSize="16" />
+                                                            </MenuItem.Icon>
+                                                        </MenuItem>
+                                                        <MenuItem Header="{Binding #Root.DataContext.L.Favorite}" Command="{Binding #Root.DataContext.ToggleTotpFavoriteCommand}" CommandParameter="{Binding}">
+                                                            <MenuItem.Icon>
+                                                                <ic:FluentIcon Icon="Star" FontSize="16" />
+                                                            </MenuItem.Icon>
+                                                        </MenuItem>
+                                                        <MenuItem Header="{Binding #Root.DataContext.L.Select}" Command="{Binding #Root.DataContext.ToggleTotpSelectionCommand}" CommandParameter="{Binding}">
+                                                            <MenuItem.Icon>
+                                                                <ic:FluentIcon Icon="CheckmarkCircle" FontSize="16" />
+                                                            </MenuItem.Icon>
+                                                        </MenuItem>
+                                                        <Separator />
+                                                        <MenuItem Header="{Binding #Root.DataContext.L.Delete}" Command="{Binding #Root.DataContext.DeleteTotpCommand}" CommandParameter="{Binding}">
+                                                            <MenuItem.Icon>
+                                                                <ic:FluentIcon Icon="Delete" FontSize="16" />
+                                                            </MenuItem.Icon>
+                                                        </MenuItem>
+                                                    </ContextMenu>
+                                                </Border.ContextMenu>
+                                                <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto" MinHeight="58">
+                                                    <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                                    <Grid Grid.Column="1" Width="52" Height="52" VerticalAlignment="Center">
+                                                        <ProgressBar Width="52" Height="8" Value="{Binding TotpProgress}" Minimum="0" Maximum="100" VerticalAlignment="Bottom" />
+                                                        <Border Width="46" Height="46" CornerRadius="23" Background="{DynamicResource ControlFillColorDefaultBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                                                            <ic:FluentIcon Icon="Key" FontSize="20" Foreground="{DynamicResource AccentFillColorDefaultBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Border>
+                                                    </Grid>
+                                                    <StackPanel Grid.Column="2" Margin="16,0,0,0" VerticalAlignment="Center">
+                                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                                            <ic:FluentIcon Icon="Star" FontSize="16" Foreground="{DynamicResource SystemFillColorCautionBrush}" IsVisible="{Binding IsFavorite}" />
+                                                        </StackPanel>
+                                                        <TextBlock Text="{Binding Notes}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="3" Text="{Binding TotpCode}" FontSize="28" FontFamily="Consolas" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{DynamicResource AccentFillColorDefaultBrush}" />
+                                                    <TextBlock Grid.Column="4" Text="{Binding TotpTimeRemaining}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                                    <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                        <Button Command="{Binding #Root.DataContext.CopyTotpCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding #Root.DataContext.L.CopyCode}">
+                                                            <ic:FluentIcon Icon="Copy" FontSize="18" />
+                                                        </Button>
+                                                        <Button Command="{Binding #Root.DataContext.EditTotpCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding #Root.DataContext.L.Edit}">
+                                                            <ic:FluentIcon Icon="Edit" FontSize="18" />
+                                                        </Button>
+                                                        <Button Command="{Binding #Root.DataContext.ToggleTotpFavoriteCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding #Root.DataContext.L.Favorite}">
+                                                            <ic:FluentIcon Icon="Star" FontSize="18" />
+                                                        </Button>
+                                                        <Button Command="{Binding #Root.DataContext.DeleteTotpCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding #Root.DataContext.L.Delete}">
+                                                            <ic:FluentIcon Icon="Delete" FontSize="18" />
+                                                        </Button>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+
+                                <Border Padding="16,12"
+                                        CornerRadius="12"
+                                        BorderBrush="{DynamicResource CardBorderBrush}"
+                                        BorderThickness="1"
+                                        Background="{DynamicResource CardBackgroundBrush}"
+                                        VerticalAlignment="Bottom"
+                                        HorizontalAlignment="Center"
+                                        Margin="0,0,0,24"
+                                        IsVisible="{Binding HasSelectedTotpItems}">
+                                    <StackPanel Orientation="Horizontal" Spacing="14">
+                                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <ic:FluentIcon Icon="CheckmarkCircle" FontSize="16" Foreground="{DynamicResource AccentFillColorDefaultBrush}" />
+                                            <TextBlock Text="{Binding SelectedTotpCountText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <Border Width="1" Height="24" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
+                                        <Button Command="{Binding FavoriteSelectedTotpCommand}" ToolTip.Tip="{Binding L.BatchFavorite}">
+                                            <ic:FluentIcon Icon="Star" FontSize="18" />
+                                        </Button>
+                                        <Button Command="{Binding DeleteSelectedTotpCommand}" ToolTip.Tip="{Binding L.BatchDelete}">
+                                            <ic:FluentIcon Icon="Delete" FontSize="18" />
+                                        </Button>
+                                        <Border Width="1" Height="24" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
+                                        <Button Command="{Binding ClearTotpSelectionCommand}" Content="{Binding L.Cancel}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
                         </Grid>
 
                         <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsCards}}" RowDefinitions="Auto,*">
@@ -600,6 +692,7 @@
                                 <StackPanel>
                                     <TextBlock Text="{Binding L.Wallet}" FontSize="20" FontWeight="SemiBold" />
                                     <TextBlock Text="{Binding WalletCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="{Binding L.WalletPageDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
                                 </StackPanel>
                                 <Button Grid.Column="1" Command="{Binding AddWalletItemCommand}">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -608,24 +701,158 @@
                                     </StackPanel>
                                 </Button>
                             </Grid>
-                            <ItemsControl Grid.Row="1" ItemsSource="{Binding WalletItems}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="models:SecureItem">
-                                        <Border Width="310" Height="148" Margin="0,0,12,12" Padding="16" CornerRadius="8" Background="#172F7DFF" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1">
-                                            <Grid RowDefinitions="Auto,*,Auto">
-                                                <TextBlock Text="{Binding ItemType}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                                <TextBlock Grid.Row="2" Text="{Binding Notes}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                            <Grid Grid.Row="1" ColumnDefinitions="2*,3*" ColumnSpacing="16">
+                                <Grid>
+                                    <ListBox ItemsSource="{Binding WalletItems}" SelectedItem="{Binding SelectedWalletItem}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate x:DataType="models:SecureItem">
+                                                <Border Margin="0,0,0,8" Padding="16" CornerRadius="8" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1">
+                                                    <Border.ContextMenu>
+                                                        <ContextMenu>
+                                                            <MenuItem Header="{Binding #Root.DataContext.L.PasswordDetails}" Command="{Binding #Root.DataContext.ShowWalletDetailsCommand}" CommandParameter="{Binding}">
+                                                                <MenuItem.Icon>
+                                                                    <ic:FluentIcon Icon="Info" FontSize="16" />
+                                                                </MenuItem.Icon>
+                                                            </MenuItem>
+                                                            <MenuItem Header="{Binding #Root.DataContext.L.Edit}" Command="{Binding #Root.DataContext.EditWalletItemCommand}" CommandParameter="{Binding}">
+                                                                <MenuItem.Icon>
+                                                                    <ic:FluentIcon Icon="Edit" FontSize="16" />
+                                                                </MenuItem.Icon>
+                                                            </MenuItem>
+                                                            <MenuItem Header="{Binding #Root.DataContext.L.Select}" Command="{Binding #Root.DataContext.ToggleWalletSelectionCommand}" CommandParameter="{Binding}">
+                                                                <MenuItem.Icon>
+                                                                    <ic:FluentIcon Icon="CheckmarkCircle" FontSize="16" />
+                                                                </MenuItem.Icon>
+                                                            </MenuItem>
+                                                            <Separator />
+                                                            <MenuItem Header="{Binding #Root.DataContext.L.Delete}" Command="{Binding #Root.DataContext.DeleteWalletItemCommand}" CommandParameter="{Binding}">
+                                                                <MenuItem.Icon>
+                                                                    <ic:FluentIcon Icon="Delete" FontSize="16" />
+                                                                </MenuItem.Icon>
+                                                            </MenuItem>
+                                                        </ContextMenu>
+                                                    </Border.ContextMenu>
+                                                    <Grid ColumnDefinitions="Auto,Auto,*,Auto" MinHeight="56">
+                                                        <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                                        <Border Grid.Column="1" Width="48" Height="48" CornerRadius="8" Background="{DynamicResource AccentFillColorDefaultBrush}">
+                                                            <ic:FluentIcon Icon="WalletCreditCard" FontSize="20" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Border>
+                                                        <StackPanel Grid.Column="2" Margin="14,0,0,0" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{Binding Notes}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                            <Button Command="{Binding #Root.DataContext.ShowWalletDetailsCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding #Root.DataContext.L.PasswordDetails}">
+                                                                <ic:FluentIcon Icon="Info" FontSize="18" />
+                                                            </Button>
+                                                            <Button Command="{Binding #Root.DataContext.EditWalletItemCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding #Root.DataContext.L.Edit}">
+                                                                <ic:FluentIcon Icon="Edit" FontSize="18" />
+                                                            </Button>
+                                                            <Button Command="{Binding #Root.DataContext.DeleteWalletItemCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding #Root.DataContext.L.Delete}">
+                                                                <ic:FluentIcon Icon="Delete" FontSize="18" />
+                                                            </Button>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+
+                                    <Border Padding="16,12"
+                                            CornerRadius="12"
+                                            BorderBrush="{DynamicResource CardBorderBrush}"
+                                            BorderThickness="1"
+                                            Background="{DynamicResource CardBackgroundBrush}"
+                                            VerticalAlignment="Bottom"
+                                            HorizontalAlignment="Center"
+                                            Margin="0,0,0,24"
+                                            IsVisible="{Binding HasSelectedWalletItems}">
+                                        <StackPanel Orientation="Horizontal" Spacing="14">
+                                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                <ic:FluentIcon Icon="CheckmarkCircle" FontSize="16" Foreground="{DynamicResource AccentFillColorDefaultBrush}" />
+                                                <TextBlock Text="{Binding SelectedWalletCountText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                            <Border Width="1" Height="24" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
+                                            <Button Command="{Binding DeleteSelectedWalletItemsCommand}" ToolTip.Tip="{Binding L.BatchDelete}">
+                                                <ic:FluentIcon Icon="Delete" FontSize="18" />
+                                            </Button>
+                                            <Border Width="1" Height="24" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
+                                            <Button Command="{Binding ClearWalletSelectionCommand}" Content="{Binding L.Cancel}" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <Border Grid.Column="1" Padding="18" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}">
+                                    <Grid RowDefinitions="Auto,*,Auto" IsVisible="{Binding HasSelectedWalletItem}">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                                            <Border Width="56" Height="56" CornerRadius="10" Background="{DynamicResource AccentFillColorDefaultBrush}">
+                                                <ic:FluentIcon Icon="WalletCreditCard" FontSize="26" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding SelectedWalletDetails.Title}" FontSize="22" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding SelectedWalletDetails.KindText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                            <Button Grid.Column="2" Command="{Binding EditWalletItemCommand}" CommandParameter="{Binding SelectedWalletItem}" ToolTip.Tip="{Binding L.Edit}">
+                                                <ic:FluentIcon Icon="Edit" FontSize="18" />
+                                            </Button>
+                                        </Grid>
+
+                                        <ScrollViewer Grid.Row="1" Margin="0,18,0,0">
+                                            <StackPanel Spacing="16">
+                                                <Border Padding="20" CornerRadius="12" Background="#172F7DFF" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" MaxWidth="420" HorizontalAlignment="Left">
+                                                    <Grid RowDefinitions="Auto,*,Auto" MinHeight="170">
+                                                        <TextBlock Text="{Binding SelectedWalletDetails.KindText}" FontWeight="SemiBold" />
+                                                        <StackPanel Grid.Row="1" VerticalAlignment="Center" Spacing="4">
+                                                            <TextBlock Text="{Binding SelectedWalletDetails.PrimaryText}" FontSize="24" FontFamily="Consolas" FontWeight="Bold" />
+                                                            <TextBlock Text="{Binding SelectedWalletDetails.SecondaryText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Row="2" Text="{Binding SelectedWalletDetails.ExpiryText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                    </Grid>
+                                                </Border>
+
+                                                <ItemsControl ItemsSource="{Binding SelectedWalletDetails.Fields}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:WalletFieldDisplayItem">
+                                                            <Grid ColumnDefinitions="130,*" Margin="0,0,0,8">
+                                                                <TextBlock Text="{Binding Label}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                                <TextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" />
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+
+                                                <StackPanel Spacing="8">
+                                                    <TextBlock Text="{Binding L.DocumentPhotos}" FontWeight="SemiBold" />
+                                                    <ItemsControl ItemsSource="{Binding SelectedWalletDetails.ImagePaths}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Border Padding="10" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Margin="0,0,0,8">
+                                                                    <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                    <TextBlock Text="{Binding L.NoDocumentPhotos}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding !SelectedWalletDetails.HasImages}" />
+                                                </StackPanel>
+
+                                                <StackPanel Spacing="4">
+                                                    <TextBlock Text="{Binding L.Notes}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding SelectedWalletDetails.Notes}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </ScrollViewer>
+
+                                        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,12,0,0">
+                                            <Button Command="{Binding DeleteWalletItemCommand}" CommandParameter="{Binding SelectedWalletItem}">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <ic:FluentIcon Icon="Delete" FontSize="18" />
+                                                    <TextBlock Text="{Binding L.Delete}" />
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Grid>
                         </Grid>
 
                         <ScrollViewer IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsSettings}}">
@@ -785,9 +1012,199 @@
                             </StackPanel>
                         </ScrollViewer>
 
+                        <ScrollViewer IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsDatabaseManagement}}">
+                            <StackPanel Spacing="16" MaxWidth="980">
+                                <TextBlock Text="{Binding L.LocalDatabaseDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                    <Border Padding="16" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}">
+                                        <StackPanel Spacing="12">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <ic:FluentIcon Icon="Database" FontSize="20" />
+                                                <TextBlock Text="{Binding L.LocalDatabase}" FontWeight="SemiBold" />
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding LocalDatabaseSummaryText}" FontSize="24" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding L.LocalDatabaseDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="8">
+                                                <Button Command="{Binding LoadCommand}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <ic:FluentIcon Icon="ArrowClockwise" FontSize="18" />
+                                                        <TextBlock Text="{Binding L.Refresh}" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Grid.Column="1" Command="{Binding SelectSectionCommand}" CommandParameter="Passwords">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <ic:FluentIcon Icon="Key" FontSize="18" />
+                                                        <TextBlock Text="{Binding L.Passwords}" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Grid.Column="1" Padding="16" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}">
+                                        <StackPanel Spacing="12">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <ic:FluentIcon Icon="Folder" FontSize="20" />
+                                                <TextBlock Text="{Binding L.ExternalDatabases}" FontWeight="SemiBold" />
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding L.ExternalDatabasesDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                                                <Button Command="{Binding SelectSectionCommand}" CommandParameter="Sync" HorizontalContentAlignment="Center">KDBX</Button>
+                                                <Button Grid.Column="1" Command="{Binding CreateMdbxVaultCommand}" HorizontalContentAlignment="Center">MDBX</Button>
+                                                <Button Grid.Column="2" Command="{Binding SelectSectionCommand}" CommandParameter="Sync" HorizontalContentAlignment="Center">Bitwarden</Button>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <fa:FASettingsExpander Header="{Binding L.CloudAndLocalVaults}" Description="{Binding L.CloudAndLocalVaultsDescription}" IsExpanded="True">
+                                    <fa:FASettingsExpander.IconSource>
+                                        <fa:FASymbolIconSource Symbol="Folder" />
+                                    </fa:FASettingsExpander.IconSource>
+                                    <fa:FASettingsExpander.Items>
+                                        <fa:FASettingsExpanderItem Content="{Binding L.MdbxDatabaseCount}" Description="{Binding MdbxDatabaseCountText}">
+                                            <fa:FASettingsExpanderItem.Footer>
+                                                <Button Command="{Binding CreateMdbxVaultCommand}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <ic:FluentIcon Icon="Database" FontSize="20" />
+                                                        <TextBlock Text="{Binding L.CreateMdbxMetadata}" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </fa:FASettingsExpanderItem.Footer>
+                                        </fa:FASettingsExpanderItem>
+                                        <fa:FASettingsExpanderItem Content="{Binding L.MdbxLocalCache}" Description="{Binding L.MdbxLocalCacheDescription}">
+                                            <fa:FASettingsExpanderItem.Footer>
+                                                <ToggleSwitch IsChecked="{Binding MdbxLocalCacheEnabled}" />
+                                            </fa:FASettingsExpanderItem.Footer>
+                                        </fa:FASettingsExpanderItem>
+                                        <fa:FASettingsExpanderItem Content="{Binding L.EnableOneDrive}" Description="{Binding L.EnableOneDriveDescription}">
+                                            <fa:FASettingsExpanderItem.Footer>
+                                                <ToggleSwitch IsChecked="{Binding OneDriveEnabled}" />
+                                            </fa:FASettingsExpanderItem.Footer>
+                                        </fa:FASettingsExpanderItem>
+                                    </fa:FASettingsExpander.Items>
+                                </fa:FASettingsExpander>
+
+                                <Border Padding="0" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}">
+                                    <Grid RowDefinitions="Auto,*" MinHeight="220">
+                                        <Grid Margin="18,16,18,10" ColumnDefinitions="*,Auto">
+                                            <StackPanel Spacing="3">
+                                                <TextBlock Text="{Binding L.RegisteredDatabases}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding VaultSourceCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Command="{Binding LoadCommand}">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <ic:FluentIcon Icon="ArrowClockwise" FontSize="18" />
+                                                    <TextBlock Text="{Binding L.Refresh}" />
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
+
+                                        <ListBox Grid.Row="1" ItemsSource="{Binding VaultSources}" SelectionMode="Single" Margin="8,0,8,8">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:VaultSourceDisplayItem">
+                                                    <Border Padding="8,10">
+                                                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="3">
+                                                            <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                                                            <Border Grid.Column="1" Grid.RowSpan="2" Padding="8,3" CornerRadius="10" Background="{DynamicResource LayerFillColorSubtleBrush}" VerticalAlignment="Top">
+                                                                <TextBlock Text="{Binding Kind}" FontSize="12" />
+                                                            </Border>
+                                                            <TextBlock Grid.Row="1" Text="{Binding LocalPath}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                            <Grid Grid.Row="2" Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                                                <TextBlock Text="{Binding RemoteUrl}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Grid.Column="1" Text="{Binding SyncStatus}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                            </Grid>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </Grid>
+                                </Border>
+
+                                <fa:FASettingsExpander Header="{Binding L.FeatureParityMap}" Description="{Binding L.FeatureParityMapDescription}" IsExpanded="False" ItemsSource="{Binding Capabilities}">
+                                    <fa:FASettingsExpander.IconSource>
+                                        <fa:FASymbolIconSource Symbol="Sync" />
+                                    </fa:FASettingsExpander.IconSource>
+                                    <fa:FASettingsExpander.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:LocalizedPlatformCapability">
+                                            <fa:FASettingsExpanderItem Content="{Binding Title}" Description="{Binding Description}">
+                                                <fa:FASettingsExpanderItem.Footer>
+                                                    <TextBlock Text="{Binding Status}" Margin="16,0,0,0" VerticalAlignment="Center" />
+                                                </fa:FASettingsExpanderItem.Footer>
+                                            </fa:FASettingsExpanderItem>
+                                        </DataTemplate>
+                                    </fa:FASettingsExpander.ItemTemplate>
+                                </fa:FASettingsExpander>
+
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                    <fa:FASettingsExpander Header="{Binding L.ImportData}" Description="{Binding L.ImportDataDescription}" IsExpanded="False">
+                                        <fa:FASettingsExpander.IconSource>
+                                            <fa:FASymbolIconSource Symbol="Folder" />
+                                        </fa:FASettingsExpander.IconSource>
+                                        <StackPanel Spacing="8">
+                                            <TextBox Text="{Binding ImportJsonText}" PlaceholderText="{Binding L.ImportJsonWatermark}" AcceptsReturn="True" MinHeight="100" TextWrapping="Wrap" />
+                                            <Button Command="{Binding ImportDataCommand}" HorizontalAlignment="Left">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <ic:FluentIcon Icon="ArrowUpload" FontSize="20" />
+                                                    <TextBlock Text="{Binding L.Import}" />
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
+                                    </fa:FASettingsExpander>
+
+                                    <fa:FASettingsExpander Grid.Column="1" Header="{Binding L.ExportData}" Description="{Binding L.ExportDataDescription}" IsExpanded="False">
+                                        <fa:FASettingsExpander.IconSource>
+                                            <fa:FASymbolIconSource Symbol="ProtectedDocument" />
+                                        </fa:FASettingsExpander.IconSource>
+                                        <StackPanel Spacing="8">
+                                            <Button Command="{Binding ExportDataCommand}" HorizontalAlignment="Left">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <ic:FluentIcon Icon="ArrowDownload" FontSize="20" />
+                                                    <TextBlock Text="{Binding L.Export}" />
+                                                </StackPanel>
+                                            </Button>
+                                            <TextBox Text="{Binding ExportPreview}" AcceptsReturn="True" MinHeight="100" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </fa:FASettingsExpander>
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+
                         <ScrollViewer IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsSync}}">
                             <StackPanel Spacing="16" MaxWidth="900">
                                 <TextBlock Text="{Binding L.SyncSubtitle}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+
+                                <Border Padding="16" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}">
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                        <Border Width="12" Height="12" CornerRadius="6" Background="{DynamicResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Spacing="3">
+                                            <TextBlock Text="{Binding L.WebDavConnection}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding WebDavConnectionStatusText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                                            <Button Command="{Binding CreateWebDavBackupCommand}" IsEnabled="{Binding !IsWebDavBusy}">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
+                                                    <TextBlock Text="{Binding L.BackupNow}" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Command="{Binding RestoreLatestWebDavBackupCommand}" IsEnabled="{Binding !IsWebDavBusy}">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <ic:FluentIcon Icon="ArrowDownload" FontSize="18" />
+                                                    <TextBlock Text="{Binding L.RestoreLatest}" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Command="{Binding SelectSectionCommand}" CommandParameter="DatabaseManagement">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <ic:FluentIcon Icon="Database" FontSize="18" />
+                                                    <TextBlock Text="{Binding L.DatabaseManagement}" />
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
 
                                 <fa:FASettingsExpander Header="{Binding L.RemoteSync}" Description="{Binding L.RemoteSyncDescription}" IsExpanded="True">
                                     <fa:FASettingsExpander.IconSource>
@@ -809,6 +1226,12 @@
                                         <fa:FASettingsExpanderItem Content="{Binding L.WebDavUsername}" Description="{Binding L.WebDavUsernameDescription}">
                                             <fa:FASettingsExpanderItem.Footer>
                                                 <TextBox Width="260" Text="{Binding WebDavUsername}" />
+                                            </fa:FASettingsExpanderItem.Footer>
+                                        </fa:FASettingsExpanderItem>
+
+                                        <fa:FASettingsExpanderItem Content="{Binding L.WebDavPassword}" Description="{Binding L.WebDavPasswordDescription}">
+                                            <fa:FASettingsExpanderItem.Footer>
+                                                <TextBox Width="260" PasswordChar="*" Text="{Binding WebDavPassword}" />
                                             </fa:FASettingsExpanderItem.Footer>
                                         </fa:FASettingsExpanderItem>
 
@@ -843,6 +1266,112 @@
                                         </fa:FASettingsExpanderItem>
                                     </fa:FASettingsExpander.Items>
                                 </fa:FASettingsExpander>
+
+                                <fa:FASettingsExpander Header="{Binding L.WebDavBackupOptions}" Description="{Binding WebDavBackupOptionsSummaryText}" IsExpanded="True">
+                                    <fa:FASettingsExpander.IconSource>
+                                        <fa:FASymbolIconSource Symbol="Save" />
+                                    </fa:FASettingsExpander.IconSource>
+                                    <fa:FASettingsExpander.Items>
+                                        <fa:FASettingsExpanderItem Content="{Binding L.IncludePasswords}" Description="{Binding L.WebDavBackupOptionsDescription}">
+                                            <fa:FASettingsExpanderItem.Footer>
+                                                <CheckBox IsChecked="{Binding WebDavBackupIncludePasswords}" />
+                                            </fa:FASettingsExpanderItem.Footer>
+                                        </fa:FASettingsExpanderItem>
+
+                                        <fa:FASettingsExpanderItem Content="{Binding L.IncludeTotp}">
+                                            <fa:FASettingsExpanderItem.Footer>
+                                                <CheckBox IsChecked="{Binding WebDavBackupIncludeTotp}" />
+                                            </fa:FASettingsExpanderItem.Footer>
+                                        </fa:FASettingsExpanderItem>
+
+                                        <fa:FASettingsExpanderItem Content="{Binding L.IncludeNotes}">
+                                            <fa:FASettingsExpanderItem.Footer>
+                                                <CheckBox IsChecked="{Binding WebDavBackupIncludeNotes}" />
+                                            </fa:FASettingsExpanderItem.Footer>
+                                        </fa:FASettingsExpanderItem>
+
+                                        <fa:FASettingsExpanderItem Content="{Binding L.IncludeCards}">
+                                            <fa:FASettingsExpanderItem.Footer>
+                                                <CheckBox IsChecked="{Binding WebDavBackupIncludeCards}" />
+                                            </fa:FASettingsExpanderItem.Footer>
+                                        </fa:FASettingsExpanderItem>
+
+                                        <fa:FASettingsExpanderItem Content="{Binding L.IncludeDocuments}">
+                                            <fa:FASettingsExpanderItem.Footer>
+                                                <CheckBox IsChecked="{Binding WebDavBackupIncludeDocuments}" />
+                                            </fa:FASettingsExpanderItem.Footer>
+                                        </fa:FASettingsExpanderItem>
+
+                                        <fa:FASettingsExpanderItem Content="{Binding L.IncludeImages}">
+                                            <fa:FASettingsExpanderItem.Footer>
+                                                <CheckBox IsChecked="{Binding WebDavBackupIncludeImages}" />
+                                            </fa:FASettingsExpanderItem.Footer>
+                                        </fa:FASettingsExpanderItem>
+
+                                        <fa:FASettingsExpanderItem Content="{Binding L.IncludeCategories}">
+                                            <fa:FASettingsExpanderItem.Footer>
+                                                <CheckBox IsChecked="{Binding WebDavBackupIncludeCategories}" />
+                                            </fa:FASettingsExpanderItem.Footer>
+                                        </fa:FASettingsExpanderItem>
+
+                                        <fa:FASettingsExpanderItem Content="{Binding L.EncryptBackup}" Description="{Binding L.EncryptBackupDescription}">
+                                            <fa:FASettingsExpanderItem.Footer>
+                                                <ToggleSwitch IsChecked="{Binding WebDavBackupEncryptionEnabled}" />
+                                            </fa:FASettingsExpanderItem.Footer>
+                                        </fa:FASettingsExpanderItem>
+
+                                        <fa:FASettingsExpanderItem Content="{Binding L.BackupEncryptionPassword}" Description="{Binding L.BackupEncryptionPasswordDescription}">
+                                            <fa:FASettingsExpanderItem.Footer>
+                                                <TextBox Width="260" PasswordChar="*" Text="{Binding WebDavBackupEncryptionPassword}" />
+                                            </fa:FASettingsExpanderItem.Footer>
+                                        </fa:FASettingsExpanderItem>
+                                    </fa:FASettingsExpander.Items>
+                                </fa:FASettingsExpander>
+
+                                <Border Padding="0" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}">
+                                    <Grid RowDefinitions="Auto,*" MinHeight="260">
+                                        <Grid Margin="18,16,18,10" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                            <StackPanel Spacing="3">
+                                                <TextBlock Text="{Binding L.BackupHistory}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding WebDavBackupHistoryCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Command="{Binding LoadWebDavBackupsCommand}" IsEnabled="{Binding !IsLoadingWebDavBackups}">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <ic:FluentIcon Icon="ArrowClockwise" FontSize="18" />
+                                                    <TextBlock Text="{Binding L.Refresh}" />
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
+
+                                        <Grid Grid.Row="1">
+                                            <TextBlock Text="{Binding L.NoBackupsFound}"
+                                                       IsVisible="{Binding !HasWebDavBackupHistory}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            <ListBox ItemsSource="{Binding WebDavBackupHistory}" IsVisible="{Binding HasWebDavBackupHistory}" SelectionMode="Single" Margin="8,0,8,8">
+                                                <ListBox.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:WebDavBackupHistoryItem">
+                                                        <Border Padding="8,10">
+                                                            <Grid ColumnDefinitions="*,Auto,Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="3">
+                                                                <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" />
+                                                                <TextBlock Grid.Column="1" Text="{Binding SizeText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                                <Button Grid.Column="2" Grid.RowSpan="2" Command="{Binding #Root.DataContext.RestoreWebDavBackupCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding #Root.DataContext.L.OperationRestore}">
+                                                                    <ic:FluentIcon Icon="ArrowDownload" FontSize="18" />
+                                                                </Button>
+                                                                <Button Grid.Column="3" Grid.RowSpan="2" Command="{Binding #Root.DataContext.DeleteWebDavBackupCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding #Root.DataContext.L.Delete}">
+                                                                    <ic:FluentIcon Icon="Delete" FontSize="18" />
+                                                                </Button>
+                                                                <TextBlock Grid.Row="1" Text="{Binding DateString}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Path}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" MaxWidth="260" />
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ListBox.ItemTemplate>
+                                            </ListBox>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
 
                                 <fa:FASettingsExpander Header="{Binding L.CloudAndLocalVaults}" Description="{Binding L.CloudAndLocalVaultsDescription}" IsExpanded="True">
                                     <fa:FASettingsExpander.IconSource>
@@ -1033,5 +1562,87 @@
                 </Grid>
             </fa:FANavigationView>
         </Grid>
+
+        <Border Grid.Row="2"
+                IsVisible="{Binding IsUnlocked}"
+                Background="{DynamicResource LayerFillColorDefaultBrush}"
+                BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="0,1,0,0">
+            <Border Padding="2,0" ClipToBounds="True">
+                <Grid ColumnSpacing="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                <Button Classes="StatusBarButton"
+                        Command="{Binding SelectSectionCommand}"
+                        CommandParameter="Passwords"
+                        ToolTip.Tip="{Binding L.Passwords}">
+                    <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                        <TextBlock Text="&#xE895;" FontFamily="Segoe Fluent Icons" FontSize="12" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                        <TextBlock Text="Monica" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                    </StackPanel>
+                </Button>
+
+                <Button Grid.Column="1"
+                        Classes="StatusBarButton"
+                        Command="{Binding SelectSectionCommand}"
+                        CommandParameter="Sync"
+                        ToolTip.Tip="{Binding L.SyncAndBackup}">
+                    <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                        <TextBlock Text="&#xE777;" FontFamily="Segoe Fluent Icons" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Text="{Binding ShellVaultText}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Button>
+
+                <Button Grid.Column="2"
+                        Classes="StatusBarButton"
+                        Command="{Binding SelectSectionCommand}"
+                        CommandParameter="Sync"
+                        ToolTip.Tip="{Binding L.SyncAndBackup}">
+                    <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                        <TextBlock Text="&#xE7BA;" FontFamily="Segoe Fluent Icons" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Text="{Binding ShellSyncText}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Button>
+
+                <Button Grid.Column="3"
+                        Classes="StatusBarButton"
+                        Command="{Binding LoadCommand}"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Stretch"
+                        ToolTip.Tip="{Binding L.Refresh}">
+                    <TextBlock Text="{Binding ShellPageText}"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               TextTrimming="CharacterEllipsis" />
+                </Button>
+
+                <TextBlock Grid.Column="4" Text="Ln 1, Col 1" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" Margin="8,0" />
+                <TextBlock Grid.Column="5" Text="Spaces: 4" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" Margin="8,0" />
+                <TextBlock Grid.Column="6" Text="UTF-8" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" Margin="8,0" />
+                <TextBlock Grid.Column="7" Text="CRLF" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" Margin="8,0" />
+
+                <Button Grid.Column="8"
+                        Classes="StatusBarButton"
+                        Command="{Binding SelectSectionCommand}"
+                        CommandParameter="Settings"
+                        ToolTip.Tip="{Binding L.Settings}">
+                    <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding ShellPlatformText}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Text="&#xE713;" FontFamily="Segoe Fluent Icons" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Button>
+                </Grid>
+            </Border>
+        </Border>
     </Grid>
 </Window>

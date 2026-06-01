@@ -32,6 +32,7 @@ public interface ILocalizationService : INotifyPropertyChanged
     string CompromisedPasswords { get; }
     string CheckCompromisedPasswords { get; }
     string SyncAndBackup { get; }
+    string DatabaseManagement { get; }
     string Settings { get; }
     string Folders { get; }
     string Personal { get; }
@@ -44,6 +45,7 @@ public interface ILocalizationService : INotifyPropertyChanged
     string Export { get; }
     string UnlockMonica { get; }
     string CreateMonicaVault { get; }
+    string LegacyVaultDetected { get; }
     string UnlockDescription { get; }
     string CreateVaultDescription { get; }
     string MasterPasswordWatermark { get; }
@@ -89,6 +91,7 @@ public interface ILocalizationService : INotifyPropertyChanged
     string RestorePassword { get; }
     string DeletePermanently { get; }
     string Delete { get; }
+    string Select { get; }
     string Save { get; }
     string Cancel { get; }
     string NoFolder { get; }
@@ -160,12 +163,47 @@ public interface ILocalizationService : INotifyPropertyChanged
     string Close { get; }
     string TwoStepVerification { get; }
     string AddAuthenticator { get; }
+    string EditAuthenticator { get; }
+    string TotpPageDescription { get; }
+    string AdvancedTotpOptions { get; }
+    string TotpSecretHint { get; }
     string CopyCode { get; }
     string Wallet { get; }
     string AddItem { get; }
+    string AddWalletItem { get; }
+    string EditWalletItem { get; }
+    string WalletPageDescription { get; }
+    string Document { get; }
+    string BankCard { get; }
+    string DocumentNumber { get; }
+    string FullName { get; }
+    string IssuedDate { get; }
+    string ExpiryDate { get; }
+    string IssuedBy { get; }
+    string Nationality { get; }
+    string AdditionalInfo { get; }
+    string CardNumber { get; }
+    string CardholderName { get; }
+    string Expiry { get; }
+    string ExpiryMonth { get; }
+    string ExpiryYear { get; }
+    string BankName { get; }
+    string BillingAddress { get; }
+    string CardBrand { get; }
+    string DocumentPhotos { get; }
+    string NoDocumentPhotos { get; }
+    string ImagePathsWatermark { get; }
+    string ImagePathsDescription { get; }
     string DesktopEquivalents { get; }
     string DesktopEquivalentsMessage { get; }
     string CreateMdbxMetadata { get; }
+    string LocalDatabase { get; }
+    string LocalDatabaseDescription { get; }
+    string ExternalDatabases { get; }
+    string ExternalDatabasesDescription { get; }
+    string MdbxDatabaseCount { get; }
+    string RegisteredDatabases { get; }
+    string WebDavConnection { get; }
     string FeatureParityMap { get; }
     string FeatureParityMapDescription { get; }
     string ExportPreview { get; }
@@ -245,8 +283,25 @@ public interface ILocalizationService : INotifyPropertyChanged
     string WebDavServerUrlDescription { get; }
     string WebDavUsername { get; }
     string WebDavUsernameDescription { get; }
+    string WebDavPassword { get; }
+    string WebDavPasswordDescription { get; }
     string WebDavRemotePath { get; }
     string WebDavRemotePathDescription { get; }
+    string WebDavBackupOptions { get; }
+    string WebDavBackupOptionsDescription { get; }
+    string BackupNow { get; }
+    string RestoreLatest { get; }
+    string IncludePasswords { get; }
+    string IncludeTotp { get; }
+    string IncludeNotes { get; }
+    string IncludeCards { get; }
+    string IncludeDocuments { get; }
+    string IncludeImages { get; }
+    string IncludeCategories { get; }
+    string EncryptBackup { get; }
+    string EncryptBackupDescription { get; }
+    string BackupEncryptionPassword { get; }
+    string BackupEncryptionPasswordDescription { get; }
     string SyncOnStartup { get; }
     string SyncOnStartupDescription { get; }
     string SyncAfterChanges { get; }
@@ -265,6 +320,8 @@ public interface ILocalizationService : INotifyPropertyChanged
     string ImportDataDescription { get; }
     string ExportData { get; }
     string ExportDataDescription { get; }
+    string BackupHistory { get; }
+    string NoBackupsFound { get; }
     string Available { get; }
     string DesktopEquivalent { get; }
     string PlatformLimited { get; }
@@ -340,6 +397,7 @@ public sealed class LocalizationService : ILocalizationService
     public string CompromisedPasswords => Text();
     public string CheckCompromisedPasswords => Text();
     public string SyncAndBackup => Text();
+    public string DatabaseManagement => Text();
     public string Settings => Text();
     public string Folders => Text();
     public string Personal => Text();
@@ -352,6 +410,7 @@ public sealed class LocalizationService : ILocalizationService
     public string Export => Text();
     public string UnlockMonica => Text();
     public string CreateMonicaVault => Text();
+    public string LegacyVaultDetected => Text();
     public string UnlockDescription => Text();
     public string CreateVaultDescription => Text();
     public string MasterPasswordWatermark => Text();
@@ -397,6 +456,7 @@ public sealed class LocalizationService : ILocalizationService
     public string RestorePassword => Text();
     public string DeletePermanently => Text();
     public string Delete => Text();
+    public string Select => Text();
     public string Save => Text();
     public string Cancel => Text();
     public string NoFolder => Text();
@@ -468,12 +528,47 @@ public sealed class LocalizationService : ILocalizationService
     public string Close => Text();
     public string TwoStepVerification => Text();
     public string AddAuthenticator => Text();
+    public string EditAuthenticator => Text();
+    public string TotpPageDescription => Text();
+    public string AdvancedTotpOptions => Text();
+    public string TotpSecretHint => Text();
     public string CopyCode => Text();
     public string Wallet => Text();
     public string AddItem => Text();
+    public string AddWalletItem => Text();
+    public string EditWalletItem => Text();
+    public string WalletPageDescription => Text();
+    public string Document => Text();
+    public string BankCard => Text();
+    public string DocumentNumber => Text();
+    public string FullName => Text();
+    public string IssuedDate => Text();
+    public string ExpiryDate => Text();
+    public string IssuedBy => Text();
+    public string Nationality => Text();
+    public string AdditionalInfo => Text();
+    public string CardNumber => Text();
+    public string CardholderName => Text();
+    public string Expiry => Text();
+    public string ExpiryMonth => Text();
+    public string ExpiryYear => Text();
+    public string BankName => Text();
+    public string BillingAddress => Text();
+    public string CardBrand => Text();
+    public string DocumentPhotos => Text();
+    public string NoDocumentPhotos => Text();
+    public string ImagePathsWatermark => Text();
+    public string ImagePathsDescription => Text();
     public string DesktopEquivalents => Text();
     public string DesktopEquivalentsMessage => Text();
     public string CreateMdbxMetadata => Text();
+    public string LocalDatabase => Text();
+    public string LocalDatabaseDescription => Text();
+    public string ExternalDatabases => Text();
+    public string ExternalDatabasesDescription => Text();
+    public string MdbxDatabaseCount => Text();
+    public string RegisteredDatabases => Text();
+    public string WebDavConnection => Text();
     public string FeatureParityMap => Text();
     public string FeatureParityMapDescription => Text();
     public string ExportPreview => Text();
@@ -553,8 +648,25 @@ public sealed class LocalizationService : ILocalizationService
     public string WebDavServerUrlDescription => Text();
     public string WebDavUsername => Text();
     public string WebDavUsernameDescription => Text();
+    public string WebDavPassword => Text();
+    public string WebDavPasswordDescription => Text();
     public string WebDavRemotePath => Text();
     public string WebDavRemotePathDescription => Text();
+    public string WebDavBackupOptions => Text();
+    public string WebDavBackupOptionsDescription => Text();
+    public string BackupNow => Text();
+    public string RestoreLatest => Text();
+    public string IncludePasswords => Text();
+    public string IncludeTotp => Text();
+    public string IncludeNotes => Text();
+    public string IncludeCards => Text();
+    public string IncludeDocuments => Text();
+    public string IncludeImages => Text();
+    public string IncludeCategories => Text();
+    public string EncryptBackup => Text();
+    public string EncryptBackupDescription => Text();
+    public string BackupEncryptionPassword => Text();
+    public string BackupEncryptionPasswordDescription => Text();
     public string SyncOnStartup => Text();
     public string SyncOnStartupDescription => Text();
     public string SyncAfterChanges => Text();
@@ -573,6 +685,8 @@ public sealed class LocalizationService : ILocalizationService
     public string ImportDataDescription => Text();
     public string ExportData => Text();
     public string ExportDataDescription => Text();
+    public string BackupHistory => Text();
+    public string NoBackupsFound => Text();
     public string Available => Text();
     public string DesktopEquivalent => Text();
     public string PlatformLimited => Text();
@@ -654,6 +768,7 @@ public sealed class LocalizationService : ILocalizationService
         ["MediumSeverity"] = "Medium",
         ["LowSeverity"] = "Low",
         ["SyncAndBackup"] = "Sync and Backup",
+        ["DatabaseManagement"] = "Database Management",
         ["Settings"] = "Settings",
         ["Folders"] = "Folders",
         ["Personal"] = "Personal",
@@ -666,6 +781,7 @@ public sealed class LocalizationService : ILocalizationService
         ["Export"] = "Export",
         ["UnlockMonica"] = "Unlock Monica",
         ["CreateMonicaVault"] = "Create Monica Vault",
+        ["LegacyVaultDetected"] = "Monica for Windows vault detected",
         ["UnlockDescription"] = "Use your master password to open the Avalonia desktop vault.",
         ["CreateVaultDescription"] = "Choose a master password. It will be required every time this desktop vault opens.",
         ["MasterPasswordWatermark"] = "Master password",
@@ -717,6 +833,7 @@ public sealed class LocalizationService : ILocalizationService
         ["RestorePassword"] = "Restore password",
         ["DeletePermanently"] = "Delete permanently",
         ["Delete"] = "Delete",
+        ["Select"] = "Select",
         ["Save"] = "Save",
         ["Cancel"] = "Cancel",
         ["NoFolder"] = "No folder",
@@ -788,12 +905,58 @@ public sealed class LocalizationService : ILocalizationService
         ["Close"] = "Close",
         ["TwoStepVerification"] = "Two-Step Verification",
         ["AddAuthenticator"] = "Add Authenticator",
+        ["EditAuthenticator"] = "Edit Authenticator",
+        ["TotpPageDescription"] = "TOTP authenticators with copy, edit, favorite, delete, context menu, and batch actions.",
+        ["AdvancedTotpOptions"] = "Advanced options",
+        ["TotpSecretHint"] = "Paste a Base32 secret or otpauth URI. Monica stores the normalized TOTP metadata in the local vault.",
+        ["TotpTypeTotp"] = "TOTP (time based)",
+        ["TotpTypeHotp"] = "HOTP (counter based)",
+        ["TotpTypeSteam"] = "Steam Guard",
         ["CopyCode"] = "Copy code",
         ["Wallet"] = "Wallet",
         ["AddItem"] = "Add Item",
+        ["AddWalletItem"] = "Add wallet item",
+        ["EditWalletItem"] = "Edit wallet item",
+        ["WalletPageDescription"] = "Cards and identity documents with edit, details, context menu, image paths, and batch delete.",
+        ["Document"] = "Document",
+        ["BankCard"] = "Bank card",
+        ["DocumentNumber"] = "Document number",
+        ["FullName"] = "Full name",
+        ["IssuedDate"] = "Issued date",
+        ["ExpiryDate"] = "Expiry date",
+        ["IssuedBy"] = "Issued by",
+        ["Nationality"] = "Nationality",
+        ["AdditionalInfo"] = "Additional info",
+        ["CardNumber"] = "Card number",
+        ["CardholderName"] = "Cardholder name",
+        ["Expiry"] = "Expiry",
+        ["ExpiryMonth"] = "Expiry month",
+        ["ExpiryYear"] = "Expiry year",
+        ["BankName"] = "Bank name",
+        ["BillingAddress"] = "Billing address",
+        ["CardBrand"] = "Brand",
+        ["DocumentPhotos"] = "Document photos",
+        ["NoDocumentPhotos"] = "No document photos",
+        ["ImagePathsWatermark"] = "Front image path\nBack image path",
+        ["ImagePathsDescription"] = "Enter one local image path per line. File picking and encrypted image storage will use this same imagePaths schema.",
+        ["DocumentTypeIdCard"] = "ID card",
+        ["DocumentTypePassport"] = "Passport",
+        ["DocumentTypeDriverLicense"] = "Driver license",
+        ["DocumentTypeSocialSecurity"] = "Social security card",
+        ["DocumentTypeOther"] = "Other document",
+        ["CardTypeDebit"] = "Debit card",
+        ["CardTypeCredit"] = "Credit card",
+        ["CardTypePrepaid"] = "Prepaid card",
         ["DesktopEquivalents"] = "Desktop equivalents",
         ["DesktopEquivalentsMessage"] = "Android Autofill, IME, Accessibility and Credential Provider features are represented through quick search, clipboard, tray/browser extension boundaries, or platform-limited status.",
         ["CreateMdbxMetadata"] = "Create MDBX Metadata",
+        ["LocalDatabase"] = "Local database",
+        ["LocalDatabaseDescription"] = "Avalonia uses the Monica v68 SQLite schema as the canonical desktop vault.",
+        ["ExternalDatabases"] = "External databases",
+        ["ExternalDatabasesDescription"] = "KeePass KDBX, MDBX, Bitwarden and WebDAV sources are exposed through platform-neutral services.",
+        ["MdbxDatabaseCount"] = "MDBX vault metadata",
+        ["RegisteredDatabases"] = "Registered databases",
+        ["WebDavConnection"] = "WebDAV connection",
         ["FeatureParityMap"] = "Feature parity map",
         ["ExportPreview"] = "Export Preview",
         ["ImportMonicaJson"] = "Import Monica JSON",
@@ -877,8 +1040,25 @@ public sealed class LocalizationService : ILocalizationService
         ["WebDavServerUrlDescription"] = "Base HTTPS URL of the WebDAV server.",
         ["WebDavUsername"] = "Username",
         ["WebDavUsernameDescription"] = "Account name Monica uses when connecting to the WebDAV endpoint.",
+        ["WebDavPassword"] = "Password",
+        ["WebDavPasswordDescription"] = "Password or app password used for WebDAV Basic authentication.",
         ["WebDavRemotePath"] = "Remote path",
         ["WebDavRemotePathDescription"] = "Folder path where Monica stores vault backup files.",
+        ["WebDavBackupOptions"] = "Backup options",
+        ["WebDavBackupOptionsDescription"] = "Choose which Monica data goes into manual WebDAV backups.",
+        ["BackupNow"] = "Backup now",
+        ["RestoreLatest"] = "Restore latest",
+        ["IncludePasswords"] = "Passwords",
+        ["IncludeTotp"] = "Authenticators",
+        ["IncludeNotes"] = "Notes",
+        ["IncludeCards"] = "Bank cards",
+        ["IncludeDocuments"] = "Documents",
+        ["IncludeImages"] = "Image references",
+        ["IncludeCategories"] = "Folders",
+        ["EncryptBackup"] = "Encrypt backup",
+        ["EncryptBackupDescription"] = "Protect the WebDAV backup package with a separate backup password.",
+        ["BackupEncryptionPassword"] = "Backup password",
+        ["BackupEncryptionPasswordDescription"] = "Required for encrypted backup and restore.",
         ["SyncOnStartup"] = "Sync on startup",
         ["SyncOnStartupDescription"] = "Pull remote changes when the desktop vault is opened.",
         ["SyncAfterChanges"] = "Sync after local changes",
@@ -897,6 +1077,8 @@ public sealed class LocalizationService : ILocalizationService
         ["ImportDataDescription"] = "Bring Monica JSON packages or password CSV records into this vault.",
         ["ExportData"] = "Export data",
         ["ExportDataDescription"] = "Prepare readable Monica JSON and password CSV previews before saving elsewhere.",
+        ["BackupHistory"] = "Backup history",
+        ["NoBackupsFound"] = "No backup files found.",
         ["FeatureParityMapDescription"] = "Desktop availability for Android-originated Monica features.",
         ["Available"] = "Available",
         ["DesktopEquivalent"] = "Desktop equivalent",
@@ -957,8 +1139,53 @@ public sealed class LocalizationService : ILocalizationService
         ["MinuteFormat"] = "{0} min",
         ["SecondFormat"] = "{0} sec",
         ["PasswordCountFormat"] = "{0} items",
+        ["DatabaseSummaryFormat"] = "{0} passwords, {1} notes, {2} authenticators, {3} wallet items",
+        ["MdbxDatabaseCountFormat"] = "{0} MDBX metadata record(s)",
+        ["VaultSourceCountFormat"] = "{0} registered source(s)",
+        ["WebDavConfiguredFormat"] = "Configured for {0}",
+        ["WebDavDisabled"] = "WebDAV is disabled. Local vault operations remain available.",
+        ["EnableWebDavFirst"] = "Enable WebDAV and configure the server before loading backups.",
+        ["WebDavServerUrlRequired"] = "Enter a valid WebDAV server URL.",
+        ["WebDavBackupHistoryCountFormat"] = "{0} backup file(s)",
+        ["LoadedWebDavBackupsFormat"] = "Loaded {0} WebDAV backup file(s).",
+        ["WebDavBackupHistoryFailedFormat"] = "WebDAV backup history failed: {0}",
+        ["WebDavBackupOptionsSummaryFormat"] = "{0} data group(s), {1}",
+        ["Encrypted"] = "encrypted",
+        ["PlainJson"] = "plain Monica JSON",
+        ["SelectWebDavBackupContent"] = "Select at least one WebDAV backup data group.",
+        ["WebDavEncryptionPasswordRequired"] = "Enter the backup encryption password.",
+        ["CreatedWebDavBackupFormat"] = "Created WebDAV backup {0}.",
+        ["CreateWebDavBackupFailedFormat"] = "Create WebDAV backup failed: {0}",
+        ["RestoredWebDavBackupFormat"] = "Restored WebDAV backup {0}: {1} passwords, {2} secure items and {3} folders imported.",
+        ["RestoreWebDavBackupFailedFormat"] = "Restore WebDAV backup failed: {0}",
+        ["DeletedWebDavBackupFormat"] = "Deleted WebDAV backup {0}.",
+        ["DeleteWebDavBackupFailedFormat"] = "Delete WebDAV backup failed: {0}",
+        ["UnknownDate"] = "Unknown date",
+        ["UnknownSize"] = "Unknown size",
+        ["CanonicalVault"] = "Monica v68 SQLite canonical vault",
+        ["LocalOnly"] = "Local only",
+        ["NotConfigured"] = "Not configured",
+        ["KeePassSourceNameFormat"] = "KeePass source #{0}",
+        ["BitwardenSourceNameFormat"] = "Bitwarden source #{0}",
+        ["EntryCountFormat"] = "{0} entry record(s)",
+        ["PendingSyncCountFormat"] = "{0} pending local change(s)",
+        ["NoPendingChanges"] = "No pending changes",
+        ["AutomaticSync"] = "Automatic sync",
+        ["StartupSync"] = "Sync on startup",
+        ["ChangeSync"] = "Sync after changes",
+        ["ManualSync"] = "Manual sync",
+        ["Synced"] = "Synced",
+        ["Syncing"] = "Syncing",
+        ["Pending"] = "Pending",
+        ["PendingUpload"] = "Pending upload",
+        ["RemoteChanged"] = "Remote changed",
+        ["Conflict"] = "Conflict",
+        ["Failed"] = "Failed",
+        ["None"] = "None",
         ["ArchivedPasswordCountFormat"] = "{0} archived passwords",
         ["SelectedPasswordCountFormat"] = "{0} selected",
+        ["SelectedTotpCountFormat"] = "{0} selected",
+        ["SelectedWalletCountFormat"] = "{0} selected",
         ["DeletedPasswordCountFormat"] = "{0} deleted passwords",
         ["NoteCountFormat"] = "{0} notes",
         ["TotpCountFormat"] = "{0} authenticators",
@@ -967,6 +1194,8 @@ public sealed class LocalizationService : ILocalizationService
         ["Locked"] = "Locked",
         ["VaultLocked"] = "Vault locked",
         ["FirstRunCreateMasterPassword"] = "First run: create a master password.",
+        ["LegacyVaultImportRequired"] = "A Monica for Windows vault was detected. Import is required before Avalonia can use this path.",
+        ["LegacyVaultImportPromptFormat"] = "Found legacy data at {0}. Monica by Avalonia will not modify this PascalCase database automatically. A one-time import flow must migrate it into the v68 snake_case schema first.",
         ["VaultMetadataLoadFailedFormat"] = "Vault metadata could not be loaded: {0}",
         ["SettingsLoaded"] = "Settings loaded",
         ["SettingsSaved"] = "Settings saved",
@@ -979,6 +1208,8 @@ public sealed class LocalizationService : ILocalizationService
         ["VaultLoadFailedFormat"] = "Vault load failed: {0}",
         ["CreatedPasswordFormat"] = "Created {0}",
         ["UpdatedPasswordFormat"] = "Updated {0}",
+        ["SavedTotpFormat"] = "Saved authenticator {0}",
+        ["SavedWalletItemFormat"] = "Saved wallet item {0}",
         ["ArchivedPasswordFormat"] = "Archived {0}",
         ["UnarchivedPasswordFormat"] = "Unarchived {0}",
         ["RestoredPasswordFormat"] = "Restored {0}",
@@ -997,11 +1228,21 @@ public sealed class LocalizationService : ILocalizationService
         ["PasswordHistoryUnavailable"] = "Password history is unavailable.",
         ["PasswordHistoryLastUsedFormat"] = "Last used: {0}",
         ["FavoritedPasswordCountFormat"] = "Favorited {0} passwords",
+        ["FavoritedTotpFormat"] = "Favorited authenticator {0}",
+        ["UnfavoritedTotpFormat"] = "Removed favorite from authenticator {0}",
+        ["FavoritedTotpCountFormat"] = "Favorited {0} authenticators",
         ["ArchivedSelectedPasswordsFormat"] = "Archived {0} selected passwords",
         ["StackedPasswordCountFormat"] = "Stacked {0} passwords",
         ["MovedToRecycleBinFormat"] = "Moved {0} to recycle bin",
         ["MovedSelectedPasswordsToRecycleBinFormat"] = "Moved {0} selected passwords to recycle bin",
+        ["MovedSelectedTotpToRecycleBinFormat"] = "Moved {0} selected authenticators to recycle bin",
+        ["MovedSelectedWalletItemsToRecycleBinFormat"] = "Moved {0} selected wallet items to recycle bin",
         ["MovedSelectedPasswordsToFolderFormat"] = "Moved {0} selected passwords to {1}",
+        ["AuthenticatorTitleRequired"] = "Enter an authenticator title.",
+        ["TotpSecretRequired"] = "Enter a TOTP secret.",
+        ["DocumentNumberRequired"] = "Enter a document number.",
+        ["CardNumberRequired"] = "Enter a card number.",
+        ["BoundPasswordMissing"] = "The password bound to this authenticator could not be found.",
         ["FolderNameRequired"] = "Enter a folder name.",
         ["CreatedFolderFormat"] = "Created folder {0}",
         ["SelectedFolderFormat"] = "Selected folder {0}",
@@ -1030,6 +1271,7 @@ public sealed class LocalizationService : ILocalizationService
         ["ExportPrepared"] = "Prepared Monica JSON export preview",
         ["ImportJsonRequired"] = "Paste Monica JSON before importing.",
         ["ImportedMonicaJsonFormat"] = "Imported {0} passwords and {1} secure items.",
+        ["ImportedMonicaJsonWithCategoriesFormat"] = "Imported {0} passwords, {1} secure items and {2} folders.",
         ["ImportCsvRequired"] = "Paste password CSV before importing.",
         ["ImportedPasswordCsvFormat"] = "Imported {0} passwords from CSV.",
         ["ExportedPasswordCsv"] = "Prepared password CSV export preview",
@@ -1047,6 +1289,7 @@ public sealed class LocalizationService : ILocalizationService
         ["Cards"] = "卡包",
         ["Generator"] = "生成器",
         ["SyncAndBackup"] = "同步与备份",
+        ["DatabaseManagement"] = "数据库管理",
         ["Settings"] = "设置",
         ["Folders"] = "文件夹",
         ["Personal"] = "个人",
@@ -1054,6 +1297,7 @@ public sealed class LocalizationService : ILocalizationService
         ["Export"] = "导出",
         ["UnlockMonica"] = "解锁 Monica",
         ["CreateMonicaVault"] = "创建 Monica 保险库",
+        ["LegacyVaultDetected"] = "检测到 Monica for Windows 保险库",
         ["UnlockDescription"] = "使用主密码打开 Avalonia 桌面保险库。",
         ["CreateVaultDescription"] = "设置一个主密码。之后每次打开桌面保险库都需要它。",
         ["MasterPasswordWatermark"] = "主密码",
@@ -1127,6 +1371,13 @@ public sealed class LocalizationService : ILocalizationService
         ["DesktopEquivalents"] = "桌面等价能力",
         ["DesktopEquivalentsMessage"] = "Android 的自动填充、输入法、无障碍和凭据提供程序能力，在桌面端通过快速搜索、剪贴板、托盘/浏览器扩展接口或平台受限状态呈现。",
         ["CreateMdbxMetadata"] = "创建 MDBX 元数据",
+        ["LocalDatabase"] = "本地数据库",
+        ["LocalDatabaseDescription"] = "Avalonia 使用 Monica v68 SQLite 架构作为桌面端主保险库。",
+        ["ExternalDatabases"] = "外部数据库",
+        ["ExternalDatabasesDescription"] = "KeePass KDBX、MDBX、Bitwarden 与 WebDAV 来源通过平台无关服务接入。",
+        ["MdbxDatabaseCount"] = "MDBX 保险库元数据",
+        ["RegisteredDatabases"] = "已登记数据库",
+        ["WebDavConnection"] = "WebDAV 连接",
         ["FeatureParityMap"] = "功能对齐表",
         ["ExportPreview"] = "导出预览",
         ["PasswordGenerator"] = "密码生成器",
@@ -1172,6 +1423,8 @@ public sealed class LocalizationService : ILocalizationService
         ["EnableWebDav"] = "启用 WebDAV 同步",
         ["WebDavServerUrl"] = "服务器地址",
         ["WebDavUsername"] = "用户名",
+        ["WebDavPassword"] = "密码",
+        ["WebDavPasswordDescription"] = "用于 WebDAV Basic 认证的密码或应用密码。",
         ["WebDavRemotePath"] = "远程路径",
         ["SyncOnStartup"] = "启动时同步",
         ["SyncAfterChanges"] = "本地变更后同步",
@@ -1179,6 +1432,8 @@ public sealed class LocalizationService : ILocalizationService
         ["OneDrive"] = "OneDrive",
         ["EnableOneDrive"] = "启用 OneDrive 接口",
         ["MdbxLocalCache"] = "保留 MDBX 本地缓存",
+        ["BackupHistory"] = "备份历史",
+        ["NoBackupsFound"] = "未找到备份文件。",
         ["Available"] = "可用",
         ["DesktopEquivalent"] = "桌面等价",
         ["PlatformLimited"] = "平台受限",
@@ -1238,11 +1493,47 @@ public sealed class LocalizationService : ILocalizationService
         ["MinuteFormat"] = "{0} 分钟",
         ["SecondFormat"] = "{0} 秒",
         ["PasswordCountFormat"] = "{0} 项",
+        ["DatabaseSummaryFormat"] = "{0} 个密码、{1} 条笔记、{2} 个验证器、{3} 个卡包项目",
+        ["MdbxDatabaseCountFormat"] = "{0} 条 MDBX 元数据",
+        ["VaultSourceCountFormat"] = "{0} 个已登记来源",
+        ["WebDavConfiguredFormat"] = "已配置到 {0}",
+        ["WebDavDisabled"] = "WebDAV 已禁用。本地保险库操作仍可使用。",
+        ["EnableWebDavFirst"] = "请先启用 WebDAV 并配置服务器，再加载备份。",
+        ["WebDavServerUrlRequired"] = "请输入有效的 WebDAV 服务器地址。",
+        ["WebDavBackupHistoryCountFormat"] = "{0} 个备份文件",
+        ["LoadedWebDavBackupsFormat"] = "已加载 {0} 个 WebDAV 备份文件。",
+        ["WebDavBackupHistoryFailedFormat"] = "WebDAV 备份历史加载失败：{0}",
+        ["DeletedWebDavBackupFormat"] = "已删除 WebDAV 备份 {0}。",
+        ["DeleteWebDavBackupFailedFormat"] = "删除 WebDAV 备份失败：{0}",
+        ["UnknownDate"] = "未知日期",
+        ["UnknownSize"] = "未知大小",
+        ["CanonicalVault"] = "Monica v68 SQLite 主保险库",
+        ["LocalOnly"] = "仅本地",
+        ["NotConfigured"] = "未配置",
+        ["KeePassSourceNameFormat"] = "KeePass 来源 #{0}",
+        ["BitwardenSourceNameFormat"] = "Bitwarden 来源 #{0}",
+        ["EntryCountFormat"] = "{0} 条项目记录",
+        ["PendingSyncCountFormat"] = "{0} 条本地待同步变更",
+        ["NoPendingChanges"] = "没有待同步变更",
+        ["AutomaticSync"] = "自动同步",
+        ["StartupSync"] = "启动时同步",
+        ["ChangeSync"] = "变更后同步",
+        ["ManualSync"] = "手动同步",
+        ["Synced"] = "已同步",
+        ["Syncing"] = "同步中",
+        ["Pending"] = "待处理",
+        ["PendingUpload"] = "待上传",
+        ["RemoteChanged"] = "远端已变更",
+        ["Conflict"] = "冲突",
+        ["Failed"] = "失败",
+        ["None"] = "无",
         ["TotpCountFormat"] = "{0} 个验证器",
         ["WalletCountFormat"] = "{0} 张卡片与证件",
         ["Locked"] = "已锁定",
         ["VaultLocked"] = "保险库已锁定",
         ["FirstRunCreateMasterPassword"] = "首次运行：请创建主密码。",
+        ["LegacyVaultImportRequired"] = "检测到 Monica for Windows 旧保险库。Avalonia 使用此路径前需要先执行导入。",
+        ["LegacyVaultImportPromptFormat"] = "在 {0} 发现旧版数据。Monica by Avalonia 不会自动修改这个 PascalCase 数据库；需要先通过一次性导入流程迁移到 v68 snake_case 架构。",
         ["VaultMetadataLoadFailedFormat"] = "无法加载保险库元数据：{0}",
         ["SettingsLoaded"] = "设置已加载",
         ["SettingsSaved"] = "设置已保存",

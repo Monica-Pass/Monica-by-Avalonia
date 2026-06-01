@@ -85,11 +85,13 @@ public sealed class VaultCredentialTests
             new ImportExportService(),
             new PlatformCapabilityService(),
             new NoopClipboardService(),
+            new NoopWebDavBackupService(),
             new MdbxVaultService(),
             new NoopPasswordAttachmentFileService(),
             new NoopPasswordEditorDialogService(),
             new NoopPasswordDetailDialogService(),
             new NoopCategoryPickerDialogService(),
+            new LegacyVaultDetector(factory),
             new AppSettingsService(GetTempSettingsPath()),
             new LocalizationService());
     }
@@ -111,6 +113,16 @@ public sealed class VaultCredentialTests
     private sealed class NoopClipboardService : IClipboardService
     {
         public Task SetTextAsync(string text, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class NoopWebDavBackupService : IWebDavBackupService
+    {
+        public string NormalizeRemotePath(string rootPath, string relativePath) => relativePath;
+        public Task<IReadOnlyList<RemoteFileEntry>> ListAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<RemoteFileEntry>>([]);
+        public Task UploadTextAsync(WebDavProfile profile, string relativePath, string content, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<string> DownloadTextAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) => Task.FromResult("");
+        public Task DeleteAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class NoopPasswordEditorDialogService : IPasswordEditorDialogService

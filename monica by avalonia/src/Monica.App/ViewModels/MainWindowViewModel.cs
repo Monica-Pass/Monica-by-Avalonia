@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Avalonia;
 using Avalonia.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -24,6 +25,21 @@ public sealed record SecurityIssueItem(string Title, string Subtitle, string Cat
 public sealed record PasswordHistoryDisplayItem(PasswordHistoryEntry Entry, string DisplayPassword, bool CanCopy);
 public sealed record PasswordQuickAccessItem(PasswordEntry Entry, int OpenCount, string LastOpenedText, string Subtitle);
 public sealed record PasswordFolderFilterChoice(long? Id, string Name, int Count);
+public sealed record VaultSourceDisplayItem(string DisplayName, string Kind, string LocalPath, string RemoteUrl, string SyncStatus);
+public sealed record WebDavBackupHistoryItem(string FileName, string Path, string DateString, string SizeText, DateTimeOffset? LastModified);
+public sealed record MonicaJsonImportResult(int Passwords, int SecureItems, int Categories);
+
+internal sealed class DisabledTotpEditorDialogService : ITotpEditorDialogService
+{
+    public Task<TotpEditorViewModel?> ShowAsync(SecureItem? item, CancellationToken cancellationToken = default) =>
+        Task.FromResult<TotpEditorViewModel?>(null);
+}
+
+internal sealed class DisabledWalletItemEditorDialogService : IWalletItemEditorDialogService
+{
+    public Task<WalletItemEditorViewModel?> ShowAsync(SecureItem? item, VaultItemType? newItemType = null, CancellationToken cancellationToken = default) =>
+        Task.FromResult<WalletItemEditorViewModel?>(null);
+}
 
 public sealed partial class MainWindowViewModel : ObservableObject
 {
@@ -34,6 +50,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         Recent,
         Frequent
+    }
+
+    private sealed class DisabledWebDavBackupService : IWebDavBackupService
+    {
+        public string NormalizeRemotePath(string rootPath, string relativePath) => relativePath;
+
+        public Task<IReadOnlyList<RemoteFileEntry>> ListAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<RemoteFileEntry>>([]);
+
+        public Task UploadTextAsync(WebDavProfile profile, string relativePath, string content, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<string> DownloadTextAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) =>
+            Task.FromResult("");
+
+        public Task DeleteAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 
     private static readonly string[] KnownTwoFactorDomains =
@@ -67,12 +100,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IPwnedPasswordService _pwnedPasswordService;
     private readonly IImportExportService _importExportService;
     private readonly IClipboardService _clipboardService;
+    private readonly IWebDavBackupService _webDavBackupService;
     private readonly IMdbxVaultService _mdbxVaultService;
     private readonly IPasswordAttachmentFileService _passwordAttachmentFileService;
     private readonly IPasswordEditorDialogService _passwordEditorDialogService;
     private readonly IPasswordDetailDialogService _passwordDetailDialogService;
     private readonly ICategoryPickerDialogService _categoryPickerDialogService;
+    private readonly ITotpEditorDialogService _totpEditorDialogService;
+    private readonly IWalletItemEditorDialogService _walletItemEditorDialogService;
     private readonly IVaultCredentialStore _credentialStore;
+    private readonly ILegacyVaultDetector _legacyVaultDetector;
     private readonly IAppSettingsService _settingsService;
     private readonly ILocalizationService _localization;
     private readonly IReadOnlyList<PlatformCapability> _sourceCapabilities;
@@ -82,6 +119,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private IReadOnlyDictionary<long, CompromisedPasswordResult> _compromisedPasswordResults = new Dictionary<long, CompromisedPasswordResult>();
     private bool _hasCompromisedPasswordCheckResults;
     private bool _isApplyingSettings;
+    private LegacyVaultDetection _legacyVaultDetection = LegacyVaultDetection.Empty;
 
     public MainWindowViewModel(
         IMonicaRepository repository,
@@ -92,14 +130,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IImportExportService importExportService,
         IPlatformCapabilityService platformCapabilityService,
         IClipboardService clipboardService,
+        IWebDavBackupService? webDavBackupService,
         IMdbxVaultService mdbxVaultService,
         IPasswordAttachmentFileService passwordAttachmentFileService,
         IPasswordEditorDialogService passwordEditorDialogService,
         IPasswordDetailDialogService passwordDetailDialogService,
         ICategoryPickerDialogService categoryPickerDialogService,
+        ILegacyVaultDetector? legacyVaultDetector,
         IAppSettingsService settingsService,
         ILocalizationService localization,
-        IPwnedPasswordService? pwnedPasswordService = null)
+        IPwnedPasswordService? pwnedPasswordService = null,
+        ITotpEditorDialogService? totpEditorDialogService = null,
+        IWalletItemEditorDialogService? walletItemEditorDialogService = null)
     {
         _repository = repository;
         _credentialStore = credentialStore;
@@ -109,11 +151,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _pwnedPasswordService = pwnedPasswordService ?? new PwnedPasswordService();
         _importExportService = importExportService;
         _clipboardService = clipboardService;
+        _webDavBackupService = webDavBackupService ?? new DisabledWebDavBackupService();
         _mdbxVaultService = mdbxVaultService;
         _passwordAttachmentFileService = passwordAttachmentFileService;
         _passwordEditorDialogService = passwordEditorDialogService;
         _passwordDetailDialogService = passwordDetailDialogService;
         _categoryPickerDialogService = categoryPickerDialogService;
+        _totpEditorDialogService = totpEditorDialogService ?? new DisabledTotpEditorDialogService();
+        _walletItemEditorDialogService = walletItemEditorDialogService ?? new DisabledWalletItemEditorDialogService();
+        _legacyVaultDetector = legacyVaultDetector ?? new NoLegacyVaultDetector();
         _settingsService = settingsService;
         _localization = localization;
         _localization.PropertyChanged += (_, _) => RefreshLocalizedProperties();
@@ -136,6 +182,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<TimelineEntry> TimelineEntries { get; } = [];
     public ObservableCollection<SecuritySummaryItem> SecuritySummaryItems { get; } = [];
     public ObservableCollection<SecurityIssueItem> SecurityIssueItems { get; } = [];
+    public ObservableCollection<VaultSourceDisplayItem> VaultSources { get; } = [];
+    public ObservableCollection<WebDavBackupHistoryItem> WebDavBackupHistory { get; } = [];
     public ObservableCollection<SettingsChoice> LanguageOptions { get; } = [];
     public ObservableCollection<SettingsChoice> ThemeOptions { get; } = [];
     public ObservableCollection<SettingsChoice> StartupSectionOptions { get; } = [];
@@ -233,6 +281,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool _noteIsFavorite;
 
     [ObservableProperty]
+    private SecureItem? _selectedWalletItem;
+
+    [ObservableProperty]
+    private WalletItemDetailsViewModel? _selectedWalletDetails;
+
+    [ObservableProperty]
     private string _settingsLanguage = "system";
 
     [ObservableProperty]
@@ -284,6 +338,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _webDavUsername = "";
 
     [ObservableProperty]
+    private string _webDavPassword = "";
+
+    [ObservableProperty]
     private string _webDavRemotePath = "/Monica";
 
     [ObservableProperty]
@@ -291,6 +348,39 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _webDavSyncAfterChanges;
+
+    [ObservableProperty]
+    private bool _isLoadingWebDavBackups;
+
+    [ObservableProperty]
+    private bool _isRunningWebDavBackup;
+
+    [ObservableProperty]
+    private bool _webDavBackupIncludePasswords = true;
+
+    [ObservableProperty]
+    private bool _webDavBackupIncludeTotp = true;
+
+    [ObservableProperty]
+    private bool _webDavBackupIncludeNotes = true;
+
+    [ObservableProperty]
+    private bool _webDavBackupIncludeCards = true;
+
+    [ObservableProperty]
+    private bool _webDavBackupIncludeDocuments = true;
+
+    [ObservableProperty]
+    private bool _webDavBackupIncludeImages = true;
+
+    [ObservableProperty]
+    private bool _webDavBackupIncludeCategories = true;
+
+    [ObservableProperty]
+    private bool _webDavBackupEncryptionEnabled;
+
+    [ObservableProperty]
+    private string _webDavBackupEncryptionPassword = "";
 
     [ObservableProperty]
     private string _syncConflictStrategy = "ask";
@@ -326,6 +416,27 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool _quickFilterAttachments;
 
     public string SelectedSectionTitle => SectionTitle(SelectedSection);
+    public string ShellVaultText => SelectedSection switch
+    {
+        "DatabaseManagement" => "Database",
+        "Sync" => WebDavEnabled ? "WebDAV" : "Local",
+        "Settings" => "Monica",
+        "Archive" => "Archive",
+        "RecycleBin" => "Recycle Bin",
+        _ => "Monica Local"
+    };
+    public string ShellSyncText => SelectedSection switch
+    {
+        "DatabaseManagement" => "Sources Ready",
+        "Sync" => WebDavEnabled ? "Sync Ready" : "Local Only",
+        "Settings" => "Ready",
+        _ => StatusMessage
+    };
+    public string ShellPageText => SelectedSectionTitle;
+    public string ShellPlatformText => OperatingSystem.IsWindows() ? "Windows" :
+        OperatingSystem.IsMacOS() ? "macOS" :
+        OperatingSystem.IsLinux() ? "Linux" :
+        "Desktop";
     public string LoginTitle => IsVaultInitialized ? _localization.UnlockMonica : _localization.CreateMonicaVault;
     public string LoginDescription => IsVaultInitialized
         ? _localization.UnlockDescription
@@ -350,6 +461,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public string WalletCountText => _localization.Format("WalletCountFormat", WalletItems.Count);
     public string TimelineCountText => _localization.Format("TimelineCountFormat", TimelineEntries.Count);
     public string SecurityIssueCountText => _localization.Format("SecurityIssueCountFormat", SecurityIssueItems.Count);
+    public string LocalDatabaseSummaryText => _localization.Format("DatabaseSummaryFormat", Passwords.Count, NoteItems.Count, TotpItems.Count, WalletItems.Count);
+    public string MdbxDatabaseCountText => _localization.Format("MdbxDatabaseCountFormat", MdbxDatabases.Count);
+    public string VaultSourceCountText => _localization.Format("VaultSourceCountFormat", VaultSources.Count);
+    public string WebDavConnectionStatusText => WebDavEnabled
+        ? _localization.Format("WebDavConfiguredFormat", string.IsNullOrWhiteSpace(WebDavServerUrl) ? _localization.Get("NotConfigured") : WebDavServerUrl)
+        : _localization.Get("WebDavDisabled");
+    public string WebDavBackupHistoryCountText => _localization.Format("WebDavBackupHistoryCountFormat", WebDavBackupHistory.Count);
+    public bool HasWebDavBackupHistory => WebDavBackupHistory.Count > 0;
+    public bool IsWebDavBusy => IsLoadingWebDavBackups || IsRunningWebDavBackup;
+    public string WebDavBackupOptionsSummaryText => _localization.Format(
+        "WebDavBackupOptionsSummaryFormat",
+        CountSelectedWebDavBackupOptions(),
+        WebDavBackupEncryptionEnabled ? _localization.Get("Encrypted") : _localization.Get("PlainJson"));
+    public bool HasLegacyVaultImportPrompt => _legacyVaultDetection.RequiresImport;
+    public string LegacyVaultImportPromptText => _legacyVaultDetection.RequiresImport
+        ? _localization.Format("LegacyVaultImportPromptFormat", _legacyVaultDetection.DatabasePath)
+        : "";
     public string GeneratorLengthText => _localization.Format("GeneratorLengthFormat", GeneratorLength);
     public string GeneratedPasswordStrengthText
     {
@@ -369,6 +497,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public string NotePlainPreview => NoteContentCodec.ToPlainPreview(NoteContent, NoteIsMarkdown);
     public int SelectedPasswordCount => Passwords.Count(item => item.IsSelected);
     public bool HasSelectedPasswords => SelectedPasswordCount > 0;
+    public int SelectedTotpCount => TotpItems.Count(item => item.IsSelected);
+    public string SelectedTotpCountText => _localization.Format("SelectedTotpCountFormat", SelectedTotpCount);
+    public bool HasSelectedTotpItems => SelectedTotpCount > 0;
+    public int SelectedWalletCount => WalletItems.Count(item => item.IsSelected);
+    public string SelectedWalletCountText => _localization.Format("SelectedWalletCountFormat", SelectedWalletCount);
+    public bool HasSelectedWalletItems => SelectedWalletCount > 0;
+    public bool HasSelectedWalletItem => SelectedWalletItem is not null;
     public bool AreAllFilteredPasswordsSelected
     {
         get
@@ -430,7 +565,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RaisePasswordSelectionState();
     }
 
-    partial void OnSelectedSectionChanged(string value) => OnPropertyChanged(nameof(SelectedSectionTitle));
+    partial void OnSelectedSectionChanged(string value)
+    {
+        OnPropertyChanged(nameof(SelectedSectionTitle));
+        RaiseShellStatus();
+    }
+
+    partial void OnStatusMessageChanged(string value) => RaiseShellStatus();
 
     partial void OnGeneratedPasswordChanged(string value) => OnPropertyChanged(nameof(GeneratedPasswordStrengthText));
 
@@ -453,6 +594,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     partial void OnSelectedNoteChanged(SecureItem? value) => LoadNoteIntoEditor(value);
+
+    partial void OnSelectedWalletItemChanged(SecureItem? value)
+    {
+        SelectedWalletDetails = value is null ? null : new WalletItemDetailsViewModel(_localization, value);
+        OnPropertyChanged(nameof(HasSelectedWalletItem));
+    }
 
     partial void OnIsVaultInitializedChanged(bool value)
     {
@@ -501,15 +648,66 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(PasswordListContentMargin));
         OnPropertyChanged(nameof(ShowPasswordListDetails));
     }
-    partial void OnWebDavEnabledChanged(bool value) => UpdateSettings(settings => settings.WebDavEnabled = value);
-    partial void OnWebDavServerUrlChanged(string value) => UpdateSettings(settings => settings.WebDavServerUrl = value);
-    partial void OnWebDavUsernameChanged(string value) => UpdateSettings(settings => settings.WebDavUsername = value);
-    partial void OnWebDavRemotePathChanged(string value) => UpdateSettings(settings => settings.WebDavRemotePath = value);
-    partial void OnWebDavSyncOnStartupChanged(bool value) => UpdateSettings(settings => settings.WebDavSyncOnStartup = value);
-    partial void OnWebDavSyncAfterChangesChanged(bool value) => UpdateSettings(settings => settings.WebDavSyncAfterChanges = value);
-    partial void OnSyncConflictStrategyChanged(string value) => UpdateSettings(settings => settings.SyncConflictStrategy = value);
+    partial void OnWebDavEnabledChanged(bool value)
+    {
+        UpdateSettings(settings => settings.WebDavEnabled = value);
+        OnPropertyChanged(nameof(WebDavConnectionStatusText));
+        RefreshVaultSources();
+        RaiseShellStatus();
+    }
+    partial void OnWebDavServerUrlChanged(string value)
+    {
+        UpdateSettings(settings => settings.WebDavServerUrl = value);
+        OnPropertyChanged(nameof(WebDavConnectionStatusText));
+        RefreshVaultSources();
+    }
+    partial void OnWebDavUsernameChanged(string value)
+    {
+        UpdateSettings(settings => settings.WebDavUsername = value);
+        RefreshVaultSources();
+    }
+    partial void OnWebDavPasswordChanged(string value) => UpdateSettings(settings => settings.WebDavPassword = value);
+    partial void OnWebDavRemotePathChanged(string value)
+    {
+        UpdateSettings(settings => settings.WebDavRemotePath = value);
+        RefreshVaultSources();
+    }
+    partial void OnWebDavSyncOnStartupChanged(bool value)
+    {
+        UpdateSettings(settings => settings.WebDavSyncOnStartup = value);
+        RefreshVaultSources();
+    }
+    partial void OnWebDavSyncAfterChangesChanged(bool value)
+    {
+        UpdateSettings(settings => settings.WebDavSyncAfterChanges = value);
+        RefreshVaultSources();
+    }
+    partial void OnIsLoadingWebDavBackupsChanged(bool value) => OnPropertyChanged(nameof(IsWebDavBusy));
+    partial void OnIsRunningWebDavBackupChanged(bool value) => OnPropertyChanged(nameof(IsWebDavBusy));
+    partial void OnWebDavBackupIncludePasswordsChanged(bool value) => UpdateWebDavBackupOption(settings => settings.WebDavBackupIncludePasswords = value);
+    partial void OnWebDavBackupIncludeTotpChanged(bool value) => UpdateWebDavBackupOption(settings => settings.WebDavBackupIncludeTotp = value);
+    partial void OnWebDavBackupIncludeNotesChanged(bool value) => UpdateWebDavBackupOption(settings => settings.WebDavBackupIncludeNotes = value);
+    partial void OnWebDavBackupIncludeCardsChanged(bool value) => UpdateWebDavBackupOption(settings => settings.WebDavBackupIncludeCards = value);
+    partial void OnWebDavBackupIncludeDocumentsChanged(bool value) => UpdateWebDavBackupOption(settings => settings.WebDavBackupIncludeDocuments = value);
+    partial void OnWebDavBackupIncludeImagesChanged(bool value) => UpdateWebDavBackupOption(settings => settings.WebDavBackupIncludeImages = value);
+    partial void OnWebDavBackupIncludeCategoriesChanged(bool value) => UpdateWebDavBackupOption(settings => settings.WebDavBackupIncludeCategories = value);
+    partial void OnWebDavBackupEncryptionEnabledChanged(bool value) => UpdateWebDavBackupOption(settings => settings.WebDavBackupEncryptionEnabled = value);
+    partial void OnWebDavBackupEncryptionPasswordChanged(string value) => UpdateSettings(settings => settings.WebDavBackupEncryptionPassword = value);
+    partial void OnSyncConflictStrategyChanged(string value)
+    {
+        UpdateSettings(settings => settings.SyncConflictStrategy = value);
+        RefreshVaultSources();
+    }
     partial void OnOneDriveEnabledChanged(bool value) => UpdateSettings(settings => settings.OneDriveEnabled = value);
     partial void OnMdbxLocalCacheEnabledChanged(bool value) => UpdateSettings(settings => settings.MdbxLocalCacheEnabled = value);
+
+    private void RaiseShellStatus()
+    {
+        OnPropertyChanged(nameof(ShellVaultText));
+        OnPropertyChanged(nameof(ShellSyncText));
+        OnPropertyChanged(nameof(ShellPageText));
+        OnPropertyChanged(nameof(ShellPlatformText));
+    }
 
     [RelayCommand]
     public async Task InitializeAsync()
@@ -518,6 +716,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             await _settingsService.LoadAsync();
             ApplySettings(_settingsService.Current);
+            _legacyVaultDetection = await _legacyVaultDetector.DetectAsync();
+            RaiseLegacyVaultImportPrompt();
+            if (_legacyVaultDetection.RequiresImport)
+            {
+                IsVaultInitialized = false;
+                StatusMessage = _localization.Get("LegacyVaultImportRequired");
+                return;
+            }
+
             IsVaultInitialized = await _credentialStore.GetAsync() is not null;
             StatusMessage = IsVaultInitialized
                 ? _localization.Get("VaultLocked")
@@ -537,6 +744,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (string.IsNullOrWhiteSpace(MasterPassword))
             {
                 StatusMessage = _localization.Get("EnterMasterPassword");
+                return;
+            }
+
+            if (_legacyVaultDetection.RequiresImport)
+            {
+                StatusMessage = _localization.Get("LegacyVaultImportRequired");
                 return;
             }
 
@@ -594,6 +807,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             WalletItems.Clear();
             Categories.Clear();
             MdbxDatabases.Clear();
+            VaultSources.Clear();
             TimelineEntries.Clear();
 
             var allPasswords = await _repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true);
@@ -638,6 +852,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             {
                 if (item.ItemType is VaultItemType.BankCard or VaultItemType.Document)
                 {
+                    item.IsSelected = false;
+                    TrackWalletSelection(item);
                     WalletItems.Add(item);
                 }
             }
@@ -654,6 +870,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 MdbxDatabases.Add(database);
             }
 
+            RefreshVaultSources();
             await LoadTotpItemsAsync();
             await LoadTimelineAsync();
             RefreshSecurityAnalysis();
@@ -1374,17 +1591,27 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private async Task AddTotpAsync()
     {
-        var item = new SecureItem
+        var editor = await _totpEditorDialogService.ShowAsync(null);
+        if (editor is null)
         {
-            ItemType = VaultItemType.Totp,
-            Title = $"Authenticator {TotpItems.Count + 1}",
-            Notes = "Monica desktop sample",
-            ItemData = """{"secret":"JBSWY3DPEHPK3PXP","period":30,"digits":6,"otpType":"TOTP"}"""
-        };
+            return;
+        }
+
+        var item = editor.ApplyTo();
         RefreshTotpDisplay(item);
         await _repository.SaveSecureItemAsync(item);
+        await _repository.LogAsync(new OperationLog
+        {
+            ItemType = "TOTP",
+            ItemId = item.Id,
+            ItemTitle = item.Title,
+            OperationType = "CREATE",
+            DeviceName = Environment.MachineName
+        });
         TotpItems.Insert(0, item);
         RaiseCounts();
+        await LoadTimelineAsync();
+        StatusMessage = _localization.Format("SavedTotpFormat", item.Title);
     }
 
     [RelayCommand]
@@ -1401,18 +1628,271 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task EditTotpAsync(SecureItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        var editor = await _totpEditorDialogService.ShowAsync(item);
+        if (editor is null)
+        {
+            return;
+        }
+
+        if (item.BoundPasswordId is { } passwordId)
+        {
+            var password = Passwords.FirstOrDefault(entry => entry.Id == passwordId)
+                ?? (await _repository.GetPasswordsAsync()).FirstOrDefault(entry => entry.Id == passwordId);
+            if (password is null)
+            {
+                StatusMessage = _localization.Get("BoundPasswordMissing");
+                return;
+            }
+
+            password.AuthenticatorKey = editor.ToAuthenticatorKey();
+            password.Title = editor.Title.Trim();
+            password.Username = editor.AccountName.Trim();
+            password.IsFavorite = editor.IsFavorite;
+            await _repository.SavePasswordAsync(password);
+            await SynchronizeBoundTotpAsync(password);
+            RefreshPasswordTotpDisplay(password);
+            await LoadTotpItemsAsync();
+        }
+        else
+        {
+            editor.ApplyTo(item);
+            RefreshTotpDisplay(item);
+            await _repository.SaveSecureItemAsync(item);
+        }
+
+        await _repository.LogAsync(new OperationLog
+        {
+            ItemType = "TOTP",
+            ItemId = item.Id,
+            ItemTitle = editor.Title.Trim(),
+            OperationType = "UPDATE",
+            DeviceName = Environment.MachineName
+        });
+        ClearTotpSelection();
+        await LoadTimelineAsync();
+        StatusMessage = _localization.Format("SavedTotpFormat", editor.Title.Trim());
+    }
+
+    [RelayCommand]
+    private async Task ToggleTotpFavoriteAsync(SecureItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        var next = !item.IsFavorite;
+        await SetTotpFavoriteAsync(item, next);
+        await LoadTimelineAsync();
+        StatusMessage = _localization.Format(next ? "FavoritedTotpFormat" : "UnfavoritedTotpFormat", item.Title);
+    }
+
+    [RelayCommand]
+    private async Task DeleteTotpAsync(SecureItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        await DeleteTotpItemAsync(item, updateStatus: true);
+    }
+
+    [RelayCommand]
+    private void ToggleTotpSelection(SecureItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        item.IsSelected = !item.IsSelected;
+        RaiseTotpSelectionState();
+    }
+
+    [RelayCommand]
+    private void ClearTotpSelection()
+    {
+        foreach (var item in TotpItems.Where(item => item.IsSelected))
+        {
+            item.IsSelected = false;
+        }
+
+        RaiseTotpSelectionState();
+    }
+
+    [RelayCommand]
+    private async Task FavoriteSelectedTotpAsync()
+    {
+        var selected = TotpItems.Where(item => item.IsSelected).ToArray();
+        if (selected.Length == 0)
+        {
+            return;
+        }
+
+        foreach (var item in selected)
+        {
+            if (!item.IsFavorite)
+            {
+                await SetTotpFavoriteAsync(item, true);
+            }
+        }
+
+        foreach (var item in selected)
+        {
+            item.IsSelected = false;
+        }
+
+        RaiseTotpSelectionState();
+        await LoadTimelineAsync();
+        StatusMessage = _localization.Format("FavoritedTotpCountFormat", selected.Length);
+    }
+
+    [RelayCommand]
+    private async Task DeleteSelectedTotpAsync()
+    {
+        var selected = TotpItems.Where(item => item.IsSelected).ToArray();
+        if (selected.Length == 0)
+        {
+            return;
+        }
+
+        foreach (var item in selected)
+        {
+            await DeleteTotpItemAsync(item, updateStatus: false);
+        }
+
+        RaiseTotpSelectionState();
+        await LoadTimelineAsync();
+        StatusMessage = _localization.Format("MovedSelectedTotpToRecycleBinFormat", selected.Length);
+    }
+
+    [RelayCommand]
     private async Task AddWalletItemAsync()
     {
-        var item = new SecureItem
+        var editor = await _walletItemEditorDialogService.ShowAsync(null, WalletItems.Count % 2 == 0 ? VaultItemType.BankCard : VaultItemType.Document);
+        if (editor is null)
         {
-            ItemType = WalletItems.Count % 2 == 0 ? VaultItemType.BankCard : VaultItemType.Document,
-            Title = WalletItems.Count % 2 == 0 ? "Bank Card" : "Identity Document",
-            Notes = "Desktop wallet entry",
-            ItemData = "{}"
-        };
+            return;
+        }
+
+        var item = editor.ApplyTo();
         await _repository.SaveSecureItemAsync(item);
+        await _repository.LogAsync(new OperationLog
+        {
+            ItemType = "WALLET",
+            ItemId = item.Id,
+            ItemTitle = item.Title,
+            OperationType = "CREATE",
+            DeviceName = Environment.MachineName
+        });
+        TrackWalletSelection(item);
         WalletItems.Insert(0, item);
+        SelectedWalletItem = item;
         RaiseCounts();
+        await LoadTimelineAsync();
+        StatusMessage = _localization.Format("SavedWalletItemFormat", item.Title);
+    }
+
+    [RelayCommand]
+    private async Task EditWalletItemAsync(SecureItem? item)
+    {
+        item ??= SelectedWalletItem;
+        if (item is null)
+        {
+            return;
+        }
+
+        var editor = await _walletItemEditorDialogService.ShowAsync(item);
+        if (editor is null)
+        {
+            return;
+        }
+
+        editor.ApplyTo(item);
+        await _repository.SaveSecureItemAsync(item);
+        await _repository.LogAsync(new OperationLog
+        {
+            ItemType = "WALLET",
+            ItemId = item.Id,
+            ItemTitle = item.Title,
+            OperationType = "UPDATE",
+            DeviceName = Environment.MachineName
+        });
+        SelectedWalletItem = item;
+        SelectedWalletDetails = new WalletItemDetailsViewModel(_localization, item);
+        await LoadTimelineAsync();
+        RaiseCounts();
+        StatusMessage = _localization.Format("SavedWalletItemFormat", item.Title);
+    }
+
+    [RelayCommand]
+    private void ShowWalletDetails(SecureItem? item)
+    {
+        if (item is not null)
+        {
+            SelectedWalletItem = item;
+        }
+    }
+
+    [RelayCommand]
+    private async Task DeleteWalletItemAsync(SecureItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        await DeleteWalletItemCoreAsync(item, updateStatus: true);
+    }
+
+    [RelayCommand]
+    private void ToggleWalletSelection(SecureItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        item.IsSelected = !item.IsSelected;
+        RaiseWalletSelectionState();
+    }
+
+    [RelayCommand]
+    private void ClearWalletSelection()
+    {
+        foreach (var item in WalletItems.Where(item => item.IsSelected))
+        {
+            item.IsSelected = false;
+        }
+
+        RaiseWalletSelectionState();
+    }
+
+    [RelayCommand]
+    private async Task DeleteSelectedWalletItemsAsync()
+    {
+        var selected = WalletItems.Where(item => item.IsSelected).ToArray();
+        if (selected.Length == 0)
+        {
+            return;
+        }
+
+        foreach (var item in selected)
+        {
+            await DeleteWalletItemCoreAsync(item, updateStatus: false);
+        }
+
+        RaiseWalletSelectionState();
+        await LoadTimelineAsync();
+        StatusMessage = _localization.Format("MovedSelectedWalletItemsToRecycleBinFormat", selected.Length);
     }
 
     public async Task<long> AddPasswordAttachmentMetadataAsync(
@@ -1621,21 +2101,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void ExportData()
     {
-        var exportPasswords = Passwords.Select(ClonePasswordForExport).ToArray();
-        var exportSecureItems = TotpItems
-            .Concat(WalletItems)
-            .Concat(NoteItems)
-            .Where(item => item.Id > 0)
-            .Select(CloneSecureItemForExport)
-            .ToArray();
-        ExportPreview = _importExportService.ExportJson(exportPasswords, exportSecureItems);
+        ExportPreview = BuildMonicaJsonExport(
+            includePasswords: true,
+            includeTotp: true,
+            includeNotes: true,
+            includeCards: true,
+            includeDocuments: true,
+            includeImages: true,
+            includeCategories: true);
         StatusMessage = _localization.Get("ExportPrepared");
     }
 
     [RelayCommand]
     private void ExportPasswordCsv()
     {
-        var exportPasswords = Passwords.Select(ClonePasswordForExport).ToArray();
+        var exportPasswords = Passwords.Select(item => ClonePasswordForExport(item)).ToArray();
         ExportCsvPreview = _importExportService.ExportPasswordCsv(exportPasswords);
         StatusMessage = _localization.Get("ExportedPasswordCsv");
     }
@@ -1651,46 +2131,361 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         try
         {
-            var package = _importExportService.ImportJson(ImportJsonText);
-            var passwordIdMap = new Dictionary<long, long>();
-            var importedPasswords = 0;
-            foreach (var source in package.Passwords)
-            {
-                var imported = ClonePasswordForImport(source);
-                var sourceId = source.Id;
-                await _repository.SavePasswordAsync(imported);
-                if (sourceId != 0)
-                {
-                    passwordIdMap[sourceId] = imported.Id;
-                }
-
-                importedPasswords++;
-            }
-
-            var importedSecureItems = 0;
-            foreach (var source in package.SecureItems)
-            {
-                var imported = CloneSecureItemForImport(source, passwordIdMap);
-                await _repository.SaveSecureItemAsync(imported);
-                importedSecureItems++;
-            }
-
-            await _repository.LogAsync(new OperationLog
-            {
-                ItemType = "VAULT",
-                ItemTitle = _localization.Get("MonicaJson"),
-                OperationType = "IMPORT",
-                DeviceName = Environment.MachineName
-            });
-
+            var result = await ImportMonicaJsonAsync(ImportJsonText);
             ImportJsonText = "";
-            await LoadAsync();
-            StatusMessage = _localization.Format("ImportedMonicaJsonFormat", importedPasswords, importedSecureItems);
+            StatusMessage = FormatMonicaJsonImportStatus(result);
         }
         catch (Exception ex)
         {
             StatusMessage = _localization.Format("ImportFailedFormat", ex.Message);
         }
+    }
+
+    [RelayCommand]
+    private async Task LoadWebDavBackupsAsync()
+    {
+        if (!TryCreateWebDavProfile(out var profile))
+        {
+            return;
+        }
+
+        try
+        {
+            IsLoadingWebDavBackups = true;
+            var entries = await _webDavBackupService.ListAsync(profile, "");
+            WebDavBackupHistory.Clear();
+            foreach (var item in entries
+                .Where(item => !item.IsDirectory)
+                .OrderByDescending(item => item.LastModified ?? DateTimeOffset.MinValue)
+                .ThenBy(item => item.Path, StringComparer.OrdinalIgnoreCase))
+            {
+                WebDavBackupHistory.Add(ToWebDavBackupHistoryItem(item));
+            }
+
+            RaiseWebDavBackupHistoryState();
+            StatusMessage = _localization.Format("LoadedWebDavBackupsFormat", WebDavBackupHistory.Count);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = _localization.Format("WebDavBackupHistoryFailedFormat", ex.Message);
+        }
+        finally
+        {
+            IsLoadingWebDavBackups = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task CreateWebDavBackupAsync()
+    {
+        if (!TryCreateWebDavProfile(out var profile))
+        {
+            return;
+        }
+
+        if (!HasSelectedWebDavBackupOptions())
+        {
+            StatusMessage = _localization.Get("SelectWebDavBackupContent");
+            return;
+        }
+
+        if (WebDavBackupEncryptionEnabled && string.IsNullOrWhiteSpace(WebDavBackupEncryptionPassword))
+        {
+            StatusMessage = _localization.Get("WebDavEncryptionPasswordRequired");
+            return;
+        }
+
+        try
+        {
+            IsRunningWebDavBackup = true;
+            var json = BuildMonicaJsonExport(
+                WebDavBackupIncludePasswords,
+                WebDavBackupIncludeTotp,
+                WebDavBackupIncludeNotes,
+                WebDavBackupIncludeCards,
+                WebDavBackupIncludeDocuments,
+                WebDavBackupIncludeImages,
+                WebDavBackupIncludeCategories);
+            var extension = WebDavBackupEncryptionEnabled ? "monica.enc.json" : "monica.json";
+            var fileName = $"monica_backup_{DateTimeOffset.UtcNow:yyyyMMdd_HHmmss}.{extension}";
+            var content = WebDavBackupEncryptionEnabled
+                ? EncryptWebDavBackupPayload(json, WebDavBackupEncryptionPassword)
+                : json;
+
+            await _webDavBackupService.UploadTextAsync(profile, fileName, content);
+            var path = _webDavBackupService.NormalizeRemotePath(profile.RootPath, fileName);
+            var existing = WebDavBackupHistory.FirstOrDefault(item => string.Equals(item.Path, path, StringComparison.OrdinalIgnoreCase));
+            if (existing is not null)
+            {
+                WebDavBackupHistory.Remove(existing);
+            }
+
+            WebDavBackupHistory.Insert(0, new WebDavBackupHistoryItem(
+                fileName,
+                path,
+                DateTimeOffset.UtcNow.ToLocalTime().ToString("yyyy/MM/dd HH:mm", _localization.Culture),
+                FormatByteSize(Encoding.UTF8.GetByteCount(content)),
+                DateTimeOffset.UtcNow));
+            RaiseWebDavBackupHistoryState();
+            StatusMessage = _localization.Format("CreatedWebDavBackupFormat", fileName);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = _localization.Format("CreateWebDavBackupFailedFormat", ex.Message);
+        }
+        finally
+        {
+            IsRunningWebDavBackup = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task RestoreWebDavBackupAsync(WebDavBackupHistoryItem? item)
+    {
+        if (item is null || !TryCreateWebDavProfile(out var profile))
+        {
+            return;
+        }
+
+        if (IsEncryptedWebDavBackup(item.FileName) && string.IsNullOrWhiteSpace(WebDavBackupEncryptionPassword))
+        {
+            StatusMessage = _localization.Get("WebDavEncryptionPasswordRequired");
+            return;
+        }
+
+        try
+        {
+            IsRunningWebDavBackup = true;
+            var content = await _webDavBackupService.DownloadTextAsync(profile, item.FileName);
+            var json = IsEncryptedWebDavBackup(item.FileName)
+                ? DecryptWebDavBackupPayload(content, WebDavBackupEncryptionPassword)
+                : content;
+            var result = await ImportMonicaJsonAsync(json);
+            StatusMessage = _localization.Format("RestoredWebDavBackupFormat", item.FileName, result.Passwords, result.SecureItems, result.Categories);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = _localization.Format("RestoreWebDavBackupFailedFormat", ex.Message);
+        }
+        finally
+        {
+            IsRunningWebDavBackup = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task RestoreLatestWebDavBackupAsync()
+    {
+        if (!WebDavBackupHistory.Any())
+        {
+            await LoadWebDavBackupsAsync();
+        }
+
+        await RestoreWebDavBackupAsync(WebDavBackupHistory.FirstOrDefault());
+    }
+
+    [RelayCommand]
+    private async Task DeleteWebDavBackupAsync(WebDavBackupHistoryItem? item)
+    {
+        if (item is null || !TryCreateWebDavProfile(out var profile))
+        {
+            return;
+        }
+
+        try
+        {
+            await _webDavBackupService.DeleteAsync(profile, item.FileName);
+            WebDavBackupHistory.Remove(item);
+            RaiseWebDavBackupHistoryState();
+            StatusMessage = _localization.Format("DeletedWebDavBackupFormat", item.FileName);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = _localization.Format("DeleteWebDavBackupFailedFormat", ex.Message);
+        }
+    }
+
+    private string BuildMonicaJsonExport(
+        bool includePasswords,
+        bool includeTotp,
+        bool includeNotes,
+        bool includeCards,
+        bool includeDocuments,
+        bool includeImages,
+        bool includeCategories)
+    {
+        var exportPasswords = includePasswords
+            ? Passwords.Select(item => ClonePasswordForExport(item, includeCategories)).ToArray()
+            : Array.Empty<PasswordEntry>();
+        var exportSecureItems = TotpItems
+            .Where(_ => includeTotp)
+            .Concat(NoteItems.Where(_ => includeNotes))
+            .Concat(WalletItems.Where(item =>
+                (item.ItemType == VaultItemType.BankCard && includeCards) ||
+                (item.ItemType == VaultItemType.Document && includeDocuments)))
+            .Where(item => item.Id > 0)
+            .Select(item => CloneSecureItemForExport(item, includeCategories, includeImages))
+            .ToArray();
+        var exportCategories = includeCategories
+            ? Categories.Select(CloneCategory).ToArray()
+            : Array.Empty<Category>();
+
+        return _importExportService.ExportJson(exportPasswords, exportSecureItems, exportCategories);
+    }
+
+    private async Task<MonicaJsonImportResult> ImportMonicaJsonAsync(string json)
+    {
+        var package = _importExportService.ImportJson(json);
+        var categoryIdMap = new Dictionary<long, long>();
+        var importedCategories = 0;
+
+        if (package.Categories.Count > 0)
+        {
+            var existingCategories = (await _repository.GetCategoriesAsync())
+                .ToDictionary(item => item.Name, item => item, StringComparer.OrdinalIgnoreCase);
+            foreach (var source in package.Categories.OrderBy(item => item.SortOrder).ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(source.Name))
+                {
+                    continue;
+                }
+
+                var name = source.Name.Trim();
+                if (existingCategories.TryGetValue(name, out var existing))
+                {
+                    if (source.Id != 0)
+                    {
+                        categoryIdMap[source.Id] = existing.Id;
+                    }
+
+                    continue;
+                }
+
+                var imported = CloneCategory(source);
+                imported.Id = 0;
+                imported.Name = name;
+                await _repository.SaveCategoryAsync(imported);
+                existingCategories[imported.Name] = imported;
+                if (source.Id != 0)
+                {
+                    categoryIdMap[source.Id] = imported.Id;
+                }
+
+                importedCategories++;
+            }
+        }
+
+        var passwordIdMap = new Dictionary<long, long>();
+        var importedPasswords = 0;
+        foreach (var source in package.Passwords)
+        {
+            var imported = ClonePasswordForImport(source, categoryIdMap);
+            var sourceId = source.Id;
+            await _repository.SavePasswordAsync(imported);
+            if (sourceId != 0)
+            {
+                passwordIdMap[sourceId] = imported.Id;
+            }
+
+            importedPasswords++;
+        }
+
+        var importedSecureItems = 0;
+        foreach (var source in package.SecureItems)
+        {
+            var imported = CloneSecureItemForImport(source, passwordIdMap, categoryIdMap);
+            await _repository.SaveSecureItemAsync(imported);
+            importedSecureItems++;
+        }
+
+        await _repository.LogAsync(new OperationLog
+        {
+            ItemType = "VAULT",
+            ItemTitle = _localization.Get("MonicaJson"),
+            OperationType = "IMPORT",
+            ChangesJson = JsonSerializer.Serialize(new { importedPasswords, importedSecureItems, importedCategories }),
+            DeviceName = Environment.MachineName
+        });
+
+        await LoadAsync();
+        return new MonicaJsonImportResult(importedPasswords, importedSecureItems, importedCategories);
+    }
+
+    private string FormatMonicaJsonImportStatus(MonicaJsonImportResult result)
+    {
+        return result.Categories > 0
+            ? _localization.Format("ImportedMonicaJsonWithCategoriesFormat", result.Passwords, result.SecureItems, result.Categories)
+            : _localization.Format("ImportedMonicaJsonFormat", result.Passwords, result.SecureItems);
+    }
+
+    private bool HasSelectedWebDavBackupOptions() =>
+        WebDavBackupIncludePasswords ||
+        WebDavBackupIncludeTotp ||
+        WebDavBackupIncludeNotes ||
+        WebDavBackupIncludeCards ||
+        WebDavBackupIncludeDocuments ||
+        WebDavBackupIncludeImages ||
+        WebDavBackupIncludeCategories;
+
+    private int CountSelectedWebDavBackupOptions() =>
+        (WebDavBackupIncludePasswords ? 1 : 0) +
+        (WebDavBackupIncludeTotp ? 1 : 0) +
+        (WebDavBackupIncludeNotes ? 1 : 0) +
+        (WebDavBackupIncludeCards ? 1 : 0) +
+        (WebDavBackupIncludeDocuments ? 1 : 0) +
+        (WebDavBackupIncludeImages ? 1 : 0) +
+        (WebDavBackupIncludeCategories ? 1 : 0);
+
+    private static bool IsEncryptedWebDavBackup(string fileName) =>
+        fileName.EndsWith(".enc.json", StringComparison.OrdinalIgnoreCase);
+
+    private static string EncryptWebDavBackupPayload(string json, string password)
+    {
+        const int saltSize = 16;
+        const int nonceSize = 12;
+        const int tagSize = 16;
+        const int iterations = 300_000;
+
+        var salt = RandomNumberGenerator.GetBytes(saltSize);
+        var nonce = RandomNumberGenerator.GetBytes(nonceSize);
+        var plainBytes = Encoding.UTF8.GetBytes(json);
+        var cipherBytes = new byte[plainBytes.Length];
+        var tag = new byte[tagSize];
+        var key = Rfc2898DeriveBytes.Pbkdf2(Encoding.UTF8.GetBytes(password), salt, iterations, HashAlgorithmName.SHA256, 32);
+
+        using var aes = new AesGcm(key, tagSize);
+        aes.Encrypt(nonce, plainBytes, cipherBytes, tag);
+
+        return JsonSerializer.Serialize(new WebDavEncryptedBackupPackage(
+            1,
+            "pbkdf2-sha256",
+            iterations,
+            Convert.ToBase64String(salt),
+            Convert.ToBase64String(nonce),
+            Convert.ToBase64String(tag),
+            Convert.ToBase64String(cipherBytes)));
+    }
+
+    private static string DecryptWebDavBackupPayload(string content, string password)
+    {
+        const int tagSize = 16;
+        var package = JsonSerializer.Deserialize<WebDavEncryptedBackupPackage>(content)
+            ?? throw new InvalidOperationException("Invalid encrypted Monica backup payload.");
+        if (!string.Equals(package.Kdf, "pbkdf2-sha256", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Unsupported Monica backup encryption KDF.");
+        }
+
+        var salt = Convert.FromBase64String(package.Salt);
+        var nonce = Convert.FromBase64String(package.Nonce);
+        var tag = Convert.FromBase64String(package.Tag);
+        var cipherBytes = Convert.FromBase64String(package.CipherText);
+        var plainBytes = new byte[cipherBytes.Length];
+        var key = Rfc2898DeriveBytes.Pbkdf2(Encoding.UTF8.GetBytes(password), salt, package.Iterations, HashAlgorithmName.SHA256, 32);
+
+        using var aes = new AesGcm(key, tagSize);
+        aes.Decrypt(nonce, cipherBytes, tag, plainBytes);
+        return Encoding.UTF8.GetString(plainBytes);
     }
 
     [RelayCommand]
@@ -1738,6 +2533,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var metadata = await _mdbxVaultService.CreateLocalMetadataAsync("Local Monica Vault", Path.Combine(root, "local.mdbx"));
         await _repository.SaveMdbxDatabaseAsync(metadata);
         MdbxDatabases.Add(metadata);
+        OnPropertyChanged(nameof(MdbxDatabaseCountText));
+        RefreshVaultSources();
         StatusMessage = _localization.Get("CreatedMdbxMetadata");
     }
 
@@ -1888,6 +2685,194 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(WalletCountText));
         OnPropertyChanged(nameof(TimelineCountText));
         OnPropertyChanged(nameof(SecurityIssueCountText));
+        OnPropertyChanged(nameof(LocalDatabaseSummaryText));
+        OnPropertyChanged(nameof(MdbxDatabaseCountText));
+        OnPropertyChanged(nameof(VaultSourceCountText));
+        RaiseTotpSelectionState();
+        RaiseWalletSelectionState();
+    }
+
+    private void RefreshVaultSources()
+    {
+        VaultSources.Clear();
+        VaultSources.Add(new VaultSourceDisplayItem(
+            _localization.LocalDatabase,
+            "SQLite",
+            _localization.Get("CanonicalVault"),
+            _localization.Get("LocalOnly"),
+            _localization.Get("Available")));
+
+        if (WebDavEnabled)
+        {
+            VaultSources.Add(new VaultSourceDisplayItem(
+                _localization.WebDav,
+                "WebDAV",
+                string.IsNullOrWhiteSpace(WebDavRemotePath) ? "/" : WebDavRemotePath,
+                string.IsNullOrWhiteSpace(WebDavServerUrl) ? _localization.Get("NotConfigured") : WebDavServerUrl,
+                BuildWebDavSourceStatus()));
+        }
+
+        foreach (var database in MdbxDatabases)
+        {
+            VaultSources.Add(new VaultSourceDisplayItem(
+                string.IsNullOrWhiteSpace(database.Name) ? "MDBX" : database.Name,
+                "MDBX",
+                string.IsNullOrWhiteSpace(database.FilePath) ? _localization.Get("NotConfigured") : database.FilePath,
+                database.StorageLocation.ToString(),
+                LocalizeSyncStatus(database.LastSyncStatus)));
+        }
+
+        var keePassGroups = Passwords
+            .Concat(ArchivedPasswords)
+            .Concat(DeletedPasswords)
+            .Where(item => item.KeepassDatabaseId is not null)
+            .GroupBy(item => item.KeepassDatabaseId!.Value)
+            .OrderBy(group => group.Key);
+
+        foreach (var group in keePassGroups)
+        {
+            var sample = group.First();
+            VaultSources.Add(new VaultSourceDisplayItem(
+                _localization.Format("KeePassSourceNameFormat", group.Key),
+                "KDBX",
+                sample.KeepassGroupPath ?? _localization.Get("NotConfigured"),
+                _localization.Format("EntryCountFormat", group.Count()),
+                _localization.Get("DesktopEquivalent")));
+        }
+
+        var bitwardenGroups = Passwords
+            .Concat(ArchivedPasswords)
+            .Concat(DeletedPasswords)
+            .Where(item => item.BitwardenVaultId is not null)
+            .GroupBy(item => item.BitwardenVaultId!.Value)
+            .OrderBy(group => group.Key);
+
+        foreach (var group in bitwardenGroups)
+        {
+            var pendingCount = group.Count(item => item.BitwardenLocalModified);
+            VaultSources.Add(new VaultSourceDisplayItem(
+                _localization.Format("BitwardenSourceNameFormat", group.Key),
+                "Bitwarden",
+                _localization.Format("EntryCountFormat", group.Count()),
+                pendingCount > 0 ? _localization.Format("PendingSyncCountFormat", pendingCount) : _localization.Get("NoPendingChanges"),
+                pendingCount > 0 ? _localization.Get("Pending") : _localization.Get("Available")));
+        }
+
+        OnPropertyChanged(nameof(VaultSourceCountText));
+    }
+
+    private bool TryCreateWebDavProfile(out WebDavProfile profile)
+    {
+        profile = new WebDavProfile();
+        if (!WebDavEnabled)
+        {
+            StatusMessage = _localization.Get("EnableWebDavFirst");
+            return false;
+        }
+
+        if (!Uri.TryCreate(WebDavServerUrl, UriKind.Absolute, out var baseUri))
+        {
+            StatusMessage = _localization.Get("WebDavServerUrlRequired");
+            return false;
+        }
+
+        profile = new WebDavProfile
+        {
+            BaseUri = baseUri,
+            Username = WebDavUsername.Trim(),
+            Password = WebDavPassword,
+            RootPath = string.IsNullOrWhiteSpace(WebDavRemotePath) ? "/" : WebDavRemotePath
+        };
+        return true;
+    }
+
+    private WebDavBackupHistoryItem ToWebDavBackupHistoryItem(RemoteFileEntry item)
+    {
+        var fileName = ExtractWebDavFileName(item.Path);
+        var dateString = item.LastModified is null
+            ? _localization.Get("UnknownDate")
+            : item.LastModified.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm", _localization.Culture);
+        return new WebDavBackupHistoryItem(
+            fileName,
+            item.Path,
+            dateString,
+            FormatByteSize(item.Length),
+            item.LastModified);
+    }
+
+    private void RaiseWebDavBackupHistoryState()
+    {
+        OnPropertyChanged(nameof(WebDavBackupHistoryCountText));
+        OnPropertyChanged(nameof(HasWebDavBackupHistory));
+    }
+
+    private static string ExtractWebDavFileName(string path)
+    {
+        var normalized = Uri.TryCreate(path, UriKind.Absolute, out var uri) ? uri.AbsolutePath : path;
+        normalized = normalized.TrimEnd('/');
+        var index = normalized.LastIndexOf('/');
+        return Uri.UnescapeDataString(index >= 0 ? normalized[(index + 1)..] : normalized);
+    }
+
+    private string FormatByteSize(long? length)
+    {
+        if (length is null)
+        {
+            return _localization.Get("UnknownSize");
+        }
+
+        var value = (double)length.Value;
+        string[] units = ["B", "KB", "MB", "GB"];
+        var unitIndex = 0;
+        while (value >= 1024 && unitIndex < units.Length - 1)
+        {
+            value /= 1024;
+            unitIndex++;
+        }
+
+        return string.Format(_localization.Culture, "{0:0.#} {1}", value, units[unitIndex]);
+    }
+
+    private string BuildWebDavSourceStatus()
+    {
+        if (string.IsNullOrWhiteSpace(WebDavServerUrl))
+        {
+            return _localization.Get("NotConfigured");
+        }
+
+        if (WebDavSyncOnStartup && WebDavSyncAfterChanges)
+        {
+            return _localization.Get("AutomaticSync");
+        }
+
+        if (WebDavSyncOnStartup)
+        {
+            return _localization.Get("StartupSync");
+        }
+
+        if (WebDavSyncAfterChanges)
+        {
+            return _localization.Get("ChangeSync");
+        }
+
+        return _localization.Get("ManualSync");
+    }
+
+    private string LocalizeSyncStatus(SyncStatus status)
+    {
+        return status switch
+        {
+            SyncStatus.Synced => _localization.Get("Synced"),
+            SyncStatus.Syncing => _localization.Get("Syncing"),
+            SyncStatus.Pending => _localization.Get("Pending"),
+            SyncStatus.PendingUpload => _localization.Get("PendingUpload"),
+            SyncStatus.InSync => _localization.Get("Synced"),
+            SyncStatus.RemoteChanged => _localization.Get("RemoteChanged"),
+            SyncStatus.LocalOnly => _localization.Get("LocalOnly"),
+            SyncStatus.Conflict => _localization.Get("Conflict"),
+            SyncStatus.Failed => _localization.Get("Failed"),
+            _ => _localization.Get("None")
+        };
     }
 
     private void RaisePasswordSelectionState()
@@ -1897,6 +2882,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(HasSelectedPasswords));
         OnPropertyChanged(nameof(CanStackSelectedPasswords));
         OnPropertyChanged(nameof(AreAllFilteredPasswordsSelected));
+    }
+
+    private void RaiseTotpSelectionState()
+    {
+        OnPropertyChanged(nameof(SelectedTotpCount));
+        OnPropertyChanged(nameof(SelectedTotpCountText));
+        OnPropertyChanged(nameof(HasSelectedTotpItems));
+    }
+
+    private void RaiseWalletSelectionState()
+    {
+        OnPropertyChanged(nameof(SelectedWalletCount));
+        OnPropertyChanged(nameof(SelectedWalletCountText));
+        OnPropertyChanged(nameof(HasSelectedWalletItems));
     }
 
     private void RefreshPasswordFilters()
@@ -1919,6 +2918,34 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (e.PropertyName == nameof(PasswordEntry.IsSelected))
         {
             RaisePasswordSelectionState();
+        }
+    }
+
+    private void TrackTotpSelection(SecureItem item)
+    {
+        item.PropertyChanged -= SecureItemPropertyChanged;
+        item.PropertyChanged += SecureItemPropertyChanged;
+    }
+
+    private void SecureItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SecureItem.IsSelected))
+        {
+            RaiseTotpSelectionState();
+        }
+    }
+
+    private void TrackWalletSelection(SecureItem item)
+    {
+        item.PropertyChanged -= WalletItemPropertyChanged;
+        item.PropertyChanged += WalletItemPropertyChanged;
+    }
+
+    private void WalletItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SecureItem.IsSelected))
+        {
+            RaiseWalletSelectionState();
         }
     }
 
@@ -2175,18 +3202,30 @@ public sealed partial class MainWindowViewModel : ObservableObject
         StatusMessage = _localization.Get("ClearedPasswordHistory");
     }
 
-    private PasswordEntry ClonePasswordForExport(PasswordEntry source)
+    private PasswordEntry ClonePasswordForExport(PasswordEntry source, bool includeCategory = true)
     {
         var clone = ClonePassword(source);
         clone.Password = UnprotectPassword(source.Password);
+        if (!includeCategory)
+        {
+            clone.CategoryId = null;
+        }
+
         return clone;
     }
 
-    private PasswordEntry ClonePasswordForImport(PasswordEntry source)
+    private PasswordEntry ClonePasswordForImport(PasswordEntry source, IReadOnlyDictionary<long, long>? categoryIdMap = null)
     {
         var clone = ClonePassword(source);
         clone.Id = 0;
         clone.Password = ProtectPassword(UnprotectPassword(source.Password));
+        if (clone.CategoryId is { } categoryId)
+        {
+            clone.CategoryId = categoryIdMap?.TryGetValue(categoryId, out var importedCategoryId) == true
+                ? importedCategoryId
+                : null;
+        }
+
         clone.IsDeleted = false;
         clone.DeletedAt = null;
         clone.IsArchived = false;
@@ -2255,12 +3294,26 @@ public sealed partial class MainWindowViewModel : ObservableObject
         };
     }
 
-    private static SecureItem CloneSecureItemForExport(SecureItem source)
+    private static SecureItem CloneSecureItemForExport(SecureItem source, bool includeCategory = true, bool includeImages = true)
     {
-        return CloneSecureItem(source);
+        var clone = CloneSecureItem(source);
+        if (!includeCategory)
+        {
+            clone.CategoryId = null;
+        }
+
+        if (!includeImages)
+        {
+            StripSecureItemImages(clone);
+        }
+
+        return clone;
     }
 
-    private static SecureItem CloneSecureItemForImport(SecureItem source, IReadOnlyDictionary<long, long> passwordIdMap)
+    private static SecureItem CloneSecureItemForImport(
+        SecureItem source,
+        IReadOnlyDictionary<long, long> passwordIdMap,
+        IReadOnlyDictionary<long, long>? categoryIdMap = null)
     {
         var clone = CloneSecureItem(source);
         clone.Id = 0;
@@ -2268,6 +3321,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             clone.BoundPasswordId = passwordIdMap.TryGetValue(boundPasswordId, out var importedPasswordId)
                 ? importedPasswordId
+                : null;
+        }
+
+        if (clone.CategoryId is { } categoryId)
+        {
+            clone.CategoryId = categoryIdMap?.TryGetValue(categoryId, out var importedCategoryId) == true
+                ? importedCategoryId
                 : null;
         }
 
@@ -2310,6 +3370,48 @@ public sealed partial class MainWindowViewModel : ObservableObject
             BitwardenLocalModified = source.BitwardenLocalModified,
             SyncStatus = source.SyncStatus
         };
+    }
+
+    private static Category CloneCategory(Category source)
+    {
+        return new Category
+        {
+            Id = source.Id,
+            Name = source.Name,
+            SortOrder = source.SortOrder,
+            MdbxDatabaseId = source.MdbxDatabaseId
+        };
+    }
+
+    private static void StripSecureItemImages(SecureItem item)
+    {
+        item.ImagePaths = "[]";
+        if (item.ItemType == VaultItemType.Note)
+        {
+            var note = NoteContentCodec.DecodeFromItem(item);
+            item.ItemData = NoteContentCodec.BuildSavePayload(
+                item.Title,
+                note.Content,
+                string.Join(",", note.Tags),
+                note.IsMarkdown,
+                []).ItemData;
+            return;
+        }
+
+        if (item.ItemType == VaultItemType.Document)
+        {
+            var data = WalletItemDataCodec.DecodeDocument(item);
+            data.ImagePaths.Clear();
+            item.ItemData = WalletItemDataCodec.EncodeDocument(data);
+            return;
+        }
+
+        if (item.ItemType == VaultItemType.BankCard)
+        {
+            var data = WalletItemDataCodec.DecodeBankCard(item);
+            data.ImagePaths.Clear();
+            item.ItemData = WalletItemDataCodec.EncodeBankCard(data);
+        }
     }
 
     private void ReplacePasswordGroup(IReadOnlyList<PasswordEntry> previousEntries, IReadOnlyList<PasswordEntry> updatedEntries)
@@ -2430,6 +3532,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 continue;
             }
 
+            TrackTotpSelection(item);
             RefreshTotpDisplay(item);
             TotpItems.Add(item);
             if (item.BoundPasswordId is { } passwordId)
@@ -2441,9 +3544,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         foreach (var password in Passwords.Where(item => item.HasAuthenticator && !seenVirtualPasswordIds.Contains(item.Id)))
         {
             var virtualItem = BuildVirtualTotpItem(password);
+            TrackTotpSelection(virtualItem);
             RefreshTotpDisplay(virtualItem);
             TotpItems.Add(virtualItem);
         }
+
+        RaiseTotpSelectionState();
     }
 
     private async Task LoadTimelineAsync()
@@ -2793,6 +3899,112 @@ public sealed partial class MainWindowViewModel : ObservableObject
         entry.TotpProgress = _totpService.GetProgress(data.Period);
     }
 
+    private async Task SetTotpFavoriteAsync(SecureItem item, bool isFavorite)
+    {
+        item.IsFavorite = isFavorite;
+        if (item.BoundPasswordId is { } passwordId)
+        {
+            var password = Passwords.FirstOrDefault(entry => entry.Id == passwordId)
+                ?? (await _repository.GetPasswordsAsync()).FirstOrDefault(entry => entry.Id == passwordId);
+            if (password is not null)
+            {
+                password.IsFavorite = isFavorite;
+                await _repository.SavePasswordAsync(password);
+                await SynchronizeBoundTotpAsync(password);
+                var synchronized = (await _repository.GetSecureItemsByBoundPasswordIdAsync(password.Id))
+                    .FirstOrDefault(secureItem => secureItem.ItemType == VaultItemType.Totp);
+                if (synchronized is not null)
+                {
+                    synchronized.IsFavorite = isFavorite;
+                    await _repository.SaveSecureItemAsync(synchronized);
+                }
+            }
+        }
+        else if (item.Id > 0)
+        {
+            await _repository.SaveSecureItemAsync(item);
+        }
+
+        await _repository.LogAsync(new OperationLog
+        {
+            ItemType = "TOTP",
+            ItemId = item.Id,
+            ItemTitle = item.Title,
+            OperationType = "FAVORITE",
+            DeviceName = Environment.MachineName
+        });
+    }
+
+    private async Task DeleteTotpItemAsync(SecureItem item, bool updateStatus)
+    {
+        if (item.BoundPasswordId is { } passwordId)
+        {
+            var password = Passwords.FirstOrDefault(entry => entry.Id == passwordId)
+                ?? (await _repository.GetPasswordsAsync()).FirstOrDefault(entry => entry.Id == passwordId);
+            if (password is not null)
+            {
+                password.IsFavorite = item.IsFavorite;
+                password.AuthenticatorKey = "";
+                await _repository.SavePasswordAsync(password);
+                await SynchronizeBoundTotpAsync(password);
+                RefreshPasswordTotpDisplay(password);
+            }
+        }
+        else if (item.Id > 0)
+        {
+            await _repository.SoftDeleteSecureItemAsync(item.Id);
+        }
+
+        TotpItems.Remove(item);
+        item.IsSelected = false;
+        await _repository.LogAsync(new OperationLog
+        {
+            ItemType = "TOTP",
+            ItemId = item.Id,
+            ItemTitle = item.Title,
+            OperationType = "DELETE",
+            DeviceName = Environment.MachineName
+        });
+        RaiseCounts();
+        RaiseTotpSelectionState();
+        if (updateStatus)
+        {
+            await LoadTimelineAsync();
+            StatusMessage = _localization.Format("MovedToRecycleBinFormat", item.Title);
+        }
+    }
+
+    private async Task DeleteWalletItemCoreAsync(SecureItem item, bool updateStatus)
+    {
+        if (item.Id > 0)
+        {
+            await _repository.SoftDeleteSecureItemAsync(item.Id);
+        }
+
+        WalletItems.Remove(item);
+        item.IsSelected = false;
+        if (SelectedWalletItem?.Id == item.Id)
+        {
+            SelectedWalletItem = WalletItems.FirstOrDefault();
+        }
+
+        await _repository.LogAsync(new OperationLog
+        {
+            ItemType = "WALLET",
+            ItemId = item.Id,
+            ItemTitle = item.Title,
+            OperationType = "DELETE",
+            DeviceName = Environment.MachineName
+        });
+        RaiseCounts();
+        RaiseWalletSelectionState();
+        if (updateStatus)
+        {
+            await LoadTimelineAsync();
+            StatusMessage = _localization.Format("MovedToRecycleBinFormat", item.Title);
+        }
+    }
+
     private async Task SynchronizeBoundTotpAsync(PasswordEntry entry)
     {
         var existing = await _repository.GetSecureItemsByBoundPasswordIdAsync(entry.Id, includeDeleted: true);
@@ -2831,6 +4043,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         primary.BitwardenCipherId = entry.BitwardenCipherId;
         primary.BitwardenRevisionDate = entry.BitwardenRevisionDate;
         primary.BitwardenLocalModified = entry.BitwardenLocalModified;
+        primary.IsFavorite = entry.IsFavorite;
         primary.IsDeleted = false;
         primary.DeletedAt = null;
         primary.SyncStatus = entry.BitwardenVaultId is null ? SyncStatus.None : SyncStatus.Pending;
@@ -2854,6 +4067,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ItemData = data is null ? "{}" : TotpDataResolver.ToItemData(data),
             BoundPasswordId = entry.Id,
             CategoryId = entry.CategoryId,
+            IsFavorite = entry.IsFavorite,
             CreatedAt = entry.CreatedAt,
             UpdatedAt = entry.UpdatedAt
         };
@@ -3089,6 +4303,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private sealed record SecurityPasswordSnapshot(PasswordEntry Entry, string PlainPassword, string[] NormalizedWebsites);
     private sealed record WebsiteSnapshot(PasswordEntry Entry, string Website);
     private sealed record CompromisedPasswordResult(string PasswordHash, int ExposureCount);
+    private sealed record WebDavEncryptedBackupPackage(
+        int Version,
+        string Kdf,
+        int Iterations,
+        string Salt,
+        string Nonce,
+        string Tag,
+        string CipherText);
 
     private void ApplySettings(DesktopAppSettings settings)
     {
@@ -3114,9 +4336,19 @@ public sealed partial class MainWindowViewModel : ObservableObject
             WebDavEnabled = settings.WebDavEnabled;
             WebDavServerUrl = settings.WebDavServerUrl;
             WebDavUsername = settings.WebDavUsername;
+            WebDavPassword = settings.WebDavPassword;
             WebDavRemotePath = settings.WebDavRemotePath;
             WebDavSyncOnStartup = settings.WebDavSyncOnStartup;
             WebDavSyncAfterChanges = settings.WebDavSyncAfterChanges;
+            WebDavBackupIncludePasswords = settings.WebDavBackupIncludePasswords;
+            WebDavBackupIncludeTotp = settings.WebDavBackupIncludeTotp;
+            WebDavBackupIncludeNotes = settings.WebDavBackupIncludeNotes;
+            WebDavBackupIncludeCards = settings.WebDavBackupIncludeCards;
+            WebDavBackupIncludeDocuments = settings.WebDavBackupIncludeDocuments;
+            WebDavBackupIncludeImages = settings.WebDavBackupIncludeImages;
+            WebDavBackupIncludeCategories = settings.WebDavBackupIncludeCategories;
+            WebDavBackupEncryptionEnabled = settings.WebDavBackupEncryptionEnabled;
+            WebDavBackupEncryptionPassword = settings.WebDavBackupEncryptionPassword;
             SyncConflictStrategy = settings.SyncConflictStrategy;
             OneDriveEnabled = settings.OneDriveEnabled;
             MdbxLocalCacheEnabled = settings.MdbxLocalCacheEnabled;
@@ -3138,6 +4370,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         update(_settingsService.Current);
         QueueSaveSettings();
+    }
+
+    private void UpdateWebDavBackupOption(Action<DesktopAppSettings> update)
+    {
+        UpdateSettings(update);
+        OnPropertyChanged(nameof(WebDavBackupOptionsSummaryText));
     }
 
     private void QueueSaveSettings()
@@ -3168,6 +4406,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(LoginButtonText));
         OnPropertyChanged(nameof(GeneratorLengthText));
         OnPropertyChanged(nameof(GeneratedPasswordStrengthText));
+        OnPropertyChanged(nameof(WebDavConnectionStatusText));
+        OnPropertyChanged(nameof(LegacyVaultImportPromptText));
+        OnPropertyChanged(nameof(WebDavBackupOptionsSummaryText));
+        RefreshVaultSources();
+        RaiseWebDavBackupHistoryState();
         RaisePasswordQuickAccessState();
         RaiseCounts();
         OnPropertyChanged(nameof(SecurityIssueCountText));
@@ -3177,6 +4420,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             CompromisedPasswordStatus = _localization.Get("CompromisedPasswordNotChecked");
         }
+    }
+
+    private void RaiseLegacyVaultImportPrompt()
+    {
+        OnPropertyChanged(nameof(HasLegacyVaultImportPrompt));
+        OnPropertyChanged(nameof(LegacyVaultImportPromptText));
     }
 
     private void RefreshChoiceLabels()
@@ -3201,6 +4450,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             new("RecycleBin", _localization.RecycleBin),
             new("SecurityAnalysis", _localization.SecurityAnalysis),
             new("Timeline", _localization.Timeline),
+            new("DatabaseManagement", _localization.DatabaseManagement),
             new("Sync", _localization.SyncAndBackup),
             new("Settings", _localization.Settings));
 
@@ -3280,6 +4530,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             "RecycleBin" => _localization.RecycleBin,
             "SecurityAnalysis" => _localization.SecurityAnalysis,
             "Timeline" => _localization.Timeline,
+            "DatabaseManagement" => _localization.DatabaseManagement,
             "Sync" => _localization.SyncAndBackup,
             "Settings" => _localization.Settings,
             _ => section

@@ -13,6 +13,13 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
 
     public async Task MigrateAsync(CancellationToken cancellationToken = default)
     {
+        var legacyDetection = await new LegacyVaultDetector(connectionFactory).DetectAsync(cancellationToken);
+        if (legacyDetection.RequiresImport)
+        {
+            throw new InvalidOperationException(
+                "This database looks like a Monica for Windows PascalCase vault. Import it through the desktop migration flow before using the Avalonia v68 schema.");
+        }
+
         await using var connection = connectionFactory.CreateConnection();
         await connection.OpenAsync(cancellationToken);
 

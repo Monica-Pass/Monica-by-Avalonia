@@ -69,6 +69,21 @@ public sealed class AppSettingsTests
     }
 
     [Fact]
+    public async Task App_settings_allows_database_management_startup_section()
+    {
+        var path = GetTempPath();
+        var settings = new AppSettingsService(path);
+        await settings.LoadAsync();
+        settings.Current.StartupSection = "DatabaseManagement";
+        await settings.SaveAsync();
+
+        var reloaded = new AppSettingsService(path);
+        await reloaded.LoadAsync();
+
+        Assert.Equal("DatabaseManagement", reloaded.Current.StartupSection);
+    }
+
+    [Fact]
     public async Task ViewModel_initializes_chinese_language_and_saves_changed_settings()
     {
         var settingsPath = GetTempPath();
@@ -95,7 +110,37 @@ public sealed class AppSettingsTests
         Assert.Equal("https://dav.example.com", reloaded.Current.WebDavServerUrl);
     }
 
-    private static MainWindowViewModel CreateViewModel(string settingsPath)
+    [Fact]
+    public async Task ViewModel_loads_and_deletes_webdav_backup_history()
+    {
+        var settingsPath = GetTempPath();
+        var webDav = new CapturingWebDavBackupService(
+        [
+            new RemoteFileEntry("/Monica/backup_20260101_120000.zip", false, 2048, new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero)),
+            new RemoteFileEntry("/Monica/folder", true, null, null)
+        ]);
+        var viewModel = CreateViewModel(settingsPath, webDav);
+        viewModel.WebDavEnabled = true;
+        viewModel.WebDavServerUrl = "https://dav.example.com";
+        viewModel.WebDavUsername = "user";
+        viewModel.WebDavPassword = "secret";
+        viewModel.WebDavRemotePath = "/Monica";
+
+        await viewModel.LoadWebDavBackupsCommand.ExecuteAsync(null);
+
+        var item = Assert.Single(viewModel.WebDavBackupHistory);
+        Assert.Equal("backup_20260101_120000.zip", item.FileName);
+        Assert.Equal("2 KB", item.SizeText);
+        Assert.Equal("https://dav.example.com/", webDav.LastProfile?.BaseUri.ToString());
+        Assert.Equal("/Monica", webDav.LastProfile?.RootPath);
+
+        await viewModel.DeleteWebDavBackupCommand.ExecuteAsync(item);
+
+        Assert.Empty(viewModel.WebDavBackupHistory);
+        Assert.Equal(item.FileName, webDav.DeletedPath);
+    }
+
+    private static MainWindowViewModel CreateViewModel(string settingsPath, IWebDavBackupService? webDavBackupService = null)
     {
         var databasePath = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
         Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
@@ -110,11 +155,13 @@ public sealed class AppSettingsTests
             new ImportExportService(),
             new PlatformCapabilityService(),
             new NoopClipboardService(),
+            webDavBackupService ?? new NoopWebDavBackupService(),
             new MdbxVaultService(),
             new NoopPasswordAttachmentFileService(),
             new NoopPasswordEditorDialogService(),
             new NoopPasswordDetailDialogService(),
             new NoopCategoryPickerDialogService(),
+            new LegacyVaultDetector(factory),
             new AppSettingsService(settingsPath),
             new LocalizationService());
     }
@@ -129,6 +176,49 @@ public sealed class AppSettingsTests
     private sealed class NoopClipboardService : IClipboardService
     {
         public Task SetTextAsync(string text, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class NoopWebDavBackupService : IWebDavBackupService
+    {
+        public string NormalizeRemotePath(string rootPath, string relativePath) => relativePath;
+        public Task<IReadOnlyList<RemoteFileEntry>> ListAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<RemoteFileEntry>>([]);
+        public Task UploadTextAsync(WebDavProfile profile, string relativePath, string content, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<string> DownloadTextAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) => Task.FromResult("");
+        public Task DeleteAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class CapturingWebDavBackupService(IReadOnlyList<RemoteFileEntry> entries) : IWebDavBackupService
+    {
+        public WebDavProfile? LastProfile { get; private set; }
+        public string DeletedPath { get; private set; } = "";
+
+        public string NormalizeRemotePath(string rootPath, string relativePath) => relativePath;
+
+        public Task<IReadOnlyList<RemoteFileEntry>> ListAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default)
+        {
+            LastProfile = profile;
+            return Task.FromResult(entries);
+        }
+
+        public Task UploadTextAsync(WebDavProfile profile, string relativePath, string content, CancellationToken cancellationToken = default)
+        {
+            LastProfile = profile;
+            return Task.CompletedTask;
+        }
+
+        public Task<string> DownloadTextAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default)
+        {
+            LastProfile = profile;
+            return Task.FromResult("");
+        }
+
+        public Task DeleteAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default)
+        {
+            LastProfile = profile;
+            DeletedPath = relativePath;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class NoopPasswordEditorDialogService : IPasswordEditorDialogService

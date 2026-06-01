@@ -9,13 +9,17 @@ namespace Monica.Core.ImportExport;
 
 public interface IImportExportService
 {
-    string ExportJson(IEnumerable<PasswordEntry> passwords, IEnumerable<SecureItem> secureItems);
+    string ExportJson(IEnumerable<PasswordEntry> passwords, IEnumerable<SecureItem> secureItems, IEnumerable<Category>? categories = null);
     MonicaExportPackage ImportJson(string json);
     string ExportPasswordCsv(IEnumerable<PasswordEntry> passwords);
     IReadOnlyList<PasswordEntry> ImportPasswordCsv(string csv);
 }
 
-public sealed record MonicaExportPackage(int SchemaVersion, IReadOnlyList<PasswordEntry> Passwords, IReadOnlyList<SecureItem> SecureItems);
+public sealed record MonicaExportPackage(
+    int SchemaVersion,
+    IReadOnlyList<PasswordEntry> Passwords,
+    IReadOnlyList<SecureItem> SecureItems,
+    IReadOnlyList<Category> Categories);
 
 public sealed class ImportExportService : IImportExportService
 {
@@ -38,12 +42,13 @@ public sealed class ImportExportService : IImportExportService
         "sshKeyData"
     ];
 
-    public string ExportJson(IEnumerable<PasswordEntry> passwords, IEnumerable<SecureItem> secureItems)
+    public string ExportJson(IEnumerable<PasswordEntry> passwords, IEnumerable<SecureItem> secureItems, IEnumerable<Category>? categories = null)
     {
         var package = new MonicaExportDtoPackage(
             68,
             passwords.Select(PasswordEntryDto.FromModel).ToList(),
-            secureItems.Select(SecureItemDto.FromModel).ToList());
+            secureItems.Select(SecureItemDto.FromModel).ToList(),
+            (categories ?? []).Select(CategoryDto.FromModel).ToList());
         return JsonSerializer.Serialize(package, MonicaJsonContext.Default.MonicaExportDtoPackage);
     }
 
@@ -51,11 +56,12 @@ public sealed class ImportExportService : IImportExportService
     {
         var package = JsonSerializer.Deserialize(json, MonicaJsonContext.Default.MonicaExportDtoPackage);
         return package is null
-            ? new MonicaExportPackage(68, [], [])
+            ? new MonicaExportPackage(68, [], [], [])
             : new MonicaExportPackage(
                 package.SchemaVersion,
                 package.Passwords.Select(item => item.ToModel()).ToList(),
-                package.SecureItems.Select(item => item.ToModel()).ToList());
+                package.SecureItems.Select(item => item.ToModel()).ToList(),
+                (package.Categories ?? []).Select(item => item.ToModel()).ToList());
     }
 
     public string ExportPasswordCsv(IEnumerable<PasswordEntry> passwords)
@@ -204,7 +210,41 @@ public sealed class ImportExportService : IImportExportService
     }
 }
 
-internal sealed record MonicaExportDtoPackage(int SchemaVersion, IReadOnlyList<PasswordEntryDto> Passwords, IReadOnlyList<SecureItemDto> SecureItems);
+internal sealed record MonicaExportDtoPackage(
+    int SchemaVersion,
+    IReadOnlyList<PasswordEntryDto> Passwords,
+    IReadOnlyList<SecureItemDto> SecureItems,
+    IReadOnlyList<CategoryDto>? Categories = null);
+
+internal sealed class CategoryDto
+{
+    public long Id { get; set; }
+    public string Name { get; set; } = "";
+    public int SortOrder { get; set; }
+    public long? MdbxDatabaseId { get; set; }
+
+    public static CategoryDto FromModel(Category source)
+    {
+        return new CategoryDto
+        {
+            Id = source.Id,
+            Name = source.Name,
+            SortOrder = source.SortOrder,
+            MdbxDatabaseId = source.MdbxDatabaseId
+        };
+    }
+
+    public Category ToModel()
+    {
+        return new Category
+        {
+            Id = Id,
+            Name = Name,
+            SortOrder = SortOrder,
+            MdbxDatabaseId = MdbxDatabaseId
+        };
+    }
+}
 
 internal sealed class PasswordEntryDto
 {
@@ -487,4 +527,5 @@ internal sealed class SecureItemDto
 [JsonSerializable(typeof(MonicaExportPackage))]
 [JsonSerializable(typeof(PasswordEntry))]
 [JsonSerializable(typeof(SecureItem))]
+[JsonSerializable(typeof(Category))]
 internal sealed partial class MonicaJsonContext : JsonSerializerContext;

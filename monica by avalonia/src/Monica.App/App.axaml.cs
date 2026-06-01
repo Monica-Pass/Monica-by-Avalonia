@@ -42,6 +42,7 @@ public partial class App : Application
         services.AddLogging();
         services.AddHttpClient();
         services.AddSingleton<ISqliteConnectionFactory, SqliteConnectionFactory>();
+        services.AddSingleton<ILegacyVaultDetector, LegacyVaultDetector>();
         services.AddSingleton<IDatabaseMigrator, DatabaseMigrator>();
         services.AddSingleton<IVaultCredentialStore, VaultCredentialStore>();
         services.AddSingleton<IMonicaRepository, MonicaRepository>();
@@ -71,6 +72,12 @@ public partial class App : Application
             _.GetRequiredService<ICryptoService>(),
             _.GetRequiredService<ITotpService>()));
         services.AddSingleton<ICategoryPickerDialogService>(_ => new CategoryPickerDialogService(
+            () => mainWindow,
+            _.GetRequiredService<ILocalizationService>()));
+        services.AddSingleton<ITotpEditorDialogService>(_ => new TotpEditorDialogService(
+            () => mainWindow,
+            _.GetRequiredService<ILocalizationService>()));
+        services.AddSingleton<IWalletItemEditorDialogService>(_ => new WalletItemEditorDialogService(
             () => mainWindow,
             _.GetRequiredService<ILocalizationService>()));
         services.AddSingleton<IAppSettingsService, AppSettingsService>();

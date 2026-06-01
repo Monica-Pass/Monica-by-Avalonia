@@ -14,6 +14,7 @@ public static class StringConverters
     public static IValueConverter IsRecycleBin { get; } = new SectionConverter("RecycleBin");
     public static IValueConverter IsSecurityAnalysis { get; } = new SectionConverter("SecurityAnalysis");
     public static IValueConverter IsTimeline { get; } = new SectionConverter("Timeline");
+    public static IValueConverter IsDatabaseManagement { get; } = new SectionConverter("DatabaseManagement");
     public static IValueConverter IsSettings { get; } = new SectionConverter("Settings");
     public static IValueConverter IsSync { get; } = new SectionConverter("Sync");
     public static IValueConverter IsSettingsOrSync { get; } = new SectionSetConverter(new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Settings", "Sync" });

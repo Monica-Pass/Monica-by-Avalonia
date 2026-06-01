@@ -23,9 +23,19 @@ public sealed class DesktopAppSettings
     public bool WebDavEnabled { get; set; }
     public string WebDavServerUrl { get; set; } = "";
     public string WebDavUsername { get; set; } = "";
+    public string WebDavPassword { get; set; } = "";
     public string WebDavRemotePath { get; set; } = "/Monica";
     public bool WebDavSyncOnStartup { get; set; }
     public bool WebDavSyncAfterChanges { get; set; }
+    public bool WebDavBackupIncludePasswords { get; set; } = true;
+    public bool WebDavBackupIncludeTotp { get; set; } = true;
+    public bool WebDavBackupIncludeNotes { get; set; } = true;
+    public bool WebDavBackupIncludeCards { get; set; } = true;
+    public bool WebDavBackupIncludeDocuments { get; set; } = true;
+    public bool WebDavBackupIncludeImages { get; set; } = true;
+    public bool WebDavBackupIncludeCategories { get; set; } = true;
+    public bool WebDavBackupEncryptionEnabled { get; set; }
+    public string WebDavBackupEncryptionPassword { get; set; } = "";
     public string SyncConflictStrategy { get; set; } = "ask";
     public bool OneDriveEnabled { get; set; }
     public bool MdbxLocalCacheEnabled { get; set; } = true;
@@ -97,7 +107,7 @@ public sealed class AppSettingsService : IAppSettingsService
     {
         settings.Language = NormalizeChoice(settings.Language, "system", "system", "en-US", "zh-CN");
         settings.Theme = NormalizeChoice(settings.Theme, "system", "system", "light", "dark");
-        settings.StartupSection = NormalizeChoice(settings.StartupSection, "Passwords", "Passwords", "Notes", "Totp", "Cards", "Generator", "Archive", "RecycleBin", "SecurityAnalysis", "Timeline", "Sync", "Settings");
+        settings.StartupSection = NormalizeChoice(settings.StartupSection, "Passwords", "Passwords", "Notes", "Totp", "Cards", "Generator", "Archive", "RecycleBin", "SecurityAnalysis", "Timeline", "DatabaseManagement", "Sync", "Settings");
         settings.SyncConflictStrategy = NormalizeChoice(settings.SyncConflictStrategy, "ask", "ask", "local-wins", "remote-wins");
         settings.PasswordSortOrder = NormalizeChoice(settings.PasswordSortOrder, "updated-desc", "updated-desc", "title-asc", "website-asc", "username-asc", "created-desc", "favorites-first");
         settings.AutoLockMinutes = Clamp(settings.AutoLockMinutes, 1, 120);

@@ -23,6 +23,9 @@ public interface IWebDavBackupService
 {
     string NormalizeRemotePath(string rootPath, string relativePath);
     Task<IReadOnlyList<RemoteFileEntry>> ListAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default);
+    Task UploadTextAsync(WebDavProfile profile, string relativePath, string content, CancellationToken cancellationToken = default);
+    Task<string> DownloadTextAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default);
+    Task DeleteAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default);
 }
 
 public interface IOneDriveBackupService

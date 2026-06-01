@@ -852,6 +852,166 @@ public sealed class PasswordManagementTests
     }
 
     [Fact]
+    public async Task ViewModel_adds_edits_favorites_and_deletes_totp_items()
+    {
+        var harness = CreateHarness();
+        await harness.ViewModel.LoadAsync();
+        harness.TotpDialog.ConfigureNext(editor =>
+        {
+            editor.Title = "GitHub";
+            editor.Secret = "JBSWY3DPEHPK3PXP";
+            editor.Issuer = "GitHub";
+            editor.AccountName = "dev@example.com";
+            editor.Notes = "primary account";
+        });
+
+        await harness.ViewModel.AddTotpCommand.ExecuteAsync(null);
+
+        var item = Assert.Single(harness.ViewModel.TotpItems);
+        Assert.Equal("GitHub", item.Title);
+        Assert.Equal("primary account", item.Notes);
+        Assert.True(item.Id > 0);
+        Assert.Single(await harness.Repository.GetSecureItemsAsync(VaultItemType.Totp));
+
+        harness.TotpDialog.ConfigureNext(editor =>
+        {
+            editor.Title = "GitHub prod";
+            editor.Secret = "JBSWY3DPEHPK3PXP";
+            editor.AccountName = "prod@example.com";
+            editor.IsFavorite = true;
+        });
+
+        await harness.ViewModel.EditTotpCommand.ExecuteAsync(item);
+
+        Assert.Equal("GitHub prod", item.Title);
+        Assert.True(item.IsFavorite);
+        var stored = Assert.Single(await harness.Repository.GetSecureItemsAsync(VaultItemType.Totp));
+        Assert.True(stored.IsFavorite);
+        Assert.Contains("prod@example.com", stored.ItemData);
+
+        await harness.ViewModel.ToggleTotpFavoriteCommand.ExecuteAsync(item);
+
+        Assert.False(item.IsFavorite);
+
+        item.IsSelected = true;
+        await harness.ViewModel.FavoriteSelectedTotpCommand.ExecuteAsync(null);
+
+        Assert.False(item.IsSelected);
+        Assert.True(item.IsFavorite);
+        Assert.False(harness.ViewModel.HasSelectedTotpItems);
+
+        item.IsSelected = true;
+        await harness.ViewModel.DeleteSelectedTotpCommand.ExecuteAsync(null);
+
+        Assert.Empty(harness.ViewModel.TotpItems);
+        Assert.Empty(await harness.Repository.GetSecureItemsAsync(VaultItemType.Totp));
+        Assert.Single(await harness.Repository.GetSecureItemsAsync(VaultItemType.Totp, includeDeleted: true));
+        Assert.Equal(harness.ViewModel.L.Format("MovedSelectedTotpToRecycleBinFormat", 1), harness.ViewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task ViewModel_edits_and_deletes_virtual_totp_from_bound_password()
+    {
+        var harness = CreateHarness();
+        var password = new PasswordEntry
+        {
+            Title = "GitHub",
+            Website = "github.com",
+            Username = "dev",
+            Password = "secret",
+            AuthenticatorKey = "JBSWY3DPEHPK3PXP"
+        };
+        await harness.Repository.SavePasswordAsync(password);
+        await harness.ViewModel.LoadAsync();
+        var item = Assert.Single(harness.ViewModel.TotpItems, entry => entry.BoundPasswordId == password.Id);
+
+        harness.TotpDialog.ConfigureNext(editor =>
+        {
+            editor.Title = "GitHub mobile";
+            editor.Secret = "JBSWY3DPEHPK3PXP";
+            editor.Issuer = "GitHub";
+            editor.AccountName = "mobile@example.com";
+            editor.IsFavorite = true;
+        });
+
+        await harness.ViewModel.EditTotpCommand.ExecuteAsync(item);
+
+        var updatedPassword = Assert.Single(await harness.Repository.GetPasswordsAsync());
+        Assert.Equal("GitHub mobile", updatedPassword.Title);
+        Assert.Equal("mobile@example.com", updatedPassword.Username);
+        Assert.Contains("otpauth://totp/", updatedPassword.AuthenticatorKey);
+        Assert.True(updatedPassword.IsFavorite);
+        var storedTotp = Assert.Single(await harness.Repository.GetSecureItemsByBoundPasswordIdAsync(password.Id));
+        Assert.True(storedTotp.IsFavorite);
+
+        var displayed = Assert.Single(harness.ViewModel.TotpItems, entry => entry.BoundPasswordId == password.Id);
+        await harness.ViewModel.DeleteTotpCommand.ExecuteAsync(displayed);
+
+        updatedPassword = Assert.Single(await harness.Repository.GetPasswordsAsync());
+        Assert.Empty(updatedPassword.AuthenticatorKey);
+        Assert.Empty(harness.ViewModel.TotpItems);
+        Assert.Empty(await harness.Repository.GetSecureItemsByBoundPasswordIdAsync(password.Id));
+    }
+
+    [Fact]
+    public async Task ViewModel_adds_edits_shows_and_batch_deletes_wallet_items()
+    {
+        var harness = CreateHarness();
+        await harness.ViewModel.LoadAsync();
+        harness.WalletDialog.ConfigureNext(editor =>
+        {
+            editor.SelectedWalletType = editor.WalletTypeOptions.Single(item => item.Value == VaultItemType.Document);
+            editor.Title = "Passport";
+            editor.DocumentNumber = "P12345678";
+            editor.FullName = "Ada Lovelace";
+            editor.IssuedDate = "2020-01-01";
+            editor.ExpiryDate = "2030-01-01";
+            editor.IssuedBy = "UK";
+            editor.ImagePathsText = "front.png\nback.png";
+            editor.Notes = "Travel document";
+        });
+
+        await harness.ViewModel.AddWalletItemCommand.ExecuteAsync(null);
+
+        var document = Assert.Single(harness.ViewModel.WalletItems);
+        Assert.Equal(VaultItemType.Document, document.ItemType);
+        Assert.Equal("Passport", document.Title);
+        Assert.Contains("P12345678", document.ItemData);
+        Assert.Contains("front.png", document.ImagePaths);
+        Assert.Equal(document.Id, harness.ViewModel.SelectedWalletItem?.Id);
+        Assert.Equal("P12***5678", harness.ViewModel.SelectedWalletDetails?.PrimaryText);
+        Assert.True(harness.ViewModel.SelectedWalletDetails?.HasImages);
+
+        harness.WalletDialog.ConfigureNext(editor =>
+        {
+            editor.SelectedWalletType = editor.WalletTypeOptions.Single(item => item.Value == VaultItemType.BankCard);
+            editor.Title = "Work card";
+            editor.CardNumber = "4111111111111111";
+            editor.CardholderName = "Ada Lovelace";
+            editor.BankName = "Monica Bank";
+            editor.ExpiryMonth = "12";
+            editor.ExpiryYear = "2030";
+            editor.Cvv = "123";
+            editor.ImagePathsText = "card-front.png";
+        });
+
+        await harness.ViewModel.EditWalletItemCommand.ExecuteAsync(document);
+
+        Assert.Equal(VaultItemType.BankCard, document.ItemType);
+        Assert.Equal("Work card", document.Title);
+        Assert.Contains("4111111111111111", document.ItemData);
+        Assert.Equal("**** **** **** 1111", harness.ViewModel.SelectedWalletDetails?.PrimaryText);
+
+        document.IsSelected = true;
+        await harness.ViewModel.DeleteSelectedWalletItemsCommand.ExecuteAsync(null);
+
+        Assert.Empty(harness.ViewModel.WalletItems);
+        Assert.Empty(await harness.Repository.GetSecureItemsAsync(VaultItemType.BankCard));
+        Assert.Single(await harness.Repository.GetSecureItemsAsync(VaultItemType.BankCard, includeDeleted: true));
+        Assert.Equal(harness.ViewModel.L.Format("MovedSelectedWalletItemsToRecycleBinFormat", 1), harness.ViewModel.StatusMessage);
+    }
+
+    [Fact]
     public async Task ViewModel_moves_selected_passwords_to_category_and_updates_bound_totp()
     {
         var harness = CreateHarness();
@@ -941,6 +1101,139 @@ public sealed class PasswordManagementTests
 
         Assert.Equal(work.Id, harness.ViewModel.SelectedPasswordFolderFilter?.Id);
         Assert.Equal(harness.ViewModel.L.Format("SelectedFolderFormat", "Work"), harness.ViewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task ViewModel_creates_webdav_backup_with_selected_data_groups()
+    {
+        var webDav = new FakeWebDavBackupService();
+        var harness = CreateHarness(webDavBackupService: webDav);
+        harness.Crypto.InitializeSession("source password", new byte[16]);
+        var category = new Category { Name = "Work", SortOrder = 1 };
+        await harness.Repository.SaveCategoryAsync(category);
+        await harness.Repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "GitHub",
+            Username = "dev",
+            Password = harness.Crypto.EncryptString("plain-webdav-secret"),
+            CategoryId = category.Id
+        });
+        await harness.Repository.SaveSecureItemAsync(new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = "Recovery",
+            ItemData = NoteContentCodec.BuildSavePayload("Recovery", "markdown body", "", true, ["inline.png"]).ItemData,
+            ImagePaths = NoteContentCodec.EncodeStringArray(["inline.png"]),
+            CategoryId = category.Id
+        });
+        await harness.ViewModel.LoadAsync();
+        harness.ViewModel.WebDavEnabled = true;
+        harness.ViewModel.WebDavServerUrl = "https://dav.example.com/";
+        harness.ViewModel.WebDavRemotePath = "/Monica";
+        harness.ViewModel.WebDavBackupIncludeTotp = false;
+        harness.ViewModel.WebDavBackupIncludeCards = false;
+        harness.ViewModel.WebDavBackupIncludeDocuments = false;
+        harness.ViewModel.WebDavBackupIncludeImages = false;
+
+        await harness.ViewModel.CreateWebDavBackupCommand.ExecuteAsync(null);
+
+        Assert.EndsWith(".monica.json", webDav.UploadedPath);
+        Assert.Contains("GitHub", webDav.UploadedContent);
+        Assert.Contains("plain-webdav-secret", webDav.UploadedContent);
+        Assert.Contains("Work", webDav.UploadedContent);
+        Assert.Contains("Recovery", webDav.UploadedContent);
+        Assert.DoesNotContain("inline.png", webDav.UploadedContent);
+        Assert.Single(harness.ViewModel.WebDavBackupHistory);
+        Assert.Equal(harness.ViewModel.L.Format("CreatedWebDavBackupFormat", harness.ViewModel.WebDavBackupHistory.Single().FileName), harness.ViewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task ViewModel_restores_webdav_backup_and_rebinds_categories()
+    {
+        var sourceWebDav = new FakeWebDavBackupService();
+        var source = CreateHarness(webDavBackupService: sourceWebDav);
+        source.Crypto.InitializeSession("source password", new byte[16]);
+        var category = new Category { Name = "Ops", SortOrder = 2 };
+        await source.Repository.SaveCategoryAsync(category);
+        var password = new PasswordEntry
+        {
+            Title = "Pager",
+            Username = "ops",
+            Password = source.Crypto.EncryptString("restore-secret"),
+            CategoryId = category.Id
+        };
+        await source.Repository.SavePasswordAsync(password);
+        await source.Repository.SaveSecureItemAsync(new SecureItem
+        {
+            ItemType = VaultItemType.Totp,
+            Title = "Pager",
+            BoundPasswordId = password.Id,
+            CategoryId = category.Id,
+            ItemData = TotpDataResolver.ToItemData(TotpDataResolver.FromAuthenticatorKey("JBSWY3DPEHPK3PXP")!)
+        });
+        await source.ViewModel.LoadAsync();
+        source.ViewModel.WebDavEnabled = true;
+        source.ViewModel.WebDavServerUrl = "https://dav.example.com/";
+        await source.ViewModel.CreateWebDavBackupCommand.ExecuteAsync(null);
+
+        var targetWebDav = new FakeWebDavBackupService
+        {
+            DownloadContent = sourceWebDav.UploadedContent
+        };
+        var target = CreateHarness(webDavBackupService: targetWebDav);
+        target.Crypto.InitializeSession("target password", new byte[16]);
+        target.ViewModel.WebDavEnabled = true;
+        target.ViewModel.WebDavServerUrl = "https://dav.example.com/";
+        var item = new WebDavBackupHistoryItem("monica_backup_20260601_120000.monica.json", "/Monica/monica_backup_20260601_120000.monica.json", "2026/06/01 12:00", "1 KB", null);
+
+        await target.ViewModel.RestoreWebDavBackupCommand.ExecuteAsync(item);
+
+        var restoredPassword = Assert.Single(await target.Repository.GetPasswordsAsync());
+        Assert.Equal("Pager", restoredPassword.Title);
+        Assert.Equal("restore-secret", target.Crypto.DecryptString(restoredPassword.Password));
+        var restoredCategory = Assert.Single(await target.Repository.GetCategoriesAsync());
+        Assert.Equal("Ops", restoredCategory.Name);
+        Assert.Equal(restoredCategory.Id, restoredPassword.CategoryId);
+        var restoredTotp = Assert.Single(await target.Repository.GetSecureItemsByBoundPasswordIdAsync(restoredPassword.Id));
+        Assert.Equal(restoredCategory.Id, restoredTotp.CategoryId);
+        Assert.Equal(target.ViewModel.L.Format("RestoredWebDavBackupFormat", item.FileName, 1, 1, 1), target.ViewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task ViewModel_creates_and_restores_encrypted_webdav_backup()
+    {
+        var webDav = new FakeWebDavBackupService();
+        var source = CreateHarness(webDavBackupService: webDav);
+        source.Crypto.InitializeSession("source password", new byte[16]);
+        await source.Repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "Encrypted",
+            Username = "user",
+            Password = source.Crypto.EncryptString("encrypted-secret")
+        });
+        await source.ViewModel.LoadAsync();
+        source.ViewModel.WebDavEnabled = true;
+        source.ViewModel.WebDavServerUrl = "https://dav.example.com/";
+        source.ViewModel.WebDavBackupEncryptionEnabled = true;
+        source.ViewModel.WebDavBackupEncryptionPassword = "backup password";
+
+        await source.ViewModel.CreateWebDavBackupCommand.ExecuteAsync(null);
+
+        Assert.EndsWith(".monica.enc.json", webDav.UploadedPath);
+        Assert.DoesNotContain("encrypted-secret", webDav.UploadedContent);
+
+        var targetWebDav = new FakeWebDavBackupService { DownloadContent = webDav.UploadedContent };
+        var target = CreateHarness(webDavBackupService: targetWebDav);
+        target.Crypto.InitializeSession("target password", new byte[16]);
+        target.ViewModel.WebDavEnabled = true;
+        target.ViewModel.WebDavServerUrl = "https://dav.example.com/";
+        target.ViewModel.WebDavBackupEncryptionPassword = "backup password";
+        var item = new WebDavBackupHistoryItem("monica_backup_20260601_120000.monica.enc.json", "/Monica/monica_backup_20260601_120000.monica.enc.json", "2026/06/01 12:00", "1 KB", null);
+
+        await target.ViewModel.RestoreWebDavBackupCommand.ExecuteAsync(item);
+
+        var restored = Assert.Single(await target.Repository.GetPasswordsAsync());
+        Assert.Equal("encrypted-secret", target.Crypto.DecryptString(restored.Password));
     }
 
     [Fact]
@@ -1557,7 +1850,7 @@ public sealed class PasswordManagementTests
         Assert.Equal(harness.ViewModel.L.Get("ExportedPasswordCsv"), harness.ViewModel.StatusMessage);
     }
 
-    private static PasswordHarness CreateHarness(IPwnedPasswordService? pwnedPasswordService = null)
+    private static PasswordHarness CreateHarness(IPwnedPasswordService? pwnedPasswordService = null, IWebDavBackupService? webDavBackupService = null)
     {
         var databasePath = GetTempDatabasePath();
         var factory = new SqliteConnectionFactory(databasePath);
@@ -1570,6 +1863,8 @@ public sealed class PasswordManagementTests
         var clipboard = new CapturingClipboardService();
         var detailDialog = new FakePasswordDetailDialogService(localization, clipboard, crypto, new TotpService());
         var categoryPicker = new FakeCategoryPickerDialogService();
+        var totpDialog = new FakeTotpEditorDialogService(localization);
+        var walletDialog = new FakeWalletItemEditorDialogService(localization);
         var viewModel = new MainWindowViewModel(
             repository,
             new VaultCredentialStore(factory, migrator),
@@ -1579,16 +1874,20 @@ public sealed class PasswordManagementTests
             new ImportExportService(),
             new PlatformCapabilityService(),
             clipboard,
+            webDavBackupService ?? new FakeWebDavBackupService(),
             new MdbxVaultService(),
             new FakePasswordAttachmentFileService(),
             dialog,
             detailDialog,
             categoryPicker,
+            new LegacyVaultDetector(factory),
             new AppSettingsService(GetTempSettingsPath()),
             localization,
-            pwnedPasswordService);
+            pwnedPasswordService: pwnedPasswordService,
+            totpEditorDialogService: totpDialog,
+            walletItemEditorDialogService: walletDialog);
 
-        return new PasswordHarness(viewModel, repository, crypto, dialog, detailDialog, categoryPicker, clipboard, databasePath);
+        return new PasswordHarness(viewModel, repository, crypto, dialog, detailDialog, categoryPicker, totpDialog, walletDialog, clipboard, databasePath);
     }
 
     private static async Task SetPasswordUpdatedAtAsync(string databasePath, long id, DateTimeOffset updatedAt)
@@ -1628,6 +1927,8 @@ public sealed class PasswordManagementTests
         FakePasswordEditorDialogService Dialog,
         FakePasswordDetailDialogService DetailDialog,
         FakeCategoryPickerDialogService CategoryPicker,
+        FakeTotpEditorDialogService TotpDialog,
+        FakeWalletItemEditorDialogService WalletDialog,
         CapturingClipboardService Clipboard,
         string DatabasePath);
 
@@ -1676,6 +1977,39 @@ public sealed class PasswordManagementTests
         }
     }
 
+    private sealed class FakeWebDavBackupService : IWebDavBackupService
+    {
+        public string UploadedPath { get; private set; } = "";
+        public string UploadedContent { get; private set; } = "";
+        public string DownloadContent { get; init; } = "";
+
+        public string NormalizeRemotePath(string rootPath, string relativePath)
+        {
+            var root = string.IsNullOrWhiteSpace(rootPath) ? "/" : rootPath.Trim();
+            root = "/" + root.Trim('/');
+            var relative = string.IsNullOrWhiteSpace(relativePath) ? "" : relativePath.Trim('/');
+            return string.IsNullOrEmpty(relative) ? root : $"{root}/{relative}";
+        }
+
+        public Task<IReadOnlyList<RemoteFileEntry>> ListAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<RemoteFileEntry>>(
+                string.IsNullOrEmpty(UploadedPath)
+                    ? []
+                    : [new RemoteFileEntry(NormalizeRemotePath(profile.RootPath, UploadedPath), false, UploadedContent.Length, DateTimeOffset.UtcNow)]);
+
+        public Task UploadTextAsync(WebDavProfile profile, string relativePath, string content, CancellationToken cancellationToken = default)
+        {
+            UploadedPath = relativePath;
+            UploadedContent = content;
+            return Task.CompletedTask;
+        }
+
+        public Task<string> DownloadTextAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) =>
+            Task.FromResult(string.IsNullOrEmpty(DownloadContent) ? UploadedContent : DownloadContent);
+
+        public Task DeleteAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
     private sealed class FakePasswordEditorDialogService(
         ILocalizationService localization,
         IPasswordGeneratorService passwordGenerator) : IPasswordEditorDialogService
@@ -1714,6 +2048,70 @@ public sealed class PasswordManagementTests
             _configureNext?.Invoke(editor);
             _configureNext = null;
             return Task.FromResult<PasswordEditorViewModel?>(editor.Validate() ? editor : null);
+        }
+    }
+
+    private sealed class FakeTotpEditorDialogService(ILocalizationService localization) : ITotpEditorDialogService
+    {
+        private Action<TotpEditorViewModel>? _configureNext;
+        private bool _cancelNext;
+
+        public void ConfigureNext(Action<TotpEditorViewModel> configure)
+        {
+            _cancelNext = false;
+            _configureNext = configure;
+        }
+
+        public void CancelNext()
+        {
+            _cancelNext = true;
+            _configureNext = null;
+        }
+
+        public Task<TotpEditorViewModel?> ShowAsync(SecureItem? item, CancellationToken cancellationToken = default)
+        {
+            if (_cancelNext)
+            {
+                _cancelNext = false;
+                return Task.FromResult<TotpEditorViewModel?>(null);
+            }
+
+            var editor = new TotpEditorViewModel(localization, item);
+            _configureNext?.Invoke(editor);
+            _configureNext = null;
+            return Task.FromResult<TotpEditorViewModel?>(editor.Validate() ? editor : null);
+        }
+    }
+
+    private sealed class FakeWalletItemEditorDialogService(ILocalizationService localization) : IWalletItemEditorDialogService
+    {
+        private Action<WalletItemEditorViewModel>? _configureNext;
+        private bool _cancelNext;
+
+        public void ConfigureNext(Action<WalletItemEditorViewModel> configure)
+        {
+            _cancelNext = false;
+            _configureNext = configure;
+        }
+
+        public void CancelNext()
+        {
+            _cancelNext = true;
+            _configureNext = null;
+        }
+
+        public Task<WalletItemEditorViewModel?> ShowAsync(SecureItem? item, VaultItemType? newItemType = null, CancellationToken cancellationToken = default)
+        {
+            if (_cancelNext)
+            {
+                _cancelNext = false;
+                return Task.FromResult<WalletItemEditorViewModel?>(null);
+            }
+
+            var editor = new WalletItemEditorViewModel(localization, item, newItemType);
+            _configureNext?.Invoke(editor);
+            _configureNext = null;
+            return Task.FromResult<WalletItemEditorViewModel?>(editor.Validate() ? editor : null);
         }
     }
 

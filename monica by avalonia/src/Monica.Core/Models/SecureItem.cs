@@ -16,6 +16,9 @@ public partial class SecureItem : ObservableObject
     [ObservableProperty]
     private bool _isFavorite;
 
+    [ObservableProperty]
+    private bool _isSelected;
+
     public int SortOrder { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

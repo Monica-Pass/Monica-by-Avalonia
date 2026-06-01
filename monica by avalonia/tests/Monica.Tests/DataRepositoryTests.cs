@@ -24,6 +24,30 @@ public sealed class DataRepositoryTests
     }
 
     [Fact]
+    public async Task Migration_refuses_legacy_pascal_case_windows_vault()
+    {
+        var path = GetTempDatabasePath();
+        await using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path}"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "CREATE TABLE PasswordEntries (Id INTEGER PRIMARY KEY, Title TEXT NOT NULL);";
+            await command.ExecuteNonQueryAsync();
+        }
+
+        var factory = new SqliteConnectionFactory(path);
+        var migrator = new DatabaseMigrator(factory);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => migrator.MigrateAsync());
+        Assert.Contains("Monica for Windows", exception.Message, StringComparison.Ordinal);
+
+        await using var verifyConnection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path};Mode=ReadOnly");
+        await verifyConnection.OpenAsync();
+        Assert.True(await HasTableAsync(verifyConnection, "PasswordEntries"));
+        Assert.False(await HasTableAsync(verifyConnection, "password_entries"));
+    }
+
+    [Fact]
     public async Task Repository_saves_password_secure_item_category_and_mdbx_metadata()
     {
         var path = GetTempDatabasePath();
@@ -291,5 +315,13 @@ public sealed class DataRepositoryTests
         var path = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         return path;
+    }
+
+    private static async Task<bool> HasTableAsync(Microsoft.Data.Sqlite.SqliteConnection connection, string tableName)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT 1 FROM sqlite_master WHERE type='table' AND name=$name LIMIT 1;";
+        command.Parameters.AddWithValue("$name", tableName);
+        return await command.ExecuteScalarAsync() is not null;
     }
 }
