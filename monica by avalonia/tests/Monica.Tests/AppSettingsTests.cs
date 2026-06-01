@@ -297,6 +297,35 @@ public sealed class AppSettingsTests
     }
 
     [Fact]
+    public async Task ViewModel_saves_aegis_json_export_through_file_picker()
+    {
+        var integration = new PlatformIntegrationService("TestOS",
+        [
+            PlatformIntegrationService.Available(PlatformFeatureKeys.FilePicker, "File picking works.")
+        ]);
+        var filePicker = new CapturingFileSystemPickerService(integration, null, "totp-aegis.json");
+        var viewModel = CreateViewModel(
+            GetTempPath(),
+            platformIntegrationService: integration,
+            fileSystemPickerService: filePicker);
+        viewModel.TotpItems.Add(new SecureItem
+        {
+            Title = "GitHub",
+            Notes = "work account",
+            ItemType = VaultItemType.Totp,
+            ItemData = TotpDataResolver.ToItemData(new TotpData("JBSWY3DPEHPK3PXP", "GitHub", "dev@example.com"))
+        });
+
+        await viewModel.SaveAegisJsonExportCommand.ExecuteAsync(null);
+
+        Assert.Contains("\"db\"", filePicker.SavedContent);
+        Assert.Contains("JBSWY3DPEHPK3PXP", filePicker.SavedContent);
+        Assert.EndsWith(".json", filePicker.SuggestedFileName, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Aegis JSON", Assert.Single(filePicker.SaveFileTypes).Name);
+        Assert.Equal(viewModel.L.Format("SavedExportFileFormat", "totp-aegis.json"), viewModel.StatusMessage);
+    }
+
+    [Fact]
     public async Task ViewModel_disables_platform_limited_desktop_settings()
     {
         var settingsPath = GetTempPath();

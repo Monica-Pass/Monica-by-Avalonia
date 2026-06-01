@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Monica.Core.ImportExport;
 using Monica.Core.Models;
 using Monica.Core.Services;
@@ -121,6 +122,64 @@ public sealed class CoreServicesTests
         Assert.Equal("""[{"rpId":"github.com"}]""", imported.PasskeyBindings);
         Assert.Equal("""{"ssid":"Monica"}""", imported.WifiMetadata);
         Assert.Equal("ssh-ed25519 AAAA", imported.SshKeyData);
+    }
+
+    [Fact]
+    public void Import_export_exports_totp_items_as_aegis_json()
+    {
+        var service = new ImportExportService();
+        var items = new[]
+        {
+            new SecureItem
+            {
+                Id = 42,
+                ItemType = VaultItemType.Totp,
+                Title = "GitHub",
+                Notes = "work account",
+                ItemData = TotpDataResolver.ToItemData(new TotpData(
+                    "jbsw y3dp-ehpk3pxp",
+                    "GitHub",
+                    "dev@example.com",
+                    Period: 45,
+                    Digits: 8,
+                    Algorithm: "SHA256"))
+            },
+            new SecureItem
+            {
+                Id = 43,
+                ItemType = VaultItemType.Totp,
+                Title = "Broken",
+                ItemData = "{}"
+            },
+            new SecureItem
+            {
+                Id = 44,
+                ItemType = VaultItemType.Note,
+                Title = "Not an authenticator",
+                ItemData = "{}"
+            }
+        };
+
+        var json = service.ExportAegisJson(items);
+
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        Assert.Equal(1, root.GetProperty("version").GetInt32());
+        Assert.Empty(root.GetProperty("header").GetProperty("slots").EnumerateArray());
+        Assert.Equal("", root.GetProperty("header").GetProperty("params").GetProperty("nonce").GetString());
+        var db = root.GetProperty("db");
+        Assert.Equal(3, db.GetProperty("version").GetInt32());
+        var entry = Assert.Single(db.GetProperty("entries").EnumerateArray());
+        Assert.Equal("totp", entry.GetProperty("type").GetString());
+        Assert.True(Guid.TryParse(entry.GetProperty("uuid").GetString(), out _));
+        Assert.Equal("dev@example.com", entry.GetProperty("name").GetString());
+        Assert.Equal("GitHub", entry.GetProperty("issuer").GetString());
+        Assert.Equal("work account", entry.GetProperty("note").GetString());
+        var info = entry.GetProperty("info");
+        Assert.Equal("JBSWY3DPEHPK3PXP", info.GetProperty("secret").GetString());
+        Assert.Equal("SHA256", info.GetProperty("algo").GetString());
+        Assert.Equal(8, info.GetProperty("digits").GetInt32());
+        Assert.Equal(45, info.GetProperty("period").GetInt32());
     }
 
     [Fact]

@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using CsvHelper;
 using CsvHelper.Configuration;
 using Monica.Core.Models;
+using Monica.Core.Services;
 
 namespace Monica.Core.ImportExport;
 
@@ -12,6 +13,7 @@ public interface IImportExportService
     string ExportJson(IEnumerable<PasswordEntry> passwords, IEnumerable<SecureItem> secureItems, IEnumerable<Category>? categories = null);
     MonicaExportPackage ImportJson(string json);
     string ExportPasswordCsv(IEnumerable<PasswordEntry> passwords);
+    string ExportAegisJson(IEnumerable<SecureItem> secureItems);
     IReadOnlyList<PasswordEntry> ImportPasswordCsv(string csv);
 }
 
@@ -97,6 +99,21 @@ public sealed class ImportExportService : IImportExportService
         }
 
         return writer.ToString();
+    }
+
+    public string ExportAegisJson(IEnumerable<SecureItem> secureItems)
+    {
+        var entries = secureItems
+            .Where(item => item.ItemType == VaultItemType.Totp)
+            .Select(CreateAegisEntry)
+            .OfType<AegisEntryDto>()
+            .ToList();
+        var package = new AegisExportPackageDto(
+            1,
+            new AegisHeaderDto([], new AegisHeaderParamsDto("", "")),
+            new AegisDatabaseDto(3, entries));
+
+        return JsonSerializer.Serialize(package, MonicaJsonContext.Default.AegisExportPackageDto);
     }
 
     public IReadOnlyList<PasswordEntry> ImportPasswordCsv(string csvText)
@@ -208,6 +225,42 @@ public sealed class ImportExportService : IImportExportService
             ? loginType
             : PasswordLoginType.Password;
     }
+
+    private static AegisEntryDto? CreateAegisEntry(SecureItem item)
+    {
+        var data = TotpDataResolver.ParseStoredItemData(item.ItemData, item.Title);
+        if (data is null || string.IsNullOrWhiteSpace(data.Secret))
+        {
+            return null;
+        }
+
+        var normalized = TotpDataResolver.Normalize(data);
+        if (!string.Equals(normalized.OtpType, "TOTP", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(normalized.OtpType, "STEAM", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var name = FirstNonEmpty(normalized.AccountName, item.Title, normalized.Issuer, "Authenticator");
+        var issuer = string.IsNullOrWhiteSpace(normalized.Issuer) ? item.Title.Trim() : normalized.Issuer;
+        var note = string.IsNullOrWhiteSpace(item.Notes) ? null : item.Notes.Trim();
+        var entryType = string.Equals(normalized.OtpType, "STEAM", StringComparison.OrdinalIgnoreCase) ? "steam" : "totp";
+
+        return new AegisEntryDto(
+            entryType,
+            Guid.NewGuid().ToString(),
+            name,
+            issuer,
+            note,
+            new AegisEntryInfoDto(
+                normalized.Secret,
+                normalized.Algorithm,
+                normalized.Digits,
+                normalized.Period));
+    }
+
+    private static string FirstNonEmpty(params string[] values) =>
+        values.Select(value => value.Trim()).First(value => !string.IsNullOrWhiteSpace(value));
 }
 
 internal sealed record MonicaExportDtoPackage(
@@ -215,6 +268,37 @@ internal sealed record MonicaExportDtoPackage(
     IReadOnlyList<PasswordEntryDto> Passwords,
     IReadOnlyList<SecureItemDto> SecureItems,
     IReadOnlyList<CategoryDto>? Categories = null);
+
+internal sealed record AegisExportPackageDto(
+    int Version,
+    AegisHeaderDto Header,
+    AegisDatabaseDto Db);
+
+internal sealed record AegisHeaderDto(
+    IReadOnlyList<AegisHeaderSlotDto> Slots,
+    AegisHeaderParamsDto Params);
+
+internal sealed class AegisHeaderSlotDto
+{
+}
+
+internal sealed record AegisHeaderParamsDto(string Nonce, string Tag);
+
+internal sealed record AegisDatabaseDto(int Version, IReadOnlyList<AegisEntryDto> Entries);
+
+internal sealed record AegisEntryDto(
+    string Type,
+    string Uuid,
+    string Name,
+    string Issuer,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Note,
+    AegisEntryInfoDto Info);
+
+internal sealed record AegisEntryInfoDto(
+    string Secret,
+    string Algo,
+    int Digits,
+    int Period);
 
 internal sealed class CategoryDto
 {
@@ -524,6 +608,7 @@ internal sealed class SecureItemDto
 
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web, WriteIndented = true)]
 [JsonSerializable(typeof(MonicaExportDtoPackage))]
+[JsonSerializable(typeof(AegisExportPackageDto))]
 [JsonSerializable(typeof(MonicaExportPackage))]
 [JsonSerializable(typeof(PasswordEntry))]
 [JsonSerializable(typeof(SecureItem))]

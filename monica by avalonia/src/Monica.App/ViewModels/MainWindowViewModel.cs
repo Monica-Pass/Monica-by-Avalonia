@@ -138,6 +138,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [
         new("Password CSV", ["*.csv"])
     ];
+    private static readonly PlatformFilePickerFileType[] AegisJsonFileTypes =
+    [
+        new("Aegis JSON", ["*.json"])
+    ];
 
     private enum QuickAccessSort
     {
@@ -422,6 +426,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private string _exportCsvPreview = "";
+
+    [ObservableProperty]
+    private string _exportAegisPreview = "";
 
     [ObservableProperty]
     private string _importCsvText = "";
@@ -2614,6 +2621,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
         StatusMessage = _localization.Get("ExportedPasswordCsv");
     }
 
+    [RelayCommand]
+    private void ExportAegisJson()
+    {
+        ExportAegisPreview = BuildAegisJsonExport();
+        StatusMessage = _localization.Get("ExportedAegisJson");
+    }
+
     [RelayCommand(CanExecute = nameof(CanUseFilePicker))]
     private async Task ImportMonicaJsonFileAsync()
     {
@@ -2682,6 +2696,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
             $"monica_passwords_{DateTimeOffset.Now:yyyyMMdd_HHmmss}.csv",
             ExportCsvPreview,
             PasswordCsvFileTypes);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUseFilePicker))]
+    private async Task SaveAegisJsonExportAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ExportAegisPreview))
+        {
+            ExportAegisJson();
+        }
+
+        await SaveExportTextAsync(
+            _localization.Get("ExportAegisJson"),
+            $"monica_totp_aegis_{DateTimeOffset.Now:yyyyMMdd_HHmmss}.json",
+            ExportAegisPreview,
+            AegisJsonFileTypes);
     }
 
     private async Task SaveExportTextAsync(
@@ -2915,6 +2944,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
             : Array.Empty<Category>();
 
         return _importExportService.ExportJson(exportPasswords, exportSecureItems, exportCategories);
+    }
+
+    private string BuildAegisJsonExport()
+    {
+        var exportTotps = TotpItems
+            .Select(item => CloneSecureItemForExport(item))
+            .ToArray();
+
+        return _importExportService.ExportAegisJson(exportTotps);
     }
 
     private async Task<MonicaJsonImportResult> ImportMonicaJsonAsync(string json)
@@ -5153,6 +5191,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ImportPasswordCsvFileCommand.NotifyCanExecuteChanged();
         SaveMonicaJsonExportCommand.NotifyCanExecuteChanged();
         SavePasswordCsvExportCommand.NotifyCanExecuteChanged();
+        SaveAegisJsonExportCommand.NotifyCanExecuteChanged();
     }
 
     private void RaiseAboutText()
