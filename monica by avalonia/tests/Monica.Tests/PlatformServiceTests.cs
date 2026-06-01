@@ -42,4 +42,53 @@ public sealed class PlatformServiceTests
         Assert.False(summary.Exists);
         Assert.Contains("not found", summary.Status, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void Platform_integration_reports_declared_capabilities()
+    {
+        var service = new PlatformIntegrationService(
+            "TestOS",
+            [
+                PlatformIntegrationService.Available(PlatformFeatureKeys.FilePicker, "Picker works."),
+                PlatformIntegrationService.Unsupported(PlatformFeatureKeys.NativePasskey, "Native passkeys are unavailable.")
+            ]);
+
+        Assert.Equal("TestOS", service.PlatformName);
+        Assert.True(service.GetCapability(PlatformFeatureKeys.FilePicker).IsUsable);
+        Assert.Equal(PlatformFeatureStatus.Unsupported, service.GetCapability(PlatformFeatureKeys.NativePasskey).Status);
+        Assert.Equal(PlatformFeatureStatus.Unsupported, service.GetCapability("unknown").Status);
+    }
+
+    [Fact]
+    public void Platform_capability_service_maps_native_passkey_status()
+    {
+        var integration = new PlatformIntegrationService(
+            "TestOS",
+            [
+                PlatformIntegrationService.DesktopEquivalent(PlatformFeatureKeys.BrowserBridge, "Bridge works."),
+                PlatformIntegrationService.DesktopEquivalent(PlatformFeatureKeys.GlobalHotkey, "Hotkey works."),
+                PlatformIntegrationService.Unsupported(PlatformFeatureKeys.NativePasskey, "Credential provider unavailable.")
+            ]);
+        var service = new PlatformCapabilityService(integration);
+
+        var autofill = service.GetCapability("autofill");
+        var credentialProvider = service.GetCapability("credential-provider");
+
+        Assert.Equal(PlatformFeatureStatus.DesktopEquivalent, autofill.Status);
+        Assert.Equal(PlatformFeatureStatus.Unsupported, credentialProvider.Status);
+        Assert.Equal("Credential provider unavailable.", credentialProvider.UnsupportedReason);
+    }
+
+    [Fact]
+    public async Task Unsupported_secret_protector_throws_platform_reason()
+    {
+        var integration = new PlatformIntegrationService(
+            "TestOS",
+            [PlatformIntegrationService.Unsupported(PlatformFeatureKeys.SecretProtection, "No keyring.")]);
+        var protector = new UnsupportedSecretProtector(integration);
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => protector.ProtectAsync("secret"));
+
+        Assert.Contains("No keyring", error.Message);
+    }
 }

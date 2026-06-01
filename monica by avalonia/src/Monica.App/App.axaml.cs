@@ -51,7 +51,14 @@ public partial class App : Application
         services.AddSingleton<IPasswordGeneratorService, PasswordGeneratorService>();
         services.AddSingleton<IPwnedPasswordService, PwnedPasswordService>();
         services.AddSingleton<IImportExportService, ImportExportService>();
+        services.AddSingleton<IPlatformIntegrationService, PlatformIntegrationService>();
         services.AddSingleton<IPlatformCapabilityService, PlatformCapabilityService>();
+        services.AddSingleton<ISecretProtector, UnsupportedSecretProtector>();
+        services.AddSingleton<IFileSystemPickerService, CapabilityOnlyFileSystemPickerService>();
+        services.AddSingleton<IBrowserBridgeService, CapabilityOnlyBrowserBridgeService>();
+        services.AddSingleton<INativePasskeyService, CapabilityOnlyNativePasskeyService>();
+        services.AddSingleton<ITrayService, CapabilityOnlyTrayService>();
+        services.AddSingleton<IGlobalHotkeyService, CapabilityOnlyGlobalHotkeyService>();
         services.AddSingleton<IWebDavBackupService, WebDavBackupService>();
         services.AddSingleton<IOneDriveBackupService, OneDriveBackupService>();
         services.AddSingleton<IKeePassVaultService, KeePassVaultService>();

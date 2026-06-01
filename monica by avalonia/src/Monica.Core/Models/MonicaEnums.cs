@@ -36,6 +36,7 @@ public enum PlatformFeatureStatus
     Available,
     DesktopEquivalent,
     PlatformLimited,
+    Unsupported,
     Planned
 }
 

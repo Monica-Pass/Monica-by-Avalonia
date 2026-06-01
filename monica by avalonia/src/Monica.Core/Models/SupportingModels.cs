@@ -134,4 +134,10 @@ public sealed class WebDavProfile
     public string RootPath { get; init; } = "/";
 }
 
-public sealed record PlatformCapability(string Key, string Title, string Description, PlatformFeatureStatus Status);
+public sealed record PlatformCapability(
+    string Key,
+    string Title,
+    string Description,
+    PlatformFeatureStatus Status,
+    string? UnsupportedReason = null,
+    string? SettingKey = null);
