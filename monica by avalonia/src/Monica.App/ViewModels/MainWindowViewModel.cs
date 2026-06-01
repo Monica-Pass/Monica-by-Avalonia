@@ -116,6 +116,11 @@ internal sealed class DisabledMasterPasswordMaintenanceService : IMasterPassword
         string newPassword,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(MasterPasswordMaintenanceResult.Failure("Master password maintenance is not available."));
+
+    public Task<MasterPasswordMaintenanceResult> ResetMasterPasswordFromUnlockedVaultAsync(
+        string newPassword,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(MasterPasswordMaintenanceResult.Failure("Master password maintenance is not available."));
 }
 
 public sealed partial class MainWindowViewModel : ObservableObject

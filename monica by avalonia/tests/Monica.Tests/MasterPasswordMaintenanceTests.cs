@@ -124,6 +124,45 @@ public sealed class MasterPasswordMaintenanceTests
         Assert.Equal("current-secret", harness.Crypto.DecryptString(reloadedPassword.Password));
     }
 
+    [Fact]
+    public async Task ResetMasterPasswordFromUnlockedVault_reencrypts_without_current_password()
+    {
+        var harness = await CreateHarnessAsync("old password");
+        var password = new PasswordEntry
+        {
+            Title = "Portal",
+            Password = harness.Crypto.EncryptString("current-secret")
+        };
+        await harness.Repository.SavePasswordAsync(password);
+
+        var result = await harness.Service.ResetMasterPasswordFromUnlockedVaultAsync("new password");
+
+        Assert.True(result.Success, result.Message);
+        Assert.Equal(1, result.PasswordsReencrypted);
+        var loadedCredential = await harness.CredentialStore.GetAsync();
+        Assert.NotNull(loadedCredential);
+        Assert.True(new CryptoService().VerifyMasterPassword("new password", loadedCredential));
+        Assert.False(new CryptoService().VerifyMasterPassword("old password", loadedCredential));
+        var reloadedPassword = Assert.Single(await harness.Repository.GetPasswordsAsync());
+        Assert.Equal("current-secret", harness.Crypto.DecryptString(reloadedPassword.Password));
+    }
+
+    [Fact]
+    public async Task ResetMasterPasswordFromUnlockedVault_requires_unlocked_crypto_session()
+    {
+        var harness = await CreateHarnessAsync("old password");
+        var lockedCrypto = new CryptoService();
+        var lockedService = new MasterPasswordMaintenanceService(harness.Factory, new DatabaseMigrator(harness.Factory), lockedCrypto);
+
+        var result = await lockedService.ResetMasterPasswordFromUnlockedVaultAsync("new password");
+
+        Assert.False(result.Success);
+        Assert.Contains("unlocked", result.Message, StringComparison.OrdinalIgnoreCase);
+        var loadedCredential = await harness.CredentialStore.GetAsync();
+        Assert.NotNull(loadedCredential);
+        Assert.True(new CryptoService().VerifyMasterPassword("old password", loadedCredential));
+    }
+
     private static async Task<TestHarness> CreateHarnessAsync(string masterPassword)
     {
         var factory = new SqliteConnectionFactory(GetTempDatabasePath());

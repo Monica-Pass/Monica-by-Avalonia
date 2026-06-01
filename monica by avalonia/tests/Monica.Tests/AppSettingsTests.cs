@@ -145,10 +145,12 @@ public sealed class AppSettingsTests
         viewModel.WebDavEnabled = true;
         viewModel.WebDavServerUrl = "https://dav.example.com";
         passwordCapability.IsEnabled = false;
-        await Task.Delay(250);
 
-        var reloaded = new AppSettingsService(settingsPath);
-        await reloaded.LoadAsync();
+        var reloaded = await LoadSettingsUntilAsync(settingsPath, settings =>
+            settings.WebDavEnabled &&
+            string.Equals(settings.WebDavServerUrl, "https://dav.example.com", StringComparison.Ordinal) &&
+            settings.FeatureToggles.TryGetValue("passwords", out var enabled) &&
+            !enabled);
         Assert.True(reloaded.Current.WebDavEnabled);
         Assert.Equal("https://dav.example.com", reloaded.Current.WebDavServerUrl);
         Assert.False(reloaded.IsFeatureEnabled("passwords"));
@@ -353,6 +355,27 @@ public sealed class AppSettingsTests
         return path;
     }
 
+    private static async Task<AppSettingsService> LoadSettingsUntilAsync(string path, Func<DesktopAppSettings, bool> predicate)
+    {
+        AppSettingsService settings = new(path);
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            settings = new AppSettingsService(path);
+            await settings.LoadAsync();
+            if (predicate(settings.Current))
+            {
+                return settings;
+            }
+
+            await Task.Delay(100);
+        }
+
+        settings = new AppSettingsService(path);
+        await settings.LoadAsync();
+        Assert.True(predicate(settings.Current));
+        return settings;
+    }
+
     private sealed class NoopClipboardService : IClipboardService
     {
         public Task SetTextAsync(string text, CancellationToken cancellationToken = default) => Task.CompletedTask;
@@ -412,6 +435,14 @@ public sealed class AppSettingsTests
             CancellationToken cancellationToken = default)
         {
             CurrentPassword = currentPassword;
+            NewPassword = newPassword;
+            return Task.FromResult(result);
+        }
+
+        public Task<MasterPasswordMaintenanceResult> ResetMasterPasswordFromUnlockedVaultAsync(
+            string newPassword,
+            CancellationToken cancellationToken = default)
+        {
             NewPassword = newPassword;
             return Task.FromResult(result);
         }

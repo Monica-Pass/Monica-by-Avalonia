@@ -9,6 +9,10 @@ public interface IMasterPasswordMaintenanceService
         string currentPassword,
         string newPassword,
         CancellationToken cancellationToken = default);
+
+    Task<MasterPasswordMaintenanceResult> ResetMasterPasswordFromUnlockedVaultAsync(
+        string newPassword,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record MasterPasswordMaintenanceResult(
@@ -79,6 +83,41 @@ public sealed class MasterPasswordMaintenanceService(
             return MasterPasswordMaintenanceResult.Failure("Current master password is incorrect.");
         }
 
+        return await ReEncryptUnlockedVaultAsync(connection, newPassword, cancellationToken);
+    }
+
+    public async Task<MasterPasswordMaintenanceResult> ResetMasterPasswordFromUnlockedVaultAsync(
+        string newPassword,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 8)
+        {
+            return MasterPasswordMaintenanceResult.Failure("New master password must be at least 8 characters.");
+        }
+
+        if (!cryptoService.IsUnlocked)
+        {
+            return MasterPasswordMaintenanceResult.Failure("Vault must be unlocked before resetting the master password.");
+        }
+
+        await migrator.MigrateAsync(cancellationToken);
+        await using var connection = connectionFactory.CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+
+        var storedHash = await LoadCredentialAsync(connection, cancellationToken);
+        if (storedHash is null)
+        {
+            return MasterPasswordMaintenanceResult.Failure("Vault credential is not initialized.");
+        }
+
+        return await ReEncryptUnlockedVaultAsync(connection, newPassword, cancellationToken);
+    }
+
+    private async Task<MasterPasswordMaintenanceResult> ReEncryptUnlockedVaultAsync(
+        Microsoft.Data.Sqlite.SqliteConnection connection,
+        string newPassword,
+        CancellationToken cancellationToken)
+    {
         IReadOnlyList<PlainSecretCell> plainSecrets;
         try
         {
@@ -93,17 +132,17 @@ public sealed class MasterPasswordMaintenanceService(
         IReadOnlyList<EncryptedSecretCell> encryptedSecrets;
         try
         {
-            cryptoService.InitializeSession(newPassword, newHash.Salt);
+            var newSession = new CryptoService();
+            newSession.InitializeSession(newPassword, newHash.Salt);
             encryptedSecrets = plainSecrets
                 .Select(cell => new EncryptedSecretCell(
                     cell.Spec,
                     cell.Id,
-                    cryptoService.EncryptString(cell.PlainText)))
+                    newSession.EncryptString(cell.PlainText)))
                 .ToList();
         }
         catch (Exception ex)
         {
-            cryptoService.VerifyMasterPassword(currentPassword, storedHash);
             return MasterPasswordMaintenanceResult.Failure($"Failed to encrypt vault data with the new master password: {ex.Message}");
         }
 
@@ -121,10 +160,10 @@ public sealed class MasterPasswordMaintenanceService(
         catch (Exception ex)
         {
             await transaction.RollbackAsync(cancellationToken);
-            cryptoService.VerifyMasterPassword(currentPassword, storedHash);
             return MasterPasswordMaintenanceResult.Failure($"Failed to save re-encrypted vault data: {ex.Message}");
         }
 
+        cryptoService.InitializeSession(newPassword, newHash.Salt);
         return new MasterPasswordMaintenanceResult(
             true,
             "Master password updated and vault data re-encrypted.",
