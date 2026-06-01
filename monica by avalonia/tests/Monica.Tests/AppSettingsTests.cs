@@ -214,6 +214,47 @@ public sealed class AppSettingsTests
         Assert.Equal("Global hotkeys need a native adapter.", hotkey.UnsupportedReason);
     }
 
+    [Fact]
+    public async Task ViewModel_disables_platform_limited_desktop_settings()
+    {
+        var settingsPath = GetTempPath();
+        var settings = new AppSettingsService(settingsPath);
+        await settings.LoadAsync();
+        settings.Current.MinimizeToTray = true;
+        settings.Current.BrowserIntegrationEnabled = true;
+        await settings.SaveAsync();
+
+        var integration = new PlatformIntegrationService("LimitedOS",
+        [
+            PlatformIntegrationService.Unsupported(PlatformFeatureKeys.Tray, "Tray is not available here."),
+            PlatformIntegrationService.PlatformLimited(PlatformFeatureKeys.GlobalHotkey, "Global hotkeys need compositor support."),
+            PlatformIntegrationService.Unsupported(PlatformFeatureKeys.BrowserBridge, "Browser bridge is not available here.")
+        ]);
+        var viewModel = CreateViewModel(settingsPath, platformIntegrationService: integration);
+
+        await viewModel.InitializeAsync();
+
+        Assert.False(viewModel.CanUseTrayIntegration);
+        Assert.False(viewModel.MinimizeToTray);
+        Assert.Contains("Tray is not available here.", viewModel.TrayIntegrationStatusText);
+        Assert.False(viewModel.CanUseGlobalHotkeyIntegration);
+        Assert.Contains("Global hotkeys need compositor support.", viewModel.GlobalHotkeyIntegrationStatusText);
+        Assert.False(viewModel.CanUseBrowserBridgeIntegration);
+        Assert.False(viewModel.BrowserIntegrationEnabled);
+        Assert.Contains("Browser bridge is not available here.", viewModel.BrowserBridgeIntegrationStatusText);
+
+        viewModel.MinimizeToTray = true;
+        viewModel.BrowserIntegrationEnabled = true;
+        await Task.Delay(250);
+
+        var reloaded = new AppSettingsService(settingsPath);
+        await reloaded.LoadAsync();
+        Assert.False(viewModel.MinimizeToTray);
+        Assert.False(viewModel.BrowserIntegrationEnabled);
+        Assert.False(reloaded.Current.MinimizeToTray);
+        Assert.False(reloaded.Current.BrowserIntegrationEnabled);
+    }
+
     private static MainWindowViewModel CreateViewModel(
         string settingsPath,
         IWebDavBackupService? webDavBackupService = null,

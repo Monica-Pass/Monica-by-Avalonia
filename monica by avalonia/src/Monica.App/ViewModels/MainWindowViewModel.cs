@@ -279,6 +279,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         PlatformName,
         PlatformIntegrationCapabilities.Count(item => item.IsUsable),
         PlatformIntegrationCapabilities.Count);
+    public bool CanUseTrayIntegration => IsPlatformIntegrationUsable(PlatformFeatureKeys.Tray);
+    public bool CanUseGlobalHotkeyIntegration => IsPlatformIntegrationUsable(PlatformFeatureKeys.GlobalHotkey);
+    public bool CanUseBrowserBridgeIntegration => IsPlatformIntegrationUsable(PlatformFeatureKeys.BrowserBridge);
+    public string TrayIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.Tray);
+    public string GlobalHotkeyIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.GlobalHotkey);
+    public string BrowserBridgeIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.BrowserBridge);
 
     [ObservableProperty]
     private string _selectedSection = "Passwords";
@@ -713,10 +719,31 @@ public sealed partial class MainWindowViewModel : ObservableObject
     partial void OnClearClipboardEnabledChanged(bool value) => UpdateSettings(settings => settings.ClearClipboardEnabled = value);
     partial void OnClipboardClearSecondsChanged(int value) => UpdateSettings(settings => settings.ClipboardClearSeconds = value);
     partial void OnRequirePasswordBeforeExportChanged(bool value) => UpdateSettings(settings => settings.RequirePasswordBeforeExport = value);
-    partial void OnMinimizeToTrayChanged(bool value) => UpdateSettings(settings => settings.MinimizeToTray = value);
+    partial void OnMinimizeToTrayChanged(bool value)
+    {
+        if (value && !CanUseTrayIntegration)
+        {
+            MinimizeToTray = false;
+            return;
+        }
+
+        UpdateSettings(settings => settings.MinimizeToTray = value);
+    }
+
     partial void OnQuickSearchEnabledChanged(bool value) => UpdateSettings(settings => settings.QuickSearchEnabled = value);
     partial void OnQuickSearchHotkeyChanged(string value) => UpdateSettings(settings => settings.QuickSearchHotkey = value);
-    partial void OnBrowserIntegrationEnabledChanged(bool value) => UpdateSettings(settings => settings.BrowserIntegrationEnabled = value);
+
+    partial void OnBrowserIntegrationEnabledChanged(bool value)
+    {
+        if (value && !CanUseBrowserBridgeIntegration)
+        {
+            BrowserIntegrationEnabled = false;
+            return;
+        }
+
+        UpdateSettings(settings => settings.BrowserIntegrationEnabled = value);
+    }
+
     partial void OnBrowserIntegrationPortChanged(int value) => UpdateSettings(settings => settings.BrowserIntegrationPort = value);
     partial void OnCompactPasswordListChanged(bool value)
     {
@@ -4407,10 +4434,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ClearClipboardEnabled = settings.ClearClipboardEnabled;
             ClipboardClearSeconds = settings.ClipboardClearSeconds;
             RequirePasswordBeforeExport = settings.RequirePasswordBeforeExport;
-            MinimizeToTray = settings.MinimizeToTray;
+            MinimizeToTray = settings.MinimizeToTray && CanUseTrayIntegration;
             QuickSearchEnabled = settings.QuickSearchEnabled;
             QuickSearchHotkey = settings.QuickSearchHotkey;
-            BrowserIntegrationEnabled = settings.BrowserIntegrationEnabled;
+            BrowserIntegrationEnabled = settings.BrowserIntegrationEnabled && CanUseBrowserBridgeIntegration;
             BrowserIntegrationPort = settings.BrowserIntegrationPort;
             CompactPasswordList = settings.CompactPasswordList;
             SelectedPasswordSort = settings.PasswordSortOrder;
@@ -4483,7 +4510,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RefreshCapabilities();
         OnPropertyChanged(nameof(SelectedSectionTitle));
         OnPropertyChanged(nameof(PlatformIntegrationsTitle));
-        OnPropertyChanged(nameof(PlatformIntegrationSummaryText));
+        RaisePlatformIntegrationState();
         OnPropertyChanged(nameof(LoginTitle));
         OnPropertyChanged(nameof(LoginDescription));
         OnPropertyChanged(nameof(LoginButtonText));
@@ -4591,7 +4618,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 capability.Status));
         }
 
+        RaisePlatformIntegrationState();
+    }
+
+    private void RaisePlatformIntegrationState()
+    {
         OnPropertyChanged(nameof(PlatformIntegrationSummaryText));
+        OnPropertyChanged(nameof(CanUseTrayIntegration));
+        OnPropertyChanged(nameof(CanUseGlobalHotkeyIntegration));
+        OnPropertyChanged(nameof(CanUseBrowserBridgeIntegration));
+        OnPropertyChanged(nameof(TrayIntegrationStatusText));
+        OnPropertyChanged(nameof(GlobalHotkeyIntegrationStatusText));
+        OnPropertyChanged(nameof(BrowserBridgeIntegrationStatusText));
     }
 
     private void RefreshCapabilities()
@@ -4637,6 +4675,26 @@ public sealed partial class MainWindowViewModel : ObservableObject
             _ => status.ToString()
         };
     }
+
+    private bool IsPlatformIntegrationUsable(string key) => GetPlatformIntegration(key).IsUsable;
+
+    private string FormatPlatformIntegrationStatus(string key)
+    {
+        var capability = GetPlatformIntegration(key);
+        var status = LocalizeFeatureStatus(capability.Status);
+        return string.IsNullOrWhiteSpace(capability.UnsupportedReason)
+            ? status
+            : $"{status}: {capability.UnsupportedReason}";
+    }
+
+    private PlatformIntegrationCapability GetPlatformIntegration(string key) =>
+        _sourcePlatformIntegrationCapabilities.FirstOrDefault(
+            item => string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase))
+        ?? new PlatformIntegrationCapability(
+            key,
+            PlatformFeatureStatus.Unsupported,
+            "This platform adapter has not declared this feature.",
+            "This platform adapter has not declared this feature.");
 
     private string SectionTitle(string section)
     {

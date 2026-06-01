@@ -958,7 +958,10 @@
                                     <fa:FASettingsExpander.Items>
                                         <fa:FASettingsExpanderItem Content="{Binding L.MinimizeToTray}" Description="{Binding L.MinimizeToTrayDescription}">
                                             <fa:FASettingsExpanderItem.Footer>
-                                                <ToggleSwitch IsChecked="{Binding MinimizeToTray}" />
+                                                <StackPanel Orientation="Horizontal" Spacing="12" Margin="16,0,0,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding TrayIntegrationStatusText}" FontSize="12" TextWrapping="Wrap" MaxWidth="260" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                    <ToggleSwitch IsChecked="{Binding MinimizeToTray}" IsEnabled="{Binding CanUseTrayIntegration}" ToolTip.Tip="{Binding TrayIntegrationStatusText}" />
+                                                </StackPanel>
                                             </fa:FASettingsExpanderItem.Footer>
                                         </fa:FASettingsExpanderItem>
 
@@ -970,19 +973,25 @@
 
                                         <fa:FASettingsExpanderItem Content="{Binding L.QuickSearchHotkey}" Description="{Binding L.QuickSearchHotkeyDescription}">
                                             <fa:FASettingsExpanderItem.Footer>
-                                                <TextBox Width="220" Text="{Binding QuickSearchHotkey}" />
+                                                <StackPanel Orientation="Horizontal" Spacing="12" Margin="16,0,0,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding GlobalHotkeyIntegrationStatusText}" FontSize="12" TextWrapping="Wrap" MaxWidth="260" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                    <TextBox Width="220" Text="{Binding QuickSearchHotkey}" IsEnabled="{Binding CanUseGlobalHotkeyIntegration}" ToolTip.Tip="{Binding GlobalHotkeyIntegrationStatusText}" />
+                                                </StackPanel>
                                             </fa:FASettingsExpanderItem.Footer>
                                         </fa:FASettingsExpanderItem>
 
                                         <fa:FASettingsExpanderItem Content="{Binding L.BrowserIntegration}" Description="{Binding L.BrowserIntegrationDescription}">
                                             <fa:FASettingsExpanderItem.Footer>
-                                                <ToggleSwitch IsChecked="{Binding BrowserIntegrationEnabled}" />
+                                                <StackPanel Orientation="Horizontal" Spacing="12" Margin="16,0,0,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding BrowserBridgeIntegrationStatusText}" FontSize="12" TextWrapping="Wrap" MaxWidth="260" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                    <ToggleSwitch IsChecked="{Binding BrowserIntegrationEnabled}" IsEnabled="{Binding CanUseBrowserBridgeIntegration}" ToolTip.Tip="{Binding BrowserBridgeIntegrationStatusText}" />
+                                                </StackPanel>
                                             </fa:FASettingsExpanderItem.Footer>
                                         </fa:FASettingsExpanderItem>
 
                                         <fa:FASettingsExpanderItem Content="{Binding L.BrowserIntegrationPort}" Description="{Binding L.BrowserIntegrationPortDescription}">
                                             <fa:FASettingsExpanderItem.Footer>
-                                                <NumericUpDown Width="180" Minimum="1024" Maximum="65535" Increment="1" Value="{Binding BrowserIntegrationPort}" />
+                                                <NumericUpDown Width="180" Minimum="1024" Maximum="65535" Increment="1" Value="{Binding BrowserIntegrationPort}" IsEnabled="{Binding CanUseBrowserBridgeIntegration}" ToolTip.Tip="{Binding BrowserBridgeIntegrationStatusText}" />
                                             </fa:FASettingsExpanderItem.Footer>
                                         </fa:FASettingsExpanderItem>
 
