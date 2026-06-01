@@ -183,12 +183,47 @@ public sealed class AppSettingsTests
         Assert.Equal(item.FileName, webDav.DeletedPath);
     }
 
-    private static MainWindowViewModel CreateViewModel(string settingsPath, IWebDavBackupService? webDavBackupService = null)
+    [Fact]
+    public async Task ViewModel_surfaces_platform_integration_statuses()
+    {
+        var integration = new PlatformIntegrationService("TestOS",
+        [
+            PlatformIntegrationService.Available(PlatformFeatureKeys.Tray, "Tray integration is ready."),
+            PlatformIntegrationService.PlatformLimited(PlatformFeatureKeys.GlobalHotkey, "Global hotkeys need a native adapter.")
+        ]);
+        var viewModel = CreateViewModel(GetTempPath(), platformIntegrationService: integration);
+
+        await viewModel.InitializeAsync();
+
+        Assert.Equal("TestOS", viewModel.PlatformName);
+        Assert.Equal(viewModel.L.Get("PlatformIntegrations"), viewModel.PlatformIntegrationsTitle);
+        Assert.Contains("TestOS", viewModel.PlatformIntegrationSummaryText);
+        Assert.Contains("1/2", viewModel.PlatformIntegrationSummaryText);
+
+        var tray = Assert.Single(viewModel.PlatformIntegrationCapabilities, item => item.Key == PlatformFeatureKeys.Tray);
+        Assert.Equal(viewModel.L.Get("Integration.tray.Title"), tray.Title);
+        Assert.Equal(viewModel.L.Available, tray.Status);
+        Assert.True(tray.IsUsable);
+        Assert.False(tray.HasUnsupportedReason);
+
+        var hotkey = Assert.Single(viewModel.PlatformIntegrationCapabilities, item => item.Key == PlatformFeatureKeys.GlobalHotkey);
+        Assert.Equal(viewModel.L.Get("Integration.global-hotkey.Title"), hotkey.Title);
+        Assert.Equal(viewModel.L.PlatformLimited, hotkey.Status);
+        Assert.False(hotkey.IsUsable);
+        Assert.True(hotkey.HasUnsupportedReason);
+        Assert.Equal("Global hotkeys need a native adapter.", hotkey.UnsupportedReason);
+    }
+
+    private static MainWindowViewModel CreateViewModel(
+        string settingsPath,
+        IWebDavBackupService? webDavBackupService = null,
+        IPlatformIntegrationService? platformIntegrationService = null)
     {
         var databasePath = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
         Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
         var factory = new SqliteConnectionFactory(databasePath);
         var migrator = new DatabaseMigrator(factory);
+        platformIntegrationService ??= new PlatformIntegrationService();
         return new MainWindowViewModel(
             new MonicaRepository(factory, migrator),
             new VaultCredentialStore(factory, migrator),
@@ -196,7 +231,8 @@ public sealed class AppSettingsTests
             new TotpService(),
             new PasswordGeneratorService(),
             new ImportExportService(),
-            new PlatformCapabilityService(),
+            new PlatformCapabilityService(platformIntegrationService),
+            platformIntegrationService,
             new NoopClipboardService(),
             webDavBackupService ?? new NoopWebDavBackupService(),
             new MdbxVaultService(),

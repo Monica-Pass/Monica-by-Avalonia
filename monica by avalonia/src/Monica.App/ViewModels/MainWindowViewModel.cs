@@ -18,6 +18,18 @@ using Monica.Platform.Services;
 namespace Monica.App.ViewModels;
 
 public sealed record SettingsChoice(object Value, string Label);
+public sealed record LocalizedPlatformIntegrationCapability(
+    string Key,
+    string Title,
+    string Description,
+    string Status,
+    string UnsupportedReason,
+    PlatformFeatureStatus StatusValue)
+{
+    public bool HasUnsupportedReason => !string.IsNullOrWhiteSpace(UnsupportedReason);
+    public bool IsUsable => StatusValue is PlatformFeatureStatus.Available or PlatformFeatureStatus.DesktopEquivalent;
+}
+
 public sealed class LocalizedPlatformCapability : ObservableObject
 {
     private readonly Action<string, bool> _setFeatureEnabled;
@@ -168,6 +180,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IAppSettingsService _settingsService;
     private readonly ILocalizationService _localization;
     private readonly IReadOnlyList<PlatformCapability> _sourceCapabilities;
+    private readonly IReadOnlyList<PlatformIntegrationCapability> _sourcePlatformIntegrationCapabilities;
     private IReadOnlyDictionary<long, IReadOnlyList<CustomField>> _passwordCustomFields = new Dictionary<long, IReadOnlyList<CustomField>>();
     private IReadOnlyDictionary<long, IReadOnlyList<Attachment>> _passwordAttachments = new Dictionary<long, IReadOnlyList<Attachment>>();
     private IReadOnlyDictionary<long, PasswordQuickAccessRecord> _passwordQuickAccessRecords = new Dictionary<long, PasswordQuickAccessRecord>();
@@ -184,6 +197,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IPasswordGeneratorService passwordGenerator,
         IImportExportService importExportService,
         IPlatformCapabilityService platformCapabilityService,
+        IPlatformIntegrationService platformIntegrationService,
         IClipboardService clipboardService,
         IWebDavBackupService? webDavBackupService,
         IMdbxVaultService mdbxVaultService,
@@ -219,7 +233,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _localization = localization;
         _localization.PropertyChanged += (_, _) => RefreshLocalizedProperties();
         _sourceCapabilities = platformCapabilityService.GetCapabilities();
+        _sourcePlatformIntegrationCapabilities = platformIntegrationService.GetCapabilities();
+        PlatformName = platformIntegrationService.PlatformName;
         CompromisedPasswordStatus = _localization.Get("CompromisedPasswordNotChecked");
+        RefreshPlatformIntegrationCapabilities();
         RefreshCapabilities();
         RefreshChoiceLabels();
     }
@@ -232,6 +249,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<SecureItem> TotpItems { get; } = [];
     public ObservableCollection<SecureItem> WalletItems { get; } = [];
     public ObservableCollection<Category> Categories { get; } = [];
+    public ObservableCollection<LocalizedPlatformIntegrationCapability> PlatformIntegrationCapabilities { get; } = [];
     public ObservableCollection<LocalizedPlatformCapability> Capabilities { get; } = [];
     public ObservableCollection<LocalMdbxDatabase> MdbxDatabases { get; } = [];
     public ObservableCollection<TimelineEntry> TimelineEntries { get; } = [];
@@ -253,6 +271,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isVaultInitialized;
+
+    public string PlatformName { get; }
+    public string PlatformIntegrationsTitle => _localization.Get("PlatformIntegrations");
+    public string PlatformIntegrationSummaryText => _localization.Format(
+        "PlatformIntegrationsDescriptionFormat",
+        PlatformName,
+        PlatformIntegrationCapabilities.Count(item => item.IsUsable),
+        PlatformIntegrationCapabilities.Count);
 
     [ObservableProperty]
     private string _selectedSection = "Passwords";
@@ -4453,8 +4479,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void RefreshLocalizedProperties()
     {
         RefreshChoiceLabels();
+        RefreshPlatformIntegrationCapabilities();
         RefreshCapabilities();
         OnPropertyChanged(nameof(SelectedSectionTitle));
+        OnPropertyChanged(nameof(PlatformIntegrationsTitle));
+        OnPropertyChanged(nameof(PlatformIntegrationSummaryText));
         OnPropertyChanged(nameof(LoginTitle));
         OnPropertyChanged(nameof(LoginDescription));
         OnPropertyChanged(nameof(LoginButtonText));
@@ -4544,6 +4573,25 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             target.Add(choice);
         }
+    }
+
+    private void RefreshPlatformIntegrationCapabilities()
+    {
+        PlatformIntegrationCapabilities.Clear();
+        foreach (var capability in _sourcePlatformIntegrationCapabilities)
+        {
+            var descriptionKey = $"Integration.{capability.Key}.Description";
+            var localizedDescription = _localization.Get(descriptionKey);
+            PlatformIntegrationCapabilities.Add(new LocalizedPlatformIntegrationCapability(
+                capability.Key,
+                _localization.Get($"Integration.{capability.Key}.Title"),
+                localizedDescription == descriptionKey ? capability.Description : localizedDescription,
+                LocalizeFeatureStatus(capability.Status),
+                capability.UnsupportedReason ?? "",
+                capability.Status));
+        }
+
+        OnPropertyChanged(nameof(PlatformIntegrationSummaryText));
     }
 
     private void RefreshCapabilities()

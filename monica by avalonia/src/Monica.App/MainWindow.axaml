@@ -994,6 +994,24 @@
                                     </fa:FASettingsExpander.Items>
                                 </fa:FASettingsExpander>
 
+                                <fa:FASettingsExpander Header="{Binding PlatformIntegrationsTitle}" Description="{Binding PlatformIntegrationSummaryText}" IsExpanded="False" ItemsSource="{Binding PlatformIntegrationCapabilities}">
+                                    <fa:FASettingsExpander.IconSource>
+                                        <fa:FASymbolIconSource Symbol="Permissions" />
+                                    </fa:FASettingsExpander.IconSource>
+                                    <fa:FASettingsExpander.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:LocalizedPlatformIntegrationCapability">
+                                            <fa:FASettingsExpanderItem Content="{Binding Title}" Description="{Binding Description}">
+                                                <fa:FASettingsExpanderItem.Footer>
+                                                    <StackPanel Spacing="2" Margin="16,0,0,0" MinWidth="160" MaxWidth="360">
+                                                        <TextBlock Text="{Binding Status}" FontWeight="SemiBold" />
+                                                        <TextBlock Text="{Binding UnsupportedReason}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding HasUnsupportedReason}" />
+                                                    </StackPanel>
+                                                </fa:FASettingsExpanderItem.Footer>
+                                            </fa:FASettingsExpanderItem>
+                                        </DataTemplate>
+                                    </fa:FASettingsExpander.ItemTemplate>
+                                </fa:FASettingsExpander>
+
                                 <fa:FAInfoBar IsOpen="True" Severity="Informational" Title="{Binding L.DesktopEquivalents}" Message="{Binding L.DesktopEquivalentsMessage}" />
                                 <fa:FASettingsExpander Header="{Binding L.FeatureParityMap}" Description="{Binding L.FeatureParityMapDescription}" IsExpanded="True" ItemsSource="{Binding Capabilities}">
                                     <fa:FASettingsExpander.IconSource>

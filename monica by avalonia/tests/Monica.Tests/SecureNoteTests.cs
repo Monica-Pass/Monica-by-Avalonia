@@ -94,6 +94,7 @@ public sealed class SecureNoteTests
             new PasswordGeneratorService(),
             new ImportExportService(),
             new PlatformCapabilityService(),
+            new PlatformIntegrationService(),
             new NoopClipboardService(),
             new NoopWebDavBackupService(),
             new MdbxVaultService(),

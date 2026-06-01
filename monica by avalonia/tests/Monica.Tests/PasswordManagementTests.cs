@@ -1873,6 +1873,7 @@ public sealed class PasswordManagementTests
             generator,
             new ImportExportService(),
             new PlatformCapabilityService(),
+            new PlatformIntegrationService(),
             clipboard,
             webDavBackupService ?? new FakeWebDavBackupService(),
             new MdbxVaultService(),
