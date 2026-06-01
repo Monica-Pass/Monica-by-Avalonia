@@ -4443,7 +4443,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         try
         {
             await _settingsService.SaveAsync();
-            StatusMessage = _localization.Get("SettingsSaved");
         }
         catch (Exception ex)
         {
