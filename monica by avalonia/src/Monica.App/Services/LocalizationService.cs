@@ -220,6 +220,9 @@ public interface ILocalizationService : INotifyPropertyChanged
     string ImportCsvWatermark { get; }
     string ExportPasswordCsv { get; }
     string ExportCsvPreview { get; }
+    string ExportTotpCsv { get; }
+    string ExportTotpCsvDescription { get; }
+    string ExportTotpCsvPreview { get; }
     string ExportAegisJson { get; }
     string ExportAegisJsonDescription { get; }
     string ExportAegisPreview { get; }
@@ -227,6 +230,7 @@ public interface ILocalizationService : INotifyPropertyChanged
     string ImportFromFile { get; }
     string SaveJsonExport { get; }
     string SaveCsvExport { get; }
+    string SaveTotpCsvExport { get; }
     string SaveAegisExport { get; }
     string PasswordGenerator { get; }
     string Generate { get; }
@@ -609,6 +613,9 @@ public sealed class LocalizationService : ILocalizationService
     public string ImportCsvWatermark => Text();
     public string ExportPasswordCsv => Text();
     public string ExportCsvPreview => Text();
+    public string ExportTotpCsv => Text();
+    public string ExportTotpCsvDescription => Text();
+    public string ExportTotpCsvPreview => Text();
     public string ExportAegisJson => Text();
     public string ExportAegisJsonDescription => Text();
     public string ExportAegisPreview => Text();
@@ -616,6 +623,7 @@ public sealed class LocalizationService : ILocalizationService
     public string ImportFromFile => Text();
     public string SaveJsonExport => Text();
     public string SaveCsvExport => Text();
+    public string SaveTotpCsvExport => Text();
     public string SaveAegisExport => Text();
     public string PasswordGenerator => Text();
     public string Generate => Text();
@@ -1038,6 +1046,9 @@ public sealed class LocalizationService : ILocalizationService
         ["ImportCsvWatermark"] = "Paste password CSV here",
         ["ExportPasswordCsv"] = "Export Password CSV",
         ["ExportCsvPreview"] = "Password CSV Preview",
+        ["ExportTotpCsv"] = "Export TOTP CSV",
+        ["ExportTotpCsvDescription"] = "Export authenticators as Monica for Windows compatible secure-item CSV rows.",
+        ["ExportTotpCsvPreview"] = "TOTP CSV Preview",
         ["ExportAegisJson"] = "Export Aegis JSON",
         ["ExportAegisJsonDescription"] = "Export authenticators as unencrypted Aegis JSON. The file contains plaintext TOTP secrets.",
         ["ExportAegisPreview"] = "Aegis JSON Preview",
@@ -1045,6 +1056,7 @@ public sealed class LocalizationService : ILocalizationService
         ["ImportFromFile"] = "Import from file",
         ["SaveJsonExport"] = "Save JSON export",
         ["SaveCsvExport"] = "Save CSV export",
+        ["SaveTotpCsvExport"] = "Save TOTP CSV",
         ["SaveAegisExport"] = "Save Aegis JSON",
         ["PasswordGenerator"] = "Password Generator",
         ["Generate"] = "Generate",
@@ -1410,6 +1422,7 @@ public sealed class LocalizationService : ILocalizationService
         ["ImportCsvRequired"] = "Paste password CSV before importing.",
         ["ImportedPasswordCsvFormat"] = "Imported {0} passwords from CSV.",
         ["ExportedPasswordCsv"] = "Prepared password CSV export preview",
+        ["ExportedTotpCsv"] = "Prepared TOTP CSV export preview",
         ["ExportedAegisJson"] = "Prepared Aegis JSON export preview",
         ["SavedExportFileFormat"] = "Saved export to {0}.",
         ["SaveExportFileFailedFormat"] = "Save export failed: {0}",
@@ -1550,6 +1563,9 @@ public sealed class LocalizationService : ILocalizationService
         ["ImportCsvWatermark"] = "在此粘贴密码 CSV",
         ["ExportPasswordCsv"] = "导出密码 CSV",
         ["ExportCsvPreview"] = "密码 CSV 预览",
+        ["ExportTotpCsv"] = "导出 TOTP CSV",
+        ["ExportTotpCsvDescription"] = "将验证器导出为 Monica for Windows 兼容的安全项目 CSV 行。",
+        ["ExportTotpCsvPreview"] = "TOTP CSV 预览",
         ["ExportAegisJson"] = "导出 Aegis JSON",
         ["ExportAegisJsonDescription"] = "将验证器导出为未加密的 Aegis JSON。文件会包含明文 TOTP 密钥。",
         ["ExportAegisPreview"] = "Aegis JSON 预览",
@@ -1557,6 +1573,7 @@ public sealed class LocalizationService : ILocalizationService
         ["ImportFromFile"] = "从文件导入",
         ["SaveJsonExport"] = "保存 JSON 导出",
         ["SaveCsvExport"] = "保存 CSV 导出",
+        ["SaveTotpCsvExport"] = "保存 TOTP CSV",
         ["SaveAegisExport"] = "保存 Aegis JSON",
         ["PasswordGenerator"] = "密码生成器",
         ["Generate"] = "生成",
@@ -1792,6 +1809,7 @@ public sealed class LocalizationService : ILocalizationService
         ["ImportCsvRequired"] = "请先粘贴密码 CSV 再导入。",
         ["ImportedPasswordCsvFormat"] = "已从 CSV 导入 {0} 个密码。",
         ["ExportedPasswordCsv"] = "已准备密码 CSV 导出预览",
+        ["ExportedTotpCsv"] = "已准备 TOTP CSV 导出预览",
         ["ExportedAegisJson"] = "已准备 Aegis JSON 导出预览",
         ["SavedExportFileFormat"] = "已保存导出到 {0}。",
         ["SaveExportFileFailedFormat"] = "保存导出失败：{0}",

@@ -13,6 +13,7 @@ public interface IImportExportService
     string ExportJson(IEnumerable<PasswordEntry> passwords, IEnumerable<SecureItem> secureItems, IEnumerable<Category>? categories = null);
     MonicaExportPackage ImportJson(string json);
     string ExportPasswordCsv(IEnumerable<PasswordEntry> passwords);
+    string ExportTotpCsv(IEnumerable<SecureItem> secureItems);
     string ExportAegisJson(IEnumerable<SecureItem> secureItems);
     IReadOnlyList<SecureItem> ImportAegisJson(string json);
     IReadOnlyList<PasswordEntry> ImportPasswordCsv(string csv);
@@ -43,6 +44,18 @@ public sealed class ImportExportService : IImportExportService
         "passkeyBindings",
         "wifiMetadata",
         "sshKeyData"
+    ];
+    private static readonly string[] SecureItemCsvHeaders =
+    [
+        "ID",
+        "Type",
+        "Title",
+        "Data",
+        "Notes",
+        "IsFavorite",
+        "ImagePaths",
+        "CreatedAt",
+        "UpdatedAt"
     ];
 
     public string ExportJson(IEnumerable<PasswordEntry> passwords, IEnumerable<SecureItem> secureItems, IEnumerable<Category>? categories = null)
@@ -96,6 +109,41 @@ public sealed class ImportExportService : IImportExportService
             csv.WriteField(password.PasskeyBindings);
             csv.WriteField(password.WifiMetadata);
             csv.WriteField(password.SshKeyData);
+            csv.NextRecord();
+        }
+
+        return writer.ToString();
+    }
+
+    public string ExportTotpCsv(IEnumerable<SecureItem> secureItems)
+    {
+        using var writer = new StringWriter(CultureInfo.InvariantCulture);
+        using var csv = new CsvWriter(writer, CreateCsvConfiguration());
+
+        foreach (var header in SecureItemCsvHeaders)
+        {
+            csv.WriteField(header);
+        }
+
+        csv.NextRecord();
+
+        foreach (var item in secureItems.Where(item => item.ItemType == VaultItemType.Totp))
+        {
+            var data = TotpDataResolver.ParseStoredItemData(item.ItemData, item.Title, item.Notes);
+            if (data is null || string.IsNullOrWhiteSpace(data.Secret))
+            {
+                continue;
+            }
+
+            csv.WriteField(item.Id);
+            csv.WriteField("TOTP");
+            csv.WriteField(item.Title);
+            csv.WriteField(TotpDataResolver.ToItemData(data));
+            csv.WriteField(item.Notes);
+            csv.WriteField(item.IsFavorite.ToString());
+            csv.WriteField("");
+            csv.WriteField(item.CreatedAt.ToUnixTimeMilliseconds());
+            csv.WriteField(item.UpdatedAt.ToUnixTimeMilliseconds());
             csv.NextRecord();
         }
 

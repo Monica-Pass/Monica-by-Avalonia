@@ -332,6 +332,36 @@ public sealed class AppSettingsTests
     }
 
     [Fact]
+    public async Task ViewModel_saves_totp_csv_export_through_file_picker()
+    {
+        var integration = new PlatformIntegrationService("TestOS",
+        [
+            PlatformIntegrationService.Available(PlatformFeatureKeys.FilePicker, "File picking works.")
+        ]);
+        var filePicker = new CapturingFileSystemPickerService(integration, null, "totp.csv");
+        var viewModel = CreateViewModel(
+            GetTempPath(),
+            platformIntegrationService: integration,
+            fileSystemPickerService: filePicker);
+        viewModel.TotpItems.Add(new SecureItem
+        {
+            Title = "GitHub",
+            Notes = "work account",
+            ItemType = VaultItemType.Totp,
+            ItemData = TotpDataResolver.ToItemData(new TotpData("JBSWY3DPEHPK3PXP", "GitHub", "dev@example.com"))
+        });
+
+        await viewModel.SaveTotpCsvExportCommand.ExecuteAsync(null);
+
+        Assert.Contains("ID,Type,Title,Data,Notes,IsFavorite,ImagePaths,CreatedAt,UpdatedAt", filePicker.SavedContent);
+        Assert.Contains("TOTP", filePicker.SavedContent);
+        Assert.Contains("JBSWY3DPEHPK3PXP", filePicker.SavedContent);
+        Assert.EndsWith(".csv", filePicker.SuggestedFileName, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("TOTP CSV", Assert.Single(filePicker.SaveFileTypes).Name);
+        Assert.Equal(viewModel.L.Format("SavedExportFileFormat", "totp.csv"), viewModel.StatusMessage);
+    }
+
+    [Fact]
     public async Task ViewModel_saves_aegis_json_export_through_file_picker()
     {
         var integration = new PlatformIntegrationService("TestOS",

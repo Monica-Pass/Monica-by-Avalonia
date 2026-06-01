@@ -183,6 +183,37 @@ public sealed class CoreServicesTests
     }
 
     [Fact]
+    public void Import_export_exports_totp_items_as_winui_compatible_csv()
+    {
+        var service = new ImportExportService();
+        var items = new[]
+        {
+            new SecureItem
+            {
+                Id = 42,
+                ItemType = VaultItemType.Totp,
+                Title = "GitHub",
+                Notes = "work account",
+                IsFavorite = true,
+                CreatedAt = DateTimeOffset.FromUnixTimeMilliseconds(1000),
+                UpdatedAt = DateTimeOffset.FromUnixTimeMilliseconds(2000),
+                ItemData = TotpDataResolver.ToItemData(new TotpData("jbsw y3dp-ehpk3pxp", "GitHub", "dev@example.com"))
+            },
+            new SecureItem { Id = 43, ItemType = VaultItemType.Totp, Title = "Broken", ItemData = "{}" },
+            new SecureItem { Id = 44, ItemType = VaultItemType.Note, Title = "Secure note", ItemData = "{}" }
+        };
+
+        var csv = service.ExportTotpCsv(items);
+
+        Assert.Contains("ID,Type,Title,Data,Notes,IsFavorite,ImagePaths,CreatedAt,UpdatedAt", csv);
+        Assert.Contains("42,TOTP,GitHub", csv);
+        Assert.Contains("JBSWY3DPEHPK3PXP", csv);
+        Assert.Contains("work account,True,,1000,2000", csv);
+        Assert.DoesNotContain("Broken", csv);
+        Assert.DoesNotContain("Secure note", csv);
+    }
+
+    [Fact]
     public void Import_export_imports_unencrypted_aegis_json()
     {
         var service = new ImportExportService();
