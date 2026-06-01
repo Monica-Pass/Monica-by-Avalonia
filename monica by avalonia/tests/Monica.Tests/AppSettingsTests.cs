@@ -303,6 +303,41 @@ public sealed class AppSettingsTests
     }
 
     [Fact]
+    public async Task ViewModel_imports_totp_csv_from_file_picker()
+    {
+        var integration = new PlatformIntegrationService("TestOS",
+        [
+            PlatformIntegrationService.Available(PlatformFeatureKeys.FilePicker, "File picking works.")
+        ]);
+        var csv = new ImportExportService().ExportTotpCsv(
+        [
+            new SecureItem
+            {
+                ItemType = VaultItemType.Totp,
+                Title = "GitHub",
+                Notes = "work account",
+                ItemData = TotpDataResolver.ToItemData(new TotpData("JBSWY3DPEHPK3PXP", "GitHub", "dev@example.com"))
+            }
+        ]);
+        var filePicker = new CapturingFileSystemPickerService(
+            integration,
+            new PickedTextFile("totp.csv", csv));
+        var viewModel = CreateViewModel(
+            GetTempPath(),
+            platformIntegrationService: integration,
+            fileSystemPickerService: filePicker);
+
+        await viewModel.ImportTotpCsvFileCommand.ExecuteAsync(null);
+
+        var imported = Assert.Single(viewModel.TotpItems);
+        Assert.Equal("GitHub", imported.Title);
+        Assert.Equal("", viewModel.ImportTotpCsvText);
+        Assert.Equal(viewModel.L.Format("ImportedTotpCsvFormat", 1, 0), viewModel.StatusMessage);
+        Assert.Equal("TOTP CSV", Assert.Single(filePicker.OpenFileTypes).Name);
+        Assert.Equal("*.csv", Assert.Single(Assert.Single(filePicker.OpenFileTypes).Patterns));
+    }
+
+    [Fact]
     public async Task ViewModel_saves_password_csv_export_through_file_picker()
     {
         var integration = new PlatformIntegrationService("TestOS",

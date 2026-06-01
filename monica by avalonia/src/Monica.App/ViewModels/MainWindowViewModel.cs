@@ -432,6 +432,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _importAegisJsonText = "";
 
     [ObservableProperty]
+    private string _importTotpCsvText = "";
+
+    [ObservableProperty]
     private string _exportCsvPreview = "";
 
     [ObservableProperty]
@@ -2686,6 +2689,26 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand(CanExecute = nameof(CanUseFilePicker))]
+    private async Task ImportTotpCsvFileAsync()
+    {
+        try
+        {
+            var file = await _fileSystemPickerService.OpenTextFileAsync(_localization.Get("ImportTotpCsv"), TotpCsvFileTypes);
+            if (file is null)
+            {
+                return;
+            }
+
+            ImportTotpCsvText = file.Content;
+            await ImportTotpCsvAsync();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = _localization.Format("ImportFailedFormat", ex.Message);
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUseFilePicker))]
     private async Task ImportAegisJsonFileAsync()
     {
         try
@@ -3250,6 +3273,54 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ImportAegisJsonText = "";
             await LoadAsync();
             StatusMessage = _localization.Format("ImportedAegisJsonFormat", importedTotps, skippedTotps);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = _localization.Format("ImportFailedFormat", ex.Message);
+        }
+    }
+
+    [RelayCommand]
+    private async Task ImportTotpCsvAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ImportTotpCsvText))
+        {
+            StatusMessage = _localization.Get("ImportTotpCsvRequired");
+            return;
+        }
+
+        try
+        {
+            var entries = _importExportService.ImportTotpCsv(ImportTotpCsvText);
+            var existingTitles = (await _repository.GetSecureItemsAsync(VaultItemType.Totp))
+                .Select(item => item.Title)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var importedTotps = 0;
+            var skippedTotps = 0;
+
+            foreach (var source in entries)
+            {
+                if (!existingTitles.Add(source.Title))
+                {
+                    skippedTotps++;
+                    continue;
+                }
+
+                await _repository.SaveSecureItemAsync(source);
+                importedTotps++;
+            }
+
+            await _repository.LogAsync(new OperationLog
+            {
+                ItemType = "TOTP",
+                ItemTitle = _localization.Get("TotpCsv"),
+                OperationType = "IMPORT",
+                DeviceName = Environment.MachineName
+            });
+
+            ImportTotpCsvText = "";
+            await LoadAsync();
+            StatusMessage = _localization.Format("ImportedTotpCsvFormat", importedTotps, skippedTotps);
         }
         catch (Exception ex)
         {
@@ -5298,6 +5369,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OpenGitHubRepositoryCommand.NotifyCanExecuteChanged();
         ImportMonicaJsonFileCommand.NotifyCanExecuteChanged();
         ImportPasswordCsvFileCommand.NotifyCanExecuteChanged();
+        ImportTotpCsvFileCommand.NotifyCanExecuteChanged();
         ImportAegisJsonFileCommand.NotifyCanExecuteChanged();
         SaveMonicaJsonExportCommand.NotifyCanExecuteChanged();
         SavePasswordCsvExportCommand.NotifyCanExecuteChanged();

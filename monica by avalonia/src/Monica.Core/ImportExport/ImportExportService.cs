@@ -15,6 +15,7 @@ public interface IImportExportService
     string ExportPasswordCsv(IEnumerable<PasswordEntry> passwords);
     string ExportTotpCsv(IEnumerable<SecureItem> secureItems);
     string ExportAegisJson(IEnumerable<SecureItem> secureItems);
+    IReadOnlyList<SecureItem> ImportTotpCsv(string csv);
     IReadOnlyList<SecureItem> ImportAegisJson(string json);
     IReadOnlyList<PasswordEntry> ImportPasswordCsv(string csv);
 }
@@ -197,6 +198,51 @@ public sealed class ImportExportService : IImportExportService
         return imported;
     }
 
+    public IReadOnlyList<SecureItem> ImportTotpCsv(string csvText)
+    {
+        using var reader = new StringReader(csvText);
+        using var csv = new CsvReader(reader, CreateCsvConfiguration());
+        var items = new List<SecureItem>();
+
+        if (!csv.Read())
+        {
+            return items;
+        }
+
+        csv.ReadHeader();
+
+        while (csv.Read())
+        {
+            var type = ReadField(csv, "type", "itemType", "item_type");
+            if (!string.Equals(type, "TOTP", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var title = ReadField(csv, "title", "name");
+            var dataText = ReadField(csv, "data", "itemData", "item_data");
+            var data = TotpDataResolver.ParseStoredItemData(dataText, title);
+            if (data is null || string.IsNullOrWhiteSpace(data.Secret))
+            {
+                continue;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            items.Add(new SecureItem
+            {
+                ItemType = VaultItemType.Totp,
+                Title = FirstNonEmpty(title, data.AccountName, data.Issuer, "Authenticator"),
+                Notes = ReadField(csv, "notes", "note"),
+                IsFavorite = ParseBoolean(ReadField(csv, "isFavorite", "favorite")),
+                CreatedAt = ParseUnixMilliseconds(ReadField(csv, "createdAt", "created_at")) ?? now,
+                UpdatedAt = ParseUnixMilliseconds(ReadField(csv, "updatedAt", "updated_at")) ?? now,
+                ItemData = TotpDataResolver.ToItemData(data)
+            });
+        }
+
+        return items;
+    }
+
     public IReadOnlyList<PasswordEntry> ImportPasswordCsv(string csvText)
     {
         using var reader = new StringReader(csvText);
@@ -306,6 +352,16 @@ public sealed class ImportExportService : IImportExportService
             ? loginType
             : PasswordLoginType.Password;
     }
+
+    private static bool ParseBoolean(string value) =>
+        bool.TryParse(value, out var result)
+            ? result
+            : value is "1" or "yes" or "YES";
+
+    private static DateTimeOffset? ParseUnixMilliseconds(string value) =>
+        long.TryParse(value, CultureInfo.InvariantCulture, out var milliseconds)
+            ? DateTimeOffset.FromUnixTimeMilliseconds(milliseconds)
+            : null;
 
     private static AegisEntryDto? CreateAegisEntry(SecureItem item)
     {
