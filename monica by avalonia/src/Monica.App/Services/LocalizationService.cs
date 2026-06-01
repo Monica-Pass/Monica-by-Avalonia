@@ -33,6 +33,8 @@ public interface ILocalizationService : INotifyPropertyChanged
     string CheckCompromisedPasswords { get; }
     string SyncAndBackup { get; }
     string DatabaseManagement { get; }
+    string DataManagement { get; }
+    string DataManagementDescription { get; }
     string Settings { get; }
     string Folders { get; }
     string Personal { get; }
@@ -413,6 +415,8 @@ public sealed class LocalizationService : ILocalizationService
     public string CheckCompromisedPasswords => Text();
     public string SyncAndBackup => Text();
     public string DatabaseManagement => Text();
+    public string DataManagement => Text();
+    public string DataManagementDescription => Text();
     public string Settings => Text();
     public string Folders => Text();
     public string Personal => Text();
@@ -799,6 +803,8 @@ public sealed class LocalizationService : ILocalizationService
         ["LowSeverity"] = "Low",
         ["SyncAndBackup"] = "Sync and Backup",
         ["DatabaseManagement"] = "Database Management",
+        ["DataManagement"] = "Data Management",
+        ["DataManagementDescription"] = "File import and export actions aligned with the Monica for Windows settings page.",
         ["Settings"] = "Settings",
         ["Folders"] = "Folders",
         ["Personal"] = "Personal",
@@ -1398,6 +1404,8 @@ public sealed class LocalizationService : ILocalizationService
         ["Generator"] = "生成器",
         ["SyncAndBackup"] = "同步与备份",
         ["DatabaseManagement"] = "数据库管理",
+        ["DataManagement"] = "数据管理",
+        ["DataManagementDescription"] = "与 Monica for Windows 设置页对齐的文件导入与导出操作。",
         ["Settings"] = "设置",
         ["Folders"] = "文件夹",
         ["Personal"] = "个人",
