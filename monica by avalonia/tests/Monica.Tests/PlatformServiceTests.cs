@@ -91,4 +91,43 @@ public sealed class PlatformServiceTests
 
         Assert.Contains("No keyring", error.Message);
     }
+
+    [Fact]
+    public void Secret_protector_factory_selects_platform_adapter()
+    {
+        var integration = new PlatformIntegrationService(
+            "TestOS",
+            [PlatformIntegrationService.Available(PlatformFeatureKeys.SecretProtection, "Secret protection works.")]);
+
+        var protector = SecretProtectorFactory.Create(integration);
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.IsType<WindowsSecretProtector>(protector);
+        }
+        else
+        {
+            Assert.IsType<UnsupportedSecretProtector>(protector);
+        }
+    }
+
+    [Fact]
+    public async Task Windows_secret_protector_roundtrips_current_user_secret()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var integration = new PlatformIntegrationService(
+            "Windows",
+            [PlatformIntegrationService.Available(PlatformFeatureKeys.SecretProtection, "Windows DPAPI is available.")]);
+        var protector = new WindowsSecretProtector(integration);
+
+        var protectedText = await protector.ProtectAsync("secret-value");
+        var roundtripped = await protector.UnprotectAsync(protectedText);
+
+        Assert.NotEqual("secret-value", protectedText);
+        Assert.Equal("secret-value", roundtripped);
+    }
 }

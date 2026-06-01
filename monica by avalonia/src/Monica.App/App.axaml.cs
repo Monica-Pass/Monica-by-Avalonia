@@ -53,7 +53,8 @@ public partial class App : Application
         services.AddSingleton<IImportExportService, ImportExportService>();
         services.AddSingleton<IPlatformIntegrationService, PlatformIntegrationService>();
         services.AddSingleton<IPlatformCapabilityService, PlatformCapabilityService>();
-        services.AddSingleton<ISecretProtector, UnsupportedSecretProtector>();
+        services.AddSingleton<ISecretProtector>(provider =>
+            SecretProtectorFactory.Create(provider.GetRequiredService<IPlatformIntegrationService>()));
         services.AddSingleton<IFileSystemPickerService, CapabilityOnlyFileSystemPickerService>();
         services.AddSingleton<IBrowserBridgeService, CapabilityOnlyBrowserBridgeService>();
         services.AddSingleton<INativePasskeyService, CapabilityOnlyNativePasskeyService>();
