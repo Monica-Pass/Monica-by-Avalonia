@@ -49,6 +49,13 @@ public enum ImportExportFormat
     AegisJson
 }
 
+public enum VaultClearScope
+{
+    All,
+    Passwords,
+    SecureItems
+}
+
 public enum MdbxStorageLocation
 {
     Internal,

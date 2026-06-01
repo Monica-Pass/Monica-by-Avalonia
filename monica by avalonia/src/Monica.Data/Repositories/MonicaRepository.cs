@@ -36,6 +36,7 @@ public interface IMonicaRepository
     Task<long> SaveMdbxDatabaseAsync(LocalMdbxDatabase database, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<OperationLog>> GetOperationLogsAsync(int limit = 100, string? itemType = null, CancellationToken cancellationToken = default);
     Task LogAsync(OperationLog log, CancellationToken cancellationToken = default);
+    Task ClearVaultDataAsync(VaultClearScope scope, CancellationToken cancellationToken = default);
 }
 
 public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory, IDatabaseMigrator migrator) : IMonicaRepository
@@ -426,6 +427,29 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
         await migrator.MigrateAsync(cancellationToken);
         await using var connection = connectionFactory.CreateConnection();
         await connection.ExecuteAsync("DELETE FROM password_history_entries WHERE entry_id = @EntryId", new { EntryId = entryId });
+    }
+
+    public async Task ClearVaultDataAsync(VaultClearScope scope, CancellationToken cancellationToken = default)
+    {
+        await migrator.MigrateAsync(cancellationToken);
+        await using var connection = connectionFactory.CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            foreach (var sql in GetClearVaultStatements(scope))
+            {
+                await connection.ExecuteAsync(sql, transaction: transaction);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     public async Task RecordPasswordQuickAccessAsync(long passwordId, CancellationToken cancellationToken = default)
@@ -1169,6 +1193,42 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
         public string LastSyncStatus { get; init; } = "";
         public string? LastSyncError { get; init; }
     }
+
+    private static IReadOnlyList<string> GetClearVaultStatements(VaultClearScope scope) => scope switch
+    {
+        VaultClearScope.Passwords =>
+        [
+            "UPDATE secure_items SET bound_password_id = NULL WHERE bound_password_id IS NOT NULL;",
+            "UPDATE passkeys SET bound_password_id = NULL WHERE bound_password_id IS NOT NULL;",
+            "DELETE FROM attachments WHERE owner_type = 'PASSWORD';",
+            "DELETE FROM custom_fields;",
+            "DELETE FROM password_history_entries;",
+            "DELETE FROM password_quick_access_records;",
+            "DELETE FROM password_entries;",
+            "DELETE FROM operation_logs WHERE item_type = 'PASSWORD';"
+        ],
+        VaultClearScope.SecureItems =>
+        [
+            "UPDATE password_entries SET bound_note_id = NULL WHERE bound_note_id IS NOT NULL;",
+            "DELETE FROM secure_items;",
+            "DELETE FROM operation_logs WHERE item_type IN ('NOTE', 'TOTP', 'WALLET');"
+        ],
+        _ =>
+        [
+            "DELETE FROM attachments;",
+            "DELETE FROM custom_fields;",
+            "DELETE FROM password_history_entries;",
+            "DELETE FROM password_quick_access_records;",
+            "DELETE FROM password_entries;",
+            "DELETE FROM secure_items;",
+            "DELETE FROM passkeys;",
+            "DELETE FROM operation_logs;",
+            "DELETE FROM categories;",
+            "DELETE FROM local_mdbx_databases;",
+            "DELETE FROM mdbx_remote_sources;",
+            "DELETE FROM bitwarden_vaults;"
+        ]
+    };
 
     private static PasswordLoginType ParseLoginType(string value) => value.ToUpperInvariant() switch
     {

@@ -1,4 +1,5 @@
 using Monica.Core.Models;
+using Monica.Core.Services;
 using Monica.Data;
 using Monica.Data.Repositories;
 
@@ -308,6 +309,94 @@ public sealed class DataRepositoryTests
         Assert.Equal([second.Id, first.Id], records.Select(item => item.PasswordId).ToArray());
         Assert.Equal(2, records[0].OpenCount);
         Assert.Equal(1, records[1].OpenCount);
+    }
+
+    [Fact]
+    public async Task Repository_clears_password_scope_without_deleting_secure_items()
+    {
+        var path = GetTempDatabasePath();
+        var factory = new SqliteConnectionFactory(path);
+        var repository = new MonicaRepository(factory, new DatabaseMigrator(factory));
+        var password = new PasswordEntry { Title = "Portal", Password = "one" };
+        await repository.SavePasswordAsync(password);
+        await repository.ReplaceCustomFieldsAsync(password.Id, [new CustomField { Title = "PIN", Value = "1234" }]);
+        await repository.SavePasswordHistoryAsync(new PasswordHistoryEntry
+        {
+            EntryId = password.Id,
+            Password = "old",
+            LastUsedAt = DateTimeOffset.UtcNow
+        });
+        await repository.SaveAttachmentAsync(new Attachment
+        {
+            OwnerType = "PASSWORD",
+            OwnerId = password.Id,
+            FileName = "secret.txt",
+            StoragePath = "attachments/secret.enc",
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        var note = new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = "Recovery note",
+            BoundPasswordId = password.Id
+        };
+        await repository.SaveSecureItemAsync(note);
+        await repository.LogAsync(new OperationLog { ItemType = "PASSWORD", ItemId = password.Id, ItemTitle = password.Title, OperationType = "CREATE", Timestamp = DateTimeOffset.UtcNow });
+        await repository.LogAsync(new OperationLog { ItemType = "NOTE", ItemId = note.Id, ItemTitle = note.Title, OperationType = "CREATE", Timestamp = DateTimeOffset.UtcNow });
+
+        await repository.ClearVaultDataAsync(VaultClearScope.Passwords);
+
+        Assert.Empty(await repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
+        Assert.Empty(await repository.GetCustomFieldsAsync(password.Id));
+        Assert.Empty(await repository.GetPasswordHistoryAsync(password.Id));
+        Assert.Empty(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
+        Assert.Empty(await repository.GetOperationLogsAsync(itemType: "PASSWORD"));
+        Assert.Single(await repository.GetOperationLogsAsync(itemType: "NOTE"));
+        var remainingNote = Assert.Single(await repository.GetSecureItemsAsync(VaultItemType.Note));
+        Assert.Null(remainingNote.BoundPasswordId);
+    }
+
+    [Fact]
+    public async Task Repository_clears_all_vault_data_but_keeps_credentials()
+    {
+        var path = GetTempDatabasePath();
+        var factory = new SqliteConnectionFactory(path);
+        var migrator = new DatabaseMigrator(factory);
+        var repository = new MonicaRepository(factory, migrator);
+        var credentialStore = new VaultCredentialStore(factory, migrator);
+        await credentialStore.SaveAsync(new MasterPasswordHash("hash", new byte[16], "pbkdf2", 10, 0, 1));
+
+        var category = new Category { Name = "Work" };
+        await repository.SaveCategoryAsync(category);
+        var password = new PasswordEntry { Title = "Portal", Password = "one", CategoryId = category.Id };
+        await repository.SavePasswordAsync(password);
+        await repository.SaveSecureItemAsync(new SecureItem { ItemType = VaultItemType.Totp, Title = "OTP", CategoryId = category.Id });
+        await repository.SaveAttachmentAsync(new Attachment
+        {
+            OwnerType = "PASSWORD",
+            OwnerId = password.Id,
+            FileName = "secret.txt",
+            StoragePath = "attachments/secret.enc",
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        await repository.SaveMdbxDatabaseAsync(new LocalMdbxDatabase
+        {
+            Name = "Local",
+            FilePath = Path.Combine(Path.GetTempPath(), "local.mdbx"),
+            StorageLocation = MdbxStorageLocation.Internal,
+            SourceType = "LOCAL_INTERNAL"
+        });
+        await repository.LogAsync(new OperationLog { ItemType = "PASSWORD", ItemId = password.Id, ItemTitle = password.Title, OperationType = "CREATE", Timestamp = DateTimeOffset.UtcNow });
+
+        await repository.ClearVaultDataAsync(VaultClearScope.All);
+
+        Assert.Empty(await repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
+        Assert.Empty(await repository.GetSecureItemsAsync());
+        Assert.Empty(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
+        Assert.Empty(await repository.GetCategoriesAsync());
+        Assert.Empty(await repository.GetMdbxDatabasesAsync());
+        Assert.Empty(await repository.GetOperationLogsAsync());
+        Assert.NotNull(await credentialStore.GetAsync());
     }
 
     private static string GetTempDatabasePath()

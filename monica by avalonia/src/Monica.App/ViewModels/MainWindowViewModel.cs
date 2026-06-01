@@ -285,6 +285,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public string TrayIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.Tray);
     public string GlobalHotkeyIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.GlobalHotkey);
     public string BrowserBridgeIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.BrowserBridge);
+    public string DangerZoneTitle => _localization.Get("DangerZone");
+    public string DangerZoneDescription => _localization.Get("DangerZoneDescription");
+    public string ClearVaultDataTitle => _localization.Get("ClearVaultData");
+    public string ClearVaultDataDescription => _localization.Get("ClearVaultDataDescription");
+    public string ClearPasswordsOnlyText => _localization.Get("ClearPasswordsOnly");
+    public string ClearSecureItemsOnlyText => _localization.Get("ClearSecureItemsOnly");
+    public string ClearAllVaultDataText => _localization.Get("ClearAllVaultData");
+    public string ClearVaultConfirmationInstructionText =>
+        _localization.Format("ClearVaultConfirmationInstructionFormat", _localization.Get("ClearVaultConfirmationPhrase"));
 
     [ObservableProperty]
     private string _selectedSection = "Passwords";
@@ -414,6 +423,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _compactPasswordList;
+
+    [ObservableProperty]
+    private string _dangerZoneConfirmationText = "";
 
     [ObservableProperty]
     private bool _webDavEnabled;
@@ -999,6 +1011,35 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             SelectedSection = section;
         }
+    }
+
+    [RelayCommand]
+    private async Task ClearVaultDataAsync(string? scope)
+    {
+        if (!IsUnlocked)
+        {
+            StatusMessage = _localization.Get("VaultLocked");
+            return;
+        }
+
+        var requiredPhrase = _localization.Get("ClearVaultConfirmationPhrase");
+        if (!string.Equals(DangerZoneConfirmationText.Trim(), requiredPhrase, StringComparison.Ordinal))
+        {
+            StatusMessage = _localization.Format("ClearVaultConfirmationFailedFormat", requiredPhrase);
+            return;
+        }
+
+        var clearScope = scope?.ToLowerInvariant() switch
+        {
+            "passwords" => VaultClearScope.Passwords,
+            "secureitems" or "secure-items" => VaultClearScope.SecureItems,
+            _ => VaultClearScope.All
+        };
+
+        await _repository.ClearVaultDataAsync(clearScope);
+        DangerZoneConfirmationText = "";
+        await LoadAsync();
+        StatusMessage = _localization.Format("ClearedVaultDataFormat", LocalizeVaultClearScope(clearScope));
     }
 
     [RelayCommand]
@@ -4511,6 +4552,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedSectionTitle));
         OnPropertyChanged(nameof(PlatformIntegrationsTitle));
         RaisePlatformIntegrationState();
+        RaiseDangerZoneText();
         OnPropertyChanged(nameof(LoginTitle));
         OnPropertyChanged(nameof(LoginDescription));
         OnPropertyChanged(nameof(LoginButtonText));
@@ -4632,6 +4674,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(BrowserBridgeIntegrationStatusText));
     }
 
+    private void RaiseDangerZoneText()
+    {
+        OnPropertyChanged(nameof(DangerZoneTitle));
+        OnPropertyChanged(nameof(DangerZoneDescription));
+        OnPropertyChanged(nameof(ClearVaultDataTitle));
+        OnPropertyChanged(nameof(ClearVaultDataDescription));
+        OnPropertyChanged(nameof(ClearPasswordsOnlyText));
+        OnPropertyChanged(nameof(ClearSecureItemsOnlyText));
+        OnPropertyChanged(nameof(ClearAllVaultDataText));
+        OnPropertyChanged(nameof(ClearVaultConfirmationInstructionText));
+    }
+
     private void RefreshCapabilities()
     {
         Capabilities.Clear();
@@ -4675,6 +4729,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
             _ => status.ToString()
         };
     }
+
+    private string LocalizeVaultClearScope(VaultClearScope scope) => scope switch
+    {
+        VaultClearScope.Passwords => _localization.Get("ClearPasswordsOnly"),
+        VaultClearScope.SecureItems => _localization.Get("ClearSecureItemsOnly"),
+        _ => _localization.Get("ClearAllVaultData")
+    };
 
     private bool IsPlatformIntegrationUsable(string key) => GetPlatformIntegration(key).IsUsable;
 

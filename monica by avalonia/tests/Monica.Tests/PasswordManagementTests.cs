@@ -1829,6 +1829,32 @@ public sealed class PasswordManagementTests
     }
 
     [Fact]
+    public async Task ViewModel_clears_vault_data_only_after_danger_confirmation()
+    {
+        var harness = CreateHarness();
+        harness.ViewModel.IsUnlocked = true;
+        var password = new PasswordEntry { Title = "Portal", Password = "one" };
+        await harness.Repository.SavePasswordAsync(password);
+        await harness.Repository.SaveSecureItemAsync(new SecureItem { ItemType = VaultItemType.Note, Title = "Recovery" });
+        await harness.ViewModel.LoadAsync();
+
+        await harness.ViewModel.ClearVaultDataCommand.ExecuteAsync("Passwords");
+
+        Assert.Single(harness.ViewModel.Passwords);
+        Assert.Equal(
+            harness.ViewModel.L.Format("ClearVaultConfirmationFailedFormat", harness.ViewModel.L.Get("ClearVaultConfirmationPhrase")),
+            harness.ViewModel.StatusMessage);
+
+        harness.ViewModel.DangerZoneConfirmationText = harness.ViewModel.L.Get("ClearVaultConfirmationPhrase");
+        await harness.ViewModel.ClearVaultDataCommand.ExecuteAsync("Passwords");
+
+        Assert.Empty(harness.ViewModel.Passwords);
+        Assert.Single(harness.ViewModel.NoteItems);
+        Assert.Empty(await harness.Repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
+        Assert.Equal("", harness.ViewModel.DangerZoneConfirmationText);
+    }
+
+    [Fact]
     public async Task ViewModel_exports_password_csv_with_plaintext_when_unlocked()
     {
         var harness = CreateHarness();
