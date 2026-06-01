@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Monica.Core.Models;
 
 namespace Monica.Platform.Services;
@@ -12,6 +13,7 @@ public static class PlatformFeatureKeys
     public const string NativePasskey = "native-passkey";
     public const string NativeNotification = "native-notification";
     public const string WindowSecurity = "window-security";
+    public const string ExternalLinks = "external-links";
 }
 
 public sealed record PlatformIntegrationCapability(
@@ -60,6 +62,12 @@ public interface ITrayService
 public interface IGlobalHotkeyService
 {
     PlatformIntegrationCapability Capability { get; }
+}
+
+public interface IExternalLinkService
+{
+    PlatformIntegrationCapability Capability { get; }
+    Task OpenAsync(Uri uri, CancellationToken cancellationToken = default);
 }
 
 public sealed class PlatformIntegrationService : IPlatformIntegrationService
@@ -118,6 +126,7 @@ public sealed class PlatformIntegrationService : IPlatformIntegrationService
                 Available(PlatformFeatureKeys.Tray, "Windows tray integration is available for desktop builds."),
                 Available(PlatformFeatureKeys.GlobalHotkey, "Windows global hotkeys can be registered by a platform adapter."),
                 DesktopEquivalent(PlatformFeatureKeys.BrowserBridge, "Browser integration is provided through a local desktop bridge."),
+                Available(PlatformFeatureKeys.ExternalLinks, "External links can be opened through the Windows shell."),
                 PlatformLimited(PlatformFeatureKeys.NativePasskey, "Full Windows credential-provider integration requires a dedicated native adapter."),
                 DesktopEquivalent(PlatformFeatureKeys.NativeNotification, "Desktop notifications can replace Android notification features."),
                 Available(PlatformFeatureKeys.WindowSecurity, "Window-level security features can be mapped to Windows shell behavior.")
@@ -133,6 +142,7 @@ public sealed class PlatformIntegrationService : IPlatformIntegrationService
                 PlatformLimited(PlatformFeatureKeys.Tray, "Menu bar integration needs a macOS adapter."),
                 PlatformLimited(PlatformFeatureKeys.GlobalHotkey, "Global hotkeys require a macOS accessibility-aware adapter."),
                 DesktopEquivalent(PlatformFeatureKeys.BrowserBridge, "Browser integration is provided through a local desktop bridge."),
+                Available(PlatformFeatureKeys.ExternalLinks, "External links can be opened through the macOS desktop shell."),
                 Unsupported(PlatformFeatureKeys.NativePasskey, "Android Credential Provider behavior is not available on macOS."),
                 DesktopEquivalent(PlatformFeatureKeys.NativeNotification, "Desktop notifications can replace Android notification features."),
                 PlatformLimited(PlatformFeatureKeys.WindowSecurity, "macOS window privacy behavior needs a native adapter.")
@@ -148,6 +158,7 @@ public sealed class PlatformIntegrationService : IPlatformIntegrationService
                 PlatformLimited(PlatformFeatureKeys.Tray, "Tray behavior depends on the active Linux desktop environment."),
                 PlatformLimited(PlatformFeatureKeys.GlobalHotkey, "Global hotkeys depend on the compositor and desktop environment."),
                 DesktopEquivalent(PlatformFeatureKeys.BrowserBridge, "Browser integration is provided through a local desktop bridge."),
+                Available(PlatformFeatureKeys.ExternalLinks, "External links can be opened through the Linux desktop shell."),
                 Unsupported(PlatformFeatureKeys.NativePasskey, "Android Credential Provider behavior is not available on Linux."),
                 DesktopEquivalent(PlatformFeatureKeys.NativeNotification, "Desktop notifications can replace Android notification features."),
                 PlatformLimited(PlatformFeatureKeys.WindowSecurity, "Linux screenshot/window privacy support depends on the compositor.")
@@ -161,6 +172,7 @@ public sealed class PlatformIntegrationService : IPlatformIntegrationService
             Unsupported(PlatformFeatureKeys.Tray, "No tray adapter is available for this platform."),
             Unsupported(PlatformFeatureKeys.GlobalHotkey, "No global hotkey adapter is available for this platform."),
             DesktopEquivalent(PlatformFeatureKeys.BrowserBridge, "Browser integration is provided through a local desktop bridge."),
+            PlatformLimited(PlatformFeatureKeys.ExternalLinks, "External link launching depends on the current desktop shell."),
             Unsupported(PlatformFeatureKeys.NativePasskey, "Native passkey integration is not available for this platform."),
             Unsupported(PlatformFeatureKeys.NativeNotification, "No notification adapter is available for this platform."),
             Unsupported(PlatformFeatureKeys.WindowSecurity, "No window security adapter is available for this platform.")
@@ -218,4 +230,28 @@ public sealed class CapabilityOnlyTrayService(IPlatformIntegrationService platfo
 public sealed class CapabilityOnlyGlobalHotkeyService(IPlatformIntegrationService platformIntegrationService) : IGlobalHotkeyService
 {
     public PlatformIntegrationCapability Capability => platformIntegrationService.GetCapability(PlatformFeatureKeys.GlobalHotkey);
+}
+
+public sealed class SystemExternalLinkService(IPlatformIntegrationService platformIntegrationService) : IExternalLinkService
+{
+    public PlatformIntegrationCapability Capability => platformIntegrationService.GetCapability(PlatformFeatureKeys.ExternalLinks);
+
+    public Task OpenAsync(Uri uri, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!Capability.IsUsable)
+        {
+            throw new InvalidOperationException(Capability.UnsupportedReason ?? "External links are not supported on this platform.");
+        }
+
+        var process = Process.Start(new ProcessStartInfo(uri.AbsoluteUri)
+        {
+            UseShellExecute = true
+        });
+
+        return process is null
+            ? Task.FromException(new InvalidOperationException("The desktop shell did not accept the external link."))
+            : Task.CompletedTask;
+    }
 }

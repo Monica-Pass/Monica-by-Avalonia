@@ -62,6 +62,7 @@ public partial class App : Application
         services.AddSingleton<INativePasskeyService, CapabilityOnlyNativePasskeyService>();
         services.AddSingleton<ITrayService, CapabilityOnlyTrayService>();
         services.AddSingleton<IGlobalHotkeyService, CapabilityOnlyGlobalHotkeyService>();
+        services.AddSingleton<IExternalLinkService, SystemExternalLinkService>();
         services.AddSingleton<IWebDavBackupService, WebDavBackupService>();
         services.AddSingleton<IOneDriveBackupService, OneDriveBackupService>();
         services.AddSingleton<IKeePassVaultService, KeePassVaultService>();

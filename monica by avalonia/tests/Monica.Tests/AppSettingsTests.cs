@@ -218,6 +218,27 @@ public sealed class AppSettingsTests
     }
 
     [Fact]
+    public async Task ViewModel_opens_about_repository_through_platform_service()
+    {
+        var integration = new PlatformIntegrationService("TestOS",
+        [
+            PlatformIntegrationService.Available(PlatformFeatureKeys.ExternalLinks, "External links work.")
+        ]);
+        var externalLinks = new CapturingExternalLinkService(integration);
+        var viewModel = CreateViewModel(
+            GetTempPath(),
+            platformIntegrationService: integration,
+            externalLinkService: externalLinks);
+
+        await viewModel.InitializeAsync();
+        await viewModel.OpenGitHubRepositoryCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.CanOpenExternalLinks);
+        Assert.Equal(MainWindowViewModel.GitHubRepositoryUrl, externalLinks.OpenedUri?.AbsoluteUri);
+        Assert.Equal(viewModel.L.Get("GitHubRepositoryOpened"), viewModel.StatusMessage);
+    }
+
+    [Fact]
     public async Task ViewModel_disables_platform_limited_desktop_settings()
     {
         var settingsPath = GetTempPath();
@@ -351,7 +372,8 @@ public sealed class AppSettingsTests
         string settingsPath,
         IWebDavBackupService? webDavBackupService = null,
         IPlatformIntegrationService? platformIntegrationService = null,
-        IMasterPasswordMaintenanceService? masterPasswordMaintenanceService = null)
+        IMasterPasswordMaintenanceService? masterPasswordMaintenanceService = null,
+        IExternalLinkService? externalLinkService = null)
     {
         var databasePath = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
         Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
@@ -377,7 +399,8 @@ public sealed class AppSettingsTests
             new LegacyVaultDetector(factory),
             new AppSettingsService(settingsPath),
             new LocalizationService(),
-            masterPasswordMaintenanceService: masterPasswordMaintenanceService);
+            masterPasswordMaintenanceService: masterPasswordMaintenanceService,
+            externalLinkService: externalLinkService);
     }
 
     private static string GetTempPath()
@@ -428,6 +451,18 @@ public sealed class AppSettingsTests
         public Task UploadTextAsync(WebDavProfile profile, string relativePath, string content, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<string> DownloadTextAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) => Task.FromResult("");
         public Task DeleteAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class CapturingExternalLinkService(IPlatformIntegrationService platformIntegrationService) : IExternalLinkService
+    {
+        public Uri? OpenedUri { get; private set; }
+        public PlatformIntegrationCapability Capability => platformIntegrationService.GetCapability(PlatformFeatureKeys.ExternalLinks);
+
+        public Task OpenAsync(Uri uri, CancellationToken cancellationToken = default)
+        {
+            OpenedUri = uri;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class CapturingWebDavBackupService(IReadOnlyList<RemoteFileEntry> entries) : IWebDavBackupService

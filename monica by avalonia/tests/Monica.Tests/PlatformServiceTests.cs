@@ -93,6 +93,20 @@ public sealed class PlatformServiceTests
     }
 
     [Fact]
+    public async Task System_external_link_service_throws_platform_reason_when_unsupported()
+    {
+        var integration = new PlatformIntegrationService(
+            "TestOS",
+            [PlatformIntegrationService.Unsupported(PlatformFeatureKeys.ExternalLinks, "No desktop shell.")]);
+        var service = new SystemExternalLinkService(integration);
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.OpenAsync(new Uri("https://example.com")));
+
+        Assert.Contains("No desktop shell", error.Message);
+    }
+
+    [Fact]
     public void Secret_protector_factory_selects_platform_adapter()
     {
         var integration = new PlatformIntegrationService(

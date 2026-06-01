@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -125,6 +126,8 @@ internal sealed class DisabledMasterPasswordMaintenanceService : IMasterPassword
 
 public sealed partial class MainWindowViewModel : ObservableObject
 {
+    public const string GitHubRepositoryUrl = "https://github.com/JoyinJoester/Monica";
+
     private const int PasswordHistoryLimit = 10;
     private const int PasswordQuickAccessLimit = 6;
 
@@ -197,6 +200,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly ILocalizationService _localization;
     private readonly IReadOnlyList<PlatformCapability> _sourceCapabilities;
     private readonly IReadOnlyList<PlatformIntegrationCapability> _sourcePlatformIntegrationCapabilities;
+    private readonly IExternalLinkService _externalLinkService;
     private readonly SecurityQuestionService _securityQuestionService = new();
     private IReadOnlyDictionary<long, IReadOnlyList<CustomField>> _passwordCustomFields = new Dictionary<long, IReadOnlyList<CustomField>>();
     private IReadOnlyDictionary<long, IReadOnlyList<Attachment>> _passwordAttachments = new Dictionary<long, IReadOnlyList<Attachment>>();
@@ -228,7 +232,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IPwnedPasswordService? pwnedPasswordService = null,
         ITotpEditorDialogService? totpEditorDialogService = null,
         IWalletItemEditorDialogService? walletItemEditorDialogService = null,
-        IMasterPasswordMaintenanceService? masterPasswordMaintenanceService = null)
+        IMasterPasswordMaintenanceService? masterPasswordMaintenanceService = null,
+        IExternalLinkService? externalLinkService = null)
     {
         _repository = repository;
         _credentialStore = credentialStore;
@@ -253,6 +258,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _localization.PropertyChanged += (_, _) => RefreshLocalizedProperties();
         _sourceCapabilities = platformCapabilityService.GetCapabilities();
         _sourcePlatformIntegrationCapabilities = platformIntegrationService.GetCapabilities();
+        _externalLinkService = externalLinkService ?? new SystemExternalLinkService(platformIntegrationService);
         PlatformName = platformIntegrationService.PlatformName;
         CompromisedPasswordStatus = _localization.Get("CompromisedPasswordNotChecked");
         RefreshPlatformIntegrationCapabilities();
@@ -302,9 +308,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public bool CanUseTrayIntegration => IsPlatformIntegrationUsable(PlatformFeatureKeys.Tray);
     public bool CanUseGlobalHotkeyIntegration => IsPlatformIntegrationUsable(PlatformFeatureKeys.GlobalHotkey);
     public bool CanUseBrowserBridgeIntegration => IsPlatformIntegrationUsable(PlatformFeatureKeys.BrowserBridge);
+    public bool CanOpenExternalLinks => IsPlatformIntegrationUsable(PlatformFeatureKeys.ExternalLinks);
     public string TrayIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.Tray);
     public string GlobalHotkeyIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.GlobalHotkey);
     public string BrowserBridgeIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.BrowserBridge);
+    public string ExternalLinksIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.ExternalLinks);
+    public string AboutTitle => _localization.Get("About");
+    public string AboutDescription => _localization.Get("AboutDescription");
+    public string AppVersionLabel => _localization.Get("AppVersion");
+    public string GitHubRepositoryLabel => _localization.Get("GitHubRepository");
+    public string OpenRepositoryText => _localization.Get("OpenRepository");
+    public string RepositoryUrlText => GitHubRepositoryUrl;
+    public string AppVersionText => GetAppVersionText();
     public string DangerZoneTitle => _localization.Get("DangerZone");
     public string DangerZoneDescription => _localization.Get("DangerZoneDescription");
     public string ClearVaultDataTitle => _localization.Get("ClearVaultData");
@@ -1134,6 +1149,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (!string.IsNullOrWhiteSpace(section))
         {
             SelectedSection = section;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanOpenExternalLinks))]
+    private async Task OpenGitHubRepositoryAsync()
+    {
+        try
+        {
+            await _externalLinkService.OpenAsync(new Uri(GitHubRepositoryUrl, UriKind.Absolute));
+            StatusMessage = _localization.Get("GitHubRepositoryOpened");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = _localization.Format("GitHubRepositoryOpenFailedFormat", ex.Message);
         }
     }
 
@@ -4883,6 +4912,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedSectionTitle));
         OnPropertyChanged(nameof(PlatformIntegrationsTitle));
         RaisePlatformIntegrationState();
+        RaiseAboutText();
         RaiseSecurityRecoveryText();
         RaiseMasterPasswordMaintenanceText();
         RaiseDangerZoneText();
@@ -5008,9 +5038,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(CanUseTrayIntegration));
         OnPropertyChanged(nameof(CanUseGlobalHotkeyIntegration));
         OnPropertyChanged(nameof(CanUseBrowserBridgeIntegration));
+        OnPropertyChanged(nameof(CanOpenExternalLinks));
         OnPropertyChanged(nameof(TrayIntegrationStatusText));
         OnPropertyChanged(nameof(GlobalHotkeyIntegrationStatusText));
         OnPropertyChanged(nameof(BrowserBridgeIntegrationStatusText));
+        OnPropertyChanged(nameof(ExternalLinksIntegrationStatusText));
+        OpenGitHubRepositoryCommand.NotifyCanExecuteChanged();
+    }
+
+    private void RaiseAboutText()
+    {
+        OnPropertyChanged(nameof(AboutTitle));
+        OnPropertyChanged(nameof(AboutDescription));
+        OnPropertyChanged(nameof(AppVersionLabel));
+        OnPropertyChanged(nameof(GitHubRepositoryLabel));
+        OnPropertyChanged(nameof(OpenRepositoryText));
+        OnPropertyChanged(nameof(RepositoryUrlText));
+        OnPropertyChanged(nameof(AppVersionText));
     }
 
     private void RaiseDangerZoneText()
@@ -5130,6 +5174,32 @@ public sealed partial class MainWindowViewModel : ObservableObject
             PlatformFeatureStatus.Unsupported,
             "This platform adapter has not declared this feature.",
             "This platform adapter has not declared this feature.");
+
+    private static string GetAppVersionText()
+    {
+        var assembly = typeof(MainWindowViewModel).Assembly;
+        var informationalVersion = assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion;
+        var version = string.IsNullOrWhiteSpace(informationalVersion)
+            ? assembly.GetName().Version?.ToString()
+            : informationalVersion;
+
+        if (string.IsNullOrWhiteSpace(version))
+        {
+            return "V0.0.0";
+        }
+
+        var metadataIndex = version.IndexOf('+', StringComparison.Ordinal);
+        if (metadataIndex >= 0)
+        {
+            version = version[..metadataIndex];
+        }
+
+        return version.StartsWith('V') || version.StartsWith('v')
+            ? version
+            : $"V{version}";
+    }
 
     private string SectionTitle(string section)
     {
