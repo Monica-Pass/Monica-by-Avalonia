@@ -32,6 +32,10 @@ public interface IPlatformIntegrationService
     PlatformIntegrationCapability GetCapability(string key);
 }
 
+public sealed record PlatformFilePickerFileType(string Name, IReadOnlyList<string> Patterns);
+
+public sealed record PickedTextFile(string FileName, string Content);
+
 public interface ISecretProtector
 {
     PlatformIntegrationCapability Capability { get; }
@@ -42,6 +46,8 @@ public interface ISecretProtector
 public interface IFileSystemPickerService
 {
     PlatformIntegrationCapability Capability { get; }
+    Task<PickedTextFile?> OpenTextFileAsync(string title, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default);
+    Task<string?> SaveTextFileAsync(string title, string suggestedFileName, string content, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default);
 }
 
 public interface IBrowserBridgeService
@@ -210,6 +216,15 @@ public sealed class UnsupportedSecretProtector(IPlatformIntegrationService platf
 public sealed class CapabilityOnlyFileSystemPickerService(IPlatformIntegrationService platformIntegrationService) : IFileSystemPickerService
 {
     public PlatformIntegrationCapability Capability => platformIntegrationService.GetCapability(PlatformFeatureKeys.FilePicker);
+
+    public Task<PickedTextFile?> OpenTextFileAsync(string title, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
+        throw CreateUnsupportedException();
+
+    public Task<string?> SaveTextFileAsync(string title, string suggestedFileName, string content, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
+        throw CreateUnsupportedException();
+
+    private InvalidOperationException CreateUnsupportedException() =>
+        new(Capability.UnsupportedReason ?? "File picking is not supported on this platform.");
 }
 
 public sealed class CapabilityOnlyBrowserBridgeService(IPlatformIntegrationService platformIntegrationService) : IBrowserBridgeService

@@ -1601,12 +1601,20 @@
                                             <TextBlock Text="{Binding L.ImportMonicaJson}" FontWeight="SemiBold" />
                                             <TextBlock Text="{Binding L.ImportMonicaJsonDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                             <TextBox Text="{Binding ImportJsonText}" PlaceholderText="{Binding L.ImportJsonWatermark}" AcceptsReturn="True" MinHeight="120" TextWrapping="Wrap" />
-                                            <Button Command="{Binding ImportDataCommand}" HorizontalAlignment="Left">
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <ic:FluentIcon Icon="ArrowUpload" FontSize="20" />
-                                                    <TextBlock Text="{Binding L.Import}" />
-                                                </StackPanel>
-                                            </Button>
+                                            <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="8">
+                                                <Button Command="{Binding ImportMonicaJsonFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <ic:FluentIcon Icon="Folder" FontSize="20" />
+                                                        <TextBlock Text="{Binding L.ImportFromFile}" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Grid.Column="1" Command="{Binding ImportDataCommand}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <ic:FluentIcon Icon="ArrowUpload" FontSize="20" />
+                                                        <TextBlock Text="{Binding L.Import}" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </Grid>
                                         </StackPanel>
 
                                         <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
@@ -1615,14 +1623,20 @@
                                             <TextBlock Text="{Binding L.ImportPasswordCsv}" FontWeight="SemiBold" />
                                             <TextBlock Text="{Binding L.ImportPasswordCsvDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                             <TextBox Text="{Binding ImportCsvText}" PlaceholderText="{Binding L.ImportCsvWatermark}" AcceptsReturn="True" MinHeight="120" TextWrapping="Wrap" />
-                                            <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="8">
-                                                <Button Command="{Binding ImportPasswordCsvCommand}">
+                                            <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="8">
+                                                <Button Command="{Binding ImportPasswordCsvFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <ic:FluentIcon Icon="Folder" FontSize="20" />
+                                                        <TextBlock Text="{Binding L.ImportFromFile}" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Grid.Column="1" Command="{Binding ImportPasswordCsvCommand}">
                                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                                         <ic:FluentIcon Icon="ArrowUpload" FontSize="20" />
                                                         <TextBlock Text="{Binding L.ImportPasswordCsv}" />
                                                     </StackPanel>
                                                 </Button>
-                                                <Button Grid.Column="1" Command="{Binding ExportPasswordCsvCommand}">
+                                                <Button Grid.Column="2" Command="{Binding ExportPasswordCsvCommand}">
                                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                                         <ic:FluentIcon Icon="ArrowDownload" FontSize="20" />
                                                         <TextBlock Text="{Binding L.ExportPasswordCsv}" />
@@ -1638,6 +1652,20 @@
                                         <fa:FASymbolIconSource Symbol="ProtectedDocument" />
                                     </fa:FASettingsExpander.IconSource>
                                     <StackPanel Spacing="12">
+                                        <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="8">
+                                            <Button Command="{Binding SaveMonicaJsonExportCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <ic:FluentIcon Icon="Save" FontSize="20" />
+                                                    <TextBlock Text="{Binding L.SaveJsonExport}" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Grid.Column="1" Command="{Binding SavePasswordCsvExportCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <ic:FluentIcon Icon="Save" FontSize="20" />
+                                                    <TextBlock Text="{Binding L.SaveCsvExport}" />
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
                                         <TextBlock Text="{Binding L.ExportPreview}" FontWeight="SemiBold" />
                                         <TextBox Text="{Binding ExportPreview}" AcceptsReturn="True" MinHeight="160" TextWrapping="Wrap" />
                                         <TextBlock Text="{Binding L.ExportCsvPreview}" FontWeight="SemiBold" Margin="0,8,0,0" />

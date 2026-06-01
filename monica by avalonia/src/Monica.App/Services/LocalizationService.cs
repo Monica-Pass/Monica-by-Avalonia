@@ -216,6 +216,9 @@ public interface ILocalizationService : INotifyPropertyChanged
     string ExportPasswordCsv { get; }
     string ExportCsvPreview { get; }
     string Import { get; }
+    string ImportFromFile { get; }
+    string SaveJsonExport { get; }
+    string SaveCsvExport { get; }
     string PasswordGenerator { get; }
     string Generate { get; }
     string SaveAsLogin { get; }
@@ -593,6 +596,9 @@ public sealed class LocalizationService : ILocalizationService
     public string ExportPasswordCsv => Text();
     public string ExportCsvPreview => Text();
     public string Import => Text();
+    public string ImportFromFile => Text();
+    public string SaveJsonExport => Text();
+    public string SaveCsvExport => Text();
     public string PasswordGenerator => Text();
     public string Generate => Text();
     public string SaveAsLogin => Text();
@@ -1010,6 +1016,9 @@ public sealed class LocalizationService : ILocalizationService
         ["ExportPasswordCsv"] = "Export Password CSV",
         ["ExportCsvPreview"] = "Password CSV Preview",
         ["Import"] = "Import",
+        ["ImportFromFile"] = "Import from file",
+        ["SaveJsonExport"] = "Save JSON export",
+        ["SaveCsvExport"] = "Save CSV export",
         ["PasswordGenerator"] = "Password Generator",
         ["Generate"] = "Generate",
         ["SaveAsLogin"] = "Save as Login",
@@ -1372,6 +1381,8 @@ public sealed class LocalizationService : ILocalizationService
         ["ImportCsvRequired"] = "Paste password CSV before importing.",
         ["ImportedPasswordCsvFormat"] = "Imported {0} passwords from CSV.",
         ["ExportedPasswordCsv"] = "Prepared password CSV export preview",
+        ["SavedExportFileFormat"] = "Saved export to {0}.",
+        ["SaveExportFileFailedFormat"] = "Save export failed: {0}",
         ["ImportFailedFormat"] = "Import failed: {0}",
         ["MonicaJson"] = "Monica JSON",
         ["PasswordCsv"] = "Password CSV",
@@ -1495,6 +1506,18 @@ public sealed class LocalizationService : ILocalizationService
         ["ClearVaultConfirmationFailedFormat"] = "请输入“{0}”以确认清空保险库数据。",
         ["ClearedVaultDataFormat"] = "已清空：{0}。",
         ["ExportPreview"] = "导出预览",
+        ["ImportMonicaJson"] = "导入 Monica JSON",
+        ["ImportMonicaJsonDescription"] = "选择或粘贴 Monica JSON 导出包，将密码、笔记、卡包和验证器导入此保险库。",
+        ["ImportJsonWatermark"] = "在此粘贴 Monica JSON 导出内容",
+        ["ImportPasswordCsv"] = "导入密码 CSV",
+        ["ImportPasswordCsvDescription"] = "选择或粘贴 Monica、Bitwarden 风格或其他密码管理器的 CSV。保存前会加密密码。",
+        ["ImportCsvWatermark"] = "在此粘贴密码 CSV",
+        ["ExportPasswordCsv"] = "导出密码 CSV",
+        ["ExportCsvPreview"] = "密码 CSV 预览",
+        ["Import"] = "导入",
+        ["ImportFromFile"] = "从文件导入",
+        ["SaveJsonExport"] = "保存 JSON 导出",
+        ["SaveCsvExport"] = "保存 CSV 导出",
         ["PasswordGenerator"] = "密码生成器",
         ["Generate"] = "生成",
         ["SaveAsLogin"] = "保存为登录项",
@@ -1721,6 +1744,17 @@ public sealed class LocalizationService : ILocalizationService
         ["MovedToRecycleBinFormat"] = "已将 {0} 移到回收站",
         ["GeneratedPassword"] = "已生成密码",
         ["ExportPrepared"] = "已准备 Monica JSON 导出预览",
+        ["ImportJsonRequired"] = "请先粘贴 Monica JSON 再导入。",
+        ["ImportedMonicaJsonFormat"] = "已导入 {0} 个密码和 {1} 个安全项目。",
+        ["ImportedMonicaJsonWithCategoriesFormat"] = "已导入 {0} 个密码、{1} 个安全项目和 {2} 个文件夹。",
+        ["ImportCsvRequired"] = "请先粘贴密码 CSV 再导入。",
+        ["ImportedPasswordCsvFormat"] = "已从 CSV 导入 {0} 个密码。",
+        ["ExportedPasswordCsv"] = "已准备密码 CSV 导出预览",
+        ["SavedExportFileFormat"] = "已保存导出到 {0}。",
+        ["SaveExportFileFailedFormat"] = "保存导出失败：{0}",
+        ["ImportFailedFormat"] = "导入失败：{0}",
+        ["MonicaJson"] = "Monica JSON",
+        ["PasswordCsv"] = "密码 CSV",
         ["CreatedMdbxMetadata"] = "已创建 MDBX 元数据和本地工作文件路径"
     };
 }

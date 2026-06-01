@@ -57,7 +57,9 @@ public partial class App : Application
         services.AddSingleton<IPlatformCapabilityService, PlatformCapabilityService>();
         services.AddSingleton<ISecretProtector>(provider =>
             SecretProtectorFactory.Create(provider.GetRequiredService<IPlatformIntegrationService>()));
-        services.AddSingleton<IFileSystemPickerService, CapabilityOnlyFileSystemPickerService>();
+        services.AddSingleton<IFileSystemPickerService>(_ => new AvaloniaFileSystemPickerService(
+            () => mainWindow,
+            _.GetRequiredService<IPlatformIntegrationService>()));
         services.AddSingleton<IBrowserBridgeService, CapabilityOnlyBrowserBridgeService>();
         services.AddSingleton<INativePasskeyService, CapabilityOnlyNativePasskeyService>();
         services.AddSingleton<ITrayService, CapabilityOnlyTrayService>();

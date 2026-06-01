@@ -93,6 +93,23 @@ public sealed class PlatformServiceTests
     }
 
     [Fact]
+    public async Task Capability_only_file_picker_throws_platform_reason()
+    {
+        var integration = new PlatformIntegrationService(
+            "TestOS",
+            [PlatformIntegrationService.Unsupported(PlatformFeatureKeys.FilePicker, "No picker.")]);
+        var service = new CapabilityOnlyFileSystemPickerService(integration);
+
+        var openError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.OpenTextFileAsync("Open", [new PlatformFilePickerFileType("JSON", ["*.json"])]));
+        var saveError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.SaveTextFileAsync("Save", "monica.json", "{}", [new PlatformFilePickerFileType("JSON", ["*.json"])]));
+
+        Assert.Contains("No picker", openError.Message);
+        Assert.Contains("No picker", saveError.Message);
+    }
+
+    [Fact]
     public async Task System_external_link_service_throws_platform_reason_when_unsupported()
     {
         var integration = new PlatformIntegrationService(

@@ -130,6 +130,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private const int PasswordHistoryLimit = 10;
     private const int PasswordQuickAccessLimit = 6;
+    private static readonly PlatformFilePickerFileType[] MonicaJsonFileTypes =
+    [
+        new("Monica JSON", ["*.json"])
+    ];
+    private static readonly PlatformFilePickerFileType[] PasswordCsvFileTypes =
+    [
+        new("Password CSV", ["*.csv"])
+    ];
 
     private enum QuickAccessSort
     {
@@ -201,6 +209,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IReadOnlyList<PlatformCapability> _sourceCapabilities;
     private readonly IReadOnlyList<PlatformIntegrationCapability> _sourcePlatformIntegrationCapabilities;
     private readonly IExternalLinkService _externalLinkService;
+    private readonly IFileSystemPickerService _fileSystemPickerService;
     private readonly SecurityQuestionService _securityQuestionService = new();
     private IReadOnlyDictionary<long, IReadOnlyList<CustomField>> _passwordCustomFields = new Dictionary<long, IReadOnlyList<CustomField>>();
     private IReadOnlyDictionary<long, IReadOnlyList<Attachment>> _passwordAttachments = new Dictionary<long, IReadOnlyList<Attachment>>();
@@ -233,7 +242,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ITotpEditorDialogService? totpEditorDialogService = null,
         IWalletItemEditorDialogService? walletItemEditorDialogService = null,
         IMasterPasswordMaintenanceService? masterPasswordMaintenanceService = null,
-        IExternalLinkService? externalLinkService = null)
+        IExternalLinkService? externalLinkService = null,
+        IFileSystemPickerService? fileSystemPickerService = null)
     {
         _repository = repository;
         _credentialStore = credentialStore;
@@ -259,6 +269,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _sourceCapabilities = platformCapabilityService.GetCapabilities();
         _sourcePlatformIntegrationCapabilities = platformIntegrationService.GetCapabilities();
         _externalLinkService = externalLinkService ?? new SystemExternalLinkService(platformIntegrationService);
+        _fileSystemPickerService = fileSystemPickerService ?? new CapabilityOnlyFileSystemPickerService(platformIntegrationService);
         PlatformName = platformIntegrationService.PlatformName;
         CompromisedPasswordStatus = _localization.Get("CompromisedPasswordNotChecked");
         RefreshPlatformIntegrationCapabilities();
@@ -309,10 +320,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public bool CanUseGlobalHotkeyIntegration => IsPlatformIntegrationUsable(PlatformFeatureKeys.GlobalHotkey);
     public bool CanUseBrowserBridgeIntegration => IsPlatformIntegrationUsable(PlatformFeatureKeys.BrowserBridge);
     public bool CanOpenExternalLinks => IsPlatformIntegrationUsable(PlatformFeatureKeys.ExternalLinks);
+    public bool CanUseFilePicker => IsPlatformIntegrationUsable(PlatformFeatureKeys.FilePicker);
     public string TrayIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.Tray);
     public string GlobalHotkeyIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.GlobalHotkey);
     public string BrowserBridgeIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.BrowserBridge);
     public string ExternalLinksIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.ExternalLinks);
+    public string FilePickerIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.FilePicker);
     public string AboutTitle => _localization.Get("About");
     public string AboutDescription => _localization.Get("AboutDescription");
     public string AppVersionLabel => _localization.Get("AppVersion");
@@ -2599,6 +2612,96 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var exportPasswords = Passwords.Select(item => ClonePasswordForExport(item)).ToArray();
         ExportCsvPreview = _importExportService.ExportPasswordCsv(exportPasswords);
         StatusMessage = _localization.Get("ExportedPasswordCsv");
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUseFilePicker))]
+    private async Task ImportMonicaJsonFileAsync()
+    {
+        try
+        {
+            var file = await _fileSystemPickerService.OpenTextFileAsync(_localization.Get("ImportMonicaJson"), MonicaJsonFileTypes);
+            if (file is null)
+            {
+                return;
+            }
+
+            ImportJsonText = file.Content;
+            await ImportDataAsync();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = _localization.Format("ImportFailedFormat", ex.Message);
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUseFilePicker))]
+    private async Task ImportPasswordCsvFileAsync()
+    {
+        try
+        {
+            var file = await _fileSystemPickerService.OpenTextFileAsync(_localization.Get("ImportPasswordCsv"), PasswordCsvFileTypes);
+            if (file is null)
+            {
+                return;
+            }
+
+            ImportCsvText = file.Content;
+            await ImportPasswordCsvAsync();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = _localization.Format("ImportFailedFormat", ex.Message);
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUseFilePicker))]
+    private async Task SaveMonicaJsonExportAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ExportPreview))
+        {
+            ExportData();
+        }
+
+        await SaveExportTextAsync(
+            _localization.Get("ExportData"),
+            $"monica_export_{DateTimeOffset.Now:yyyyMMdd_HHmmss}.json",
+            ExportPreview,
+            MonicaJsonFileTypes);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUseFilePicker))]
+    private async Task SavePasswordCsvExportAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ExportCsvPreview))
+        {
+            ExportPasswordCsv();
+        }
+
+        await SaveExportTextAsync(
+            _localization.Get("ExportPasswordCsv"),
+            $"monica_passwords_{DateTimeOffset.Now:yyyyMMdd_HHmmss}.csv",
+            ExportCsvPreview,
+            PasswordCsvFileTypes);
+    }
+
+    private async Task SaveExportTextAsync(
+        string title,
+        string suggestedFileName,
+        string content,
+        IReadOnlyList<PlatformFilePickerFileType> fileTypes)
+    {
+        try
+        {
+            var fileName = await _fileSystemPickerService.SaveTextFileAsync(title, suggestedFileName, content, fileTypes);
+            if (fileName is not null)
+            {
+                StatusMessage = _localization.Format("SavedExportFileFormat", fileName);
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = _localization.Format("SaveExportFileFailedFormat", ex.Message);
+        }
     }
 
     [RelayCommand]
@@ -5039,11 +5142,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(CanUseGlobalHotkeyIntegration));
         OnPropertyChanged(nameof(CanUseBrowserBridgeIntegration));
         OnPropertyChanged(nameof(CanOpenExternalLinks));
+        OnPropertyChanged(nameof(CanUseFilePicker));
         OnPropertyChanged(nameof(TrayIntegrationStatusText));
         OnPropertyChanged(nameof(GlobalHotkeyIntegrationStatusText));
         OnPropertyChanged(nameof(BrowserBridgeIntegrationStatusText));
         OnPropertyChanged(nameof(ExternalLinksIntegrationStatusText));
+        OnPropertyChanged(nameof(FilePickerIntegrationStatusText));
         OpenGitHubRepositoryCommand.NotifyCanExecuteChanged();
+        ImportMonicaJsonFileCommand.NotifyCanExecuteChanged();
+        ImportPasswordCsvFileCommand.NotifyCanExecuteChanged();
+        SaveMonicaJsonExportCommand.NotifyCanExecuteChanged();
+        SavePasswordCsvExportCommand.NotifyCanExecuteChanged();
     }
 
     private void RaiseAboutText()

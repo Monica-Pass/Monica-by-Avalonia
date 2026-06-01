@@ -239,6 +239,64 @@ public sealed class AppSettingsTests
     }
 
     [Fact]
+    public async Task ViewModel_imports_monica_json_from_file_picker()
+    {
+        var integration = new PlatformIntegrationService("TestOS",
+        [
+            PlatformIntegrationService.Available(PlatformFeatureKeys.FilePicker, "File picking works.")
+        ]);
+        var json = new ImportExportService().ExportJson(
+            [new PasswordEntry { Title = "File imported login", Username = "dev", Password = "secret" }],
+            []);
+        var filePicker = new CapturingFileSystemPickerService(
+            integration,
+            new PickedTextFile("monica.json", json));
+        var viewModel = CreateViewModel(
+            GetTempPath(),
+            platformIntegrationService: integration,
+            fileSystemPickerService: filePicker);
+
+        await viewModel.InitializeAsync();
+        await viewModel.ImportMonicaJsonFileCommand.ExecuteAsync(null);
+
+        var imported = Assert.Single(viewModel.Passwords);
+        Assert.Equal("File imported login", imported.Title);
+        Assert.Equal("", viewModel.ImportJsonText);
+        Assert.Equal(viewModel.L.Format("ImportedMonicaJsonFormat", 1, 0), viewModel.StatusMessage);
+        Assert.Equal("Monica JSON", Assert.Single(filePicker.OpenFileTypes).Name);
+        Assert.Equal("*.json", Assert.Single(Assert.Single(filePicker.OpenFileTypes).Patterns));
+    }
+
+    [Fact]
+    public async Task ViewModel_saves_password_csv_export_through_file_picker()
+    {
+        var integration = new PlatformIntegrationService("TestOS",
+        [
+            PlatformIntegrationService.Available(PlatformFeatureKeys.FilePicker, "File picking works.")
+        ]);
+        var filePicker = new CapturingFileSystemPickerService(integration, null, "passwords.csv");
+        var viewModel = CreateViewModel(
+            GetTempPath(),
+            platformIntegrationService: integration,
+            fileSystemPickerService: filePicker);
+        viewModel.Passwords.Add(new PasswordEntry
+        {
+            Title = "CSV export login",
+            Website = "https://example.com",
+            Username = "dev",
+            Password = "plain-secret"
+        });
+
+        await viewModel.SavePasswordCsvExportCommand.ExecuteAsync(null);
+
+        Assert.Contains("CSV export login", filePicker.SavedContent);
+        Assert.Contains("plain-secret", filePicker.SavedContent);
+        Assert.EndsWith(".csv", filePicker.SuggestedFileName, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Password CSV", Assert.Single(filePicker.SaveFileTypes).Name);
+        Assert.Equal(viewModel.L.Format("SavedExportFileFormat", "passwords.csv"), viewModel.StatusMessage);
+    }
+
+    [Fact]
     public async Task ViewModel_disables_platform_limited_desktop_settings()
     {
         var settingsPath = GetTempPath();
@@ -373,7 +431,8 @@ public sealed class AppSettingsTests
         IWebDavBackupService? webDavBackupService = null,
         IPlatformIntegrationService? platformIntegrationService = null,
         IMasterPasswordMaintenanceService? masterPasswordMaintenanceService = null,
-        IExternalLinkService? externalLinkService = null)
+        IExternalLinkService? externalLinkService = null,
+        IFileSystemPickerService? fileSystemPickerService = null)
     {
         var databasePath = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
         Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
@@ -400,7 +459,8 @@ public sealed class AppSettingsTests
             new AppSettingsService(settingsPath),
             new LocalizationService(),
             masterPasswordMaintenanceService: masterPasswordMaintenanceService,
-            externalLinkService: externalLinkService);
+            externalLinkService: externalLinkService,
+            fileSystemPickerService: fileSystemPickerService);
     }
 
     private static string GetTempPath()
@@ -462,6 +522,32 @@ public sealed class AppSettingsTests
         {
             OpenedUri = uri;
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class CapturingFileSystemPickerService(
+        IPlatformIntegrationService platformIntegrationService,
+        PickedTextFile? openFile,
+        string? savedFileName = null) : IFileSystemPickerService
+    {
+        public IReadOnlyList<PlatformFilePickerFileType> OpenFileTypes { get; private set; } = [];
+        public IReadOnlyList<PlatformFilePickerFileType> SaveFileTypes { get; private set; } = [];
+        public string SuggestedFileName { get; private set; } = "";
+        public string SavedContent { get; private set; } = "";
+        public PlatformIntegrationCapability Capability => platformIntegrationService.GetCapability(PlatformFeatureKeys.FilePicker);
+
+        public Task<PickedTextFile?> OpenTextFileAsync(string title, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default)
+        {
+            OpenFileTypes = fileTypes;
+            return Task.FromResult(openFile);
+        }
+
+        public Task<string?> SaveTextFileAsync(string title, string suggestedFileName, string content, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default)
+        {
+            SuggestedFileName = suggestedFileName;
+            SavedContent = content;
+            SaveFileTypes = fileTypes;
+            return Task.FromResult(savedFileName);
         }
     }
 
