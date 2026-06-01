@@ -315,6 +315,38 @@ public sealed class AppSettingsTests
         Assert.False(viewModel.IsChangingMasterPassword);
     }
 
+    [Fact]
+    public async Task ViewModel_resets_master_password_after_security_answers()
+    {
+        var maintenance = new CapturingMasterPasswordMaintenanceService(
+            new MasterPasswordMaintenanceResult(true, "ok", PasswordsReencrypted: 2, PasswordHistoryEntriesReencrypted: 1, MdbxSecretsReencrypted: 1));
+        var viewModel = CreateViewModel(GetTempPath(), masterPasswordMaintenanceService: maintenance);
+        await viewModel.InitializeAsync();
+        viewModel.IsUnlocked = true;
+        viewModel.SecurityRecoveryEnabled = true;
+        viewModel.SecurityQuestion1Id = 11;
+        viewModel.SecurityQuestion1Answer = "Tiga";
+        viewModel.SecurityQuestion2Id = SecurityQuestionService.CustomQuestionId;
+        viewModel.SecurityQuestion2CustomText = "Favorite shell?";
+        viewModel.SecurityQuestion2Answer = "PowerShell";
+        viewModel.SaveSecurityQuestionsCommand.Execute(null);
+
+        viewModel.SecurityRecoveryAnswer1 = "tiga";
+        viewModel.SecurityRecoveryAnswer2 = "powershell";
+        viewModel.RecoveryNewMasterPassword = "new password";
+        viewModel.RecoveryConfirmNewMasterPassword = "new password";
+        await viewModel.ResetMasterPasswordWithSecurityQuestionsCommand.ExecuteAsync(null);
+
+        Assert.True(maintenance.WasReset);
+        Assert.Equal("new password", maintenance.NewPassword);
+        Assert.Equal("", viewModel.SecurityRecoveryAnswer1);
+        Assert.Equal("", viewModel.SecurityRecoveryAnswer2);
+        Assert.Equal("", viewModel.RecoveryNewMasterPassword);
+        Assert.Equal("", viewModel.RecoveryConfirmNewMasterPassword);
+        Assert.Equal(viewModel.L.Format("ResetMasterPasswordChangedFormat", 4), viewModel.StatusMessage);
+        Assert.False(viewModel.IsResettingMasterPassword);
+    }
+
     private static MainWindowViewModel CreateViewModel(
         string settingsPath,
         IWebDavBackupService? webDavBackupService = null,
@@ -361,10 +393,17 @@ public sealed class AppSettingsTests
         for (var attempt = 0; attempt < 20; attempt++)
         {
             settings = new AppSettingsService(path);
-            await settings.LoadAsync();
-            if (predicate(settings.Current))
+            try
             {
-                return settings;
+                await settings.LoadAsync();
+                if (predicate(settings.Current))
+                {
+                    return settings;
+                }
+            }
+            catch (IOException)
+            {
+                // The view model saves settings asynchronously; retry if the file is momentarily locked.
             }
 
             await Task.Delay(100);
@@ -428,6 +467,7 @@ public sealed class AppSettingsTests
     {
         public string CurrentPassword { get; private set; } = "";
         public string NewPassword { get; private set; } = "";
+        public bool WasReset { get; private set; }
 
         public Task<MasterPasswordMaintenanceResult> ChangeMasterPasswordAsync(
             string currentPassword,
@@ -443,6 +483,7 @@ public sealed class AppSettingsTests
             string newPassword,
             CancellationToken cancellationToken = default)
         {
+            WasReset = true;
             NewPassword = newPassword;
             return Task.FromResult(result);
         }

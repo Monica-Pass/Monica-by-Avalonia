@@ -265,6 +265,9 @@ public interface ILocalizationService : INotifyPropertyChanged
     string NewMasterPassword { get; }
     string ConfirmNewMasterPassword { get; }
     string ChangeMasterPasswordAction { get; }
+    string ResetMasterPassword { get; }
+    string ResetMasterPasswordDescription { get; }
+    string ResetMasterPasswordAction { get; }
     string Desktop { get; }
     string DesktopSettingsDescription { get; }
     string MinimizeToTray { get; }
@@ -639,6 +642,9 @@ public sealed class LocalizationService : ILocalizationService
     public string NewMasterPassword => Text();
     public string ConfirmNewMasterPassword => Text();
     public string ChangeMasterPasswordAction => Text();
+    public string ResetMasterPassword => Text();
+    public string ResetMasterPasswordDescription => Text();
+    public string ResetMasterPasswordAction => Text();
     public string Desktop => Text();
     public string DesktopSettingsDescription => Text();
     public string MinimizeToTray => Text();
@@ -1051,11 +1057,19 @@ public sealed class LocalizationService : ILocalizationService
         ["NewMasterPassword"] = "New master password",
         ["ConfirmNewMasterPassword"] = "Confirm new master password",
         ["ChangeMasterPasswordAction"] = "Update master password",
+        ["ResetMasterPassword"] = "Reset master password",
+        ["ResetMasterPasswordDescription"] = "Use configured security questions to set a new master password while the vault is unlocked.",
+        ["ResetMasterPasswordAction"] = "Verify and reset",
         ["EnterCurrentMasterPassword"] = "Enter the current master password.",
         ["EnterNewMasterPassword"] = "Enter the new master password.",
         ["ChangeMasterPasswordInProgress"] = "Updating master password and re-encrypting vault data...",
         ["MasterPasswordChangedFormat"] = "Master password updated. Re-encrypted {0} database secret(s).",
         ["ChangeMasterPasswordFailedFormat"] = "Master password update failed: {0}",
+        ["SecurityQuestionAnswersRequired"] = "Enter both security-question answers.",
+        ["SecurityQuestionAnswersIncorrect"] = "Security-question answers are incorrect.",
+        ["ResetMasterPasswordInProgress"] = "Verifying recovery answers and re-encrypting vault data...",
+        ["ResetMasterPasswordChangedFormat"] = "Master password reset. Re-encrypted {0} database secret(s).",
+        ["ResetMasterPasswordFailedFormat"] = "Master password reset failed: {0}",
         ["SecurityRecovery"] = "Security questions",
         ["SecurityRecoveryDescription"] = "Configure two recovery questions that can later support master-password reset flows.",
         ["SecurityRecoveryEnabled"] = "Use security questions",
@@ -1502,11 +1516,19 @@ public sealed class LocalizationService : ILocalizationService
         ["NewMasterPassword"] = "新主密码",
         ["ConfirmNewMasterPassword"] = "确认新主密码",
         ["ChangeMasterPasswordAction"] = "更新主密码",
+        ["ResetMasterPassword"] = "重设主密码",
+        ["ResetMasterPasswordDescription"] = "在保险库已解锁时，通过已配置的密保问题设置新主密码。",
+        ["ResetMasterPasswordAction"] = "验证并重设",
         ["EnterCurrentMasterPassword"] = "请输入当前主密码。",
         ["EnterNewMasterPassword"] = "请输入新主密码。",
         ["ChangeMasterPasswordInProgress"] = "正在更新主密码并重新加密保险库数据...",
         ["MasterPasswordChangedFormat"] = "主密码已更新，已重新加密 {0} 个数据库密文。",
         ["ChangeMasterPasswordFailedFormat"] = "主密码更新失败：{0}",
+        ["SecurityQuestionAnswersRequired"] = "请输入两个密保答案。",
+        ["SecurityQuestionAnswersIncorrect"] = "密保答案不正确。",
+        ["ResetMasterPasswordInProgress"] = "正在验证密保答案并重新加密保险库数据...",
+        ["ResetMasterPasswordChangedFormat"] = "主密码已重设，已重新加密 {0} 个数据库密文。",
+        ["ResetMasterPasswordFailedFormat"] = "主密码重设失败：{0}",
         ["SecurityRecovery"] = "密保问题",
         ["SecurityRecoveryDescription"] = "配置两个找回问题，后续用于支持主密码重置流程。",
         ["SecurityRecoveryEnabled"] = "启用密保问题",

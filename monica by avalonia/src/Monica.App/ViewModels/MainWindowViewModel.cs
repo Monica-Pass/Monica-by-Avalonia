@@ -331,8 +331,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public string SecurityQuestionAnswerText => _localization.Get("SecurityQuestionAnswer");
     public string CustomSecurityQuestionText => _localization.Get("CustomSecurityQuestion");
     public string SaveSecurityQuestionsText => _localization.Get("SaveSecurityQuestions");
+    public string ResetMasterPasswordTitle => _localization.Get("ResetMasterPassword");
+    public string ResetMasterPasswordDescription => _localization.Get("ResetMasterPasswordDescription");
+    public string ResetMasterPasswordActionText => _localization.Get("ResetMasterPasswordAction");
+    public string SecurityRecoveryQuestion1PromptText => _settingsService.Current.SecurityRecovery.Question1Text;
+    public string SecurityRecoveryQuestion2PromptText => _settingsService.Current.SecurityRecovery.Question2Text;
     public bool IsSecurityQuestion1Custom => SecurityQuestion1Id == SecurityQuestionService.CustomQuestionId;
     public bool IsSecurityQuestion2Custom => SecurityQuestion2Id == SecurityQuestionService.CustomQuestionId;
+    public bool CanResetMasterPasswordWithSecurityQuestions => _settingsService.Current.SecurityRecovery.HasCompleteSetup;
+    public bool CanRunResetMasterPassword => CanResetMasterPasswordWithSecurityQuestions && !IsResettingMasterPassword;
 
     [ObservableProperty]
     private string _selectedSection = "Passwords";
@@ -477,6 +484,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private string _securityQuestion2Answer = "";
+
+    [ObservableProperty]
+    private string _securityRecoveryAnswer1 = "";
+
+    [ObservableProperty]
+    private string _securityRecoveryAnswer2 = "";
+
+    [ObservableProperty]
+    private string _recoveryNewMasterPassword = "";
+
+    [ObservableProperty]
+    private string _recoveryConfirmNewMasterPassword = "";
+
+    [ObservableProperty]
+    private bool _isResettingMasterPassword;
 
     [ObservableProperty]
     private bool _minimizeToTray;
@@ -807,7 +829,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         UpdateSettings(settings => settings.SecurityRecovery.IsEnabled = value);
         OnPropertyChanged(nameof(SecurityRecoveryStatusText));
+        OnPropertyChanged(nameof(CanResetMasterPasswordWithSecurityQuestions));
+        OnPropertyChanged(nameof(CanRunResetMasterPassword));
     }
+
+    partial void OnIsResettingMasterPasswordChanged(bool value) => OnPropertyChanged(nameof(CanRunResetMasterPassword));
 
     partial void OnSecurityQuestion1IdChanged(int value)
     {
@@ -1207,6 +1233,82 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task ResetMasterPasswordWithSecurityQuestionsAsync()
+    {
+        if (!IsUnlocked)
+        {
+            StatusMessage = _localization.Get("VaultLocked");
+            return;
+        }
+
+        var recovery = _settingsService.Current.SecurityRecovery;
+        if (!recovery.HasCompleteSetup)
+        {
+            StatusMessage = _localization.Get("SecurityQuestionsNotConfigured");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(SecurityRecoveryAnswer1) || string.IsNullOrWhiteSpace(SecurityRecoveryAnswer2))
+        {
+            StatusMessage = _localization.Get("SecurityQuestionAnswersRequired");
+            return;
+        }
+
+        if (!_securityQuestionService.VerifyAnswer(SecurityRecoveryAnswer1, recovery.Question1AnswerHash, recovery.Question1AnswerSalt) ||
+            !_securityQuestionService.VerifyAnswer(SecurityRecoveryAnswer2, recovery.Question2AnswerHash, recovery.Question2AnswerSalt))
+        {
+            StatusMessage = _localization.Get("SecurityQuestionAnswersIncorrect");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(RecoveryNewMasterPassword))
+        {
+            StatusMessage = _localization.Get("EnterNewMasterPassword");
+            return;
+        }
+
+        if (RecoveryNewMasterPassword.Length < 8)
+        {
+            StatusMessage = _localization.Get("MasterPasswordMinLength");
+            return;
+        }
+
+        if (!string.Equals(RecoveryNewMasterPassword, RecoveryConfirmNewMasterPassword, StringComparison.Ordinal))
+        {
+            StatusMessage = _localization.Get("ConfirmationMismatch");
+            return;
+        }
+
+        IsResettingMasterPassword = true;
+        StatusMessage = _localization.Get("ResetMasterPasswordInProgress");
+        try
+        {
+            var result = await _masterPasswordMaintenanceService.ResetMasterPasswordFromUnlockedVaultAsync(RecoveryNewMasterPassword);
+            if (!result.Success)
+            {
+                StatusMessage = _localization.Format("ResetMasterPasswordFailedFormat", result.Message);
+                return;
+            }
+
+            SecurityRecoveryAnswer1 = "";
+            SecurityRecoveryAnswer2 = "";
+            RecoveryNewMasterPassword = "";
+            RecoveryConfirmNewMasterPassword = "";
+            MasterPassword = "";
+            ConfirmMasterPassword = "";
+            StatusMessage = _localization.Format("ResetMasterPasswordChangedFormat", result.TotalSecretsReencrypted);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = _localization.Format("ResetMasterPasswordFailedFormat", ex.Message);
+        }
+        finally
+        {
+            IsResettingMasterPassword = false;
+        }
+    }
+
+    [RelayCommand]
     private void SaveSecurityQuestions()
     {
         if (!SecurityRecoveryEnabled)
@@ -1214,6 +1316,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             _settingsService.Current.SecurityRecovery.IsEnabled = false;
             QueueSaveSettings();
             OnPropertyChanged(nameof(SecurityRecoveryStatusText));
+            OnPropertyChanged(nameof(CanResetMasterPasswordWithSecurityQuestions));
+            OnPropertyChanged(nameof(CanRunResetMasterPassword));
             StatusMessage = _localization.Get("SecurityQuestionsDisabled");
             return;
         }
@@ -1229,6 +1333,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
             SecurityQuestion2Answer = "";
             QueueSaveSettings();
             OnPropertyChanged(nameof(SecurityRecoveryStatusText));
+            OnPropertyChanged(nameof(SecurityRecoveryQuestion1PromptText));
+            OnPropertyChanged(nameof(SecurityRecoveryQuestion2PromptText));
+            OnPropertyChanged(nameof(CanResetMasterPasswordWithSecurityQuestions));
+            OnPropertyChanged(nameof(CanRunResetMasterPassword));
             StatusMessage = _localization.Get("SecurityQuestionsSaved");
         }
         catch (ArgumentException ex)
@@ -4720,6 +4828,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
             SecurityQuestion2CustomText = settings.Question2Id == SecurityQuestionService.CustomQuestionId ? settings.Question2Text : "";
             SecurityQuestion2Answer = "";
             OnPropertyChanged(nameof(SecurityRecoveryStatusText));
+            OnPropertyChanged(nameof(SecurityRecoveryQuestion1PromptText));
+            OnPropertyChanged(nameof(SecurityRecoveryQuestion2PromptText));
+            OnPropertyChanged(nameof(CanResetMasterPasswordWithSecurityQuestions));
+            OnPropertyChanged(nameof(CanRunResetMasterPassword));
             OnPropertyChanged(nameof(IsSecurityQuestion1Custom));
             OnPropertyChanged(nameof(IsSecurityQuestion2Custom));
         }
@@ -4934,6 +5046,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(SecurityQuestionAnswerText));
         OnPropertyChanged(nameof(CustomSecurityQuestionText));
         OnPropertyChanged(nameof(SaveSecurityQuestionsText));
+        OnPropertyChanged(nameof(ResetMasterPasswordTitle));
+        OnPropertyChanged(nameof(ResetMasterPasswordDescription));
+        OnPropertyChanged(nameof(ResetMasterPasswordActionText));
+        OnPropertyChanged(nameof(SecurityRecoveryQuestion1PromptText));
+        OnPropertyChanged(nameof(SecurityRecoveryQuestion2PromptText));
+        OnPropertyChanged(nameof(CanResetMasterPasswordWithSecurityQuestions));
+        OnPropertyChanged(nameof(CanRunResetMasterPassword));
     }
 
     private void RefreshCapabilities()
