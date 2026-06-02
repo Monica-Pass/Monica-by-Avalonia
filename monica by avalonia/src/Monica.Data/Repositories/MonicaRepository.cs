@@ -39,8 +39,13 @@ public interface IMonicaRepository
     Task ClearVaultDataAsync(VaultClearScope scope, CancellationToken cancellationToken = default);
 }
 
-public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory, IDatabaseMigrator migrator) : IMonicaRepository
+public sealed class MonicaRepository(
+    ISqliteConnectionFactory connectionFactory,
+    IDatabaseMigrator migrator,
+    IVaultDataProtector? vaultDataProtector = null) : IMonicaRepository
 {
+    private readonly IVaultDataProtector _vaultDataProtector = vaultDataProtector ?? NoopVaultDataProtector.Instance;
+
     public async Task<IReadOnlyList<PasswordEntry>> GetPasswordsAsync(bool includeDeleted = false, bool includeArchived = false, CancellationToken cancellationToken = default)
     {
         await migrator.MigrateAsync(cancellationToken);
@@ -54,7 +59,7 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
             """,
             new { IncludeDeleted = includeDeleted ? 1 : 0, IncludeArchived = includeArchived ? 1 : 0 });
 
-        return rows.Select(ToModel).ToList();
+        return rows.Select(ToModel).Select(entry => _vaultDataProtector.Unprotect(entry)).ToList();
     }
 
     public async Task<long> SavePasswordAsync(PasswordEntry entry, CancellationToken cancellationToken = default)
@@ -90,7 +95,7 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
                     @ReplicaGroupId, @BitwardenVaultId, @BitwardenCipherId, @BitwardenFolderId, @BitwardenRevisionDate,
                     @BitwardenCipherType, @BitwardenLocalModified);
                 """,
-                ToRow(entry));
+                ToRow(_vaultDataProtector.Protect(entry)));
             entry.Id = await connection.ExecuteScalarAsync<long>("SELECT last_insert_rowid();");
         }
         else
@@ -115,7 +120,7 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
                     bitwarden_local_modified=@BitwardenLocalModified
                 WHERE id=@Id;
                 """,
-                ToRow(entry));
+                ToRow(_vaultDataProtector.Protect(entry)));
         }
 
         return entry.Id;
@@ -174,7 +179,7 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
             """,
             new { EntryId = entryId });
 
-        return rows.Select(ToModel).ToList();
+        return rows.Select(ToModel).Select(field => _vaultDataProtector.Unprotect(field)).ToList();
     }
 
     public async Task<IReadOnlyDictionary<long, IReadOnlyList<CustomField>>> GetCustomFieldsByEntryIdsAsync(IReadOnlyList<long> entryIds, CancellationToken cancellationToken = default)
@@ -198,6 +203,7 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
 
         return rows
             .Select(ToModel)
+            .Select(field => _vaultDataProtector.Unprotect(field))
             .GroupBy(field => field.EntryId)
             .ToDictionary(group => group.Key, group => (IReadOnlyList<CustomField>)group.ToList());
     }
@@ -212,13 +218,21 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
 
         var rows = fields
             .Where(field => !string.IsNullOrWhiteSpace(field.Title) && !string.IsNullOrWhiteSpace(field.Value))
-            .Select((field, index) => new
+            .Select((field, index) => _vaultDataProtector.Protect(new CustomField
             {
                 EntryId = entryId,
                 Title = field.Title.Trim(),
                 Value = field.Value.Trim(),
-                IsProtected = field.IsProtected ? 1 : 0,
+                IsProtected = field.IsProtected,
                 SortOrder = index
+            }))
+            .Select(field => new
+            {
+                field.EntryId,
+                field.Title,
+                field.Value,
+                IsProtected = field.IsProtected ? 1 : 0,
+                field.SortOrder
             })
             .ToArray();
 
@@ -249,16 +263,24 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
         }
 
         await using var connection = connectionFactory.CreateConnection();
-        var ids = await connection.QueryAsync<long>(
+        var rows = await connection.QueryAsync<CustomFieldRow>(
             """
-            SELECT DISTINCT entry_id
+            SELECT id, entry_id, title, value, is_protected, sort_order
             FROM custom_fields
-            WHERE title LIKE @Query OR value LIKE @Query
             ORDER BY entry_id ASC
-            """,
-            new { Query = $"%{query.Trim()}%" });
+            """);
 
-        return ids.ToList();
+        var term = query.Trim();
+        return rows
+            .Select(ToModel)
+            .Select(field => _vaultDataProtector.Unprotect(field))
+            .Where(field =>
+                field.Title.Contains(term, StringComparison.CurrentCultureIgnoreCase) ||
+                field.Value.Contains(term, StringComparison.CurrentCultureIgnoreCase))
+            .Select(field => field.EntryId)
+            .Distinct()
+            .OrderBy(id => id)
+            .ToList();
     }
 
     public async Task<IReadOnlyList<Attachment>> GetAttachmentsAsync(string ownerType, long ownerId, CancellationToken cancellationToken = default)
@@ -360,7 +382,7 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
             """,
             new { EntryId = entryId });
 
-        return rows.Select(ToModel).ToList();
+        return rows.Select(ToModel).Select(entry => _vaultDataProtector.Unprotect(entry)).ToList();
     }
 
     public async Task<long> SavePasswordHistoryAsync(PasswordHistoryEntry entry, CancellationToken cancellationToken = default)
@@ -379,7 +401,7 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
                 INSERT INTO password_history_entries(entry_id, password, last_used_at)
                 VALUES(@EntryId, @Password, @LastUsedAt)
                 """,
-                ToRow(entry));
+                ToRow(_vaultDataProtector.Protect(entry)));
             entry.Id = await connection.ExecuteScalarAsync<long>("SELECT last_insert_rowid();");
         }
         else
@@ -390,7 +412,7 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
                 SET entry_id=@EntryId, password=@Password, last_used_at=@LastUsedAt
                 WHERE id=@Id
                 """,
-                ToRow(entry));
+                ToRow(_vaultDataProtector.Protect(entry)));
         }
 
         return entry.Id;
@@ -503,7 +525,7 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
             ORDER BY is_favorite DESC, sort_order ASC, updated_at DESC
             """,
             new { IncludeDeleted = includeDeleted ? 1 : 0, ItemType = itemType?.ToString().ToUpperInvariant() });
-        return rows.Select(ToModel).ToList();
+        return rows.Select(ToModel).Select(item => _vaultDataProtector.Unprotect(item)).ToList();
     }
 
     public async Task<IReadOnlyList<SecureItem>> GetSecureItemsByBoundPasswordIdAsync(long passwordId, bool includeDeleted = false, CancellationToken cancellationToken = default)
@@ -519,7 +541,7 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
             ORDER BY updated_at DESC, id DESC
             """,
             new { PasswordId = passwordId, IncludeDeleted = includeDeleted ? 1 : 0 });
-        return rows.Select(ToModel).ToList();
+        return rows.Select(ToModel).Select(item => _vaultDataProtector.Unprotect(item)).ToList();
     }
 
     public async Task<long> SaveSecureItemAsync(SecureItem item, CancellationToken cancellationToken = default)
@@ -547,7 +569,7 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
                     @MdbxDatabaseId, @MdbxFolderId, @IsDeleted, @DeletedAt, @ReplicaGroupId, @BitwardenVaultId,
                     @BitwardenCipherId, @BitwardenFolderId, @BitwardenRevisionDate, @BitwardenLocalModified, @SyncStatus);
                 """,
-                ToRow(item));
+                ToRow(_vaultDataProtector.Protect(item)));
             item.Id = await connection.ExecuteScalarAsync<long>("SELECT last_insert_rowid();");
         }
         else
@@ -565,7 +587,7 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
                     sync_status=@SyncStatus
                 WHERE id=@Id;
                 """,
-                ToRow(item));
+                ToRow(_vaultDataProtector.Protect(item)));
         }
 
         return item.Id;
@@ -636,7 +658,7 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
         await migrator.MigrateAsync(cancellationToken);
         await using var connection = connectionFactory.CreateConnection();
         var rows = await connection.QueryAsync<MdbxDatabaseRow>("SELECT * FROM local_mdbx_databases ORDER BY sort_order ASC, created_at DESC");
-        return rows.Select(ToModel).ToList();
+        return rows.Select(ToModel).Select(database => _vaultDataProtector.Unprotect(database)).ToList();
     }
 
     public async Task<long> SaveMdbxDatabaseAsync(LocalMdbxDatabase database, CancellationToken cancellationToken = default)
@@ -668,7 +690,7 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
                     @LastSyncedAt, @IsDefault, @ProjectCount, @SortOrder, @WorkingCopyPath, @CacheCopyPath, @IsOfflineAvailable,
                     @LastSyncStatus, @LastSyncError);
                 """,
-                ToRow(database));
+                ToRow(_vaultDataProtector.Protect(database)));
             database.Id = await connection.ExecuteScalarAsync<long>("SELECT last_insert_rowid();");
         }
         else
@@ -684,7 +706,7 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
                     last_sync_status=@LastSyncStatus, last_sync_error=@LastSyncError
                 WHERE id=@Id;
                 """,
-                ToRow(database));
+                ToRow(_vaultDataProtector.Protect(database)));
         }
 
         return database.Id;
@@ -694,6 +716,7 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
     {
         await migrator.MigrateAsync(cancellationToken);
         await using var connection = connectionFactory.CreateConnection();
+        var protectedLog = _vaultDataProtector.Protect(log);
         await connection.ExecuteAsync(
             """
             INSERT INTO operation_logs(item_type, item_id, item_title, operation_type, changes_json, device_id, device_name, timestamp, is_reverted)
@@ -701,15 +724,15 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
             """,
             new
             {
-                log.ItemType,
-                log.ItemId,
-                log.ItemTitle,
-                log.OperationType,
-                log.ChangesJson,
-                log.DeviceId,
-                log.DeviceName,
-                Timestamp = ToUnixMilliseconds(log.Timestamp),
-                IsReverted = log.IsReverted ? 1 : 0
+                protectedLog.ItemType,
+                protectedLog.ItemId,
+                protectedLog.ItemTitle,
+                protectedLog.OperationType,
+                protectedLog.ChangesJson,
+                protectedLog.DeviceId,
+                protectedLog.DeviceName,
+                Timestamp = ToUnixMilliseconds(protectedLog.Timestamp),
+                IsReverted = protectedLog.IsReverted ? 1 : 0
             });
     }
 
@@ -731,7 +754,7 @@ public sealed class MonicaRepository(ISqliteConnectionFactory connectionFactory,
                 Limit = Math.Clamp(limit, 1, 500)
             });
 
-        return rows.Select(ToModel).ToList();
+        return rows.Select(ToModel).Select(log => _vaultDataProtector.Unprotect(log)).ToList();
     }
 
     private static PasswordEntry ToModel(PasswordEntryRow row) => new()

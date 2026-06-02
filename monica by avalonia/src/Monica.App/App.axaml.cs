@@ -49,6 +49,7 @@ public partial class App : Application
         services.AddSingleton<IMonicaRepository, MonicaRepository>();
         services.AddSingleton<IMasterPasswordMaintenanceService, MasterPasswordMaintenanceService>();
         services.AddSingleton<ICryptoService, CryptoService>();
+        services.AddSingleton<IVaultDataProtector, VaultDataProtector>();
         services.AddSingleton<ITotpService, TotpService>();
         services.AddSingleton<IPasswordGeneratorService, PasswordGeneratorService>();
         services.AddSingleton<IPwnedPasswordService, PwnedPasswordService>();

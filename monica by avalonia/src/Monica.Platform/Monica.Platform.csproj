@@ -8,6 +8,7 @@
   <ItemGroup>
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
     <PackageReference Include="KPCLib" Version="2.0.4" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.8" />
     <PackageReference Include="Microsoft.Graph" Version="6.1.0" />
     <PackageReference Include="Microsoft.Identity.Client" Version="4.84.1" />

@@ -199,6 +199,26 @@ public interface ILocalizationService : INotifyPropertyChanged
     string DesktopEquivalents { get; }
     string DesktopEquivalentsMessage { get; }
     string CreateMdbxMetadata { get; }
+    string MdbxVaults { get; }
+    string MdbxVaultsDescription { get; }
+    string MdbxLocalSource { get; }
+    string MdbxWebDavSource { get; }
+    string MdbxOneDriveSource { get; }
+    string CreateLocalMdbxVault { get; }
+    string RegisterMdbxSource { get; }
+    string Configure { get; }
+    string RegisteredMdbxVaults { get; }
+    string NoMdbxVaults { get; }
+    string Default { get; }
+    string LocalPath { get; }
+    string SetDefault { get; }
+    string Open { get; }
+    string MdbxRuntime { get; }
+    string MdbxSecurity { get; }
+    string MdbxAndroidParity { get; }
+    string MdbxAndroidParityDescription { get; }
+    string MdbxAndroidParityLocal { get; }
+    string MdbxAndroidParityRemote { get; }
     string LocalDatabase { get; }
     string LocalDatabaseDescription { get; }
     string ExternalDatabases { get; }
@@ -602,6 +622,26 @@ public sealed class LocalizationService : ILocalizationService
     public string DesktopEquivalents => Text();
     public string DesktopEquivalentsMessage => Text();
     public string CreateMdbxMetadata => Text();
+    public string MdbxVaults => Text();
+    public string MdbxVaultsDescription => Text();
+    public string MdbxLocalSource => Text();
+    public string MdbxWebDavSource => Text();
+    public string MdbxOneDriveSource => Text();
+    public string CreateLocalMdbxVault => Text();
+    public string RegisterMdbxSource => Text();
+    public string Configure => Text();
+    public string RegisteredMdbxVaults => Text();
+    public string NoMdbxVaults => Text();
+    public string Default => Text();
+    public string LocalPath => Text();
+    public string SetDefault => Text();
+    public string Open => Text();
+    public string MdbxRuntime => Text();
+    public string MdbxSecurity => Text();
+    public string MdbxAndroidParity => Text();
+    public string MdbxAndroidParityDescription => Text();
+    public string MdbxAndroidParityLocal => Text();
+    public string MdbxAndroidParityRemote => Text();
     public string LocalDatabase => Text();
     public string LocalDatabaseDescription => Text();
     public string ExternalDatabases => Text();
@@ -1028,6 +1068,26 @@ public sealed class LocalizationService : ILocalizationService
         ["DesktopEquivalents"] = "Desktop equivalents",
         ["DesktopEquivalentsMessage"] = "Android Autofill, IME, Accessibility and Credential Provider features are represented through quick search, clipboard, tray/browser extension boundaries, or platform-limited status.",
         ["CreateMdbxMetadata"] = "Create MDBX Metadata",
+        ["MdbxVaults"] = "MDBX Vaults",
+        ["MdbxVaultsDescription"] = "Manage local, WebDAV and OneDrive MDBX vault metadata from one page. Local vaults can be opened on desktop now; remote MDBX entries are registered for the upcoming sync engine.",
+        ["MdbxLocalSource"] = "Local MDBX",
+        ["MdbxWebDavSource"] = "WebDAV MDBX",
+        ["MdbxOneDriveSource"] = "OneDrive MDBX",
+        ["CreateLocalMdbxVault"] = "Create local MDBX",
+        ["RegisterMdbxSource"] = "Register source",
+        ["Configure"] = "Configure",
+        ["RegisteredMdbxVaults"] = "Registered MDBX vaults",
+        ["NoMdbxVaults"] = "No MDBX vault metadata has been registered yet.",
+        ["Default"] = "Default",
+        ["LocalPath"] = "Local path",
+        ["SetDefault"] = "Set default",
+        ["Open"] = "Open",
+        ["MdbxRuntime"] = "Runtime",
+        ["MdbxSecurity"] = "Security",
+        ["MdbxAndroidParity"] = "Android parity",
+        ["MdbxAndroidParityDescription"] = "Desktop MDBX now has a dedicated manager page matching the Android source hub shape.",
+        ["MdbxAndroidParityLocal"] = "Local MDBX metadata and working-copy opening are available on desktop.",
+        ["MdbxAndroidParityRemote"] = "WebDAV and OneDrive MDBX source records are visible here; full remote sync/commit/conflict handling still requires the Android MDBX engine port.",
         ["LocalDatabase"] = "Local database",
         ["LocalDatabaseDescription"] = "Avalonia uses the Monica v68 SQLite schema as the canonical desktop vault.",
         ["ExternalDatabases"] = "External databases",
@@ -1316,6 +1376,34 @@ public sealed class LocalizationService : ILocalizationService
         ["PasswordCountFormat"] = "{0} items",
         ["DatabaseSummaryFormat"] = "{0} passwords, {1} notes, {2} authenticators, {3} wallet items",
         ["MdbxDatabaseCountFormat"] = "{0} MDBX metadata record(s)",
+        ["MdbxSourceCountFormat"] = "{0} vault(s)",
+        ["MdbxLocalSourceReadyFormat"] = "{0} local MDBX vault(s) are ready.",
+        ["MdbxLocalSourceEmpty"] = "Create a local MDBX working copy for desktop vault operations.",
+        ["MdbxWebDavSourceReadyFormat"] = "{0} WebDAV MDBX source(s) are registered.",
+        ["MdbxWebDavSourceEmpty"] = "WebDAV is enabled; register an MDBX source record for this remote path.",
+        ["MdbxOneDriveSourceReadyFormat"] = "{0} OneDrive MDBX source(s) are registered.",
+        ["MdbxOneDriveSourceEmpty"] = "OneDrive is enabled; register an MDBX source record for Microsoft Graph sync.",
+        ["MdbxRuntimeSummary"] = "Local metadata and working-copy paths are active. Remote source records are visible while the full MDBX sync engine is ported.",
+        ["MdbxSecuritySummary"] = "MDBX secrets are stored through the vault encryption layer; file contents still depend on the MDBX engine implementation.",
+        ["MdbxSourceLocal"] = "Local",
+        ["MdbxSourceExternal"] = "External",
+        ["MdbxNoDescription"] = "No description",
+        ["Never"] = "Never",
+        ["MdbxLocalVaultName"] = "Local Monica Vault",
+        ["MdbxWebDavVaultName"] = "WebDAV Monica Vault",
+        ["MdbxOneDriveVaultName"] = "OneDrive Monica Vault",
+        ["MdbxLocalMetadataDescription"] = "Local desktop MDBX metadata and working copy.",
+        ["MdbxWebDavMetadataDescription"] = "WebDAV MDBX metadata record for the upcoming remote sync engine.",
+        ["MdbxOneDriveMetadataDescription"] = "OneDrive MDBX metadata record for the upcoming Microsoft Graph sync engine.",
+        ["MdbxMetadataAlreadyRegisteredFormat"] = "{0} is already registered.",
+        ["CreatedMdbxWebDavMetadata"] = "Registered WebDAV MDBX metadata.",
+        ["CreatedMdbxOneDriveMetadata"] = "Registered OneDrive MDBX metadata.",
+        ["EnableOneDriveFirst"] = "Enable OneDrive first.",
+        ["MdbxVaultsRefreshed"] = "MDBX vault metadata refreshed.",
+        ["MdbxRemoteOpenPending"] = "Remote MDBX opening is waiting for the full MDBX sync engine port.",
+        ["OpenedMdbxDatabaseFormat"] = "Opened {0}; local file size is {1} byte(s).",
+        ["SelectedMdbxDefaultFormat"] = "{0} is now the default MDBX vault.",
+        ["ConfigureMdbxRemoteSourcesHint"] = "Configure WebDAV or OneDrive before registering remote MDBX sources.",
         ["VaultSourceCountFormat"] = "{0} registered source(s)",
         ["WebDavConfiguredFormat"] = "Configured for {0}",
         ["WebDavDisabled"] = "WebDAV is disabled. Local vault operations remain available.",
@@ -1467,7 +1555,7 @@ public sealed class LocalizationService : ILocalizationService
         ["TotpCsv"] = "TOTP CSV",
         ["NoteCsv"] = "Notes CSV",
         ["PasswordCsv"] = "Password CSV",
-        ["CreatedMdbxMetadata"] = "Created MDBX metadata and local working file path"
+        ["CreatedMdbxMetadata"] = "Created a real MDBX-1 vault and registered its local metadata"
     };
 
     private static readonly Dictionary<string, string> Chinese = new()
@@ -1562,6 +1650,26 @@ public sealed class LocalizationService : ILocalizationService
         ["DesktopEquivalents"] = "桌面等价能力",
         ["DesktopEquivalentsMessage"] = "Android 的自动填充、输入法、无障碍和凭据提供程序能力，在桌面端通过快速搜索、剪贴板、托盘/浏览器扩展接口或平台受限状态呈现。",
         ["CreateMdbxMetadata"] = "创建 MDBX 元数据",
+        ["MdbxVaults"] = "MDBX 保险库",
+        ["MdbxVaultsDescription"] = "在一个页面管理本地、WebDAV 与 OneDrive 的 MDBX 保险库元数据。本地 MDBX 现在可在桌面端打开；远程 MDBX 会先登记为后续同步引擎使用的来源。",
+        ["MdbxLocalSource"] = "本地 MDBX",
+        ["MdbxWebDavSource"] = "WebDAV MDBX",
+        ["MdbxOneDriveSource"] = "OneDrive MDBX",
+        ["CreateLocalMdbxVault"] = "创建本地 MDBX",
+        ["RegisterMdbxSource"] = "登记来源",
+        ["Configure"] = "配置",
+        ["RegisteredMdbxVaults"] = "已登记 MDBX 保险库",
+        ["NoMdbxVaults"] = "还没有登记 MDBX 保险库元数据。",
+        ["Default"] = "默认",
+        ["LocalPath"] = "本地路径",
+        ["SetDefault"] = "设为默认",
+        ["Open"] = "打开",
+        ["MdbxRuntime"] = "运行状态",
+        ["MdbxSecurity"] = "安全",
+        ["MdbxAndroidParity"] = "Android 对齐",
+        ["MdbxAndroidParityDescription"] = "桌面端 MDBX 现在拥有独立管理页，形态对齐 Android 的来源管理中心。",
+        ["MdbxAndroidParityLocal"] = "桌面端已支持本地 MDBX 元数据和工作副本打开。",
+        ["MdbxAndroidParityRemote"] = "WebDAV 与 OneDrive MDBX 来源已在此可见；完整远程同步、提交历史和冲突处理仍需要移植 Android MDBX 引擎。",
         ["LocalDatabase"] = "本地数据库",
         ["LocalDatabaseDescription"] = "Avalonia 使用 Monica v68 SQLite 架构作为桌面端主保险库。",
         ["ExternalDatabases"] = "外部数据库",
@@ -1792,6 +1900,34 @@ public sealed class LocalizationService : ILocalizationService
         ["PasswordCountFormat"] = "{0} 项",
         ["DatabaseSummaryFormat"] = "{0} 个密码、{1} 条笔记、{2} 个验证器、{3} 个卡包项目",
         ["MdbxDatabaseCountFormat"] = "{0} 条 MDBX 元数据",
+        ["MdbxSourceCountFormat"] = "{0} 个保险库",
+        ["MdbxLocalSourceReadyFormat"] = "{0} 个本地 MDBX 保险库已就绪。",
+        ["MdbxLocalSourceEmpty"] = "创建本地 MDBX 工作副本，用于桌面保险库操作。",
+        ["MdbxWebDavSourceReadyFormat"] = "已登记 {0} 个 WebDAV MDBX 来源。",
+        ["MdbxWebDavSourceEmpty"] = "WebDAV 已启用；可以为该远程路径登记 MDBX 来源。",
+        ["MdbxOneDriveSourceReadyFormat"] = "已登记 {0} 个 OneDrive MDBX 来源。",
+        ["MdbxOneDriveSourceEmpty"] = "OneDrive 已启用；可以登记用于 Microsoft Graph 同步的 MDBX 来源。",
+        ["MdbxRuntimeSummary"] = "本地元数据和工作副本路径已启用；完整 MDBX 同步引擎移植前，远程来源会先显示为登记记录。",
+        ["MdbxSecuritySummary"] = "MDBX 密钥类字段通过统一保险库加密层保存；文件内容加密仍取决于 MDBX 引擎实现。",
+        ["MdbxSourceLocal"] = "本地",
+        ["MdbxSourceExternal"] = "外部",
+        ["MdbxNoDescription"] = "无描述",
+        ["Never"] = "从未",
+        ["MdbxLocalVaultName"] = "本地 Monica 保险库",
+        ["MdbxWebDavVaultName"] = "WebDAV Monica 保险库",
+        ["MdbxOneDriveVaultName"] = "OneDrive Monica 保险库",
+        ["MdbxLocalMetadataDescription"] = "本地桌面 MDBX 元数据和工作副本。",
+        ["MdbxWebDavMetadataDescription"] = "为后续远程同步引擎准备的 WebDAV MDBX 元数据记录。",
+        ["MdbxOneDriveMetadataDescription"] = "为后续 Microsoft Graph 同步引擎准备的 OneDrive MDBX 元数据记录。",
+        ["MdbxMetadataAlreadyRegisteredFormat"] = "{0} 已经登记。",
+        ["CreatedMdbxWebDavMetadata"] = "已登记 WebDAV MDBX 元数据。",
+        ["CreatedMdbxOneDriveMetadata"] = "已登记 OneDrive MDBX 元数据。",
+        ["EnableOneDriveFirst"] = "请先启用 OneDrive。",
+        ["MdbxVaultsRefreshed"] = "MDBX 保险库元数据已刷新。",
+        ["MdbxRemoteOpenPending"] = "远程 MDBX 打开功能正在等待完整 MDBX 同步引擎移植。",
+        ["OpenedMdbxDatabaseFormat"] = "已打开 {0}；本地文件大小为 {1} 字节。",
+        ["SelectedMdbxDefaultFormat"] = "{0} 已设为默认 MDBX 保险库。",
+        ["ConfigureMdbxRemoteSourcesHint"] = "登记远程 MDBX 来源前，请先配置 WebDAV 或 OneDrive。",
         ["VaultSourceCountFormat"] = "{0} 个已登记来源",
         ["WebDavConfiguredFormat"] = "已配置到 {0}",
         ["WebDavDisabled"] = "WebDAV 已禁用。本地保险库操作仍可使用。",
@@ -1871,6 +2007,6 @@ public sealed class LocalizationService : ILocalizationService
         ["TotpCsv"] = "TOTP CSV",
         ["NoteCsv"] = "笔记 CSV",
         ["PasswordCsv"] = "密码 CSV",
-        ["CreatedMdbxMetadata"] = "已创建 MDBX 元数据和本地工作文件路径"
+        ["CreatedMdbxMetadata"] = "已创建真实 MDBX-1 保险库并登记本地元数据"
     };
 }

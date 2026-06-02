@@ -12,6 +12,9 @@ public interface ISqliteConnectionFactory
 
 public sealed class SqliteConnectionFactory : ISqliteConnectionFactory
 {
+    internal const string DefaultApplicationDataDirectoryName = "Monica by Avalonia";
+    internal const string DefaultDatabaseFileName = "monica.db";
+
     private static int _initialized;
 
     public SqliteConnectionFactory(string? databasePath = null)
@@ -41,8 +44,10 @@ public sealed class SqliteConnectionFactory : ISqliteConnectionFactory
 
     private static string GetDefaultDatabasePath()
     {
-        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Monica");
+        var root = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            DefaultApplicationDataDirectoryName);
         Directory.CreateDirectory(root);
-        return Path.Combine(root, "monica.db");
+        return Path.Combine(root, DefaultDatabaseFileName);
     }
 }

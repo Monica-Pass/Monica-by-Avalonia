@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Monica.Core.Models;
 using Monica.Core.Services;
+using Monica.Platform.Services;
 
 namespace Monica.App.Services;
 
@@ -57,6 +58,8 @@ public interface IAppSettingsService
 
 public sealed class AppSettingsService : IAppSettingsService
 {
+    private const string ProtectedSettingPrefix = "secret:v1:";
+
     private static readonly IReadOnlyDictionary<string, bool> DefaultFeatureToggles =
         FeatureCatalog.AndroidParityFeatures.ToDictionary(
             item => item.Key,
@@ -64,11 +67,13 @@ public sealed class AppSettingsService : IAppSettingsService
             StringComparer.OrdinalIgnoreCase);
 
     private readonly string _settingsPath;
+    private readonly ISecretProtector? _secretProtector;
     private readonly SemaphoreSlim _saveGate = new(1, 1);
 
-    public AppSettingsService(string? settingsPath = null)
+    public AppSettingsService(string? settingsPath = null, ISecretProtector? secretProtector = null)
     {
         _settingsPath = settingsPath ?? GetDefaultSettingsPath();
+        _secretProtector = secretProtector;
         Normalize(Current);
     }
 
@@ -90,6 +95,7 @@ public sealed class AppSettingsService : IAppSettingsService
             cancellationToken) ?? new DesktopAppSettings();
 
         Normalize(Current);
+        await UnprotectSecretsAsync(Current, cancellationToken);
     }
 
     public async Task SaveAsync(CancellationToken cancellationToken = default)
@@ -99,10 +105,12 @@ public sealed class AppSettingsService : IAppSettingsService
         {
             Normalize(Current);
             Directory.CreateDirectory(Path.GetDirectoryName(_settingsPath)!);
+            var settingsToSave = Clone(Current);
+            await ProtectSecretsAsync(settingsToSave, cancellationToken);
             await using var stream = File.Create(_settingsPath);
             await JsonSerializer.SerializeAsync(
                 stream,
-                Current,
+                settingsToSave,
                 AppSettingsJsonContext.Default.DesktopAppSettings,
                 cancellationToken);
         }
@@ -114,9 +122,88 @@ public sealed class AppSettingsService : IAppSettingsService
 
     private static string GetDefaultSettingsPath()
     {
-        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Monica");
+        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Monica by Avalonia");
         return Path.Combine(root, "settings.json");
     }
+
+    private async Task ProtectSecretsAsync(DesktopAppSettings settings, CancellationToken cancellationToken)
+    {
+        settings.WebDavPassword = await ProtectSettingAsync(settings.WebDavPassword, cancellationToken);
+        settings.WebDavBackupEncryptionPassword = await ProtectSettingAsync(settings.WebDavBackupEncryptionPassword, cancellationToken);
+    }
+
+    private async Task UnprotectSecretsAsync(DesktopAppSettings settings, CancellationToken cancellationToken)
+    {
+        settings.WebDavPassword = await UnprotectSettingAsync(settings.WebDavPassword, cancellationToken);
+        settings.WebDavBackupEncryptionPassword = await UnprotectSettingAsync(settings.WebDavBackupEncryptionPassword, cancellationToken);
+    }
+
+    private async Task<string> ProtectSettingAsync(string value, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(value) || value.StartsWith(ProtectedSettingPrefix, StringComparison.Ordinal) || _secretProtector is null)
+        {
+            return value;
+        }
+
+        try
+        {
+            return ProtectedSettingPrefix + await _secretProtector.ProtectAsync(value, cancellationToken);
+        }
+        catch (InvalidOperationException)
+        {
+            return value;
+        }
+    }
+
+    private async Task<string> UnprotectSettingAsync(string value, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(value) || !value.StartsWith(ProtectedSettingPrefix, StringComparison.Ordinal) || _secretProtector is null)
+        {
+            return value;
+        }
+
+        return await _secretProtector.UnprotectAsync(value[ProtectedSettingPrefix.Length..], cancellationToken);
+    }
+
+    private static DesktopAppSettings Clone(DesktopAppSettings source) => new()
+    {
+        Language = source.Language,
+        Theme = source.Theme,
+        StartupSection = source.StartupSection,
+        AutoLockEnabled = source.AutoLockEnabled,
+        AutoLockMinutes = source.AutoLockMinutes,
+        ClearClipboardEnabled = source.ClearClipboardEnabled,
+        ClipboardClearSeconds = source.ClipboardClearSeconds,
+        RequirePasswordBeforeExport = source.RequirePasswordBeforeExport,
+        SecurityRecovery = source.SecurityRecovery,
+        MinimizeToTray = source.MinimizeToTray,
+        QuickSearchEnabled = source.QuickSearchEnabled,
+        QuickSearchHotkey = source.QuickSearchHotkey,
+        BrowserIntegrationEnabled = source.BrowserIntegrationEnabled,
+        BrowserIntegrationPort = source.BrowserIntegrationPort,
+        CompactPasswordList = source.CompactPasswordList,
+        PasswordSortOrder = source.PasswordSortOrder,
+        WebDavEnabled = source.WebDavEnabled,
+        WebDavServerUrl = source.WebDavServerUrl,
+        WebDavUsername = source.WebDavUsername,
+        WebDavPassword = source.WebDavPassword,
+        WebDavRemotePath = source.WebDavRemotePath,
+        WebDavSyncOnStartup = source.WebDavSyncOnStartup,
+        WebDavSyncAfterChanges = source.WebDavSyncAfterChanges,
+        WebDavBackupIncludePasswords = source.WebDavBackupIncludePasswords,
+        WebDavBackupIncludeTotp = source.WebDavBackupIncludeTotp,
+        WebDavBackupIncludeNotes = source.WebDavBackupIncludeNotes,
+        WebDavBackupIncludeCards = source.WebDavBackupIncludeCards,
+        WebDavBackupIncludeDocuments = source.WebDavBackupIncludeDocuments,
+        WebDavBackupIncludeImages = source.WebDavBackupIncludeImages,
+        WebDavBackupIncludeCategories = source.WebDavBackupIncludeCategories,
+        WebDavBackupEncryptionEnabled = source.WebDavBackupEncryptionEnabled,
+        WebDavBackupEncryptionPassword = source.WebDavBackupEncryptionPassword,
+        SyncConflictStrategy = source.SyncConflictStrategy,
+        OneDriveEnabled = source.OneDriveEnabled,
+        MdbxLocalCacheEnabled = source.MdbxLocalCacheEnabled,
+        FeatureToggles = new Dictionary<string, bool>(source.FeatureToggles, StringComparer.OrdinalIgnoreCase)
+    };
 
     public IReadOnlyDictionary<string, bool> GetFeatureToggles()
     {
@@ -145,7 +232,7 @@ public sealed class AppSettingsService : IAppSettingsService
     {
         settings.Language = NormalizeChoice(settings.Language, "system", "system", "en-US", "zh-CN");
         settings.Theme = NormalizeChoice(settings.Theme, "system", "system", "light", "dark");
-        settings.StartupSection = NormalizeChoice(settings.StartupSection, "Passwords", "Passwords", "Notes", "Totp", "Cards", "Generator", "Archive", "RecycleBin", "SecurityAnalysis", "Timeline", "DatabaseManagement", "Sync", "Settings");
+        settings.StartupSection = NormalizeChoice(settings.StartupSection, "Passwords", "Passwords", "Notes", "Totp", "Cards", "Generator", "Archive", "RecycleBin", "SecurityAnalysis", "Timeline", "Mdbx", "DatabaseManagement", "Sync", "Settings");
         settings.SyncConflictStrategy = NormalizeChoice(settings.SyncConflictStrategy, "ask", "ask", "local-wins", "remote-wins");
         settings.PasswordSortOrder = NormalizeChoice(settings.PasswordSortOrder, "updated-desc", "updated-desc", "title-asc", "website-asc", "username-asc", "created-desc", "favorites-first");
         settings.AutoLockMinutes = Clamp(settings.AutoLockMinutes, 1, 120);

@@ -21,6 +21,9 @@ public sealed record MasterPasswordMaintenanceResult(
     int PasswordsReencrypted = 0,
     int PasswordHistoryEntriesReencrypted = 0,
     int MdbxSecretsReencrypted = 0,
+    int CustomFieldsReencrypted = 0,
+    int SecureItemsReencrypted = 0,
+    int OperationLogsReencrypted = 0,
     int RemoteSourceSecretsReencrypted = 0,
     int BitwardenSecretsReencrypted = 0)
 {
@@ -28,6 +31,9 @@ public sealed record MasterPasswordMaintenanceResult(
         PasswordsReencrypted +
         PasswordHistoryEntriesReencrypted +
         MdbxSecretsReencrypted +
+        CustomFieldsReencrypted +
+        SecureItemsReencrypted +
+        OperationLogsReencrypted +
         RemoteSourceSecretsReencrypted +
         BitwardenSecretsReencrypted;
 
@@ -39,18 +45,52 @@ public sealed class MasterPasswordMaintenanceService(
     IDatabaseMigrator migrator,
     ICryptoService cryptoService) : IMasterPasswordMaintenanceService
 {
+    private const string ProtectedPrefix = "vault:v1:";
+
     private static readonly SecretColumnSpec[] SecretColumns =
     [
-        new("password_entries", "id", "password", SecretBucket.Passwords),
-        new("password_history_entries", "id", "password", SecretBucket.PasswordHistory),
-        new("local_mdbx_databases", "id", "encrypted_password", SecretBucket.Mdbx),
-        new("mdbx_remote_sources", "id", "username_encrypted", SecretBucket.RemoteSources),
-        new("mdbx_remote_sources", "id", "password_encrypted", SecretBucket.RemoteSources),
-        new("bitwarden_vaults", "id", "encrypted_access_token", SecretBucket.Bitwarden),
-        new("bitwarden_vaults", "id", "encrypted_refresh_token", SecretBucket.Bitwarden),
-        new("bitwarden_vaults", "id", "encrypted_master_key", SecretBucket.Bitwarden),
-        new("bitwarden_vaults", "id", "encrypted_enc_key", SecretBucket.Bitwarden),
-        new("bitwarden_vaults", "id", "encrypted_mac_key", SecretBucket.Bitwarden)
+        new("password_entries", "id", "title", SecretBucket.Passwords, true),
+        new("password_entries", "id", "website", SecretBucket.Passwords, true),
+        new("password_entries", "id", "username", SecretBucket.Passwords, true),
+        new("password_entries", "id", "password", SecretBucket.Passwords, false),
+        new("password_entries", "id", "notes", SecretBucket.Passwords, true),
+        new("password_entries", "id", "app_package_name", SecretBucket.Passwords, true),
+        new("password_entries", "id", "app_name", SecretBucket.Passwords, true),
+        new("password_entries", "id", "email", SecretBucket.Passwords, true),
+        new("password_entries", "id", "phone", SecretBucket.Passwords, true),
+        new("password_entries", "id", "address_line", SecretBucket.Passwords, true),
+        new("password_entries", "id", "city", SecretBucket.Passwords, true),
+        new("password_entries", "id", "state", SecretBucket.Passwords, true),
+        new("password_entries", "id", "zip_code", SecretBucket.Passwords, true),
+        new("password_entries", "id", "country", SecretBucket.Passwords, true),
+        new("password_entries", "id", "credit_card_number", SecretBucket.Passwords, true),
+        new("password_entries", "id", "credit_card_holder", SecretBucket.Passwords, true),
+        new("password_entries", "id", "credit_card_expiry", SecretBucket.Passwords, true),
+        new("password_entries", "id", "credit_card_cvv", SecretBucket.Passwords, true),
+        new("password_entries", "id", "authenticator_key", SecretBucket.Passwords, true),
+        new("password_entries", "id", "passkey_bindings", SecretBucket.Passwords, true),
+        new("password_entries", "id", "ssh_key_data", SecretBucket.Passwords, true),
+        new("password_entries", "id", "sso_provider", SecretBucket.Passwords, true),
+        new("password_entries", "id", "wifi_metadata", SecretBucket.Passwords, true),
+        new("password_entries", "id", "custom_icon_value", SecretBucket.Passwords, true),
+        new("password_history_entries", "id", "password", SecretBucket.PasswordHistory, false),
+        new("custom_fields", "id", "title", SecretBucket.CustomFields, true),
+        new("custom_fields", "id", "value", SecretBucket.CustomFields, true),
+        new("secure_items", "id", "title", SecretBucket.SecureItems, true),
+        new("secure_items", "id", "notes", SecretBucket.SecureItems, true),
+        new("secure_items", "id", "item_data", SecretBucket.SecureItems, true),
+        new("secure_items", "id", "image_paths", SecretBucket.SecureItems, true),
+        new("local_mdbx_databases", "id", "encrypted_password", SecretBucket.Mdbx, false),
+        new("local_mdbx_databases", "id", "key_file_uri", SecretBucket.Mdbx, true),
+        new("operation_logs", "id", "item_title", SecretBucket.OperationLogs, true),
+        new("operation_logs", "id", "changes_json", SecretBucket.OperationLogs, true),
+        new("mdbx_remote_sources", "id", "username_encrypted", SecretBucket.RemoteSources, false),
+        new("mdbx_remote_sources", "id", "password_encrypted", SecretBucket.RemoteSources, false),
+        new("bitwarden_vaults", "id", "encrypted_access_token", SecretBucket.Bitwarden, false),
+        new("bitwarden_vaults", "id", "encrypted_refresh_token", SecretBucket.Bitwarden, false),
+        new("bitwarden_vaults", "id", "encrypted_master_key", SecretBucket.Bitwarden, false),
+        new("bitwarden_vaults", "id", "encrypted_enc_key", SecretBucket.Bitwarden, false),
+        new("bitwarden_vaults", "id", "encrypted_mac_key", SecretBucket.Bitwarden, false)
     ];
 
     public async Task<MasterPasswordMaintenanceResult> ChangeMasterPasswordAsync(
@@ -138,7 +178,7 @@ public sealed class MasterPasswordMaintenanceService(
                 .Select(cell => new EncryptedSecretCell(
                     cell.Spec,
                     cell.Id,
-                    newSession.EncryptString(cell.PlainText)))
+                    ProtectedPrefix + newSession.EncryptString(cell.PlainText)))
                 .ToList();
         }
         catch (Exception ex)
@@ -170,6 +210,9 @@ public sealed class MasterPasswordMaintenanceService(
             Count(encryptedSecrets, SecretBucket.Passwords),
             Count(encryptedSecrets, SecretBucket.PasswordHistory),
             Count(encryptedSecrets, SecretBucket.Mdbx),
+            Count(encryptedSecrets, SecretBucket.CustomFields),
+            Count(encryptedSecrets, SecretBucket.SecureItems),
+            Count(encryptedSecrets, SecretBucket.OperationLogs),
             Count(encryptedSecrets, SecretBucket.RemoteSources),
             Count(encryptedSecrets, SecretBucket.Bitwarden));
     }
@@ -194,10 +237,32 @@ public sealed class MasterPasswordMaintenanceService(
             secrets.AddRange(rows.Select(row => new PlainSecretCell(
                 spec,
                 row.Id,
-                cryptoService.DecryptString(row.Value))));
+                UnprotectStoredSecret(spec, row.Value))));
         }
 
         return secrets;
+    }
+
+    private string UnprotectStoredSecret(SecretColumnSpec spec, string value)
+    {
+        if (value.StartsWith(ProtectedPrefix, StringComparison.Ordinal))
+        {
+            return cryptoService.DecryptString(value[ProtectedPrefix.Length..]);
+        }
+
+        try
+        {
+            return cryptoService.DecryptString(value);
+        }
+        catch (Exception ex) when (ex is FormatException or System.Security.Cryptography.CryptographicException or ArgumentException)
+        {
+            if (spec.AllowPlaintextFallback)
+            {
+                return value;
+            }
+
+            throw;
+        }
     }
 
     private static async Task<MasterPasswordHash?> LoadCredentialAsync(
@@ -286,11 +351,14 @@ public sealed class MasterPasswordMaintenanceService(
         Passwords,
         PasswordHistory,
         Mdbx,
+        CustomFields,
+        SecureItems,
+        OperationLogs,
         RemoteSources,
         Bitwarden
     }
 
-    private sealed record SecretColumnSpec(string TableName, string IdColumn, string ValueColumn, SecretBucket Bucket);
+    private sealed record SecretColumnSpec(string TableName, string IdColumn, string ValueColumn, SecretBucket Bucket, bool AllowPlaintextFallback);
     private sealed record PlainSecretCell(SecretColumnSpec Spec, long Id, string PlainText);
     private sealed record EncryptedSecretCell(SecretColumnSpec Spec, long Id, string Value);
 

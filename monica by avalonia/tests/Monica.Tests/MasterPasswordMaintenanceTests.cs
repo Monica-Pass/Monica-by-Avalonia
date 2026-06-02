@@ -46,12 +46,12 @@ public sealed class MasterPasswordMaintenanceTests
         var result = await harness.Service.ChangeMasterPasswordAsync("old password", "new password");
 
         Assert.True(result.Success, result.Message);
-        Assert.Equal(1, result.PasswordsReencrypted);
+        Assert.Equal(2, result.PasswordsReencrypted);
         Assert.Equal(1, result.PasswordHistoryEntriesReencrypted);
         Assert.Equal(1, result.MdbxSecretsReencrypted);
         Assert.Equal(2, result.RemoteSourceSecretsReencrypted);
         Assert.Equal(5, result.BitwardenSecretsReencrypted);
-        Assert.Equal(10, result.TotalSecretsReencrypted);
+        Assert.Equal(11, result.TotalSecretsReencrypted);
 
         var loadedCredential = await harness.CredentialStore.GetAsync();
         Assert.NotNull(loadedCredential);
@@ -63,16 +63,17 @@ public sealed class MasterPasswordMaintenanceTests
         var reloadedMdbx = Assert.Single(await harness.Repository.GetMdbxDatabasesAsync());
         var syncSecrets = await LoadSyncSecretsAsync(harness.Factory);
 
-        Assert.Equal("current-secret", harness.Crypto.DecryptString(reloadedPassword.Password));
-        Assert.Equal("old-secret", harness.Crypto.DecryptString(reloadedHistory.Password));
-        Assert.Equal("mdbx-secret", harness.Crypto.DecryptString(reloadedMdbx.EncryptedPassword!));
-        Assert.Equal("dav-user", harness.Crypto.DecryptString(syncSecrets.RemoteUsername));
-        Assert.Equal("dav-secret", harness.Crypto.DecryptString(syncSecrets.RemotePassword));
-        Assert.Equal("access-token", harness.Crypto.DecryptString(syncSecrets.BitwardenAccessToken));
-        Assert.Equal("refresh-token", harness.Crypto.DecryptString(syncSecrets.BitwardenRefreshToken));
-        Assert.Equal("master-key", harness.Crypto.DecryptString(syncSecrets.BitwardenMasterKey));
-        Assert.Equal("enc-key", harness.Crypto.DecryptString(syncSecrets.BitwardenEncKey));
-        Assert.Equal("mac-key", harness.Crypto.DecryptString(syncSecrets.BitwardenMacKey));
+        Assert.Equal("Portal", reloadedPassword.Title);
+        Assert.Equal("current-secret", reloadedPassword.Password);
+        Assert.Equal("old-secret", reloadedHistory.Password);
+        Assert.Equal("mdbx-secret", reloadedMdbx.EncryptedPassword);
+        Assert.Equal("dav-user", UnprotectStoredSecret(harness.Crypto, syncSecrets.RemoteUsername));
+        Assert.Equal("dav-secret", UnprotectStoredSecret(harness.Crypto, syncSecrets.RemotePassword));
+        Assert.Equal("access-token", UnprotectStoredSecret(harness.Crypto, syncSecrets.BitwardenAccessToken));
+        Assert.Equal("refresh-token", UnprotectStoredSecret(harness.Crypto, syncSecrets.BitwardenRefreshToken));
+        Assert.Equal("master-key", UnprotectStoredSecret(harness.Crypto, syncSecrets.BitwardenMasterKey));
+        Assert.Equal("enc-key", UnprotectStoredSecret(harness.Crypto, syncSecrets.BitwardenEncKey));
+        Assert.Equal("mac-key", UnprotectStoredSecret(harness.Crypto, syncSecrets.BitwardenMacKey));
     }
 
     [Fact]
@@ -96,7 +97,7 @@ public sealed class MasterPasswordMaintenanceTests
         Assert.False(new CryptoService().VerifyMasterPassword("new password", loadedCredential));
 
         var reloadedPassword = Assert.Single(await harness.Repository.GetPasswordsAsync());
-        Assert.Equal("current-secret", harness.Crypto.DecryptString(reloadedPassword.Password));
+        Assert.Equal("current-secret", reloadedPassword.Password);
     }
 
     [Fact]
@@ -121,7 +122,7 @@ public sealed class MasterPasswordMaintenanceTests
         Assert.False(new CryptoService().VerifyMasterPassword("new password", loadedCredential));
 
         var reloadedPassword = Assert.Single(await harness.Repository.GetPasswordsAsync());
-        Assert.Equal("current-secret", harness.Crypto.DecryptString(reloadedPassword.Password));
+        Assert.Equal("current-secret", reloadedPassword.Password);
     }
 
     [Fact]
@@ -138,13 +139,13 @@ public sealed class MasterPasswordMaintenanceTests
         var result = await harness.Service.ResetMasterPasswordFromUnlockedVaultAsync("new password");
 
         Assert.True(result.Success, result.Message);
-        Assert.Equal(1, result.PasswordsReencrypted);
+        Assert.Equal(2, result.PasswordsReencrypted);
         var loadedCredential = await harness.CredentialStore.GetAsync();
         Assert.NotNull(loadedCredential);
         Assert.True(new CryptoService().VerifyMasterPassword("new password", loadedCredential));
         Assert.False(new CryptoService().VerifyMasterPassword("old password", loadedCredential));
         var reloadedPassword = Assert.Single(await harness.Repository.GetPasswordsAsync());
-        Assert.Equal("current-secret", harness.Crypto.DecryptString(reloadedPassword.Password));
+        Assert.Equal("current-secret", reloadedPassword.Password);
     }
 
     [Fact]
@@ -167,9 +168,9 @@ public sealed class MasterPasswordMaintenanceTests
     {
         var factory = new SqliteConnectionFactory(GetTempDatabasePath());
         var migrator = new DatabaseMigrator(factory);
-        var repository = new MonicaRepository(factory, migrator);
-        var credentialStore = new VaultCredentialStore(factory, migrator);
         var crypto = new CryptoService();
+        var repository = new MonicaRepository(factory, migrator, new VaultDataProtector(crypto));
+        var credentialStore = new VaultCredentialStore(factory, migrator);
         var hash = crypto.HashMasterPassword(masterPassword);
         await credentialStore.SaveAsync(hash);
         Assert.True(crypto.VerifyMasterPassword(masterPassword, hash));
@@ -302,6 +303,14 @@ public sealed class MasterPasswordMaintenanceTests
         var path = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         return path;
+    }
+
+    private static string UnprotectStoredSecret(CryptoService crypto, string value)
+    {
+        const string prefix = "vault:v1:";
+        return value.StartsWith(prefix, StringComparison.Ordinal)
+            ? crypto.DecryptString(value[prefix.Length..])
+            : crypto.DecryptString(value);
     }
 
     private sealed record TestHarness(

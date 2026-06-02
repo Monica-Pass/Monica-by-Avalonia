@@ -116,6 +116,11 @@
                             <fa:FASymbolIconSource Symbol="Clock" />
                         </fa:FANavigationViewItem.IconSource>
                     </fa:FANavigationViewItem>
+                    <fa:FANavigationViewItem Content="{Binding L.MdbxVaults}" Tag="Mdbx">
+                        <fa:FANavigationViewItem.IconSource>
+                            <fa:FASymbolIconSource Symbol="Folder" />
+                        </fa:FANavigationViewItem.IconSource>
+                    </fa:FANavigationViewItem>
                 </fa:FANavigationView.MenuItems>
 
                 <fa:FANavigationView.FooterMenuItems>
@@ -1315,7 +1320,7 @@
                                             <TextBlock Text="{Binding L.ExternalDatabasesDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                             <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
                                                 <Button Command="{Binding SelectSectionCommand}" CommandParameter="Sync" HorizontalContentAlignment="Center">KDBX</Button>
-                                                <Button Grid.Column="1" Command="{Binding CreateMdbxVaultCommand}" HorizontalContentAlignment="Center">MDBX</Button>
+                                                <Button Grid.Column="1" Command="{Binding SelectSectionCommand}" CommandParameter="Mdbx" HorizontalContentAlignment="Center">MDBX</Button>
                                                 <Button Grid.Column="2" Command="{Binding SelectSectionCommand}" CommandParameter="Sync" HorizontalContentAlignment="Center">Bitwarden</Button>
                                             </Grid>
                                         </StackPanel>
@@ -1329,10 +1334,10 @@
                                     <fa:FASettingsExpander.Items>
                                         <fa:FASettingsExpanderItem Content="{Binding L.MdbxDatabaseCount}" Description="{Binding MdbxDatabaseCountText}">
                                             <fa:FASettingsExpanderItem.Footer>
-                                                <Button Command="{Binding CreateMdbxVaultCommand}">
+                                                <Button Command="{Binding SelectSectionCommand}" CommandParameter="Mdbx">
                                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                                         <ic:FluentIcon Icon="Database" FontSize="20" />
-                                                        <TextBlock Text="{Binding L.CreateMdbxMetadata}" />
+                                                        <TextBlock Text="{Binding L.MdbxVaults}" />
                                                     </StackPanel>
                                                 </Button>
                                             </fa:FASettingsExpanderItem.Footer>
@@ -1439,6 +1444,170 @@
                                             <TextBox Text="{Binding ExportPreview}" AcceptsReturn="True" MinHeight="100" TextWrapping="Wrap" />
                                         </StackPanel>
                                     </fa:FASettingsExpander>
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <ScrollViewer IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsMdbx}}">
+                            <StackPanel Spacing="16" MaxWidth="980">
+                                <TextBlock Text="{Binding L.MdbxVaultsDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+
+                                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                                    <Border Padding="16" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}">
+                                        <StackPanel Spacing="12">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <ic:FluentIcon Icon="Database" FontSize="20" />
+                                                <TextBlock Text="{Binding L.MdbxLocalSource}" FontWeight="SemiBold" />
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding MdbxLocalCountText}" FontSize="22" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding MdbxLocalSourceStatusText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            <Button Command="{Binding CreateMdbxVaultCommand}" HorizontalAlignment="Left">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <ic:FluentIcon Icon="Database" FontSize="18" />
+                                                    <TextBlock Text="{Binding L.CreateLocalMdbxVault}" />
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Grid.Column="1" Padding="16" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}">
+                                        <StackPanel Spacing="12">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <ic:FluentIcon Icon="Folder" FontSize="20" />
+                                                <TextBlock Text="{Binding L.MdbxWebDavSource}" FontWeight="SemiBold" />
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding MdbxWebDavCountText}" FontSize="22" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding MdbxWebDavSourceStatusText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="8">
+                                                <Button Command="{Binding CreateWebDavMdbxVaultCommand}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
+                                                        <TextBlock Text="{Binding L.RegisterMdbxSource}" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Grid.Column="1" Command="{Binding ConfigureMdbxRemoteSourcesCommand}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <ic:FluentIcon Icon="Database" FontSize="18" />
+                                                        <TextBlock Text="{Binding L.Configure}" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Grid.Column="2" Padding="16" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}">
+                                        <StackPanel Spacing="12">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <ic:FluentIcon Icon="Folder" FontSize="20" />
+                                                <TextBlock Text="{Binding L.MdbxOneDriveSource}" FontWeight="SemiBold" />
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding MdbxOneDriveCountText}" FontSize="22" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding MdbxOneDriveSourceStatusText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="8">
+                                                <Button Command="{Binding CreateOneDriveMdbxVaultCommand}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
+                                                        <TextBlock Text="{Binding L.RegisterMdbxSource}" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Grid.Column="1" Command="{Binding ConfigureMdbxRemoteSourcesCommand}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <ic:FluentIcon Icon="Database" FontSize="18" />
+                                                        <TextBlock Text="{Binding L.Configure}" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <Grid ColumnDefinitions="2*,*" ColumnSpacing="12">
+                                    <Border Padding="0" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}">
+                                        <Grid RowDefinitions="Auto,*" MinHeight="320">
+                                            <Grid Margin="18,16,18,10" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                                <StackPanel Spacing="3">
+                                                    <TextBlock Text="{Binding L.RegisteredMdbxVaults}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding MdbxDatabaseCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Command="{Binding RefreshMdbxVaultsCommand}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <ic:FluentIcon Icon="ArrowClockwise" FontSize="18" />
+                                                        <TextBlock Text="{Binding L.Refresh}" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </Grid>
+
+                                            <Grid Grid.Row="1">
+                                                <TextBlock Text="{Binding L.NoMdbxVaults}"
+                                                           IsVisible="{Binding !HasMdbxDatabases}"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                <ListBox ItemsSource="{Binding MdbxDatabaseItems}" IsVisible="{Binding HasMdbxDatabases}" SelectionMode="Single" Margin="8,0,8,8">
+                                                    <ListBox.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:MdbxDatabaseDisplayItem">
+                                                            <Border Padding="8,10">
+                                                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4">
+                                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                                                        <Border Padding="8,2" CornerRadius="10" Background="{DynamicResource LayerFillColorSubtleBrush}" IsVisible="{Binding IsDefault}">
+                                                                            <TextBlock Text="{Binding #Root.DataContext.L.Default}" FontSize="12" />
+                                                                        </Border>
+                                                                    </StackPanel>
+                                                                    <Border Grid.Column="1" Padding="8,3" CornerRadius="10" Background="{DynamicResource LayerFillColorSubtleBrush}" VerticalAlignment="Top">
+                                                                        <TextBlock Text="{Binding Source}" FontSize="12" />
+                                                                    </Border>
+                                                                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Description}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                                    <Grid Grid.Row="2" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                                                        <TextBlock Text="{Binding #Root.DataContext.L.LocalPath}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                                        <TextBlock Grid.Column="1" Text="{Binding LocalPath}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                                    </Grid>
+                                                                    <Grid Grid.Row="3" Grid.ColumnSpan="2" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                                                        <TextBlock Text="{Binding SyncStatus}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                                        <Button Grid.Column="1" Command="{Binding #Root.DataContext.SetDefaultMdbxDatabaseCommand}" CommandParameter="{Binding}" IsEnabled="{Binding !IsDefault}">
+                                                                            <TextBlock Text="{Binding #Root.DataContext.L.SetDefault}" />
+                                                                        </Button>
+                                                                        <Button Grid.Column="2" Command="{Binding #Root.DataContext.OpenMdbxDatabaseCommand}" CommandParameter="{Binding}">
+                                                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                                                <ic:FluentIcon Icon="ArrowDownload" FontSize="18" />
+                                                                                <TextBlock Text="{Binding #Root.DataContext.L.Open}" />
+                                                                            </StackPanel>
+                                                                        </Button>
+                                                                    </Grid>
+                                                                </Grid>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ListBox.ItemTemplate>
+                                                </ListBox>
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+
+                                    <StackPanel Grid.Column="1" Spacing="12">
+                                        <fa:FASettingsExpander Header="{Binding L.MdbxRuntime}" Description="{Binding MdbxRuntimeSummaryText}" IsExpanded="True">
+                                            <fa:FASettingsExpander.IconSource>
+                                                <fa:FASymbolIconSource Symbol="Library" />
+                                            </fa:FASettingsExpander.IconSource>
+                                            <fa:FASettingsExpander.Items>
+                                                <fa:FASettingsExpanderItem Content="{Binding L.MdbxLocalCache}" Description="{Binding L.MdbxLocalCacheDescription}">
+                                                    <fa:FASettingsExpanderItem.Footer>
+                                                        <ToggleSwitch IsChecked="{Binding MdbxLocalCacheEnabled}" />
+                                                    </fa:FASettingsExpanderItem.Footer>
+                                                </fa:FASettingsExpanderItem>
+                                                <fa:FASettingsExpanderItem Content="{Binding L.MdbxSecurity}" Description="{Binding MdbxSecuritySummaryText}" />
+                                            </fa:FASettingsExpander.Items>
+                                        </fa:FASettingsExpander>
+
+                                        <fa:FASettingsExpander Header="{Binding L.MdbxAndroidParity}" Description="{Binding L.MdbxAndroidParityDescription}" IsExpanded="False">
+                                            <fa:FASettingsExpander.IconSource>
+                                                <fa:FASymbolIconSource Symbol="Sync" />
+                                            </fa:FASettingsExpander.IconSource>
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="{Binding L.MdbxAndroidParityLocal}" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding L.MdbxAndroidParityRemote}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                        </fa:FASettingsExpander>
+                                    </StackPanel>
                                 </Grid>
                             </StackPanel>
                         </ScrollViewer>
@@ -1663,10 +1832,10 @@
 
                                         <fa:FASettingsExpanderItem Content="{Binding L.CreateMdbxMetadata}" Description="{Binding L.CreateMdbxMetadataDescription}">
                                             <fa:FASettingsExpanderItem.Footer>
-                                                <Button Command="{Binding CreateMdbxVaultCommand}">
+                                                <Button Command="{Binding SelectSectionCommand}" CommandParameter="Mdbx">
                                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                                         <ic:FluentIcon Icon="Database" FontSize="20" />
-                                                        <TextBlock Text="{Binding L.CreateMdbxMetadata}" />
+                                                        <TextBlock Text="{Binding L.MdbxVaults}" />
                                                     </StackPanel>
                                                 </Button>
                                             </fa:FASettingsExpanderItem.Footer>

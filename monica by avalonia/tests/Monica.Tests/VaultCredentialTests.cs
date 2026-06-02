@@ -12,6 +12,20 @@ namespace Monica.Tests;
 public sealed class VaultCredentialTests
 {
     [Fact]
+    public void Default_database_path_uses_avalonia_specific_storage()
+    {
+        var factory = new SqliteConnectionFactory();
+        var legacyWindowsPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Monica",
+            "monica.db");
+
+        Assert.Equal("monica.db", Path.GetFileName(factory.DatabasePath));
+        Assert.Equal("Monica by Avalonia", Path.GetFileName(Path.GetDirectoryName(factory.DatabasePath)));
+        Assert.NotEqual(legacyWindowsPath, factory.DatabasePath);
+    }
+
+    [Fact]
     public async Task Credential_store_roundtrips_master_password_hash()
     {
         var path = GetTempDatabasePath();
@@ -98,6 +112,101 @@ public sealed class VaultCredentialTests
         Assert.True(second.IsUnlocked);
     }
 
+    [Fact]
+    public async Task Repository_encrypts_sensitive_vault_fields_at_rest()
+    {
+        var path = GetTempDatabasePath();
+        var factory = new SqliteConnectionFactory(path);
+        var migrator = new DatabaseMigrator(factory);
+        var crypto = new CryptoService();
+        var hash = crypto.HashMasterPassword("vault password");
+        crypto.InitializeSession("vault password", hash.Salt);
+        var repository = new MonicaRepository(factory, migrator, new VaultDataProtector(crypto));
+
+        var passwordId = await repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "secret-login-title",
+            Website = "https://secret.example",
+            Username = "secret-user",
+            Password = "secret-password",
+            Notes = "secret-password-notes",
+            CreditCardNumber = "4111111111111111",
+            CreditCardCvv = "123",
+            AuthenticatorKey = "secret-totp-seed",
+            WifiMetadata = "secret-wifi-json"
+        });
+        await repository.ReplaceCustomFieldsAsync(passwordId,
+        [
+            new CustomField { Title = "secret-field-title", Value = "secret-field-value", IsProtected = true }
+        ]);
+        await repository.SavePasswordHistoryAsync(new PasswordHistoryEntry
+        {
+            EntryId = passwordId,
+            Password = "secret-old-password"
+        });
+        await repository.SaveSecureItemAsync(new SecureItem
+        {
+            ItemType = VaultItemType.Totp,
+            Title = "secret-totp-title",
+            Notes = "secret-totp-notes",
+            ItemData = """{"secret":"secret-secure-item-payload"}"""
+        });
+        await repository.SaveMdbxDatabaseAsync(new LocalMdbxDatabase
+        {
+            Name = "Local",
+            FilePath = "local.mdbx",
+            StorageLocation = MdbxStorageLocation.Internal,
+            EncryptedPassword = "secret-mdbx-password",
+            KeyFileUri = "secret-key-file-uri"
+        });
+        await repository.LogAsync(new OperationLog
+        {
+            ItemType = "PASSWORD",
+            ItemId = passwordId,
+            ItemTitle = "secret-log-title",
+            OperationType = "CREATE",
+            ChangesJson = """{"secret":"secret-log-change"}"""
+        });
+
+        var rawVaultText = await ReadRawVaultTextAsync(path);
+
+        foreach (var secret in new[]
+        {
+            "secret-login-title",
+            "secret-user",
+            "secret-password",
+            "secret-password-notes",
+            "4111111111111111",
+            "secret-totp-seed",
+            "secret-wifi-json",
+            "secret-field-title",
+            "secret-field-value",
+            "secret-old-password",
+            "secret-totp-title",
+            "secret-secure-item-payload",
+            "secret-mdbx-password",
+            "secret-key-file-uri",
+            "secret-log-title",
+            "secret-log-change"
+        })
+        {
+            Assert.DoesNotContain(secret, rawVaultText);
+        }
+
+        Assert.Contains("vault:v1:", rawVaultText);
+
+        var reloadedPassword = Assert.Single(await repository.GetPasswordsAsync());
+        Assert.Equal("secret-login-title", reloadedPassword.Title);
+        Assert.Equal("secret-password", reloadedPassword.Password);
+        Assert.Equal("secret-totp-seed", reloadedPassword.AuthenticatorKey);
+        Assert.Equal("4111111111111111", reloadedPassword.CreditCardNumber);
+        Assert.Equal("secret-field-value", Assert.Single(await repository.GetCustomFieldsAsync(passwordId)).Value);
+        Assert.Equal("secret-old-password", Assert.Single(await repository.GetPasswordHistoryAsync(passwordId)).Password);
+        Assert.Contains("secret-secure-item-payload", Assert.Single(await repository.GetSecureItemsAsync(VaultItemType.Totp)).ItemData);
+        Assert.Equal("secret-mdbx-password", Assert.Single(await repository.GetMdbxDatabasesAsync()).EncryptedPassword);
+        Assert.Contains("secret-log-change", Assert.Single(await repository.GetOperationLogsAsync()).ChangesJson);
+    }
+
     private static MainWindowViewModel CreateViewModel(string databasePath)
     {
         var factory = new SqliteConnectionFactory(databasePath);
@@ -136,6 +245,39 @@ public sealed class VaultCredentialTests
         var path = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.settings.json");
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         return path;
+    }
+
+    private static async Task<string> ReadRawVaultTextAsync(string databasePath)
+    {
+        await using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={databasePath};Mode=ReadOnly");
+        await connection.OpenAsync();
+        var fragments = new List<string>();
+        foreach (var sql in new[]
+        {
+            "SELECT title, website, username, password, notes, credit_card_number, credit_card_cvv, authenticator_key, wifi_metadata FROM password_entries",
+            "SELECT title, value FROM custom_fields",
+            "SELECT password FROM password_history_entries",
+            "SELECT title, notes, item_data, image_paths FROM secure_items",
+            "SELECT encrypted_password, key_file_uri FROM local_mdbx_databases",
+            "SELECT item_title, changes_json FROM operation_logs"
+        })
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                for (var index = 0; index < reader.FieldCount; index++)
+                {
+                    if (!reader.IsDBNull(index))
+                    {
+                        fragments.Add(reader.GetString(index));
+                    }
+                }
+            }
+        }
+
+        return string.Join("\n", fragments);
     }
 
     private sealed class NoopClipboardService : IClipboardService

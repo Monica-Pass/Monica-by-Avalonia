@@ -40,6 +40,30 @@ public sealed class AppSettingsTests
     }
 
     [Fact]
+    public async Task App_settings_protects_persisted_secret_values()
+    {
+        var path = GetTempPath();
+        var protector = new ReversingSecretProtector();
+        var first = new AppSettingsService(path, protector);
+        await first.LoadAsync();
+        first.Current.WebDavPassword = "secret-webdav-password";
+        first.Current.WebDavBackupEncryptionPassword = "secret-backup-password";
+
+        await first.SaveAsync();
+
+        var rawJson = await File.ReadAllTextAsync(path);
+        Assert.DoesNotContain("secret-webdav-password", rawJson);
+        Assert.DoesNotContain("secret-backup-password", rawJson);
+        Assert.Contains("secret:v1:", rawJson);
+
+        var second = new AppSettingsService(path, protector);
+        await second.LoadAsync();
+
+        Assert.Equal("secret-webdav-password", second.Current.WebDavPassword);
+        Assert.Equal("secret-backup-password", second.Current.WebDavBackupEncryptionPassword);
+    }
+
+    [Fact]
     public async Task App_settings_allows_archive_startup_section()
     {
         var path = GetTempPath();
@@ -82,6 +106,21 @@ public sealed class AppSettingsTests
         await reloaded.LoadAsync();
 
         Assert.Equal("DatabaseManagement", reloaded.Current.StartupSection);
+    }
+
+    [Fact]
+    public async Task App_settings_allows_mdbx_startup_section()
+    {
+        var path = GetTempPath();
+        var settings = new AppSettingsService(path);
+        await settings.LoadAsync();
+        settings.Current.StartupSection = "Mdbx";
+        await settings.SaveAsync();
+
+        var reloaded = new AppSettingsService(path);
+        await reloaded.LoadAsync();
+
+        Assert.Equal("Mdbx", reloaded.Current.StartupSection);
     }
 
     [Fact]
@@ -184,6 +223,41 @@ public sealed class AppSettingsTests
 
         Assert.Empty(viewModel.WebDavBackupHistory);
         Assert.Equal(item.FileName, webDav.DeletedPath);
+    }
+
+    [Fact]
+    public async Task ViewModel_creates_local_mdbx_metadata_without_duplicates()
+    {
+        var viewModel = CreateViewModel(GetTempPath());
+
+        await viewModel.CreateMdbxVaultCommand.ExecuteAsync(null);
+        await viewModel.CreateMdbxVaultCommand.ExecuteAsync(null);
+
+        var item = Assert.Single(viewModel.MdbxDatabaseItems);
+        Assert.Single(viewModel.MdbxDatabases);
+        Assert.True(viewModel.HasMdbxDatabases);
+        Assert.True(item.IsLocal);
+        Assert.True(item.IsDefault);
+        Assert.Equal(1, viewModel.MdbxLocalDatabaseCount);
+        Assert.Equal(0, viewModel.MdbxWebDavDatabaseCount);
+    }
+
+    [Fact]
+    public async Task ViewModel_registers_remote_mdbx_sources_for_page_state()
+    {
+        var viewModel = CreateViewModel(GetTempPath());
+        viewModel.WebDavEnabled = true;
+        viewModel.WebDavRemotePath = "/Monica";
+        viewModel.OneDriveEnabled = true;
+
+        await viewModel.CreateWebDavMdbxVaultCommand.ExecuteAsync(null);
+        await viewModel.CreateOneDriveMdbxVaultCommand.ExecuteAsync(null);
+
+        Assert.Equal(2, viewModel.MdbxDatabaseItems.Count);
+        Assert.Equal(1, viewModel.MdbxWebDavDatabaseCount);
+        Assert.Equal(1, viewModel.MdbxOneDriveDatabaseCount);
+        Assert.All(viewModel.MdbxDatabaseItems, item => Assert.True(item.IsRemote));
+        Assert.Contains(viewModel.MdbxDatabaseItems, item => item.RemotePath == "/Monica/local.mdbx");
     }
 
     [Fact]
@@ -721,6 +795,22 @@ public sealed class AppSettingsTests
         {
             OpenedUri = uri;
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class ReversingSecretProtector : ISecretProtector
+    {
+        public PlatformIntegrationCapability Capability { get; } = PlatformIntegrationService.Available(
+            PlatformFeatureKeys.SecretProtection,
+            "Test secret protection is available.");
+
+        public Task<string> ProtectAsync(string plainText, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(new string(plainText.Reverse().ToArray()))));
+
+        public Task<string> UnprotectAsync(string protectedText, CancellationToken cancellationToken = default)
+        {
+            var reversed = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(protectedText));
+            return Task.FromResult(new string(reversed.Reverse().ToArray()));
         }
     }
 

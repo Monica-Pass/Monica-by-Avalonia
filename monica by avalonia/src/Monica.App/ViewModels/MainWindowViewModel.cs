@@ -95,6 +95,22 @@ public sealed record PasswordHistoryDisplayItem(PasswordHistoryEntry Entry, stri
 public sealed record PasswordQuickAccessItem(PasswordEntry Entry, int OpenCount, string LastOpenedText, string Subtitle);
 public sealed record PasswordFolderFilterChoice(long? Id, string Name, int Count);
 public sealed record VaultSourceDisplayItem(string DisplayName, string Kind, string LocalPath, string RemoteUrl, string SyncStatus);
+public sealed record MdbxDatabaseDisplayItem(
+    LocalMdbxDatabase Database,
+    string Name,
+    string Source,
+    string LocalPath,
+    string RemotePath,
+    string Mode,
+    string UnlockMethod,
+    string CreatedText,
+    string LastAccessedText,
+    string LastSyncedText,
+    string SyncStatus,
+    string Description,
+    bool IsDefault,
+    bool IsLocal,
+    bool IsRemote);
 public sealed record WebDavBackupHistoryItem(string FileName, string Path, string DateString, string SizeText, DateTimeOffset? LastModified);
 public sealed record MonicaJsonImportResult(int Passwords, int SecureItems, int Categories);
 
@@ -307,6 +323,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<LocalizedPlatformIntegrationCapability> PlatformIntegrationCapabilities { get; } = [];
     public ObservableCollection<LocalizedPlatformCapability> Capabilities { get; } = [];
     public ObservableCollection<LocalMdbxDatabase> MdbxDatabases { get; } = [];
+    public ObservableCollection<MdbxDatabaseDisplayItem> MdbxDatabaseItems { get; } = [];
     public ObservableCollection<TimelineEntry> TimelineEntries { get; } = [];
     public ObservableCollection<SecuritySummaryItem> SecuritySummaryItems { get; } = [];
     public ObservableCollection<SecurityIssueItem> SecurityIssueItems { get; } = [];
@@ -679,6 +696,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public string SelectedSectionTitle => SectionTitle(SelectedSection);
     public string ShellVaultText => SelectedSection switch
     {
+        "Mdbx" => "MDBX",
         "DatabaseManagement" => "Database",
         "Sync" => WebDavEnabled ? "WebDAV" : "Local",
         "Settings" => "Monica",
@@ -688,6 +706,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     };
     public string ShellSyncText => SelectedSection switch
     {
+        "Mdbx" => MdbxDatabases.Count > 0 ? "Vaults Ready" : "Metadata",
         "DatabaseManagement" => "Sources Ready",
         "Sync" => WebDavEnabled ? "Sync Ready" : "Local Only",
         "Settings" => "Ready",
@@ -724,6 +743,28 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public string SecurityIssueCountText => _localization.Format("SecurityIssueCountFormat", SecurityIssueItems.Count);
     public string LocalDatabaseSummaryText => _localization.Format("DatabaseSummaryFormat", Passwords.Count, NoteItems.Count, TotpItems.Count, WalletItems.Count);
     public string MdbxDatabaseCountText => _localization.Format("MdbxDatabaseCountFormat", MdbxDatabases.Count);
+    public string MdbxLocalCountText => _localization.Format("MdbxSourceCountFormat", MdbxLocalDatabaseCount);
+    public string MdbxWebDavCountText => _localization.Format("MdbxSourceCountFormat", MdbxWebDavDatabaseCount);
+    public string MdbxOneDriveCountText => _localization.Format("MdbxSourceCountFormat", MdbxOneDriveDatabaseCount);
+    public int MdbxLocalDatabaseCount => MdbxDatabases.Count(IsLocalMdbxDatabase);
+    public int MdbxWebDavDatabaseCount => MdbxDatabases.Count(item => item.StorageLocation == MdbxStorageLocation.RemoteWebDav);
+    public int MdbxOneDriveDatabaseCount => MdbxDatabases.Count(item => item.StorageLocation == MdbxStorageLocation.RemoteOneDrive);
+    public bool HasMdbxDatabases => MdbxDatabases.Count > 0;
+    public string MdbxLocalSourceStatusText => MdbxLocalDatabaseCount > 0
+        ? _localization.Format("MdbxLocalSourceReadyFormat", MdbxLocalDatabaseCount)
+        : _localization.Get("MdbxLocalSourceEmpty");
+    public string MdbxWebDavSourceStatusText => !WebDavEnabled
+        ? _localization.Get("WebDavDisabled")
+        : MdbxWebDavDatabaseCount > 0
+            ? _localization.Format("MdbxWebDavSourceReadyFormat", MdbxWebDavDatabaseCount)
+            : _localization.Get("MdbxWebDavSourceEmpty");
+    public string MdbxOneDriveSourceStatusText => !OneDriveEnabled
+        ? _localization.Get("FeatureDisabled")
+        : MdbxOneDriveDatabaseCount > 0
+            ? _localization.Format("MdbxOneDriveSourceReadyFormat", MdbxOneDriveDatabaseCount)
+            : _localization.Get("MdbxOneDriveSourceEmpty");
+    public string MdbxRuntimeSummaryText => _localization.Get("MdbxRuntimeSummary");
+    public string MdbxSecuritySummaryText => _localization.Get("MdbxSecuritySummary");
     public string VaultSourceCountText => _localization.Format("VaultSourceCountFormat", VaultSources.Count);
     public string WebDavConnectionStatusText => WebDavEnabled
         ? _localization.Format("WebDavConfiguredFormat", string.IsNullOrWhiteSpace(WebDavServerUrl) ? _localization.Get("NotConfigured") : WebDavServerUrl)
@@ -965,6 +1006,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         UpdateSettings(settings => settings.WebDavEnabled = value);
         OnPropertyChanged(nameof(WebDavConnectionStatusText));
         RefreshVaultSources();
+        RefreshMdbxVaultState();
         RaiseShellStatus();
     }
     partial void OnWebDavServerUrlChanged(string value)
@@ -1010,8 +1052,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
         UpdateSettings(settings => settings.SyncConflictStrategy = value);
         RefreshVaultSources();
     }
-    partial void OnOneDriveEnabledChanged(bool value) => UpdateSettings(settings => settings.OneDriveEnabled = value);
-    partial void OnMdbxLocalCacheEnabledChanged(bool value) => UpdateSettings(settings => settings.MdbxLocalCacheEnabled = value);
+    partial void OnOneDriveEnabledChanged(bool value)
+    {
+        UpdateSettings(settings => settings.OneDriveEnabled = value);
+        RefreshMdbxVaultState();
+    }
+
+    partial void OnMdbxLocalCacheEnabledChanged(bool value)
+    {
+        UpdateSettings(settings => settings.MdbxLocalCacheEnabled = value);
+        RefreshMdbxVaultState();
+    }
 
     private void RaiseShellStatus()
     {
@@ -1107,6 +1158,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             WalletItems.Clear();
             Categories.Clear();
             MdbxDatabases.Clear();
+            MdbxDatabaseItems.Clear();
             VaultSources.Clear();
             TimelineEntries.Clear();
 
@@ -1170,6 +1222,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 MdbxDatabases.Add(database);
             }
 
+            RefreshMdbxVaultState();
             RefreshVaultSources();
             await LoadTotpItemsAsync();
             await LoadTimelineAsync();
@@ -3469,13 +3522,154 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private async Task CreateMdbxVaultAsync()
     {
-        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Monica", "mdbx");
-        var metadata = await _mdbxVaultService.CreateLocalMetadataAsync("Local Monica Vault", Path.Combine(root, "local.mdbx"));
+        var path = BuildMdbxWorkingCopyPath("local.mdbx");
+        var existing = MdbxDatabases.FirstOrDefault(item => string.Equals(item.FilePath, path, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+        {
+            existing.LastAccessedAt = DateTimeOffset.UtcNow;
+            await _repository.SaveMdbxDatabaseAsync(existing);
+            RefreshMdbxVaultState();
+            RefreshVaultSources();
+            StatusMessage = _localization.Format("MdbxMetadataAlreadyRegisteredFormat", existing.Name);
+            return;
+        }
+
+        var metadata = await _mdbxVaultService.CreateLocalMetadataAsync(_localization.Get("MdbxLocalVaultName"), path);
+        metadata.IsDefault = MdbxDatabases.Count == 0;
         await _repository.SaveMdbxDatabaseAsync(metadata);
         MdbxDatabases.Add(metadata);
-        OnPropertyChanged(nameof(MdbxDatabaseCountText));
+        RefreshMdbxVaultState();
         RefreshVaultSources();
         StatusMessage = _localization.Get("CreatedMdbxMetadata");
+    }
+
+    [RelayCommand]
+    private async Task CreateWebDavMdbxVaultAsync()
+    {
+        if (!WebDavEnabled)
+        {
+            StatusMessage = _localization.Get("EnableWebDavFirst");
+            return;
+        }
+
+        var remotePath = string.IsNullOrWhiteSpace(WebDavRemotePath) ? "/Monica/local.mdbx" : WebDavRemotePath.TrimEnd('/') + "/local.mdbx";
+        var existing = MdbxDatabases.FirstOrDefault(item =>
+            item.StorageLocation == MdbxStorageLocation.RemoteWebDav &&
+            string.Equals(item.FilePath, remotePath, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+        {
+            StatusMessage = _localization.Format("MdbxMetadataAlreadyRegisteredFormat", existing.Name);
+            return;
+        }
+
+        var metadata = CreateRemoteMdbxMetadata(
+            _localization.Get("MdbxWebDavVaultName"),
+            remotePath,
+            MdbxStorageLocation.RemoteWebDav,
+            "REMOTE_WEBDAV",
+            BuildMdbxWorkingCopyPath("webdav-local.mdbx"),
+            _localization.Get("MdbxWebDavMetadataDescription"));
+        await _repository.SaveMdbxDatabaseAsync(metadata);
+        MdbxDatabases.Add(metadata);
+        RefreshMdbxVaultState();
+        RefreshVaultSources();
+        StatusMessage = _localization.Get("CreatedMdbxWebDavMetadata");
+    }
+
+    [RelayCommand]
+    private async Task CreateOneDriveMdbxVaultAsync()
+    {
+        if (!OneDriveEnabled)
+        {
+            StatusMessage = _localization.Get("EnableOneDriveFirst");
+            return;
+        }
+
+        const string remotePath = "OneDrive:/Monica/local.mdbx";
+        var existing = MdbxDatabases.FirstOrDefault(item =>
+            item.StorageLocation == MdbxStorageLocation.RemoteOneDrive &&
+            string.Equals(item.FilePath, remotePath, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+        {
+            StatusMessage = _localization.Format("MdbxMetadataAlreadyRegisteredFormat", existing.Name);
+            return;
+        }
+
+        var metadata = CreateRemoteMdbxMetadata(
+            _localization.Get("MdbxOneDriveVaultName"),
+            remotePath,
+            MdbxStorageLocation.RemoteOneDrive,
+            "REMOTE_ONEDRIVE",
+            BuildMdbxWorkingCopyPath("onedrive-local.mdbx"),
+            _localization.Get("MdbxOneDriveMetadataDescription"));
+        await _repository.SaveMdbxDatabaseAsync(metadata);
+        MdbxDatabases.Add(metadata);
+        RefreshMdbxVaultState();
+        RefreshVaultSources();
+        StatusMessage = _localization.Get("CreatedMdbxOneDriveMetadata");
+    }
+
+    [RelayCommand]
+    private async Task RefreshMdbxVaultsAsync()
+    {
+        MdbxDatabases.Clear();
+        foreach (var database in await _repository.GetMdbxDatabasesAsync())
+        {
+            MdbxDatabases.Add(database);
+        }
+
+        RefreshMdbxVaultState();
+        RefreshVaultSources();
+        StatusMessage = _localization.Get("MdbxVaultsRefreshed");
+    }
+
+    [RelayCommand]
+    private async Task OpenMdbxDatabaseAsync(MdbxDatabaseDisplayItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        if (!item.IsLocal)
+        {
+            StatusMessage = _localization.Get("MdbxRemoteOpenPending");
+            return;
+        }
+
+        await using var stream = await _mdbxVaultService.OpenLocalStreamAsync(item.Database);
+        item.Database.LastAccessedAt = DateTimeOffset.UtcNow;
+        item.Database.LastSyncStatus = SyncStatus.LocalOnly;
+        await _repository.SaveMdbxDatabaseAsync(item.Database);
+        RefreshMdbxVaultState();
+        RefreshVaultSources();
+        StatusMessage = _localization.Format("OpenedMdbxDatabaseFormat", item.Name, stream.Length);
+    }
+
+    [RelayCommand]
+    private async Task SetDefaultMdbxDatabaseAsync(MdbxDatabaseDisplayItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        foreach (var database in MdbxDatabases)
+        {
+            database.IsDefault = database.Id == item.Database.Id;
+            await _repository.SaveMdbxDatabaseAsync(database);
+        }
+
+        RefreshMdbxVaultState();
+        RefreshVaultSources();
+        StatusMessage = _localization.Format("SelectedMdbxDefaultFormat", item.Name);
+    }
+
+    [RelayCommand]
+    private void ConfigureMdbxRemoteSources()
+    {
+        SelectedSection = "Sync";
+        StatusMessage = _localization.Get("ConfigureMdbxRemoteSourcesHint");
     }
 
     [RelayCommand]
@@ -3627,10 +3821,109 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(SecurityIssueCountText));
         OnPropertyChanged(nameof(LocalDatabaseSummaryText));
         OnPropertyChanged(nameof(MdbxDatabaseCountText));
+        RaiseMdbxVaultState();
         OnPropertyChanged(nameof(VaultSourceCountText));
         RaiseTotpSelectionState();
         RaiseWalletSelectionState();
     }
+
+    private void RefreshMdbxVaultState()
+    {
+        MdbxDatabaseItems.Clear();
+        foreach (var database in MdbxDatabases.OrderByDescending(item => item.IsDefault).ThenBy(item => item.SortOrder).ThenBy(item => item.Name))
+        {
+            MdbxDatabaseItems.Add(ToMdbxDisplayItem(database));
+        }
+
+        RaiseMdbxVaultState();
+    }
+
+    private void RaiseMdbxVaultState()
+    {
+        OnPropertyChanged(nameof(MdbxDatabaseCountText));
+        OnPropertyChanged(nameof(MdbxLocalCountText));
+        OnPropertyChanged(nameof(MdbxWebDavCountText));
+        OnPropertyChanged(nameof(MdbxOneDriveCountText));
+        OnPropertyChanged(nameof(MdbxLocalDatabaseCount));
+        OnPropertyChanged(nameof(MdbxWebDavDatabaseCount));
+        OnPropertyChanged(nameof(MdbxOneDriveDatabaseCount));
+        OnPropertyChanged(nameof(HasMdbxDatabases));
+        OnPropertyChanged(nameof(MdbxLocalSourceStatusText));
+        OnPropertyChanged(nameof(MdbxWebDavSourceStatusText));
+        OnPropertyChanged(nameof(MdbxOneDriveSourceStatusText));
+        OnPropertyChanged(nameof(MdbxRuntimeSummaryText));
+        OnPropertyChanged(nameof(MdbxSecuritySummaryText));
+    }
+
+    private MdbxDatabaseDisplayItem ToMdbxDisplayItem(LocalMdbxDatabase database)
+    {
+        var isLocal = IsLocalMdbxDatabase(database);
+        var source = database.StorageLocation switch
+        {
+            MdbxStorageLocation.Internal => _localization.Get("MdbxSourceLocal"),
+            MdbxStorageLocation.External => _localization.Get("MdbxSourceExternal"),
+            MdbxStorageLocation.RemoteWebDav => _localization.WebDav,
+            MdbxStorageLocation.RemoteOneDrive => _localization.OneDrive,
+            _ => database.StorageLocation.ToString()
+        };
+        var localPath = string.IsNullOrWhiteSpace(database.WorkingCopyPath)
+            ? database.FilePath
+            : database.WorkingCopyPath;
+        var remotePath = isLocal
+            ? _localization.Get("LocalOnly")
+            : string.IsNullOrWhiteSpace(database.FilePath) ? _localization.Get("NotConfigured") : database.FilePath;
+
+        return new MdbxDatabaseDisplayItem(
+            database,
+            string.IsNullOrWhiteSpace(database.Name) ? "MDBX" : database.Name,
+            source,
+            string.IsNullOrWhiteSpace(localPath) ? _localization.Get("NotConfigured") : localPath,
+            remotePath,
+            database.TigaMode.ToString(),
+            database.UnlockMethod.ToString(),
+            FormatLocalDate(database.CreatedAt),
+            FormatLocalDate(database.LastAccessedAt),
+            database.LastSyncedAt is null ? _localization.Get("Never") : FormatLocalDate(database.LastSyncedAt.Value),
+            LocalizeSyncStatus(database.LastSyncStatus),
+            string.IsNullOrWhiteSpace(database.Description) ? _localization.Get("MdbxNoDescription") : database.Description,
+            database.IsDefault,
+            isLocal,
+            !isLocal);
+    }
+
+    private static bool IsLocalMdbxDatabase(LocalMdbxDatabase database) =>
+        database.StorageLocation is MdbxStorageLocation.Internal or MdbxStorageLocation.External;
+
+    private static string BuildMdbxWorkingCopyPath(string fileName)
+    {
+        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Monica by Avalonia", "mdbx");
+        return Path.Combine(root, fileName);
+    }
+
+    private LocalMdbxDatabase CreateRemoteMdbxMetadata(
+        string name,
+        string remotePath,
+        MdbxStorageLocation storageLocation,
+        string sourceType,
+        string workingCopyPath,
+        string description) => new()
+    {
+        Name = name,
+        FilePath = remotePath,
+        StorageLocation = storageLocation,
+        SourceType = sourceType,
+        TigaMode = MdbxTigaMode.Multi,
+        UnlockMethod = MdbxUnlockMethod.MasterPassword,
+        LastSyncStatus = SyncStatus.Pending,
+        WorkingCopyPath = workingCopyPath,
+        IsOfflineAvailable = MdbxLocalCacheEnabled,
+        Description = description,
+        CreatedAt = DateTimeOffset.UtcNow,
+        LastAccessedAt = DateTimeOffset.UtcNow
+    };
+
+    private string FormatLocalDate(DateTimeOffset value) =>
+        value.ToLocalTime().ToString("yyyy/MM/dd HH:mm", _localization.Culture);
 
     private void RefreshVaultSources()
     {
@@ -5424,6 +5717,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             new("RecycleBin", _localization.RecycleBin),
             new("SecurityAnalysis", _localization.SecurityAnalysis),
             new("Timeline", _localization.Timeline),
+            new("Mdbx", _localization.Get("MdbxVaults")),
             new("DatabaseManagement", _localization.DatabaseManagement),
             new("Sync", _localization.SyncAndBackup),
             new("Settings", _localization.Settings));
@@ -5686,6 +5980,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             "RecycleBin" => _localization.RecycleBin,
             "SecurityAnalysis" => _localization.SecurityAnalysis,
             "Timeline" => _localization.Timeline,
+            "Mdbx" => _localization.Get("MdbxVaults"),
             "DatabaseManagement" => _localization.DatabaseManagement,
             "Sync" => _localization.SyncAndBackup,
             "Settings" => _localization.Settings,

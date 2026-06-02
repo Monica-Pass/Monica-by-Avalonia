@@ -99,7 +99,7 @@ public sealed class PasswordAttachmentFileService(
             basePath = AppContext.BaseDirectory;
         }
 
-        return Path.Combine(basePath, "Monica", AttachmentFolderName);
+        return Path.Combine(basePath, "Monica by Avalonia", AttachmentFolderName);
     }
 
     private static string InferContentType(string fileName)

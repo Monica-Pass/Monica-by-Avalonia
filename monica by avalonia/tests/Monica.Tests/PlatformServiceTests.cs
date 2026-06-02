@@ -1,5 +1,6 @@
 using Monica.Core.Models;
 using Monica.Platform.Services;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Monica.Tests;
@@ -29,7 +30,10 @@ public sealed class PlatformServiceTests
         await using var stream = await service.OpenLocalStreamAsync(metadata);
 
         Assert.Equal("Test", metadata.Name);
+        Assert.False(string.IsNullOrWhiteSpace(metadata.EncryptedPassword));
+        Assert.Equal("mdbx-1/argon2id", metadata.KdfProfile);
         Assert.True(stream.CanWrite);
+        Assert.Equal("MDBX-1", await ReadMdbxFormatVersionAsync(path));
     }
 
     [Fact]
@@ -140,6 +144,15 @@ public sealed class PlatformServiceTests
         {
             Assert.IsType<UnsupportedSecretProtector>(protector);
         }
+    }
+
+    private static async Task<string> ReadMdbxFormatVersionAsync(string path)
+    {
+        await using var connection = new SqliteConnection($"Data Source={path}");
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT format_version FROM vault_meta LIMIT 1";
+        return (string)(await command.ExecuteScalarAsync() ?? "");
     }
 
     [Fact]
