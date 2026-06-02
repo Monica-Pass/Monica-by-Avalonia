@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Monica.Core.Models;
 using Monica.Core.Services;
+using Monica.Data.Services;
 
 namespace Monica.App.Services;
 
@@ -17,7 +18,7 @@ public interface IPasswordAttachmentFileService
 public sealed class PasswordAttachmentFileService(
     Func<Window> ownerProvider,
     ILocalizationService localization,
-    ICryptoService cryptoService) : IPasswordAttachmentFileService
+    ICryptoService cryptoService) : IPasswordAttachmentFileService, IAttachmentContentStore
 {
     private const string AttachmentFolderName = "secure_attachments";
 
@@ -77,6 +78,29 @@ public sealed class PasswordAttachmentFileService(
 
         return Task.CompletedTask;
     }
+
+    public async Task<byte[]?> TryReadAttachmentContentAsync(Attachment attachment, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(attachment.StoragePath) ||
+            attachment.StoragePath.StartsWith("mdbx:", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var path = ResolveAttachmentPath(attachment.StoragePath);
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        var encryptedPayload = await File.ReadAllTextAsync(path, Encoding.UTF8, cancellationToken);
+        var base64Content = cryptoService.DecryptString(encryptedPayload);
+        return Convert.FromBase64String(base64Content);
+    }
+
+    public Task DeleteAttachmentContentAsync(Attachment attachment, CancellationToken cancellationToken = default) =>
+        DeleteStoredAttachmentAsync(attachment.StoragePath, cancellationToken);
 
     private static string ResolveAttachmentPath(string storagePath)
     {

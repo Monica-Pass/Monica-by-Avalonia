@@ -1,11 +1,13 @@
 using Monica.Core.Models;
 using Monica.Data.Mdbx;
+using Monica.Data.Services;
 
 namespace Monica.Data.Repositories;
 
 public sealed class MdbxBackedMonicaRepository(
     IMonicaRepository inner,
-    IMdbxVaultStore mdbxVaultStore) : IMonicaRepository
+    IMdbxVaultStore mdbxVaultStore,
+    IAttachmentContentStore? attachmentContentStore = null) : IMonicaRepository
 {
     public async Task<IReadOnlyList<PasswordEntry>> GetPasswordsAsync(bool includeDeleted = false, bool includeArchived = false, CancellationToken cancellationToken = default)
     {
@@ -90,11 +92,29 @@ public sealed class MdbxBackedMonicaRepository(
     public Task<IReadOnlyList<long>> SearchEntryIdsByCustomFieldContentAsync(string query, CancellationToken cancellationToken = default) =>
         inner.SearchEntryIdsByCustomFieldContentAsync(query, cancellationToken);
 
-    public Task<IReadOnlyList<Attachment>> GetAttachmentsAsync(string ownerType, long ownerId, CancellationToken cancellationToken = default) =>
-        inner.GetAttachmentsAsync(ownerType, ownerId, cancellationToken);
+    public async Task<IReadOnlyList<Attachment>> GetAttachmentsAsync(string ownerType, long ownerId, CancellationToken cancellationToken = default)
+    {
+        var attachments = await inner.GetAttachmentsAsync(ownerType, ownerId, cancellationToken);
+        return await MigratePasswordAttachmentsAsync(ownerType, attachments, cancellationToken);
+    }
 
-    public Task<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>> GetAttachmentsByOwnerIdsAsync(string ownerType, IReadOnlyList<long> ownerIds, CancellationToken cancellationToken = default) =>
-        inner.GetAttachmentsByOwnerIdsAsync(ownerType, ownerIds, cancellationToken);
+    public async Task<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>> GetAttachmentsByOwnerIdsAsync(string ownerType, IReadOnlyList<long> ownerIds, CancellationToken cancellationToken = default)
+    {
+        var attachmentsByOwnerId = await inner.GetAttachmentsByOwnerIdsAsync(ownerType, ownerIds, cancellationToken);
+        if (!IsPasswordOwnerType(ownerType) || attachmentContentStore is null)
+        {
+            return attachmentsByOwnerId;
+        }
+
+        var migrated = await MigratePasswordAttachmentsAsync(
+            ownerType,
+            attachmentsByOwnerId.Values.SelectMany(item => item).ToArray(),
+            cancellationToken);
+
+        return migrated
+            .GroupBy(attachment => attachment.OwnerId)
+            .ToDictionary(group => group.Key, group => (IReadOnlyList<Attachment>)group.ToList());
+    }
 
     public Task<long> SaveAttachmentAsync(Attachment attachment, CancellationToken cancellationToken = default) =>
         inner.SaveAttachmentAsync(attachment, cancellationToken);
@@ -285,9 +305,104 @@ public sealed class MdbxBackedMonicaRepository(
         }
     }
 
+    private async Task<IReadOnlyList<Attachment>> MigratePasswordAttachmentsAsync(
+        string ownerType,
+        IReadOnlyList<Attachment> attachments,
+        CancellationToken cancellationToken)
+    {
+        if (!IsPasswordOwnerType(ownerType) || attachmentContentStore is null || attachments.Count == 0)
+        {
+            return attachments;
+        }
+
+        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
+        if (database is null)
+        {
+            return attachments;
+        }
+
+        var candidates = attachments
+            .Where(attachment => attachment.OwnerId > 0)
+            .Where(attachment => !string.IsNullOrWhiteSpace(attachment.StoragePath))
+            .Where(attachment => MdbxVaultStore.TryParseAttachmentStoragePath(attachment.StoragePath) is null)
+            .ToArray();
+        if (candidates.Length == 0)
+        {
+            return attachments;
+        }
+
+        var ownerIds = candidates.Select(attachment => attachment.OwnerId).Distinct().ToHashSet();
+        var passwords = (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
+            .Where(password => ownerIds.Contains(password.Id))
+            .ToDictionary(password => password.Id);
+        var migratedById = new Dictionary<long, Attachment>();
+
+        foreach (var attachment in candidates)
+        {
+            try
+            {
+                if (!passwords.TryGetValue(attachment.OwnerId, out var entry))
+                {
+                    continue;
+                }
+
+                var content = await attachmentContentStore.TryReadAttachmentContentAsync(attachment, cancellationToken);
+                if (content is null || content.Length == 0)
+                {
+                    continue;
+                }
+
+                var original = new Attachment
+                {
+                    Id = attachment.Id,
+                    OwnerType = attachment.OwnerType,
+                    OwnerId = attachment.OwnerId,
+                    FileName = attachment.FileName,
+                    ContentType = attachment.ContentType,
+                    StoragePath = attachment.StoragePath,
+                    SizeBytes = attachment.SizeBytes,
+                    CreatedAt = attachment.CreatedAt,
+                    BitwardenVaultId = attachment.BitwardenVaultId,
+                    KeepassBinaryRef = attachment.KeepassBinaryRef
+                };
+
+                if (IsUnboundFromMdbx(entry))
+                {
+                    await mdbxVaultStore.SavePasswordAsync(database, entry, cancellationToken);
+                    await inner.SavePasswordAsync(entry, cancellationToken);
+                }
+
+                await mdbxVaultStore.SavePasswordAttachmentAsync(database, entry, attachment, content, cancellationToken);
+                await inner.SaveAttachmentAsync(attachment, cancellationToken);
+                await attachmentContentStore.DeleteAttachmentContentAsync(original, cancellationToken);
+                migratedById[attachment.Id] = attachment;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch
+            {
+                continue;
+            }
+        }
+
+        if (migratedById.Count == 0)
+        {
+            return attachments;
+        }
+
+        return attachments
+            .Select(attachment => migratedById.TryGetValue(attachment.Id, out var migrated) ? migrated : attachment)
+            .ToArray();
+    }
+
     private static bool IsUnboundFromMdbx(PasswordEntry entry) =>
         entry.MdbxDatabaseId is null && string.IsNullOrWhiteSpace(entry.MdbxFolderId);
 
     private static bool IsUnboundFromMdbx(SecureItem item) =>
         item.MdbxDatabaseId is null && string.IsNullOrWhiteSpace(item.MdbxFolderId);
+
+    private static bool IsPasswordOwnerType(string ownerType) =>
+        string.Equals(ownerType, "PASSWORD", StringComparison.OrdinalIgnoreCase);
 }

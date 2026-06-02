@@ -2,6 +2,7 @@ using Monica.Core.Models;
 using Monica.Data;
 using Monica.Data.Mdbx;
 using Monica.Data.Repositories;
+using Monica.Data.Services;
 
 namespace Monica.Tests;
 
@@ -174,12 +175,47 @@ public sealed class MdbxRepositoryTests
         Assert.Null(bridge.TryReadAttachmentContent(database.WorkingCopyPath!, saved.StoragePath));
     }
 
-    private static IMonicaRepository CreateRepository(out FakeMdbxNativeBridge bridge)
+    [Fact]
+    public async Task Repository_migrates_existing_password_attachment_content_to_mdbx_when_listed()
+    {
+        var contentStore = new FakeAttachmentContentStore();
+        var repository = CreateRepository(out var bridge, contentStore);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "Legacy attachment",
+            Password = "secret"
+        };
+        await repository.SavePasswordAsync(password);
+        var content = "legacy attachment bytes"u8.ToArray();
+        var attachment = new Attachment
+        {
+            OwnerType = "PASSWORD",
+            OwnerId = password.Id,
+            FileName = "legacy.txt",
+            ContentType = "text/plain",
+            StoragePath = "secure_attachments/legacy.enc",
+            SizeBytes = content.Length
+        };
+        await repository.SaveAttachmentAsync(attachment);
+        contentStore.Put(attachment.StoragePath, content);
+
+        var migrated = Assert.Single(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
+        var reloaded = Assert.Single(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
+
+        Assert.Equal(attachment.Id, migrated.Id);
+        Assert.StartsWith("mdbx:", migrated.StoragePath, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(migrated.StoragePath, reloaded.StoragePath);
+        Assert.Equal(content, bridge.ReadAttachmentContent(database.WorkingCopyPath!, migrated.StoragePath));
+        Assert.Null(contentStore.TryRead(attachment.StoragePath));
+    }
+
+    private static IMonicaRepository CreateRepository(out FakeMdbxNativeBridge bridge, IAttachmentContentStore? attachmentContentStore = null)
     {
         var factory = new SqliteConnectionFactory(GetTempDatabasePath());
         var inner = new MonicaRepository(factory, new DatabaseMigrator(factory));
         bridge = new FakeMdbxNativeBridge();
-        return new MdbxBackedMonicaRepository(inner, new MdbxVaultStore(bridge));
+        return new MdbxBackedMonicaRepository(inner, new MdbxVaultStore(bridge), attachmentContentStore);
     }
 
     private static async Task<LocalMdbxDatabase> SaveDefaultMdbxDatabaseAsync(IMonicaRepository repository)
@@ -246,6 +282,26 @@ public sealed class MdbxRepositoryTests
 
             var attachmentId = MdbxVaultStore.TryParseAttachmentStoragePath(storagePath);
             return attachmentId is null ? null : vault.TryReadAttachmentContent(attachmentId);
+        }
+    }
+
+    private sealed class FakeAttachmentContentStore : IAttachmentContentStore
+    {
+        private readonly Dictionary<string, byte[]> _content = new(StringComparer.OrdinalIgnoreCase);
+
+        public void Put(string storagePath, byte[] content) =>
+            _content[storagePath] = content.ToArray();
+
+        public byte[]? TryRead(string storagePath) =>
+            _content.TryGetValue(storagePath, out var content) ? content.ToArray() : null;
+
+        public Task<byte[]?> TryReadAttachmentContentAsync(Attachment attachment, CancellationToken cancellationToken = default) =>
+            Task.FromResult(TryRead(attachment.StoragePath));
+
+        public Task DeleteAttachmentContentAsync(Attachment attachment, CancellationToken cancellationToken = default)
+        {
+            _content.Remove(attachment.StoragePath);
+            return Task.CompletedTask;
         }
     }
 

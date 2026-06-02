@@ -52,7 +52,8 @@ public partial class App : Application
         services.AddSingleton<IMdbxVaultStore, MdbxVaultStore>();
         services.AddSingleton<IMonicaRepository>(provider => new MdbxBackedMonicaRepository(
             provider.GetRequiredService<MonicaRepository>(),
-            provider.GetRequiredService<IMdbxVaultStore>()));
+            provider.GetRequiredService<IMdbxVaultStore>(),
+            provider.GetRequiredService<IAttachmentContentStore>()));
         services.AddSingleton<IMasterPasswordMaintenanceService, MasterPasswordMaintenanceService>();
         services.AddSingleton<ICryptoService, CryptoService>();
         services.AddSingleton<IVaultDataProtector, VaultDataProtector>();
@@ -78,10 +79,12 @@ public partial class App : Application
         services.AddSingleton<IMdbxVaultService>(provider => new MdbxVaultService(
             nativeBridge: provider.GetRequiredService<IMdbxNativeBridge>()));
         services.AddSingleton<IClipboardService>(_ => new AvaloniaClipboardService(() => mainWindow));
-        services.AddSingleton<IPasswordAttachmentFileService>(_ => new PasswordAttachmentFileService(
+        services.AddSingleton<PasswordAttachmentFileService>(_ => new PasswordAttachmentFileService(
             () => mainWindow,
             _.GetRequiredService<ILocalizationService>(),
             _.GetRequiredService<ICryptoService>()));
+        services.AddSingleton<IPasswordAttachmentFileService>(provider => provider.GetRequiredService<PasswordAttachmentFileService>());
+        services.AddSingleton<IAttachmentContentStore>(provider => provider.GetRequiredService<PasswordAttachmentFileService>());
         services.AddSingleton<IPasswordEditorDialogService>(_ => new PasswordEditorDialogService(
             () => mainWindow,
             _.GetRequiredService<ILocalizationService>(),
