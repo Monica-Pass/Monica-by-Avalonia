@@ -1746,6 +1746,28 @@
                                         <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
 
                                         <StackPanel Spacing="8">
+                                            <TextBlock Text="{Binding L.ImportNoteCsv}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding L.ImportNoteCsvDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            <TextBox Text="{Binding ImportNoteCsvText}" PlaceholderText="{Binding L.ImportNoteCsvWatermark}" AcceptsReturn="True" MinHeight="120" TextWrapping="Wrap" />
+                                            <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="8">
+                                                <Button Command="{Binding ImportNoteCsvFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <ic:FluentIcon Icon="Folder" FontSize="20" />
+                                                        <TextBlock Text="{Binding L.ImportFromFile}" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Grid.Column="1" Command="{Binding ImportNoteCsvCommand}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <ic:FluentIcon Icon="ArrowUpload" FontSize="20" />
+                                                        <TextBlock Text="{Binding L.ImportNoteCsv}" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </Grid>
+                                        </StackPanel>
+
+                                        <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
+
+                                        <StackPanel Spacing="8">
                                             <TextBlock Text="{Binding L.ImportPasswordCsv}" FontWeight="SemiBold" />
                                             <TextBlock Text="{Binding L.ImportPasswordCsvDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                             <TextBox Text="{Binding ImportCsvText}" PlaceholderText="{Binding L.ImportCsvWatermark}" AcceptsReturn="True" MinHeight="120" TextWrapping="Wrap" />

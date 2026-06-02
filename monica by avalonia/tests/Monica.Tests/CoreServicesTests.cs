@@ -248,6 +248,42 @@ public sealed class CoreServicesTests
     }
 
     [Fact]
+    public void Import_export_imports_winui_compatible_note_csv()
+    {
+        var service = new ImportExportService();
+        var payload = NoteContentCodec.BuildSavePayload("Recovery", "# backup codes\nalpha", "ops, personal", true, ["inline.png"]);
+        var csv = service.ExportNoteCsv(
+        [
+            new SecureItem
+            {
+                Id = 51,
+                ItemType = VaultItemType.Note,
+                Title = payload.Title,
+                Notes = payload.NotesCache,
+                ImagePaths = payload.ImagePaths,
+                IsFavorite = true,
+                CreatedAt = DateTimeOffset.FromUnixTimeMilliseconds(3000),
+                UpdatedAt = DateTimeOffset.FromUnixTimeMilliseconds(4000),
+                ItemData = payload.ItemData
+            }
+        ]);
+
+        var imported = Assert.Single(service.ImportNoteCsv(csv));
+        var decoded = NoteContentCodec.DecodeFromItem(imported);
+
+        Assert.Equal(VaultItemType.Note, imported.ItemType);
+        Assert.Equal("Recovery", imported.Title);
+        Assert.Equal("# backup codes\nalpha", decoded.Content);
+        Assert.Contains("ops", decoded.Tags);
+        Assert.Contains("personal", decoded.Tags);
+        Assert.True(decoded.IsMarkdown);
+        Assert.True(imported.IsFavorite);
+        Assert.Contains("inline.png", NoteContentCodec.DecodeImagePaths(imported.ImagePaths));
+        Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(3000), imported.CreatedAt);
+        Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(4000), imported.UpdatedAt);
+    }
+
+    [Fact]
     public void Import_export_imports_winui_compatible_totp_csv()
     {
         var service = new ImportExportService();

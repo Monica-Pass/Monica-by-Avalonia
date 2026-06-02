@@ -338,6 +338,43 @@ public sealed class AppSettingsTests
     }
 
     [Fact]
+    public async Task ViewModel_imports_note_csv_from_file_picker()
+    {
+        var integration = new PlatformIntegrationService("TestOS",
+        [
+            PlatformIntegrationService.Available(PlatformFeatureKeys.FilePicker, "File picking works.")
+        ]);
+        var payload = NoteContentCodec.BuildSavePayload("Recovery", "# backup codes\nalpha", "ops", true, ["inline.png"]);
+        var csv = new ImportExportService().ExportNoteCsv(
+        [
+            new SecureItem
+            {
+                ItemType = VaultItemType.Note,
+                Title = payload.Title,
+                Notes = payload.NotesCache,
+                ImagePaths = payload.ImagePaths,
+                ItemData = payload.ItemData
+            }
+        ]);
+        var filePicker = new CapturingFileSystemPickerService(
+            integration,
+            new PickedTextFile("notes.csv", csv));
+        var viewModel = CreateViewModel(
+            GetTempPath(),
+            platformIntegrationService: integration,
+            fileSystemPickerService: filePicker);
+
+        await viewModel.ImportNoteCsvFileCommand.ExecuteAsync(null);
+
+        var imported = Assert.Single(viewModel.NoteItems);
+        Assert.Equal("Recovery", imported.Title);
+        Assert.Equal("", viewModel.ImportNoteCsvText);
+        Assert.Equal(viewModel.L.Format("ImportedNoteCsvFormat", 1, 0), viewModel.StatusMessage);
+        Assert.Equal("Notes CSV", Assert.Single(filePicker.OpenFileTypes).Name);
+        Assert.Equal("*.csv", Assert.Single(Assert.Single(filePicker.OpenFileTypes).Patterns));
+    }
+
+    [Fact]
     public async Task ViewModel_saves_password_csv_export_through_file_picker()
     {
         var integration = new PlatformIntegrationService("TestOS",

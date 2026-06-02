@@ -17,6 +17,7 @@ public interface IImportExportService
     string ExportNoteCsv(IEnumerable<SecureItem> secureItems);
     string ExportAegisJson(IEnumerable<SecureItem> secureItems);
     IReadOnlyList<SecureItem> ImportTotpCsv(string csv);
+    IReadOnlyList<SecureItem> ImportNoteCsv(string csv);
     IReadOnlyList<SecureItem> ImportAegisJson(string json);
     IReadOnlyList<PasswordEntry> ImportPasswordCsv(string csv);
 }
@@ -275,6 +276,59 @@ public sealed class ImportExportService : IImportExportService
                 CreatedAt = ParseUnixMilliseconds(ReadField(csv, "createdAt", "created_at")) ?? now,
                 UpdatedAt = ParseUnixMilliseconds(ReadField(csv, "updatedAt", "updated_at")) ?? now,
                 ItemData = TotpDataResolver.ToItemData(data)
+            });
+        }
+
+        return items;
+    }
+
+    public IReadOnlyList<SecureItem> ImportNoteCsv(string csvText)
+    {
+        using var reader = new StringReader(csvText);
+        using var csv = new CsvReader(reader, CreateCsvConfiguration());
+        var items = new List<SecureItem>();
+
+        if (!csv.Read())
+        {
+            return items;
+        }
+
+        csv.ReadHeader();
+
+        while (csv.Read())
+        {
+            var type = ReadField(csv, "type", "itemType", "item_type");
+            if (!string.Equals(type, "NOTE", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var title = ReadField(csv, "title", "name");
+            var dataText = ReadField(csv, "data", "itemData", "item_data");
+            var notes = ReadField(csv, "notes", "note");
+            var decoded = NoteContentCodec.Decode(dataText, notes);
+            if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(decoded.Content))
+            {
+                continue;
+            }
+
+            var payload = NoteContentCodec.BuildSavePayload(
+                title,
+                decoded.Content,
+                string.Join(",", decoded.Tags),
+                decoded.IsMarkdown,
+                NoteContentCodec.DecodeImagePaths(ReadField(csv, "imagePaths", "image_paths")));
+            var now = DateTimeOffset.UtcNow;
+            items.Add(new SecureItem
+            {
+                ItemType = VaultItemType.Note,
+                Title = payload.Title,
+                Notes = payload.NotesCache,
+                ImagePaths = payload.ImagePaths,
+                IsFavorite = ParseBoolean(ReadField(csv, "isFavorite", "favorite")),
+                CreatedAt = ParseUnixMilliseconds(ReadField(csv, "createdAt", "created_at")) ?? now,
+                UpdatedAt = ParseUnixMilliseconds(ReadField(csv, "updatedAt", "updated_at")) ?? now,
+                ItemData = payload.ItemData
             });
         }
 

@@ -439,6 +439,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _importTotpCsvText = "";
 
     [ObservableProperty]
+    private string _importNoteCsvText = "";
+
+    [ObservableProperty]
     private string _exportCsvPreview = "";
 
     [ObservableProperty]
@@ -2723,6 +2726,26 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand(CanExecute = nameof(CanUseFilePicker))]
+    private async Task ImportNoteCsvFileAsync()
+    {
+        try
+        {
+            var file = await _fileSystemPickerService.OpenTextFileAsync(_localization.Get("ImportNoteCsv"), NoteCsvFileTypes);
+            if (file is null)
+            {
+                return;
+            }
+
+            ImportNoteCsvText = file.Content;
+            await ImportNoteCsvAsync();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = _localization.Format("ImportFailedFormat", ex.Message);
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUseFilePicker))]
     private async Task ImportAegisJsonFileAsync()
     {
         try
@@ -3359,6 +3382,54 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ImportTotpCsvText = "";
             await LoadAsync();
             StatusMessage = _localization.Format("ImportedTotpCsvFormat", importedTotps, skippedTotps);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = _localization.Format("ImportFailedFormat", ex.Message);
+        }
+    }
+
+    [RelayCommand]
+    private async Task ImportNoteCsvAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ImportNoteCsvText))
+        {
+            StatusMessage = _localization.Get("ImportNoteCsvRequired");
+            return;
+        }
+
+        try
+        {
+            var entries = _importExportService.ImportNoteCsv(ImportNoteCsvText);
+            var existingTitles = (await _repository.GetSecureItemsAsync(VaultItemType.Note))
+                .Select(item => item.Title)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var importedNotes = 0;
+            var skippedNotes = 0;
+
+            foreach (var source in entries)
+            {
+                if (!existingTitles.Add(source.Title))
+                {
+                    skippedNotes++;
+                    continue;
+                }
+
+                await _repository.SaveSecureItemAsync(source);
+                importedNotes++;
+            }
+
+            await _repository.LogAsync(new OperationLog
+            {
+                ItemType = "NOTE",
+                ItemTitle = _localization.Get("NoteCsv"),
+                OperationType = "IMPORT",
+                DeviceName = Environment.MachineName
+            });
+
+            ImportNoteCsvText = "";
+            await LoadAsync();
+            StatusMessage = _localization.Format("ImportedNoteCsvFormat", importedNotes, skippedNotes);
         }
         catch (Exception ex)
         {
@@ -5408,6 +5479,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ImportMonicaJsonFileCommand.NotifyCanExecuteChanged();
         ImportPasswordCsvFileCommand.NotifyCanExecuteChanged();
         ImportTotpCsvFileCommand.NotifyCanExecuteChanged();
+        ImportNoteCsvFileCommand.NotifyCanExecuteChanged();
         ImportAegisJsonFileCommand.NotifyCanExecuteChanged();
         SaveMonicaJsonExportCommand.NotifyCanExecuteChanged();
         SavePasswordCsvExportCommand.NotifyCanExecuteChanged();
