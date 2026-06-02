@@ -36,7 +36,7 @@ public sealed class MdbxBackedMonicaRepository(
 
         await inner.SavePasswordAsync(entry, cancellationToken);
         var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        await mdbxVaultStore.SavePasswordAsync(database, entry, categories.ToDictionary(category => category.Id), cancellationToken);
+        await SavePasswordToMdbxAsync(database, entry, categories.ToDictionary(category => category.Id), cancellationToken);
         await inner.SavePasswordAsync(entry, cancellationToken);
         return entry.Id;
     }
@@ -109,17 +109,115 @@ public sealed class MdbxBackedMonicaRepository(
         await inner.DeletePasswordPermanentlyAsync(id, cancellationToken);
     }
 
-    public Task<IReadOnlyList<CustomField>> GetCustomFieldsAsync(long entryId, CancellationToken cancellationToken = default) =>
-        inner.GetCustomFieldsAsync(entryId, cancellationToken);
+    public async Task<IReadOnlyList<CustomField>> GetCustomFieldsAsync(long entryId, CancellationToken cancellationToken = default)
+    {
+        var fieldsByEntryId = await GetCustomFieldsByEntryIdsAsync([entryId], cancellationToken);
+        return fieldsByEntryId.TryGetValue(entryId, out var fields) ? fields : [];
+    }
 
-    public Task<IReadOnlyDictionary<long, IReadOnlyList<CustomField>>> GetCustomFieldsByEntryIdsAsync(IReadOnlyList<long> entryIds, CancellationToken cancellationToken = default) =>
-        inner.GetCustomFieldsByEntryIdsAsync(entryIds, cancellationToken);
+    public async Task<IReadOnlyDictionary<long, IReadOnlyList<CustomField>>> GetCustomFieldsByEntryIdsAsync(IReadOnlyList<long> entryIds, CancellationToken cancellationToken = default)
+    {
+        var ids = entryIds.Where(id => id > 0).Distinct().ToArray();
+        if (ids.Length == 0)
+        {
+            return new Dictionary<long, IReadOnlyList<CustomField>>();
+        }
 
-    public Task ReplaceCustomFieldsAsync(long entryId, IReadOnlyList<CustomField> fields, CancellationToken cancellationToken = default) =>
-        inner.ReplaceCustomFieldsAsync(entryId, fields, cancellationToken);
+        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
+        if (database is null)
+        {
+            return await inner.GetCustomFieldsByEntryIdsAsync(ids, cancellationToken);
+        }
 
-    public Task<IReadOnlyList<long>> SearchEntryIdsByCustomFieldContentAsync(string query, CancellationToken cancellationToken = default) =>
-        inner.SearchEntryIdsByCustomFieldContentAsync(query, cancellationToken);
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        await MirrorUnboundPasswordsAsync(database, categories.ToDictionary(category => category.Id), cancellationToken);
+
+        var existingIds = (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
+            .Select(entry => entry.Id)
+            .ToHashSet();
+        ids = ids.Where(existingIds.Contains).ToArray();
+        if (ids.Length == 0)
+        {
+            return new Dictionary<long, IReadOnlyList<CustomField>>();
+        }
+
+        var mdbxFields = new Dictionary<long, IReadOnlyList<CustomField>>(
+            await mdbxVaultStore.GetPasswordCustomFieldsByEntryIdsAsync(database, ids, cancellationToken));
+        var missingIds = ids.Where(id => !mdbxFields.ContainsKey(id)).ToArray();
+        if (missingIds.Length == 0)
+        {
+            return mdbxFields;
+        }
+
+        foreach (var item in await inner.GetCustomFieldsByEntryIdsAsync(missingIds, cancellationToken))
+        {
+            mdbxFields[item.Key] = item.Value;
+        }
+
+        return mdbxFields;
+    }
+
+    public async Task ReplaceCustomFieldsAsync(long entryId, IReadOnlyList<CustomField> fields, CancellationToken cancellationToken = default)
+    {
+        await inner.ReplaceCustomFieldsAsync(entryId, fields, cancellationToken);
+
+        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
+        if (database is null)
+        {
+            return;
+        }
+
+        var entry = (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
+            .FirstOrDefault(item => item.Id == entryId);
+        if (entry is null)
+        {
+            return;
+        }
+
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        await SavePasswordToMdbxAsync(database, entry, categories.ToDictionary(category => category.Id), cancellationToken);
+        await inner.SavePasswordAsync(entry, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<long>> SearchEntryIdsByCustomFieldContentAsync(string query, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return [];
+        }
+
+        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
+        if (database is null)
+        {
+            return await inner.SearchEntryIdsByCustomFieldContentAsync(query, cancellationToken);
+        }
+
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        await MirrorUnboundPasswordsAsync(database, categories.ToDictionary(category => category.Id), cancellationToken);
+
+        var existingIds = (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
+            .Select(entry => entry.Id)
+            .ToHashSet();
+        if (existingIds.Count == 0)
+        {
+            return [];
+        }
+
+        var mdbxMatches = await mdbxVaultStore.SearchPasswordEntryIdsByCustomFieldContentAsync(database, query, cancellationToken);
+        mdbxMatches = mdbxMatches.Where(existingIds.Contains).ToList();
+        var sqliteMatches = await inner.SearchEntryIdsByCustomFieldContentAsync(query, cancellationToken);
+        if (sqliteMatches.Count == 0)
+        {
+            return mdbxMatches;
+        }
+
+        var mdbxFieldCoverage = await mdbxVaultStore.GetPasswordCustomFieldsByEntryIdsAsync(database, sqliteMatches, cancellationToken);
+        return mdbxMatches
+            .Concat(sqliteMatches.Where(id => !mdbxFieldCoverage.ContainsKey(id)))
+            .Distinct()
+            .OrderBy(id => id)
+            .ToList();
+    }
 
     public async Task<IReadOnlyList<Attachment>> GetAttachmentsAsync(string ownerType, long ownerId, CancellationToken cancellationToken = default)
     {
@@ -161,7 +259,7 @@ public sealed class MdbxBackedMonicaRepository(
             {
                 if (IsUnboundFromMdbx(entry))
                 {
-                    await mdbxVaultStore.SavePasswordAsync(database, entry, (await EnsureMdbxCategoriesAsync(database, cancellationToken)).ToDictionary(category => category.Id), cancellationToken);
+                    await SavePasswordToMdbxAsync(database, entry, (await EnsureMdbxCategoriesAsync(database, cancellationToken)).ToDictionary(category => category.Id), cancellationToken);
                     await inner.SavePasswordAsync(entry, cancellationToken);
                 }
 
@@ -308,7 +406,7 @@ public sealed class MdbxBackedMonicaRepository(
                          .Where(entry => entry.CategoryId == id))
             {
                 entry.CategoryId = null;
-                await mdbxVaultStore.SavePasswordAsync(database, entry, categories, cancellationToken);
+                await SavePasswordToMdbxAsync(database, entry, categories, cancellationToken);
                 await inner.SavePasswordAsync(entry, cancellationToken);
             }
 
@@ -394,9 +492,17 @@ public sealed class MdbxBackedMonicaRepository(
     private async Task MirrorUnboundPasswordsAsync(LocalMdbxDatabase database, IReadOnlyDictionary<long, Category> categories, CancellationToken cancellationToken)
     {
         var sqlitePasswords = await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken);
+        var customFieldsByEntryId = await inner.GetCustomFieldsByEntryIdsAsync(
+            sqlitePasswords.Select(entry => entry.Id).ToArray(),
+            cancellationToken);
         foreach (var entry in sqlitePasswords.Where(IsUnboundFromMdbx))
         {
-            await mdbxVaultStore.SavePasswordAsync(database, entry, categories, cancellationToken);
+            await mdbxVaultStore.SavePasswordAsync(
+                database,
+                entry,
+                customFieldsByEntryId.TryGetValue(entry.Id, out var fields) ? fields : [],
+                categories,
+                cancellationToken);
             if (entry.IsDeleted)
             {
                 await mdbxVaultStore.SoftDeletePasswordAsync(database, entry, cancellationToken);
@@ -524,7 +630,7 @@ public sealed class MdbxBackedMonicaRepository(
 
                 if (IsUnboundFromMdbx(entry))
                 {
-                    await mdbxVaultStore.SavePasswordAsync(database, entry, categoryById, cancellationToken);
+                    await SavePasswordToMdbxAsync(database, entry, categoryById, cancellationToken);
                     await inner.SavePasswordAsync(entry, cancellationToken);
                 }
 
@@ -555,6 +661,18 @@ public sealed class MdbxBackedMonicaRepository(
 
     private static bool IsUnboundFromMdbx(PasswordEntry entry) =>
         entry.MdbxDatabaseId is null && string.IsNullOrWhiteSpace(entry.MdbxFolderId);
+
+    private async Task SavePasswordToMdbxAsync(
+        LocalMdbxDatabase database,
+        PasswordEntry entry,
+        IReadOnlyDictionary<long, Category> categories,
+        CancellationToken cancellationToken)
+    {
+        var customFields = entry.Id > 0
+            ? await inner.GetCustomFieldsAsync(entry.Id, cancellationToken)
+            : [];
+        await mdbxVaultStore.SavePasswordAsync(database, entry, customFields, categories, cancellationToken);
+    }
 
     private static bool IsUnboundFromMdbx(SecureItem item) =>
         item.MdbxDatabaseId is null && string.IsNullOrWhiteSpace(item.MdbxFolderId);

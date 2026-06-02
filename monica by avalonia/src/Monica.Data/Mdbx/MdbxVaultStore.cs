@@ -10,8 +10,11 @@ public interface IMdbxVaultStore
     Task<Category> SaveCategoryAsync(LocalMdbxDatabase database, Category category, CancellationToken cancellationToken = default);
     Task<PasswordEntry> SavePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, CancellationToken cancellationToken = default);
     Task<PasswordEntry> SavePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, IReadOnlyDictionary<long, Category> categories, CancellationToken cancellationToken = default);
+    Task<PasswordEntry> SavePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, IReadOnlyList<CustomField> customFields, IReadOnlyDictionary<long, Category> categories, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PasswordEntry>> GetPasswordsAsync(LocalMdbxDatabase database, bool includeDeleted = false, bool includeArchived = false, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PasswordEntry>> GetPasswordsAsync(LocalMdbxDatabase database, IReadOnlyList<Category> categories, bool includeDeleted = false, bool includeArchived = false, CancellationToken cancellationToken = default);
+    Task<IReadOnlyDictionary<long, IReadOnlyList<CustomField>>> GetPasswordCustomFieldsByEntryIdsAsync(LocalMdbxDatabase database, IReadOnlyList<long> entryIds, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<long>> SearchPasswordEntryIdsByCustomFieldContentAsync(LocalMdbxDatabase database, string query, CancellationToken cancellationToken = default);
     Task SoftDeletePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, CancellationToken cancellationToken = default);
     Task RestorePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, CancellationToken cancellationToken = default);
     Task SoftDeletePasswordEntriesAsync(LocalMdbxDatabase database, CancellationToken cancellationToken = default);
@@ -58,11 +61,25 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
 
     public async Task<PasswordEntry> SavePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, IReadOnlyDictionary<long, Category> categories, CancellationToken cancellationToken = default)
     {
+        return await SavePasswordAsync(database, entry, [], categories, cancellationToken);
+    }
+
+    public async Task<PasswordEntry> SavePasswordAsync(
+        LocalMdbxDatabase database,
+        PasswordEntry entry,
+        IReadOnlyList<CustomField> customFields,
+        IReadOnlyDictionary<long, Category> categories,
+        CancellationToken cancellationToken = default)
+    {
         var vault = await OpenAsync(database, cancellationToken);
         using var _ = vault;
         var project = await ResolveProjectAsync(vault, entry.CategoryId, categories, cancellationToken);
         var entryType = ToMdbxEntryType(entry);
-        var payload = SerializePayload("password", entry);
+        var payload = SerializePayload("password", new MdbxPasswordPayload
+        {
+            Entry = entry,
+            CustomFields = NormalizeCustomFields(entry.Id, customFields).ToList()
+        });
         var record = await SaveEntryAsync(vault, project.ProjectId, entry.MdbxFolderId, PasswordEntryTypes, entryType, entry.Title, payload, cancellationToken);
 
         entry.MdbxDatabaseId = database.Id;
@@ -79,26 +96,15 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         using var _ = vault;
         var projects = await EnsureProjectsForReadAsync(vault, cancellationToken);
         var categoryByProjectId = BuildCategoryByProjectId(categories, projects);
-        var records = new List<MdbxNativeEntryRecord>();
-        foreach (var project in projects)
-        {
-            foreach (var entryType in PasswordEntryTypes)
-            {
-                records.AddRange(await vault.ListEntriesAsync(project.ProjectId, entryType, cancellationToken));
-                if (includeDeleted)
-                {
-                    records.AddRange(await vault.ListDeletedEntriesAsync(project.ProjectId, entryType, cancellationToken));
-                }
-            }
-        }
+        var records = await ListPasswordRecordsAsync(vault, projects, includeDeleted, cancellationToken);
 
         return records
-            .Select(record => (Record: record, Entry: DeserializePayload<PasswordEntry>(record.PayloadJson)))
-            .Where(item => item.Entry is not null)
+            .Select(record => (Record: record, Payload: DeserializePasswordPayload(record.PayloadJson)))
+            .Where(item => item.Payload is not null)
             .Select(item =>
             {
                 var record = item.Record;
-                var entry = item.Entry!;
+                var entry = item.Payload!.Entry;
                 entry.MdbxDatabaseId = database.Id;
                 entry.MdbxFolderId = record.EntryId;
                 if (categoryByProjectId.TryGetValue(record.ProjectId, out var categoryId))
@@ -114,6 +120,70 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
             .OrderByDescending(entry => entry.IsFavorite)
             .ThenBy(entry => entry.SortOrder)
             .ThenByDescending(entry => entry.UpdatedAt)
+            .ToList();
+    }
+
+    public async Task<IReadOnlyDictionary<long, IReadOnlyList<CustomField>>> GetPasswordCustomFieldsByEntryIdsAsync(
+        LocalMdbxDatabase database,
+        IReadOnlyList<long> entryIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = entryIds.Where(id => id > 0).Distinct().ToHashSet();
+        if (ids.Count == 0)
+        {
+            return new Dictionary<long, IReadOnlyList<CustomField>>();
+        }
+
+        var vault = await OpenAsync(database, cancellationToken);
+        using var _ = vault;
+        var projects = await EnsureProjectsForReadAsync(vault, cancellationToken);
+        var records = await ListPasswordRecordsAsync(vault, projects, includeDeleted: true, cancellationToken);
+        var result = new Dictionary<long, IReadOnlyList<CustomField>>();
+
+        foreach (var item in records
+                     .Select(record => (Record: record, Payload: DeserializePasswordPayload(record.PayloadJson)))
+                     .Where(item => item.Payload is not null)
+                     .OrderBy(item => item.Record.Deleted))
+        {
+            var payload = item.Payload!;
+            if (!ids.Contains(payload.Entry.Id) || payload.CustomFields is null || result.ContainsKey(payload.Entry.Id))
+            {
+                continue;
+            }
+
+            result[payload.Entry.Id] = NormalizeCustomFields(payload.Entry.Id, payload.CustomFields).ToList();
+        }
+
+        return result;
+    }
+
+    public async Task<IReadOnlyList<long>> SearchPasswordEntryIdsByCustomFieldContentAsync(
+        LocalMdbxDatabase database,
+        string query,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return [];
+        }
+
+        var term = query.Trim();
+        var vault = await OpenAsync(database, cancellationToken);
+        using var _ = vault;
+        var projects = await EnsureProjectsForReadAsync(vault, cancellationToken);
+        var records = await ListPasswordRecordsAsync(vault, projects, includeDeleted: true, cancellationToken);
+
+        return records
+            .Select(record => DeserializePasswordPayload(record.PayloadJson))
+            .Where(payload => payload?.CustomFields is not null)
+            .Select(payload => payload!)
+            .Where(payload => payload.CustomFields!.Any(field =>
+                field.Title.Contains(term, StringComparison.CurrentCultureIgnoreCase) ||
+                field.Value.Contains(term, StringComparison.CurrentCultureIgnoreCase)))
+            .Select(payload => payload.Entry.Id)
+            .Where(id => id > 0)
+            .Distinct()
+            .OrderBy(id => id)
             .ToList();
     }
 
@@ -473,6 +543,28 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         return null;
     }
 
+    private static async Task<IReadOnlyList<MdbxNativeEntryRecord>> ListPasswordRecordsAsync(
+        IMdbxNativeVault vault,
+        IReadOnlyList<MdbxNativeProjectRecord> projects,
+        bool includeDeleted,
+        CancellationToken cancellationToken)
+    {
+        var records = new List<MdbxNativeEntryRecord>();
+        foreach (var project in projects)
+        {
+            foreach (var entryType in PasswordEntryTypes)
+            {
+                records.AddRange(await vault.ListEntriesAsync(project.ProjectId, entryType, cancellationToken));
+                if (includeDeleted)
+                {
+                    records.AddRange(await vault.ListDeletedEntriesAsync(project.ProjectId, entryType, cancellationToken));
+                }
+            }
+        }
+
+        return records;
+    }
+
     private static Dictionary<string, long> BuildCategoryByProjectId(IReadOnlyList<Category> categories, IReadOnlyList<MdbxNativeProjectRecord> projects)
     {
         var categoryByProjectId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
@@ -503,6 +595,47 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         return payload is null ? default : payload.Data;
     }
 
+    private static PasswordPayloadSnapshot? DeserializePasswordPayload(string payloadJson)
+    {
+        try
+        {
+            var payload = JsonSerializer.Deserialize<MdbxPayload<MdbxPasswordPayload>>(payloadJson, JsonOptions);
+            if (payload?.Data.Entry is not null)
+            {
+                return new PasswordPayloadSnapshot(payload.Data.Entry, payload.Data.CustomFields);
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        try
+        {
+            var entry = DeserializePayload<PasswordEntry>(payloadJson);
+            return entry is null ? null : new PasswordPayloadSnapshot(entry, CustomFields: null);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static IReadOnlyList<CustomField> NormalizeCustomFields(long entryId, IReadOnlyList<CustomField> customFields) =>
+        customFields
+            .Where(field => !string.IsNullOrWhiteSpace(field.Title) && !string.IsNullOrWhiteSpace(field.Value))
+            .OrderBy(field => field.SortOrder)
+            .ThenBy(field => field.Id)
+            .Select((field, index) => new CustomField
+            {
+                Id = field.Id,
+                EntryId = entryId,
+                Title = field.Title.Trim(),
+                Value = field.Value.Trim(),
+                IsProtected = field.IsProtected,
+                SortOrder = index
+            })
+            .ToList();
+
     private static string ToMdbxEntryType(PasswordEntry entry) =>
         entry.LoginType == PasswordLoginType.SshKey ? "ssh-key" : "login";
 
@@ -528,4 +661,12 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
     }
 
     private sealed record MdbxPayload<T>(string Kind, int SchemaVersion, T Data);
+
+    private sealed class MdbxPasswordPayload
+    {
+        public PasswordEntry? Entry { get; init; }
+        public List<CustomField>? CustomFields { get; init; }
+    }
+
+    private sealed record PasswordPayloadSnapshot(PasswordEntry Entry, List<CustomField>? CustomFields);
 }

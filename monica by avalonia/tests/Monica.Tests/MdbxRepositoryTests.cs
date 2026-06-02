@@ -51,6 +51,127 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
+    public async Task Repository_roundtrips_password_custom_fields_through_mdbx_payload()
+    {
+        var repository = CreateRepository(out _, out var sqliteRepository);
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "With fields",
+            Username = "dev",
+            Password = "secret"
+        };
+        await repository.SavePasswordAsync(password);
+        await repository.ReplaceCustomFieldsAsync(password.Id,
+        [
+            new CustomField { Title = "Security question", Value = "First school" },
+            new CustomField { Title = "Backup code", Value = "123456", IsProtected = true }
+        ]);
+
+        await sqliteRepository.ReplaceCustomFieldsAsync(password.Id,
+        [
+            new CustomField { Title = "SQLite stale", Value = "stale-only" }
+        ]);
+
+        var fields = await repository.GetCustomFieldsAsync(password.Id);
+        var fieldsByEntryId = await repository.GetCustomFieldsByEntryIdsAsync([password.Id]);
+
+        Assert.Equal(["Security question", "Backup code"], fields.Select(field => field.Title).ToArray());
+        Assert.All(fields, field => Assert.Equal(password.Id, field.EntryId));
+        Assert.True(fields[1].IsProtected);
+        Assert.Equal(fields.Select(field => field.Title), fieldsByEntryId[password.Id].Select(field => field.Title));
+        Assert.Equal([password.Id], await repository.SearchEntryIdsByCustomFieldContentAsync("school"));
+        Assert.Empty(await repository.SearchEntryIdsByCustomFieldContentAsync("stale-only"));
+    }
+
+    [Fact]
+    public async Task Repository_updates_and_clears_password_custom_fields_in_mdbx_payload()
+    {
+        var repository = CreateRepository(out _, out var sqliteRepository);
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "Mutable fields",
+            Password = "secret"
+        };
+        await repository.SavePasswordAsync(password);
+        await repository.ReplaceCustomFieldsAsync(password.Id,
+        [
+            new CustomField { Title = "Old", Value = "remove-me" }
+        ]);
+
+        await repository.ReplaceCustomFieldsAsync(password.Id,
+        [
+            new CustomField { Title = "New", Value = "keep-me" }
+        ]);
+
+        Assert.Equal("New", Assert.Single(await repository.GetCustomFieldsAsync(password.Id)).Title);
+        Assert.Empty(await repository.SearchEntryIdsByCustomFieldContentAsync("remove-me"));
+        Assert.Equal([password.Id], await repository.SearchEntryIdsByCustomFieldContentAsync("keep-me"));
+
+        await repository.ReplaceCustomFieldsAsync(password.Id, []);
+        await sqliteRepository.ReplaceCustomFieldsAsync(password.Id,
+        [
+            new CustomField { Title = "Old", Value = "stale-after-clear" }
+        ]);
+
+        Assert.Empty(await repository.GetCustomFieldsAsync(password.Id));
+        Assert.Empty(await repository.SearchEntryIdsByCustomFieldContentAsync("stale-after-clear"));
+    }
+
+    [Fact]
+    public async Task Repository_does_not_return_mdbx_custom_fields_after_password_is_permanently_deleted()
+    {
+        var repository = CreateRepository(out _);
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "Delete fields",
+            Password = "secret"
+        };
+        await repository.SavePasswordAsync(password);
+        await repository.ReplaceCustomFieldsAsync(password.Id,
+        [
+            new CustomField { Title = "Recovery", Value = "delete-me" }
+        ]);
+
+        await repository.DeletePasswordPermanentlyAsync(password.Id);
+
+        Assert.Empty(await repository.GetCustomFieldsAsync(password.Id));
+        Assert.Empty(await repository.GetCustomFieldsByEntryIdsAsync([password.Id]));
+        Assert.Empty(await repository.SearchEntryIdsByCustomFieldContentAsync("delete-me"));
+    }
+
+    [Fact]
+    public async Task Repository_mirrors_legacy_sqlite_custom_fields_when_default_mdbx_vault_is_added()
+    {
+        var repository = CreateRepository(out _, out var sqliteRepository);
+        var password = new PasswordEntry
+        {
+            Title = "Legacy fields",
+            Password = "legacy-secret"
+        };
+        await repository.SavePasswordAsync(password);
+        await repository.ReplaceCustomFieldsAsync(password.Id,
+        [
+            new CustomField { Title = "Legacy hint", Value = "mother maiden" }
+        ]);
+
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        Assert.Single(await repository.GetPasswordsAsync());
+        await sqliteRepository.ReplaceCustomFieldsAsync(password.Id,
+        [
+            new CustomField { Title = "SQLite stale", Value = "after-mirror" }
+        ]);
+
+        var fields = await repository.GetCustomFieldsAsync(password.Id);
+
+        Assert.Equal("Legacy hint", Assert.Single(fields).Title);
+        Assert.Equal([password.Id], await repository.SearchEntryIdsByCustomFieldContentAsync("maiden"));
+        Assert.Empty(await repository.SearchEntryIdsByCustomFieldContentAsync("after-mirror"));
+    }
+
+    [Fact]
     public async Task Repository_roundtrips_secure_items_through_mdbx_store()
     {
         var repository = CreateRepository(out _);
@@ -378,10 +499,14 @@ public sealed class MdbxRepositoryTests
         Assert.Null(bridge.TryReadAttachmentContent(database.WorkingCopyPath!, savedAttachment.StoragePath));
     }
 
-    private static IMonicaRepository CreateRepository(out FakeMdbxNativeBridge bridge, IAttachmentContentStore? attachmentContentStore = null)
+    private static IMonicaRepository CreateRepository(out FakeMdbxNativeBridge bridge, IAttachmentContentStore? attachmentContentStore = null) =>
+        CreateRepository(out bridge, out _, attachmentContentStore);
+
+    private static IMonicaRepository CreateRepository(out FakeMdbxNativeBridge bridge, out IMonicaRepository sqliteRepository, IAttachmentContentStore? attachmentContentStore = null)
     {
         var factory = new SqliteConnectionFactory(GetTempDatabasePath());
         var inner = new MonicaRepository(factory, new DatabaseMigrator(factory));
+        sqliteRepository = inner;
         bridge = new FakeMdbxNativeBridge();
         return new MdbxBackedMonicaRepository(inner, new MdbxVaultStore(bridge), attachmentContentStore);
     }
