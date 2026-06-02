@@ -607,6 +607,41 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
+    public async Task Repository_migrates_legacy_password_attachments_after_default_mdbx_vault_is_added()
+    {
+        var contentStore = new FakeAttachmentContentStore();
+        var repository = CreateRepository(out var bridge, contentStore);
+        var password = new PasswordEntry
+        {
+            Title = "Legacy before vault",
+            Password = "secret"
+        };
+        await repository.SavePasswordAsync(password);
+        var content = "legacy before vault bytes"u8.ToArray();
+        var attachment = new Attachment
+        {
+            OwnerType = "PASSWORD",
+            OwnerId = password.Id,
+            FileName = "before-vault.txt",
+            ContentType = "text/plain",
+            StoragePath = "secure_attachments/before-vault.enc",
+            SizeBytes = content.Length
+        };
+        await repository.SaveAttachmentAsync(attachment);
+        contentStore.Put(attachment.StoragePath, content);
+
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+
+        var migrated = Assert.Single(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
+        var reloaded = Assert.Single(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
+
+        Assert.StartsWith("mdbx:", migrated.StoragePath, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(migrated.StoragePath, reloaded.StoragePath);
+        Assert.Equal(content, bridge.ReadAttachmentContent(database.WorkingCopyPath!, migrated.StoragePath));
+        Assert.Null(contentStore.TryRead(attachment.StoragePath));
+    }
+
+    [Fact]
     public async Task Repository_clears_password_scope_from_mdbx_without_rehydrating_entries()
     {
         var repository = CreateRepository(out var bridge);
@@ -714,8 +749,8 @@ public sealed class MdbxRepositoryTests
         var database = new LocalMdbxDatabase
         {
             Name = "Local",
-            FilePath = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.mdbx"),
-            WorkingCopyPath = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.mdbx"),
+            FilePath = Path.Combine(GetTempRootPath(), $"{Guid.NewGuid():N}.mdbx"),
+            WorkingCopyPath = Path.Combine(GetTempRootPath(), $"{Guid.NewGuid():N}.mdbx"),
             StorageLocation = MdbxStorageLocation.Internal,
             SourceType = "LOCAL_INTERNAL",
             EncryptedPassword = "test-mdbx-password",
@@ -729,9 +764,29 @@ public sealed class MdbxRepositoryTests
 
     private static string GetTempDatabasePath()
     {
-        var path = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
+        var path = Path.Combine(GetTempRootPath(), $"{Guid.NewGuid():N}.db");
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         return path;
+    }
+
+    private static string GetTempRootPath()
+    {
+        var current = AppContext.BaseDirectory;
+        while (!string.IsNullOrWhiteSpace(current))
+        {
+            if (File.Exists(Path.Combine(current, "Monica by Avalonia.slnx")))
+            {
+                var root = Path.Combine(current, "artifacts", "monica-tests");
+                Directory.CreateDirectory(root);
+                return root;
+            }
+
+            current = Directory.GetParent(current)?.FullName;
+        }
+
+        var fallback = Path.Combine(Path.GetTempPath(), "monica-tests");
+        Directory.CreateDirectory(fallback);
+        return fallback;
     }
 
     private sealed class FakeMdbxNativeBridge : IMdbxNativeBridge

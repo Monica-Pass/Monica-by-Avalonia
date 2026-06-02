@@ -629,6 +629,10 @@ public sealed class MdbxBackedMonicaRepository(
         var customFieldsByEntryId = await inner.GetCustomFieldsByEntryIdsAsync(
             sqlitePasswords.Select(entry => entry.Id).ToArray(),
             cancellationToken);
+        var attachmentsByEntryId = await inner.GetAttachmentsByOwnerIdsAsync(
+            "PASSWORD",
+            sqlitePasswords.Select(entry => entry.Id).ToArray(),
+            cancellationToken);
         foreach (var entry in sqlitePasswords.Where(IsUnboundFromMdbx))
         {
             await mdbxVaultStore.SavePasswordAsync(
@@ -636,6 +640,7 @@ public sealed class MdbxBackedMonicaRepository(
                 entry,
                 customFieldsByEntryId.TryGetValue(entry.Id, out var fields) ? fields : [],
                 await inner.GetPasswordHistoryAsync(entry.Id, cancellationToken),
+                attachmentsByEntryId.TryGetValue(entry.Id, out var attachments) ? attachments : [],
                 categories,
                 cancellationToken);
             if (entry.IsDeleted)
