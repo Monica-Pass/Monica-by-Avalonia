@@ -11,10 +11,13 @@ public interface IMdbxVaultStore
     Task<PasswordEntry> SavePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, CancellationToken cancellationToken = default);
     Task<PasswordEntry> SavePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, IReadOnlyDictionary<long, Category> categories, CancellationToken cancellationToken = default);
     Task<PasswordEntry> SavePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, IReadOnlyList<CustomField> customFields, IReadOnlyDictionary<long, Category> categories, CancellationToken cancellationToken = default);
+    Task<PasswordEntry> SavePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, IReadOnlyList<CustomField> customFields, IReadOnlyList<PasswordHistoryEntry> passwordHistory, IReadOnlyDictionary<long, Category> categories, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PasswordEntry>> GetPasswordsAsync(LocalMdbxDatabase database, bool includeDeleted = false, bool includeArchived = false, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PasswordEntry>> GetPasswordsAsync(LocalMdbxDatabase database, IReadOnlyList<Category> categories, bool includeDeleted = false, bool includeArchived = false, CancellationToken cancellationToken = default);
     Task<IReadOnlyDictionary<long, IReadOnlyList<CustomField>>> GetPasswordCustomFieldsByEntryIdsAsync(LocalMdbxDatabase database, IReadOnlyList<long> entryIds, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<long>> SearchPasswordEntryIdsByCustomFieldContentAsync(LocalMdbxDatabase database, string query, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PasswordHistoryEntry>?> GetPasswordHistoryAsync(LocalMdbxDatabase database, long entryId, CancellationToken cancellationToken = default);
+    Task<long?> FindPasswordHistoryOwnerIdAsync(LocalMdbxDatabase database, long historyId, CancellationToken cancellationToken = default);
     Task SoftDeletePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, CancellationToken cancellationToken = default);
     Task RestorePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, CancellationToken cancellationToken = default);
     Task SoftDeletePasswordEntriesAsync(LocalMdbxDatabase database, CancellationToken cancellationToken = default);
@@ -64,10 +67,19 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         return await SavePasswordAsync(database, entry, [], categories, cancellationToken);
     }
 
+    public Task<PasswordEntry> SavePasswordAsync(
+        LocalMdbxDatabase database,
+        PasswordEntry entry,
+        IReadOnlyList<CustomField> customFields,
+        IReadOnlyDictionary<long, Category> categories,
+        CancellationToken cancellationToken = default) =>
+        SavePasswordAsync(database, entry, customFields, [], categories, cancellationToken);
+
     public async Task<PasswordEntry> SavePasswordAsync(
         LocalMdbxDatabase database,
         PasswordEntry entry,
         IReadOnlyList<CustomField> customFields,
+        IReadOnlyList<PasswordHistoryEntry> passwordHistory,
         IReadOnlyDictionary<long, Category> categories,
         CancellationToken cancellationToken = default)
     {
@@ -78,7 +90,8 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         var payload = SerializePayload("password", new MdbxPasswordPayload
         {
             Entry = entry,
-            CustomFields = NormalizeCustomFields(entry.Id, customFields).ToList()
+            CustomFields = NormalizeCustomFields(entry.Id, customFields).ToList(),
+            PasswordHistory = NormalizePasswordHistory(entry.Id, passwordHistory).ToList()
         });
         var record = await SaveEntryAsync(vault, project.ProjectId, entry.MdbxFolderId, PasswordEntryTypes, entryType, entry.Title, payload, cancellationToken);
 
@@ -185,6 +198,63 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
             .Distinct()
             .OrderBy(id => id)
             .ToList();
+    }
+
+    public async Task<IReadOnlyList<PasswordHistoryEntry>?> GetPasswordHistoryAsync(
+        LocalMdbxDatabase database,
+        long entryId,
+        CancellationToken cancellationToken = default)
+    {
+        if (entryId <= 0)
+        {
+            return [];
+        }
+
+        var vault = await OpenAsync(database, cancellationToken);
+        using var _ = vault;
+        var projects = await EnsureProjectsForReadAsync(vault, cancellationToken);
+        var records = await ListPasswordRecordsAsync(vault, projects, includeDeleted: true, cancellationToken);
+
+        foreach (var item in records
+                     .Select(record => (Record: record, Payload: DeserializePasswordPayload(record.PayloadJson)))
+                     .Where(item => item.Payload is not null)
+                     .OrderBy(item => item.Record.Deleted))
+        {
+            var payload = item.Payload!;
+            if (payload.Entry.Id != entryId)
+            {
+                continue;
+            }
+
+            return payload.PasswordHistory is null
+                ? null
+                : NormalizePasswordHistory(entryId, payload.PasswordHistory).ToList();
+        }
+
+        return null;
+    }
+
+    public async Task<long?> FindPasswordHistoryOwnerIdAsync(
+        LocalMdbxDatabase database,
+        long historyId,
+        CancellationToken cancellationToken = default)
+    {
+        if (historyId <= 0)
+        {
+            return null;
+        }
+
+        var vault = await OpenAsync(database, cancellationToken);
+        using var _ = vault;
+        var projects = await EnsureProjectsForReadAsync(vault, cancellationToken);
+        var records = await ListPasswordRecordsAsync(vault, projects, includeDeleted: true, cancellationToken);
+
+        return records
+            .Select(record => DeserializePasswordPayload(record.PayloadJson))
+            .Where(payload => payload?.PasswordHistory is not null)
+            .Select(payload => payload!)
+            .FirstOrDefault(payload => payload.PasswordHistory!.Any(entry => entry.Id == historyId))
+            ?.Entry.Id;
     }
 
     public async Task SoftDeletePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, CancellationToken cancellationToken = default)
@@ -602,7 +672,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
             var payload = JsonSerializer.Deserialize<MdbxPayload<MdbxPasswordPayload>>(payloadJson, JsonOptions);
             if (payload?.Data.Entry is not null)
             {
-                return new PasswordPayloadSnapshot(payload.Data.Entry, payload.Data.CustomFields);
+                return new PasswordPayloadSnapshot(payload.Data.Entry, payload.Data.CustomFields, payload.Data.PasswordHistory);
             }
         }
         catch (JsonException)
@@ -612,7 +682,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         try
         {
             var entry = DeserializePayload<PasswordEntry>(payloadJson);
-            return entry is null ? null : new PasswordPayloadSnapshot(entry, CustomFields: null);
+            return entry is null ? null : new PasswordPayloadSnapshot(entry, CustomFields: null, PasswordHistory: null);
         }
         catch (JsonException)
         {
@@ -633,6 +703,20 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
                 Value = field.Value.Trim(),
                 IsProtected = field.IsProtected,
                 SortOrder = index
+            })
+            .ToList();
+
+    private static IReadOnlyList<PasswordHistoryEntry> NormalizePasswordHistory(long entryId, IReadOnlyList<PasswordHistoryEntry> passwordHistory) =>
+        passwordHistory
+            .Where(entry => !string.IsNullOrWhiteSpace(entry.Password))
+            .OrderByDescending(entry => entry.LastUsedAt)
+            .ThenByDescending(entry => entry.Id)
+            .Select(entry => new PasswordHistoryEntry
+            {
+                Id = entry.Id,
+                EntryId = entryId,
+                Password = entry.Password,
+                LastUsedAt = entry.LastUsedAt == default ? DateTimeOffset.UtcNow : entry.LastUsedAt
             })
             .ToList();
 
@@ -666,7 +750,11 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
     {
         public PasswordEntry? Entry { get; init; }
         public List<CustomField>? CustomFields { get; init; }
+        public List<PasswordHistoryEntry>? PasswordHistory { get; init; }
     }
 
-    private sealed record PasswordPayloadSnapshot(PasswordEntry Entry, List<CustomField>? CustomFields);
+    private sealed record PasswordPayloadSnapshot(
+        PasswordEntry Entry,
+        List<CustomField>? CustomFields,
+        List<PasswordHistoryEntry>? PasswordHistory);
 }

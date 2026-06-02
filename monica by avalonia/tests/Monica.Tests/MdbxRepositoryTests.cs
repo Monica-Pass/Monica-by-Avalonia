@@ -172,6 +172,120 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
+    public async Task Repository_roundtrips_password_history_through_mdbx_payload()
+    {
+        var repository = CreateRepository(out _, out var sqliteRepository);
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "With history",
+            Password = "current"
+        };
+        await repository.SavePasswordAsync(password);
+        var older = new PasswordHistoryEntry
+        {
+            EntryId = password.Id,
+            Password = "older-secret",
+            LastUsedAt = DateTimeOffset.UtcNow.AddMinutes(-10)
+        };
+        var latest = new PasswordHistoryEntry
+        {
+            EntryId = password.Id,
+            Password = "latest-secret",
+            LastUsedAt = DateTimeOffset.UtcNow
+        };
+
+        await repository.SavePasswordHistoryAsync(older);
+        await repository.SavePasswordHistoryAsync(latest);
+        await sqliteRepository.ClearPasswordHistoryAsync(password.Id);
+        await sqliteRepository.SavePasswordHistoryAsync(new PasswordHistoryEntry
+        {
+            EntryId = password.Id,
+            Password = "sqlite-stale",
+            LastUsedAt = DateTimeOffset.UtcNow.AddMinutes(5)
+        });
+
+        var history = await repository.GetPasswordHistoryAsync(password.Id);
+
+        Assert.Equal(["latest-secret", "older-secret"], history.Select(item => item.Password).ToArray());
+        Assert.All(history, item => Assert.Equal(password.Id, item.EntryId));
+        Assert.DoesNotContain(history, item => item.Password == "sqlite-stale");
+    }
+
+    [Fact]
+    public async Task Repository_trims_deletes_and_clears_password_history_in_mdbx_payload()
+    {
+        var repository = CreateRepository(out _, out var sqliteRepository);
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "Mutable history",
+            Password = "current"
+        };
+        await repository.SavePasswordAsync(password);
+        for (var index = 0; index < 4; index++)
+        {
+            await repository.SavePasswordHistoryAsync(new PasswordHistoryEntry
+            {
+                EntryId = password.Id,
+                Password = $"old-{index}",
+                LastUsedAt = DateTimeOffset.UtcNow.AddMinutes(index)
+            });
+        }
+
+        await repository.TrimPasswordHistoryAsync(password.Id, 2);
+
+        var trimmed = await repository.GetPasswordHistoryAsync(password.Id);
+        Assert.Equal(["old-3", "old-2"], trimmed.Select(item => item.Password).ToArray());
+
+        await repository.DeletePasswordHistoryAsync(trimmed[0].Id);
+
+        Assert.Equal("old-2", Assert.Single(await repository.GetPasswordHistoryAsync(password.Id)).Password);
+
+        await repository.ClearPasswordHistoryAsync(password.Id);
+        await sqliteRepository.SavePasswordHistoryAsync(new PasswordHistoryEntry
+        {
+            EntryId = password.Id,
+            Password = "sqlite-stale-after-clear",
+            LastUsedAt = DateTimeOffset.UtcNow
+        });
+
+        Assert.Empty(await repository.GetPasswordHistoryAsync(password.Id));
+    }
+
+    [Fact]
+    public async Task Repository_mirrors_legacy_sqlite_password_history_when_default_mdbx_vault_is_added()
+    {
+        var repository = CreateRepository(out _, out var sqliteRepository);
+        var password = new PasswordEntry
+        {
+            Title = "Legacy history",
+            Password = "current"
+        };
+        await repository.SavePasswordAsync(password);
+        await repository.SavePasswordHistoryAsync(new PasswordHistoryEntry
+        {
+            EntryId = password.Id,
+            Password = "legacy-secret",
+            LastUsedAt = DateTimeOffset.UtcNow
+        });
+
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        Assert.Single(await repository.GetPasswordsAsync());
+        await sqliteRepository.ClearPasswordHistoryAsync(password.Id);
+        await sqliteRepository.SavePasswordHistoryAsync(new PasswordHistoryEntry
+        {
+            EntryId = password.Id,
+            Password = "sqlite-stale-after-mirror",
+            LastUsedAt = DateTimeOffset.UtcNow.AddMinutes(5)
+        });
+
+        var history = await repository.GetPasswordHistoryAsync(password.Id);
+
+        Assert.Equal("legacy-secret", Assert.Single(history).Password);
+    }
+
+    [Fact]
     public async Task Repository_roundtrips_secure_items_through_mdbx_store()
     {
         var repository = CreateRepository(out _);
