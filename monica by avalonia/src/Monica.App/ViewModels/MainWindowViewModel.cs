@@ -3224,6 +3224,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 var imported = CloneCategory(source);
                 imported.Id = 0;
                 imported.Name = name;
+                imported.MdbxDatabaseId = null;
+                imported.MdbxFolderId = null;
                 await _repository.SaveCategoryAsync(imported);
                 existingCategories[imported.Name] = imported;
                 if (source.Id != 0)
@@ -4463,6 +4465,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var clone = ClonePassword(source);
         clone.Id = 0;
         clone.Password = ProtectPassword(UnprotectPassword(source.Password));
+        clone.MdbxDatabaseId = null;
+        clone.MdbxFolderId = null;
         if (clone.CategoryId is { } categoryId)
         {
             clone.CategoryId = categoryIdMap?.TryGetValue(categoryId, out var importedCategoryId) == true
@@ -4561,6 +4565,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         var clone = CloneSecureItem(source);
         clone.Id = 0;
+        clone.MdbxDatabaseId = null;
+        clone.MdbxFolderId = null;
         if (clone.BoundPasswordId is { } boundPasswordId)
         {
             clone.BoundPasswordId = passwordIdMap.TryGetValue(boundPasswordId, out var importedPasswordId)

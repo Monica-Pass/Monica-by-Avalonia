@@ -424,6 +424,37 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
+    public async Task Repository_clears_foreign_mdbx_ids_for_new_sqlite_only_items()
+    {
+        var repository = CreateRepository(out _);
+        var password = new PasswordEntry
+        {
+            Title = "Foreign password",
+            Password = "secret",
+            MdbxDatabaseId = 999,
+            MdbxFolderId = "foreign-entry"
+        };
+        var note = new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = "Foreign note",
+            MdbxDatabaseId = 999,
+            MdbxFolderId = "foreign-note"
+        };
+
+        await repository.SavePasswordAsync(password);
+        await repository.SaveSecureItemAsync(note);
+
+        var reloadedPassword = Assert.Single(await repository.GetPasswordsAsync());
+        var reloadedNote = Assert.Single(await repository.GetSecureItemsAsync(VaultItemType.Note));
+
+        Assert.Null(reloadedPassword.MdbxDatabaseId);
+        Assert.Null(reloadedPassword.MdbxFolderId);
+        Assert.Null(reloadedNote.MdbxDatabaseId);
+        Assert.Null(reloadedNote.MdbxFolderId);
+    }
+
+    [Fact]
     public async Task Repository_mirrors_existing_sqlite_items_after_default_mdbx_vault_is_added()
     {
         var repository = CreateRepository(out _);
@@ -452,6 +483,79 @@ public sealed class MdbxRepositoryTests
         Assert.Equal("created before the vault", mirroredNote.Notes);
         Assert.NotNull(mirroredNote.MdbxDatabaseId);
         Assert.False(string.IsNullOrWhiteSpace(mirroredNote.MdbxFolderId));
+    }
+
+    [Fact]
+    public async Task Repository_rebinds_new_items_with_foreign_mdbx_ids_to_current_vault()
+    {
+        var repository = CreateRepository(out var bridge);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        var localCategory = new Category { Name = "Local category" };
+        await repository.SaveCategoryAsync(localCategory);
+        var localPassword = new PasswordEntry
+        {
+            Title = "Local login",
+            Password = "local-secret",
+            CategoryId = localCategory.Id
+        };
+        var localNote = new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = "Local note",
+            Notes = "local truth",
+            CategoryId = localCategory.Id
+        };
+        await repository.SavePasswordAsync(localPassword);
+        await repository.SaveSecureItemAsync(localNote);
+        var localCategoryMdbxId = localCategory.MdbxFolderId;
+        var localPasswordMdbxId = localPassword.MdbxFolderId;
+        var localNoteMdbxId = localNote.MdbxFolderId;
+
+        var importedCategory = new Category
+        {
+            Name = "Imported category",
+            MdbxDatabaseId = 999,
+            MdbxFolderId = localCategoryMdbxId
+        };
+        await repository.SaveCategoryAsync(importedCategory);
+        var importedPassword = new PasswordEntry
+        {
+            Title = "Imported login",
+            Password = "imported-secret",
+            MdbxDatabaseId = 999,
+            MdbxFolderId = localPasswordMdbxId,
+            CategoryId = importedCategory.Id
+        };
+        var importedNote = new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = "Imported note",
+            Notes = "imported truth",
+            MdbxDatabaseId = 999,
+            MdbxFolderId = localNoteMdbxId,
+            CategoryId = importedCategory.Id
+        };
+        await repository.SavePasswordAsync(importedPassword);
+        await repository.SaveSecureItemAsync(importedNote);
+
+        var passwords = await repository.GetPasswordsAsync();
+        var notes = await repository.GetSecureItemsAsync(VaultItemType.Note);
+        var categories = await repository.GetCategoriesAsync();
+
+        Assert.Equal(database.Id, importedCategory.MdbxDatabaseId);
+        Assert.Equal(database.Id, importedPassword.MdbxDatabaseId);
+        Assert.Equal(database.Id, importedNote.MdbxDatabaseId);
+        Assert.NotEqual(localCategoryMdbxId, importedCategory.MdbxFolderId);
+        Assert.NotEqual(localPasswordMdbxId, importedPassword.MdbxFolderId);
+        Assert.NotEqual(localNoteMdbxId, importedNote.MdbxFolderId);
+        Assert.Contains(passwords, item => item.Id == localPassword.Id && item.Title == "Local login");
+        Assert.Contains(passwords, item => item.Id == importedPassword.Id && item.Title == "Imported login");
+        Assert.Contains(notes, item => item.Id == localNote.Id && item.Title == "Local note");
+        Assert.Contains(notes, item => item.Id == importedNote.Id && item.Title == "Imported note");
+        Assert.Contains(categories, item => item.Id == localCategory.Id && item.Name == "Local category");
+        Assert.Contains(categories, item => item.Id == importedCategory.Id && item.Name == "Imported category");
+        Assert.Equal("Local category", bridge.GetProjectTitleForEntry(database.WorkingCopyPath!, localPassword.MdbxFolderId!));
+        Assert.Equal("Imported category", bridge.GetProjectTitleForEntry(database.WorkingCopyPath!, importedPassword.MdbxFolderId!));
     }
 
     [Fact]

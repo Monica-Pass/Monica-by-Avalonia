@@ -28,6 +28,7 @@ public sealed class MdbxBackedMonicaRepository(
 
     public async Task<long> SavePasswordAsync(PasswordEntry entry, CancellationToken cancellationToken = default)
     {
+        ClearForeignMdbxBindingForNewPassword(entry);
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         if (database is null)
         {
@@ -478,6 +479,7 @@ public sealed class MdbxBackedMonicaRepository(
 
     public async Task<long> SaveSecureItemAsync(SecureItem item, CancellationToken cancellationToken = default)
     {
+        ClearForeignMdbxBindingForNewSecureItem(item);
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         if (database is null)
         {
@@ -517,6 +519,7 @@ public sealed class MdbxBackedMonicaRepository(
 
     public async Task<long> SaveCategoryAsync(Category category, CancellationToken cancellationToken = default)
     {
+        ClearForeignMdbxBindingForNewCategory(category);
         await inner.SaveCategoryAsync(category, cancellationToken);
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         if (database is not null)
@@ -803,6 +806,17 @@ public sealed class MdbxBackedMonicaRepository(
     private static bool IsUnboundFromMdbx(PasswordEntry entry) =>
         entry.MdbxDatabaseId is null && string.IsNullOrWhiteSpace(entry.MdbxFolderId);
 
+    private static void ClearForeignMdbxBindingForNewPassword(PasswordEntry entry)
+    {
+        if (entry.Id != 0)
+        {
+            return;
+        }
+
+        entry.MdbxDatabaseId = null;
+        entry.MdbxFolderId = null;
+    }
+
     private async Task SavePasswordToMdbxAsync(
         LocalMdbxDatabase database,
         PasswordEntry entry,
@@ -909,6 +923,28 @@ public sealed class MdbxBackedMonicaRepository(
 
     private static bool IsUnboundFromMdbx(SecureItem item) =>
         item.MdbxDatabaseId is null && string.IsNullOrWhiteSpace(item.MdbxFolderId);
+
+    private static void ClearForeignMdbxBindingForNewSecureItem(SecureItem item)
+    {
+        if (item.Id != 0)
+        {
+            return;
+        }
+
+        item.MdbxDatabaseId = null;
+        item.MdbxFolderId = null;
+    }
+
+    private static void ClearForeignMdbxBindingForNewCategory(Category category)
+    {
+        if (category.Id != 0)
+        {
+            return;
+        }
+
+        category.MdbxDatabaseId = null;
+        category.MdbxFolderId = null;
+    }
 
     private static bool IsPasswordOwnerType(string ownerType) =>
         string.Equals(ownerType, "PASSWORD", StringComparison.OrdinalIgnoreCase);
