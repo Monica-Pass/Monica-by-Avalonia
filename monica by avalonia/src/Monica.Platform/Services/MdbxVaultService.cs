@@ -2,6 +2,7 @@ using Monica.Core.Models;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using Microsoft.Data.Sqlite;
+using Monica.Data.Mdbx;
 
 namespace Monica.Platform.Services;
 
@@ -14,9 +15,10 @@ public interface IMdbxVaultEngine
     Task<MdbxVaultInspection> InspectAsync(string path, CancellationToken cancellationToken = default);
 }
 
-public sealed class MdbxVaultService(IMdbxVaultEngine? engine = null) : IMdbxVaultService
+public sealed class MdbxVaultService(IMdbxVaultEngine? engine = null, IMdbxNativeBridge? nativeBridge = null) : IMdbxVaultService
 {
     private readonly IMdbxVaultEngine _engine = engine ?? new MdbxCliVaultEngine();
+    private readonly IMdbxNativeBridge _nativeBridge = nativeBridge ?? new UnavailableMdbxNativeBridge();
 
     public async Task<LocalMdbxDatabase> CreateLocalMetadataAsync(string name, string filePath, MdbxTigaMode mode = MdbxTigaMode.Multi, CancellationToken cancellationToken = default)
     {
@@ -25,7 +27,14 @@ public sealed class MdbxVaultService(IMdbxVaultEngine? engine = null) : IMdbxVau
         var password = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         if (!File.Exists(fullPath))
         {
-            await _engine.CreateVaultAsync(fullPath, password, mode, cancellationToken);
+            if (_nativeBridge.IsAvailable)
+            {
+                using var vault = await _nativeBridge.CreateVaultAsync(fullPath, password, "monica-avalonia", mode, cancellationToken);
+            }
+            else
+            {
+                await _engine.CreateVaultAsync(fullPath, password, mode, cancellationToken);
+            }
         }
 
         var inspection = await _engine.InspectAsync(fullPath, cancellationToken);
@@ -62,7 +71,15 @@ public sealed class MdbxVaultService(IMdbxVaultEngine? engine = null) : IMdbxVau
             throw new InvalidOperationException("MDBX vault password is missing from metadata.");
         }
 
-        await _engine.OpenVaultAsync(path, database.EncryptedPassword, cancellationToken);
+        if (_nativeBridge.IsAvailable)
+        {
+            using var vault = await _nativeBridge.OpenVaultAsync(path, database.EncryptedPassword, "monica-avalonia", cancellationToken);
+        }
+        else
+        {
+            await _engine.OpenVaultAsync(path, database.EncryptedPassword, cancellationToken);
+        }
+
         var inspection = await _engine.InspectAsync(path, cancellationToken);
         if (!string.Equals(inspection.FormatVersion, "MDBX-1", StringComparison.OrdinalIgnoreCase))
         {

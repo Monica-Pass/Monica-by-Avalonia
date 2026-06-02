@@ -23,7 +23,7 @@ public sealed class PlatformServiceTests
     [Fact]
     public async Task Mdbx_service_creates_metadata_and_stream()
     {
-        var service = new MdbxVaultService();
+        var service = new MdbxVaultService(new MdbxTestVaultEngine());
         var path = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.mdbx");
 
         var metadata = await service.CreateLocalMetadataAsync("Test", path, MdbxTigaMode.Sky);

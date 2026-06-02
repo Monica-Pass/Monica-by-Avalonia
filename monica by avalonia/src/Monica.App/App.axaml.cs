@@ -8,6 +8,7 @@ using Monica.App.ViewModels;
 using Monica.Core.ImportExport;
 using Monica.Core.Services;
 using Monica.Data;
+using Monica.Data.Mdbx;
 using Monica.Data.Repositories;
 using Monica.Data.Services;
 using Monica.Platform.Services;
@@ -46,7 +47,12 @@ public partial class App : Application
         services.AddSingleton<ILegacyVaultDetector, LegacyVaultDetector>();
         services.AddSingleton<IDatabaseMigrator, DatabaseMigrator>();
         services.AddSingleton<IVaultCredentialStore, VaultCredentialStore>();
-        services.AddSingleton<IMonicaRepository, MonicaRepository>();
+        services.AddSingleton<MonicaRepository>();
+        services.AddSingleton<IMdbxNativeBridge, MdbxUniffiNativeBridge>();
+        services.AddSingleton<IMdbxVaultStore, MdbxVaultStore>();
+        services.AddSingleton<IMonicaRepository>(provider => new MdbxBackedMonicaRepository(
+            provider.GetRequiredService<MonicaRepository>(),
+            provider.GetRequiredService<IMdbxVaultStore>()));
         services.AddSingleton<IMasterPasswordMaintenanceService, MasterPasswordMaintenanceService>();
         services.AddSingleton<ICryptoService, CryptoService>();
         services.AddSingleton<IVaultDataProtector, VaultDataProtector>();
@@ -69,7 +75,8 @@ public partial class App : Application
         services.AddSingleton<IWebDavBackupService, WebDavBackupService>();
         services.AddSingleton<IOneDriveBackupService, OneDriveBackupService>();
         services.AddSingleton<IKeePassVaultService, KeePassVaultService>();
-        services.AddSingleton<IMdbxVaultService, MdbxVaultService>();
+        services.AddSingleton<IMdbxVaultService>(provider => new MdbxVaultService(
+            nativeBridge: provider.GetRequiredService<IMdbxNativeBridge>()));
         services.AddSingleton<IClipboardService>(_ => new AvaloniaClipboardService(() => mainWindow));
         services.AddSingleton<IPasswordAttachmentFileService>(_ => new PasswordAttachmentFileService(
             () => mainWindow,

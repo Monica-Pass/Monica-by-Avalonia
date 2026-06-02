@@ -723,7 +723,7 @@ public sealed class AppSettingsTests
             platformIntegrationService,
             new NoopClipboardService(),
             webDavBackupService ?? new NoopWebDavBackupService(),
-            new MdbxVaultService(),
+            new MdbxVaultService(new MdbxTestVaultEngine()),
             new NoopPasswordAttachmentFileService(),
             new NoopPasswordEditorDialogService(),
             new NoopPasswordDetailDialogService(),
