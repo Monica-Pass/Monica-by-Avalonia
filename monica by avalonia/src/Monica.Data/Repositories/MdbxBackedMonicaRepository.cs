@@ -93,7 +93,7 @@ public sealed class MdbxBackedMonicaRepository(
                 .FirstOrDefault(item => item.Id == id);
             if (entry is not null)
             {
-                foreach (var attachment in await inner.GetAttachmentsAsync("PASSWORD", id, cancellationToken))
+                foreach (var attachment in await GetPasswordAttachmentsForMdbxDeletionAsync(database, id, cancellationToken))
                 {
                     await mdbxVaultStore.DeleteAttachmentAsync(database, attachment, cancellationToken);
                 }
@@ -108,6 +108,49 @@ public sealed class MdbxBackedMonicaRepository(
         }
 
         await inner.DeletePasswordPermanentlyAsync(id, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<Attachment>> GetPasswordAttachmentsForMdbxDeletionAsync(
+        LocalMdbxDatabase database,
+        long entryId,
+        CancellationToken cancellationToken)
+    {
+        var result = new List<Attachment>();
+        var seenKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var mdbxAttachmentsByEntryId = await mdbxVaultStore.GetPasswordAttachmentsByEntryIdsAsync(database, [entryId], cancellationToken);
+        if (mdbxAttachmentsByEntryId.TryGetValue(entryId, out var mdbxAttachments))
+        {
+            AddUniqueAttachments(result, seenKeys, mdbxAttachments);
+        }
+
+        AddUniqueAttachments(result, seenKeys, await inner.GetAttachmentsAsync("PASSWORD", entryId, cancellationToken));
+        return result;
+    }
+
+    private static void AddUniqueAttachments(List<Attachment> result, HashSet<string> seenKeys, IReadOnlyList<Attachment> attachments)
+    {
+        foreach (var attachment in attachments)
+        {
+            if (seenKeys.Add(GetAttachmentIdentityKey(attachment)))
+            {
+                result.Add(attachment);
+            }
+        }
+    }
+
+    private static string GetAttachmentIdentityKey(Attachment attachment)
+    {
+        if (attachment.Id > 0)
+        {
+            return $"id:{attachment.Id}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(attachment.StoragePath))
+        {
+            return $"path:{attachment.StoragePath.Trim()}";
+        }
+
+        return $"name:{attachment.OwnerType}:{attachment.OwnerId}:{attachment.FileName}:{attachment.CreatedAt.ToUnixTimeMilliseconds()}";
     }
 
     public async Task<IReadOnlyList<CustomField>> GetCustomFieldsAsync(long entryId, CancellationToken cancellationToken = default)

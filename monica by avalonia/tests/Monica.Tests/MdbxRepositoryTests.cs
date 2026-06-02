@@ -914,6 +914,37 @@ public sealed class MdbxRepositoryTests
         Assert.Null(bridge.TryReadAttachmentContent(database.WorkingCopyPath!, savedAttachment.StoragePath));
     }
 
+    [Fact]
+    public async Task Repository_permanent_delete_removes_attachments_found_only_in_mdbx_payload()
+    {
+        var repository = CreateRepository(out var bridge, out var sqliteRepository);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "Payload-only attachment",
+            Password = "secret"
+        };
+        await repository.SavePasswordAsync(password);
+        var attachment = new Attachment
+        {
+            OwnerType = "PASSWORD",
+            OwnerId = password.Id,
+            FileName = "codes.txt",
+            ContentType = "text/plain",
+            StoragePath = "secure_attachments/codes.enc",
+            SizeBytes = 5
+        };
+        await repository.SaveAttachmentAsync(attachment, "codes"u8.ToArray());
+        var savedAttachment = Assert.Single(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
+        await sqliteRepository.DeleteAttachmentAsync(savedAttachment.Id, savedAttachment);
+
+        await repository.DeletePasswordPermanentlyAsync(password.Id);
+
+        Assert.Empty(await repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
+        Assert.Equal(0, bridge.CountActiveAttachments(database.WorkingCopyPath!));
+        Assert.Null(bridge.TryReadAttachmentContent(database.WorkingCopyPath!, savedAttachment.StoragePath));
+    }
+
     private static IMonicaRepository CreateRepository(out FakeMdbxNativeBridge bridge, IAttachmentContentStore? attachmentContentStore = null) =>
         CreateRepository(out bridge, out _, attachmentContentStore);
 
