@@ -348,7 +348,11 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         using var _ = vault;
         var project = await ResolveProjectAsync(vault, item.CategoryId, categories, cancellationToken);
         var entryType = ToMdbxEntryType(item.ItemType);
-        var payload = SerializePayload("secure-item", item);
+        var payload = SerializePayload("secure-item", new MdbxSecureItemPayload
+        {
+            Item = item,
+            Attachments = []
+        });
         var record = await SaveEntryAsync(vault, project.ProjectId, item.MdbxFolderId, SecureEntryTypes, entryType, item.Title, payload, cancellationToken);
 
         item.MdbxDatabaseId = database.Id;
@@ -382,7 +386,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         }
 
         return records
-            .Select(record => (Record: record, Item: DeserializePayload<SecureItem>(record.PayloadJson)))
+            .Select(record => (Record: record, Item: DeserializeSecureItemPayload(record.PayloadJson)))
             .Where(item => item.Item is not null)
             .Select(item =>
             {
@@ -737,6 +741,30 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         }
     }
 
+    private static SecureItem? DeserializeSecureItemPayload(string payloadJson)
+    {
+        try
+        {
+            var payload = JsonSerializer.Deserialize<MdbxPayload<MdbxSecureItemPayload>>(payloadJson, JsonOptions);
+            if (payload?.Data.Item is not null)
+            {
+                return payload.Data.Item;
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        try
+        {
+            return DeserializePayload<SecureItem>(payloadJson);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
     private static IReadOnlyList<CustomField> NormalizeCustomFields(long entryId, IReadOnlyList<CustomField> customFields) =>
         customFields
             .Where(field => !string.IsNullOrWhiteSpace(field.Title) && !string.IsNullOrWhiteSpace(field.Value))
@@ -818,6 +846,12 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         public PasswordEntry? Entry { get; init; }
         public List<CustomField>? CustomFields { get; init; }
         public List<PasswordHistoryEntry>? PasswordHistory { get; init; }
+        public List<Attachment>? Attachments { get; init; }
+    }
+
+    private sealed class MdbxSecureItemPayload
+    {
+        public SecureItem? Item { get; init; }
         public List<Attachment>? Attachments { get; init; }
     }
 

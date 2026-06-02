@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Monica.Core.Models;
 using Monica.Data;
 using Monica.Data.Mdbx;
@@ -8,6 +9,11 @@ namespace Monica.Tests;
 
 public sealed class MdbxRepositoryTests
 {
+    private static readonly JsonSerializerOptions MdbxPayloadJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     [Fact]
     public async Task Repository_roundtrips_passwords_through_mdbx_store_when_default_vault_exists()
     {
@@ -288,8 +294,8 @@ public sealed class MdbxRepositoryTests
     [Fact]
     public async Task Repository_roundtrips_secure_items_through_mdbx_store()
     {
-        var repository = CreateRepository(out _);
-        await SaveDefaultMdbxDatabaseAsync(repository);
+        var repository = CreateRepository(out var bridge);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
         var note = new SecureItem
         {
             ItemType = VaultItemType.Note,
@@ -321,10 +327,82 @@ public sealed class MdbxRepositoryTests
         Assert.Equal("GitHub OTP", Assert.Single(onlyTotp).Title);
         Assert.All(all, item => Assert.False(string.IsNullOrWhiteSpace(item.MdbxFolderId)));
 
+        var notePayloadJson = bridge.GetEntryPayloadJson(database.WorkingCopyPath!, note.MdbxFolderId!);
+        using (var payload = JsonDocument.Parse(notePayloadJson!))
+        {
+            Assert.Equal("secure-item", payload.RootElement.GetProperty("kind").GetString());
+            Assert.Equal(1, payload.RootElement.GetProperty("schemaVersion").GetInt32());
+            Assert.Equal("Recovery note", payload.RootElement.GetProperty("data").GetProperty("item").GetProperty("title").GetString());
+            Assert.True(payload.RootElement.GetProperty("data").TryGetProperty("attachments", out _));
+        }
+
         await repository.SoftDeleteSecureItemAsync(note.Id);
 
         Assert.DoesNotContain(await repository.GetSecureItemsAsync(), item => item.Id == note.Id);
         Assert.Contains(await repository.GetSecureItemsAsync(includeDeleted: true), item => item.Id == note.Id && item.IsDeleted);
+    }
+
+    [Fact]
+    public async Task Repository_prefers_mdbx_secure_item_payload_over_sqlite_cache()
+    {
+        var repository = CreateRepository(out _, out var sqliteRepository);
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        var note = new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = "MDBX truth",
+            Notes = "keep this",
+            ItemData = """{"body":"mdbx"}"""
+        };
+        await repository.SaveSecureItemAsync(note);
+
+        await sqliteRepository.SaveSecureItemAsync(new SecureItem
+        {
+            Id = note.Id,
+            ItemType = VaultItemType.Note,
+            Title = "SQLite stale",
+            Notes = "stale notes",
+            ItemData = """{"body":"sqlite"}""",
+            MdbxDatabaseId = note.MdbxDatabaseId,
+            MdbxFolderId = note.MdbxFolderId
+        });
+
+        var reloaded = Assert.Single(await repository.GetSecureItemsAsync(VaultItemType.Note));
+
+        Assert.Equal("MDBX truth", reloaded.Title);
+        Assert.Equal("keep this", reloaded.Notes);
+        Assert.Equal("""{"body":"mdbx"}""", reloaded.ItemData);
+    }
+
+    [Fact]
+    public async Task Repository_reads_legacy_secure_item_payloads_from_mdbx_store()
+    {
+        var repository = CreateRepository(out var bridge);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        using var vault = await bridge.OpenVaultAsync(database.WorkingCopyPath!, database.EncryptedPassword!, "monica-avalonia");
+        var project = await vault.CreateProjectAsync("Monica");
+        var legacyItem = new SecureItem
+        {
+            Id = 42,
+            ItemType = VaultItemType.Note,
+            Title = "Legacy secure payload",
+            Notes = "old shape",
+            ItemData = """{"body":"legacy"}"""
+        };
+        var legacyPayloadJson = JsonSerializer.Serialize(new
+        {
+            Kind = "secure-item",
+            SchemaVersion = 1,
+            Data = legacyItem
+        }, MdbxPayloadJsonOptions);
+        await vault.CreateEntryAsync(project.ProjectId, "note", legacyItem.Title, legacyPayloadJson);
+
+        var reloaded = Assert.Single(await repository.GetSecureItemsAsync(VaultItemType.Note));
+
+        Assert.Equal(42, reloaded.Id);
+        Assert.Equal("Legacy secure payload", reloaded.Title);
+        Assert.Equal("old shape", reloaded.Notes);
+        Assert.Equal("""{"body":"legacy"}""", reloaded.ItemData);
     }
 
     [Fact]
@@ -847,6 +925,9 @@ public sealed class MdbxRepositoryTests
 
         public int CountActiveAttachments(string path) =>
             _vaults.TryGetValue(path, out var vault) ? vault.CountAttachments(deleted: false) : 0;
+
+        public string? GetEntryPayloadJson(string path, string entryId) =>
+            _vaults.TryGetValue(path, out var vault) ? vault.GetEntryPayloadJson(entryId) : null;
     }
 
     private sealed class FakeAttachmentContentStore : IAttachmentContentStore
@@ -1057,6 +1138,9 @@ public sealed class MdbxRepositoryTests
 
         public int CountAttachments(bool deleted) =>
             _attachments.Count(attachment => attachment.Deleted == deleted);
+
+        public string? GetEntryPayloadJson(string entryId) =>
+            _entries.FirstOrDefault(entry => string.Equals(entry.EntryId, entryId, StringComparison.OrdinalIgnoreCase))?.PayloadJson;
 
         private MdbxNativeEntryRecord SetDeleted(string projectId, string entryId, bool deleted)
         {
