@@ -52,10 +52,18 @@ public sealed class MdbxBackedMonicaRepository(
             if (entry is not null)
             {
                 await mdbxVaultStore.SoftDeletePasswordAsync(database, entry, cancellationToken);
+                entry.IsDeleted = true;
+                entry.DeletedAt = DateTimeOffset.UtcNow;
+                entry.IsArchived = false;
+                entry.ArchivedAt = null;
+                await inner.SavePasswordAsync(entry, cancellationToken);
                 var boundTotps = await GetMdbxBoundTotpsByPasswordIdAsync(database, id, includeDeleted: true, cancellationToken);
                 foreach (var item in boundTotps)
                 {
                     await mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken);
+                    item.IsDeleted = true;
+                    item.DeletedAt = entry.DeletedAt;
+                    await inner.SaveSecureItemAsync(item, cancellationToken);
                 }
             }
         }
@@ -73,10 +81,16 @@ public sealed class MdbxBackedMonicaRepository(
             if (entry is not null)
             {
                 await mdbxVaultStore.RestorePasswordAsync(database, entry, cancellationToken);
+                entry.IsDeleted = false;
+                entry.DeletedAt = null;
+                await inner.SavePasswordAsync(entry, cancellationToken);
                 var boundTotps = await GetMdbxBoundTotpsByPasswordIdAsync(database, id, includeDeleted: true, cancellationToken);
                 foreach (var item in boundTotps)
                 {
                     await mdbxVaultStore.RestoreSecureItemAsync(database, item, cancellationToken);
+                    item.IsDeleted = false;
+                    item.DeletedAt = null;
+                    await inner.SaveSecureItemAsync(item, cancellationToken);
                 }
             }
         }
@@ -592,6 +606,9 @@ public sealed class MdbxBackedMonicaRepository(
             if (item is not null)
             {
                 await mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken);
+                item.IsDeleted = true;
+                item.DeletedAt = DateTimeOffset.UtcNow;
+                await inner.SaveSecureItemAsync(item, cancellationToken);
             }
         }
 

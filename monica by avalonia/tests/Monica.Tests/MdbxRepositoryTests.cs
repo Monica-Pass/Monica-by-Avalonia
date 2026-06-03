@@ -486,6 +486,7 @@ public sealed class MdbxRepositoryTests
         await repository.SoftDeleteSecureItemAsync(note.Id);
 
         Assert.Empty(await repository.GetSecureItemsAsync(VaultItemType.Note));
+        Assert.Contains(await repository.GetSecureItemsAsync(VaultItemType.Note, includeDeleted: true), item => item.Id == note.Id && item.IsDeleted);
         Assert.Equal(0, bridge.CountActiveEntries(database.WorkingCopyPath!));
         Assert.Equal(1, bridge.CountDeletedEntries(database.WorkingCopyPath!));
     }
@@ -1404,6 +1405,7 @@ public sealed class MdbxRepositoryTests
         await repository.SoftDeletePasswordAsync(password.Id);
 
         Assert.Empty(await repository.GetPasswordsAsync());
+        Assert.Contains(await repository.GetPasswordsAsync(includeDeleted: true), entry => entry.Id == password.Id && entry.IsDeleted);
 
         await repository.RestorePasswordAsync(password.Id);
 

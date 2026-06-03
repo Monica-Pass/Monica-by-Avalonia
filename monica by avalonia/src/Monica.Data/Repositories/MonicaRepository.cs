@@ -105,7 +105,8 @@ public sealed class MonicaRepository(
         }
         else
         {
-            await connection.ExecuteAsync(
+            var parameters = ToRow(_vaultDataProtector.Protect(entry));
+            var updated = await connection.ExecuteAsync(
                 """
                 UPDATE password_entries SET
                     title=@Title, website=@Website, username=@Username, password=@Password, notes=@Notes,
@@ -125,7 +126,32 @@ public sealed class MonicaRepository(
                     bitwarden_local_modified=@BitwardenLocalModified
                 WHERE id=@Id;
                 """,
-                ToRow(_vaultDataProtector.Protect(entry)));
+                parameters);
+            if (updated == 0)
+            {
+                await connection.ExecuteAsync(
+                    """
+                    INSERT INTO password_entries (
+                        id, title, website, username, password, notes, created_at, updated_at, is_favorite, sort_order, is_group_cover,
+                        app_package_name, app_name, email, phone, address_line, city, state, zip_code, country,
+                        credit_card_number, credit_card_holder, credit_card_expiry, credit_card_cvv, category_id, bound_note_id,
+                        keepass_database_id, keepass_group_path, keepass_entry_uuid, keepass_group_uuid, mdbx_database_id, mdbx_folder_id,
+                        authenticator_key, passkey_bindings, ssh_key_data, login_type, sso_provider, sso_ref_entry_id, wifi_metadata,
+                        custom_icon_type, custom_icon_value, custom_icon_updated_at, is_deleted, deleted_at, is_archived, archived_at,
+                        replica_group_id, bitwarden_vault_id, bitwarden_cipher_id, bitwarden_folder_id, bitwarden_revision_date,
+                        bitwarden_cipher_type, bitwarden_local_modified)
+                    VALUES (
+                        @Id, @Title, @Website, @Username, @Password, @Notes, @CreatedAt, @UpdatedAt, @IsFavorite, @SortOrder, @IsGroupCover,
+                        @AppPackageName, @AppName, @Email, @Phone, @AddressLine, @City, @State, @ZipCode, @Country,
+                        @CreditCardNumber, @CreditCardHolder, @CreditCardExpiry, @CreditCardCvv, @CategoryId, @BoundNoteId,
+                        @KeepassDatabaseId, @KeepassGroupPath, @KeepassEntryUuid, @KeepassGroupUuid, @MdbxDatabaseId, @MdbxFolderId,
+                        @AuthenticatorKey, @PasskeyBindings, @SshKeyData, @LoginType, @SsoProvider, @SsoRefEntryId, @WifiMetadata,
+                        @CustomIconType, @CustomIconValue, @CustomIconUpdatedAt, @IsDeleted, @DeletedAt, @IsArchived, @ArchivedAt,
+                        @ReplicaGroupId, @BitwardenVaultId, @BitwardenCipherId, @BitwardenFolderId, @BitwardenRevisionDate,
+                        @BitwardenCipherType, @BitwardenLocalModified);
+                    """,
+                    parameters);
+            }
         }
 
         return entry.Id;
@@ -590,7 +616,8 @@ public sealed class MonicaRepository(
         }
         else
         {
-            await connection.ExecuteAsync(
+            var parameters = ToRow(_vaultDataProtector.Protect(item));
+            var updated = await connection.ExecuteAsync(
                 """
                 UPDATE secure_items SET item_type=@ItemType, title=@Title, notes=@Notes, is_favorite=@IsFavorite,
                     sort_order=@SortOrder, updated_at=@UpdatedAt, item_data=@ItemData, image_paths=@ImagePaths,
@@ -603,7 +630,24 @@ public sealed class MonicaRepository(
                     sync_status=@SyncStatus
                 WHERE id=@Id;
                 """,
-                ToRow(_vaultDataProtector.Protect(item)));
+                parameters);
+            if (updated == 0)
+            {
+                await connection.ExecuteAsync(
+                    """
+                    INSERT INTO secure_items (
+                        id, item_type, title, notes, is_favorite, sort_order, created_at, updated_at, item_data, image_paths, bound_password_id,
+                        category_id, keepass_database_id, keepass_group_path, keepass_entry_uuid, keepass_group_uuid,
+                        mdbx_database_id, mdbx_folder_id, is_deleted, deleted_at, replica_group_id, bitwarden_vault_id,
+                        bitwarden_cipher_id, bitwarden_folder_id, bitwarden_revision_date, bitwarden_local_modified, sync_status)
+                    VALUES (
+                        @Id, @ItemType, @Title, @Notes, @IsFavorite, @SortOrder, @CreatedAt, @UpdatedAt, @ItemData, @ImagePaths, @BoundPasswordId,
+                        @CategoryId, @KeepassDatabaseId, @KeepassGroupPath, @KeepassEntryUuid, @KeepassGroupUuid,
+                        @MdbxDatabaseId, @MdbxFolderId, @IsDeleted, @DeletedAt, @ReplicaGroupId, @BitwardenVaultId,
+                        @BitwardenCipherId, @BitwardenFolderId, @BitwardenRevisionDate, @BitwardenLocalModified, @SyncStatus);
+                    """,
+                    parameters);
+            }
         }
 
         return item.Id;
