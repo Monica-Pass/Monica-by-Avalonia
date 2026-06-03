@@ -16,7 +16,8 @@ public interface IImportExportService
         IEnumerable<Category>? categories = null,
         IReadOnlyDictionary<long, IReadOnlyList<CustomField>>? passwordCustomFields = null,
         IReadOnlyDictionary<long, IReadOnlyList<PasswordHistoryEntry>>? passwordHistory = null,
-        IReadOnlyDictionary<long, IReadOnlyList<PasswordAttachmentExport>>? passwordAttachments = null);
+        IReadOnlyDictionary<long, IReadOnlyList<PasswordAttachmentExport>>? passwordAttachments = null,
+        IReadOnlyDictionary<long, IReadOnlyList<SecureItemAttachmentExport>>? secureItemAttachments = null);
     MonicaExportPackage ImportJson(string json);
     string ExportPasswordCsv(IEnumerable<PasswordEntry> passwords);
     string ExportTotpCsv(IEnumerable<SecureItem> secureItems);
@@ -36,7 +37,8 @@ public sealed record MonicaExportPackage(
     IReadOnlyList<Category> Categories,
     IReadOnlyList<PasswordCustomFieldExportGroup> PasswordCustomFields,
     IReadOnlyList<PasswordHistoryExportGroup> PasswordHistory,
-    IReadOnlyList<PasswordAttachmentExportGroup> PasswordAttachments);
+    IReadOnlyList<PasswordAttachmentExportGroup> PasswordAttachments,
+    IReadOnlyList<SecureItemAttachmentExportGroup> SecureItemAttachments);
 
 public sealed record PasswordCustomFieldExportGroup(long PasswordId, IReadOnlyList<CustomField> Fields);
 
@@ -45,6 +47,10 @@ public sealed record PasswordHistoryExportGroup(long PasswordId, IReadOnlyList<P
 public sealed record PasswordAttachmentExportGroup(long PasswordId, IReadOnlyList<PasswordAttachmentExport> Attachments);
 
 public sealed record PasswordAttachmentExport(Attachment Metadata, string ContentBase64);
+
+public sealed record SecureItemAttachmentExportGroup(long SecureItemId, IReadOnlyList<SecureItemAttachmentExport> Attachments);
+
+public sealed record SecureItemAttachmentExport(Attachment Metadata, string ContentBase64);
 
 public sealed class ImportExportService : IImportExportService
 {
@@ -85,21 +91,28 @@ public sealed class ImportExportService : IImportExportService
         IEnumerable<Category>? categories = null,
         IReadOnlyDictionary<long, IReadOnlyList<CustomField>>? passwordCustomFields = null,
         IReadOnlyDictionary<long, IReadOnlyList<PasswordHistoryEntry>>? passwordHistory = null,
-        IReadOnlyDictionary<long, IReadOnlyList<PasswordAttachmentExport>>? passwordAttachments = null)
+        IReadOnlyDictionary<long, IReadOnlyList<PasswordAttachmentExport>>? passwordAttachments = null,
+        IReadOnlyDictionary<long, IReadOnlyList<SecureItemAttachmentExport>>? secureItemAttachments = null)
     {
         var passwordList = passwords.ToList();
+        var secureItemList = secureItems.ToList();
         var exportedPasswordIds = passwordList
             .Select(item => item.Id)
             .Where(id => id > 0)
             .ToHashSet();
+        var exportedSecureItemIds = secureItemList
+            .Select(item => item.Id)
+            .Where(id => id > 0)
+            .ToHashSet();
         var package = new MonicaExportDtoPackage(
-            70,
+            71,
             passwordList.Select(PasswordEntryDto.FromModel).ToList(),
-            secureItems.Select(SecureItemDto.FromModel).ToList(),
+            secureItemList.Select(SecureItemDto.FromModel).ToList(),
             (categories ?? []).Select(CategoryDto.FromModel).ToList(),
             ToCustomFieldGroupDtos(passwordCustomFields, exportedPasswordIds),
             ToPasswordHistoryGroupDtos(passwordHistory, exportedPasswordIds),
-            ToPasswordAttachmentGroupDtos(passwordAttachments, exportedPasswordIds));
+            ToPasswordAttachmentGroupDtos(passwordAttachments, exportedPasswordIds),
+            ToSecureItemAttachmentGroupDtos(secureItemAttachments, exportedSecureItemIds));
         return JsonSerializer.Serialize(package, MonicaJsonContext.Default.MonicaExportDtoPackage);
     }
 
@@ -107,7 +120,7 @@ public sealed class ImportExportService : IImportExportService
     {
         var package = JsonSerializer.Deserialize(json, MonicaJsonContext.Default.MonicaExportDtoPackage);
         return package is null
-            ? new MonicaExportPackage(68, [], [], [], [], [], [])
+            ? new MonicaExportPackage(68, [], [], [], [], [], [], [])
             : new MonicaExportPackage(
                 package.SchemaVersion,
                 package.Passwords.Select(item => item.ToModel()).ToList(),
@@ -115,7 +128,8 @@ public sealed class ImportExportService : IImportExportService
                 (package.Categories ?? []).Select(item => item.ToModel()).ToList(),
                 (package.PasswordCustomFields ?? []).Select(item => item.ToModel()).ToList(),
                 (package.PasswordHistory ?? []).Select(item => item.ToModel()).ToList(),
-                (package.PasswordAttachments ?? []).Select(item => item.ToModel()).ToList());
+                (package.PasswordAttachments ?? []).Select(item => item.ToModel()).ToList(),
+                (package.SecureItemAttachments ?? []).Select(item => item.ToModel()).ToList());
     }
 
     private static IReadOnlyList<PasswordCustomFieldGroupDto> ToCustomFieldGroupDtos(
@@ -163,6 +177,22 @@ public sealed class ImportExportService : IImportExportService
             .Where(item => exportedPasswordIds.Contains(item.Key) && item.Value.Count > 0)
             .OrderBy(item => item.Key)
             .Select(item => PasswordAttachmentGroupDto.FromModel(item.Key, item.Value))
+            .ToList();
+    }
+
+    private static IReadOnlyList<SecureItemAttachmentGroupDto> ToSecureItemAttachmentGroupDtos(
+        IReadOnlyDictionary<long, IReadOnlyList<SecureItemAttachmentExport>>? secureItemAttachments,
+        IReadOnlySet<long> exportedSecureItemIds)
+    {
+        if (secureItemAttachments is null || exportedSecureItemIds.Count == 0)
+        {
+            return [];
+        }
+
+        return secureItemAttachments
+            .Where(item => exportedSecureItemIds.Contains(item.Key) && item.Value.Count > 0)
+            .OrderBy(item => item.Key)
+            .Select(item => SecureItemAttachmentGroupDto.FromModel(item.Key, item.Value))
             .ToList();
     }
 
@@ -687,7 +717,8 @@ internal sealed record MonicaExportDtoPackage(
     IReadOnlyList<CategoryDto>? Categories = null,
     IReadOnlyList<PasswordCustomFieldGroupDto>? PasswordCustomFields = null,
     IReadOnlyList<PasswordHistoryGroupDto>? PasswordHistory = null,
-    IReadOnlyList<PasswordAttachmentGroupDto>? PasswordAttachments = null);
+    IReadOnlyList<PasswordAttachmentGroupDto>? PasswordAttachments = null,
+    IReadOnlyList<SecureItemAttachmentGroupDto>? SecureItemAttachments = null);
 
 internal sealed record AegisExportPackageDto(
     int Version,
@@ -902,6 +933,48 @@ internal sealed class PasswordAttachmentDto
     public PasswordAttachmentExport ToModel()
     {
         return new PasswordAttachmentExport(Metadata.ToModel(), ContentBase64);
+    }
+}
+
+internal sealed class SecureItemAttachmentGroupDto
+{
+    public long SecureItemId { get; set; }
+    public List<SecureItemAttachmentDto> Attachments { get; set; } = [];
+
+    public static SecureItemAttachmentGroupDto FromModel(long secureItemId, IReadOnlyList<SecureItemAttachmentExport> attachments)
+    {
+        return new SecureItemAttachmentGroupDto
+        {
+            SecureItemId = secureItemId,
+            Attachments = attachments.Select(SecureItemAttachmentDto.FromModel).ToList()
+        };
+    }
+
+    public SecureItemAttachmentExportGroup ToModel()
+    {
+        return new SecureItemAttachmentExportGroup(
+            SecureItemId,
+            Attachments.Select(item => item.ToModel()).ToList());
+    }
+}
+
+internal sealed class SecureItemAttachmentDto
+{
+    public AttachmentDto Metadata { get; set; } = new();
+    public string ContentBase64 { get; set; } = "";
+
+    public static SecureItemAttachmentDto FromModel(SecureItemAttachmentExport source)
+    {
+        return new SecureItemAttachmentDto
+        {
+            Metadata = AttachmentDto.FromModel(source.Metadata),
+            ContentBase64 = source.ContentBase64
+        };
+    }
+
+    public SecureItemAttachmentExport ToModel()
+    {
+        return new SecureItemAttachmentExport(Metadata.ToModel(), ContentBase64);
     }
 }
 

@@ -74,7 +74,7 @@ public sealed class CoreServicesTests
         };
         var items = new[]
         {
-            new SecureItem { ItemType = VaultItemType.Note, Title = "Note", ItemData = "{}" }
+            new SecureItem { Id = 9, ItemType = VaultItemType.Note, Title = "Note", ItemData = "{}", ImagePaths = NoteContentCodec.EncodeStringArray(["mdbx:note-image-1"]) }
         };
         var customFields = new Dictionary<long, IReadOnlyList<CustomField>>
         {
@@ -108,11 +108,34 @@ public sealed class CoreServicesTests
                     Convert.ToBase64String("recovery"u8.ToArray()))
             ]
         };
+        var secureItemAttachments = new Dictionary<long, IReadOnlyList<SecureItemAttachmentExport>>
+        {
+            [9] =
+            [
+                new SecureItemAttachmentExport(
+                    new Attachment
+                    {
+                        OwnerType = "SECURE_ITEM",
+                        OwnerId = 9,
+                        FileName = "note-image-1",
+                        ContentType = "image/png",
+                        StoragePath = "mdbx:note-image-1",
+                        SizeBytes = 10
+                    },
+                    Convert.ToBase64String("note image"u8.ToArray()))
+            ]
+        };
 
-        var json = service.ExportJson(passwords, items, passwordCustomFields: customFields, passwordHistory: history, passwordAttachments: attachments);
+        var json = service.ExportJson(
+            passwords,
+            items,
+            passwordCustomFields: customFields,
+            passwordHistory: history,
+            passwordAttachments: attachments,
+            secureItemAttachments: secureItemAttachments);
         var package = service.ImportJson(json);
 
-        Assert.Equal(70, package.SchemaVersion);
+        Assert.Equal(71, package.SchemaVersion);
         Assert.Single(package.Passwords);
         Assert.Single(package.SecureItems);
         Assert.Equal("Recovery", Assert.Single(Assert.Single(package.PasswordCustomFields).Fields).Title);
@@ -120,6 +143,9 @@ public sealed class CoreServicesTests
         var attachment = Assert.Single(Assert.Single(package.PasswordAttachments).Attachments);
         Assert.Equal("recovery.txt", attachment.Metadata.FileName);
         Assert.Equal("recovery", Encoding.UTF8.GetString(Convert.FromBase64String(attachment.ContentBase64)));
+        var secureItemAttachment = Assert.Single(Assert.Single(package.SecureItemAttachments).Attachments);
+        Assert.Equal("note-image-1", secureItemAttachment.Metadata.FileName);
+        Assert.Equal("note image", Encoding.UTF8.GetString(Convert.FromBase64String(secureItemAttachment.ContentBase64)));
     }
 
     [Fact]

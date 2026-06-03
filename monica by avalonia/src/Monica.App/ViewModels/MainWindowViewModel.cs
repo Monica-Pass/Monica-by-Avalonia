@@ -3170,6 +3170,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var passwordAttachmentsByPasswordId = includePasswords
             ? await GetPasswordAttachmentsForExportAsync(exportPasswords.Select(item => item.Id).ToArray())
             : new Dictionary<long, IReadOnlyList<PasswordAttachmentExport>>();
+        var secureItemAttachmentsByItemId = includeImages
+            ? await GetSecureItemAttachmentsForExportAsync(exportSecureItems)
+            : new Dictionary<long, IReadOnlyList<SecureItemAttachmentExport>>();
 
         return _importExportService.ExportJson(
             exportPasswords,
@@ -3177,7 +3180,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             exportCategories,
             customFieldsByPasswordId,
             passwordHistoryByPasswordId,
-            passwordAttachmentsByPasswordId);
+            passwordAttachmentsByPasswordId,
+            secureItemAttachmentsByItemId);
     }
 
     private async Task<string> BuildTotpCsvExportAsync()
@@ -3304,6 +3308,37 @@ public sealed partial class MainWindowViewModel : ObservableObject
         return result;
     }
 
+    private async Task<IReadOnlyDictionary<long, IReadOnlyList<SecureItemAttachmentExport>>> GetSecureItemAttachmentsForExportAsync(IReadOnlyList<SecureItem> secureItems)
+    {
+        var result = new Dictionary<long, IReadOnlyList<SecureItemAttachmentExport>>();
+        foreach (var item in secureItems.Where(item => item.Id > 0).OrderBy(item => item.Id))
+        {
+            var exports = new List<SecureItemAttachmentExport>();
+            var imagePaths = DecodeSecureItemImagePaths(item);
+            for (var index = 0; index < imagePaths.Count; index++)
+            {
+                var imagePath = imagePaths[index];
+                var attachment = CreateSecureItemImageAttachmentForExport(item, imagePath, index);
+                var content = await _repository.TryReadAttachmentContentAsync(attachment);
+                if (content is null)
+                {
+                    continue;
+                }
+
+                exports.Add(new SecureItemAttachmentExport(
+                    CloneAttachmentForExport(attachment),
+                    Convert.ToBase64String(content)));
+            }
+
+            if (exports.Count > 0)
+            {
+                result[item.Id] = exports;
+            }
+        }
+
+        return result;
+    }
+
     private async Task<MonicaJsonImportResult> ImportMonicaJsonAsync(string json)
     {
         var package = _importExportService.ImportJson(json);
@@ -3411,6 +3446,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             var imported = CloneSecureItemForImport(source, passwordIdMap, categoryIdMap);
             await _repository.SaveSecureItemAsync(imported);
+            if (source.Id > 0)
+            {
+                var restoredImagePaths = await ImportSecureItemAttachmentsAsync(
+                    imported,
+                    package.SecureItemAttachments.FirstOrDefault(group => group.SecureItemId == source.Id)?.Attachments ?? []);
+                if (restoredImagePaths.Count > 0)
+                {
+                    ApplySecureItemImagePaths(imported, restoredImagePaths);
+                    await _repository.SaveSecureItemAsync(imported);
+                }
+            }
+
             importedSecureItems++;
         }
 
@@ -4786,6 +4833,94 @@ public sealed partial class MainWindowViewModel : ObservableObject
         };
     }
 
+    private static IReadOnlyList<string> DecodeSecureItemImagePaths(SecureItem item) => item.ItemType switch
+    {
+        VaultItemType.Document => WalletItemDataCodec.DecodeDocument(item).ImagePaths,
+        VaultItemType.BankCard => WalletItemDataCodec.DecodeBankCard(item).ImagePaths,
+        VaultItemType.Note => NoteContentCodec.DecodeImagePaths(item.ImagePaths),
+        _ => WalletItemDataCodec.DecodeImagePaths(item.ImagePaths)
+    };
+
+    private static Attachment CreateSecureItemImageAttachmentForExport(SecureItem item, string imagePath, int index)
+    {
+        return new Attachment
+        {
+            Id = 0,
+            OwnerType = "SECURE_ITEM",
+            OwnerId = item.Id,
+            FileName = ResolveSecureItemImageFileName(item, imagePath, index),
+            ContentType = InferAttachmentContentType(imagePath),
+            StoragePath = imagePath,
+            SizeBytes = 0,
+            CreatedAt = item.UpdatedAt == default ? DateTimeOffset.UtcNow : item.UpdatedAt
+        };
+    }
+
+    private static string ResolveSecureItemImageFileName(SecureItem item, string imagePath, int index)
+    {
+        var fileName = Path.GetFileName(imagePath.Replace('\\', Path.DirectorySeparatorChar));
+        if (!string.IsNullOrWhiteSpace(fileName) && !imagePath.StartsWith("mdbx:", StringComparison.OrdinalIgnoreCase))
+        {
+            return fileName;
+        }
+
+        var prefix = item.ItemType switch
+        {
+            VaultItemType.BankCard => "card-image",
+            VaultItemType.Document => "document-image",
+            VaultItemType.Note => "note-image",
+            _ => "secure-item-image"
+        };
+        return $"{prefix}-{index + 1}";
+    }
+
+    private static string InferAttachmentContentType(string path)
+    {
+        var extension = Path.GetExtension(path).ToLowerInvariant();
+        return extension switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".gif" => "image/gif",
+            ".webp" => "image/webp",
+            ".bmp" => "image/bmp",
+            ".svg" => "image/svg+xml",
+            ".pdf" => "application/pdf",
+            _ => ""
+        };
+    }
+
+    private static void ApplySecureItemImagePaths(SecureItem item, IReadOnlyList<string> imagePaths)
+    {
+        item.ImagePaths = WalletItemDataCodec.EncodeImagePaths(imagePaths);
+        if (item.ItemType == VaultItemType.Note)
+        {
+            var note = NoteContentCodec.DecodeFromItem(item);
+            item.ItemData = NoteContentCodec.BuildSavePayload(
+                item.Title,
+                note.Content,
+                string.Join(",", note.Tags),
+                note.IsMarkdown,
+                imagePaths).ItemData;
+            return;
+        }
+
+        if (item.ItemType == VaultItemType.Document)
+        {
+            var data = WalletItemDataCodec.DecodeDocument(item);
+            data.ImagePaths = imagePaths.ToList();
+            item.ItemData = WalletItemDataCodec.EncodeDocument(data);
+            return;
+        }
+
+        if (item.ItemType == VaultItemType.BankCard)
+        {
+            var data = WalletItemDataCodec.DecodeBankCard(item);
+            data.ImagePaths = imagePaths.ToList();
+            item.ItemData = WalletItemDataCodec.EncodeBankCard(data);
+        }
+    }
+
     private static bool TryDecodeAttachmentContent(string contentBase64, out byte[] content)
     {
         try
@@ -4798,6 +4933,31 @@ public sealed partial class MainWindowViewModel : ObservableObject
             content = [];
             return false;
         }
+    }
+
+    private async Task<IReadOnlyList<string>> ImportSecureItemAttachmentsAsync(SecureItem item, IReadOnlyList<SecureItemAttachmentExport> attachments)
+    {
+        if (attachments.Count == 0)
+        {
+            return [];
+        }
+
+        var restoredPaths = new List<string>();
+        foreach (var source in attachments)
+        {
+            if (!TryDecodeAttachmentContent(source.ContentBase64, out var content))
+            {
+                continue;
+            }
+
+            var draft = await _passwordAttachmentFileService.StoreAttachmentAsync(
+                source.Metadata.FileName,
+                content,
+                source.Metadata.ContentType);
+            restoredPaths.Add(draft.StoragePath);
+        }
+
+        return restoredPaths;
     }
 
     private static SecureItem CloneSecureItemForExport(SecureItem source, bool includeCategory = true, bool includeImages = true)

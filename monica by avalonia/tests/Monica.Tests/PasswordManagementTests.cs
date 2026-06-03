@@ -1863,6 +1863,38 @@ public sealed class PasswordManagementTests
     }
 
     [Fact]
+    public async Task ViewModel_imports_monica_json_secure_item_images()
+    {
+        var source = CreateHarness();
+        var sourceImageContent = "document image bytes"u8.ToArray();
+        source.Attachments.Put("secure_attachments/document-front.png", sourceImageContent);
+        var document = new SecureItem
+        {
+            ItemType = VaultItemType.Document,
+            Title = "Passport",
+            ItemData = WalletItemDataCodec.EncodeDocument(new DocumentWalletData
+            {
+                DocumentNumber = "P-123",
+                ImagePaths = ["secure_attachments/document-front.png"]
+            }),
+            ImagePaths = WalletItemDataCodec.EncodeImagePaths(["secure_attachments/document-front.png"])
+        };
+        await source.Repository.SaveSecureItemAsync(document);
+        await source.ViewModel.LoadAsync();
+        await source.ViewModel.ExportDataCommand.ExecuteAsync(null);
+
+        var target = CreateHarness();
+        target.ViewModel.ImportJsonText = source.ViewModel.ExportPreview;
+        await target.ViewModel.ImportDataCommand.ExecuteAsync(null);
+
+        var imported = Assert.Single(await target.Repository.GetSecureItemsAsync(VaultItemType.Document));
+        var imagePath = Assert.Single(WalletItemDataCodec.DecodeDocument(imported).ImagePaths);
+        Assert.StartsWith("secure_attachments/imported-", imagePath, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(sourceImageContent, target.Attachments.TryRead(imagePath));
+        Assert.Equal(target.ViewModel.L.Format("ImportedMonicaJsonFormat", 0, 1), target.ViewModel.StatusMessage);
+    }
+
+    [Fact]
     public async Task ViewModel_imports_password_csv_and_encrypts_passwords()
     {
         var harness = CreateHarness();
@@ -2004,7 +2036,7 @@ public sealed class PasswordManagementTests
             totpEditorDialogService: totpDialog,
             walletItemEditorDialogService: walletDialog);
 
-        return new PasswordHarness(viewModel, repository, crypto, dialog, detailDialog, categoryPicker, totpDialog, walletDialog, clipboard, databasePath);
+        return new PasswordHarness(viewModel, repository, crypto, dialog, detailDialog, categoryPicker, totpDialog, walletDialog, clipboard, attachmentFileService, databasePath);
     }
 
     private static async Task SetPasswordUpdatedAtAsync(string databasePath, long id, DateTimeOffset updatedAt)
@@ -2047,6 +2079,7 @@ public sealed class PasswordManagementTests
         FakeTotpEditorDialogService TotpDialog,
         FakeWalletItemEditorDialogService WalletDialog,
         CapturingClipboardService Clipboard,
+        FakePasswordAttachmentFileService Attachments,
         string DatabasePath);
 
     private sealed class CapturingClipboardService : IClipboardService
@@ -2081,6 +2114,16 @@ public sealed class PasswordManagementTests
     {
         private readonly Dictionary<string, byte[]> _content = new(StringComparer.OrdinalIgnoreCase);
         private int _nextAttachmentId;
+
+        public void Put(string storagePath, byte[] content)
+        {
+            _content[storagePath] = content.ToArray();
+        }
+
+        public byte[]? TryRead(string storagePath)
+        {
+            return _content.TryGetValue(storagePath, out var content) ? content.ToArray() : null;
+        }
 
         public Task<PasswordAttachmentFileDraft?> PickAndStoreAttachmentAsync(PasswordEntry entry, CancellationToken cancellationToken = default)
         {

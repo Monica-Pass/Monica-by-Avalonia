@@ -457,6 +457,22 @@ public sealed class MdbxRepositoryTests
         Assert.All(imagePaths, path => Assert.StartsWith("mdbx:", path, StringComparison.OrdinalIgnoreCase));
         Assert.Equal(frontContent, bridge.ReadAttachmentContent(database.WorkingCopyPath!, imagePaths[0]));
         Assert.Equal(backContent, bridge.ReadAttachmentContent(database.WorkingCopyPath!, imagePaths[1]));
+        Assert.Equal(frontContent, await repository.TryReadAttachmentContentAsync(new Attachment
+        {
+            OwnerType = "SECURE_ITEM",
+            OwnerId = reloaded.Id,
+            FileName = "front.png",
+            ContentType = "image/png",
+            StoragePath = imagePaths[0]
+        }));
+        Assert.Equal(backContent, await repository.TryReadAttachmentContentAsync(new Attachment
+        {
+            OwnerType = "SECURE_ITEM",
+            OwnerId = reloaded.Id,
+            FileName = "back.png",
+            ContentType = "image/png",
+            StoragePath = imagePaths[1]
+        }));
         Assert.Null(contentStore.TryRead("secure_attachments/front.png"));
         Assert.Null(contentStore.TryRead("secure_attachments/back.png"));
         Assert.Equal(2, bridge.CountActiveAttachmentsForEntry(database.WorkingCopyPath!, reloaded.MdbxFolderId!));
