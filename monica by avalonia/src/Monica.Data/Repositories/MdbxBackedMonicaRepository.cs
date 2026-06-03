@@ -381,6 +381,28 @@ public sealed class MdbxBackedMonicaRepository(
         return mdbxAttachments;
     }
 
+    public async Task<byte[]?> TryReadAttachmentContentAsync(Attachment attachment, CancellationToken cancellationToken = default)
+    {
+        if (!IsPasswordOwnerType(attachment.OwnerType))
+        {
+            return await inner.TryReadAttachmentContentAsync(attachment, cancellationToken);
+        }
+
+        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
+        if (database is not null && MdbxVaultStore.TryParseAttachmentStoragePath(attachment.StoragePath) is not null)
+        {
+            var content = await mdbxVaultStore.TryReadAttachmentContentAsync(database, attachment, cancellationToken);
+            if (content is not null)
+            {
+                return content;
+            }
+        }
+
+        return attachmentContentStore is null
+            ? await inner.TryReadAttachmentContentAsync(attachment, cancellationToken)
+            : await attachmentContentStore.TryReadAttachmentContentAsync(attachment, cancellationToken);
+    }
+
     public async Task<long> SaveAttachmentAsync(Attachment attachment, CancellationToken cancellationToken = default)
     {
         var id = await inner.SaveAttachmentAsync(attachment, cancellationToken);

@@ -12,6 +12,7 @@ public sealed record PasswordAttachmentFileDraft(string FileName, string Storage
 public interface IPasswordAttachmentFileService
 {
     Task<PasswordAttachmentFileDraft?> PickAndStoreAttachmentAsync(PasswordEntry entry, CancellationToken cancellationToken = default);
+    Task<PasswordAttachmentFileDraft> StoreAttachmentAsync(string fileName, byte[] content, string contentType = "", CancellationToken cancellationToken = default);
     Task DeleteStoredAttachmentAsync(string storagePath, CancellationToken cancellationToken = default);
 }
 
@@ -42,6 +43,12 @@ public sealed class PasswordAttachmentFileService(
         await source.CopyToAsync(buffer, cancellationToken);
         var content = buffer.ToArray();
 
+        return await StoreAttachmentAsync(file.Name, content, InferContentType(file.Name), cancellationToken);
+    }
+
+    public async Task<PasswordAttachmentFileDraft> StoreAttachmentAsync(string fileName, byte[] content, string contentType = "", CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         var encryptedPayload = cryptoService.EncryptString(Convert.ToBase64String(content));
         var storageName = $"{Guid.NewGuid():N}.monicaattachment";
         var relativeStoragePath = $"{AttachmentFolderName}/{storageName}";
@@ -50,10 +57,10 @@ public sealed class PasswordAttachmentFileService(
         await File.WriteAllTextAsync(absoluteStoragePath, encryptedPayload, Encoding.UTF8, cancellationToken);
 
         return new PasswordAttachmentFileDraft(
-            file.Name,
+            string.IsNullOrWhiteSpace(fileName) ? localization.Get("Attachment") : fileName.Trim(),
             relativeStoragePath,
-            buffer.Length,
-            InferContentType(file.Name),
+            content.LongLength,
+            string.IsNullOrWhiteSpace(contentType) ? InferContentType(fileName) : contentType.Trim(),
             content);
     }
 

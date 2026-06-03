@@ -5,6 +5,7 @@ using Monica.Core.Models;
 using Monica.Core.Services;
 using Monica.Data;
 using Monica.Data.Repositories;
+using Monica.Data.Services;
 using Monica.Platform.Services;
 using Avalonia;
 using Microsoft.Data.Sqlite;
@@ -1830,6 +1831,7 @@ public sealed class PasswordManagementTests
             ItemData = """{"secret":"JBSWY3DPEHPK3PXP","period":30,"digits":6,"otpType":"TOTP"}"""
         });
         await source.ViewModel.LoadAsync();
+        await source.ViewModel.AddPasswordAttachmentCommand.ExecuteAsync(source.ViewModel.Passwords.Single());
         await source.ViewModel.ExportDataCommand.ExecuteAsync(null);
 
         var target = CreateHarness();
@@ -1851,6 +1853,9 @@ public sealed class PasswordManagementTests
         var importedHistory = Assert.Single(await target.Repository.GetPasswordHistoryAsync(imported.Id));
         Assert.NotEqual("old-import-secret", importedHistory.Password);
         Assert.Equal("old-import-secret", target.Crypto.DecryptString(importedHistory.Password));
+        var importedAttachment = Assert.Single(await target.Repository.GetAttachmentsAsync("PASSWORD", imported.Id));
+        Assert.Equal("picked.txt", importedAttachment.FileName);
+        Assert.Equal("picked attachment"u8.ToArray(), await target.Repository.TryReadAttachmentContentAsync(importedAttachment));
         Assert.Single(target.ViewModel.Passwords);
         Assert.Single(target.ViewModel.TotpItems, item => item.BoundPasswordId == imported.Id);
         Assert.Empty(target.ViewModel.ImportJsonText);
@@ -1965,7 +1970,8 @@ public sealed class PasswordManagementTests
         var databasePath = GetTempDatabasePath();
         var factory = new SqliteConnectionFactory(databasePath);
         var migrator = new DatabaseMigrator(factory);
-        var repository = new MonicaRepository(factory, migrator);
+        var attachmentFileService = new FakePasswordAttachmentFileService();
+        var repository = new MonicaRepository(factory, migrator, attachmentContentStore: attachmentFileService);
         var crypto = new CryptoService();
         var localization = new LocalizationService();
         var generator = new PasswordGeneratorService();
@@ -1987,7 +1993,7 @@ public sealed class PasswordManagementTests
             clipboard,
             webDavBackupService ?? new FakeWebDavBackupService(),
             new MdbxVaultService(),
-            new FakePasswordAttachmentFileService(),
+            attachmentFileService,
             dialog,
             detailDialog,
             categoryPicker,
@@ -2071,21 +2077,51 @@ public sealed class PasswordManagementTests
         }
     }
 
-    private sealed class FakePasswordAttachmentFileService : IPasswordAttachmentFileService
+    private sealed class FakePasswordAttachmentFileService : IPasswordAttachmentFileService, IAttachmentContentStore
     {
+        private readonly Dictionary<string, byte[]> _content = new(StringComparer.OrdinalIgnoreCase);
+        private int _nextAttachmentId;
+
         public Task<PasswordAttachmentFileDraft?> PickAndStoreAttachmentAsync(PasswordEntry entry, CancellationToken cancellationToken = default)
         {
+            var content = "picked attachment"u8.ToArray();
+            _content["secure_attachments/picked.enc"] = content;
             return Task.FromResult<PasswordAttachmentFileDraft?>(new PasswordAttachmentFileDraft(
                 "picked.txt",
                 "secure_attachments/picked.enc",
-                64,
-                "text/plain"));
+                content.LongLength,
+                "text/plain",
+                content));
+        }
+
+        public Task<PasswordAttachmentFileDraft> StoreAttachmentAsync(string fileName, byte[] content, string contentType = "", CancellationToken cancellationToken = default)
+        {
+            var storagePath = $"secure_attachments/imported-{++_nextAttachmentId}.enc";
+            _content[storagePath] = content.ToArray();
+            return Task.FromResult(new PasswordAttachmentFileDraft(
+                fileName,
+                storagePath,
+                content.LongLength,
+                contentType,
+                content));
         }
 
         public Task DeleteStoredAttachmentAsync(string storagePath, CancellationToken cancellationToken = default)
         {
+            _content.Remove(storagePath);
             return Task.CompletedTask;
         }
+
+        public Task<byte[]?> TryReadAttachmentContentAsync(Attachment attachment, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(
+                _content.TryGetValue(attachment.StoragePath, out var content)
+                    ? content.ToArray()
+                    : null);
+        }
+
+        public Task DeleteAttachmentContentAsync(Attachment attachment, CancellationToken cancellationToken = default) =>
+            DeleteStoredAttachmentAsync(attachment.StoragePath, cancellationToken);
     }
 
     private sealed class FakeWebDavBackupService : IWebDavBackupService

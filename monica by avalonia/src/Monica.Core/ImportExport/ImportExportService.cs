@@ -15,7 +15,8 @@ public interface IImportExportService
         IEnumerable<SecureItem> secureItems,
         IEnumerable<Category>? categories = null,
         IReadOnlyDictionary<long, IReadOnlyList<CustomField>>? passwordCustomFields = null,
-        IReadOnlyDictionary<long, IReadOnlyList<PasswordHistoryEntry>>? passwordHistory = null);
+        IReadOnlyDictionary<long, IReadOnlyList<PasswordHistoryEntry>>? passwordHistory = null,
+        IReadOnlyDictionary<long, IReadOnlyList<PasswordAttachmentExport>>? passwordAttachments = null);
     MonicaExportPackage ImportJson(string json);
     string ExportPasswordCsv(IEnumerable<PasswordEntry> passwords);
     string ExportTotpCsv(IEnumerable<SecureItem> secureItems);
@@ -34,11 +35,16 @@ public sealed record MonicaExportPackage(
     IReadOnlyList<SecureItem> SecureItems,
     IReadOnlyList<Category> Categories,
     IReadOnlyList<PasswordCustomFieldExportGroup> PasswordCustomFields,
-    IReadOnlyList<PasswordHistoryExportGroup> PasswordHistory);
+    IReadOnlyList<PasswordHistoryExportGroup> PasswordHistory,
+    IReadOnlyList<PasswordAttachmentExportGroup> PasswordAttachments);
 
 public sealed record PasswordCustomFieldExportGroup(long PasswordId, IReadOnlyList<CustomField> Fields);
 
 public sealed record PasswordHistoryExportGroup(long PasswordId, IReadOnlyList<PasswordHistoryEntry> Entries);
+
+public sealed record PasswordAttachmentExportGroup(long PasswordId, IReadOnlyList<PasswordAttachmentExport> Attachments);
+
+public sealed record PasswordAttachmentExport(Attachment Metadata, string ContentBase64);
 
 public sealed class ImportExportService : IImportExportService
 {
@@ -78,7 +84,8 @@ public sealed class ImportExportService : IImportExportService
         IEnumerable<SecureItem> secureItems,
         IEnumerable<Category>? categories = null,
         IReadOnlyDictionary<long, IReadOnlyList<CustomField>>? passwordCustomFields = null,
-        IReadOnlyDictionary<long, IReadOnlyList<PasswordHistoryEntry>>? passwordHistory = null)
+        IReadOnlyDictionary<long, IReadOnlyList<PasswordHistoryEntry>>? passwordHistory = null,
+        IReadOnlyDictionary<long, IReadOnlyList<PasswordAttachmentExport>>? passwordAttachments = null)
     {
         var passwordList = passwords.ToList();
         var exportedPasswordIds = passwordList
@@ -86,12 +93,13 @@ public sealed class ImportExportService : IImportExportService
             .Where(id => id > 0)
             .ToHashSet();
         var package = new MonicaExportDtoPackage(
-            69,
+            70,
             passwordList.Select(PasswordEntryDto.FromModel).ToList(),
             secureItems.Select(SecureItemDto.FromModel).ToList(),
             (categories ?? []).Select(CategoryDto.FromModel).ToList(),
             ToCustomFieldGroupDtos(passwordCustomFields, exportedPasswordIds),
-            ToPasswordHistoryGroupDtos(passwordHistory, exportedPasswordIds));
+            ToPasswordHistoryGroupDtos(passwordHistory, exportedPasswordIds),
+            ToPasswordAttachmentGroupDtos(passwordAttachments, exportedPasswordIds));
         return JsonSerializer.Serialize(package, MonicaJsonContext.Default.MonicaExportDtoPackage);
     }
 
@@ -99,14 +107,15 @@ public sealed class ImportExportService : IImportExportService
     {
         var package = JsonSerializer.Deserialize(json, MonicaJsonContext.Default.MonicaExportDtoPackage);
         return package is null
-            ? new MonicaExportPackage(68, [], [], [], [], [])
+            ? new MonicaExportPackage(68, [], [], [], [], [], [])
             : new MonicaExportPackage(
                 package.SchemaVersion,
                 package.Passwords.Select(item => item.ToModel()).ToList(),
                 package.SecureItems.Select(item => item.ToModel()).ToList(),
                 (package.Categories ?? []).Select(item => item.ToModel()).ToList(),
                 (package.PasswordCustomFields ?? []).Select(item => item.ToModel()).ToList(),
-                (package.PasswordHistory ?? []).Select(item => item.ToModel()).ToList());
+                (package.PasswordHistory ?? []).Select(item => item.ToModel()).ToList(),
+                (package.PasswordAttachments ?? []).Select(item => item.ToModel()).ToList());
     }
 
     private static IReadOnlyList<PasswordCustomFieldGroupDto> ToCustomFieldGroupDtos(
@@ -138,6 +147,22 @@ public sealed class ImportExportService : IImportExportService
             .Where(item => exportedPasswordIds.Contains(item.Key) && item.Value.Count > 0)
             .OrderBy(item => item.Key)
             .Select(item => PasswordHistoryGroupDto.FromModel(item.Key, item.Value))
+            .ToList();
+    }
+
+    private static IReadOnlyList<PasswordAttachmentGroupDto> ToPasswordAttachmentGroupDtos(
+        IReadOnlyDictionary<long, IReadOnlyList<PasswordAttachmentExport>>? passwordAttachments,
+        IReadOnlySet<long> exportedPasswordIds)
+    {
+        if (passwordAttachments is null || exportedPasswordIds.Count == 0)
+        {
+            return [];
+        }
+
+        return passwordAttachments
+            .Where(item => exportedPasswordIds.Contains(item.Key) && item.Value.Count > 0)
+            .OrderBy(item => item.Key)
+            .Select(item => PasswordAttachmentGroupDto.FromModel(item.Key, item.Value))
             .ToList();
     }
 
@@ -661,7 +686,8 @@ internal sealed record MonicaExportDtoPackage(
     IReadOnlyList<SecureItemDto> SecureItems,
     IReadOnlyList<CategoryDto>? Categories = null,
     IReadOnlyList<PasswordCustomFieldGroupDto>? PasswordCustomFields = null,
-    IReadOnlyList<PasswordHistoryGroupDto>? PasswordHistory = null);
+    IReadOnlyList<PasswordHistoryGroupDto>? PasswordHistory = null,
+    IReadOnlyList<PasswordAttachmentGroupDto>? PasswordAttachments = null);
 
 internal sealed record AegisExportPackageDto(
     int Version,
@@ -833,6 +859,96 @@ internal sealed class PasswordHistoryEntryDto
             EntryId = EntryId,
             Password = Password,
             LastUsedAt = LastUsedAt
+        };
+    }
+}
+
+internal sealed class PasswordAttachmentGroupDto
+{
+    public long PasswordId { get; set; }
+    public List<PasswordAttachmentDto> Attachments { get; set; } = [];
+
+    public static PasswordAttachmentGroupDto FromModel(long passwordId, IReadOnlyList<PasswordAttachmentExport> attachments)
+    {
+        return new PasswordAttachmentGroupDto
+        {
+            PasswordId = passwordId,
+            Attachments = attachments.Select(PasswordAttachmentDto.FromModel).ToList()
+        };
+    }
+
+    public PasswordAttachmentExportGroup ToModel()
+    {
+        return new PasswordAttachmentExportGroup(
+            PasswordId,
+            Attachments.Select(item => item.ToModel()).ToList());
+    }
+}
+
+internal sealed class PasswordAttachmentDto
+{
+    public AttachmentDto Metadata { get; set; } = new();
+    public string ContentBase64 { get; set; } = "";
+
+    public static PasswordAttachmentDto FromModel(PasswordAttachmentExport source)
+    {
+        return new PasswordAttachmentDto
+        {
+            Metadata = AttachmentDto.FromModel(source.Metadata),
+            ContentBase64 = source.ContentBase64
+        };
+    }
+
+    public PasswordAttachmentExport ToModel()
+    {
+        return new PasswordAttachmentExport(Metadata.ToModel(), ContentBase64);
+    }
+}
+
+internal sealed class AttachmentDto
+{
+    public long Id { get; set; }
+    public string OwnerType { get; set; } = "";
+    public long OwnerId { get; set; }
+    public string FileName { get; set; } = "";
+    public string ContentType { get; set; } = "";
+    public string StoragePath { get; set; } = "";
+    public long SizeBytes { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public long? BitwardenVaultId { get; set; }
+    public string? KeepassBinaryRef { get; set; }
+
+    public static AttachmentDto FromModel(Attachment source)
+    {
+        return new AttachmentDto
+        {
+            Id = source.Id,
+            OwnerType = source.OwnerType,
+            OwnerId = source.OwnerId,
+            FileName = source.FileName,
+            ContentType = source.ContentType,
+            StoragePath = source.StoragePath,
+            SizeBytes = source.SizeBytes,
+            CreatedAt = source.CreatedAt,
+            BitwardenVaultId = source.BitwardenVaultId,
+            KeepassBinaryRef = source.KeepassBinaryRef
+        };
+    }
+
+    public Attachment ToModel()
+    {
+        return new Attachment
+        {
+            Id = Id,
+            OwnerType = OwnerType,
+            OwnerId = OwnerId,
+            FileName = FileName,
+            ContentType = ContentType,
+            StoragePath = StoragePath,
+            SizeBytes = SizeBytes,
+            CreatedAt = CreatedAt,
+            BitwardenVaultId = BitwardenVaultId,
+            KeepassBinaryRef = KeepassBinaryRef
         };
     }
 }

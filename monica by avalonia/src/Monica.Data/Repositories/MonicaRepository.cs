@@ -1,5 +1,6 @@
 using Dapper;
 using Monica.Core.Models;
+using Monica.Data.Services;
 
 namespace Monica.Data.Repositories;
 
@@ -16,6 +17,7 @@ public interface IMonicaRepository
     Task<IReadOnlyList<long>> SearchEntryIdsByCustomFieldContentAsync(string query, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Attachment>> GetAttachmentsAsync(string ownerType, long ownerId, CancellationToken cancellationToken = default);
     Task<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>> GetAttachmentsByOwnerIdsAsync(string ownerType, IReadOnlyList<long> ownerIds, CancellationToken cancellationToken = default);
+    Task<byte[]?> TryReadAttachmentContentAsync(Attachment attachment, CancellationToken cancellationToken = default);
     Task<long> SaveAttachmentAsync(Attachment attachment, CancellationToken cancellationToken = default);
     Task<long> SaveAttachmentAsync(Attachment attachment, byte[] content, CancellationToken cancellationToken = default);
     Task DeleteAttachmentAsync(long id, CancellationToken cancellationToken = default);
@@ -44,7 +46,8 @@ public interface IMonicaRepository
 public sealed class MonicaRepository(
     ISqliteConnectionFactory connectionFactory,
     IDatabaseMigrator migrator,
-    IVaultDataProtector? vaultDataProtector = null) : IMonicaRepository
+    IVaultDataProtector? vaultDataProtector = null,
+    IAttachmentContentStore? attachmentContentStore = null) : IMonicaRepository
 {
     private readonly IVaultDataProtector _vaultDataProtector = vaultDataProtector ?? NoopVaultDataProtector.Instance;
 
@@ -325,6 +328,11 @@ public sealed class MonicaRepository(
             .GroupBy(attachment => attachment.OwnerId)
             .ToDictionary(group => group.Key, group => (IReadOnlyList<Attachment>)group.ToList());
     }
+
+    public Task<byte[]?> TryReadAttachmentContentAsync(Attachment attachment, CancellationToken cancellationToken = default) =>
+        attachmentContentStore is null
+            ? Task.FromResult<byte[]?>(null)
+            : attachmentContentStore.TryReadAttachmentContentAsync(attachment, cancellationToken);
 
     public Task<long> SaveAttachmentAsync(Attachment attachment, CancellationToken cancellationToken = default) =>
         SaveAttachmentAsync(attachment, [], cancellationToken);

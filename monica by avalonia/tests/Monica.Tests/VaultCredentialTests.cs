@@ -331,6 +331,9 @@ public sealed class VaultCredentialTests
         public Task<PasswordAttachmentFileDraft?> PickAndStoreAttachmentAsync(PasswordEntry entry, CancellationToken cancellationToken = default) =>
             Task.FromResult<PasswordAttachmentFileDraft?>(null);
 
+        public Task<PasswordAttachmentFileDraft> StoreAttachmentAsync(string fileName, byte[] content, string contentType = "", CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PasswordAttachmentFileDraft(fileName, "", content.LongLength, contentType, content));
+
         public Task DeleteStoredAttachmentAsync(string storagePath, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
     }

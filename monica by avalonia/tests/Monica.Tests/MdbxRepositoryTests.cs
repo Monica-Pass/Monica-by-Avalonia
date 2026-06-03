@@ -662,6 +662,7 @@ public sealed class MdbxRepositoryTests
         var saved = Assert.Single(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
         Assert.StartsWith("mdbx:", saved.StoragePath, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(content, bridge.ReadAttachmentContent(database.WorkingCopyPath!, saved.StoragePath));
+        Assert.Equal(content, await repository.TryReadAttachmentContentAsync(saved));
 
         await repository.DeleteAttachmentAsync(saved.Id, saved);
 

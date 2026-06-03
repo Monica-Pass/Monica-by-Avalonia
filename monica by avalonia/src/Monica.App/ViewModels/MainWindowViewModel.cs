@@ -3167,13 +3167,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var passwordHistoryByPasswordId = includePasswords
             ? await GetPasswordHistoryForExportAsync(exportPasswords.Select(item => item.Id).ToArray())
             : new Dictionary<long, IReadOnlyList<PasswordHistoryEntry>>();
+        var passwordAttachmentsByPasswordId = includePasswords
+            ? await GetPasswordAttachmentsForExportAsync(exportPasswords.Select(item => item.Id).ToArray())
+            : new Dictionary<long, IReadOnlyList<PasswordAttachmentExport>>();
 
         return _importExportService.ExportJson(
             exportPasswords,
             exportSecureItems,
             exportCategories,
             customFieldsByPasswordId,
-            passwordHistoryByPasswordId);
+            passwordHistoryByPasswordId,
+            passwordAttachmentsByPasswordId);
     }
 
     private async Task<string> BuildTotpCsvExportAsync()
@@ -3265,6 +3269,41 @@ public sealed partial class MainWindowViewModel : ObservableObject
         return result;
     }
 
+    private async Task<IReadOnlyDictionary<long, IReadOnlyList<PasswordAttachmentExport>>> GetPasswordAttachmentsForExportAsync(IReadOnlyList<long> passwordIds)
+    {
+        var ids = passwordIds.Where(id => id > 0).Distinct().ToArray();
+        if (ids.Length == 0)
+        {
+            return new Dictionary<long, IReadOnlyList<PasswordAttachmentExport>>();
+        }
+
+        var result = new Dictionary<long, IReadOnlyList<PasswordAttachmentExport>>();
+        var attachmentsByPasswordId = await _repository.GetAttachmentsByOwnerIdsAsync("PASSWORD", ids);
+        foreach (var group in attachmentsByPasswordId.OrderBy(item => item.Key))
+        {
+            var exports = new List<PasswordAttachmentExport>();
+            foreach (var attachment in group.Value)
+            {
+                var content = await _repository.TryReadAttachmentContentAsync(attachment);
+                if (content is null)
+                {
+                    continue;
+                }
+
+                exports.Add(new PasswordAttachmentExport(
+                    CloneAttachmentForExport(attachment),
+                    Convert.ToBase64String(content)));
+            }
+
+            if (exports.Count > 0)
+            {
+                result[group.Key] = exports;
+            }
+        }
+
+        return result;
+    }
+
     private async Task<MonicaJsonImportResult> ImportMonicaJsonAsync(string json)
     {
         var package = _importExportService.ImportJson(json);
@@ -3349,6 +3388,24 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
         }
 
+        foreach (var group in package.PasswordAttachments)
+        {
+            if (!passwordIdMap.TryGetValue(group.PasswordId, out var importedPasswordId))
+            {
+                continue;
+            }
+
+            foreach (var source in group.Attachments)
+            {
+                if (!TryDecodeAttachmentContent(source.ContentBase64, out var content))
+                {
+                    continue;
+                }
+
+                await ImportPasswordAttachmentAsync(source.Metadata, importedPasswordId, content);
+            }
+        }
+
         var importedSecureItems = 0;
         foreach (var source in package.SecureItems)
         {
@@ -3368,6 +3425,29 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         await LoadAsync();
         return new MonicaJsonImportResult(importedPasswords, importedSecureItems, importedCategories);
+    }
+
+    private async Task ImportPasswordAttachmentAsync(Attachment source, long importedPasswordId, byte[] content)
+    {
+        var attachment = CloneAttachmentForImport(source, importedPasswordId);
+        var draft = await _passwordAttachmentFileService.StoreAttachmentAsync(
+            attachment.FileName,
+            content,
+            attachment.ContentType);
+        attachment.StoragePath = draft.StoragePath;
+        attachment.SizeBytes = draft.SizeBytes;
+        if (string.IsNullOrWhiteSpace(attachment.ContentType))
+        {
+            attachment.ContentType = draft.ContentType;
+        }
+
+        var originalStoragePath = attachment.StoragePath;
+        await _repository.SaveAttachmentAsync(attachment, content);
+        if (!string.Equals(originalStoragePath, attachment.StoragePath, StringComparison.Ordinal) &&
+            !originalStoragePath.StartsWith("mdbx:", StringComparison.OrdinalIgnoreCase))
+        {
+            await _passwordAttachmentFileService.DeleteStoredAttachmentAsync(originalStoragePath);
+        }
     }
 
     private string FormatMonicaJsonImportStatus(MonicaJsonImportResult result)
@@ -4672,6 +4752,54 @@ public sealed partial class MainWindowViewModel : ObservableObject
             Password = ProtectPassword(UnprotectPassword(source.Password)),
             LastUsedAt = source.LastUsedAt
         };
+    }
+
+    private static Attachment CloneAttachmentForExport(Attachment source)
+    {
+        return new Attachment
+        {
+            Id = source.Id,
+            OwnerType = source.OwnerType,
+            OwnerId = source.OwnerId,
+            FileName = source.FileName,
+            ContentType = source.ContentType,
+            StoragePath = source.StoragePath,
+            SizeBytes = source.SizeBytes,
+            CreatedAt = source.CreatedAt,
+            BitwardenVaultId = source.BitwardenVaultId,
+            KeepassBinaryRef = source.KeepassBinaryRef
+        };
+    }
+
+    private static Attachment CloneAttachmentForImport(Attachment source, long importedPasswordId)
+    {
+        return new Attachment
+        {
+            Id = 0,
+            OwnerType = "PASSWORD",
+            OwnerId = importedPasswordId,
+            FileName = source.FileName,
+            ContentType = source.ContentType,
+            StoragePath = "",
+            SizeBytes = source.SizeBytes,
+            CreatedAt = source.CreatedAt == default ? DateTimeOffset.UtcNow : source.CreatedAt,
+            BitwardenVaultId = source.BitwardenVaultId,
+            KeepassBinaryRef = source.KeepassBinaryRef
+        };
+    }
+
+    private static bool TryDecodeAttachmentContent(string contentBase64, out byte[] content)
+    {
+        try
+        {
+            content = Convert.FromBase64String(contentBase64);
+            return true;
+        }
+        catch (FormatException)
+        {
+            content = [];
+            return false;
+        }
     }
 
     private static SecureItem CloneSecureItemForExport(SecureItem source, bool includeCategory = true, bool includeImages = true)

@@ -20,6 +20,7 @@ public interface IMdbxVaultStore
     Task<IReadOnlyList<PasswordHistoryEntry>?> GetPasswordHistoryAsync(LocalMdbxDatabase database, long entryId, CancellationToken cancellationToken = default);
     Task<long?> FindPasswordHistoryOwnerIdAsync(LocalMdbxDatabase database, long historyId, CancellationToken cancellationToken = default);
     Task<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>> GetPasswordAttachmentsByEntryIdsAsync(LocalMdbxDatabase database, IReadOnlyList<long> entryIds, CancellationToken cancellationToken = default);
+    Task<byte[]?> TryReadAttachmentContentAsync(LocalMdbxDatabase database, Attachment attachment, CancellationToken cancellationToken = default);
     Task SoftDeletePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, CancellationToken cancellationToken = default);
     Task RestorePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, CancellationToken cancellationToken = default);
     Task SoftDeletePasswordEntriesAsync(LocalMdbxDatabase database, CancellationToken cancellationToken = default);
@@ -302,6 +303,26 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         }
 
         return result;
+    }
+
+    public async Task<byte[]?> TryReadAttachmentContentAsync(LocalMdbxDatabase database, Attachment attachment, CancellationToken cancellationToken = default)
+    {
+        var attachmentId = TryParseAttachmentStoragePath(attachment.StoragePath);
+        if (attachmentId is null)
+        {
+            return null;
+        }
+
+        var vault = await OpenAsync(database, cancellationToken);
+        using var _ = vault;
+        try
+        {
+            return await vault.ReadAttachmentContentAsync(attachmentId, cancellationToken);
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     public async Task SoftDeletePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, CancellationToken cancellationToken = default)

@@ -47,7 +47,11 @@ public partial class App : Application
         services.AddSingleton<ILegacyVaultDetector, LegacyVaultDetector>();
         services.AddSingleton<IDatabaseMigrator, DatabaseMigrator>();
         services.AddSingleton<IVaultCredentialStore, VaultCredentialStore>();
-        services.AddSingleton<MonicaRepository>();
+        services.AddSingleton<MonicaRepository>(provider => new MonicaRepository(
+            provider.GetRequiredService<ISqliteConnectionFactory>(),
+            provider.GetRequiredService<IDatabaseMigrator>(),
+            provider.GetService<IVaultDataProtector>(),
+            provider.GetRequiredService<IAttachmentContentStore>()));
         services.AddSingleton<IMdbxNativeBridge, MdbxUniffiNativeBridge>();
         services.AddSingleton<IMdbxVaultStore, MdbxVaultStore>();
         services.AddSingleton<IMonicaRepository>(provider => new MdbxBackedMonicaRepository(

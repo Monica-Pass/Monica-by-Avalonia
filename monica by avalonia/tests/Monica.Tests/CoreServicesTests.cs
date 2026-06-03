@@ -90,15 +90,36 @@ public sealed class CoreServicesTests
                 new PasswordHistoryEntry { Id = 21, EntryId = 7, Password = "old-secret", LastUsedAt = DateTimeOffset.UnixEpoch.AddDays(1) }
             ]
         };
+        var attachments = new Dictionary<long, IReadOnlyList<PasswordAttachmentExport>>
+        {
+            [7] =
+            [
+                new PasswordAttachmentExport(
+                    new Attachment
+                    {
+                        Id = 31,
+                        OwnerType = "PASSWORD",
+                        OwnerId = 7,
+                        FileName = "recovery.txt",
+                        ContentType = "text/plain",
+                        StoragePath = "mdbx:attachment-1",
+                        SizeBytes = 12
+                    },
+                    Convert.ToBase64String("recovery"u8.ToArray()))
+            ]
+        };
 
-        var json = service.ExportJson(passwords, items, passwordCustomFields: customFields, passwordHistory: history);
+        var json = service.ExportJson(passwords, items, passwordCustomFields: customFields, passwordHistory: history, passwordAttachments: attachments);
         var package = service.ImportJson(json);
 
-        Assert.Equal(69, package.SchemaVersion);
+        Assert.Equal(70, package.SchemaVersion);
         Assert.Single(package.Passwords);
         Assert.Single(package.SecureItems);
         Assert.Equal("Recovery", Assert.Single(Assert.Single(package.PasswordCustomFields).Fields).Title);
         Assert.Equal("old-secret", Assert.Single(Assert.Single(package.PasswordHistory).Entries).Password);
+        var attachment = Assert.Single(Assert.Single(package.PasswordAttachments).Attachments);
+        Assert.Equal("recovery.txt", attachment.Metadata.FileName);
+        Assert.Equal("recovery", Encoding.UTF8.GetString(Convert.FromBase64String(attachment.ContentBase64)));
     }
 
     [Fact]
