@@ -827,6 +827,66 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
+    public async Task Repository_unassigns_mdbx_category_entries_even_when_sqlite_cache_is_stale()
+    {
+        var repository = CreateRepository(out var bridge, out var sqliteRepository);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        var category = new Category { Name = "Work" };
+        await repository.SaveCategoryAsync(category);
+        var password = new PasswordEntry
+        {
+            Title = "Work login",
+            Username = "dev",
+            Password = "secret",
+            CategoryId = category.Id
+        };
+        var note = new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = "Work note",
+            Notes = "project scoped",
+            CategoryId = category.Id
+        };
+        await repository.SavePasswordAsync(password);
+        await repository.ReplaceCustomFieldsAsync(password.Id, [
+            new CustomField
+            {
+                EntryId = password.Id,
+                Title = "env",
+                Value = "prod"
+            }
+        ]);
+        await repository.SavePasswordHistoryAsync(new PasswordHistoryEntry
+        {
+            EntryId = password.Id,
+            Password = "old-secret",
+            LastUsedAt = DateTimeOffset.UtcNow.AddDays(-1)
+        });
+        await repository.SaveSecureItemAsync(note);
+        await sqliteRepository.ClearPasswordHistoryAsync(password.Id);
+        await sqliteRepository.ReplaceCustomFieldsAsync(password.Id, []);
+        await sqliteRepository.ClearVaultDataAsync(VaultClearScope.SecureItems);
+
+        Assert.Equal("Work", bridge.GetProjectTitleForEntry(database.WorkingCopyPath!, password.MdbxFolderId!));
+        Assert.Equal("Work", bridge.GetProjectTitleForEntry(database.WorkingCopyPath!, note.MdbxFolderId!));
+
+        await repository.DeleteCategoryAsync(category.Id);
+
+        var reloadedPassword = Assert.Single(await repository.GetPasswordsAsync());
+        var reloadedNote = Assert.Single(await repository.GetSecureItemsAsync(VaultItemType.Note));
+        var customField = Assert.Single(await repository.GetCustomFieldsAsync(password.Id));
+        var history = Assert.Single(await repository.GetPasswordHistoryAsync(password.Id));
+        Assert.Null(reloadedPassword.CategoryId);
+        Assert.Null(reloadedNote.CategoryId);
+        Assert.Equal("Monica", bridge.GetProjectTitleForEntry(database.WorkingCopyPath!, reloadedPassword.MdbxFolderId!));
+        Assert.Equal("Monica", bridge.GetProjectTitleForEntry(database.WorkingCopyPath!, reloadedNote.MdbxFolderId!));
+        Assert.Equal("env", customField.Title);
+        Assert.Equal("prod", customField.Value);
+        Assert.Equal("old-secret", history.Password);
+        Assert.Empty(await repository.GetCategoriesAsync());
+    }
+
+    [Fact]
     public async Task Repository_moves_mdbx_password_entry_when_category_and_login_type_change()
     {
         var repository = CreateRepository(out var bridge);

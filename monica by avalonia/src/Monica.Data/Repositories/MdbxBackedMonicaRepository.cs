@@ -632,14 +632,17 @@ public sealed class MdbxBackedMonicaRepository(
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         if (database is not null)
         {
-            var categories = (await EnsureMdbxCategoriesAsync(database, cancellationToken))
-                .Where(category => category.Id != id)
-                .ToDictionary(category => category.Id);
+            var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+            var category = categories.FirstOrDefault(category => category.Id == id);
+            if (category is not null)
+            {
+                await mdbxVaultStore.UnassignCategoryAsync(database, category, cancellationToken);
+            }
+
             foreach (var entry in (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
                          .Where(entry => entry.CategoryId == id))
             {
                 entry.CategoryId = null;
-                await SavePasswordToMdbxAsync(database, entry, categories, cancellationToken);
                 await inner.SavePasswordAsync(entry, cancellationToken);
             }
 
@@ -647,7 +650,6 @@ public sealed class MdbxBackedMonicaRepository(
                          .Where(item => item.CategoryId == id))
             {
                 item.CategoryId = null;
-                await SaveSecureItemToMdbxAsync(database, item, categories, cancellationToken);
                 await inner.SaveSecureItemAsync(item, cancellationToken);
             }
         }
