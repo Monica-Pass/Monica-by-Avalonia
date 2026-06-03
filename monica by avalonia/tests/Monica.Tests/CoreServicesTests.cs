@@ -70,11 +70,38 @@ public sealed class CoreServicesTests
         var service = new ImportExportService();
         var passwords = new[]
         {
-            new PasswordEntry { Id = 7, Title = "GitHub", Username = "dev", Password = "encrypted" }
+            new PasswordEntry
+            {
+                Id = 7,
+                Title = "GitHub",
+                Username = "dev",
+                Password = "encrypted",
+                MdbxDatabaseId = 3,
+                MdbxFolderId = "entry-1"
+            }
         };
         var items = new[]
         {
-            new SecureItem { Id = 9, ItemType = VaultItemType.Note, Title = "Note", ItemData = "{}", ImagePaths = NoteContentCodec.EncodeStringArray(["mdbx:note-image-1"]) }
+            new SecureItem
+            {
+                Id = 9,
+                ItemType = VaultItemType.Note,
+                Title = "Note",
+                ItemData = "{}",
+                ImagePaths = NoteContentCodec.EncodeStringArray(["mdbx:note-image-1"]),
+                MdbxDatabaseId = 3,
+                MdbxFolderId = "entry-2"
+            }
+        };
+        var categories = new[]
+        {
+            new Category
+            {
+                Id = 5,
+                Name = "Work",
+                MdbxDatabaseId = 3,
+                MdbxFolderId = "project-1"
+            }
         };
         var customFields = new Dictionary<long, IReadOnlyList<CustomField>>
         {
@@ -129,6 +156,7 @@ public sealed class CoreServicesTests
         var json = service.ExportJson(
             passwords,
             items,
+            categories,
             passwordCustomFields: customFields,
             passwordHistory: history,
             passwordAttachments: attachments,
@@ -136,8 +164,15 @@ public sealed class CoreServicesTests
         var package = service.ImportJson(json);
 
         Assert.Equal(71, package.SchemaVersion);
-        Assert.Single(package.Passwords);
-        Assert.Single(package.SecureItems);
+        var exportedPassword = Assert.Single(package.Passwords);
+        var exportedSecureItem = Assert.Single(package.SecureItems);
+        var exportedCategory = Assert.Single(package.Categories);
+        Assert.Null(exportedPassword.MdbxDatabaseId);
+        Assert.Null(exportedPassword.MdbxFolderId);
+        Assert.Null(exportedSecureItem.MdbxDatabaseId);
+        Assert.Null(exportedSecureItem.MdbxFolderId);
+        Assert.Null(exportedCategory.MdbxDatabaseId);
+        Assert.Null(exportedCategory.MdbxFolderId);
         Assert.Equal("Recovery", Assert.Single(Assert.Single(package.PasswordCustomFields).Fields).Title);
         Assert.Equal("old-secret", Assert.Single(Assert.Single(package.PasswordHistory).Entries).Password);
         var attachment = Assert.Single(Assert.Single(package.PasswordAttachments).Attachments);

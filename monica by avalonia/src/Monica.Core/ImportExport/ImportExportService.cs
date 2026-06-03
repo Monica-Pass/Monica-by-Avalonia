@@ -106,9 +106,9 @@ public sealed class ImportExportService : IImportExportService
             .ToHashSet();
         var package = new MonicaExportDtoPackage(
             71,
-            passwordList.Select(PasswordEntryDto.FromModel).ToList(),
-            secureItemList.Select(SecureItemDto.FromModel).ToList(),
-            (categories ?? []).Select(CategoryDto.FromModel).ToList(),
+            passwordList.Select(ToPortableDto).ToList(),
+            secureItemList.Select(ToPortableDto).ToList(),
+            (categories ?? []).Select(ToPortableDto).ToList(),
             ToCustomFieldGroupDtos(passwordCustomFields, exportedPasswordIds),
             ToPasswordHistoryGroupDtos(passwordHistory, exportedPasswordIds),
             ToPasswordAttachmentGroupDtos(passwordAttachments, exportedPasswordIds),
@@ -194,6 +194,30 @@ public sealed class ImportExportService : IImportExportService
             .OrderBy(item => item.Key)
             .Select(item => SecureItemAttachmentGroupDto.FromModel(item.Key, item.Value))
             .ToList();
+    }
+
+    private static PasswordEntryDto ToPortableDto(PasswordEntry source)
+    {
+        var dto = PasswordEntryDto.FromModel(source);
+        dto.MdbxDatabaseId = null;
+        dto.MdbxFolderId = null;
+        return dto;
+    }
+
+    private static SecureItemDto ToPortableDto(SecureItem source)
+    {
+        var dto = SecureItemDto.FromModel(source);
+        dto.MdbxDatabaseId = null;
+        dto.MdbxFolderId = null;
+        return dto;
+    }
+
+    private static CategoryDto ToPortableDto(Category source)
+    {
+        var dto = CategoryDto.FromModel(source);
+        dto.MdbxDatabaseId = null;
+        dto.MdbxFolderId = null;
+        return dto;
     }
 
     public string ExportPasswordCsv(IEnumerable<PasswordEntry> passwords)
