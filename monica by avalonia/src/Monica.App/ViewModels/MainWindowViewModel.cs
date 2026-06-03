@@ -4679,6 +4679,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             clone.CategoryId = null;
         }
 
+        clone.MdbxDatabaseId = null;
+        clone.MdbxFolderId = null;
         return clone;
     }
 
@@ -4973,6 +4975,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             StripSecureItemImages(clone);
         }
 
+        clone.MdbxDatabaseId = null;
+        clone.MdbxFolderId = null;
         return clone;
     }
 
@@ -5046,8 +5050,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             Id = source.Id,
             Name = source.Name,
-            SortOrder = source.SortOrder,
-            MdbxDatabaseId = source.MdbxDatabaseId
+            SortOrder = source.SortOrder
         };
     }
 

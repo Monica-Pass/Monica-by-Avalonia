@@ -1895,6 +1895,48 @@ public sealed class PasswordManagementTests
     }
 
     [Fact]
+    public async Task ViewModel_strips_local_mdbx_bindings_from_monica_json_export()
+    {
+        var harness = CreateHarness();
+        var category = new Category
+        {
+            Name = "Work",
+            MdbxDatabaseId = 7,
+            MdbxFolderId = "project-1"
+        };
+        await harness.Repository.SaveCategoryAsync(category);
+        var password = new PasswordEntry
+        {
+            Title = "MDBX login",
+            Password = "secret",
+            CategoryId = category.Id,
+            MdbxDatabaseId = 7,
+            MdbxFolderId = "entry-1"
+        };
+        var secureItem = new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = "MDBX note",
+            CategoryId = category.Id,
+            MdbxDatabaseId = 7,
+            MdbxFolderId = "entry-2"
+        };
+        await harness.Repository.SavePasswordAsync(password);
+        await harness.Repository.SaveSecureItemAsync(secureItem);
+        await harness.ViewModel.LoadAsync();
+
+        await harness.ViewModel.ExportDataCommand.ExecuteAsync(null);
+
+        var package = new ImportExportService().ImportJson(harness.ViewModel.ExportPreview);
+        Assert.Null(Assert.Single(package.Passwords).MdbxDatabaseId);
+        Assert.Null(Assert.Single(package.Passwords).MdbxFolderId);
+        Assert.Null(Assert.Single(package.SecureItems).MdbxDatabaseId);
+        Assert.Null(Assert.Single(package.SecureItems).MdbxFolderId);
+        Assert.Null(Assert.Single(package.Categories).MdbxDatabaseId);
+        Assert.Null(Assert.Single(package.Categories).MdbxFolderId);
+    }
+
+    [Fact]
     public async Task ViewModel_imports_password_csv_and_encrypts_passwords()
     {
         var harness = CreateHarness();
