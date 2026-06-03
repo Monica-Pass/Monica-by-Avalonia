@@ -52,7 +52,7 @@ public sealed class MdbxBackedMonicaRepository(
             if (entry is not null)
             {
                 await mdbxVaultStore.SoftDeletePasswordAsync(database, entry, cancellationToken);
-                var boundTotps = await inner.GetSecureItemsByBoundPasswordIdAsync(id, includeDeleted: true, cancellationToken);
+                var boundTotps = await GetMdbxBoundTotpsByPasswordIdAsync(database, id, includeDeleted: true, cancellationToken);
                 foreach (var item in boundTotps)
                 {
                     await mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken);
@@ -73,7 +73,7 @@ public sealed class MdbxBackedMonicaRepository(
             if (entry is not null)
             {
                 await mdbxVaultStore.RestorePasswordAsync(database, entry, cancellationToken);
-                var boundTotps = await inner.GetSecureItemsByBoundPasswordIdAsync(id, includeDeleted: true, cancellationToken);
+                var boundTotps = await GetMdbxBoundTotpsByPasswordIdAsync(database, id, includeDeleted: true, cancellationToken);
                 foreach (var item in boundTotps)
                 {
                     await mdbxVaultStore.RestoreSecureItemAsync(database, item, cancellationToken);
@@ -105,7 +105,7 @@ public sealed class MdbxBackedMonicaRepository(
                 }
 
                 await mdbxVaultStore.SoftDeletePasswordAsync(database, entry, cancellationToken);
-                var boundTotps = await inner.GetSecureItemsByBoundPasswordIdAsync(id, includeDeleted: true, cancellationToken);
+                var boundTotps = await GetMdbxBoundTotpsByPasswordIdAsync(database, id, includeDeleted: true, cancellationToken);
                 foreach (var item in boundTotps)
                 {
                     await mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken);
@@ -805,6 +805,20 @@ public sealed class MdbxBackedMonicaRepository(
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         return items
             .Where(item => !item.IsDeleted || (!string.IsNullOrWhiteSpace(item.MdbxFolderId) && deletedMdbxEntryIds.Contains(item.MdbxFolderId)))
+            .ToList();
+    }
+
+    private async Task<IReadOnlyList<SecureItem>> GetMdbxBoundTotpsByPasswordIdAsync(
+        LocalMdbxDatabase database,
+        long passwordId,
+        bool includeDeleted,
+        CancellationToken cancellationToken)
+    {
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        await MirrorUnboundSecureItemsAsync(database, categories.ToDictionary(category => category.Id), cancellationToken);
+        var items = await mdbxVaultStore.GetSecureItemsAsync(database, categories, VaultItemType.Totp, includeDeleted, cancellationToken);
+        return items
+            .Where(item => item.BoundPasswordId == passwordId)
             .ToList();
     }
 

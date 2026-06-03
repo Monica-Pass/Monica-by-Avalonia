@@ -57,6 +57,47 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
+    public async Task Repository_cascades_password_delete_restore_to_mdbx_bound_totps_when_sqlite_cache_is_missing()
+    {
+        var repository = CreateRepository(out var bridge, out var sqliteRepository);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "Portal",
+            Username = "dev",
+            Password = "secret"
+        };
+        await repository.SavePasswordAsync(password);
+        var totp = new SecureItem
+        {
+            ItemType = VaultItemType.Totp,
+            Title = "Portal OTP",
+            ItemData = """{"secret":"JBSWY3DPEHPK3PXP"}""",
+            BoundPasswordId = password.Id
+        };
+        await repository.SaveSecureItemAsync(totp);
+        await sqliteRepository.ClearVaultDataAsync(VaultClearScope.SecureItems);
+
+        Assert.Equal("Portal OTP", Assert.Single(await repository.GetSecureItemsByBoundPasswordIdAsync(password.Id)).Title);
+
+        await repository.SoftDeletePasswordAsync(password.Id);
+
+        Assert.Empty(await repository.GetPasswordsAsync());
+        Assert.Empty(await repository.GetSecureItemsByBoundPasswordIdAsync(password.Id));
+        Assert.Equal(0, bridge.CountActiveEntries(database.WorkingCopyPath!));
+        Assert.Equal(2, bridge.CountDeletedEntries(database.WorkingCopyPath!));
+
+        await repository.RestorePasswordAsync(password.Id);
+
+        Assert.Equal("Portal", Assert.Single(await repository.GetPasswordsAsync()).Title);
+        var restoredTotp = Assert.Single(await repository.GetSecureItemsByBoundPasswordIdAsync(password.Id));
+        Assert.Equal(totp.Id, restoredTotp.Id);
+        Assert.Equal("Portal OTP", restoredTotp.Title);
+        Assert.Equal(2, bridge.CountActiveEntries(database.WorkingCopyPath!));
+        Assert.Equal(0, bridge.CountDeletedEntries(database.WorkingCopyPath!));
+    }
+
+    [Fact]
     public async Task Repository_uses_remote_mdbx_working_copy_as_default_store()
     {
         var repository = CreateRepository(out var bridge);
@@ -476,6 +517,48 @@ public sealed class MdbxRepositoryTests
         Assert.Null(contentStore.TryRead("secure_attachments/front.png"));
         Assert.Null(contentStore.TryRead("secure_attachments/back.png"));
         Assert.Equal(2, bridge.CountActiveAttachmentsForEntry(database.WorkingCopyPath!, reloaded.MdbxFolderId!));
+    }
+
+    [Fact]
+    public async Task Repository_migrates_import_restored_secure_item_images_to_mdbx_attachments()
+    {
+        var contentStore = new FakeAttachmentContentStore();
+        var repository = CreateRepository(out var bridge, contentStore);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        var document = new SecureItem
+        {
+            ItemType = VaultItemType.Document,
+            Title = "Imported passport",
+            ItemData = WalletItemDataCodec.EncodeDocument(new DocumentWalletData
+            {
+                DocumentNumber = "P-123",
+                ImagePaths = ["mdbx:source-vault-image"]
+            }),
+            ImagePaths = WalletItemDataCodec.EncodeImagePaths(["mdbx:source-vault-image"])
+        };
+
+        await repository.SaveSecureItemAsync(document);
+
+        Assert.Equal("mdbx:source-vault-image", Assert.Single(WalletItemDataCodec.DecodeDocument(document).ImagePaths));
+        Assert.Equal(0, bridge.CountActiveAttachmentsForEntry(database.WorkingCopyPath!, document.MdbxFolderId!));
+
+        var restoredContent = "restored imported image bytes"u8.ToArray();
+        contentStore.Put("secure_attachments/imported-document.png", restoredContent);
+        var importedData = WalletItemDataCodec.DecodeDocument(document);
+        importedData.ImagePaths = ["secure_attachments/imported-document.png"];
+        document.ItemData = WalletItemDataCodec.EncodeDocument(importedData);
+        document.ImagePaths = WalletItemDataCodec.EncodeImagePaths(importedData.ImagePaths);
+
+        await repository.SaveSecureItemAsync(document);
+
+        var reloaded = Assert.Single(await repository.GetSecureItemsAsync(VaultItemType.Document));
+        var imagePath = Assert.Single(WalletItemDataCodec.DecodeDocument(reloaded).ImagePaths);
+
+        Assert.StartsWith("mdbx:", imagePath, StringComparison.OrdinalIgnoreCase);
+        Assert.NotEqual("mdbx:source-vault-image", imagePath);
+        Assert.Equal(restoredContent, bridge.ReadAttachmentContent(database.WorkingCopyPath!, imagePath));
+        Assert.Null(contentStore.TryRead("secure_attachments/imported-document.png"));
+        Assert.Equal(1, bridge.CountActiveAttachmentsForEntry(database.WorkingCopyPath!, reloaded.MdbxFolderId!));
     }
 
     [Fact]
