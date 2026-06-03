@@ -219,6 +219,30 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
+    public async Task Repository_updates_password_custom_fields_when_sqlite_password_cache_is_missing()
+    {
+        var repository = CreateRepository(out _, out var sqliteRepository);
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "MDBX-only fields",
+            Password = "secret"
+        };
+        await repository.SavePasswordAsync(password);
+        await sqliteRepository.ClearVaultDataAsync(VaultClearScope.Passwords);
+
+        await repository.ReplaceCustomFieldsAsync(password.Id,
+        [
+            new CustomField { EntryId = password.Id, Title = "owner", Value = "mdbx-only" }
+        ]);
+
+        var field = Assert.Single(await repository.GetCustomFieldsAsync(password.Id));
+        Assert.Equal("owner", field.Title);
+        Assert.Equal("mdbx-only", field.Value);
+        Assert.Equal([password.Id], await repository.SearchEntryIdsByCustomFieldContentAsync("mdbx-only"));
+    }
+
+    [Fact]
     public async Task Repository_does_not_return_mdbx_custom_fields_after_password_is_permanently_deleted()
     {
         var repository = CreateRepository(out _);
@@ -309,6 +333,31 @@ public sealed class MdbxRepositoryTests
         Assert.Equal(["latest-secret", "older-secret"], history.Select(item => item.Password).ToArray());
         Assert.All(history, item => Assert.Equal(password.Id, item.EntryId));
         Assert.DoesNotContain(history, item => item.Password == "sqlite-stale");
+    }
+
+    [Fact]
+    public async Task Repository_saves_password_history_when_sqlite_password_cache_is_missing()
+    {
+        var repository = CreateRepository(out _, out var sqliteRepository);
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "MDBX-only history",
+            Password = "secret"
+        };
+        await repository.SavePasswordAsync(password);
+        await sqliteRepository.ClearVaultDataAsync(VaultClearScope.Passwords);
+
+        await repository.SavePasswordHistoryAsync(new PasswordHistoryEntry
+        {
+            EntryId = password.Id,
+            Password = "history-secret",
+            LastUsedAt = DateTimeOffset.UtcNow
+        });
+
+        var history = Assert.Single(await repository.GetPasswordHistoryAsync(password.Id));
+        Assert.Equal("history-secret", history.Password);
+        Assert.Equal(password.Id, history.EntryId);
     }
 
     [Fact]

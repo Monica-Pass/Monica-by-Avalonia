@@ -239,22 +239,23 @@ public sealed class MdbxBackedMonicaRepository(
 
     public async Task ReplaceCustomFieldsAsync(long entryId, IReadOnlyList<CustomField> fields, CancellationToken cancellationToken = default)
     {
-        await inner.ReplaceCustomFieldsAsync(entryId, fields, cancellationToken);
-
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         if (database is null)
         {
-            return;
-        }
-
-        var entry = (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
-            .FirstOrDefault(item => item.Id == entryId);
-        if (entry is null)
-        {
+            await inner.ReplaceCustomFieldsAsync(entryId, fields, cancellationToken);
             return;
         }
 
         var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var entry = await FindPasswordForMdbxOperationAsync(database, categories, entryId, includeDeleted: false, cancellationToken);
+        if (entry is null)
+        {
+            await inner.ReplaceCustomFieldsAsync(entryId, fields, cancellationToken);
+            return;
+        }
+
+        await inner.SavePasswordAsync(entry, cancellationToken);
+        await inner.ReplaceCustomFieldsAsync(entryId, fields, cancellationToken);
         await SavePasswordToMdbxAsync(database, entry, categories.ToDictionary(category => category.Id), cancellationToken);
         await inner.SavePasswordAsync(entry, cancellationToken);
     }
@@ -510,6 +511,7 @@ public sealed class MdbxBackedMonicaRepository(
 
     public async Task<long> SavePasswordHistoryAsync(PasswordHistoryEntry entry, CancellationToken cancellationToken = default)
     {
+        await EnsurePasswordHistoryOwnerCacheAsync(entry.EntryId, cancellationToken);
         var id = await inner.SavePasswordHistoryAsync(entry, cancellationToken);
         await SyncPasswordHistoryOwnerToMdbxAsync(entry.EntryId, cancellationToken);
         return id;
@@ -1093,16 +1095,31 @@ public sealed class MdbxBackedMonicaRepository(
             return;
         }
 
-        var entry = (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
-            .FirstOrDefault(item => item.Id == entryId);
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var entry = await FindPasswordForMdbxOperationAsync(database, categories, entryId, includeDeleted: true, cancellationToken);
         if (entry is null)
         {
             return;
         }
 
-        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
         await SavePasswordToMdbxAsync(database, entry, categories.ToDictionary(category => category.Id), cancellationToken);
         await inner.SavePasswordAsync(entry, cancellationToken);
+    }
+
+    private async Task EnsurePasswordHistoryOwnerCacheAsync(long entryId, CancellationToken cancellationToken)
+    {
+        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
+        if (database is null)
+        {
+            return;
+        }
+
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var entry = await FindPasswordForMdbxOperationAsync(database, categories, entryId, includeDeleted: false, cancellationToken);
+        if (entry is not null)
+        {
+            await inner.SavePasswordAsync(entry, cancellationToken);
+        }
     }
 
     private async Task<long?> FindPasswordHistoryOwnerIdAsync(long historyId, CancellationToken cancellationToken)
