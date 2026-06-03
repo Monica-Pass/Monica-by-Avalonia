@@ -1099,6 +1099,35 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
+    public async Task Repository_saves_password_attachment_metadata_when_sqlite_password_cache_is_missing()
+    {
+        var repository = CreateRepository(out _, out var sqliteRepository);
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "MDBX-only metadata owner",
+            Password = "secret"
+        };
+        await repository.SavePasswordAsync(password);
+        await sqliteRepository.ClearVaultDataAsync(VaultClearScope.Passwords);
+        var attachment = new Attachment
+        {
+            OwnerType = "PASSWORD",
+            OwnerId = password.Id,
+            FileName = "metadata-only.txt",
+            ContentType = "text/plain",
+            StoragePath = "secure_attachments/metadata-only.enc",
+            SizeBytes = 42
+        };
+
+        await repository.SaveAttachmentAsync(attachment);
+
+        var saved = Assert.Single(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
+        Assert.Equal("metadata-only.txt", saved.FileName);
+        Assert.Equal(42, saved.SizeBytes);
+    }
+
+    [Fact]
     public async Task Repository_reads_password_attachment_metadata_from_mdbx_payload()
     {
         var repository = CreateRepository(out _, out var sqliteRepository);

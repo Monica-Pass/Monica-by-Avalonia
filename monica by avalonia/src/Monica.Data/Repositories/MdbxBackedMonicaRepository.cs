@@ -409,6 +409,11 @@ public sealed class MdbxBackedMonicaRepository(
 
     public async Task<long> SaveAttachmentAsync(Attachment attachment, CancellationToken cancellationToken = default)
     {
+        if (IsPasswordOwnerType(attachment.OwnerType))
+        {
+            await EnsurePasswordAttachmentOwnerCacheAsync(attachment.OwnerId, cancellationToken);
+        }
+
         var id = await inner.SaveAttachmentAsync(attachment, cancellationToken);
         if (IsPasswordOwnerType(attachment.OwnerType))
         {
@@ -1056,6 +1061,22 @@ public sealed class MdbxBackedMonicaRepository(
             : [];
         await mdbxVaultStore.SavePasswordAsync(database, entry, customFields, passwordHistory, attachments, categories.ToDictionary(category => category.Id), cancellationToken);
         await inner.SavePasswordAsync(entry, cancellationToken);
+    }
+
+    private async Task EnsurePasswordAttachmentOwnerCacheAsync(long entryId, CancellationToken cancellationToken)
+    {
+        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
+        if (database is null)
+        {
+            return;
+        }
+
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var entry = await FindPasswordForMdbxOperationAsync(database, categories, entryId, includeDeleted: false, cancellationToken);
+        if (entry is not null)
+        {
+            await inner.SavePasswordAsync(entry, cancellationToken);
+        }
     }
 
     private async Task<long?> FindPasswordAttachmentOwnerIdAsync(long attachmentId, CancellationToken cancellationToken)
