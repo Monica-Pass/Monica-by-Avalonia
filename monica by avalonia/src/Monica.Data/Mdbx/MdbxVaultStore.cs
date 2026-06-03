@@ -7,6 +7,7 @@ namespace Monica.Data.Mdbx;
 public interface IMdbxVaultStore
 {
     bool IsAvailable { get; }
+    Task<IReadOnlyList<Category>> GetCategoriesAsync(LocalMdbxDatabase database, CancellationToken cancellationToken = default);
     Task<Category> SaveCategoryAsync(LocalMdbxDatabase database, Category category, CancellationToken cancellationToken = default);
     Task<PasswordEntry> SavePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, CancellationToken cancellationToken = default);
     Task<PasswordEntry> SavePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, IReadOnlyDictionary<long, Category> categories, CancellationToken cancellationToken = default);
@@ -21,6 +22,7 @@ public interface IMdbxVaultStore
     Task<IReadOnlyList<PasswordHistoryEntry>?> GetPasswordHistoryAsync(LocalMdbxDatabase database, long entryId, CancellationToken cancellationToken = default);
     Task<long?> FindPasswordHistoryOwnerIdAsync(LocalMdbxDatabase database, long historyId, CancellationToken cancellationToken = default);
     Task<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>> GetPasswordAttachmentsByEntryIdsAsync(LocalMdbxDatabase database, IReadOnlyList<long> entryIds, CancellationToken cancellationToken = default);
+    Task<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>> GetSecureItemAttachmentsByItemIdsAsync(LocalMdbxDatabase database, IReadOnlyList<long> itemIds, CancellationToken cancellationToken = default);
     Task<byte[]?> TryReadAttachmentContentAsync(LocalMdbxDatabase database, Attachment attachment, CancellationToken cancellationToken = default);
     Task SoftDeletePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, CancellationToken cancellationToken = default);
     Task RestorePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, CancellationToken cancellationToken = default);
@@ -55,6 +57,33 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
     };
 
     public bool IsAvailable => nativeBridge.IsAvailable;
+
+    public async Task<IReadOnlyList<Category>> GetCategoriesAsync(LocalMdbxDatabase database, CancellationToken cancellationToken = default)
+    {
+        var vault = await OpenAsync(database, cancellationToken);
+        using var _ = vault;
+        var projects = await EnsureProjectsForReadAsync(vault, cancellationToken);
+        var categories = new List<Category>();
+        foreach (var project in projects
+                     .Where(project => !string.Equals(project.Title, DefaultProjectTitle, StringComparison.OrdinalIgnoreCase))
+                     .OrderBy(project => project.Title, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!await HasBusinessEntriesAsync(vault, project.ProjectId, cancellationToken))
+            {
+                continue;
+            }
+
+            categories.Add(new Category
+            {
+                Name = project.Title,
+                SortOrder = categories.Count,
+                MdbxDatabaseId = database.Id,
+                MdbxFolderId = project.ProjectId
+            });
+        }
+
+        return categories;
+    }
 
     public async Task<Category> SaveCategoryAsync(LocalMdbxDatabase database, Category category, CancellationToken cancellationToken = default)
     {
@@ -106,7 +135,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         var entryType = ToMdbxEntryType(entry);
         var payload = SerializePayload("password", new MdbxPasswordPayload
         {
-            Entry = entry,
+            Entry = ClonePasswordEntryForPayload(entry),
             CustomFields = NormalizeCustomFields(entry.Id, customFields).ToList(),
             PasswordHistory = NormalizePasswordHistory(entry.Id, passwordHistory).ToList(),
             Attachments = NormalizeAttachments(entry.Id, attachments).ToList()
@@ -342,6 +371,47 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         return result;
     }
 
+    public async Task<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>> GetSecureItemAttachmentsByItemIdsAsync(
+        LocalMdbxDatabase database,
+        IReadOnlyList<long> itemIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = itemIds.Where(id => id > 0).Distinct().ToHashSet();
+        if (ids.Count == 0)
+        {
+            return new Dictionary<long, IReadOnlyList<Attachment>>();
+        }
+
+        var vault = await OpenAsync(database, cancellationToken);
+        using var _ = vault;
+        var projects = await EnsureProjectsForReadAsync(vault, cancellationToken);
+        var records = await ListSecureRecordsAsync(vault, projects, includeDeleted: true, cancellationToken);
+        var result = new Dictionary<long, IReadOnlyList<Attachment>>();
+
+        foreach (var item in records
+                     .Select(record => (Record: record, Payload: DeserializeSecureItemPayloadSnapshot(record.PayloadJson)))
+                     .Where(item => item.Payload is not null)
+                     .OrderBy(item => item.Record.Deleted))
+        {
+            var payload = item.Payload!;
+            if (!ids.Contains(payload.Item.Id) || result.ContainsKey(payload.Item.Id))
+            {
+                continue;
+            }
+
+            var nativeAttachments = (await vault.ListAttachmentsByEntryAsync(item.Record.EntryId, cancellationToken))
+                .Where(attachment => !attachment.Deleted)
+                .ToList();
+            result[payload.Item.Id] = nativeAttachments.Count > 0
+                ? NormalizeSecureItemNativeAttachments(payload.Item.Id, nativeAttachments).ToList()
+                : payload.Attachments is { Count: > 0 }
+                ? NormalizeSecureItemAttachments(payload.Item.Id, payload.Attachments).ToList()
+                : NormalizeSecureItemAttachments(payload.Item.Id, DecodeSecureItemImagePaths(payload.Item)).ToList();
+        }
+
+        return result;
+    }
+
     public async Task<byte[]?> TryReadAttachmentContentAsync(LocalMdbxDatabase database, Attachment attachment, CancellationToken cancellationToken = default)
     {
         var attachmentId = TryParseAttachmentStoragePath(attachment.StoragePath);
@@ -408,7 +478,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         var entryType = ToMdbxEntryType(item.ItemType);
         var payload = SerializePayload("secure-item", new MdbxSecureItemPayload
         {
-            Item = item,
+            Item = CloneSecureItemForPayload(item),
             Attachments = NormalizeSecureItemAttachments(item.Id, DecodeSecureItemImagePaths(item)).ToList()
         });
         var record = await SaveEntryAsync(vault, project.ProjectId, item.MdbxFolderId, SecureEntryTypes, entryType, item.Title, payload, cancellationToken);
@@ -562,7 +632,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
             var entryType = ToMdbxEntryType(payload.Entry);
             var payloadJson = SerializePayload("password", new MdbxPasswordPayload
             {
-                Entry = payload.Entry,
+                Entry = ClonePasswordEntryForPayload(payload.Entry),
                 CustomFields = payload.CustomFields,
                 PasswordHistory = payload.PasswordHistory,
                 Attachments = payload.Attachments
@@ -589,7 +659,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
             var entryType = ToMdbxEntryType(item.ItemType);
             var payloadJson = SerializePayload("secure-item", new MdbxSecureItemPayload
             {
-                Item = item,
+                Item = CloneSecureItemForPayload(item),
                 Attachments = NormalizeSecureItemAttachments(item.Id, DecodeSecureItemImagePaths(item)).ToList()
             });
             if (!string.Equals(record.ProjectId, defaultProject.ProjectId, StringComparison.OrdinalIgnoreCase))
@@ -759,6 +829,20 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
 
         projects.Add(await vault.CreateProjectAsync(DefaultProjectTitle, cancellationToken));
         return projects;
+    }
+
+    private static async Task<bool> HasBusinessEntriesAsync(IMdbxNativeVault vault, string projectId, CancellationToken cancellationToken)
+    {
+        foreach (var entryType in PasswordEntryTypes.Concat(SecureEntryTypes))
+        {
+            if ((await vault.ListEntriesAsync(projectId, entryType, cancellationToken)).Count > 0 ||
+                (await vault.ListDeletedEntriesAsync(projectId, entryType, cancellationToken)).Count > 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static async Task<MdbxNativeProjectRecord> ResolveProjectAsync(
@@ -953,6 +1037,22 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
     private static string SerializePayload<T>(string kind, T data) =>
         JsonSerializer.Serialize(new MdbxPayload<T>(kind, 1, data), JsonOptions);
 
+    private static PasswordEntry ClonePasswordEntryForPayload(PasswordEntry entry)
+    {
+        var clone = JsonSerializer.Deserialize<PasswordEntry>(JsonSerializer.Serialize(entry, JsonOptions), JsonOptions) ?? new PasswordEntry();
+        clone.MdbxDatabaseId = null;
+        clone.MdbxFolderId = null;
+        return clone;
+    }
+
+    private static SecureItem CloneSecureItemForPayload(SecureItem item)
+    {
+        var clone = JsonSerializer.Deserialize<SecureItem>(JsonSerializer.Serialize(item, JsonOptions), JsonOptions) ?? new SecureItem();
+        clone.MdbxDatabaseId = null;
+        clone.MdbxFolderId = null;
+        return clone;
+    }
+
     private static T? DeserializePayload<T>(string payloadJson)
     {
         var payload = JsonSerializer.Deserialize<MdbxPayload<T>>(payloadJson, JsonOptions);
@@ -984,14 +1084,17 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         }
     }
 
-    private static SecureItem? DeserializeSecureItemPayload(string payloadJson)
+    private static SecureItem? DeserializeSecureItemPayload(string payloadJson) =>
+        DeserializeSecureItemPayloadSnapshot(payloadJson)?.Item;
+
+    private static SecureItemPayloadSnapshot? DeserializeSecureItemPayloadSnapshot(string payloadJson)
     {
         try
         {
             var payload = JsonSerializer.Deserialize<MdbxPayload<MdbxSecureItemPayload>>(payloadJson, JsonOptions);
             if (payload?.Data.Item is not null)
             {
-                return payload.Data.Item;
+                return new SecureItemPayloadSnapshot(payload.Data.Item, payload.Data.Attachments);
             }
         }
         catch (JsonException)
@@ -1000,7 +1103,8 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
 
         try
         {
-            return DeserializePayload<SecureItem>(payloadJson);
+            var item = DeserializePayload<SecureItem>(payloadJson);
+            return item is null ? null : new SecureItemPayloadSnapshot(item, Attachments: null);
         }
         catch (JsonException)
         {
@@ -1055,6 +1159,40 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
                 ContentType = "",
                 StoragePath = path,
                 SizeBytes = 0,
+                CreatedAt = DateTimeOffset.UtcNow
+            })
+            .ToList();
+
+    private static IReadOnlyList<Attachment> NormalizeSecureItemAttachments(long itemId, IReadOnlyList<Attachment> attachments) =>
+        attachments
+            .Where(attachment => TryParseAttachmentStoragePath(attachment.StoragePath.Trim()) is not null)
+            .Select((attachment, index) => new Attachment
+            {
+                Id = attachment.Id,
+                OwnerType = "SECURE_ITEM",
+                OwnerId = itemId,
+                FileName = string.IsNullOrWhiteSpace(attachment.FileName) ? $"image-{index + 1}" : attachment.FileName.Trim(),
+                ContentType = attachment.ContentType.Trim(),
+                StoragePath = attachment.StoragePath.Trim(),
+                SizeBytes = attachment.SizeBytes,
+                CreatedAt = attachment.CreatedAt == default ? DateTimeOffset.UtcNow : attachment.CreatedAt,
+                BitwardenVaultId = attachment.BitwardenVaultId,
+                KeepassBinaryRef = attachment.KeepassBinaryRef
+            })
+            .ToList();
+
+    private static IReadOnlyList<Attachment> NormalizeSecureItemNativeAttachments(long itemId, IReadOnlyList<MdbxNativeAttachmentRecord> attachments) =>
+        attachments
+            .OrderBy(attachment => attachment.FileName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(attachment => attachment.AttachmentId, StringComparer.OrdinalIgnoreCase)
+            .Select(attachment => new Attachment
+            {
+                OwnerType = "SECURE_ITEM",
+                OwnerId = itemId,
+                FileName = attachment.FileName.Trim(),
+                ContentType = attachment.MediaType?.Trim() ?? "",
+                StoragePath = ToAttachmentStoragePath(attachment.AttachmentId),
+                SizeBytes = checked((long)Math.Min(attachment.OriginalSize, (ulong)long.MaxValue)),
                 CreatedAt = DateTimeOffset.UtcNow
             })
             .ToList();
@@ -1125,5 +1263,9 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         PasswordEntry Entry,
         List<CustomField>? CustomFields,
         List<PasswordHistoryEntry>? PasswordHistory,
+        List<Attachment>? Attachments);
+
+    private sealed record SecureItemPayloadSnapshot(
+        SecureItem Item,
         List<Attachment>? Attachments);
 }

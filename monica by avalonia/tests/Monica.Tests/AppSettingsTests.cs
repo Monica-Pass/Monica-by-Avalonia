@@ -265,12 +265,40 @@ public sealed class AppSettingsTests
             Assert.False(string.IsNullOrWhiteSpace(database.WorkingCopyPath));
             Assert.True(File.Exists(database.WorkingCopyPath));
         });
+        var mdbxSources = viewModel.VaultSources.Where(source => source.Kind == "MDBX").ToArray();
+        Assert.Equal(2, mdbxSources.Length);
+        foreach (var database in viewModel.MdbxDatabases)
+        {
+            var source = Assert.Single(mdbxSources, source => source.DisplayName == database.Name);
+            Assert.Equal(database.WorkingCopyPath, source.LocalPath);
+            Assert.Equal(database.FilePath, source.RemoteUrl);
+        }
+
         Assert.Equal("MDBX-1", await ReadMdbxFormatVersionAsync(viewModel.MdbxDatabases[0].WorkingCopyPath!));
 
         await viewModel.OpenMdbxDatabaseCommand.ExecuteAsync(viewModel.MdbxDatabaseItems[0]);
 
         Assert.Equal(SyncStatus.PendingUpload, viewModel.MdbxDatabases[0].LastSyncStatus);
         Assert.StartsWith("Opened ", viewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ViewModel_opening_remote_mdbx_preserves_sync_status()
+    {
+        var viewModel = CreateViewModel(GetTempPath());
+        viewModel.WebDavEnabled = true;
+        viewModel.WebDavRemotePath = "/Monica";
+        await viewModel.CreateWebDavMdbxVaultCommand.ExecuteAsync(null);
+
+        var item = Assert.Single(viewModel.MdbxDatabaseItems);
+        item.Database.LastSyncStatus = SyncStatus.Synced;
+        var previousAccessedAt = item.Database.LastAccessedAt;
+
+        await viewModel.OpenMdbxDatabaseCommand.ExecuteAsync(item);
+
+        Assert.Equal(SyncStatus.Synced, viewModel.MdbxDatabases.Single().LastSyncStatus);
+        Assert.True(viewModel.MdbxDatabases.Single().LastAccessedAt >= previousAccessedAt);
+        Assert.Equal(viewModel.L.Get("Synced"), Assert.Single(viewModel.VaultSources, source => source.DisplayName == item.Name).SyncStatus);
     }
 
     [Fact]

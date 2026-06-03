@@ -17,6 +17,8 @@ public interface IMdbxVaultEngine
 
 public sealed class MdbxVaultService(IMdbxVaultEngine? engine = null, IMdbxNativeBridge? nativeBridge = null) : IMdbxVaultService
 {
+    private const string ExpectedFormatVersion = "MDBX-1";
+    private const string DeviceId = "monica-avalonia";
     private readonly IMdbxVaultEngine _engine = engine ?? new MdbxCliVaultEngine();
     private readonly IMdbxNativeBridge _nativeBridge = nativeBridge ?? new UnavailableMdbxNativeBridge();
 
@@ -25,24 +27,25 @@ public sealed class MdbxVaultService(IMdbxVaultEngine? engine = null, IMdbxNativ
         var fullPath = Path.GetFullPath(filePath);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath) ?? Environment.CurrentDirectory);
         var password = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-        if (!File.Exists(fullPath))
+        MdbxVaultInspection inspection;
+        if (_nativeBridge.IsAvailable)
         {
-            if (_nativeBridge.IsAvailable)
-            {
-                using var vault = await _nativeBridge.CreateVaultAsync(fullPath, password, "monica-avalonia", mode, cancellationToken);
-            }
-            else
+            using var vault = File.Exists(fullPath)
+                ? await _nativeBridge.OpenVaultAsync(fullPath, password, DeviceId, cancellationToken)
+                : await _nativeBridge.CreateVaultAsync(fullPath, password, DeviceId, mode, cancellationToken);
+            inspection = await InspectNativeVaultAsync(fullPath, vault, cancellationToken);
+        }
+        else
+        {
+            if (!File.Exists(fullPath))
             {
                 await _engine.CreateVaultAsync(fullPath, password, mode, cancellationToken);
             }
+
+            inspection = await _engine.InspectAsync(fullPath, cancellationToken);
         }
 
-        var inspection = await _engine.InspectAsync(fullPath, cancellationToken);
-        if (!string.Equals(inspection.FormatVersion, "MDBX-1", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException($"Expected MDBX-1 vault, found '{inspection.FormatVersion}'.");
-        }
-
+        EnsureExpectedFormat(inspection);
         var database = new LocalMdbxDatabase
         {
             Name = name,
@@ -55,7 +58,7 @@ public sealed class MdbxVaultService(IMdbxVaultEngine? engine = null, IMdbxNativ
             WorkingCopyPath = fullPath,
             IsOfflineAvailable = true,
             KdfProfile = "mdbx-1/argon2id",
-            Description = $"MDBX-1 vault {inspection.VaultId}",
+            Description = $"{ExpectedFormatVersion} vault {inspection.VaultId}",
             CreatedAt = DateTimeOffset.UtcNow,
             LastAccessedAt = DateTimeOffset.UtcNow
         };
@@ -71,23 +74,36 @@ public sealed class MdbxVaultService(IMdbxVaultEngine? engine = null, IMdbxNativ
             throw new InvalidOperationException("MDBX vault password is missing from metadata.");
         }
 
+        MdbxVaultInspection inspection;
         if (_nativeBridge.IsAvailable)
         {
-            using var vault = await _nativeBridge.OpenVaultAsync(path, database.EncryptedPassword, "monica-avalonia", cancellationToken);
+            using var vault = await _nativeBridge.OpenVaultAsync(path, database.EncryptedPassword, DeviceId, cancellationToken);
+            inspection = await InspectNativeVaultAsync(path, vault, cancellationToken);
         }
         else
         {
             await _engine.OpenVaultAsync(path, database.EncryptedPassword, cancellationToken);
+            inspection = await _engine.InspectAsync(path, cancellationToken);
         }
 
-        var inspection = await _engine.InspectAsync(path, cancellationToken);
-        if (!string.Equals(inspection.FormatVersion, "MDBX-1", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException($"Expected MDBX-1 vault, found '{inspection.FormatVersion}'.");
-        }
+        EnsureExpectedFormat(inspection);
 
         Stream stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
         return stream;
+    }
+
+    private static async Task<MdbxVaultInspection> InspectNativeVaultAsync(string path, IMdbxNativeVault vault, CancellationToken cancellationToken)
+    {
+        var info = await vault.GetInfoAsync(cancellationToken);
+        return new MdbxVaultInspection(path, true, ExpectedFormatVersion, info.VaultId, "Available");
+    }
+
+    private static void EnsureExpectedFormat(MdbxVaultInspection inspection)
+    {
+        if (!string.Equals(inspection.FormatVersion, ExpectedFormatVersion, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"Expected {ExpectedFormatVersion} vault, found '{inspection.FormatVersion}'.");
+        }
     }
 }
 
@@ -204,8 +220,6 @@ public sealed class MdbxCliVaultEngine : IMdbxVaultEngine
                 {
                     return new MdbxCliCommand(debugExe, workspace, []);
                 }
-
-                return new MdbxCliCommand("cargo", workspace, ["run", "-q", "-p", "mdbx-cli", "--"]);
             }
 
             return new MdbxCliCommand("mdbx", Environment.CurrentDirectory, []);

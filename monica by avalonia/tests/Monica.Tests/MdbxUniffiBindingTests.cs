@@ -7,6 +7,24 @@ namespace Monica.Tests;
 public sealed class MdbxUniffiBindingTests
 {
     [Fact]
+    public async Task Native_vault_service_uses_real_uniffi_bridge_without_cli_fallback()
+    {
+        var bridge = new MdbxUniffiNativeBridge();
+        Assert.True(bridge.IsAvailable);
+        var service = new MdbxVaultService(new ThrowingMdbxVaultEngine(), bridge);
+        var path = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.mdbx");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+
+        var metadata = await service.CreateLocalMetadataAsync("Native service", path, MdbxTigaMode.Multi);
+        await using var stream = await service.OpenLocalStreamAsync(metadata);
+
+        Assert.True(stream.CanWrite);
+        Assert.Equal(path, metadata.WorkingCopyPath);
+        Assert.Equal("MDBX-1", await ReadFormatVersionAsync(path));
+        Assert.StartsWith("MDBX-1 vault ", metadata.Description, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Native_bridge_creates_mdbx1_vault_and_roundtrips_entry()
     {
         var bridge = new MdbxUniffiNativeBridge();
@@ -69,5 +87,17 @@ public sealed class MdbxUniffiBindingTests
         {
             disposable.Dispose();
         }
+    }
+
+    private sealed class ThrowingMdbxVaultEngine : IMdbxVaultEngine
+    {
+        public Task CreateVaultAsync(string path, string password, MdbxTigaMode mode, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Fallback engine should not be used when real native MDBX is available.");
+
+        public Task OpenVaultAsync(string path, string password, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Fallback engine should not be used when real native MDBX is available.");
+
+        public Task<MdbxVaultInspection> InspectAsync(string path, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Fallback engine should not be used when real native MDBX is available.");
     }
 }

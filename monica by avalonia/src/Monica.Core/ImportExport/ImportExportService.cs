@@ -209,6 +209,7 @@ public sealed class ImportExportService : IImportExportService
         var dto = SecureItemDto.FromModel(source);
         dto.MdbxDatabaseId = null;
         dto.MdbxFolderId = null;
+        StripSecureItemImages(dto);
         return dto;
     }
 
@@ -218,6 +219,37 @@ public sealed class ImportExportService : IImportExportService
         dto.MdbxDatabaseId = null;
         dto.MdbxFolderId = null;
         return dto;
+    }
+
+    private static void StripSecureItemImages(SecureItemDto dto)
+    {
+        var item = dto.ToModel();
+        item.ImagePaths = "[]";
+        if (item.ItemType == VaultItemType.Note)
+        {
+            var note = NoteContentCodec.DecodeFromItem(item);
+            item.ItemData = NoteContentCodec.BuildSavePayload(
+                item.Title,
+                note.Content,
+                string.Join(",", note.Tags),
+                note.IsMarkdown,
+                []).ItemData;
+        }
+        else if (item.ItemType == VaultItemType.Document)
+        {
+            var data = WalletItemDataCodec.DecodeDocument(item);
+            data.ImagePaths.Clear();
+            item.ItemData = WalletItemDataCodec.EncodeDocument(data);
+        }
+        else if (item.ItemType == VaultItemType.BankCard)
+        {
+            var data = WalletItemDataCodec.DecodeBankCard(item);
+            data.ImagePaths.Clear();
+            item.ItemData = WalletItemDataCodec.EncodeBankCard(data);
+        }
+
+        dto.ItemData = item.ItemData;
+        dto.ImagePaths = item.ImagePaths;
     }
 
     public string ExportPasswordCsv(IEnumerable<PasswordEntry> passwords)
@@ -310,7 +342,7 @@ public sealed class ImportExportService : IImportExportService
                 decoded.Content,
                 string.Join(",", decoded.Tags),
                 decoded.IsMarkdown,
-                NoteContentCodec.DecodeImagePaths(item.ImagePaths));
+                FilterPortableImagePaths(NoteContentCodec.DecodeImagePaths(item.ImagePaths)));
 
             csv.WriteField(item.Id);
             csv.WriteField("NOTE");
@@ -722,16 +754,21 @@ public sealed class ImportExportService : IImportExportService
         if (item.ItemType == VaultItemType.BankCard)
         {
             var data = WalletItemDataCodec.DecodeBankCard(item);
-            var imagePaths = WalletItemDataCodec.EncodeImagePaths(data.ImagePaths);
+            var imagePaths = WalletItemDataCodec.EncodeImagePaths(FilterPortableImagePaths(data.ImagePaths));
             data.ImagePaths.Clear();
             return ("BANK_CARD", WalletItemDataCodec.EncodeBankCard(data), imagePaths);
         }
 
         var document = WalletItemDataCodec.DecodeDocument(item);
-        var documentImagePaths = WalletItemDataCodec.EncodeImagePaths(document.ImagePaths);
+        var documentImagePaths = WalletItemDataCodec.EncodeImagePaths(FilterPortableImagePaths(document.ImagePaths));
         document.ImagePaths.Clear();
         return ("DOCUMENT", WalletItemDataCodec.EncodeDocument(document), documentImagePaths);
     }
+
+    private static IReadOnlyList<string> FilterPortableImagePaths(IEnumerable<string> imagePaths) =>
+        imagePaths
+            .Where(path => !path.StartsWith("mdbx:", StringComparison.OrdinalIgnoreCase))
+            .ToList();
 }
 
 internal sealed record MonicaExportDtoPackage(
@@ -949,7 +986,7 @@ internal sealed class PasswordAttachmentDto
     {
         return new PasswordAttachmentDto
         {
-            Metadata = AttachmentDto.FromModel(source.Metadata),
+            Metadata = AttachmentDto.FromModel(source.Metadata, includeStoragePath: false),
             ContentBase64 = source.ContentBase64
         };
     }
@@ -991,7 +1028,7 @@ internal sealed class SecureItemAttachmentDto
     {
         return new SecureItemAttachmentDto
         {
-            Metadata = AttachmentDto.FromModel(source.Metadata),
+            Metadata = AttachmentDto.FromModel(source.Metadata, includeStoragePath: false),
             ContentBase64 = source.ContentBase64
         };
     }
@@ -1015,7 +1052,7 @@ internal sealed class AttachmentDto
     public long? BitwardenVaultId { get; set; }
     public string? KeepassBinaryRef { get; set; }
 
-    public static AttachmentDto FromModel(Attachment source)
+    public static AttachmentDto FromModel(Attachment source, bool includeStoragePath = true)
     {
         return new AttachmentDto
         {
@@ -1024,7 +1061,7 @@ internal sealed class AttachmentDto
             OwnerId = source.OwnerId,
             FileName = source.FileName,
             ContentType = source.ContentType,
-            StoragePath = source.StoragePath,
+            StoragePath = includeStoragePath ? source.StoragePath : "",
             SizeBytes = source.SizeBytes,
             CreatedAt = source.CreatedAt,
             BitwardenVaultId = source.BitwardenVaultId,

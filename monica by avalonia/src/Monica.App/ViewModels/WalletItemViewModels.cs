@@ -11,6 +11,7 @@ public sealed record WalletFieldDisplayItem(string Label, string Value, bool IsS
 public sealed partial class WalletItemEditorViewModel : ObservableObject
 {
     private readonly SecureItem? _source;
+    private IReadOnlyList<string> _hiddenMdbxImagePaths = [];
 
     public WalletItemEditorViewModel(ILocalizationService localization, SecureItem? source, VaultItemType? newItemType = null)
     {
@@ -51,7 +52,8 @@ public sealed partial class WalletItemEditorViewModel : ObservableObject
             BankName = data.BankName;
             Brand = data.Brand;
             BillingAddress = data.BillingAddress;
-            ImagePathsText = string.Join(Environment.NewLine, data.ImagePaths);
+            _hiddenMdbxImagePaths = GetMdbxImagePaths(data.ImagePaths);
+            ImagePathsText = string.Join(Environment.NewLine, FilterEditableImagePaths(data.ImagePaths));
             SelectedCardType = CardTypeOptions.FirstOrDefault(item => item.Value == data.CardTypeString) ?? CardTypeOptions[0];
             SelectedDocumentType = DocumentTypeOptions[0];
         }
@@ -65,7 +67,8 @@ public sealed partial class WalletItemEditorViewModel : ObservableObject
             IssuedBy = data.IssuedBy;
             Nationality = data.Nationality;
             AdditionalInfo = data.AdditionalInfo;
-            ImagePathsText = string.Join(Environment.NewLine, data.ImagePaths);
+            _hiddenMdbxImagePaths = GetMdbxImagePaths(data.ImagePaths);
+            ImagePathsText = string.Join(Environment.NewLine, FilterEditableImagePaths(data.ImagePaths));
             SelectedDocumentType = DocumentTypeOptions.FirstOrDefault(item => item.Value == data.DocumentTypeString) ?? DocumentTypeOptions[0];
             SelectedCardType = CardTypeOptions[0];
         }
@@ -239,8 +242,37 @@ public sealed partial class WalletItemEditorViewModel : ObservableObject
             : SelectedDocumentType.Label;
     }
 
-    private IReadOnlyList<string> GetImagePaths() =>
-        ImagePathsText.Split(["\r\n", "\n", "\r"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    private IReadOnlyList<string> GetImagePaths()
+    {
+        var result = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in ImagePathsText
+                     .Split(["\r\n", "\n", "\r"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                     .Concat(_hiddenMdbxImagePaths))
+        {
+            if (!string.IsNullOrWhiteSpace(path) && seen.Add(path))
+            {
+                result.Add(path);
+            }
+        }
+
+        return result;
+    }
+
+    private static IReadOnlyList<string> FilterEditableImagePaths(IEnumerable<string> imagePaths) =>
+        imagePaths
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Where(path => !IsMdbxImagePath(path))
+            .ToArray();
+
+    private static IReadOnlyList<string> GetMdbxImagePaths(IEnumerable<string> imagePaths) =>
+        imagePaths
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Where(IsMdbxImagePath)
+            .ToArray();
+
+    private static bool IsMdbxImagePath(string path) =>
+        path.StartsWith("mdbx:", StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed record WalletTypeChoice(VaultItemType Value, string Label);
@@ -260,7 +292,7 @@ public sealed partial class WalletItemDetailsViewModel : ObservableObject
             PrimaryText = MaskBankCard(data.CardNumber);
             SecondaryText = string.IsNullOrWhiteSpace(data.CardholderName) ? data.BankName : data.CardholderName;
             ExpiryText = $"{data.ExpiryMonth}/{data.ExpiryYear}".Trim('/');
-            ImagePaths = data.ImagePaths;
+            ImagePaths = FilterDisplayImagePaths(data.ImagePaths);
             Fields =
             [
                 new(localization.Get("CardNumber"), FormatCardNumber(data.CardNumber), true),
@@ -277,7 +309,7 @@ public sealed partial class WalletItemDetailsViewModel : ObservableObject
             PrimaryText = MaskDocumentNumber(data.DocumentNumber);
             SecondaryText = string.IsNullOrWhiteSpace(data.FullName) ? data.IssuedBy : data.FullName;
             ExpiryText = data.ExpiryDate;
-            ImagePaths = data.ImagePaths;
+            ImagePaths = FilterDisplayImagePaths(data.ImagePaths);
             Fields =
             [
                 new(localization.Get("DocumentNumber"), data.DocumentNumber, true),
@@ -309,6 +341,12 @@ public sealed partial class WalletItemDetailsViewModel : ObservableObject
     public bool HasImages { get; }
     public string FrontImagePath { get; }
     public string BackImagePath { get; }
+
+    private static IReadOnlyList<string> FilterDisplayImagePaths(IEnumerable<string> imagePaths) =>
+        imagePaths
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Where(path => !path.StartsWith("mdbx:", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
 
     private static string MaskBankCard(string value)
     {

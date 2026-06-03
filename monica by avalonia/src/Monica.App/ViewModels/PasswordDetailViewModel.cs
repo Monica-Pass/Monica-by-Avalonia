@@ -23,7 +23,7 @@ public sealed class PasswordAttachmentItem(ILocalizationService localization, At
     public string FileName => Attachment.FileName;
     public string DisplayValue => BuildAttachmentDisplayValue(localization, Attachment);
     public string StoragePath => Attachment.StoragePath;
-    public bool CanCopy => !string.IsNullOrWhiteSpace(StoragePath);
+    public bool CanCopy => !string.IsNullOrWhiteSpace(StoragePath) && !IsMdbxAttachment(StoragePath);
 
     private static string BuildAttachmentDisplayValue(ILocalizationService localization, Attachment attachment)
     {
@@ -31,10 +31,13 @@ public sealed class PasswordAttachmentItem(ILocalizationService localization, At
         {
             FormatAttachmentSize(attachment.SizeBytes),
             attachment.ContentType,
-            attachment.StoragePath
+            IsMdbxAttachment(attachment.StoragePath) ? "" : attachment.StoragePath
         }.Where(value => !string.IsNullOrWhiteSpace(value));
         return string.Join(" - ", values);
     }
+
+    private static bool IsMdbxAttachment(string storagePath) =>
+        storagePath.StartsWith("mdbx:", StringComparison.OrdinalIgnoreCase);
 
     private static string FormatAttachmentSize(long sizeBytes)
     {

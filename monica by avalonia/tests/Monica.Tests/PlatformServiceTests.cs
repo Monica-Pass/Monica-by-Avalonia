@@ -1,4 +1,5 @@
 using Monica.Core.Models;
+using Monica.Data.Mdbx;
 using Monica.Platform.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,6 +35,40 @@ public sealed class PlatformServiceTests
         Assert.Equal("mdbx-1/argon2id", metadata.KdfProfile);
         Assert.True(stream.CanWrite);
         Assert.Equal("MDBX-1", await ReadMdbxFormatVersionAsync(path));
+    }
+
+    [Fact]
+    public async Task Mdbx_service_uses_native_bridge_without_fallback_engine_when_available()
+    {
+        var bridge = new RecordingNativeBridge();
+        var service = new MdbxVaultService(new ThrowingMdbxVaultEngine(), bridge);
+        var path = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.mdbx");
+
+        var metadata = await service.CreateLocalMetadataAsync("Native", path, MdbxTigaMode.Power);
+        await using var stream = await service.OpenLocalStreamAsync(metadata);
+
+        Assert.Equal(1, bridge.CreateCalls);
+        Assert.Equal(1, bridge.OpenCalls);
+        Assert.Equal("MDBX-1 vault native-vault", metadata.Description);
+        Assert.True(stream.CanWrite);
+        Assert.True(File.Exists(path));
+    }
+
+    [Fact]
+    public async Task Mdbx_service_inspects_existing_file_with_native_bridge_without_fallback_engine_when_available()
+    {
+        var bridge = new RecordingNativeBridge();
+        var service = new MdbxVaultService(new ThrowingMdbxVaultEngine(), bridge);
+        var path = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.mdbx");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, "existing native vault");
+
+        var metadata = await service.CreateLocalMetadataAsync("Existing native", path, MdbxTigaMode.Multi);
+
+        Assert.Equal(0, bridge.CreateCalls);
+        Assert.Equal(1, bridge.OpenCalls);
+        Assert.Equal("MDBX-1 vault native-vault", metadata.Description);
+        Assert.Equal(path, metadata.WorkingCopyPath);
     }
 
     [Fact]
@@ -153,6 +188,97 @@ public sealed class PlatformServiceTests
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT format_version FROM vault_meta LIMIT 1";
         return (string)(await command.ExecuteScalarAsync() ?? "");
+    }
+
+    private sealed class ThrowingMdbxVaultEngine : IMdbxVaultEngine
+    {
+        public Task CreateVaultAsync(string path, string password, MdbxTigaMode mode, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Fallback engine should not be used when native MDBX is available.");
+
+        public Task OpenVaultAsync(string path, string password, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Fallback engine should not be used when native MDBX is available.");
+
+        public Task<MdbxVaultInspection> InspectAsync(string path, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Fallback engine should not be used when native MDBX is available.");
+    }
+
+    private sealed class RecordingNativeBridge : IMdbxNativeBridge
+    {
+        public bool IsAvailable => true;
+        public int CreateCalls { get; private set; }
+        public int OpenCalls { get; private set; }
+
+        public Task<IMdbxNativeVault> CreateVaultAsync(string path, string password, string deviceId, MdbxTigaMode mode, CancellationToken cancellationToken = default)
+        {
+            CreateCalls++;
+            Directory.CreateDirectory(Path.GetDirectoryName(path) ?? Environment.CurrentDirectory);
+            File.WriteAllText(path, "native vault");
+            return Task.FromResult<IMdbxNativeVault>(new RecordingNativeVault());
+        }
+
+        public Task<IMdbxNativeVault> OpenVaultAsync(string path, string password, string deviceId, CancellationToken cancellationToken = default)
+        {
+            OpenCalls++;
+            return Task.FromResult<IMdbxNativeVault>(new RecordingNativeVault());
+        }
+    }
+
+    private sealed class RecordingNativeVault : IMdbxNativeVault
+    {
+        public Task<MdbxNativeVaultInfo> GetInfoAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new MdbxNativeVaultInfo("native-vault", "native-device"));
+
+        public Task<MdbxNativeProjectRecord> CreateProjectAsync(string title, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<MdbxNativeProjectRecord>> ListProjectsAsync(bool includeDeleted, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<MdbxNativeEntryRecord> CreateEntryAsync(string projectId, string entryType, string title, string payloadJson, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<MdbxNativeEntryRecord>> ListEntriesAsync(string projectId, string? entryType = null, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<MdbxNativeEntryRecord>> ListDeletedEntriesAsync(string projectId, string? entryType = null, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<MdbxNativeEntryRecord> UpdateEntryAsync(string projectId, string entryId, string entryType, string title, string payloadJson, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<MdbxNativeEntryRecord> MoveEntryAsync(string projectId, string entryId, string targetProjectId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task DeleteEntryAsync(string projectId, string entryId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<MdbxNativeEntryRecord> RestoreEntryAsync(string projectId, string entryId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<MdbxNativeAttachmentRecord> CreateAttachmentMetadataAsync(string projectId, string? entryId, string fileName, string? mediaType, string contentHash, ulong originalSize, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<MdbxNativeAttachmentRecord>> ListAttachmentsByProjectAsync(string projectId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<MdbxNativeAttachmentRecord>> ListAttachmentsByEntryAsync(string entryId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<MdbxNativeAttachmentRecord> WriteAttachmentInlineContentAsync(string attachmentId, byte[] content, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<byte[]> ReadAttachmentContentAsync(string attachmentId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<MdbxNativeAttachmentRecord> RenameAttachmentAsync(string attachmentId, string fileName, string? mediaType, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task DeleteAttachmentAsync(string attachmentId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public void Dispose()
+        {
+        }
     }
 
     [Fact]

@@ -163,6 +163,7 @@ public sealed class CoreServicesTests
             secureItemAttachments: secureItemAttachments);
         var package = service.ImportJson(json);
 
+        Assert.DoesNotContain("mdbx:", json, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(71, package.SchemaVersion);
         var exportedPassword = Assert.Single(package.Passwords);
         var exportedSecureItem = Assert.Single(package.SecureItems);
@@ -171,15 +172,19 @@ public sealed class CoreServicesTests
         Assert.Null(exportedPassword.MdbxFolderId);
         Assert.Null(exportedSecureItem.MdbxDatabaseId);
         Assert.Null(exportedSecureItem.MdbxFolderId);
+        Assert.DoesNotContain("mdbx:", exportedSecureItem.ImagePaths, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("mdbx:", exportedSecureItem.ItemData, StringComparison.OrdinalIgnoreCase);
         Assert.Null(exportedCategory.MdbxDatabaseId);
         Assert.Null(exportedCategory.MdbxFolderId);
         Assert.Equal("Recovery", Assert.Single(Assert.Single(package.PasswordCustomFields).Fields).Title);
         Assert.Equal("old-secret", Assert.Single(Assert.Single(package.PasswordHistory).Entries).Password);
         var attachment = Assert.Single(Assert.Single(package.PasswordAttachments).Attachments);
         Assert.Equal("recovery.txt", attachment.Metadata.FileName);
+        Assert.Equal("", attachment.Metadata.StoragePath);
         Assert.Equal("recovery", Encoding.UTF8.GetString(Convert.FromBase64String(attachment.ContentBase64)));
         var secureItemAttachment = Assert.Single(Assert.Single(package.SecureItemAttachments).Attachments);
         Assert.Equal("note-image-1", secureItemAttachment.Metadata.FileName);
+        Assert.Equal("", secureItemAttachment.Metadata.StoragePath);
         Assert.Equal("note image", Encoding.UTF8.GetString(Convert.FromBase64String(secureItemAttachment.ContentBase64)));
     }
 
@@ -315,7 +320,7 @@ public sealed class CoreServicesTests
     public void Import_export_exports_notes_as_winui_compatible_csv()
     {
         var service = new ImportExportService();
-        var payload = NoteContentCodec.BuildSavePayload("Recovery", "# backup codes\nalpha", "ops, personal", true, ["inline.png"]);
+        var payload = NoteContentCodec.BuildSavePayload("Recovery", "# backup codes\nalpha", "ops, personal", true, ["inline.png", "mdbx:note-image-1"]);
         var items = new[]
         {
             new SecureItem
@@ -340,16 +345,40 @@ public sealed class CoreServicesTests
         Assert.Contains("backup codes", csv);
         Assert.Contains("ops", csv);
         Assert.Contains("inline.png", csv);
+        Assert.DoesNotContain("mdbx:", csv, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("True", csv);
         Assert.Contains("3000,4000", csv);
         Assert.DoesNotContain("Authenticator", csv);
     }
 
     [Fact]
+    public void Import_export_omits_mdbx_image_paths_from_wallet_csv()
+    {
+        var service = new ImportExportService();
+        var item = new SecureItem
+        {
+            Id = 61,
+            ItemType = VaultItemType.Document,
+            Title = "Passport",
+            ItemData = WalletItemDataCodec.EncodeDocument(new DocumentWalletData
+            {
+                FullName = "Dev User",
+                ImagePaths = ["passport-front.png", "mdbx:document-image-1"]
+            }),
+            ImagePaths = WalletItemDataCodec.EncodeImagePaths(["passport-front.png", "mdbx:document-image-1"])
+        };
+
+        var csv = service.ExportWalletCsv([item]);
+
+        Assert.Contains("passport-front.png", csv);
+        Assert.DoesNotContain("mdbx:", csv, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Import_export_imports_winui_compatible_note_csv()
     {
         var service = new ImportExportService();
-        var payload = NoteContentCodec.BuildSavePayload("Recovery", "# backup codes\nalpha", "ops, personal", true, ["inline.png"]);
+        var payload = NoteContentCodec.BuildSavePayload("Recovery", "# backup codes\nalpha", "ops, personal", true, ["inline.png", "mdbx:note-image-1"]);
         var csv = service.ExportNoteCsv(
         [
             new SecureItem
@@ -377,6 +406,7 @@ public sealed class CoreServicesTests
         Assert.True(decoded.IsMarkdown);
         Assert.True(imported.IsFavorite);
         Assert.Contains("inline.png", NoteContentCodec.DecodeImagePaths(imported.ImagePaths));
+        Assert.DoesNotContain("mdbx:note-image-1", NoteContentCodec.DecodeImagePaths(imported.ImagePaths));
         Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(3000), imported.CreatedAt);
         Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(4000), imported.UpdatedAt);
     }

@@ -1013,6 +1013,102 @@ public sealed class PasswordManagementTests
     }
 
     [Fact]
+    public async Task ViewModel_load_clears_secure_item_selections_missing_from_repository_snapshot()
+    {
+        var harness = CreateHarness();
+        var notePayload = NoteContentCodec.BuildSavePayload("Recovery", "backup codes", "ops", true, []);
+        var note = new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = notePayload.Title,
+            Notes = notePayload.NotesCache,
+            ItemData = notePayload.ItemData,
+            ImagePaths = notePayload.ImagePaths
+        };
+        var wallet = new SecureItem
+        {
+            ItemType = VaultItemType.Document,
+            Title = "Passport",
+            ItemData = WalletItemDataCodec.EncodeDocument(new DocumentWalletData
+            {
+                DocumentNumber = "P12345678"
+            }),
+            ImagePaths = "[]"
+        };
+        await harness.Repository.SaveSecureItemAsync(note);
+        await harness.Repository.SaveSecureItemAsync(wallet);
+        await harness.ViewModel.LoadAsync();
+        harness.ViewModel.SelectedNote = Assert.Single(harness.ViewModel.NoteItems);
+        harness.ViewModel.SelectedWalletItem = Assert.Single(harness.ViewModel.WalletItems);
+
+        await harness.Repository.SoftDeleteSecureItemAsync(note.Id);
+        await harness.Repository.SoftDeleteSecureItemAsync(wallet.Id);
+        await harness.ViewModel.LoadAsync();
+
+        Assert.Null(harness.ViewModel.SelectedNote);
+        Assert.Equal("", harness.ViewModel.NoteTitle);
+        Assert.Equal("", harness.ViewModel.NoteContent);
+        Assert.Null(harness.ViewModel.SelectedWalletItem);
+        Assert.Null(harness.ViewModel.SelectedWalletDetails);
+        Assert.False(harness.ViewModel.HasSelectedWalletItem);
+    }
+
+    [Fact]
+    public void Wallet_details_hide_mdbx_image_storage_ids()
+    {
+        var data = new DocumentWalletData
+        {
+            DocumentNumber = "P12345678",
+            FullName = "Ada Lovelace",
+            ImagePaths = ["front.png", "mdbx:document-image-1"]
+        };
+        var details = new WalletItemDetailsViewModel(
+            new LocalizationService(),
+            new SecureItem
+            {
+                ItemType = VaultItemType.Document,
+                Title = "Passport",
+                ItemData = WalletItemDataCodec.EncodeDocument(data),
+                ImagePaths = WalletItemDataCodec.EncodeImagePaths(data.ImagePaths)
+            });
+
+        Assert.Equal(["front.png"], details.ImagePaths);
+        Assert.True(details.HasImages);
+        Assert.Equal("front.png", details.FrontImagePath);
+        Assert.DoesNotContain(details.ImagePaths, path => path.StartsWith("mdbx:", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Wallet_editor_hides_mdbx_image_storage_ids_but_preserves_them_on_save()
+    {
+        var data = new DocumentWalletData
+        {
+            DocumentNumber = "P12345678",
+            FullName = "Ada Lovelace",
+            ImagePaths = ["front.png", "mdbx:document-image-1"]
+        };
+        var item = new SecureItem
+        {
+            ItemType = VaultItemType.Document,
+            Title = "Passport",
+            ItemData = WalletItemDataCodec.EncodeDocument(data),
+            ImagePaths = WalletItemDataCodec.EncodeImagePaths(data.ImagePaths)
+        };
+        var editor = new WalletItemEditorViewModel(new LocalizationService(), item);
+
+        Assert.Contains("front.png", editor.ImagePathsText, StringComparison.Ordinal);
+        Assert.DoesNotContain("mdbx:", editor.ImagePathsText, StringComparison.OrdinalIgnoreCase);
+
+        editor.FullName = "Ada Byron";
+        editor.ImagePathsText = "front.png\nback.png";
+        editor.ApplyTo(item);
+
+        var updated = WalletItemDataCodec.DecodeDocument(item);
+        Assert.Equal(["front.png", "back.png", "mdbx:document-image-1"], updated.ImagePaths);
+        Assert.Equal(WalletItemDataCodec.EncodeImagePaths(updated.ImagePaths), item.ImagePaths);
+    }
+
+    [Fact]
     public async Task ViewModel_moves_selected_passwords_to_category_and_updates_bound_totp()
     {
         var harness = CreateHarness();
@@ -1643,6 +1739,44 @@ public sealed class PasswordManagementTests
         Assert.Equal("picked.txt", added.FileName);
         Assert.Equal("secure_attachments/picked.enc", added.StoragePath);
         Assert.True(harness.ViewModel.Passwords.Single().HasAttachments);
+    }
+
+    [Fact]
+    public async Task Password_details_hide_mdbx_attachment_storage_ids()
+    {
+        var localization = new LocalizationService();
+        var clipboard = new CapturingClipboardService();
+        var details = new PasswordDetailViewModel(
+            localization,
+            clipboard,
+            new CryptoService(),
+            new TotpService(),
+            new PasswordEntry { Id = 42, Title = "MDBX Login", Password = "secret" },
+            [],
+            category: null,
+            boundNote: null,
+            attachments:
+            [
+                new Attachment
+                {
+                    OwnerType = "PASSWORD",
+                    OwnerId = 42,
+                    FileName = "recovery.txt",
+                    ContentType = "text/plain",
+                    StoragePath = "mdbx:attachment-1",
+                    SizeBytes = 128
+                }
+            ],
+            customFields: []);
+
+        var attachment = Assert.Single(details.Attachments);
+
+        Assert.False(attachment.CanCopy);
+        Assert.DoesNotContain("mdbx:", attachment.DisplayValue, StringComparison.OrdinalIgnoreCase);
+
+        await details.CopyAttachmentPathCommand.ExecuteAsync(attachment);
+
+        Assert.Equal("", clipboard.Text);
     }
 
     [Fact]

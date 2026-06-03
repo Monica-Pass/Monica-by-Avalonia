@@ -1225,6 +1225,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             RefreshMdbxVaultState();
             RefreshVaultSources();
             await LoadTotpItemsAsync();
+            ReconcileSecureItemSelectionsAfterLoad();
             await LoadTimelineAsync();
             RefreshSecurityAnalysis();
             RaiseCounts();
@@ -2566,12 +2567,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void AddNote()
     {
         SelectedNote = null;
-        NoteTitle = "";
-        NoteContent = "";
-        NoteTagsText = "";
-        NoteIsMarkdown = true;
-        NotePreviewMode = false;
-        NoteIsFavorite = false;
+        ResetNoteEditor();
         StatusMessage = _localization.Get("EditingNewSecureNote");
     }
 
@@ -3878,7 +3874,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         await using var stream = await _mdbxVaultService.OpenLocalStreamAsync(item.Database);
         item.Database.LastAccessedAt = DateTimeOffset.UtcNow;
-        item.Database.LastSyncStatus = item.IsRemote ? SyncStatus.PendingUpload : SyncStatus.LocalOnly;
         await _repository.SaveMdbxDatabaseAsync(item.Database);
         RefreshMdbxVaultState();
         RefreshVaultSources();
@@ -4182,11 +4177,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         foreach (var database in MdbxDatabases)
         {
+            var isLocalMdbx = IsLocalMdbxDatabase(database);
+            var localPath = string.IsNullOrWhiteSpace(database.WorkingCopyPath)
+                ? database.FilePath
+                : database.WorkingCopyPath;
+            var remotePath = isLocalMdbx
+                ? _localization.Get("LocalOnly")
+                : string.IsNullOrWhiteSpace(database.FilePath) ? _localization.Get("NotConfigured") : database.FilePath;
             VaultSources.Add(new VaultSourceDisplayItem(
                 string.IsNullOrWhiteSpace(database.Name) ? "MDBX" : database.Name,
                 "MDBX",
-                string.IsNullOrWhiteSpace(database.FilePath) ? _localization.Get("NotConfigured") : database.FilePath,
-                database.StorageLocation.ToString(),
+                string.IsNullOrWhiteSpace(localPath) ? _localization.Get("NotConfigured") : localPath,
+                remotePath,
                 LocalizeSyncStatus(database.LastSyncStatus)));
         }
 
@@ -6445,6 +6447,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         if (item is null)
         {
+            ResetNoteEditor();
             return;
         }
 
@@ -6456,5 +6459,32 @@ public sealed partial class MainWindowViewModel : ObservableObject
         NoteIsFavorite = item.IsFavorite;
         NotePreviewMode = decoded.IsMarkdown;
         StatusMessage = _localization.Format("EditingNoteFormat", item.Title);
+    }
+
+    private void ReconcileSecureItemSelectionsAfterLoad()
+    {
+        if (SelectedNote is not null)
+        {
+            SelectedNote = SelectedNote.Id > 0
+                ? NoteItems.FirstOrDefault(item => item.Id == SelectedNote.Id)
+                : null;
+        }
+
+        if (SelectedWalletItem is not null)
+        {
+            SelectedWalletItem = SelectedWalletItem.Id > 0
+                ? WalletItems.FirstOrDefault(item => item.Id == SelectedWalletItem.Id)
+                : null;
+        }
+    }
+
+    private void ResetNoteEditor()
+    {
+        NoteTitle = "";
+        NoteContent = "";
+        NoteTagsText = "";
+        NoteIsMarkdown = true;
+        NotePreviewMode = false;
+        NoteIsFavorite = false;
     }
 }
