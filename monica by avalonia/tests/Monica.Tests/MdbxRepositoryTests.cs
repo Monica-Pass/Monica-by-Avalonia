@@ -713,6 +713,74 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
+    public async Task Repository_preserves_mdbx_only_attachment_metadata_when_password_is_resaved()
+    {
+        var repository = CreateRepository(out var bridge, out var sqliteRepository);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "Preserve attachment",
+            Password = "secret"
+        };
+        await repository.SavePasswordAsync(password);
+        var attachment = new Attachment
+        {
+            OwnerType = "PASSWORD",
+            OwnerId = password.Id,
+            FileName = "codes.txt",
+            ContentType = "text/plain",
+            StoragePath = "secure_attachments/codes.enc",
+            SizeBytes = 5
+        };
+        await repository.SaveAttachmentAsync(attachment, "codes"u8.ToArray());
+        var savedAttachment = Assert.Single(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
+        await sqliteRepository.DeleteAttachmentAsync(savedAttachment.Id, savedAttachment);
+
+        password.Title = "Preserved attachment";
+        await repository.SavePasswordAsync(password);
+
+        var reloadedAttachment = Assert.Single(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
+        Assert.Equal("codes.txt", reloadedAttachment.FileName);
+        Assert.Equal(savedAttachment.StoragePath, reloadedAttachment.StoragePath);
+        Assert.Equal("codes"u8.ToArray(), bridge.ReadAttachmentContent(database.WorkingCopyPath!, reloadedAttachment.StoragePath));
+    }
+
+    [Fact]
+    public async Task Repository_preserves_mdbx_only_attachment_metadata_when_custom_fields_change()
+    {
+        var repository = CreateRepository(out var bridge, out var sqliteRepository);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "Preserve fields attachment",
+            Password = "secret"
+        };
+        await repository.SavePasswordAsync(password);
+        var attachment = new Attachment
+        {
+            OwnerType = "PASSWORD",
+            OwnerId = password.Id,
+            FileName = "codes.txt",
+            ContentType = "text/plain",
+            StoragePath = "secure_attachments/codes.enc",
+            SizeBytes = 5
+        };
+        await repository.SaveAttachmentAsync(attachment, "codes"u8.ToArray());
+        var savedAttachment = Assert.Single(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
+        await sqliteRepository.DeleteAttachmentAsync(savedAttachment.Id, savedAttachment);
+
+        await repository.ReplaceCustomFieldsAsync(password.Id,
+        [
+            new CustomField { Title = "Hint", Value = "Keep attachment" }
+        ]);
+
+        var reloadedAttachment = Assert.Single(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
+        Assert.Equal("codes.txt", reloadedAttachment.FileName);
+        Assert.Equal(savedAttachment.StoragePath, reloadedAttachment.StoragePath);
+        Assert.Equal("codes"u8.ToArray(), bridge.ReadAttachmentContent(database.WorkingCopyPath!, reloadedAttachment.StoragePath));
+    }
+
+    [Fact]
     public async Task Repository_updates_mdbx_attachment_metadata_after_delete()
     {
         var repository = CreateRepository(out var bridge);
