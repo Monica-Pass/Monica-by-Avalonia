@@ -448,13 +448,23 @@ public sealed class MonicaRepository(
         }
         else
         {
-            await connection.ExecuteAsync(
+            var parameters = ToRow(_vaultDataProtector.Protect(entry));
+            var updated = await connection.ExecuteAsync(
                 """
                 UPDATE password_history_entries
                 SET entry_id=@EntryId, password=@Password, last_used_at=@LastUsedAt
                 WHERE id=@Id
                 """,
-                ToRow(_vaultDataProtector.Protect(entry)));
+                parameters);
+            if (updated == 0)
+            {
+                await connection.ExecuteAsync(
+                    """
+                    INSERT INTO password_history_entries(id, entry_id, password, last_used_at)
+                    VALUES(@Id, @EntryId, @Password, @LastUsedAt)
+                    """,
+                    parameters);
+            }
         }
 
         return entry.Id;

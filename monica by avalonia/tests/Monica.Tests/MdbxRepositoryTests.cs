@@ -361,6 +361,44 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
+    public async Task Repository_updates_existing_mdbx_history_when_sqlite_cache_is_missing()
+    {
+        var repository = CreateRepository(out _, out var sqliteRepository);
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "MDBX-only mutable history",
+            Password = "secret"
+        };
+        await repository.SavePasswordAsync(password);
+        for (var index = 0; index < 3; index++)
+        {
+            await repository.SavePasswordHistoryAsync(new PasswordHistoryEntry
+            {
+                EntryId = password.Id,
+                Password = $"mdbx-history-{index}",
+                LastUsedAt = DateTimeOffset.UtcNow.AddMinutes(index)
+            });
+        }
+
+        await sqliteRepository.ClearVaultDataAsync(VaultClearScope.Passwords);
+
+        await repository.TrimPasswordHistoryAsync(password.Id, 2);
+
+        var trimmed = await repository.GetPasswordHistoryAsync(password.Id);
+        Assert.Equal(["mdbx-history-2", "mdbx-history-1"], trimmed.Select(item => item.Password).ToArray());
+
+        await repository.DeletePasswordHistoryAsync(trimmed[0].Id);
+
+        Assert.Equal("mdbx-history-1", Assert.Single(await repository.GetPasswordHistoryAsync(password.Id)).Password);
+
+        await sqliteRepository.ClearVaultDataAsync(VaultClearScope.Passwords);
+        await repository.ClearPasswordHistoryAsync(password.Id);
+
+        Assert.Empty(await repository.GetPasswordHistoryAsync(password.Id));
+    }
+
+    [Fact]
     public async Task Repository_trims_deletes_and_clears_password_history_in_mdbx_payload()
     {
         var repository = CreateRepository(out _, out var sqliteRepository);

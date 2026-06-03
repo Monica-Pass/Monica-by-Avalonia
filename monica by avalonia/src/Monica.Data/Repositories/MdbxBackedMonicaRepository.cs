@@ -519,6 +519,7 @@ public sealed class MdbxBackedMonicaRepository(
 
     public async Task TrimPasswordHistoryAsync(long entryId, int limit, CancellationToken cancellationToken = default)
     {
+        await EnsurePasswordHistoryCacheAsync(entryId, cancellationToken);
         await inner.TrimPasswordHistoryAsync(entryId, limit, cancellationToken);
         await SyncPasswordHistoryOwnerToMdbxAsync(entryId, cancellationToken);
     }
@@ -526,6 +527,11 @@ public sealed class MdbxBackedMonicaRepository(
     public async Task DeletePasswordHistoryAsync(long id, CancellationToken cancellationToken = default)
     {
         var entryId = await FindPasswordHistoryOwnerIdAsync(id, cancellationToken);
+        if (entryId is not null)
+        {
+            await EnsurePasswordHistoryCacheAsync(entryId.Value, cancellationToken);
+        }
+
         await inner.DeletePasswordHistoryAsync(id, cancellationToken);
         if (entryId is not null)
         {
@@ -535,6 +541,7 @@ public sealed class MdbxBackedMonicaRepository(
 
     public async Task ClearPasswordHistoryAsync(long entryId, CancellationToken cancellationToken = default)
     {
+        await EnsurePasswordHistoryOwnerCacheAsync(entryId, cancellationToken);
         await inner.ClearPasswordHistoryAsync(entryId, cancellationToken);
         await SyncPasswordHistoryOwnerToMdbxAsync(entryId, cancellationToken);
     }
@@ -1119,6 +1126,27 @@ public sealed class MdbxBackedMonicaRepository(
         if (entry is not null)
         {
             await inner.SavePasswordAsync(entry, cancellationToken);
+        }
+    }
+
+    private async Task EnsurePasswordHistoryCacheAsync(long entryId, CancellationToken cancellationToken)
+    {
+        await EnsurePasswordHistoryOwnerCacheAsync(entryId, cancellationToken);
+        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
+        if (database is null)
+        {
+            return;
+        }
+
+        var history = await mdbxVaultStore.GetPasswordHistoryAsync(database, entryId, cancellationToken);
+        if (history is null || history.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var item in history)
+        {
+            await inner.SavePasswordHistoryAsync(item, cancellationToken);
         }
     }
 
