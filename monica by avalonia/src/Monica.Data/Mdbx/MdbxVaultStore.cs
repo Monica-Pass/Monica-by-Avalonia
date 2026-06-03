@@ -15,6 +15,7 @@ public interface IMdbxVaultStore
     Task<PasswordEntry> SavePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, IReadOnlyList<CustomField> customFields, IReadOnlyList<PasswordHistoryEntry> passwordHistory, IReadOnlyList<Attachment> attachments, IReadOnlyDictionary<long, Category> categories, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PasswordEntry>> GetPasswordsAsync(LocalMdbxDatabase database, bool includeDeleted = false, bool includeArchived = false, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PasswordEntry>> GetPasswordsAsync(LocalMdbxDatabase database, IReadOnlyList<Category> categories, bool includeDeleted = false, bool includeArchived = false, CancellationToken cancellationToken = default);
+    Task<PasswordEntry?> FindPasswordAsync(LocalMdbxDatabase database, IReadOnlyList<Category> categories, long entryId, bool includeDeleted = false, CancellationToken cancellationToken = default);
     Task<IReadOnlyDictionary<long, IReadOnlyList<CustomField>>> GetPasswordCustomFieldsByEntryIdsAsync(LocalMdbxDatabase database, IReadOnlyList<long> entryIds, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<long>> SearchPasswordEntryIdsByCustomFieldContentAsync(LocalMdbxDatabase database, string query, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PasswordHistoryEntry>?> GetPasswordHistoryAsync(LocalMdbxDatabase database, long entryId, CancellationToken cancellationToken = default);
@@ -150,6 +151,39 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
             .ThenBy(entry => entry.SortOrder)
             .ThenByDescending(entry => entry.UpdatedAt)
             .ToList();
+    }
+
+    public async Task<PasswordEntry?> FindPasswordAsync(LocalMdbxDatabase database, IReadOnlyList<Category> categories, long entryId, bool includeDeleted = false, CancellationToken cancellationToken = default)
+    {
+        if (entryId <= 0)
+        {
+            return null;
+        }
+
+        var vault = await OpenAsync(database, cancellationToken);
+        using var _ = vault;
+        var projects = await EnsureProjectsForReadAsync(vault, cancellationToken);
+        var categoryByProjectId = BuildCategoryByProjectId(categories, projects);
+        var records = await ListPasswordRecordsAsync(vault, projects, includeDeleted, cancellationToken);
+        foreach (var item in records
+                     .Select(record => (Record: record, Payload: DeserializePasswordPayload(record.PayloadJson)))
+                     .Where(item => item.Payload?.Entry.Id == entryId)
+                     .OrderBy(item => item.Record.Deleted))
+        {
+            var record = item.Record;
+            var entry = item.Payload!.Entry;
+            entry.MdbxDatabaseId = database.Id;
+            entry.MdbxFolderId = record.EntryId;
+            if (categoryByProjectId.TryGetValue(record.ProjectId, out var categoryId))
+            {
+                entry.CategoryId = categoryId;
+            }
+
+            entry.IsDeleted = record.Deleted;
+            return entry;
+        }
+
+        return null;
     }
 
     public async Task<IReadOnlyDictionary<long, IReadOnlyList<CustomField>>> GetPasswordCustomFieldsByEntryIdsAsync(

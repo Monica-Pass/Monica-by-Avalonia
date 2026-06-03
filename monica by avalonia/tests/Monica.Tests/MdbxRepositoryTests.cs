@@ -1330,6 +1330,105 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
+    public async Task Repository_uses_mdbx_password_payload_when_sqlite_password_cache_is_missing()
+    {
+        var repository = CreateRepository(out _, out var sqliteRepository);
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "Payload truth",
+            Password = "secret"
+        };
+        await repository.SavePasswordAsync(password);
+        await repository.ReplaceCustomFieldsAsync(password.Id, [
+            new CustomField
+            {
+                EntryId = password.Id,
+                Title = "env",
+                Value = "prod"
+            }
+        ]);
+        await repository.SavePasswordHistoryAsync(new PasswordHistoryEntry
+        {
+            EntryId = password.Id,
+            Password = "old-secret",
+            LastUsedAt = DateTimeOffset.UtcNow.AddDays(-1)
+        });
+        var content = "payload bytes"u8.ToArray();
+        var attachment = new Attachment
+        {
+            OwnerType = "PASSWORD",
+            OwnerId = password.Id,
+            FileName = "payload.txt",
+            ContentType = "text/plain",
+            StoragePath = "secure_attachments/payload.enc",
+            SizeBytes = content.Length
+        };
+        await repository.SaveAttachmentAsync(attachment, content);
+        await sqliteRepository.ClearVaultDataAsync(VaultClearScope.Passwords);
+
+        var reloaded = Assert.Single(await repository.GetPasswordsAsync());
+        var field = Assert.Single(await repository.GetCustomFieldsAsync(password.Id));
+        var history = Assert.Single(await repository.GetPasswordHistoryAsync(password.Id));
+        var savedAttachment = Assert.Single(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
+        Assert.Equal(password.Id, reloaded.Id);
+        Assert.Equal("env", field.Title);
+        Assert.Equal("prod", field.Value);
+        Assert.Equal("old-secret", history.Password);
+        Assert.Equal("payload.txt", savedAttachment.FileName);
+        Assert.Equal(content, await repository.TryReadAttachmentContentAsync(savedAttachment));
+
+        await repository.SoftDeletePasswordAsync(password.Id);
+
+        Assert.Empty(await repository.GetPasswordsAsync());
+
+        await repository.RestorePasswordAsync(password.Id);
+
+        Assert.Equal("Payload truth", Assert.Single(await repository.GetPasswordsAsync()).Title);
+    }
+
+    [Fact]
+    public async Task Repository_permanently_deletes_mdbx_password_when_sqlite_password_cache_is_missing()
+    {
+        var repository = CreateRepository(out var bridge, out var sqliteRepository);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "MDBX-only delete",
+            Password = "secret"
+        };
+        await repository.SavePasswordAsync(password);
+        var totp = new SecureItem
+        {
+            ItemType = VaultItemType.Totp,
+            Title = "MDBX-only OTP",
+            ItemData = """{"secret":"JBSWY3DPEHPK3PXP"}""",
+            BoundPasswordId = password.Id
+        };
+        await repository.SaveSecureItemAsync(totp);
+        var attachment = new Attachment
+        {
+            OwnerType = "PASSWORD",
+            OwnerId = password.Id,
+            FileName = "codes.txt",
+            ContentType = "text/plain",
+            StoragePath = "secure_attachments/codes.enc",
+            SizeBytes = 5
+        };
+        await repository.SaveAttachmentAsync(attachment, "codes"u8.ToArray());
+        var savedAttachment = Assert.Single(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
+        await sqliteRepository.ClearVaultDataAsync(VaultClearScope.Passwords);
+
+        await repository.DeletePasswordPermanentlyAsync(password.Id);
+
+        Assert.Empty(await repository.GetPasswordsAsync());
+        Assert.Equal(0, bridge.CountActiveEntries(database.WorkingCopyPath!));
+        Assert.Equal(2, bridge.CountDeletedEntries(database.WorkingCopyPath!));
+        Assert.Equal(0, bridge.CountActiveAttachments(database.WorkingCopyPath!));
+        Assert.Null(bridge.TryReadAttachmentContent(database.WorkingCopyPath!, savedAttachment.StoragePath));
+    }
+
+    [Fact]
     public async Task Repository_permanent_delete_removes_attachments_found_only_in_mdbx_payload()
     {
         var repository = CreateRepository(out var bridge, out var sqliteRepository);

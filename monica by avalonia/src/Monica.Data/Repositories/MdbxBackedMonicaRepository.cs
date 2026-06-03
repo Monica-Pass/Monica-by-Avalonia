@@ -47,8 +47,8 @@ public sealed class MdbxBackedMonicaRepository(
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         if (database is not null)
         {
-            var entry = (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
-                .FirstOrDefault(item => item.Id == id);
+            var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+            var entry = await FindPasswordForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
             if (entry is not null)
             {
                 await mdbxVaultStore.SoftDeletePasswordAsync(database, entry, cancellationToken);
@@ -68,8 +68,8 @@ public sealed class MdbxBackedMonicaRepository(
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         if (database is not null)
         {
-            var entry = (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
-                .FirstOrDefault(item => item.Id == id);
+            var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+            var entry = await FindPasswordForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
             if (entry is not null)
             {
                 await mdbxVaultStore.RestorePasswordAsync(database, entry, cancellationToken);
@@ -89,8 +89,8 @@ public sealed class MdbxBackedMonicaRepository(
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         if (database is not null)
         {
-            var entry = (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
-                .FirstOrDefault(item => item.Id == id);
+            var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+            var entry = await FindPasswordForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
             if (entry is not null)
             {
                 foreach (var attachment in await GetPasswordAttachmentsForMdbxSaveAsync(
@@ -200,9 +200,7 @@ public sealed class MdbxBackedMonicaRepository(
         var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
         await MirrorUnboundPasswordsAsync(database, categories.ToDictionary(category => category.Id), cancellationToken);
 
-        var existingIds = (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
-            .Select(entry => entry.Id)
-            .ToHashSet();
+        var existingIds = await GetPasswordIdsKnownToMdbxOrSqliteAsync(database, categories, includeDeletedMdbx: false, cancellationToken);
         ids = ids.Where(existingIds.Contains).ToArray();
         if (ids.Length == 0)
         {
@@ -263,9 +261,7 @@ public sealed class MdbxBackedMonicaRepository(
         var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
         await MirrorUnboundPasswordsAsync(database, categories.ToDictionary(category => category.Id), cancellationToken);
 
-        var existingIds = (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
-            .Select(entry => entry.Id)
-            .ToHashSet();
+        var existingIds = await GetPasswordIdsKnownToMdbxOrSqliteAsync(database, categories, includeDeletedMdbx: false, cancellationToken);
         if (existingIds.Count == 0)
         {
             return [];
@@ -320,9 +316,7 @@ public sealed class MdbxBackedMonicaRepository(
         var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
         await MirrorUnboundPasswordsAsync(database, categories.ToDictionary(category => category.Id), cancellationToken);
 
-        var existingIds = (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
-            .Select(entry => entry.Id)
-            .ToHashSet();
+        var existingIds = await GetPasswordIdsKnownToMdbxOrSqliteAsync(database, categories, includeDeletedMdbx: false, cancellationToken);
         ids = ids.Where(existingIds.Contains).ToArray();
         if (ids.Length == 0)
         {
@@ -490,8 +484,7 @@ public sealed class MdbxBackedMonicaRepository(
         var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
         await MirrorUnboundPasswordsAsync(database, categories.ToDictionary(category => category.Id), cancellationToken);
 
-        var existing = (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
-            .Any(entry => entry.Id == entryId);
+        var existing = (await GetPasswordIdsKnownToMdbxOrSqliteAsync(database, categories, includeDeletedMdbx: false, cancellationToken)).Contains(entryId);
         if (!existing)
         {
             return [];
@@ -921,6 +914,39 @@ public sealed class MdbxBackedMonicaRepository(
 
     private static bool IsUnboundFromMdbx(PasswordEntry entry) =>
         entry.MdbxDatabaseId is null && string.IsNullOrWhiteSpace(entry.MdbxFolderId);
+
+    private async Task<HashSet<long>> GetPasswordIdsKnownToMdbxOrSqliteAsync(
+        LocalMdbxDatabase database,
+        IReadOnlyList<Category> categories,
+        bool includeDeletedMdbx,
+        CancellationToken cancellationToken)
+    {
+        var ids = (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
+            .Select(entry => entry.Id)
+            .Where(id => id > 0)
+            .ToHashSet();
+        foreach (var entry in await mdbxVaultStore.GetPasswordsAsync(database, categories, includeDeleted: includeDeletedMdbx, includeArchived: true, cancellationToken))
+        {
+            if (entry.Id > 0)
+            {
+                ids.Add(entry.Id);
+            }
+        }
+
+        return ids;
+    }
+
+    private async Task<PasswordEntry?> FindPasswordForMdbxOperationAsync(
+        LocalMdbxDatabase database,
+        IReadOnlyList<Category> categories,
+        long id,
+        bool includeDeleted,
+        CancellationToken cancellationToken)
+    {
+        var entry = (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
+            .FirstOrDefault(item => item.Id == id);
+        return entry ?? await mdbxVaultStore.FindPasswordAsync(database, categories, id, includeDeleted, cancellationToken);
+    }
 
     private static void ClearForeignMdbxBindingForNewPassword(PasswordEntry entry)
     {
