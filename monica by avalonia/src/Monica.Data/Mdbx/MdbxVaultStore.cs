@@ -29,6 +29,7 @@ public interface IMdbxVaultStore
     Task<SecureItem> SaveSecureItemAsync(LocalMdbxDatabase database, SecureItem item, IReadOnlyDictionary<long, Category> categories, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SecureItem>> GetSecureItemsAsync(LocalMdbxDatabase database, VaultItemType? itemType = null, bool includeDeleted = false, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SecureItem>> GetSecureItemsAsync(LocalMdbxDatabase database, IReadOnlyList<Category> categories, VaultItemType? itemType = null, bool includeDeleted = false, CancellationToken cancellationToken = default);
+    Task<SecureItem?> FindSecureItemAsync(LocalMdbxDatabase database, IReadOnlyList<Category> categories, long itemId, bool includeDeleted = false, CancellationToken cancellationToken = default);
     Task SoftDeleteSecureItemAsync(LocalMdbxDatabase database, SecureItem item, CancellationToken cancellationToken = default);
     Task RestoreSecureItemAsync(LocalMdbxDatabase database, SecureItem item, CancellationToken cancellationToken = default);
     Task SoftDeleteSecureItemEntriesAsync(LocalMdbxDatabase database, CancellationToken cancellationToken = default);
@@ -453,6 +454,39 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
             .ThenBy(item => item.SortOrder)
             .ThenByDescending(item => item.UpdatedAt)
             .ToList();
+    }
+
+    public async Task<SecureItem?> FindSecureItemAsync(LocalMdbxDatabase database, IReadOnlyList<Category> categories, long itemId, bool includeDeleted = false, CancellationToken cancellationToken = default)
+    {
+        if (itemId <= 0)
+        {
+            return null;
+        }
+
+        var vault = await OpenAsync(database, cancellationToken);
+        using var _ = vault;
+        var projects = await EnsureProjectsForReadAsync(vault, cancellationToken);
+        var categoryByProjectId = BuildCategoryByProjectId(categories, projects);
+        var records = await ListSecureRecordsAsync(vault, projects, includeDeleted, cancellationToken);
+        foreach (var item in records
+                     .Select(record => (Record: record, Item: DeserializeSecureItemPayload(record.PayloadJson)))
+                     .Where(item => item.Item?.Id == itemId)
+                     .OrderBy(item => item.Record.Deleted))
+        {
+            var record = item.Record;
+            var secureItem = item.Item!;
+            secureItem.MdbxDatabaseId = database.Id;
+            secureItem.MdbxFolderId = record.EntryId;
+            if (categoryByProjectId.TryGetValue(record.ProjectId, out var categoryId))
+            {
+                secureItem.CategoryId = categoryId;
+            }
+
+            secureItem.IsDeleted = record.Deleted;
+            return secureItem;
+        }
+
+        return null;
     }
 
     public async Task SoftDeleteSecureItemAsync(LocalMdbxDatabase database, SecureItem item, CancellationToken cancellationToken = default)

@@ -468,6 +468,29 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
+    public async Task Repository_soft_deletes_mdbx_secure_item_when_sqlite_cache_is_missing()
+    {
+        var repository = CreateRepository(out var bridge, out var sqliteRepository);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        var note = new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = "MDBX-only note",
+            Notes = "delete from MDBX"
+        };
+        await repository.SaveSecureItemAsync(note);
+        await sqliteRepository.ClearVaultDataAsync(VaultClearScope.SecureItems);
+
+        Assert.Equal("MDBX-only note", Assert.Single(await repository.GetSecureItemsAsync(VaultItemType.Note)).Title);
+
+        await repository.SoftDeleteSecureItemAsync(note.Id);
+
+        Assert.Empty(await repository.GetSecureItemsAsync(VaultItemType.Note));
+        Assert.Equal(0, bridge.CountActiveEntries(database.WorkingCopyPath!));
+        Assert.Equal(1, bridge.CountDeletedEntries(database.WorkingCopyPath!));
+    }
+
+    [Fact]
     public async Task Repository_migrates_secure_item_image_paths_to_mdbx_attachments()
     {
         var contentStore = new FakeAttachmentContentStore();

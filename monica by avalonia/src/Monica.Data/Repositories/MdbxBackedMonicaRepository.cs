@@ -587,8 +587,8 @@ public sealed class MdbxBackedMonicaRepository(
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         if (database is not null)
         {
-            var item = (await inner.GetSecureItemsAsync(includeDeleted: true, cancellationToken: cancellationToken))
-                .FirstOrDefault(item => item.Id == id);
+            var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+            var item = await FindSecureItemForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
             if (item is not null)
             {
                 await mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken);
@@ -946,6 +946,18 @@ public sealed class MdbxBackedMonicaRepository(
         var entry = (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
             .FirstOrDefault(item => item.Id == id);
         return entry ?? await mdbxVaultStore.FindPasswordAsync(database, categories, id, includeDeleted, cancellationToken);
+    }
+
+    private async Task<SecureItem?> FindSecureItemForMdbxOperationAsync(
+        LocalMdbxDatabase database,
+        IReadOnlyList<Category> categories,
+        long id,
+        bool includeDeleted,
+        CancellationToken cancellationToken)
+    {
+        var item = (await inner.GetSecureItemsAsync(includeDeleted: true, cancellationToken: cancellationToken))
+            .FirstOrDefault(item => item.Id == id);
+        return item ?? await mdbxVaultStore.FindSecureItemAsync(database, categories, id, includeDeleted, cancellationToken);
     }
 
     private static void ClearForeignMdbxBindingForNewPassword(PasswordEntry entry)
