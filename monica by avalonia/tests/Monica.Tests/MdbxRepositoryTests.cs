@@ -732,6 +732,47 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
+    public async Task Repository_updates_secure_item_mdbx_attachments_when_sqlite_cache_is_missing()
+    {
+        var contentStore = new FakeAttachmentContentStore();
+        var repository = CreateRepository(out var bridge, out var sqliteRepository, contentStore);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        contentStore.Put("secure_attachments/front.png", "front image bytes"u8.ToArray());
+        contentStore.Put("secure_attachments/back.png", "back image bytes"u8.ToArray());
+        var card = new SecureItem
+        {
+            ItemType = VaultItemType.BankCard,
+            Title = "MDBX-only card",
+            ItemData = WalletItemDataCodec.EncodeBankCard(new BankCardWalletData
+            {
+                CardNumber = "4111111111111111",
+                ImagePaths = ["secure_attachments/front.png"]
+            }),
+            ImagePaths = WalletItemDataCodec.EncodeImagePaths(["secure_attachments/front.png"])
+        };
+        await repository.SaveSecureItemAsync(card);
+        var firstImagePath = Assert.Single(WalletItemDataCodec.DecodeBankCard(card).ImagePaths);
+        await sqliteRepository.ClearVaultDataAsync(VaultClearScope.SecureItems);
+
+        var mdbxOnlyCard = Assert.Single(await repository.GetSecureItemsAsync(VaultItemType.BankCard));
+        var cardData = WalletItemDataCodec.DecodeBankCard(mdbxOnlyCard);
+        cardData.ImagePaths = ["secure_attachments/back.png"];
+        mdbxOnlyCard.ItemData = WalletItemDataCodec.EncodeBankCard(cardData);
+        mdbxOnlyCard.ImagePaths = WalletItemDataCodec.EncodeImagePaths(cardData.ImagePaths);
+
+        await repository.SaveSecureItemAsync(mdbxOnlyCard);
+
+        var reloaded = Assert.Single(await repository.GetSecureItemsAsync(VaultItemType.BankCard));
+        var imagePath = Assert.Single(WalletItemDataCodec.DecodeBankCard(reloaded).ImagePaths);
+        Assert.StartsWith("mdbx:", imagePath, StringComparison.OrdinalIgnoreCase);
+        Assert.NotEqual(firstImagePath, imagePath);
+        Assert.Equal("back image bytes"u8.ToArray(), bridge.ReadAttachmentContent(database.WorkingCopyPath!, imagePath));
+        Assert.Null(bridge.TryReadAttachmentContent(database.WorkingCopyPath!, firstImagePath));
+        Assert.Null(contentStore.TryRead("secure_attachments/back.png"));
+        Assert.Equal(1, bridge.CountActiveAttachmentsForEntry(database.WorkingCopyPath!, reloaded.MdbxFolderId!));
+    }
+
+    [Fact]
     public async Task Repository_reads_legacy_secure_item_payloads_from_mdbx_store()
     {
         var repository = CreateRepository(out var bridge);
