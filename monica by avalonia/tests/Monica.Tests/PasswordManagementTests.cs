@@ -1812,6 +1812,16 @@ public sealed class PasswordManagementTests
             AuthenticatorKey = "JBSWY3DPEHPK3PXP"
         };
         await source.Repository.SavePasswordAsync(entry);
+        await source.Repository.ReplaceCustomFieldsAsync(entry.Id,
+        [
+            new CustomField { Title = "Recovery hint", Value = "blue", IsProtected = true }
+        ]);
+        await source.Repository.SavePasswordHistoryAsync(new PasswordHistoryEntry
+        {
+            EntryId = entry.Id,
+            Password = source.Crypto.EncryptString("old-import-secret"),
+            LastUsedAt = DateTimeOffset.UnixEpoch.AddDays(5)
+        });
         await source.Repository.SaveSecureItemAsync(new SecureItem
         {
             ItemType = VaultItemType.Totp,
@@ -1834,6 +1844,13 @@ public sealed class PasswordManagementTests
 
         var importedTotp = Assert.Single(await target.Repository.GetSecureItemsByBoundPasswordIdAsync(imported.Id));
         Assert.Equal(imported.Id, importedTotp.BoundPasswordId);
+        var importedField = Assert.Single(await target.Repository.GetCustomFieldsAsync(imported.Id));
+        Assert.Equal("Recovery hint", importedField.Title);
+        Assert.Equal("blue", importedField.Value);
+        Assert.True(importedField.IsProtected);
+        var importedHistory = Assert.Single(await target.Repository.GetPasswordHistoryAsync(imported.Id));
+        Assert.NotEqual("old-import-secret", importedHistory.Password);
+        Assert.Equal("old-import-secret", target.Crypto.DecryptString(importedHistory.Password));
         Assert.Single(target.ViewModel.Passwords);
         Assert.Single(target.ViewModel.TotpItems, item => item.BoundPasswordId == imported.Id);
         Assert.Empty(target.ViewModel.ImportJsonText);

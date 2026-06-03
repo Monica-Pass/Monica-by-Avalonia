@@ -70,19 +70,35 @@ public sealed class CoreServicesTests
         var service = new ImportExportService();
         var passwords = new[]
         {
-            new PasswordEntry { Title = "GitHub", Username = "dev", Password = "encrypted" }
+            new PasswordEntry { Id = 7, Title = "GitHub", Username = "dev", Password = "encrypted" }
         };
         var items = new[]
         {
             new SecureItem { ItemType = VaultItemType.Note, Title = "Note", ItemData = "{}" }
         };
+        var customFields = new Dictionary<long, IReadOnlyList<CustomField>>
+        {
+            [7] =
+            [
+                new CustomField { Id = 11, EntryId = 7, Title = "Recovery", Value = "blue", IsProtected = true }
+            ]
+        };
+        var history = new Dictionary<long, IReadOnlyList<PasswordHistoryEntry>>
+        {
+            [7] =
+            [
+                new PasswordHistoryEntry { Id = 21, EntryId = 7, Password = "old-secret", LastUsedAt = DateTimeOffset.UnixEpoch.AddDays(1) }
+            ]
+        };
 
-        var json = service.ExportJson(passwords, items);
+        var json = service.ExportJson(passwords, items, passwordCustomFields: customFields, passwordHistory: history);
         var package = service.ImportJson(json);
 
-        Assert.Equal(68, package.SchemaVersion);
+        Assert.Equal(69, package.SchemaVersion);
         Assert.Single(package.Passwords);
         Assert.Single(package.SecureItems);
+        Assert.Equal("Recovery", Assert.Single(Assert.Single(package.PasswordCustomFields).Fields).Title);
+        Assert.Equal("old-secret", Assert.Single(Assert.Single(package.PasswordHistory).Entries).Password);
     }
 
     [Fact]

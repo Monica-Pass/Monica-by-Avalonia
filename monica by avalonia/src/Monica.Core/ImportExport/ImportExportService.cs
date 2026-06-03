@@ -10,7 +10,12 @@ namespace Monica.Core.ImportExport;
 
 public interface IImportExportService
 {
-    string ExportJson(IEnumerable<PasswordEntry> passwords, IEnumerable<SecureItem> secureItems, IEnumerable<Category>? categories = null);
+    string ExportJson(
+        IEnumerable<PasswordEntry> passwords,
+        IEnumerable<SecureItem> secureItems,
+        IEnumerable<Category>? categories = null,
+        IReadOnlyDictionary<long, IReadOnlyList<CustomField>>? passwordCustomFields = null,
+        IReadOnlyDictionary<long, IReadOnlyList<PasswordHistoryEntry>>? passwordHistory = null);
     MonicaExportPackage ImportJson(string json);
     string ExportPasswordCsv(IEnumerable<PasswordEntry> passwords);
     string ExportTotpCsv(IEnumerable<SecureItem> secureItems);
@@ -27,7 +32,13 @@ public sealed record MonicaExportPackage(
     int SchemaVersion,
     IReadOnlyList<PasswordEntry> Passwords,
     IReadOnlyList<SecureItem> SecureItems,
-    IReadOnlyList<Category> Categories);
+    IReadOnlyList<Category> Categories,
+    IReadOnlyList<PasswordCustomFieldExportGroup> PasswordCustomFields,
+    IReadOnlyList<PasswordHistoryExportGroup> PasswordHistory);
+
+public sealed record PasswordCustomFieldExportGroup(long PasswordId, IReadOnlyList<CustomField> Fields);
+
+public sealed record PasswordHistoryExportGroup(long PasswordId, IReadOnlyList<PasswordHistoryEntry> Entries);
 
 public sealed class ImportExportService : IImportExportService
 {
@@ -62,13 +73,25 @@ public sealed class ImportExportService : IImportExportService
         "UpdatedAt"
     ];
 
-    public string ExportJson(IEnumerable<PasswordEntry> passwords, IEnumerable<SecureItem> secureItems, IEnumerable<Category>? categories = null)
+    public string ExportJson(
+        IEnumerable<PasswordEntry> passwords,
+        IEnumerable<SecureItem> secureItems,
+        IEnumerable<Category>? categories = null,
+        IReadOnlyDictionary<long, IReadOnlyList<CustomField>>? passwordCustomFields = null,
+        IReadOnlyDictionary<long, IReadOnlyList<PasswordHistoryEntry>>? passwordHistory = null)
     {
+        var passwordList = passwords.ToList();
+        var exportedPasswordIds = passwordList
+            .Select(item => item.Id)
+            .Where(id => id > 0)
+            .ToHashSet();
         var package = new MonicaExportDtoPackage(
-            68,
-            passwords.Select(PasswordEntryDto.FromModel).ToList(),
+            69,
+            passwordList.Select(PasswordEntryDto.FromModel).ToList(),
             secureItems.Select(SecureItemDto.FromModel).ToList(),
-            (categories ?? []).Select(CategoryDto.FromModel).ToList());
+            (categories ?? []).Select(CategoryDto.FromModel).ToList(),
+            ToCustomFieldGroupDtos(passwordCustomFields, exportedPasswordIds),
+            ToPasswordHistoryGroupDtos(passwordHistory, exportedPasswordIds));
         return JsonSerializer.Serialize(package, MonicaJsonContext.Default.MonicaExportDtoPackage);
     }
 
@@ -76,12 +99,46 @@ public sealed class ImportExportService : IImportExportService
     {
         var package = JsonSerializer.Deserialize(json, MonicaJsonContext.Default.MonicaExportDtoPackage);
         return package is null
-            ? new MonicaExportPackage(68, [], [], [])
+            ? new MonicaExportPackage(68, [], [], [], [], [])
             : new MonicaExportPackage(
                 package.SchemaVersion,
                 package.Passwords.Select(item => item.ToModel()).ToList(),
                 package.SecureItems.Select(item => item.ToModel()).ToList(),
-                (package.Categories ?? []).Select(item => item.ToModel()).ToList());
+                (package.Categories ?? []).Select(item => item.ToModel()).ToList(),
+                (package.PasswordCustomFields ?? []).Select(item => item.ToModel()).ToList(),
+                (package.PasswordHistory ?? []).Select(item => item.ToModel()).ToList());
+    }
+
+    private static IReadOnlyList<PasswordCustomFieldGroupDto> ToCustomFieldGroupDtos(
+        IReadOnlyDictionary<long, IReadOnlyList<CustomField>>? customFields,
+        IReadOnlySet<long> exportedPasswordIds)
+    {
+        if (customFields is null || exportedPasswordIds.Count == 0)
+        {
+            return [];
+        }
+
+        return customFields
+            .Where(item => exportedPasswordIds.Contains(item.Key) && item.Value.Count > 0)
+            .OrderBy(item => item.Key)
+            .Select(item => PasswordCustomFieldGroupDto.FromModel(item.Key, item.Value))
+            .ToList();
+    }
+
+    private static IReadOnlyList<PasswordHistoryGroupDto> ToPasswordHistoryGroupDtos(
+        IReadOnlyDictionary<long, IReadOnlyList<PasswordHistoryEntry>>? passwordHistory,
+        IReadOnlySet<long> exportedPasswordIds)
+    {
+        if (passwordHistory is null || exportedPasswordIds.Count == 0)
+        {
+            return [];
+        }
+
+        return passwordHistory
+            .Where(item => exportedPasswordIds.Contains(item.Key) && item.Value.Count > 0)
+            .OrderBy(item => item.Key)
+            .Select(item => PasswordHistoryGroupDto.FromModel(item.Key, item.Value))
+            .ToList();
     }
 
     public string ExportPasswordCsv(IEnumerable<PasswordEntry> passwords)
@@ -602,7 +659,9 @@ internal sealed record MonicaExportDtoPackage(
     int SchemaVersion,
     IReadOnlyList<PasswordEntryDto> Passwords,
     IReadOnlyList<SecureItemDto> SecureItems,
-    IReadOnlyList<CategoryDto>? Categories = null);
+    IReadOnlyList<CategoryDto>? Categories = null,
+    IReadOnlyList<PasswordCustomFieldGroupDto>? PasswordCustomFields = null,
+    IReadOnlyList<PasswordHistoryGroupDto>? PasswordHistory = null);
 
 internal sealed record AegisExportPackageDto(
     int Version,
@@ -664,6 +723,116 @@ internal sealed class CategoryDto
             SortOrder = SortOrder,
             MdbxDatabaseId = MdbxDatabaseId,
             MdbxFolderId = MdbxFolderId
+        };
+    }
+}
+
+internal sealed class PasswordCustomFieldGroupDto
+{
+    public long PasswordId { get; set; }
+    public List<CustomFieldDto> Fields { get; set; } = [];
+
+    public static PasswordCustomFieldGroupDto FromModel(long passwordId, IReadOnlyList<CustomField> fields)
+    {
+        return new PasswordCustomFieldGroupDto
+        {
+            PasswordId = passwordId,
+            Fields = fields.Select(CustomFieldDto.FromModel).ToList()
+        };
+    }
+
+    public PasswordCustomFieldExportGroup ToModel()
+    {
+        return new PasswordCustomFieldExportGroup(
+            PasswordId,
+            Fields.Select(item => item.ToModel()).ToList());
+    }
+}
+
+internal sealed class CustomFieldDto
+{
+    public long Id { get; set; }
+    public long EntryId { get; set; }
+    public string Title { get; set; } = "";
+    public string Value { get; set; } = "";
+    public bool IsProtected { get; set; }
+    public int SortOrder { get; set; }
+
+    public static CustomFieldDto FromModel(CustomField source)
+    {
+        return new CustomFieldDto
+        {
+            Id = source.Id,
+            EntryId = source.EntryId,
+            Title = source.Title,
+            Value = source.Value,
+            IsProtected = source.IsProtected,
+            SortOrder = source.SortOrder
+        };
+    }
+
+    public CustomField ToModel()
+    {
+        return new CustomField
+        {
+            Id = Id,
+            EntryId = EntryId,
+            Title = Title,
+            Value = Value,
+            IsProtected = IsProtected,
+            SortOrder = SortOrder
+        };
+    }
+}
+
+internal sealed class PasswordHistoryGroupDto
+{
+    public long PasswordId { get; set; }
+    public List<PasswordHistoryEntryDto> Entries { get; set; } = [];
+
+    public static PasswordHistoryGroupDto FromModel(long passwordId, IReadOnlyList<PasswordHistoryEntry> entries)
+    {
+        return new PasswordHistoryGroupDto
+        {
+            PasswordId = passwordId,
+            Entries = entries.Select(PasswordHistoryEntryDto.FromModel).ToList()
+        };
+    }
+
+    public PasswordHistoryExportGroup ToModel()
+    {
+        return new PasswordHistoryExportGroup(
+            PasswordId,
+            Entries.Select(item => item.ToModel()).ToList());
+    }
+}
+
+internal sealed class PasswordHistoryEntryDto
+{
+    public long Id { get; set; }
+    public long EntryId { get; set; }
+    public string Password { get; set; } = "";
+    public DateTimeOffset LastUsedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    public static PasswordHistoryEntryDto FromModel(PasswordHistoryEntry source)
+    {
+        return new PasswordHistoryEntryDto
+        {
+            Id = source.Id,
+            EntryId = source.EntryId,
+            Password = source.Password,
+            LastUsedAt = source.LastUsedAt
+        };
+    }
+
+    public PasswordHistoryEntry ToModel()
+    {
+        return new PasswordHistoryEntry
+        {
+            Id = Id,
+            EntryId = EntryId,
+            Password = Password,
+            LastUsedAt = LastUsedAt
         };
     }
 }

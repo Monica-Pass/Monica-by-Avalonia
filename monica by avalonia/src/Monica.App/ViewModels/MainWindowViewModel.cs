@@ -3161,8 +3161,19 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var exportCategories = includeCategories
             ? categories.Select(CloneCategory).ToArray()
             : Array.Empty<Category>();
+        var customFieldsByPasswordId = includePasswords
+            ? await _repository.GetCustomFieldsByEntryIdsAsync(exportPasswords.Select(item => item.Id).ToArray())
+            : new Dictionary<long, IReadOnlyList<CustomField>>();
+        var passwordHistoryByPasswordId = includePasswords
+            ? await GetPasswordHistoryForExportAsync(exportPasswords.Select(item => item.Id).ToArray())
+            : new Dictionary<long, IReadOnlyList<PasswordHistoryEntry>>();
 
-        return _importExportService.ExportJson(exportPasswords, exportSecureItems, exportCategories);
+        return _importExportService.ExportJson(
+            exportPasswords,
+            exportSecureItems,
+            exportCategories,
+            customFieldsByPasswordId,
+            passwordHistoryByPasswordId);
     }
 
     private async Task<string> BuildTotpCsvExportAsync()
@@ -3237,6 +3248,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
         return result;
     }
 
+    private async Task<IReadOnlyDictionary<long, IReadOnlyList<PasswordHistoryEntry>>> GetPasswordHistoryForExportAsync(IReadOnlyList<long> passwordIds)
+    {
+        var result = new Dictionary<long, IReadOnlyList<PasswordHistoryEntry>>();
+        foreach (var passwordId in passwordIds.Where(id => id > 0).Distinct())
+        {
+            var history = (await _repository.GetPasswordHistoryAsync(passwordId))
+                .Select(ClonePasswordHistoryForExport)
+                .ToArray();
+            if (history.Length > 0)
+            {
+                result[passwordId] = history;
+            }
+        }
+
+        return result;
+    }
+
     private async Task<MonicaJsonImportResult> ImportMonicaJsonAsync(string json)
     {
         var package = _importExportService.ImportJson(json);
@@ -3294,6 +3322,31 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
 
             importedPasswords++;
+        }
+
+        foreach (var group in package.PasswordCustomFields)
+        {
+            if (!passwordIdMap.TryGetValue(group.PasswordId, out var importedPasswordId))
+            {
+                continue;
+            }
+
+            await _repository.ReplaceCustomFieldsAsync(
+                importedPasswordId,
+                group.Fields.Select(field => CloneCustomFieldForImport(field, importedPasswordId)).ToArray());
+        }
+
+        foreach (var group in package.PasswordHistory)
+        {
+            if (!passwordIdMap.TryGetValue(group.PasswordId, out var importedPasswordId))
+            {
+                continue;
+            }
+
+            foreach (var source in group.Entries.OrderBy(item => item.LastUsedAt))
+            {
+                await _repository.SavePasswordHistoryAsync(ClonePasswordHistoryForImport(source, importedPasswordId));
+            }
         }
 
         var importedSecureItems = 0;
@@ -4583,6 +4636,41 @@ public sealed partial class MainWindowViewModel : ObservableObject
             BitwardenLocalModified = source.BitwardenLocalModified,
             CreatedAt = source.CreatedAt,
             UpdatedAt = source.UpdatedAt
+        };
+    }
+
+    private static CustomField CloneCustomFieldForImport(CustomField source, long importedPasswordId)
+    {
+        return new CustomField
+        {
+            Id = 0,
+            EntryId = importedPasswordId,
+            Title = source.Title,
+            Value = source.Value,
+            IsProtected = source.IsProtected,
+            SortOrder = source.SortOrder
+        };
+    }
+
+    private PasswordHistoryEntry ClonePasswordHistoryForExport(PasswordHistoryEntry source)
+    {
+        return new PasswordHistoryEntry
+        {
+            Id = source.Id,
+            EntryId = source.EntryId,
+            Password = UnprotectPassword(source.Password),
+            LastUsedAt = source.LastUsedAt
+        };
+    }
+
+    private PasswordHistoryEntry ClonePasswordHistoryForImport(PasswordHistoryEntry source, long importedPasswordId)
+    {
+        return new PasswordHistoryEntry
+        {
+            Id = 0,
+            EntryId = importedPasswordId,
+            Password = ProtectPassword(UnprotectPassword(source.Password)),
+            LastUsedAt = source.LastUsedAt
         };
     }
 
