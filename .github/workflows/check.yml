@@ -1,0 +1,79 @@
+name: Check
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_VERSION: 10.0.x
+  PROJECT_DIR: monica by avalonia
+  SOLUTION_FILE: Monica.slnx
+
+jobs:
+  check:
+    name: Restore, build, test
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Resolve CI version
+        id: version
+        shell: pwsh
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: ./eng/ci/resolve-version.ps1 -Mode ci
+
+      - name: Restore
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: dotnet restore "${{ env.SOLUTION_FILE }}"
+
+      - name: Verify formatting
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: dotnet format "${{ env.SOLUTION_FILE }}" --verify-no-changes --no-restore
+
+      - name: Build
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: >
+          dotnet build "${{ env.SOLUTION_FILE }}"
+          --configuration Release
+          --no-restore
+          /p:ContinuousIntegrationBuild=true
+          /p:Version=${{ steps.version.outputs.version }}
+          /p:VersionPrefix=${{ steps.version.outputs.version_prefix }}
+          /p:PackageVersion=${{ steps.version.outputs.package_version }}
+          /p:AssemblyVersion=${{ steps.version.outputs.assembly_version }}
+          /p:FileVersion=${{ steps.version.outputs.file_version }}
+          /p:InformationalVersion=${{ steps.version.outputs.informational_version }}
+
+      - name: Test
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: >
+          dotnet test "${{ env.SOLUTION_FILE }}"
+          --configuration Release
+          --no-build
+          --logger trx
+          --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-test-results
+          path: ${{ env.PROJECT_DIR }}/TestResults/**/*.trx
+          if-no-files-found: ignore
