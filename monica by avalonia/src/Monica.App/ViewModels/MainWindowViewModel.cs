@@ -136,6 +136,19 @@ public sealed record PasswordHistoryDisplayItem(PasswordHistoryEntry Entry, stri
 public sealed record PasswordQuickAccessItem(PasswordEntry Entry, int OpenCount, string LastOpenedText, string Subtitle);
 public sealed record PasswordFolderFilterChoice(long? Id, string Name, int Count);
 public sealed record VaultSourceDisplayItem(string DisplayName, string Kind, string LocalPath, string RemoteUrl, string SyncStatus);
+internal sealed record VaultLoadSnapshot(
+    IReadOnlyList<PasswordEntry> ActivePasswords,
+    IReadOnlyList<PasswordEntry> ArchivedPasswords,
+    IReadOnlyList<PasswordEntry> DeletedPasswords,
+    IReadOnlyDictionary<long, IReadOnlyList<CustomField>> PasswordCustomFields,
+    IReadOnlyDictionary<long, IReadOnlyList<Attachment>> PasswordAttachments,
+    IReadOnlyList<SecureItem> NoteItems,
+    IReadOnlyList<SecureItem> WalletItems,
+    IReadOnlyList<SecureItem> StoredTotps,
+    IReadOnlyList<Category> Categories,
+    IReadOnlyDictionary<long, PasswordQuickAccessRecord> PasswordQuickAccessRecords,
+    IReadOnlyList<LocalMdbxDatabase> MdbxDatabases,
+    IReadOnlyList<OperationLog> TimelineLogs);
 public sealed record MdbxDatabaseDisplayItem(
     LocalMdbxDatabase Database,
     string Name,
@@ -187,6 +200,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private const int PasswordHistoryLimit = 10;
     private const int PasswordQuickAccessLimit = 6;
+    private const string DefaultApplicationDataDirectoryName = "Monica by Avalonia";
+    private const string DefaultDatabaseFileName = "monica.db";
     private static readonly PlatformFilePickerFileType[] MonicaJsonFileTypes =
     [
         new("Monica JSON", ["*.json"])
@@ -616,6 +631,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public GridLength NotePreviewColumnWidth => IsNotePreviewPaneVisible
         ? new GridLength(1, GridUnitType.Star)
         : new GridLength(0);
+    public Thickness NotePreviewContentPadding => NoteSplitPreviewMode
+        ? new Thickness(0)
+        : new Thickness(36, 0, 0, 0);
     public string NoteEditorStatusText =>
         NoteSelectedCharacterCount > 0
             ? $"行 {NoteCaretLine}, 列 {NoteCaretColumn} · 已选 {NoteSelectedCharacterCount} · {NoteLineCount} 行 · {NoteWordCount} 词 · {NoteCharacterCount} 字符"
@@ -1319,6 +1337,22 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ShellPlatformText));
     }
 
+    private static bool DefaultVaultDatabaseExists()
+    {
+        try
+        {
+            var path = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                DefaultApplicationDataDirectoryName,
+                DefaultDatabaseFileName);
+            return File.Exists(path);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     [RelayCommand]
     public async Task InitializeAsync()
     {
@@ -1348,6 +1382,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         catch (Exception ex)
         {
             AppDiagnostics.Error("Initialize failed", ex);
+            IsVaultInitialized = DefaultVaultDatabaseExists();
             StatusMessage = _localization.Format("VaultMetadataLoadFailedFormat", ex.Message);
         }
     }
@@ -1381,7 +1416,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 ConfirmMasterPassword = "";
                 return;
             case VaultUnlockStatus.Failed:
-                IsVaultInitialized = result.IsVaultInitialized;
+                IsVaultInitialized = result.IsVaultInitialized || DefaultVaultDatabaseExists();
                 IsUnlocked = false;
                 StatusMessage = _localization.Format(result.MessageKey, result.Error?.Message ?? "");
                 return;
@@ -1438,23 +1473,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
             VaultSources.Clear();
             TimelineEntries.Clear();
 
-            var allPasswords = await AppDiagnostics.MeasureAsync(
-                "Load passwords",
-                () => _repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
-            var activePasswords = allPasswords.Where(item => !item.IsDeleted && !item.IsArchived).ToArray();
-            var archivedPasswords = allPasswords.Where(item => !item.IsDeleted && item.IsArchived).ToArray();
-            var deletedPasswords = allPasswords.Where(item => item.IsDeleted).ToArray();
-            var passwordIds = allPasswords.Select(item => item.Id).ToArray();
-            _passwordCustomFields = await AppDiagnostics.MeasureAsync(
-                "Load password custom fields",
-                () => _repository.GetCustomFieldsByEntryIdsAsync(passwordIds));
-            _passwordAttachments = await AppDiagnostics.MeasureAsync(
-                "Load password attachments",
-                () => _repository.GetAttachmentsByOwnerIdsAsync("PASSWORD", passwordIds));
+            StatusMessage = "正在后台读取保险库数据...";
+            var snapshot = await Task.Run(LoadVaultSnapshotAsync);
+            _passwordCustomFields = snapshot.PasswordCustomFields;
+            _passwordAttachments = snapshot.PasswordAttachments;
+            _passwordQuickAccessRecords = snapshot.PasswordQuickAccessRecords;
 
-            AppDiagnostics.Measure("Prepare password collections", () =>
+            AppDiagnostics.Measure("Apply password collections", () =>
             {
-                foreach (var item in activePasswords)
+                foreach (var item in snapshot.ActivePasswords)
                 {
                     RefreshPasswordTotpDisplay(item);
                     RefreshPasswordAttachmentState(item);
@@ -1462,7 +1489,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     TrackPasswordSelection(item);
                 }
 
-                foreach (var item in archivedPasswords)
+                foreach (var item in snapshot.ArchivedPasswords)
                 {
                     RefreshPasswordTotpDisplay(item);
                     RefreshPasswordAttachmentState(item);
@@ -1470,7 +1497,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     TrackPasswordSelection(item);
                 }
 
-                foreach (var item in deletedPasswords)
+                foreach (var item in snapshot.DeletedPasswords)
                 {
                     RefreshPasswordTotpDisplay(item);
                     RefreshPasswordAttachmentState(item);
@@ -1478,52 +1505,30 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     TrackPasswordSelection(item);
                 }
             });
-            ReplaceItems(Passwords, activePasswords);
-            ReplaceItems(ArchivedPasswords, archivedPasswords);
-            ReplaceItems(DeletedPasswords, deletedPasswords);
+            ReplaceItems(Passwords, snapshot.ActivePasswords);
+            ReplaceItems(ArchivedPasswords, snapshot.ArchivedPasswords);
+            ReplaceItems(DeletedPasswords, snapshot.DeletedPasswords);
+            RaisePasswordQuickAccessState();
 
-            var secureItems = await AppDiagnostics.MeasureAsync(
-                "Load secure items",
-                () => _repository.GetSecureItemsAsync());
-            var notes = secureItems
-                .Where(item => item.ItemType == VaultItemType.Note)
-                .ToArray();
-            ReplaceItems(NoteItems, notes);
+            ReplaceItems(NoteItems, snapshot.NoteItems);
 
-            var walletItems = new List<SecureItem>();
-            var storedTotps = new List<SecureItem>();
-            foreach (var item in secureItems)
+            foreach (var item in snapshot.WalletItems)
             {
-                if (item.ItemType is VaultItemType.BankCard or VaultItemType.Document)
-                {
-                    item.IsSelected = false;
-                    TrackWalletSelection(item);
-                    walletItems.Add(item);
-                }
-                else if (item.ItemType == VaultItemType.Totp)
-                {
-                    storedTotps.Add(item);
-                }
+                item.IsSelected = false;
+                TrackWalletSelection(item);
             }
-            ReplaceItems(WalletItems, walletItems);
+            ReplaceItems(WalletItems, snapshot.WalletItems);
 
-            var categories = await AppDiagnostics.MeasureAsync(
-                "Load categories",
-                () => _repository.GetCategoriesAsync());
-            ReplaceItems(Categories, categories);
+            ReplaceItems(Categories, snapshot.Categories);
 
             RefreshPasswordFolderFilters();
-            await LoadPasswordQuickAccessAsync();
-            var databases = await AppDiagnostics.MeasureAsync(
-                "Load MDBX database metadata",
-                () => _repository.GetMdbxDatabasesAsync());
-            ReplaceItems(MdbxDatabases, databases);
+            ReplaceItems(MdbxDatabases, snapshot.MdbxDatabases);
 
             RefreshMdbxVaultState();
             RefreshVaultSources();
-            await LoadTotpItemsAsync(storedTotps);
+            await LoadTotpItemsAsync(snapshot.StoredTotps);
             ReconcileSecureItemSelectionsAfterLoad();
-            await LoadTimelineAsync();
+            ApplyTimelineLogs(snapshot.TimelineLogs);
             RaiseCounts();
             OnPropertyChanged(nameof(FilteredPasswords));
             StatusMessage = _localization.Get("VaultUnlocked");
@@ -1548,6 +1553,67 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             IsLoadingVault = false;
         }
+    }
+
+    private async Task<VaultLoadSnapshot> LoadVaultSnapshotAsync()
+    {
+        var allPasswords = await AppDiagnostics.MeasureAsync(
+            "Load passwords",
+            () => _repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
+        var allPasswordItems = allPasswords.ToArray();
+        var activePasswords = allPasswordItems.Where(item => !item.IsDeleted && !item.IsArchived).ToArray();
+        var archivedPasswords = allPasswordItems.Where(item => !item.IsDeleted && item.IsArchived).ToArray();
+        var deletedPasswords = allPasswordItems.Where(item => item.IsDeleted).ToArray();
+        var passwordIds = allPasswordItems.Select(item => item.Id).ToArray();
+
+        var customFields = await AppDiagnostics.MeasureAsync(
+            "Load password custom fields",
+            () => _repository.GetCustomFieldsByEntryIdsAsync(passwordIds));
+        var attachments = await AppDiagnostics.MeasureAsync(
+            "Load password attachments",
+            () => _repository.GetAttachmentsByOwnerIdsAsync("PASSWORD", passwordIds));
+
+        var secureItems = await AppDiagnostics.MeasureAsync(
+            "Load secure items",
+            () => _repository.GetSecureItemsAsync());
+        var noteItems = secureItems
+            .Where(item => item.ItemType == VaultItemType.Note)
+            .ToArray();
+        var walletItems = secureItems
+            .Where(item => item.ItemType is VaultItemType.BankCard or VaultItemType.Document)
+            .ToArray();
+        var storedTotps = secureItems
+            .Where(item => item.ItemType == VaultItemType.Totp)
+            .ToArray();
+
+        var categories = await AppDiagnostics.MeasureAsync(
+            "Load categories",
+            () => _repository.GetCategoriesAsync());
+        var quickAccessRecords = (await AppDiagnostics.MeasureAsync(
+                "Load password quick access",
+                () => _repository.GetPasswordQuickAccessRecordsAsync()))
+            .Where(record => record.OpenCount > 0 && record.PasswordId > 0)
+            .ToDictionary(record => record.PasswordId);
+        var databases = await AppDiagnostics.MeasureAsync(
+            "Load MDBX database metadata",
+            () => _repository.GetMdbxDatabasesAsync());
+        var timelineLogs = await AppDiagnostics.MeasureAsync(
+            "Load timeline",
+            () => _repository.GetOperationLogsAsync(150));
+
+        return new VaultLoadSnapshot(
+            activePasswords,
+            archivedPasswords,
+            deletedPasswords,
+            customFields,
+            attachments,
+            noteItems,
+            walletItems,
+            storedTotps,
+            categories,
+            quickAccessRecords,
+            databases,
+            timelineLogs);
     }
 
     [RelayCommand]
@@ -3058,6 +3124,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(NoteEditorColumnWidth));
         OnPropertyChanged(nameof(NotePreviewSeparatorColumnWidth));
         OnPropertyChanged(nameof(NotePreviewColumnWidth));
+        OnPropertyChanged(nameof(NotePreviewContentPadding));
     }
 
     private void RaiseNoteTreeState()
@@ -6083,6 +6150,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var logs = await AppDiagnostics.MeasureAsync(
             "Load timeline",
             () => _repository.GetOperationLogsAsync(150));
+        ApplyTimelineLogs(logs);
+    }
+
+    private void ApplyTimelineLogs(IReadOnlyList<OperationLog> logs)
+    {
         var entries = logs
             .Select(log => new TimelineEntry(
                 string.IsNullOrWhiteSpace(log.ItemTitle) ? _localization.Get("Untitled") : log.ItemTitle,
