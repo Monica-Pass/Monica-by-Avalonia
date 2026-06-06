@@ -40,6 +40,8 @@ public partial class MainWindow : Window
         Closing += OnClosing;
         Closed += OnClosed;
         DataContextChanged += OnDataContextChanged;
+        PropertyChanged += MainWindow_OnPropertyChanged;
+        UpdateMaximizeRestoreButton();
     }
 
     private async void OnOpened(object? sender, EventArgs e)
@@ -62,8 +64,55 @@ public partial class MainWindow : Window
         viewModel.SelectSectionCommand.Execute(tag);
     }
 
+    private void MainWindow_OnPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property == WindowStateProperty)
+        {
+            UpdateMaximizeRestoreButton();
+        }
+    }
+
+    private void TitleBarDragArea_OnPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            BeginMoveDrag(e);
+        }
+    }
+
+    private void TitleBarDragArea_OnDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        ToggleMaximizeRestore();
+        e.Handled = true;
+    }
+
+    private void MinimizeWindowButton_OnClick(object? sender, RoutedEventArgs e) =>
+        WindowState = WindowState.Minimized;
+
+    private void MaximizeRestoreWindowButton_OnClick(object? sender, RoutedEventArgs e) =>
+        ToggleMaximizeRestore();
+
+    private void CloseWindowButton_OnClick(object? sender, RoutedEventArgs e) =>
+        Close();
+
+    private void ToggleMaximizeRestore()
+    {
+        WindowState = WindowState == WindowState.Maximized
+            ? WindowState.Normal
+            : WindowState.Maximized;
+    }
+
+    private void UpdateMaximizeRestoreButton()
+    {
+        var isMaximized = WindowState == WindowState.Maximized;
+        MaximizeRestoreWindowIcon.Text = isMaximized ? "\uE923" : "\uE922";
+        ToolTip.SetTip(MaximizeRestoreWindowButton, isMaximized ? "Restore" : "Maximize");
+    }
+
     private void OnClosed(object? sender, EventArgs e)
     {
+        PropertyChanged -= MainWindow_OnPropertyChanged;
+
         if (_observedViewModel is not null)
         {
             _observedViewModel.PropertyChanged -= ViewModel_OnPropertyChanged;

@@ -17,7 +17,10 @@
         Width="1000"
         Height="650"
         MinWidth="800"
-        MinHeight="500">
+        MinHeight="500"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="32"
+        WindowDecorations="BorderOnly">
 
     <Window.Resources>
         <SolidColorBrush x:Key="CardBackgroundBrush" Color="#2B2B2B" />
@@ -53,10 +56,91 @@
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="VerticalContentAlignment" Value="Stretch" />
         </Style>
+        <Style Selector="Button.TitleBarButton">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Width" Value="46" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="MinWidth" Value="46" />
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.TitleBarButton:pointerover">
+            <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
+        </Style>
+        <Style Selector="Button.TitleBarButton TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        </Style>
+        <Style Selector="Button.TitleBarButton:pointerover TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        </Style>
+        <Style Selector="Button.TitleBarCloseButton:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+        </Style>
+        <Style Selector="Button.TitleBarCloseButton:pointerover TextBlock">
+            <Setter Property="Foreground" Value="#1F0A0D" />
+        </Style>
     </Window.Styles>
 
-    <Grid RowDefinitions="*,24" Background="{DynamicResource LayerFillColorDefaultBrush}">
-        <Grid Grid.Row="0">
+    <Grid RowDefinitions="32,*,24" Background="{DynamicResource LayerFillColorDefaultBrush}">
+        <Border Grid.Row="0"
+                Background="{DynamicResource LayerFillColorDefaultBrush}"
+                BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="0,0,0,1">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <Grid ColumnDefinitions="Auto,Auto"
+                      Background="Transparent"
+                      PointerPressed="TitleBarDragArea_OnPointerPressed"
+                      DoubleTapped="TitleBarDragArea_OnDoubleTapped">
+                    <Image Source="/Assets/Logo.png"
+                           Width="16"
+                           Height="16"
+                           Margin="16,0,10,0"
+                           VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1"
+                               Text="Monica"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               VerticalAlignment="Center" />
+                </Grid>
+                <Border Grid.Column="1"
+                        Background="Transparent"
+                        PointerPressed="TitleBarDragArea_OnPointerPressed"
+                        DoubleTapped="TitleBarDragArea_OnDoubleTapped" />
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal">
+                    <Button Classes="TitleBarButton"
+                            Click="MinimizeWindowButton_OnClick"
+                            ToolTip.Tip="Minimize">
+                        <TextBlock Text="&#xE921;"
+                                   FontFamily="Segoe Fluent Icons"
+                                   FontSize="10" />
+                    </Button>
+                    <Button x:Name="MaximizeRestoreWindowButton"
+                            Classes="TitleBarButton"
+                            Click="MaximizeRestoreWindowButton_OnClick"
+                            ToolTip.Tip="Maximize">
+                        <TextBlock x:Name="MaximizeRestoreWindowIcon"
+                                   Text="&#xE922;"
+                                   FontFamily="Segoe Fluent Icons"
+                                   FontSize="10" />
+                    </Button>
+                    <Button Classes="TitleBarButton TitleBarCloseButton"
+                            Click="CloseWindowButton_OnClick"
+                            ToolTip.Tip="Close">
+                        <TextBlock Text="&#xE8BB;"
+                                   FontFamily="Segoe Fluent Icons"
+                                   FontSize="10" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1">
             <Grid IsVisible="{Binding !IsUnlocked}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                 <StackPanel Width="360" Spacing="16" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <ic:FluentIcon Icon="LockClosed" FontSize="48" HorizontalAlignment="Center" />
@@ -2591,7 +2675,7 @@
             </fa:FANavigationView>
         </Grid>
 
-        <Border Grid.Row="1"
+        <Border Grid.Row="2"
                 IsVisible="{Binding IsUnlocked}"
                 Background="{DynamicResource LayerFillColorDefaultBrush}"
                 BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
