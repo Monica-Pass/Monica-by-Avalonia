@@ -40,8 +40,6 @@ public partial class MainWindow : Window
         Closing += OnClosing;
         Closed += OnClosed;
         DataContextChanged += OnDataContextChanged;
-        PropertyChanged += MainWindow_OnPropertyChanged;
-        UpdateMaximizeRestoreButton();
     }
 
     private async void OnOpened(object? sender, EventArgs e)
@@ -234,8 +232,6 @@ public partial class MainWindow : Window
 
     private void OnClosed(object? sender, EventArgs e)
     {
-        PropertyChanged -= MainWindow_OnPropertyChanged;
-
         if (_observedViewModel is not null)
         {
             _observedViewModel.PropertyChanged -= ViewModel_OnPropertyChanged;
