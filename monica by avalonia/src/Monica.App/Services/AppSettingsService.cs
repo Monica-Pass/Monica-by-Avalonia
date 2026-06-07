@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Monica.Core.Models;
 using Monica.Core.Services;
+using Monica.Data;
 using Monica.Platform.Services;
 
 namespace Monica.App.Services;
@@ -122,8 +123,7 @@ public sealed class AppSettingsService : IAppSettingsService
 
     private static string GetDefaultSettingsPath()
     {
-        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Monica by Avalonia");
-        return Path.Combine(root, "settings.json");
+        return MonicaAppDataPaths.GetPath("settings.json");
     }
 
     private async Task ProtectSecretsAsync(DesktopAppSettings settings, CancellationToken cancellationToken)

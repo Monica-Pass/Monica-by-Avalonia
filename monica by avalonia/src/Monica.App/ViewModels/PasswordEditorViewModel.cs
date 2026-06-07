@@ -241,7 +241,11 @@ public sealed partial class PasswordEditorViewModel : ObservableObject
             }
 
             var strength = _passwordGenerator.Analyze(rows[0]);
-            return L.Format("GeneratedPasswordStrengthFormat", strength.Label, strength.Score, string.Join(" ", strength.Warnings));
+            return L.Format(
+                "GeneratedPasswordStrengthFormat",
+                PasswordStrengthLocalization.Label(L, strength.Label),
+                strength.Score,
+                PasswordStrengthLocalization.Warnings(L, strength.Warnings));
         }
     }
 
@@ -337,7 +341,20 @@ public sealed partial class PasswordEditorViewModel : ObservableObject
             return [BuildEntry("")];
         }
 
-        return storedPasswords.Select(BuildEntry).ToArray();
+        var entries = storedPasswords.Select(BuildEntry).ToArray();
+        if (entries.Length > 1)
+        {
+            var replicaGroupId = entries
+                .Select(entry => entry.ReplicaGroupId)
+                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))
+                ?? $"editor-{Guid.NewGuid():N}";
+            foreach (var entry in entries)
+            {
+                entry.ReplicaGroupId = replicaGroupId;
+            }
+        }
+
+        return entries;
     }
 
     public IReadOnlyList<string> GetPasswordRows()

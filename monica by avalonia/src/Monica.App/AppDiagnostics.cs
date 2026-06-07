@@ -1,14 +1,12 @@
 using System.Diagnostics;
+using Monica.Data;
 
 namespace Monica.App;
 
 internal static class AppDiagnostics
 {
     private static readonly object SyncRoot = new();
-    private static readonly string LogPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Monica by Avalonia",
-        "runtime.log");
+    private static readonly string LogPath = MonicaAppDataPaths.GetPath("runtime.log");
 
     public static void Info(string message) => Write("INFO", message);
 
@@ -24,6 +22,22 @@ internal static class AppDiagnostics
             var result = await action();
             Info($"{name} completed in {stopwatch.ElapsedMilliseconds} ms");
             return result;
+        }
+        catch (Exception ex)
+        {
+            Error($"{name} failed after {stopwatch.ElapsedMilliseconds} ms", ex);
+            throw;
+        }
+    }
+
+    public static async Task MeasureAsync(string name, Func<Task> action)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            Info($"{name} started");
+            await action();
+            Info($"{name} completed in {stopwatch.ElapsedMilliseconds} ms");
         }
         catch (Exception ex)
         {

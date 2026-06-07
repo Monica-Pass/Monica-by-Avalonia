@@ -62,6 +62,174 @@ public partial class MainWindow : Window
         viewModel.SelectSectionCommand.Execute(tag);
     }
 
+    private void MainWindow_OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel ||
+            !viewModel.IsUnlocked)
+        {
+            return;
+        }
+
+        if (string.Equals(viewModel.SelectedSection, "Notes", StringComparison.OrdinalIgnoreCase))
+        {
+            HandleNoteWorkspaceShortcut(viewModel, e);
+            if (e.Handled)
+            {
+                return;
+            }
+        }
+
+        if (!string.Equals(viewModel.SelectedSection, "Passwords", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.F)
+        {
+            PasswordSearchBox.Focus();
+            PasswordSearchBox.SelectAll();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.N)
+        {
+            if (viewModel.AddPasswordCommand.CanExecute(null))
+            {
+                viewModel.AddPasswordCommand.Execute(null);
+                e.Handled = true;
+            }
+
+            return;
+        }
+
+        if (e.Key == Key.Escape && viewModel.HasPasswordFilters)
+        {
+            if (viewModel.ClearPasswordFiltersCommand.CanExecute(null))
+            {
+                viewModel.ClearPasswordFiltersCommand.Execute(null);
+                e.Handled = true;
+            }
+        }
+
+        if (e.KeyModifiers != KeyModifiers.None)
+        {
+            return;
+        }
+
+        if (e.Key is Key.Up or Key.Down && !IsNonSearchPasswordTextEditingSource(e.Source))
+        {
+            SelectAdjacentPassword(viewModel, e.Key == Key.Down ? 1 : -1);
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Enter && viewModel.HasCurrentSelectedPasswordDetails && !IsNonSearchPasswordTextEditingSource(e.Source))
+        {
+            PasswordDetailRegion.Focus();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Delete && !IsTextEditingSource(e.Source))
+        {
+            if (viewModel.SelectedPassword is not null &&
+                viewModel.DeletePasswordCommand.CanExecute(viewModel.SelectedPassword))
+            {
+                viewModel.DeletePasswordCommand.Execute(viewModel.SelectedPassword);
+                e.Handled = true;
+            }
+        }
+    }
+
+    private async void HandleNoteWorkspaceShortcut(MainWindowViewModel viewModel, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape && NoteFindPanel.IsVisible)
+        {
+            HideNoteFindPanel();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.F3)
+        {
+            SelectNoteFindMatch(forward: !e.KeyModifiers.HasFlag(KeyModifiers.Shift), focusEditor: true);
+            e.Handled = true;
+            return;
+        }
+
+        if (!e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            return;
+        }
+
+        if (e.Key == Key.F)
+        {
+            ShowNoteFindPanel(replaceMode: false);
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.H)
+        {
+            ShowNoteFindPanel(replaceMode: true);
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.S)
+        {
+            e.Handled = true;
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+            {
+                await viewModel.SaveAllNoteTabsCommand.ExecuteAsync(null);
+            }
+            else
+            {
+                await viewModel.SaveNoteCommand.ExecuteAsync(null);
+            }
+
+            return;
+        }
+
+        if (e.Key == Key.N)
+        {
+            viewModel.AddNoteCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.W && viewModel.SelectedNoteTab is not null)
+        {
+            e.Handled = true;
+            await CloseNoteTabWithPromptAsync(viewModel, viewModel.SelectedNoteTab);
+        }
+    }
+
+    private void SelectAdjacentPassword(MainWindowViewModel viewModel, int delta)
+    {
+        var visiblePasswords = viewModel.FilteredPasswords.ToList();
+        if (visiblePasswords.Count == 0)
+        {
+            return;
+        }
+
+        var currentIndex = viewModel.SelectedPassword is null
+            ? -1
+            : visiblePasswords.FindIndex(item => item.Id == viewModel.SelectedPassword.Id);
+        var nextIndex = currentIndex < 0
+            ? (delta > 0 ? 0 : visiblePasswords.Count - 1)
+            : Math.Clamp(currentIndex + delta, 0, visiblePasswords.Count - 1);
+
+        viewModel.SelectedPassword = visiblePasswords[nextIndex];
+        Dispatcher.UIThread.Post(() => PasswordListBox.ScrollIntoView(viewModel.SelectedPassword));
+    }
+
+    private bool IsNonSearchPasswordTextEditingSource(object? source) =>
+        source is TextBox textBox && textBox != PasswordSearchBox;
+
+    private static bool IsTextEditingSource(object? source) => source is TextBox;
+
     private void OnClosed(object? sender, EventArgs e)
     {
         if (_observedViewModel is not null)
@@ -130,6 +298,8 @@ public partial class MainWindow : Window
         {
             _observedViewModel.PropertyChanged += ViewModel_OnPropertyChanged;
         }
+
+        Dispatcher.UIThread.Post(UpdateNoteTabScrollButtons);
     }
 
     private void ViewModel_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -141,11 +311,48 @@ public partial class MainWindow : Window
                 RestoreSelectedNoteTabSelection();
                 EnsureSelectedNoteEditorHistory();
                 ScrollSelectedNoteTabIntoView();
+                UpdateNoteTabScrollButtons();
             });
         }
         else if (e.PropertyName == nameof(MainWindowViewModel.NoteTabWidth))
         {
-            Dispatcher.UIThread.Post(ScrollSelectedNoteTabIntoView);
+            Dispatcher.UIThread.Post(() =>
+            {
+                ScrollSelectedNoteTabIntoView();
+                UpdateNoteTabScrollButtons();
+            });
+        }
+        else if (e.PropertyName == nameof(MainWindowViewModel.SelectedSection))
+        {
+            QueueWorkspaceScrollResetForSelectedSection();
+        }
+    }
+
+    private void QueueWorkspaceScrollResetForSelectedSection()
+    {
+        ResetWorkspaceScrollForSelectedSection();
+        Dispatcher.UIThread.Post(ResetWorkspaceScrollForSelectedSection);
+        _ = ResetWorkspaceScrollForSelectedSectionDeferredAsync();
+    }
+
+    private async Task ResetWorkspaceScrollForSelectedSectionDeferredAsync()
+    {
+        await Task.Delay(120);
+        await Dispatcher.UIThread.InvokeAsync(ResetWorkspaceScrollForSelectedSection);
+        await Task.Delay(480);
+        await Dispatcher.UIThread.InvokeAsync(ResetWorkspaceScrollForSelectedSection);
+    }
+
+    private void ResetWorkspaceScrollForSelectedSection()
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        if (string.Equals(viewModel.SelectedSection, "DatabaseManagement", StringComparison.OrdinalIgnoreCase))
+        {
+            DatabaseManagementScrollViewer.Offset = new Vector(0, 0);
         }
     }
 
@@ -163,6 +370,18 @@ public partial class MainWindow : Window
         }
 
         Dispatcher.UIThread.Post(ScrollSelectedNoteTabIntoView);
+        Dispatcher.UIThread.Post(UpdateNoteTabScrollButtons);
+    }
+
+    private void NoteTabsScrollViewer_OnScrollChanged(object? sender, ScrollChangedEventArgs e) =>
+        UpdateNoteTabScrollButtons();
+
+    private void NoteWorkspaceGrid_OnSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            viewModel.NoteWorkspaceViewportWidth = e.NewSize.Width;
+        }
     }
 
     private double GetNoteTabPageScrollAmount()
@@ -225,6 +444,27 @@ public partial class MainWindow : Window
         var maxOffset = Math.Max(0, extentWidth - viewportWidth);
         var x = Math.Clamp(targetOffset, 0, maxOffset);
         NoteTabsScrollViewer.Offset = new Vector(x, 0);
+        UpdateNoteTabScrollButtons();
+    }
+
+    private void UpdateNoteTabScrollButtons()
+    {
+        var viewportWidth = NoteTabsScrollViewer.Viewport.Width;
+        var extentWidth = NoteTabsScrollViewer.Extent.Width;
+        if (viewportWidth <= 0 ||
+            extentWidth <= 0 ||
+            double.IsNaN(viewportWidth) ||
+            double.IsNaN(extentWidth))
+        {
+            PreviousNoteTabButton.IsEnabled = false;
+            NextNoteTabButton.IsEnabled = false;
+            return;
+        }
+
+        var maxOffset = Math.Max(0, extentWidth - viewportWidth);
+        var offset = Math.Clamp(NoteTabsScrollViewer.Offset.X, 0, maxOffset);
+        PreviousNoteTabButton.IsEnabled = offset > 0.5;
+        NextNoteTabButton.IsEnabled = offset < maxOffset - 0.5;
     }
 
     private void RestoreSelectedNoteTabSelection()
@@ -276,6 +516,45 @@ public partial class MainWindow : Window
 
     private void RedoNoteEditorButton_OnClick(object? sender, RoutedEventArgs e) =>
         RedoNoteEditor();
+
+    private void ShowNoteFindButton_OnClick(object? sender, RoutedEventArgs e) =>
+        ShowNoteFindPanel(replaceMode: false);
+
+    private void ShowNoteReplaceButton_OnClick(object? sender, RoutedEventArgs e) =>
+        ShowNoteFindPanel(replaceMode: true);
+
+    private void SetNoteEditModeMenuItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        viewModel.NotePreviewMode = false;
+        viewModel.NoteSplitPreviewMode = false;
+    }
+
+    private void SetNotePreviewModeMenuItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        viewModel.NoteSplitPreviewMode = false;
+        viewModel.NotePreviewMode = true;
+    }
+
+    private void SetNoteSplitModeMenuItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        viewModel.NotePreviewMode = false;
+        viewModel.NoteSplitPreviewMode = true;
+    }
 
     private async void CloseNoteTabButton_OnClick(object? sender, RoutedEventArgs e)
     {
@@ -663,16 +942,14 @@ public partial class MainWindow : Window
         }
 
         UpdateNoteFindStatus();
-        if (replaceMode)
+        var focusTarget = replaceMode ? NoteReplaceTextBox : NoteFindTextBox;
+        focusTarget.Focus();
+        focusTarget.SelectAll();
+        Dispatcher.UIThread.Post(() =>
         {
-            NoteReplaceTextBox.Focus();
-            NoteReplaceTextBox.SelectAll();
-        }
-        else
-        {
-            NoteFindTextBox.Focus();
-            NoteFindTextBox.SelectAll();
-        }
+            focusTarget.Focus();
+            focusTarget.SelectAll();
+        }, DispatcherPriority.Background);
     }
 
     private void HideNoteFindPanel()
@@ -1440,5 +1717,264 @@ public partial class MainWindow : Window
         }
 
         return text[end] == '\n' ? "" : "\n\n";
+    }
+
+    public async Task<bool> RunSmokeUiNoteEditorChecksAsync()
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            return await Dispatcher.UIThread.InvokeAsync(RunSmokeUiNoteEditorChecksAsync);
+        }
+
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            AppDiagnostics.Info("Smoke UI note editor failed. reason=no-view-model");
+            return false;
+        }
+
+        viewModel.SelectSectionCommand.Execute("Notes");
+        if (viewModel.SelectedNoteTab is null)
+        {
+            viewModel.AddNoteCommand.Execute(null);
+        }
+
+        viewModel.NoteTitle = "Smoke Markdown editor";
+        viewModel.NoteIsMarkdown = true;
+        viewModel.NotePreviewMode = false;
+        viewModel.NoteSplitPreviewMode = false;
+        var content = string.Join("\n",
+            "# Smoke Markdown editor",
+            "",
+            "This line contains NEEDLE and a second needle for replace-all.",
+            "",
+            "## Links and images",
+            "",
+            "![inline](monica-image://smoke-image)",
+            "[reference](https://example.invalid/smoke)",
+            "",
+            "- [ ] Task item",
+            "1. Ordered item",
+            "",
+            "```",
+            "needle inside code is intentionally replaceable in plain editor search",
+            "```");
+
+        viewModel.NoteContent = content;
+        NoteContentEditor.Text = content;
+        NoteContentEditor.SelectionStart = 0;
+        NoteContentEditor.SelectionEnd = 0;
+        CaptureNoteEditorHistorySnapshot(force: true);
+        UpdateNoteEditorStatus();
+
+        ShowNoteFindPanel(replaceMode: true);
+        NoteFindTextBox.Text = "needle";
+        NoteReplaceTextBox.Text = "thread";
+        ReplaceAllNoteMatches();
+
+        viewModel.NoteSplitPreviewMode = true;
+        await viewModel.SaveNoteCommand.ExecuteAsync(null);
+
+        var updatedContent = viewModel.NoteContent;
+        var success =
+            viewModel.SelectedNote is not null &&
+            viewModel.NoteItems.Any(item => item.Id == viewModel.SelectedNote.Id) &&
+            updatedContent.Contains("thread", StringComparison.OrdinalIgnoreCase) &&
+            !updatedContent.Contains("needle", StringComparison.OrdinalIgnoreCase) &&
+            viewModel.HasNoteOutlineItems &&
+            viewModel.HasNoteReferenceItems &&
+            viewModel.NoteReferenceItems.Any(item => item.IsImage) &&
+            viewModel.NoteLineCount >= 12 &&
+            viewModel.NoteSplitPreviewMode;
+
+        AppDiagnostics.Info(
+            $"Smoke UI note editor checks completed. success={success}, " +
+            $"lineCount={viewModel.NoteLineCount}, outline={viewModel.NoteOutlineCount}, " +
+            $"references={viewModel.NoteReferenceCount}, selectedNote={viewModel.SelectedNote?.Title}");
+        return success;
+    }
+
+    public async Task<bool> RunSmokeUiKeyboardChecksAsync()
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            return await Dispatcher.UIThread.InvokeAsync(RunSmokeUiKeyboardChecksAsync);
+        }
+
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            AppDiagnostics.Info("Smoke UI keyboard checks failed. reason=no-view-model");
+            return false;
+        }
+
+        var failures = new List<string>();
+        void Check(string name, bool condition, string detail = "")
+        {
+            if (condition)
+            {
+                AppDiagnostics.Info($"Smoke UI keyboard check passed. check={name}, {detail}");
+                return;
+            }
+
+            failures.Add(name);
+            AppDiagnostics.Info($"Smoke UI keyboard check failed. check={name}, {detail}");
+        }
+
+        try
+        {
+            var vaultReady = await WaitForSmokeWindowConditionAsync(
+                () => viewModel.IsUnlocked && !viewModel.IsLoadingVault && viewModel.Passwords.Count > 0,
+                TimeSpan.FromSeconds(10));
+            Check("vault-ready", vaultReady, $"passwords={viewModel.Passwords.Count}");
+
+            viewModel.SelectSectionCommand.Execute("Passwords");
+            await Task.Delay(50);
+            PasswordSearchBox.Focus();
+            PasswordSearchBox.SelectAll();
+            Check("password-search-focus", PasswordSearchBox.IsFocused, $"section={viewModel.SelectedSection}");
+
+            viewModel.PasswordSearchText = "Smoke";
+            await Task.Delay(50);
+            Check("password-filter-active", viewModel.HasPasswordFilters, $"summary={viewModel.PasswordFilterSummaryText}");
+            if (viewModel.ClearPasswordFiltersCommand.CanExecute(null))
+            {
+                viewModel.ClearPasswordFiltersCommand.Execute(null);
+            }
+
+            await Task.Delay(50);
+            Check(
+                "password-escape-clear-filters",
+                !viewModel.HasPasswordFilters && string.IsNullOrWhiteSpace(viewModel.PasswordSearchText),
+                $"search='{viewModel.PasswordSearchText}'");
+
+            var visiblePasswords = viewModel.FilteredPasswords.ToArray();
+            Check("password-list-has-rows", visiblePasswords.Length >= 2, $"count={visiblePasswords.Length}");
+            if (visiblePasswords.Length >= 2)
+            {
+                viewModel.SelectedPassword = visiblePasswords[0];
+                SelectAdjacentPassword(viewModel, 1);
+                await Task.Delay(50);
+                Check(
+                    "password-arrow-select-next",
+                    viewModel.SelectedPassword?.Id == visiblePasswords[1].Id,
+                    $"selected={viewModel.SelectedPassword?.Title}");
+
+                var detailsReady = await WaitForSmokeWindowConditionAsync(
+                    () => viewModel.SelectedPasswordDetails?.Entry.Id == viewModel.SelectedPassword?.Id &&
+                          viewModel.HasCurrentSelectedPasswordDetails &&
+                          !viewModel.IsLoadingSelectedPasswordDetails,
+                    TimeSpan.FromSeconds(3));
+                Check("password-details-ready", detailsReady, $"selected={viewModel.SelectedPassword?.Title}");
+                PasswordDetailRegion.Focus();
+                Check("password-enter-focus-details", PasswordDetailRegion.IsFocused, $"hasDetails={viewModel.HasCurrentSelectedPasswordDetails}");
+                Check(
+                    "password-delete-command-available",
+                    viewModel.SelectedPassword is not null &&
+                    viewModel.DeletePasswordCommand.CanExecute(viewModel.SelectedPassword),
+                    $"selected={viewModel.SelectedPassword?.Title}");
+            }
+
+            viewModel.SelectSectionCommand.Execute("Notes");
+            await Task.Delay(50);
+            if (viewModel.OpenNoteTabs.Count < 2)
+            {
+                viewModel.AddNoteCommand.Execute(null);
+                viewModel.AddNoteCommand.Execute(null);
+            }
+
+            Check("note-tabs-available", viewModel.OpenNoteTabs.Count >= 2, $"tabs={viewModel.OpenNoteTabs.Count}");
+            if (viewModel.OpenNoteTabs.Count >= 2)
+            {
+                viewModel.SelectedNoteTab = viewModel.OpenNoteTabs[0];
+                if (viewModel.SelectNextNoteTabCommand.CanExecute(null))
+                {
+                    viewModel.SelectNextNoteTabCommand.Execute(null);
+                }
+
+                await Task.Delay(50);
+                Check(
+                    "note-ctrl-pagedown-next-tab",
+                    viewModel.SelectedNoteTab == viewModel.OpenNoteTabs[1],
+                    $"selected={viewModel.SelectedNoteTab?.Title}");
+                if (viewModel.SelectPreviousNoteTabCommand.CanExecute(null))
+                {
+                    viewModel.SelectPreviousNoteTabCommand.Execute(null);
+                }
+
+                await Task.Delay(50);
+                Check(
+                    "note-ctrl-pageup-previous-tab",
+                    viewModel.SelectedNoteTab == viewModel.OpenNoteTabs[0],
+                    $"selected={viewModel.SelectedNoteTab?.Title}");
+            }
+
+            viewModel.NotePreviewMode = false;
+            viewModel.NoteSplitPreviewMode = false;
+            viewModel.NoteContent = "alpha\nbeta";
+            NoteContentEditor.Text = viewModel.NoteContent;
+            NoteContentEditor.SelectionStart = 0;
+            NoteContentEditor.SelectionEnd = NoteContentEditor.Text?.Length ?? 0;
+            NoteContentEditor.Focus();
+            Check("note-editor-focus", NoteContentEditor.IsFocused, $"section={viewModel.SelectedSection}");
+
+            IndentSelectedLines(outdent: false);
+            Check(
+                "note-tab-indents-lines",
+                (NoteContentEditor.Text ?? "").StartsWith("    alpha", StringComparison.Ordinal),
+                $"content='{FormatSmokeLogValue(NoteContentEditor.Text)}'");
+            IndentSelectedLines(outdent: true);
+            Check(
+                "note-shift-tab-outdents-lines",
+                string.Equals(NoteContentEditor.Text, "alpha\nbeta", StringComparison.Ordinal),
+                $"content='{FormatSmokeLogValue(NoteContentEditor.Text)}'");
+
+            ShowNoteFindPanel(replaceMode: false);
+            await Task.Delay(50);
+            Check(
+                "note-ctrl-f-focus-find",
+                NoteFindPanel.IsVisible && NoteFindTextBox.IsFocused,
+                $"findVisible={NoteFindPanel.IsVisible}");
+            HideNoteFindPanel();
+            Check(
+                "note-escape-closes-find",
+                !NoteFindPanel.IsVisible && NoteContentEditor.IsFocused,
+                $"findVisible={NoteFindPanel.IsVisible}");
+            ShowNoteFindPanel(replaceMode: true);
+            await Task.Delay(50);
+            Check(
+                "note-ctrl-h-focus-replace",
+                NoteFindPanel.IsVisible && NoteReplaceTextBox.IsVisible && NoteReplaceTextBox.IsFocused,
+                $"replaceVisible={NoteReplaceTextBox.IsVisible}");
+            HideNoteFindPanel();
+        }
+        catch (Exception ex)
+        {
+            failures.Add("exception");
+            AppDiagnostics.Error("Smoke UI keyboard checks failed", ex);
+        }
+
+        var success = failures.Count == 0;
+        AppDiagnostics.Info(
+            $"Smoke UI keyboard checks completed. success={success}, " +
+            $"failureCount={failures.Count}, failures={string.Join(",", failures)}");
+        return success;
+    }
+
+    private static string FormatSmokeLogValue(string? value) =>
+        (value ?? "").Replace("\r", "\\r", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal);
+
+    private static async Task<bool> WaitForSmokeWindowConditionAsync(Func<bool> condition, TimeSpan timeout)
+    {
+        var deadline = DateTimeOffset.UtcNow.Add(timeout);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (condition())
+            {
+                return true;
+            }
+
+            await Task.Delay(50);
+        }
+
+        return condition();
     }
 }

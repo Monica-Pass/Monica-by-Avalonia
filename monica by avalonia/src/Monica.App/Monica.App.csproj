@@ -42,4 +42,10 @@
     <ProjectReference Include="..\Monica.Data\Monica.Data.csproj" />
     <ProjectReference Include="..\Monica.Platform\Monica.Platform.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Monica.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
 </Project>

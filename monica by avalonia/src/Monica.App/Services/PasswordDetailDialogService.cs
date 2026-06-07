@@ -18,9 +18,9 @@ public interface IPasswordDetailDialogService
         IReadOnlyList<CustomField> customFields,
         IReadOnlyList<PasswordHistoryDisplayItem> passwordHistory,
         Func<PasswordEntry, Task>? addAttachment,
-        Func<Attachment, Task>? deleteAttachment,
-        Func<PasswordHistoryEntry, Task>? deletePasswordHistory,
-        Func<long, Task>? clearPasswordHistory,
+        Func<Attachment, Task<bool>>? deleteAttachment,
+        Func<PasswordHistoryEntry, Task<bool>>? deletePasswordHistory,
+        Func<long, Task<bool>>? clearPasswordHistory,
         CancellationToken cancellationToken = default);
 }
 
@@ -40,9 +40,9 @@ public sealed class PasswordDetailDialogService(
         IReadOnlyList<CustomField> customFields,
         IReadOnlyList<PasswordHistoryDisplayItem> passwordHistory,
         Func<PasswordEntry, Task>? addAttachment,
-        Func<Attachment, Task>? deleteAttachment,
-        Func<PasswordHistoryEntry, Task>? deletePasswordHistory,
-        Func<long, Task>? clearPasswordHistory,
+        Func<Attachment, Task<bool>>? deleteAttachment,
+        Func<PasswordHistoryEntry, Task<bool>>? deletePasswordHistory,
+        Func<long, Task<bool>>? clearPasswordHistory,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();

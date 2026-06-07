@@ -39,6 +39,7 @@ public interface ILocalizationService : INotifyPropertyChanged
     string Folders { get; }
     string Personal { get; }
     string AllFolders { get; }
+    string FolderScopes { get; }
     string NewFolder { get; }
     string CreateFolder { get; }
     string RenameFolder { get; }
@@ -60,6 +61,8 @@ public interface ILocalizationService : INotifyPropertyChanged
     string AddPassword { get; }
     string EditPassword { get; }
     string PasswordDetails { get; }
+    string LoadingPasswordDetails { get; }
+    string Details { get; }
     string PasswordHistory { get; }
     string PasswordHistoryDescription { get; }
     string PasswordHistoryLatest { get; }
@@ -90,6 +93,7 @@ public interface ILocalizationService : INotifyPropertyChanged
     string QuickAccessRecent { get; }
     string QuickAccessFrequent { get; }
     string SortPasswords { get; }
+    string MoreOptions { get; }
     string RestorePassword { get; }
     string DeletePermanently { get; }
     string Delete { get; }
@@ -207,6 +211,12 @@ public interface ILocalizationService : INotifyPropertyChanged
     string CreateLocalMdbxVault { get; }
     string RegisterMdbxSource { get; }
     string Configure { get; }
+    string MdbxSourcesSection { get; }
+    string MdbxWorkingCopiesSection { get; }
+    string MdbxHealthSection { get; }
+    string MdbxDiagnostics { get; }
+    string MdbxRemotePath { get; }
+    string MdbxLastSynced { get; }
     string RegisteredMdbxVaults { get; }
     string NoMdbxVaults { get; }
     string Default { get; }
@@ -226,6 +236,9 @@ public interface ILocalizationService : INotifyPropertyChanged
     string MdbxDatabaseCount { get; }
     string RegisteredDatabases { get; }
     string WebDavConnection { get; }
+    string SyncOverview { get; }
+    string SyncConfiguration { get; }
+    string TestConnection { get; }
     string FeatureParityMap { get; }
     string FeatureParityMapDescription { get; }
     string ExportPreview { get; }
@@ -263,6 +276,9 @@ public interface ILocalizationService : INotifyPropertyChanged
     string SaveNoteCsvExport { get; }
     string SaveAegisExport { get; }
     string PasswordGenerator { get; }
+    string GeneratedPassword { get; }
+    string GeneratedPasswordLabel { get; }
+    string GeneratedPasswordPlaceholder { get; }
     string Generate { get; }
     string SaveAsLogin { get; }
     string GeneratorLength { get; }
@@ -462,6 +478,7 @@ public sealed class LocalizationService : ILocalizationService
     public string Folders => Text();
     public string Personal => Text();
     public string AllFolders => Text();
+    public string FolderScopes => Text();
     public string NewFolder => Text();
     public string CreateFolder => Text();
     public string RenameFolder => Text();
@@ -483,6 +500,8 @@ public sealed class LocalizationService : ILocalizationService
     public string AddPassword => Text();
     public string EditPassword => Text();
     public string PasswordDetails => Text();
+    public string LoadingPasswordDetails => Text();
+    public string Details => Text();
     public string PasswordHistory => Text();
     public string PasswordHistoryDescription => Text();
     public string PasswordHistoryLatest => Text();
@@ -513,6 +532,7 @@ public sealed class LocalizationService : ILocalizationService
     public string QuickAccessRecent => Text();
     public string QuickAccessFrequent => Text();
     public string SortPasswords => Text();
+    public string MoreOptions => Text();
     public string RestorePassword => Text();
     public string DeletePermanently => Text();
     public string Delete => Text();
@@ -630,6 +650,12 @@ public sealed class LocalizationService : ILocalizationService
     public string CreateLocalMdbxVault => Text();
     public string RegisterMdbxSource => Text();
     public string Configure => Text();
+    public string MdbxSourcesSection => Text();
+    public string MdbxWorkingCopiesSection => Text();
+    public string MdbxHealthSection => Text();
+    public string MdbxDiagnostics => Text();
+    public string MdbxRemotePath => Text();
+    public string MdbxLastSynced => Text();
     public string RegisteredMdbxVaults => Text();
     public string NoMdbxVaults => Text();
     public string Default => Text();
@@ -649,6 +675,9 @@ public sealed class LocalizationService : ILocalizationService
     public string MdbxDatabaseCount => Text();
     public string RegisteredDatabases => Text();
     public string WebDavConnection => Text();
+    public string SyncOverview => Text();
+    public string SyncConfiguration => Text();
+    public string TestConnection => Text();
     public string FeatureParityMap => Text();
     public string FeatureParityMapDescription => Text();
     public string ExportPreview => Text();
@@ -686,6 +715,9 @@ public sealed class LocalizationService : ILocalizationService
     public string SaveNoteCsvExport => Text();
     public string SaveAegisExport => Text();
     public string PasswordGenerator => Text();
+    public string GeneratedPassword => Text();
+    public string GeneratedPasswordLabel => Text();
+    public string GeneratedPasswordPlaceholder => Text();
     public string Generate => Text();
     public string SaveAsLogin => Text();
     public string GeneratorLength => Text();
@@ -891,6 +923,7 @@ public sealed class LocalizationService : ILocalizationService
         ["Folders"] = "Folders",
         ["Personal"] = "Personal",
         ["AllFolders"] = "All folders",
+        ["FolderScopes"] = "Scopes",
         ["NewFolder"] = "New folder",
         ["CreateFolder"] = "Create folder",
         ["RenameFolder"] = "Rename folder",
@@ -912,6 +945,9 @@ public sealed class LocalizationService : ILocalizationService
         ["AddPassword"] = "Add Password",
         ["EditPassword"] = "Edit Password",
         ["PasswordDetails"] = "Password Details",
+        ["LoadingPasswordDetails"] = "Loading password details...",
+        ["Details"] = "Details",
+        ["PasswordDetailsLoadFailedFormat"] = "Failed to load password details: {0}",
         ["PasswordHistory"] = "Password History",
         ["PasswordHistoryDescription"] = "Stored locally in this vault. Monica keeps the 10 most recent previous passwords for this entry.",
         ["PasswordHistoryLatest"] = "Latest",
@@ -931,6 +967,26 @@ public sealed class LocalizationService : ILocalizationService
         ["ArchivePassword"] = "Archive password",
         ["UnarchivePassword"] = "Unarchive password",
         ["MoveToRecycleBin"] = "Move to recycle bin",
+        ["DeletePasswordConfirmationTitle"] = "Move password to recycle bin?",
+        ["DeletePasswordConfirmationMessageFormat"] = "Move \"{0}\" to the recycle bin? You can restore it later from Recycle Bin.",
+        ["DeleteSelectedPasswordsConfirmationTitle"] = "Move selected passwords?",
+        ["DeleteSelectedPasswordsConfirmationMessageFormat"] = "Move {0} selected password(s) to the recycle bin? You can restore them later from Recycle Bin.",
+        ["DeleteItemConfirmationTitle"] = "Move item to recycle bin?",
+        ["DeleteItemConfirmationMessageFormat"] = "Move \"{0}\" to the recycle bin? You can restore it later from Recycle Bin.",
+        ["DeleteSelectedItemsConfirmationTitle"] = "Move selected items?",
+        ["DeleteSelectedItemsConfirmationMessageFormat"] = "Move {0} selected item(s) to the recycle bin? You can restore them later from Recycle Bin.",
+        ["DeletePermanentlyConfirmationTitle"] = "Delete permanently?",
+        ["DeletePermanentlyConfirmationMessageFormat"] = "Permanently delete \"{0}\"? This cannot be undone.",
+        ["DeleteWebDavBackupConfirmationTitle"] = "Delete WebDAV backup?",
+        ["DeleteWebDavBackupConfirmationMessageFormat"] = "Delete remote backup \"{0}\"? This cannot be undone.",
+        ["DeleteFolderConfirmationTitle"] = "Delete folder?",
+        ["DeleteFolderConfirmationMessageFormat"] = "Delete folder \"{0}\"? {1} password(s) will be moved to No folder.",
+        ["DeleteAttachmentConfirmationTitle"] = "Delete attachment?",
+        ["DeleteAttachmentConfirmationMessageFormat"] = "Delete attachment \"{0}\"? This removes the stored file from the vault.",
+        ["DeletePasswordHistoryConfirmationTitle"] = "Delete password history?",
+        ["DeletePasswordHistoryConfirmationMessage"] = "Delete this password history entry? This cannot be undone.",
+        ["ClearPasswordHistoryConfirmationTitle"] = "Clear password history?",
+        ["ClearPasswordHistoryConfirmationMessage"] = "Clear all password history for this login? This cannot be undone.",
         ["QuickFilterFavorite"] = "Favorites",
         ["QuickFilter2Fa"] = "2FA",
         ["QuickFilterNotes"] = "Notes",
@@ -939,9 +995,12 @@ public sealed class LocalizationService : ILocalizationService
         ["QuickFilterUncategorized"] = "Uncategorized",
         ["QuickFilterLocalOnly"] = "Local only",
         ["QuickFilterAttachments"] = "Attachments",
+        ["ClearPasswordFilters"] = "Clear filters",
+        ["ClearedPasswordFilters"] = "Cleared password filters",
         ["QuickAccessRecent"] = "Recently opened",
         ["QuickAccessFrequent"] = "Frequently opened",
         ["SortPasswords"] = "Sort passwords",
+        ["MoreOptions"] = "More options",
         ["SortUpdated"] = "Recently updated",
         ["SortTitle"] = "Title",
         ["SortWebsite"] = "Website",
@@ -1082,6 +1141,12 @@ public sealed class LocalizationService : ILocalizationService
         ["CreateLocalMdbxVault"] = "Create local MDBX",
         ["RegisterMdbxSource"] = "Register source",
         ["Configure"] = "Configure",
+        ["MdbxSourcesSection"] = "Sources",
+        ["MdbxWorkingCopiesSection"] = "Working copies",
+        ["MdbxHealthSection"] = "Health and diagnostics",
+        ["MdbxDiagnostics"] = "Diagnostics",
+        ["MdbxRemotePath"] = "Remote path",
+        ["MdbxLastSynced"] = "Last synced",
         ["RegisteredMdbxVaults"] = "Registered MDBX vaults",
         ["NoMdbxVaults"] = "No MDBX vault metadata has been registered yet.",
         ["Default"] = "Default",
@@ -1101,6 +1166,9 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxDatabaseCount"] = "MDBX vault metadata",
         ["RegisteredDatabases"] = "Registered databases",
         ["WebDavConnection"] = "WebDAV connection",
+        ["SyncOverview"] = "Sync overview",
+        ["SyncConfiguration"] = "Sync configuration",
+        ["TestConnection"] = "Test connection",
         ["FeatureParityMap"] = "Feature parity map",
         ["DangerZone"] = "Danger zone",
         ["About"] = "About",
@@ -1155,6 +1223,8 @@ public sealed class LocalizationService : ILocalizationService
         ["SaveNoteCsvExport"] = "Save Notes CSV",
         ["SaveAegisExport"] = "Save Aegis JSON",
         ["PasswordGenerator"] = "Password Generator",
+        ["GeneratedPasswordLabel"] = "Generated password",
+        ["GeneratedPasswordPlaceholder"] = "Generate or type a password.",
         ["Generate"] = "Generate",
         ["SaveAsLogin"] = "Save as Login",
         ["GeneratorLength"] = "Length",
@@ -1168,6 +1238,15 @@ public sealed class LocalizationService : ILocalizationService
         ["IncludeNumbers"] = "Include numbers",
         ["IncludeSymbols"] = "Include symbols",
         ["PasswordStrength"] = "Password strength",
+        ["PasswordStrengthExcellent"] = "Excellent",
+        ["PasswordStrengthStrong"] = "Strong",
+        ["PasswordStrengthFair"] = "Fair",
+        ["PasswordStrengthWeak"] = "Weak",
+        ["PasswordStrengthVeryWeak"] = "Very weak",
+        ["PasswordStrengthWarningShort"] = "Password is shorter than 12 characters.",
+        ["PasswordStrengthWarningMixedCase"] = "Use both upper and lower case letters.",
+        ["PasswordStrengthWarningNumbers"] = "Add numbers.",
+        ["PasswordStrengthWarningSymbols"] = "Add symbols.",
         ["GeneratorNoPassword"] = "Generate a password to see its strength.",
         ["GeneratedPasswordStrengthFormat"] = "{0} ({1}/5). {2}",
         ["CopiedGeneratedPassword"] = "Copied generated password",
@@ -1319,6 +1398,9 @@ public sealed class LocalizationService : ILocalizationService
         ["NoBackupsFound"] = "No backup files found.",
         ["FeatureParityMapDescription"] = "Desktop availability for Android-originated Monica features.",
         ["Available"] = "Available",
+        ["Enabled"] = "Enabled",
+        ["Disabled"] = "Disabled",
+        ["NeedsAttention"] = "Needs attention",
         ["DesktopEquivalent"] = "Desktop equivalent",
         ["PlatformLimited"] = "Platform limited",
         ["Unsupported"] = "Unsupported",
@@ -1383,6 +1465,25 @@ public sealed class LocalizationService : ILocalizationService
         ["DatabaseSummaryFormat"] = "{0} passwords, {1} notes, {2} authenticators, {3} wallet items",
         ["MdbxDatabaseCountFormat"] = "{0} MDBX metadata record(s)",
         ["MdbxSourceCountFormat"] = "{0} vault(s)",
+        ["MdbxWorkingCopyCountFormat"] = "{0} ready",
+        ["MdbxRemoteSourceCountFormat"] = "{0} remote",
+        ["MdbxDefaultVault"] = "Default vault",
+        ["MdbxWorkingCopies"] = "Working copies",
+        ["MdbxRemoteSources"] = "Remote sources",
+        ["MdbxDefaultVaultFormat"] = "Default: {0}",
+        ["MdbxDefaultVaultMissing"] = "No default vault",
+        ["MdbxNoWorkingCopies"] = "No MDBX working copy is ready yet.",
+        ["MdbxWorkingCopySummaryFormat"] = "{0}/{1} working copy file(s) are ready; {2} can be used offline.",
+        ["MdbxRemoteSourceEmpty"] = "No remote MDBX source has been registered.",
+        ["MdbxRemoteSummaryFormat"] = "{0} remote source(s), {1} pending sync item(s).",
+        ["MdbxSyncErrorsFormat"] = "{0} MDBX sync issue(s) need attention.",
+        ["MdbxPendingSyncFormat"] = "{0} MDBX source(s) are waiting for sync.",
+        ["MdbxNoSyncErrors"] = "No MDBX sync errors recorded.",
+        ["MdbxCacheEnabled"] = "Local MDBX cache is kept for desktop operations.",
+        ["MdbxCacheDisabled"] = "Local MDBX cache is disabled; remote sources may need to rebuild working copies.",
+        ["MdbxWorkingCopyReady"] = "Working copy ready",
+        ["MdbxWorkingCopyMissing"] = "Working copy missing",
+        ["MdbxRemoteStatusFormat"] = "{0}: {1}",
         ["MdbxLocalSourceReadyFormat"] = "{0} local MDBX vault(s) are ready.",
         ["MdbxLocalSourceEmpty"] = "Create a local MDBX working copy for desktop vault operations.",
         ["MdbxWebDavSourceReadyFormat"] = "{0} WebDAV MDBX source(s) are registered.",
@@ -1413,6 +1514,18 @@ public sealed class LocalizationService : ILocalizationService
         ["VaultSourceCountFormat"] = "{0} registered source(s)",
         ["WebDavConfiguredFormat"] = "Configured for {0}",
         ["WebDavDisabled"] = "WebDAV is disabled. Local vault operations remain available.",
+        ["SyncStatusSummaryFormat"] = "{0}; {1} backup file(s) loaded in history.",
+        ["SyncStatusLocalOnly"] = "Remote sync is disabled. Local vault operations remain available.",
+        ["SyncConfigurationDisabled"] = "Enable WebDAV before configuring remote sync.",
+        ["SyncConfigurationReadyFormat"] = "WebDAV is configured for remote path {0}.",
+        ["SyncConfigurationIncomplete"] = "WebDAV is enabled but the server URL is incomplete.",
+        ["SyncRecoveryLocalOnly"] = "No remote recovery source is active.",
+        ["SyncRecoveryNoBackupsLoaded"] = "Load backup history or create a backup to establish a recovery point.",
+        ["SyncRecoveryBackupReadyFormat"] = "{0} backup file(s) can be used for recovery.",
+        ["OneDriveBoundaryEnabled"] = "OneDrive boundary enabled",
+        ["OneDriveBoundaryDescription"] = "OneDrive is reserved for Microsoft Graph based MDBX sync metadata.",
+        ["WebDavConnectionTestSucceededFormat"] = "WebDAV connection test succeeded; {0} remote item(s) are visible.",
+        ["WebDavConnectionTestFailedFormat"] = "WebDAV connection test failed: {0}",
         ["EnableWebDavFirst"] = "Enable WebDAV and configure the server before loading backups.",
         ["WebDavServerUrlRequired"] = "Enter a valid WebDAV server URL.",
         ["WebDavBackupHistoryCountFormat"] = "{0} backup file(s)",
@@ -1571,12 +1684,46 @@ public sealed class LocalizationService : ILocalizationService
         ["Totp"] = "动态口令",
         ["Cards"] = "卡包",
         ["Generator"] = "生成器",
+        ["Archive"] = "归档",
+        ["RecycleBin"] = "回收站",
+        ["Timeline"] = "时间线",
+        ["SecurityAnalysis"] = "安全分析",
+        ["SecurityAnalysisSubtitle"] = "本地检查弱密码、复用密码、重复网站、过期密码、未受保护记录和已泄露密码。",
+        ["SecurityIssueCountFormat"] = "{0} 个问题",
+        ["SecurityScore"] = "安全评分",
+        ["SecurityScoreFormat"] = "{0}/100",
+        ["SecurityAnalyzedPasswordCountFormat"] = "已分析 {0} 个可用密码",
+        ["WeakPasswords"] = "弱密码",
+        ["WeakPasswordsSummary"] = "评分为弱或非常弱的密码。",
+        ["DuplicatePasswords"] = "重复密码",
+        ["DuplicatePasswordsSummary"] = "同一个密码被多个登录项复用。",
+        ["DuplicateWebsites"] = "重复网站",
+        ["MissingTwoFactor"] = "缺少两步验证",
+        ["MissingTwoFactorSummary"] = "支持两步验证的网站尚未保存验证器或 Passkey 绑定。",
+        ["StalePasswords"] = "长期未更新",
+        ["CompromisedPasswords"] = "已泄露密码",
+        ["CompromisedPasswordsSummary"] = "在已知泄露语料中发现的密码。",
+        ["CheckCompromisedPasswords"] = "检查泄露密码",
+        ["CompromisedPasswordNotChecked"] = "本次会话尚未检查已泄露密码。",
+        ["CompromisedPasswordCheckingFormat"] = "正在使用 k-anonymity 范围查询检查 {0} 个密码...",
+        ["CompromisedPasswordCheckCompleteFormat"] = "已检查 {0} 个可用密码；发现 {1} 个已泄露密码。",
+        ["CompromisedPasswordCheckUnavailableFormat"] = "检查泄露密码失败：{0}",
+        ["CompromisedPasswordIssueFormat"] = "在泄露数据中出现 {0} 次。请立即更换。",
+        ["WeakPasswordIssueFormat"] = "密码强度为 {0}。建议替换为生成器创建的密码。",
+        ["DuplicatePasswordIssueFormat"] = "此密码被 {0} 个条目复用，包括 {1}。",
+        ["DuplicateWebsiteIssueFormat"] = "{0} 出现在 {1} 个密码条目中。",
+        ["MissingTwoFactorIssueFormat"] = "{0} 通常支持两步验证。",
+        ["StalePasswordIssueFormat"] = "上次更新于 {0}。建议定期轮换。",
+        ["HighSeverity"] = "高",
+        ["MediumSeverity"] = "中",
+        ["LowSeverity"] = "低",
         ["SyncAndBackup"] = "同步与备份",
         ["DatabaseManagement"] = "数据库管理",
         ["DataManagement"] = "数据管理",
         ["DataManagementDescription"] = "与 Monica for Windows 设置页对齐的文件导入与导出操作。",
         ["Settings"] = "设置",
         ["Folders"] = "文件夹",
+        ["FolderScopes"] = "范围",
         ["Personal"] = "个人",
         ["Refresh"] = "刷新",
         ["Export"] = "导出",
@@ -1593,11 +1740,64 @@ public sealed class LocalizationService : ILocalizationService
         ["Search"] = "搜索...",
         ["AddPassword"] = "添加密码",
         ["EditPassword"] = "编辑密码",
+        ["PasswordDetails"] = "密码详情",
+        ["LoadingPasswordDetails"] = "正在加载密码详情...",
+        ["Details"] = "详情",
+        ["PasswordDetailsLoadFailedFormat"] = "加载密码详情失败：{0}",
+        ["PasswordHistory"] = "密码历史",
+        ["PasswordHistoryDescription"] = "保存在此保险库本地。Monica 会保留此条目的最近 10 个旧密码。",
+        ["PasswordHistoryLatest"] = "最新",
+        ["ClearPasswordHistory"] = "清空密码历史",
         ["Favorite"] = "收藏",
+        ["Copy"] = "复制",
         ["CopyPassword"] = "复制密码",
+        ["CopyUsername"] = "复制用户名",
+        ["CopyWebsite"] = "复制网站",
+        ["SortPasswords"] = "排序密码",
+        ["SortUpdated"] = "最近更新",
+        ["SortTitle"] = "标题",
+        ["SortWebsite"] = "网站",
+        ["SortUsername"] = "用户名",
+        ["SortCreated"] = "最近创建",
+        ["SortFavorites"] = "收藏优先",
+        ["MoreOptions"] = "更多操作",
         ["MoveToRecycleBin"] = "移到回收站",
+        ["BatchFavorite"] = "收藏所选",
+        ["BatchArchive"] = "归档所选",
+        ["BatchDelete"] = "删除所选",
+        ["MoveToFolder"] = "移动到文件夹",
+        ["Move"] = "移动",
+        ["ArchivePassword"] = "归档密码",
+        ["UnarchivePassword"] = "取消归档",
+        ["RestorePassword"] = "恢复密码",
+        ["DeletePermanently"] = "永久删除",
+        ["Delete"] = "删除",
+        ["Select"] = "选择",
+        ["Edit"] = "编辑",
+        ["DeletePasswordConfirmationTitle"] = "移到回收站？",
+        ["DeletePasswordConfirmationMessageFormat"] = "要将“{0}”移到回收站吗？之后可以从回收站恢复。",
+        ["DeleteSelectedPasswordsConfirmationTitle"] = "移动选中的密码？",
+        ["DeleteSelectedPasswordsConfirmationMessageFormat"] = "要将 {0} 个选中的密码移到回收站吗？之后可以从回收站恢复。",
+        ["DeleteItemConfirmationTitle"] = "移到回收站？",
+        ["DeleteItemConfirmationMessageFormat"] = "要将“{0}”移到回收站吗？之后可以从回收站恢复。",
+        ["DeleteSelectedItemsConfirmationTitle"] = "移动选中的项目？",
+        ["DeleteSelectedItemsConfirmationMessageFormat"] = "要将 {0} 个选中的项目移到回收站吗？之后可以从回收站恢复。",
+        ["DeletePermanentlyConfirmationTitle"] = "永久删除？",
+        ["DeletePermanentlyConfirmationMessageFormat"] = "要永久删除“{0}”吗？此操作无法撤销。",
+        ["DeleteWebDavBackupConfirmationTitle"] = "删除 WebDAV 备份？",
+        ["DeleteWebDavBackupConfirmationMessageFormat"] = "要删除远端备份“{0}”吗？此操作无法撤销。",
+        ["DeleteFolderConfirmationTitle"] = "删除文件夹？",
+        ["DeleteFolderConfirmationMessageFormat"] = "要删除文件夹“{0}”吗？{1} 个密码会移动到无文件夹。",
+        ["DeleteAttachmentConfirmationTitle"] = "删除附件？",
+        ["DeleteAttachmentConfirmationMessageFormat"] = "要删除附件“{0}”吗？这会从保险库移除已存储的文件。",
+        ["DeletePasswordHistoryConfirmationTitle"] = "删除密码历史？",
+        ["DeletePasswordHistoryConfirmationMessage"] = "要删除这条密码历史吗？此操作无法撤销。",
+        ["ClearPasswordHistoryConfirmationTitle"] = "清空密码历史？",
+        ["ClearPasswordHistoryConfirmationMessage"] = "要清空此登录项的全部密码历史吗？此操作无法撤销。",
         ["Save"] = "保存",
         ["Cancel"] = "取消",
+        ["ClearPasswordFilters"] = "清除筛选",
+        ["ClearedPasswordFilters"] = "已清除密码筛选",
         ["NoFolder"] = "无文件夹",
         ["NewPassword"] = "新建密码",
         ["PasswordTitleRequired"] = "请输入密码标题。",
@@ -1606,6 +1806,8 @@ public sealed class LocalizationService : ILocalizationService
         ["Website"] = "网站",
         ["Username"] = "用户名",
         ["Password"] = "密码",
+        ["Category"] = "分类",
+        ["BoundNote"] = "绑定笔记",
         ["SecurityVerification"] = "安全验证",
         ["AuthenticatorKey"] = "验证器密钥",
         ["AuthenticatorKeyHint"] = "可选的 TOTP 密钥，对应 Android 端的验证器字段。二维码导入和多密码存储会继续复用这个模型扩展。",
@@ -1647,6 +1849,11 @@ public sealed class LocalizationService : ILocalizationService
         ["CustomIconUploadedHint"] = "本地图标文件名或路径",
         ["CustomFields"] = "自定义字段",
         ["CustomFieldsHint"] = "每行一个字段，格式为 标题=值；标题前加 ! 表示受保护字段。",
+        ["Attachments"] = "附件",
+        ["Attachment"] = "附件",
+        ["AddAttachment"] = "添加附件",
+        ["NoAttachments"] = "没有附件",
+        ["SelectAttachment"] = "选择附件",
         ["Notes"] = "备注",
         ["SourceMetadata"] = "来源元数据",
         ["BitwardenVault"] = "Bitwarden 保险库",
@@ -1657,11 +1864,45 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxFolder"] = "MDBX 文件夹",
         ["CreatedAt"] = "创建时间",
         ["UpdatedAt"] = "更新时间",
+        ["Close"] = "关闭",
         ["TwoStepVerification"] = "两步验证",
         ["AddAuthenticator"] = "添加验证器",
+        ["EditAuthenticator"] = "编辑验证器",
+        ["TotpPageDescription"] = "管理动态口令：复制、编辑、收藏、删除和批量操作都在此完成。",
+        ["AdvancedTotpOptions"] = "高级选项",
+        ["TotpSecretHint"] = "粘贴 Base32 密钥或 otpauth URI。Monica 会把规范化后的动态口令元数据保存在本地保险库。",
+        ["TotpCode"] = "动态口令",
+        ["RemainingTime"] = "剩余时间",
+        ["Issuer"] = "发行方",
+        ["Account"] = "账号",
+        ["TotpSecret"] = "动态口令密钥",
         ["CopyCode"] = "复制验证码",
         ["Wallet"] = "卡包",
         ["AddItem"] = "添加项目",
+        ["AddWalletItem"] = "添加卡包项目",
+        ["EditWalletItem"] = "编辑卡包项目",
+        ["WalletPageDescription"] = "管理银行卡和证件，支持详情、编辑、图片路径和批量删除。",
+        ["Document"] = "证件",
+        ["BankCard"] = "银行卡",
+        ["DocumentNumber"] = "证件号码",
+        ["FullName"] = "姓名",
+        ["IssuedDate"] = "签发日期",
+        ["ExpiryDate"] = "到期日期",
+        ["IssuedBy"] = "签发机构",
+        ["Nationality"] = "国籍",
+        ["AdditionalInfo"] = "附加信息",
+        ["CardNumber"] = "卡号",
+        ["CardholderName"] = "持卡人",
+        ["Expiry"] = "有效期",
+        ["ExpiryMonth"] = "有效月份",
+        ["ExpiryYear"] = "有效年份",
+        ["BankName"] = "银行名称",
+        ["BillingAddress"] = "账单地址",
+        ["CardBrand"] = "卡组织",
+        ["DocumentPhotos"] = "证件照片",
+        ["NoDocumentPhotos"] = "没有证件照片",
+        ["ImagePathsWatermark"] = "每行一个本地图片路径",
+        ["ImagePathsDescription"] = "图片仍以路径引用；后续可迁移到加密附件。",
         ["DesktopEquivalents"] = "桌面等价能力",
         ["DesktopEquivalentsMessage"] = "Android 的自动填充、输入法、无障碍和凭据提供程序能力，在桌面端通过快速搜索、剪贴板、托盘/浏览器扩展接口或平台受限状态呈现。",
         ["CreateMdbxMetadata"] = "创建 MDBX 元数据",
@@ -1673,6 +1914,12 @@ public sealed class LocalizationService : ILocalizationService
         ["CreateLocalMdbxVault"] = "创建本地 MDBX",
         ["RegisterMdbxSource"] = "登记来源",
         ["Configure"] = "配置",
+        ["MdbxSourcesSection"] = "来源",
+        ["MdbxWorkingCopiesSection"] = "工作副本",
+        ["MdbxHealthSection"] = "健康与诊断",
+        ["MdbxDiagnostics"] = "诊断",
+        ["MdbxRemotePath"] = "远程路径",
+        ["MdbxLastSynced"] = "上次同步",
         ["RegisteredMdbxVaults"] = "已登记 MDBX 保险库",
         ["NoMdbxVaults"] = "还没有登记 MDBX 保险库元数据。",
         ["Default"] = "默认",
@@ -1692,6 +1939,9 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxDatabaseCount"] = "MDBX 保险库元数据",
         ["RegisteredDatabases"] = "已登记数据库",
         ["WebDavConnection"] = "WebDAV 连接",
+        ["SyncOverview"] = "同步概览",
+        ["SyncConfiguration"] = "同步配置",
+        ["TestConnection"] = "测试连接",
         ["FeatureParityMap"] = "功能对齐表",
         ["DangerZone"] = "危险区",
         ["About"] = "关于",
@@ -1746,6 +1996,8 @@ public sealed class LocalizationService : ILocalizationService
         ["SaveNoteCsvExport"] = "保存笔记 CSV",
         ["SaveAegisExport"] = "保存 Aegis JSON",
         ["PasswordGenerator"] = "密码生成器",
+        ["GeneratedPasswordLabel"] = "生成结果",
+        ["GeneratedPasswordPlaceholder"] = "点击生成，或输入密码。",
         ["Generate"] = "生成",
         ["SaveAsLogin"] = "保存为登录项",
         ["GeneratorLength"] = "长度",
@@ -1759,23 +2011,40 @@ public sealed class LocalizationService : ILocalizationService
         ["IncludeNumbers"] = "包含数字",
         ["IncludeSymbols"] = "包含符号",
         ["PasswordStrength"] = "密码强度",
+        ["PasswordStrengthExcellent"] = "极佳",
+        ["PasswordStrengthStrong"] = "强",
+        ["PasswordStrengthFair"] = "一般",
+        ["PasswordStrengthWeak"] = "弱",
+        ["PasswordStrengthVeryWeak"] = "非常弱",
+        ["PasswordStrengthWarningShort"] = "密码少于 12 个字符。",
+        ["PasswordStrengthWarningMixedCase"] = "同时使用大小写字母。",
+        ["PasswordStrengthWarningNumbers"] = "添加数字。",
+        ["PasswordStrengthWarningSymbols"] = "添加符号。",
         ["GeneratorNoPassword"] = "生成或输入密码后查看强度。",
         ["GeneratedPasswordStrengthFormat"] = "{0}（{1}/5）。{2}",
         ["SecureNotesDescription"] = "笔记以 NOTE 类型存储在 secure_items 中，并共享同一套加密、文件夹、KeePass、Bitwarden 和 MDBX 归属模型。",
         ["CreateSecureItem"] = "创建安全项目",
         ["SettingsSubtitle"] = "配置 Monica 桌面端的行为、安全、外观和集成选项。",
         ["General"] = "通用",
+        ["GeneralSettingsDescription"] = "语言、主题和解锁后默认打开的页面。",
         ["Language"] = "语言",
+        ["LanguageDescription"] = "选择 Monica 桌面端的显示语言。",
         ["Theme"] = "主题",
+        ["ThemeDescription"] = "跟随系统主题，或固定使用浅色/深色外观。",
         ["StartupView"] = "启动页",
+        ["StartupViewDescription"] = "选择保险库解锁后首先显示的页面。",
         ["Security"] = "安全",
+        ["SecuritySettingsDescription"] = "锁定、剪贴板和导出确认相关控制。",
         ["AutoLock"] = "自动锁定",
         ["AutoLockDescription"] = "桌面端空闲一段时间后锁定保险库。",
         ["AutoLockAfter"] = "自动锁定时间",
+        ["AutoLockAfterDescription"] = "设置 Monica 在空闲多久后自动锁定保险库。",
         ["ClearClipboard"] = "清空剪贴板",
         ["ClearClipboardDescription"] = "复制密码或动态口令后，按超时时间清空剪贴板。",
         ["ClearClipboardAfter"] = "清空时间",
+        ["ClearClipboardAfterDescription"] = "设置敏感内容在剪贴板中保留多久。",
         ["RequirePasswordBeforeExport"] = "导出前要求主密码",
+        ["RequirePasswordBeforeExportDescription"] = "准备导出数据前再次验证主密码。",
         ["ChangeMasterPassword"] = "修改主密码",
         ["ChangeMasterPasswordDescription"] = "使用新主密码重新加密本地 Avalonia 保险库。",
         ["CurrentMasterPassword"] = "当前主密码",
@@ -1809,12 +2078,19 @@ public sealed class LocalizationService : ILocalizationService
         ["SecurityQuestionsDisabled"] = "密保问题已关闭。",
         ["SecurityQuestionsSaveFailedFormat"] = "无法保存密保问题：{0}",
         ["Desktop"] = "桌面",
+        ["DesktopSettingsDescription"] = "托盘、快速搜索、浏览器桥接和列表密度设置。",
         ["MinimizeToTray"] = "最小化到托盘",
+        ["MinimizeToTrayDescription"] = "关闭窗口时保留后台托盘入口。",
         ["QuickSearch"] = "快速搜索浮层",
+        ["QuickSearchDescription"] = "通过桌面浮层快速查找和复制保险库项目。",
         ["QuickSearchHotkey"] = "快速搜索快捷键",
+        ["QuickSearchHotkeyDescription"] = "设置唤起快速搜索的全局快捷键。",
         ["BrowserIntegration"] = "浏览器扩展桥接",
+        ["BrowserIntegrationDescription"] = "启用桌面端给浏览器扩展使用的本地桥接服务。",
         ["BrowserIntegrationPort"] = "本地桥接端口",
+        ["BrowserIntegrationPortDescription"] = "浏览器桥接服务监听的本地端口。",
         ["CompactPasswordList"] = "紧凑密码列表",
+        ["CompactPasswordListDescription"] = "让密码列表显示得更紧凑，适合小窗口和高密度浏览。",
         ["PlatformIntegrations"] = "平台集成",
         ["PlatformIntegrationsDescriptionFormat"] = "{0}：{1}/{2} 个桌面集成可用或已有等价能力。",
         ["Integration.browser-bridge.Title"] = "浏览器桥接",
@@ -1838,21 +2114,43 @@ public sealed class LocalizationService : ILocalizationService
         ["SyncSubtitle"] = "配置远程同步、备份目标和冲突处理方式。",
         ["WebDav"] = "WebDAV",
         ["EnableWebDav"] = "启用 WebDAV 同步",
+        ["EnableWebDavDescription"] = "使用 WebDAV 端点作为 Monica 远程备份和同步目标。",
         ["WebDavServerUrl"] = "服务器地址",
+        ["WebDavServerUrlDescription"] = "WebDAV 服务器的 HTTPS 基础地址。",
         ["WebDavUsername"] = "用户名",
+        ["WebDavUsernameDescription"] = "Monica 连接 WebDAV 端点时使用的账号名。",
         ["WebDavPassword"] = "密码",
         ["WebDavPasswordDescription"] = "用于 WebDAV Basic 认证的密码或应用密码。",
         ["WebDavRemotePath"] = "远程路径",
+        ["WebDavRemotePathDescription"] = "Monica 保存保险库备份文件的远程文件夹路径。",
+        ["RemoteSync"] = "远程同步",
+        ["RemoteSyncDescription"] = "WebDAV 连接信息和自动同步行为。",
+        ["WebDavBackupOptions"] = "备份选项",
+        ["WebDavBackupOptionsDescription"] = "选择手动 WebDAV 备份包含哪些 Monica 数据。",
         ["SyncOnStartup"] = "启动时同步",
+        ["SyncOnStartupDescription"] = "桌面保险库打开时拉取远程变更。",
         ["SyncAfterChanges"] = "本地变更后同步",
+        ["SyncAfterChangesDescription"] = "本地编辑后自动推送保险库变更。",
         ["ConflictStrategy"] = "冲突处理",
+        ["ConflictStrategyDescription"] = "远程和本地同时变更时使用的处理策略。",
         ["OneDrive"] = "OneDrive",
         ["EnableOneDrive"] = "启用 OneDrive 接口",
+        ["EnableOneDriveDescription"] = "预留基于 Microsoft Graph 的 OneDrive 同步状态。",
         ["MdbxLocalCache"] = "保留 MDBX 本地缓存",
+        ["MdbxLocalCacheDescription"] = "为桌面端保险库操作保留本地 MDBX 工作文件。",
+        ["CreateMdbxMetadataDescription"] = "为桌面端 MDBX 保险库文件创建本地元数据。",
+        ["CloudAndLocalVaults"] = "云端与本地保险库",
+        ["CloudAndLocalVaultsDescription"] = "OneDrive 边界状态和 MDBX 本地保险库元数据。",
         ["BackupHistory"] = "备份历史",
+        ["BackupNow"] = "立即备份",
+        ["RestoreLatest"] = "恢复最新备份",
         ["NoBackupsFound"] = "未找到备份文件。",
         ["Available"] = "可用",
+        ["Enabled"] = "已启用",
+        ["Disabled"] = "已禁用",
+        ["NeedsAttention"] = "需要处理",
         ["DesktopEquivalent"] = "桌面等价",
+        ["FeatureParityMapDescription"] = "显示移动端能力在桌面端的当前等价状态。",
         ["PlatformLimited"] = "平台受限",
         ["Unsupported"] = "不支持",
         ["Planned"] = "计划中",
@@ -1913,9 +2211,31 @@ public sealed class LocalizationService : ILocalizationService
         ["MinuteFormat"] = "{0} 分钟",
         ["SecondFormat"] = "{0} 秒",
         ["PasswordCountFormat"] = "{0} 项",
+        ["ArchivedPasswordCountFormat"] = "{0} 个已归档密码",
+        ["DeletedPasswordCountFormat"] = "{0} 个已删除密码",
+        ["TimelineCountFormat"] = "{0} 条事件",
         ["DatabaseSummaryFormat"] = "{0} 个密码、{1} 条笔记、{2} 个验证器、{3} 个卡包项目",
         ["MdbxDatabaseCountFormat"] = "{0} 条 MDBX 元数据",
         ["MdbxSourceCountFormat"] = "{0} 个保险库",
+        ["MdbxWorkingCopyCountFormat"] = "{0} 个就绪",
+        ["MdbxRemoteSourceCountFormat"] = "{0} 个远程",
+        ["MdbxDefaultVault"] = "默认保险库",
+        ["MdbxWorkingCopies"] = "工作副本",
+        ["MdbxRemoteSources"] = "远程来源",
+        ["MdbxDefaultVaultFormat"] = "默认：{0}",
+        ["MdbxDefaultVaultMissing"] = "尚未设置默认保险库",
+        ["MdbxNoWorkingCopies"] = "还没有可用的 MDBX 工作副本。",
+        ["MdbxWorkingCopySummaryFormat"] = "{0}/{1} 个工作副本文件已就绪；{2} 个可离线使用。",
+        ["MdbxRemoteSourceEmpty"] = "还没有登记远程 MDBX 来源。",
+        ["MdbxRemoteSummaryFormat"] = "{0} 个远程来源，{1} 个等待同步。",
+        ["MdbxSyncErrorsFormat"] = "{0} 个 MDBX 同步问题需要处理。",
+        ["MdbxPendingSyncFormat"] = "{0} 个 MDBX 来源正在等待同步。",
+        ["MdbxNoSyncErrors"] = "没有记录到 MDBX 同步错误。",
+        ["MdbxCacheEnabled"] = "已保留本地 MDBX 缓存，用于桌面端操作。",
+        ["MdbxCacheDisabled"] = "本地 MDBX 缓存已关闭；远程来源可能需要重建工作副本。",
+        ["MdbxWorkingCopyReady"] = "工作副本就绪",
+        ["MdbxWorkingCopyMissing"] = "缺少工作副本",
+        ["MdbxRemoteStatusFormat"] = "{0}：{1}",
         ["MdbxLocalSourceReadyFormat"] = "{0} 个本地 MDBX 保险库已就绪。",
         ["MdbxLocalSourceEmpty"] = "创建本地 MDBX 工作副本，用于桌面保险库操作。",
         ["MdbxWebDavSourceReadyFormat"] = "已登记 {0} 个 WebDAV MDBX 来源。",
@@ -1946,6 +2266,18 @@ public sealed class LocalizationService : ILocalizationService
         ["VaultSourceCountFormat"] = "{0} 个已登记来源",
         ["WebDavConfiguredFormat"] = "已配置到 {0}",
         ["WebDavDisabled"] = "WebDAV 已禁用。本地保险库操作仍可使用。",
+        ["SyncStatusSummaryFormat"] = "{0}；历史中已加载 {1} 个备份文件。",
+        ["SyncStatusLocalOnly"] = "远程同步已关闭。本地保险库操作仍可使用。",
+        ["SyncConfigurationDisabled"] = "启用 WebDAV 后才能配置远程同步。",
+        ["SyncConfigurationReadyFormat"] = "WebDAV 已配置到远程路径 {0}。",
+        ["SyncConfigurationIncomplete"] = "WebDAV 已启用，但服务器地址还不完整。",
+        ["SyncRecoveryLocalOnly"] = "当前没有启用远程恢复来源。",
+        ["SyncRecoveryNoBackupsLoaded"] = "加载备份历史或创建备份后，才能形成恢复点。",
+        ["SyncRecoveryBackupReadyFormat"] = "已有 {0} 个备份文件可用于恢复。",
+        ["OneDriveBoundaryEnabled"] = "OneDrive 接口已启用",
+        ["OneDriveBoundaryDescription"] = "OneDrive 当前用于 Microsoft Graph MDBX 同步元数据边界。",
+        ["WebDavConnectionTestSucceededFormat"] = "WebDAV 连接测试成功；可见 {0} 个远程项目。",
+        ["WebDavConnectionTestFailedFormat"] = "WebDAV 连接测试失败：{0}",
         ["EnableWebDavFirst"] = "请先启用 WebDAV 并配置服务器，再加载备份。",
         ["WebDavServerUrlRequired"] = "请输入有效的 WebDAV 服务器地址。",
         ["WebDavBackupHistoryCountFormat"] = "{0} 个备份文件",

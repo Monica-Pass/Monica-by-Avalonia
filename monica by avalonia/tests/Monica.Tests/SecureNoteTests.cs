@@ -31,6 +31,36 @@ public sealed class SecureNoteTests
     }
 
     [Fact]
+    public void ViewModel_note_preview_markdown_does_not_emit_monica_image_uri()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.NoteIsMarkdown = true;
+        viewModel.NoteContent = "# Inline image\n\n![inline](monica-image://img-1)\n\n![web](https://example.com/a.png)";
+
+        Assert.Contains("[图片附件: inline]", viewModel.NotePreviewMarkdown);
+        Assert.DoesNotContain("monica-image://", viewModel.NotePreviewMarkdown);
+        Assert.Contains("![web](https://example.com/a.png)", viewModel.NotePreviewMarkdown);
+    }
+
+    [Fact]
+    public async Task ViewModel_picks_note_image_as_inline_markdown_attachment()
+    {
+        var picker = new CapturingFileSystemPickerService(new PickedBinaryFile("inline.png", [1, 2, 3, 4]));
+        var attachments = new CapturingPasswordAttachmentFileService("secure-notes/inline.png");
+        var viewModel = CreateViewModel(fileSystemPickerService: picker, passwordAttachmentFileService: attachments);
+
+        var markdown = await viewModel.PickNoteImageMarkdownAsync();
+
+        Assert.Equal("![](monica-image://secure-notes/inline.png)", markdown);
+        Assert.Equal("inline.png", attachments.FileName);
+        Assert.Equal("image/png", attachments.ContentType);
+        Assert.Equal([1, 2, 3, 4], attachments.Content);
+        Assert.Contains("inline.png", viewModel.StatusMessage);
+        Assert.Contains("*.png", picker.OpenFileTypes.SelectMany(type => type.Patterns));
+        Assert.Contains("*.jpg", picker.OpenFileTypes.SelectMany(type => type.Patterns));
+    }
+
+    [Fact]
     public async Task ViewModel_creates_edits_favorites_and_deletes_secure_note()
     {
         var viewModel = CreateViewModel();
@@ -59,6 +89,42 @@ public sealed class SecureNoteTests
     }
 
     [Fact]
+    public async Task ViewModel_groups_secure_notes_into_tag_file_tree()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.NoteTitle = "Operations Recovery";
+        viewModel.NoteContent = "# Recovery\n\nops codes";
+        viewModel.NoteTagsText = "ops, private";
+        await viewModel.SaveNoteCommand.ExecuteAsync(null);
+
+        viewModel.SelectedNote = null;
+        viewModel.NoteTitle = "Personal Checklist";
+        viewModel.NoteContent = "- buy backup key";
+        viewModel.NoteTagsText = "private";
+        await viewModel.SaveNoteCommand.ExecuteAsync(null);
+
+        viewModel.SelectedNote = null;
+        viewModel.NoteTitle = "Loose Note";
+        viewModel.NoteContent = "no tags";
+        viewModel.NoteTagsText = "";
+        await viewModel.SaveNoteCommand.ExecuteAsync(null);
+
+        var groups = viewModel.NoteTreeGroups;
+        Assert.Equal(["ops", "private", "未分类"], groups.Select(group => group.Name));
+        Assert.Single(groups.Single(group => group.Name == "ops").Items);
+        Assert.Equal(2, groups.Single(group => group.Name == "private").Items.Count);
+        Assert.True(groups.Single(group => group.Name == "未分类").IsUntagged);
+
+        viewModel.NoteSearchText = "operations";
+        groups = viewModel.NoteTreeGroups;
+
+        Assert.Equal(["ops", "private"], groups.Select(group => group.Name));
+        Assert.All(groups, group => Assert.Single(group.Items));
+        Assert.All(groups.SelectMany(group => group.Items), item => Assert.Equal("Operations Recovery", item.Title));
+    }
+
+    [Fact]
     public async Task Repository_soft_deletes_secure_note()
     {
         var path = GetTempDatabasePath();
@@ -81,7 +147,9 @@ public sealed class SecureNoteTests
         Assert.Single(await repository.GetSecureItemsAsync(VaultItemType.Note, includeDeleted: true));
     }
 
-    private static MainWindowViewModel CreateViewModel()
+    private static MainWindowViewModel CreateViewModel(
+        IFileSystemPickerService? fileSystemPickerService = null,
+        IPasswordAttachmentFileService? passwordAttachmentFileService = null)
     {
         var databasePath = GetTempDatabasePath();
         var factory = new SqliteConnectionFactory(databasePath);
@@ -98,13 +166,14 @@ public sealed class SecureNoteTests
             new NoopClipboardService(),
             new NoopWebDavBackupService(),
             new MdbxVaultService(),
-            new NoopPasswordAttachmentFileService(),
+            passwordAttachmentFileService ?? new NoopPasswordAttachmentFileService(),
             new NoopPasswordEditorDialogService(),
             new NoopPasswordDetailDialogService(),
             new NoopCategoryPickerDialogService(),
             new LegacyVaultDetector(factory),
             new AppSettingsService(GetTempSettingsPath()),
-            new LocalizationService());
+            new LocalizationService(),
+            fileSystemPickerService: fileSystemPickerService);
     }
 
     private static string GetTempDatabasePath()
@@ -160,9 +229,9 @@ public sealed class SecureNoteTests
             IReadOnlyList<CustomField> customFields,
             IReadOnlyList<PasswordHistoryDisplayItem> passwordHistory,
             Func<PasswordEntry, Task>? addAttachment,
-            Func<Attachment, Task>? deleteAttachment,
-            Func<PasswordHistoryEntry, Task>? deletePasswordHistory,
-            Func<long, Task>? clearPasswordHistory,
+            Func<Attachment, Task<bool>>? deleteAttachment,
+            Func<PasswordHistoryEntry, Task<bool>>? deletePasswordHistory,
+            Func<long, Task<bool>>? clearPasswordHistory,
             CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
     }
@@ -177,6 +246,47 @@ public sealed class SecureNoteTests
 
         public Task DeleteStoredAttachmentAsync(string storagePath, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
+    }
+
+    private sealed class CapturingPasswordAttachmentFileService(string storagePath) : IPasswordAttachmentFileService
+    {
+        public string FileName { get; private set; } = "";
+        public byte[] Content { get; private set; } = [];
+        public string ContentType { get; private set; } = "";
+
+        public Task<PasswordAttachmentFileDraft?> PickAndStoreAttachmentAsync(PasswordEntry entry, CancellationToken cancellationToken = default) =>
+            Task.FromResult<PasswordAttachmentFileDraft?>(null);
+
+        public Task<PasswordAttachmentFileDraft> StoreAttachmentAsync(string fileName, byte[] content, string contentType = "", CancellationToken cancellationToken = default)
+        {
+            FileName = fileName;
+            Content = content;
+            ContentType = contentType;
+            return Task.FromResult(new PasswordAttachmentFileDraft(fileName, storagePath, content.LongLength, contentType, content));
+        }
+
+        public Task DeleteStoredAttachmentAsync(string storagePath, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+    }
+
+    private sealed class CapturingFileSystemPickerService(PickedBinaryFile? openFile) : IFileSystemPickerService
+    {
+        public IReadOnlyList<PlatformFilePickerFileType> OpenFileTypes { get; private set; } = [];
+        public PlatformIntegrationCapability Capability { get; } = PlatformIntegrationService.Available(
+            PlatformFeatureKeys.FilePicker,
+            "Test file picking works.");
+
+        public Task<PickedTextFile?> OpenTextFileAsync(string title, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
+            Task.FromResult<PickedTextFile?>(null);
+
+        public Task<PickedBinaryFile?> OpenBinaryFileAsync(string title, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default)
+        {
+            OpenFileTypes = fileTypes;
+            return Task.FromResult(openFile);
+        }
+
+        public Task<string?> SaveTextFileAsync(string title, string suggestedFileName, string content, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
+            Task.FromResult<string?>(null);
     }
 
     private sealed class NoopCategoryPickerDialogService : ICategoryPickerDialogService

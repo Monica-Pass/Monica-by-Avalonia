@@ -8,14 +8,45 @@ using Monica.Platform.Services;
 
 namespace Monica.App.ViewModels;
 
-public sealed record PasswordDetailGroup(string Title, bool IsExpanded, IReadOnlyList<PasswordDetailField> Fields);
+public sealed partial class PasswordDetailGroup : ObservableObject
+{
+    public PasswordDetailGroup(string title, bool isExpanded, IReadOnlyList<PasswordDetailField> fields)
+    {
+        Title = title;
+        _isExpanded = isExpanded;
+        Fields = fields;
+    }
 
-public sealed record PasswordDetailField(
-    string Label,
-    string DisplayValue,
-    string CopyValue,
-    bool CanCopy = true,
-    bool IsSensitive = false);
+    public string Title { get; }
+    public IReadOnlyList<PasswordDetailField> Fields { get; }
+    public IReadOnlyList<PasswordDetailField> VisibleFields => IsExpanded ? Fields : [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(VisibleFields))]
+    private bool _isExpanded;
+}
+
+public sealed partial class PasswordDetailField(
+    string label,
+    string displayValue,
+    string copyValue,
+    bool canCopy = true,
+    bool isSensitive = false) : ObservableObject
+{
+    private const string HiddenSensitiveValue = "************";
+
+    public string Label { get; } = label;
+    public string DisplayValue { get; } = displayValue;
+    public string CopyValue { get; } = copyValue;
+    public bool CanCopy { get; } = canCopy;
+    public bool IsSensitive { get; } = isSensitive;
+    public bool CanToggleVisibility => IsSensitive && CanCopy && !string.IsNullOrWhiteSpace(DisplayValue);
+    public string DisplayText => CanToggleVisibility && !IsVisible ? HiddenSensitiveValue : DisplayValue;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayText))]
+    private bool _isVisible;
+}
 
 public sealed class PasswordAttachmentItem(ILocalizationService localization, Attachment attachment)
 {
@@ -88,9 +119,9 @@ public sealed partial class PasswordDetailViewModel : ObservableObject
 {
     private readonly IClipboardService _clipboardService;
     private readonly Func<PasswordEntry, Task>? _addAttachment;
-    private readonly Func<Attachment, Task>? _deleteAttachment;
-    private readonly Func<PasswordHistoryEntry, Task>? _deletePasswordHistory;
-    private readonly Func<long, Task>? _clearPasswordHistory;
+    private readonly Func<Attachment, Task<bool>>? _deleteAttachment;
+    private readonly Func<PasswordHistoryEntry, Task<bool>>? _deletePasswordHistory;
+    private readonly Func<long, Task<bool>>? _clearPasswordHistory;
 
     public PasswordDetailViewModel(
         ILocalizationService localization,
@@ -105,9 +136,9 @@ public sealed partial class PasswordDetailViewModel : ObservableObject
         IReadOnlyList<CustomField> customFields,
         IReadOnlyList<PasswordHistoryDisplayItem>? passwordHistory = null,
         Func<PasswordEntry, Task>? addAttachment = null,
-        Func<Attachment, Task>? deleteAttachment = null,
-        Func<PasswordHistoryEntry, Task>? deletePasswordHistory = null,
-        Func<long, Task>? clearPasswordHistory = null)
+        Func<Attachment, Task<bool>>? deleteAttachment = null,
+        Func<PasswordHistoryEntry, Task<bool>>? deletePasswordHistory = null,
+        Func<long, Task<bool>>? clearPasswordHistory = null)
     {
         L = localization;
         _clipboardService = clipboardService;
@@ -135,10 +166,7 @@ public sealed partial class PasswordDetailViewModel : ObservableObject
             Attachments.Add(attachment);
         }
 
-        foreach (var item in (passwordHistory ?? []).Select((item, index) => new PasswordHistoryItemViewModel(localization, item, index == 0)))
-        {
-            PasswordHistory.Add(item);
-        }
+        SetPasswordHistory(passwordHistory ?? []);
     }
 
     public ILocalizationService L { get; }
@@ -159,6 +187,17 @@ public sealed partial class PasswordDetailViewModel : ObservableObject
     public ObservableCollection<PasswordAttachmentItem> Attachments { get; } = [];
     public ObservableCollection<PasswordHistoryItemViewModel> PasswordHistory { get; } = [];
 
+    public void SetPasswordHistory(IReadOnlyList<PasswordHistoryDisplayItem> passwordHistory)
+    {
+        PasswordHistory.Clear();
+        foreach (var item in passwordHistory.Select((item, index) => new PasswordHistoryItemViewModel(L, item, index == 0)))
+        {
+            PasswordHistory.Add(item);
+        }
+
+        OnPropertyChanged(nameof(HasPasswordHistory));
+    }
+
     [ObservableProperty]
     private string _statusText = "";
 
@@ -172,6 +211,17 @@ public sealed partial class PasswordDetailViewModel : ObservableObject
 
         await _clipboardService.SetTextAsync(field.CopyValue);
         StatusText = L.Format("CopiedFieldFormat", field.Label);
+    }
+
+    [RelayCommand]
+    private void ToggleFieldVisibility(PasswordDetailField? field)
+    {
+        if (field is null || !field.CanToggleVisibility)
+        {
+            return;
+        }
+
+        field.IsVisible = !field.IsVisible;
     }
 
     [RelayCommand]
@@ -206,7 +256,11 @@ public sealed partial class PasswordDetailViewModel : ObservableObject
             return;
         }
 
-        await _deleteAttachment(item.Attachment);
+        if (!await _deleteAttachment(item.Attachment))
+        {
+            return;
+        }
+
         Attachments.Remove(item);
         OnPropertyChanged(nameof(HasAttachments));
         StatusText = L.Format("DeletedAttachmentFormat", item.FileName);
@@ -243,7 +297,11 @@ public sealed partial class PasswordDetailViewModel : ObservableObject
             return;
         }
 
-        await _deletePasswordHistory(item.Entry);
+        if (!await _deletePasswordHistory(item.Entry))
+        {
+            return;
+        }
+
         PasswordHistory.Remove(item);
         OnPropertyChanged(nameof(HasPasswordHistory));
         StatusText = L.Get("DeletedPasswordHistoryEntry");
@@ -257,7 +315,11 @@ public sealed partial class PasswordDetailViewModel : ObservableObject
             return;
         }
 
-        await _clearPasswordHistory(Entry.Id);
+        if (!await _clearPasswordHistory(Entry.Id))
+        {
+            return;
+        }
+
         PasswordHistory.Clear();
         OnPropertyChanged(nameof(HasPasswordHistory));
         StatusText = L.Get("ClearedPasswordHistory");

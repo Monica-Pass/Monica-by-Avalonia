@@ -7,9 +7,12 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Monica.App;
@@ -28,6 +31,7 @@ public sealed record SettingsChoice(object Value, string Label);
 public sealed record NoteOutlineItem(int Level, string Title, int LineNumber, Thickness Indent);
 public sealed record NoteReferenceItem(string Label, string Target, int LineNumber, bool IsImage);
 public sealed record NoteImagePreviewItem(string StoragePath, string DisplayName, string SizeText, Bitmap Image);
+public sealed record NoteTreeGroup(string Name, int Count, IReadOnlyList<SecureItem> Items, bool IsUntagged);
 public sealed partial class NoteEditorTab : ObservableObject
 {
     public NoteEditorTab(long id, SecureItem? source, string title)
@@ -134,8 +138,39 @@ public sealed record SecuritySummaryItem(string Label, string Value, string Deta
 public sealed record SecurityIssueItem(string Title, string Subtitle, string Category, string Severity, long PasswordId, PasswordEntry Entry, int SeverityWeight);
 public sealed record PasswordHistoryDisplayItem(PasswordHistoryEntry Entry, string DisplayPassword, bool CanCopy);
 public sealed record PasswordQuickAccessItem(PasswordEntry Entry, int OpenCount, string LastOpenedText, string Subtitle);
-public sealed record PasswordFolderFilterChoice(long? Id, string Name, int Count);
+internal sealed record PasswordDetailSnapshot(
+    PasswordEntry Entry,
+    IReadOnlyList<PasswordEntry> Siblings,
+    Category? Category,
+    SecureItem? BoundNote,
+    IReadOnlyList<Attachment> Attachments,
+    IReadOnlyList<CustomField> CustomFields,
+    IReadOnlyList<PasswordHistoryDisplayItem> History);
+internal sealed record PasswordDetailSourceSnapshot(
+    PasswordEntry Entry,
+    IReadOnlyList<PasswordEntry> SiblingCandidates,
+    IReadOnlyList<Category> Categories,
+    IReadOnlyList<SecureItem> NoteItems,
+    IReadOnlyDictionary<long, IReadOnlyList<Attachment>> PasswordAttachments,
+    IReadOnlyDictionary<long, IReadOnlyList<CustomField>> PasswordCustomFields);
+public sealed record PasswordFolderFilterChoice(
+    long? Id,
+    string Name,
+    int Count,
+    string DisplayName = "",
+    int Level = 0,
+    bool IsSystemNode = false,
+    string SelectionKey = "",
+    string? PathPrefix = null,
+    bool HasChildren = false,
+    bool IsExpanded = false)
+{
+    public string FolderDisplayName => string.IsNullOrWhiteSpace(DisplayName) ? Name : DisplayName;
+    public Thickness Indent => new(Math.Max(0, Level) * 14, 0, 0, 0);
+    public bool IsCollapsed => HasChildren && !IsExpanded;
+}
 public sealed record VaultSourceDisplayItem(string DisplayName, string Kind, string LocalPath, string RemoteUrl, string SyncStatus);
+public sealed record SyncHealthDisplayItem(string Label, string Value, string Detail);
 internal sealed record VaultLoadSnapshot(
     IReadOnlyList<PasswordEntry> ActivePasswords,
     IReadOnlyList<PasswordEntry> ArchivedPasswords,
@@ -147,8 +182,7 @@ internal sealed record VaultLoadSnapshot(
     IReadOnlyList<SecureItem> StoredTotps,
     IReadOnlyList<Category> Categories,
     IReadOnlyDictionary<long, PasswordQuickAccessRecord> PasswordQuickAccessRecords,
-    IReadOnlyList<LocalMdbxDatabase> MdbxDatabases,
-    IReadOnlyList<OperationLog> TimelineLogs);
+    IReadOnlyList<LocalMdbxDatabase> MdbxDatabases);
 public sealed record MdbxDatabaseDisplayItem(
     LocalMdbxDatabase Database,
     string Name,
@@ -162,6 +196,11 @@ public sealed record MdbxDatabaseDisplayItem(
     string LastSyncedText,
     string SyncStatus,
     string Description,
+    string WorkingCopyStatus,
+    string RemoteStatus,
+    string CachePath,
+    string LastSyncErrorText,
+    bool HasLastSyncError,
     bool IsDefault,
     bool IsLocal,
     bool IsRemote);
@@ -194,14 +233,25 @@ internal sealed class DisabledMasterPasswordMaintenanceService : IMasterPassword
         Task.FromResult(MasterPasswordMaintenanceResult.Failure("Master password maintenance is not available."));
 }
 
+internal sealed class DisabledConfirmationDialogService : IConfirmationDialogService
+{
+    public Task<bool> ConfirmAsync(
+        string title,
+        string message,
+        string primaryButtonText,
+        string? closeButtonText = null,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(true);
+}
+
 public sealed partial class MainWindowViewModel : ObservableObject
 {
     public const string GitHubRepositoryUrl = "https://github.com/JoyinJoester/Monica";
 
     private const int PasswordHistoryLimit = 10;
     private const int PasswordQuickAccessLimit = 6;
-    private const string DefaultApplicationDataDirectoryName = "Monica by Avalonia";
-    private const string DefaultDatabaseFileName = "monica.db";
+    private static readonly TimeSpan SelectedPasswordDetailsCoalesceDelay = TimeSpan.FromMilliseconds(60);
+    private static readonly TimeSpan SelectedPasswordDetailsLoadingDelay = TimeSpan.FromMilliseconds(120);
     private static readonly PlatformFilePickerFileType[] MonicaJsonFileTypes =
     [
         new("Monica JSON", ["*.json"])
@@ -239,6 +289,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         Recent,
         Frequent
+    }
+
+    private sealed class PasswordFolderTreeNode(string key, string displayName, int level)
+    {
+        public string Key { get; } = key;
+        public string DisplayName { get; } = displayName;
+        public int Level { get; } = level;
+        public Category? Category { get; set; }
+        public int ExactCount { get; set; }
+        public int DescendantCount { get; set; }
+        public List<PasswordFolderTreeNode> Children { get; } = [];
     }
 
     private sealed class DisabledWebDavBackupService : IWebDavBackupService
@@ -295,6 +356,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IPasswordEditorDialogService _passwordEditorDialogService;
     private readonly IPasswordDetailDialogService _passwordDetailDialogService;
     private readonly ICategoryPickerDialogService _categoryPickerDialogService;
+    private readonly IConfirmationDialogService _confirmationDialogService;
     private readonly ITotpEditorDialogService _totpEditorDialogService;
     private readonly IWalletItemEditorDialogService _walletItemEditorDialogService;
     private readonly IMasterPasswordMaintenanceService _masterPasswordMaintenanceService;
@@ -312,11 +374,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private IReadOnlyDictionary<long, IReadOnlyList<Attachment>> _passwordAttachments = new Dictionary<long, IReadOnlyList<Attachment>>();
     private IReadOnlyDictionary<long, PasswordQuickAccessRecord> _passwordQuickAccessRecords = new Dictionary<long, PasswordQuickAccessRecord>();
     private IReadOnlyDictionary<long, CompromisedPasswordResult> _compromisedPasswordResults = new Dictionary<long, CompromisedPasswordResult>();
+    private IReadOnlyList<PasswordEntry> _filteredPasswords = [];
+    private bool _filteredPasswordsDirty = true;
+    private int _selectedPasswordCount;
+    private bool _suppressPasswordSelectionStateNotifications;
     private bool _hasCompromisedPasswordCheckResults;
     private bool _isApplyingSettings;
+    private bool _isApplyingPasswordSearchImmediately;
+    private CancellationTokenSource? _passwordSearchDebounceCts;
+    private CancellationTokenSource? _selectedPasswordDetailsCts;
+    private int _selectedPasswordDetailsVersion;
     private bool _isLoadingNoteEditor;
     private int _noteImagePreviewVersion;
     private LegacyVaultDetection _legacyVaultDetection = LegacyVaultDetection.Empty;
+    private readonly HashSet<string> _collapsedPasswordFolderKeys = new(StringComparer.OrdinalIgnoreCase);
 
     public MainWindowViewModel(
         IMonicaRepository repository,
@@ -338,6 +409,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IAppSettingsService settingsService,
         ILocalizationService localization,
         IPwnedPasswordService? pwnedPasswordService = null,
+        IConfirmationDialogService? confirmationDialogService = null,
         ITotpEditorDialogService? totpEditorDialogService = null,
         IWalletItemEditorDialogService? walletItemEditorDialogService = null,
         IMasterPasswordMaintenanceService? masterPasswordMaintenanceService = null,
@@ -359,6 +431,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _passwordEditorDialogService = passwordEditorDialogService;
         _passwordDetailDialogService = passwordDetailDialogService;
         _categoryPickerDialogService = categoryPickerDialogService;
+        _confirmationDialogService = confirmationDialogService ?? new DisabledConfirmationDialogService();
         _totpEditorDialogService = totpEditorDialogService ?? new DisabledTotpEditorDialogService();
         _walletItemEditorDialogService = walletItemEditorDialogService ?? new DisabledWalletItemEditorDialogService();
         _masterPasswordMaintenanceService = masterPasswordMaintenanceService ?? new DisabledMasterPasswordMaintenanceService();
@@ -376,6 +449,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RefreshPlatformIntegrationCapabilities();
         RefreshCapabilities();
         RefreshChoiceLabels();
+        RefreshMdbxHealthItems();
+        RefreshSyncHealthItems();
     }
 
     public ILocalizationService L => _localization;
@@ -396,6 +471,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<SecuritySummaryItem> SecuritySummaryItems { get; } = [];
     public ObservableCollection<SecurityIssueItem> SecurityIssueItems { get; } = [];
     public ObservableCollection<VaultSourceDisplayItem> VaultSources { get; } = [];
+    public ObservableCollection<SyncHealthDisplayItem> MdbxHealthItems { get; } = [];
+    public ObservableCollection<SyncHealthDisplayItem> SyncHealthItems { get; } = [];
     public ObservableCollection<WebDavBackupHistoryItem> WebDavBackupHistory { get; } = [];
     public ObservableCollection<SettingsChoice> LanguageOptions { get; } = [];
     public ObservableCollection<SettingsChoice> ThemeOptions { get; } = [];
@@ -406,6 +483,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<SettingsChoice> PasswordSortOptions { get; } = [];
     public ObservableCollection<SettingsChoice> SecurityQuestionOptions { get; } = [];
     public ObservableCollection<PasswordFolderFilterChoice> PasswordFolderFilters { get; } = [];
+    public IEnumerable<PasswordFolderFilterChoice> SystemPasswordFolderFilters =>
+        PasswordFolderFilters.Where(item => item.IsSystemNode);
+    public IEnumerable<PasswordFolderFilterChoice> RegularPasswordFolderFilters =>
+        PasswordFolderFilters.Where(item => !item.IsSystemNode);
+    public bool HasRegularPasswordFolderFilters => PasswordFolderFilters.Any(item => !item.IsSystemNode);
 
     [ObservableProperty]
     private bool _isUnlocked;
@@ -498,6 +580,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _searchText = "";
 
     [ObservableProperty]
+    private string _passwordSearchText = "";
+
+    [ObservableProperty]
+    private string _passwordSearchQuery = "";
+
+    [ObservableProperty]
     private string _statusMessage = "Locked";
 
     [ObservableProperty]
@@ -558,13 +646,34 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private PasswordFolderFilterChoice? _selectedPasswordFolderFilter;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PasswordSortButtonTip))]
+    [NotifyPropertyChangedFor(nameof(IsSortUpdatedSelected))]
+    [NotifyPropertyChangedFor(nameof(IsSortTitleSelected))]
+    [NotifyPropertyChangedFor(nameof(IsSortWebsiteSelected))]
+    [NotifyPropertyChangedFor(nameof(IsSortUsernameSelected))]
+    [NotifyPropertyChangedFor(nameof(IsSortCreatedSelected))]
+    [NotifyPropertyChangedFor(nameof(IsSortFavoritesSelected))]
     private string _selectedPasswordSort = "updated-desc";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedArchivedPassword))]
+    private PasswordEntry? _selectedArchivedPassword;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedDeletedPassword))]
+    private PasswordEntry? _selectedDeletedPassword;
 
     [ObservableProperty]
     private bool _isCheckingCompromisedPasswords;
 
     [ObservableProperty]
     private bool _isLoadingVault;
+
+    [ObservableProperty]
+    private string _vaultLoadStageText = "";
+
+    [ObservableProperty]
+    private long _lastVaultLoadDurationMilliseconds;
 
     [ObservableProperty]
     private string _compromisedPasswordStatus = "";
@@ -614,9 +723,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public string NoteFormatText => NoteIsMarkdown ? "Markdown" : "Plain text";
     public IReadOnlyList<SecureItem> FavoriteNoteItems => BuildFilteredNoteItems(favoritesOnly: true);
     public IReadOnlyList<SecureItem> FilteredNoteItems => BuildFilteredNoteItems(favoritesOnly: false);
+    public IReadOnlyList<NoteTreeGroup> NoteTreeGroups => BuildNoteTreeGroups(FilteredNoteItems);
     public int FavoriteNoteCount => NoteItems.Count(item => item.IsFavorite);
     public bool HasFavoriteNoteItems => FavoriteNoteItems.Count > 0;
     public bool HasFilteredNoteItems => FilteredNoteItems.Count > 0;
+    public bool HasNoteTreeGroups => NoteTreeGroups.Count > 0;
     public string NoteTreeStatusText => string.IsNullOrWhiteSpace(NoteSearchText)
         ? NoteCountText
         : $"{FilteredNoteItems.Count}/{NoteItems.Count}";
@@ -633,15 +744,43 @@ public sealed partial class MainWindowViewModel : ObservableObject
         : new GridLength(0);
     public Thickness NotePreviewContentPadding => NoteSplitPreviewMode
         ? new Thickness(0)
-        : new Thickness(36, 0, 0, 0);
+        : new Thickness(32, 0, 0, 0);
+    public bool IsNoteTreePaneVisible => !NoteSplitPreviewMode;
+    public GridLength NoteTreeColumnWidth => IsNoteTreePaneVisible
+        ? new GridLength(280)
+        : new GridLength(0);
+    public bool IsNoteInspectorPaneVisible =>
+        NoteWorkspaceViewportWidth <= 0 || NoteWorkspaceViewportWidth >= 780;
+    public GridLength NoteInspectorColumnWidth => IsNoteInspectorPaneVisible
+        ? new GridLength(260)
+        : new GridLength(0);
     public string NoteEditorStatusText =>
         NoteSelectedCharacterCount > 0
             ? $"行 {NoteCaretLine}, 列 {NoteCaretColumn} · 已选 {NoteSelectedCharacterCount} · {NoteLineCount} 行 · {NoteWordCount} 词 · {NoteCharacterCount} 字符"
             : $"行 {NoteCaretLine}, 列 {NoteCaretColumn} · {NoteLineCount} 行 · {NoteWordCount} 词 · {NoteCharacterCount} 字符";
     public bool HasOpenNoteTabs => OpenNoteTabs.Count > 0;
     public double NoteTabWidth => CalculateNoteTabWidth(OpenNoteTabs.Count, NoteTabRailViewportWidth);
+    public double NoteTabStripWidth
+    {
+        get
+        {
+            const double fallbackWidth = 720;
+            const double minWidth = 260;
+            const double maxWidth = 680;
+            var viewportWidth = NoteWorkspaceViewportWidth;
+            if (viewportWidth <= 0 || double.IsNaN(viewportWidth))
+            {
+                return Math.Min(fallbackWidth, maxWidth);
+            }
+
+            var treeWidth = IsNoteTreePaneVisible ? 280 : 0;
+            return Math.Clamp(viewportWidth - treeWidth, minWidth, maxWidth);
+        }
+    }
 
     private double _noteTabRailViewportWidth;
+
+    private double _noteWorkspaceViewportWidth;
 
     public double NoteTabRailViewportWidth
     {
@@ -655,10 +794,22 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    public double NoteWorkspaceViewportWidth
+    {
+        get => _noteWorkspaceViewportWidth;
+        set
+        {
+            if (SetProperty(ref _noteWorkspaceViewportWidth, Math.Max(0, value)))
+            {
+                RaiseNoteWorkspaceLayoutState();
+            }
+        }
+    }
+
     private static double CalculateNoteTabWidth(int tabCount, double viewportWidth)
     {
-        const double maxWidth = 156;
-        const double minWidth = 92;
+        const double maxWidth = 148;
+        const double minWidth = 76;
         const double tabGap = 4;
 
         if (tabCount <= 0)
@@ -671,9 +822,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return tabCount switch
             {
                 <= 1 => maxWidth,
-                <= 4 => 148,
-                <= 7 => 128,
-                <= 10 => 112,
+                <= 4 => 136,
+                <= 7 => 112,
+                <= 10 => 92,
                 _ => minWidth
             };
         }
@@ -695,10 +846,69 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private int _noteSelectedCharacterCount;
 
     [ObservableProperty]
+    private SecureItem? _selectedTotpItem;
+
+    [ObservableProperty]
+    private TotpItemDetailsViewModel? _selectedTotpDetails;
+
+    [ObservableProperty]
     private SecureItem? _selectedWalletItem;
 
     [ObservableProperty]
     private WalletItemDetailsViewModel? _selectedWalletDetails;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedTimelineEntry))]
+    private TimelineEntry? _selectedTimelineEntry;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedSecurityIssue))]
+    private SecurityIssueItem? _selectedSecurityIssue;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedMdbxDatabaseItem))]
+    private MdbxDatabaseDisplayItem? _selectedMdbxDatabaseItem;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedVaultSource))]
+    private VaultSourceDisplayItem? _selectedVaultSource;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedWebDavBackupHistoryItem))]
+    private WebDavBackupHistoryItem? _selectedWebDavBackupHistoryItem;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSettingsGeneralSelected))]
+    [NotifyPropertyChangedFor(nameof(IsSettingsSecuritySelected))]
+    [NotifyPropertyChangedFor(nameof(IsSettingsSecurityRecoverySelected))]
+    [NotifyPropertyChangedFor(nameof(IsSettingsDataSelected))]
+    [NotifyPropertyChangedFor(nameof(IsSettingsDesktopSelected))]
+    [NotifyPropertyChangedFor(nameof(IsSettingsIntegrationsSelected))]
+    [NotifyPropertyChangedFor(nameof(IsSettingsAboutSelected))]
+    [NotifyPropertyChangedFor(nameof(IsSettingsDangerSelected))]
+    private string _selectedSettingsPage = "General";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSyncConfigurationSelected))]
+    [NotifyPropertyChangedFor(nameof(IsSyncBackupSelected))]
+    [NotifyPropertyChangedFor(nameof(IsSyncSourcesSelected))]
+    [NotifyPropertyChangedFor(nameof(IsSyncImportSelected))]
+    [NotifyPropertyChangedFor(nameof(IsSyncExportSelected))]
+    private string _selectedSyncPage = "Configuration";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsDatabaseSourceSelected))]
+    [NotifyPropertyChangedFor(nameof(IsDatabaseOverviewSelected))]
+    [NotifyPropertyChangedFor(nameof(IsDatabaseCloudSelected))]
+    [NotifyPropertyChangedFor(nameof(IsDatabaseCapabilitiesSelected))]
+    private string _selectedDatabaseManagementPage = "Source";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsMdbxDetailsSelected))]
+    [NotifyPropertyChangedFor(nameof(IsMdbxHealthSelected))]
+    [NotifyPropertyChangedFor(nameof(IsMdbxSourcesSelected))]
+    [NotifyPropertyChangedFor(nameof(IsMdbxRuntimeSelected))]
+    private string _selectedMdbxWorkspacePage = "Details";
 
     [ObservableProperty]
     private string _settingsLanguage = "system";
@@ -869,11 +1079,24 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool _quickFilterAttachments;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SelectedPasswordTitle))]
+    [NotifyPropertyChangedFor(nameof(SelectedPasswordSubtitle))]
+    [NotifyPropertyChangedFor(nameof(SelectedPasswordSourceText))]
+    [NotifyPropertyChangedFor(nameof(HasSelectedPassword))]
+    [NotifyPropertyChangedFor(nameof(HasNoSelectedPassword))]
+    [NotifyPropertyChangedFor(nameof(HasCurrentSelectedPasswordDetails))]
+    [NotifyPropertyChangedFor(nameof(HasSelectedPasswordLoadingState))]
     private PasswordEntry? _selectedPassword;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelectedPasswordDetails))]
+    [NotifyPropertyChangedFor(nameof(HasCurrentSelectedPasswordDetails))]
+    [NotifyPropertyChangedFor(nameof(HasSelectedPasswordLoadingState))]
     private PasswordDetailViewModel? _selectedPasswordDetails;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedPasswordLoadingState))]
+    private bool _isLoadingSelectedPasswordDetails;
 
     public string SelectedSectionTitle => SectionTitle(SelectedSection);
     public string ShellVaultText => SelectedSection switch
@@ -909,6 +1132,106 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public string ArchivedPasswordCountText => _localization.Format("ArchivedPasswordCountFormat", ArchivedPasswords.Count);
     public string DeletedPasswordCountText => _localization.Format("DeletedPasswordCountFormat", DeletedPasswords.Count);
     public string SelectedPasswordCountText => _localization.Format("SelectedPasswordCountFormat", SelectedPasswordCount);
+    public string SelectedPasswordTitle => SelectedPassword?.Title ?? _localization.Get("PasswordDetails");
+    public string SelectedPasswordSubtitle => SelectedPassword is null
+        ? PasswordCountText
+        : BuildPasswordSubtitle(SelectedPassword);
+    public string SelectedPasswordSourceText => SelectedPassword is null
+        ? ""
+        : SelectedPassword.IsMdbxEntry
+            ? "MDBX"
+            : SelectedPassword.IsKeePassEntry
+                ? "KeePass"
+                : SelectedPassword.IsBitwardenEntry
+                    ? "Bitwarden"
+                    : "Local";
+    public bool HasPasswordFilters =>
+        !string.IsNullOrWhiteSpace(PasswordSearchText) ||
+        QuickFilterFavorite ||
+        QuickFilter2Fa ||
+        QuickFilterNotes ||
+        QuickFilterPasskey ||
+        QuickFilterBoundNote ||
+        QuickFilterUncategorized ||
+        QuickFilterLocalOnly ||
+        QuickFilterAttachments ||
+        (SelectedPasswordFolderFilter is not null &&
+            !string.Equals(SelectedPasswordFolderFilter.SelectionKey, "system:all", StringComparison.OrdinalIgnoreCase));
+    public string ClearPasswordFiltersText => _localization.Get("ClearPasswordFilters");
+    public string PasswordFilterSummaryText
+    {
+        get
+        {
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(PasswordSearchText))
+            {
+                parts.Add(PasswordSearchText.Trim());
+            }
+
+            if (!string.Equals(SelectedPasswordFolderFilter?.SelectionKey, "system:all", StringComparison.OrdinalIgnoreCase) &&
+                SelectedPasswordFolderFilter is not null)
+            {
+                parts.Add(SelectedPasswordFolderFilter.FolderDisplayName);
+            }
+
+            if (QuickFilterFavorite)
+            {
+                parts.Add(_localization.Get("QuickFilterFavorite"));
+            }
+
+            if (QuickFilter2Fa)
+            {
+                parts.Add(_localization.Get("QuickFilter2Fa"));
+            }
+
+            if (QuickFilterNotes)
+            {
+                parts.Add(_localization.Get("QuickFilterNotes"));
+            }
+
+            if (QuickFilterPasskey)
+            {
+                parts.Add(_localization.Get("QuickFilterPasskey"));
+            }
+
+            if (QuickFilterBoundNote)
+            {
+                parts.Add(_localization.Get("QuickFilterBoundNote"));
+            }
+
+            if (QuickFilterUncategorized)
+            {
+                parts.Add(_localization.Get("QuickFilterUncategorized"));
+            }
+
+            if (QuickFilterLocalOnly)
+            {
+                parts.Add(_localization.Get("QuickFilterLocalOnly"));
+            }
+
+            if (QuickFilterAttachments)
+            {
+                parts.Add(_localization.Get("QuickFilterAttachments"));
+            }
+
+            return parts.Count == 0
+                ? _localization.Get("AllFolders")
+                : string.Join(" / ", parts);
+        }
+    }
+    public string SortUpdatedText => _localization.Get("SortUpdated");
+    public string SortTitleText => _localization.Get("SortTitle");
+    public string SortWebsiteText => _localization.Get("SortWebsite");
+    public string SortUsernameText => _localization.Get("SortUsername");
+    public string SortCreatedText => _localization.Get("SortCreated");
+    public string SortFavoritesText => _localization.Get("SortFavorites");
+    public string PasswordSortButtonTip => $"{_localization.SortPasswords}: {GetPasswordSortLabel(SelectedPasswordSort)}";
+    public bool IsSortUpdatedSelected => string.Equals(SelectedPasswordSort, "updated-desc", StringComparison.Ordinal);
+    public bool IsSortTitleSelected => string.Equals(SelectedPasswordSort, "title-asc", StringComparison.Ordinal);
+    public bool IsSortWebsiteSelected => string.Equals(SelectedPasswordSort, "website-asc", StringComparison.Ordinal);
+    public bool IsSortUsernameSelected => string.Equals(SelectedPasswordSort, "username-asc", StringComparison.Ordinal);
+    public bool IsSortCreatedSelected => string.Equals(SelectedPasswordSort, "created-desc", StringComparison.Ordinal);
+    public bool IsSortFavoritesSelected => string.Equals(SelectedPasswordSort, "favorites-first", StringComparison.Ordinal);
     public bool CanStackSelectedPasswords => SelectedPasswordCount > 1;
     public bool CanManageSelectedPasswordFolder => SelectedPasswordFolderFilter?.Id is > 0;
     public Thickness PasswordListCardPadding => CompactPasswordList ? new Thickness(12, 8) : new Thickness(16);
@@ -931,7 +1254,37 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public int MdbxLocalDatabaseCount => MdbxDatabases.Count(IsLocalMdbxDatabase);
     public int MdbxWebDavDatabaseCount => MdbxDatabases.Count(item => item.StorageLocation == MdbxStorageLocation.RemoteWebDav);
     public int MdbxOneDriveDatabaseCount => MdbxDatabases.Count(item => item.StorageLocation == MdbxStorageLocation.RemoteOneDrive);
+    public int MdbxRemoteDatabaseCount => MdbxWebDavDatabaseCount + MdbxOneDriveDatabaseCount;
+    public int MdbxWorkingCopyCount => MdbxDatabases.Count(HasMdbxWorkingCopy);
+    public int MdbxOfflineCopyCount => MdbxDatabases.Count(item => item.IsOfflineAvailable || HasMdbxWorkingCopy(item));
+    public int MdbxPendingSyncCount => MdbxDatabases.Count(HasPendingMdbxSync);
+    public int MdbxSyncErrorCount => MdbxDatabases.Count(HasMdbxSyncIssue);
     public bool HasMdbxDatabases => MdbxDatabases.Count > 0;
+    public bool HasMdbxSyncErrors => MdbxSyncErrorCount > 0;
+    public string MdbxDefaultVaultSummaryText
+    {
+        get
+        {
+            var defaultVault = MdbxDatabases.FirstOrDefault(item => item.IsDefault);
+            return defaultVault is null
+                ? _localization.Get("MdbxDefaultVaultMissing")
+                : _localization.Format("MdbxDefaultVaultFormat", string.IsNullOrWhiteSpace(defaultVault.Name) ? "MDBX" : defaultVault.Name);
+        }
+    }
+    public string MdbxWorkingCopySummaryText => MdbxWorkingCopyCount == 0
+        ? _localization.Get("MdbxNoWorkingCopies")
+        : _localization.Format("MdbxWorkingCopySummaryFormat", MdbxWorkingCopyCount, MdbxDatabases.Count, MdbxOfflineCopyCount);
+    public string MdbxRemoteSummaryText => MdbxRemoteDatabaseCount == 0
+        ? _localization.Get("MdbxRemoteSourceEmpty")
+        : _localization.Format("MdbxRemoteSummaryFormat", MdbxRemoteDatabaseCount, MdbxPendingSyncCount);
+    public string MdbxSyncDiagnosticsSummaryText => MdbxSyncErrorCount > 0
+        ? _localization.Format("MdbxSyncErrorsFormat", MdbxSyncErrorCount)
+        : MdbxPendingSyncCount > 0
+            ? _localization.Format("MdbxPendingSyncFormat", MdbxPendingSyncCount)
+            : _localization.Get("MdbxNoSyncErrors");
+    public string MdbxCachePolicyText => MdbxLocalCacheEnabled
+        ? _localization.Get("MdbxCacheEnabled")
+        : _localization.Get("MdbxCacheDisabled");
     public string MdbxLocalSourceStatusText => MdbxLocalDatabaseCount > 0
         ? _localization.Format("MdbxLocalSourceReadyFormat", MdbxLocalDatabaseCount)
         : _localization.Get("MdbxLocalSourceEmpty");
@@ -951,13 +1304,70 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public string WebDavConnectionStatusText => WebDavEnabled
         ? _localization.Format("WebDavConfiguredFormat", string.IsNullOrWhiteSpace(WebDavServerUrl) ? _localization.Get("NotConfigured") : WebDavServerUrl)
         : _localization.Get("WebDavDisabled");
+    public string SyncStatusSummaryText => WebDavEnabled
+        ? _localization.Format("SyncStatusSummaryFormat", BuildWebDavSourceStatus(), WebDavBackupHistory.Count)
+        : _localization.Get("SyncStatusLocalOnly");
+    public string SyncConfigurationSummaryText
+    {
+        get
+        {
+            if (!WebDavEnabled)
+            {
+                return _localization.Get("SyncConfigurationDisabled");
+            }
+
+            return Uri.TryCreate(WebDavServerUrl, UriKind.Absolute, out _)
+                ? _localization.Format("SyncConfigurationReadyFormat", string.IsNullOrWhiteSpace(WebDavRemotePath) ? "/" : WebDavRemotePath)
+                : _localization.Get("SyncConfigurationIncomplete");
+        }
+    }
+    public string SyncRecoverySummaryText
+    {
+        get
+        {
+            if (!WebDavEnabled)
+            {
+                return _localization.Get("SyncRecoveryLocalOnly");
+            }
+
+            return HasWebDavBackupHistory
+                ? _localization.Format("SyncRecoveryBackupReadyFormat", WebDavBackupHistory.Count)
+                : _localization.Get("SyncRecoveryNoBackupsLoaded");
+        }
+    }
+    public string OneDriveConnectionStatusText => OneDriveEnabled
+        ? _localization.Get("OneDriveBoundaryEnabled")
+        : _localization.Get("FeatureDisabled");
+    public int SmokeVaultLoadDelayMilliseconds { get; set; }
     public string WebDavBackupHistoryCountText => _localization.Format("WebDavBackupHistoryCountFormat", WebDavBackupHistory.Count);
     public bool HasWebDavBackupHistory => WebDavBackupHistory.Count > 0;
+    public bool HasSelectedWebDavBackupHistoryItem => SelectedWebDavBackupHistoryItem is not null;
     public bool IsWebDavBusy => IsLoadingWebDavBackups || IsRunningWebDavBackup;
     public string WebDavBackupOptionsSummaryText => _localization.Format(
         "WebDavBackupOptionsSummaryFormat",
         CountSelectedWebDavBackupOptions(),
         WebDavBackupEncryptionEnabled ? _localization.Get("Encrypted") : _localization.Get("PlainJson"));
+    public bool IsSettingsGeneralSelected => IsWorkspacePageSelected(SelectedSettingsPage, "General");
+    public bool IsSettingsSecuritySelected => IsWorkspacePageSelected(SelectedSettingsPage, "Security");
+    public bool IsSettingsSecurityRecoverySelected => IsWorkspacePageSelected(SelectedSettingsPage, "SecurityRecovery");
+    public bool IsSettingsDataSelected => IsWorkspacePageSelected(SelectedSettingsPage, "Data");
+    public bool IsSettingsDesktopSelected => IsWorkspacePageSelected(SelectedSettingsPage, "Desktop");
+    public bool IsSettingsIntegrationsSelected => IsWorkspacePageSelected(SelectedSettingsPage, "Integrations");
+    public bool IsSettingsAboutSelected => IsWorkspacePageSelected(SelectedSettingsPage, "About");
+    public bool IsSettingsDangerSelected => IsWorkspacePageSelected(SelectedSettingsPage, "Danger");
+    public bool IsSyncConfigurationSelected => IsWorkspacePageSelected(SelectedSyncPage, "Configuration");
+    public bool IsSyncBackupSelected => IsWorkspacePageSelected(SelectedSyncPage, "Backup");
+    public bool IsSyncSourcesSelected => IsWorkspacePageSelected(SelectedSyncPage, "Sources");
+    public bool IsSyncImportSelected => IsWorkspacePageSelected(SelectedSyncPage, "Import");
+    public bool IsSyncExportSelected => IsWorkspacePageSelected(SelectedSyncPage, "Export");
+    public bool IsDatabaseSourceSelected => IsWorkspacePageSelected(SelectedDatabaseManagementPage, "Source");
+    public bool IsDatabaseOverviewSelected => IsWorkspacePageSelected(SelectedDatabaseManagementPage, "Overview");
+    public bool IsDatabaseCloudSelected => IsWorkspacePageSelected(SelectedDatabaseManagementPage, "Cloud");
+    public bool IsDatabaseCapabilitiesSelected => IsWorkspacePageSelected(SelectedDatabaseManagementPage, "Capabilities");
+    public bool IsMdbxDetailsSelected => IsWorkspacePageSelected(SelectedMdbxWorkspacePage, "Details");
+    public bool IsMdbxHealthSelected => IsWorkspacePageSelected(SelectedMdbxWorkspacePage, "Health");
+    public bool IsMdbxSourcesSelected => IsWorkspacePageSelected(SelectedMdbxWorkspacePage, "Sources");
+    public bool IsMdbxRuntimeSelected => IsWorkspacePageSelected(SelectedMdbxWorkspacePage, "Runtime");
     public bool HasLegacyVaultImportPrompt => _legacyVaultDetection.RequiresImport;
     public string LegacyVaultImportPromptText => _legacyVaultDetection.RequiresImport
         ? _localization.Format("LegacyVaultImportPromptFormat", _legacyVaultDetection.DatabasePath)
@@ -973,22 +1383,43 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
 
             var strength = _passwordGenerator.Analyze(GeneratedPassword);
-            return _localization.Format("GeneratedPasswordStrengthFormat", strength.Label, strength.Score, string.Join(" ", strength.Warnings));
+            return _localization.Format(
+                "GeneratedPasswordStrengthFormat",
+                PasswordStrengthLocalization.Label(_localization, strength.Label),
+                strength.Score,
+                PasswordStrengthLocalization.Warnings(_localization, strength.Warnings));
         }
     }
 
-    public string NotePreviewMarkdown => NoteIsMarkdown ? NoteContent : "";
+    public string NotePreviewMarkdown => NoteIsMarkdown ? BuildNotePreviewMarkdown(NoteContent) : "";
     public string NotePlainPreview => NoteContentCodec.ToPlainPreview(NoteContent, NoteIsMarkdown);
-    public int SelectedPasswordCount => Passwords.Count(item => item.IsSelected);
+    public int SelectedPasswordCount => _selectedPasswordCount;
     public bool HasSelectedPasswords => SelectedPasswordCount > 0;
+    public bool HasSelectedPassword => SelectedPassword is not null;
+    public bool HasNoSelectedPassword => SelectedPassword is null;
+    public bool HasSelectedArchivedPassword => SelectedArchivedPassword is not null;
+    public bool HasSelectedDeletedPassword => SelectedDeletedPassword is not null;
     public bool HasSelectedPasswordDetails => SelectedPasswordDetails is not null;
+    public bool HasCurrentSelectedPasswordDetails =>
+        SelectedPassword is not null &&
+        SelectedPasswordDetails?.Entry.Id == SelectedPassword.Id;
+    public bool HasSelectedPasswordLoadingState =>
+        SelectedPassword is not null &&
+        IsLoadingSelectedPasswordDetails;
     public int SelectedTotpCount => TotpItems.Count(item => item.IsSelected);
     public string SelectedTotpCountText => _localization.Format("SelectedTotpCountFormat", SelectedTotpCount);
     public bool HasSelectedTotpItems => SelectedTotpCount > 0;
+    public bool HasSelectedTotpItem => SelectedTotpItem is not null;
+    public bool HasTotpItems => TotpItems.Count > 0;
     public int SelectedWalletCount => WalletItems.Count(item => item.IsSelected);
     public string SelectedWalletCountText => _localization.Format("SelectedWalletCountFormat", SelectedWalletCount);
     public bool HasSelectedWalletItems => SelectedWalletCount > 0;
     public bool HasSelectedWalletItem => SelectedWalletItem is not null;
+    public bool HasSelectedTimelineEntry => SelectedTimelineEntry is not null;
+    public bool HasSelectedSecurityIssue => SelectedSecurityIssue is not null;
+    public bool HasSelectedMdbxDatabaseItem => SelectedMdbxDatabaseItem is not null;
+    public bool HasSelectedVaultSource => SelectedVaultSource is not null;
+    public bool HasWalletItems => WalletItems.Count > 0;
     public bool AreAllFilteredPasswordsSelected
     {
         get
@@ -998,12 +1429,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         set
         {
-            foreach (var item in FilteredPasswords)
+            UpdatePasswordSelectionsInBatch(() =>
             {
-                item.IsSelected = value;
-            }
-
-            RaisePasswordSelectionState();
+                foreach (var item in FilteredPasswords)
+                {
+                    item.IsSelected = value;
+                }
+            });
         }
     }
 
@@ -1015,19 +1447,47 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public bool HasPasswordQuickAccessItems => RecentPasswordQuickAccessItems.Any() || FrequentPasswordQuickAccessItems.Any();
 
-    public IEnumerable<PasswordEntry> FilteredPasswords =>
-        ApplyPasswordSort(Passwords.Where(MatchesPasswordFilters));
+    public IReadOnlyList<PasswordEntry> FilteredPasswords => GetFilteredPasswords();
     public IEnumerable<PasswordEntry> FilteredArchivedPasswords =>
         ArchivedPasswords.Where(item => MatchesPasswordSearch(item, SearchText));
     public IEnumerable<PasswordEntry> FilteredDeletedPasswords =>
         DeletedPasswords.Where(item => MatchesPasswordSearch(item, SearchText));
+    public bool HasFilteredArchivedPasswords => FilteredArchivedPasswords.Any();
+    public bool HasFilteredDeletedPasswords => FilteredDeletedPasswords.Any();
+    public bool HasTimelineEntries => TimelineEntries.Count > 0;
+    public bool HasSecurityIssues => SecurityIssueItems.Count > 0;
 
     partial void OnSearchTextChanged(string value)
     {
-        OnPropertyChanged(nameof(FilteredPasswords));
+        RaiseFilteredPasswordsChanged();
         OnPropertyChanged(nameof(FilteredArchivedPasswords));
         OnPropertyChanged(nameof(FilteredDeletedPasswords));
+        OnPropertyChanged(nameof(HasFilteredArchivedPasswords));
+        OnPropertyChanged(nameof(HasFilteredDeletedPasswords));
+        SelectedArchivedPassword =
+            FilteredArchivedPasswords.FirstOrDefault(item => item.Id == SelectedArchivedPassword?.Id) ??
+            FilteredArchivedPasswords.FirstOrDefault();
+        SelectedDeletedPassword =
+            FilteredDeletedPasswords.FirstOrDefault(item => item.Id == SelectedDeletedPassword?.Id) ??
+            FilteredDeletedPasswords.FirstOrDefault();
         RaisePasswordSelectionState();
+        ReconcileSelectedPasswordDetails();
+    }
+
+    partial void OnPasswordSearchTextChanged(string value)
+    {
+        RaisePasswordFilterState();
+        if (_isApplyingPasswordSearchImmediately)
+        {
+            return;
+        }
+
+        QueuePasswordSearchQuery(value);
+    }
+
+    partial void OnPasswordSearchQueryChanged(string value)
+    {
+        RefreshPasswordFilters();
     }
 
     partial void OnQuickFilterFavoriteChanged(bool value) => RefreshPasswordFilters();
@@ -1040,7 +1500,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     partial void OnQuickFilterAttachmentsChanged(bool value) => RefreshPasswordFilters();
     partial void OnSelectedPasswordFolderFilterChanged(PasswordFolderFilterChoice? value)
     {
-        OnPropertyChanged(nameof(FilteredPasswords));
+        RaiseFilteredPasswordsChanged();
+        RaisePasswordFilterState();
         RaisePasswordSelectionState();
         ReconcileSelectedPasswordDetails();
         OnPropertyChanged(nameof(CanManageSelectedPasswordFolder));
@@ -1048,13 +1509,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     partial void OnSelectedPasswordSortChanged(string value)
     {
         UpdateSettings(settings => settings.PasswordSortOrder = value);
-        OnPropertyChanged(nameof(FilteredPasswords));
-        RaisePasswordSelectionState();
+        RaiseFilteredPasswordsChanged();
+        RefreshPasswordSelectionStateFromPasswords();
     }
 
-    async partial void OnSelectedPasswordChanged(PasswordEntry? value)
+    partial void OnSelectedPasswordChanged(PasswordEntry? value)
     {
-        await RefreshSelectedPasswordDetailsAsync(value);
+        QueueSelectedPasswordDetailsRefresh(value);
     }
 
     partial void OnSelectedSectionChanged(string value)
@@ -1160,6 +1621,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         LoadNoteTab(newValue);
         RefreshNoteTabState();
+    }
+
+    partial void OnSelectedTotpItemChanged(SecureItem? value)
+    {
+        if (value is not null)
+        {
+            RefreshTotpDisplay(value);
+        }
+
+        SelectedTotpDetails = value is null ? null : new TotpItemDetailsViewModel(_localization, value);
+        OnPropertyChanged(nameof(HasSelectedTotpItem));
     }
 
     partial void OnSelectedWalletItemChanged(SecureItem? value)
@@ -1269,7 +1741,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     partial void OnWebDavEnabledChanged(bool value)
     {
         UpdateSettings(settings => settings.WebDavEnabled = value);
-        OnPropertyChanged(nameof(WebDavConnectionStatusText));
+        RaiseSyncPageState();
         RefreshVaultSources();
         RefreshMdbxVaultState();
         RaiseShellStatus();
@@ -1277,32 +1749,48 @@ public sealed partial class MainWindowViewModel : ObservableObject
     partial void OnWebDavServerUrlChanged(string value)
     {
         UpdateSettings(settings => settings.WebDavServerUrl = value);
-        OnPropertyChanged(nameof(WebDavConnectionStatusText));
+        RaiseSyncPageState();
         RefreshVaultSources();
     }
     partial void OnWebDavUsernameChanged(string value)
     {
         UpdateSettings(settings => settings.WebDavUsername = value);
+        RaiseSyncPageState();
         RefreshVaultSources();
     }
-    partial void OnWebDavPasswordChanged(string value) => UpdateSettings(settings => settings.WebDavPassword = value);
+    partial void OnWebDavPasswordChanged(string value)
+    {
+        UpdateSettings(settings => settings.WebDavPassword = value);
+        RaiseSyncPageState();
+    }
     partial void OnWebDavRemotePathChanged(string value)
     {
         UpdateSettings(settings => settings.WebDavRemotePath = value);
+        RaiseSyncPageState();
         RefreshVaultSources();
     }
     partial void OnWebDavSyncOnStartupChanged(bool value)
     {
         UpdateSettings(settings => settings.WebDavSyncOnStartup = value);
+        RaiseSyncPageState();
         RefreshVaultSources();
     }
     partial void OnWebDavSyncAfterChangesChanged(bool value)
     {
         UpdateSettings(settings => settings.WebDavSyncAfterChanges = value);
+        RaiseSyncPageState();
         RefreshVaultSources();
     }
-    partial void OnIsLoadingWebDavBackupsChanged(bool value) => OnPropertyChanged(nameof(IsWebDavBusy));
-    partial void OnIsRunningWebDavBackupChanged(bool value) => OnPropertyChanged(nameof(IsWebDavBusy));
+    partial void OnIsLoadingWebDavBackupsChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsWebDavBusy));
+        RaiseSyncPageState();
+    }
+    partial void OnIsRunningWebDavBackupChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsWebDavBusy));
+        RaiseSyncPageState();
+    }
     partial void OnWebDavBackupIncludePasswordsChanged(bool value) => UpdateWebDavBackupOption(settings => settings.WebDavBackupIncludePasswords = value);
     partial void OnWebDavBackupIncludeTotpChanged(bool value) => UpdateWebDavBackupOption(settings => settings.WebDavBackupIncludeTotp = value);
     partial void OnWebDavBackupIncludeNotesChanged(bool value) => UpdateWebDavBackupOption(settings => settings.WebDavBackupIncludeNotes = value);
@@ -1315,17 +1803,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
     partial void OnSyncConflictStrategyChanged(string value)
     {
         UpdateSettings(settings => settings.SyncConflictStrategy = value);
+        RaiseSyncPageState();
         RefreshVaultSources();
     }
     partial void OnOneDriveEnabledChanged(bool value)
     {
         UpdateSettings(settings => settings.OneDriveEnabled = value);
+        RaiseSyncPageState();
         RefreshMdbxVaultState();
     }
 
     partial void OnMdbxLocalCacheEnabledChanged(bool value)
     {
         UpdateSettings(settings => settings.MdbxLocalCacheEnabled = value);
+        RaiseSyncPageState();
         RefreshMdbxVaultState();
     }
 
@@ -1341,11 +1832,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         try
         {
-            var path = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                DefaultApplicationDataDirectoryName,
-                DefaultDatabaseFileName);
-            return File.Exists(path);
+            return File.Exists(MonicaAppDataPaths.GetDatabasePath());
         }
         catch
         {
@@ -1442,6 +1929,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         await LoadCoreAsync(deferSecurityAnalysis: true);
     }
 
+    private static async Task YieldVaultLoadUiAsync()
+    {
+        await Task.Yield();
+    }
+
     [RelayCommand]
     public Task LoadAsync() => LoadCoreAsync(deferSecurityAnalysis: false);
 
@@ -1454,6 +1946,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         IsLoadingVault = true;
+        VaultLoadStageText = "准备加载保险库...";
         var loadStopwatch = Stopwatch.StartNew();
         AppDiagnostics.Info("Vault load started");
         try
@@ -1461,6 +1954,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             StatusMessage = "正在加载保险库数据...";
             SelectedPassword = null;
             SelectedPasswordDetails = null;
+            _selectedPasswordCount = 0;
             Passwords.Clear();
             ArchivedPasswords.Clear();
             DeletedPasswords.Clear();
@@ -1474,7 +1968,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
             TimelineEntries.Clear();
 
             StatusMessage = "正在后台读取保险库数据...";
+            VaultLoadStageText = "正在读取密码、笔记和分类...";
+            if (SmokeVaultLoadDelayMilliseconds > 0)
+            {
+                var delay = Math.Clamp(SmokeVaultLoadDelayMilliseconds, 0, 30000);
+                AppDiagnostics.Info($"Smoke UI vault load delay started. milliseconds={delay}");
+                await Task.Delay(delay);
+                AppDiagnostics.Info("Smoke UI vault load delay completed");
+            }
+
             var snapshot = await Task.Run(LoadVaultSnapshotAsync);
+            VaultLoadStageText = "正在整理密码列表...";
+            await YieldVaultLoadUiAsync();
             _passwordCustomFields = snapshot.PasswordCustomFields;
             _passwordAttachments = snapshot.PasswordAttachments;
             _passwordQuickAccessRecords = snapshot.PasswordQuickAccessRecords;
@@ -1505,33 +2010,56 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     TrackPasswordSelection(item);
                 }
             });
-            ReplaceItems(Passwords, snapshot.ActivePasswords);
-            ReplaceItems(ArchivedPasswords, snapshot.ArchivedPasswords);
-            ReplaceItems(DeletedPasswords, snapshot.DeletedPasswords);
-            RaisePasswordQuickAccessState();
-
-            ReplaceItems(NoteItems, snapshot.NoteItems);
-
-            foreach (var item in snapshot.WalletItems)
+            await YieldVaultLoadUiAsync();
+            AppDiagnostics.Measure("Replace password collections", () =>
             {
-                item.IsSelected = false;
-                TrackWalletSelection(item);
-            }
-            ReplaceItems(WalletItems, snapshot.WalletItems);
+                ReplaceItems(Passwords, snapshot.ActivePasswords);
+                ReplaceItems(ArchivedPasswords, snapshot.ArchivedPasswords);
+                ReplaceItems(DeletedPasswords, snapshot.DeletedPasswords);
+                RefreshPasswordSelectionStateFromPasswords();
+                RaisePasswordQuickAccessState();
+            });
+            await YieldVaultLoadUiAsync();
 
-            ReplaceItems(Categories, snapshot.Categories);
+            VaultLoadStageText = "正在加载笔记和安全项目...";
+            await YieldVaultLoadUiAsync();
+            AppDiagnostics.Measure("Replace secure item collections", () =>
+            {
+                ReplaceItems(NoteItems, snapshot.NoteItems);
 
-            RefreshPasswordFolderFilters();
-            ReplaceItems(MdbxDatabases, snapshot.MdbxDatabases);
+                foreach (var item in snapshot.WalletItems)
+                {
+                    item.IsSelected = false;
+                    TrackWalletSelection(item);
+                }
 
-            RefreshMdbxVaultState();
-            RefreshVaultSources();
-            await LoadTotpItemsAsync(snapshot.StoredTotps);
-            ReconcileSecureItemSelectionsAfterLoad();
-            ApplyTimelineLogs(snapshot.TimelineLogs);
-            RaiseCounts();
-            OnPropertyChanged(nameof(FilteredPasswords));
+                ReplaceItems(WalletItems, snapshot.WalletItems);
+            });
+            await YieldVaultLoadUiAsync();
+
+            VaultLoadStageText = "正在加载文件夹和保险库源...";
+            await YieldVaultLoadUiAsync();
+            AppDiagnostics.Measure("Replace folder and source collections", () =>
+            {
+                ReplaceItems(Categories, snapshot.Categories);
+                RefreshPasswordFolderFilters();
+                ReplaceItems(MdbxDatabases, snapshot.MdbxDatabases);
+                RefreshMdbxVaultState();
+                RefreshVaultSources();
+            });
+            await YieldVaultLoadUiAsync();
+            VaultLoadStageText = "正在加载验证码...";
+            await YieldVaultLoadUiAsync();
+            await AppDiagnostics.MeasureAsync("Apply TOTP collections", () => LoadTotpItemsAsync(snapshot.StoredTotps));
+            AppDiagnostics.Measure("Finalize vault load UI state", () =>
+            {
+                ReconcileSecureItemSelectionsAfterLoad();
+                RaiseCounts();
+                RaiseFilteredPasswordsChanged();
+            });
             StatusMessage = _localization.Get("VaultUnlocked");
+            VaultLoadStageText = "保险库已就绪";
+            _ = LoadTimelineDeferredAsync();
             if (deferSecurityAnalysis)
             {
                 _ = RefreshSecurityAnalysisDeferredAsync();
@@ -1541,12 +2069,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 AppDiagnostics.Measure("Refresh security analysis", RefreshSecurityAnalysis);
             }
 
-            AppDiagnostics.Info($"Vault load completed in {loadStopwatch.ElapsedMilliseconds} ms. passwords={Passwords.Count}, archived={ArchivedPasswords.Count}, deleted={DeletedPasswords.Count}, notes={NoteItems.Count}, totp={TotpItems.Count}, wallet={WalletItems.Count}");
+            LastVaultLoadDurationMilliseconds = loadStopwatch.ElapsedMilliseconds;
+            AppDiagnostics.Info($"Vault load completed in {LastVaultLoadDurationMilliseconds} ms. passwords={Passwords.Count}, archived={ArchivedPasswords.Count}, deleted={DeletedPasswords.Count}, notes={NoteItems.Count}, totp={TotpItems.Count}, wallet={WalletItems.Count}");
         }
         catch (Exception ex)
         {
+            LastVaultLoadDurationMilliseconds = loadStopwatch.ElapsedMilliseconds;
             AppDiagnostics.Error($"Vault load failed after {loadStopwatch.ElapsedMilliseconds} ms", ex);
             IsUnlocked = false;
+            VaultLoadStageText = "保险库加载失败";
             StatusMessage = _localization.Format("VaultLoadFailedFormat", ex.Message);
         }
         finally
@@ -1597,9 +2128,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var databases = await AppDiagnostics.MeasureAsync(
             "Load MDBX database metadata",
             () => _repository.GetMdbxDatabasesAsync());
-        var timelineLogs = await AppDiagnostics.MeasureAsync(
-            "Load timeline",
-            () => _repository.GetOperationLogsAsync(150));
 
         return new VaultLoadSnapshot(
             activePasswords,
@@ -1612,8 +2140,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             storedTotps,
             categories,
             quickAccessRecords,
-            databases,
-            timelineLogs);
+            databases);
     }
 
     [RelayCommand]
@@ -1624,6 +2151,74 @@ public sealed partial class MainWindowViewModel : ObservableObject
             SelectedSection = section;
         }
     }
+
+    [RelayCommand]
+    private void SelectSettingsPage(string? page)
+    {
+        SelectedSettingsPage = NormalizeSettingsPage(page);
+    }
+
+    [RelayCommand]
+    private void SelectSyncPage(string? page)
+    {
+        SelectedSyncPage = NormalizeSyncPage(page);
+    }
+
+    [RelayCommand]
+    private void SelectDatabaseManagementPage(string? page)
+    {
+        SelectedDatabaseManagementPage = NormalizeDatabaseManagementPage(page);
+    }
+
+    [RelayCommand]
+    private void SelectMdbxWorkspacePage(string? page)
+    {
+        SelectedMdbxWorkspacePage = NormalizeMdbxWorkspacePage(page);
+    }
+
+    private static bool IsWorkspacePageSelected(string selectedPage, string expectedPage) =>
+        string.Equals(selectedPage, expectedPage, StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizeSettingsPage(string? page) =>
+        page?.Trim().ToLowerInvariant() switch
+        {
+            "security" => "Security",
+            "securityrecovery" or "security-recovery" or "recovery" => "SecurityRecovery",
+            "data" or "datamanagement" or "data-management" => "Data",
+            "desktop" => "Desktop",
+            "integrations" or "platform" => "Integrations",
+            "about" => "About",
+            "danger" or "dangerzone" or "danger-zone" => "Danger",
+            _ => "General"
+        };
+
+    private static string NormalizeSyncPage(string? page) =>
+        page?.Trim().ToLowerInvariant() switch
+        {
+            "backup" or "backups" or "history" => "Backup",
+            "sources" or "vaults" or "database" => "Sources",
+            "import" => "Import",
+            "export" => "Export",
+            _ => "Configuration"
+        };
+
+    private static string NormalizeDatabaseManagementPage(string? page) =>
+        page?.Trim().ToLowerInvariant() switch
+        {
+            "overview" or "local" => "Overview",
+            "cloud" or "vaults" or "sources" => "Cloud",
+            "capabilities" or "features" => "Capabilities",
+            _ => "Source"
+        };
+
+    private static string NormalizeMdbxWorkspacePage(string? page) =>
+        page?.Trim().ToLowerInvariant() switch
+        {
+            "health" or "diagnostics" => "Health",
+            "sources" or "remote" => "Sources",
+            "runtime" or "android" => "Runtime",
+            _ => "Details"
+        };
 
     [RelayCommand(CanExecute = nameof(CanOpenExternalLinks))]
     private async Task OpenGitHubRepositoryAsync()
@@ -1926,7 +2521,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         await LoadTimelineAsync();
         RefreshSecurityAnalysis();
         RaiseCounts();
-        OnPropertyChanged(nameof(FilteredPasswords));
+        RaiseFilteredPasswordsChanged();
         StatusMessage = _localization.Format("CreatedPasswordFormat", entries[0].Title);
     }
 
@@ -1992,7 +2587,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         await LoadTimelineAsync();
         RefreshSecurityAnalysis();
         RaiseCounts();
-        OnPropertyChanged(nameof(FilteredPasswords));
+        RaiseFilteredPasswordsChanged();
         StatusMessage = _localization.Format("UpdatedPasswordFormat", updatedEntries[0].Title);
     }
 
@@ -2079,21 +2674,195 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ClearPasswordHistoryAsync);
     }
 
-    private async Task RefreshSelectedPasswordDetailsAsync(PasswordEntry? entry)
+    private void QueueSelectedPasswordDetailsRefresh(PasswordEntry? entry)
     {
+        var version = Interlocked.Increment(ref _selectedPasswordDetailsVersion);
+        CancelSelectedPasswordDetailsRefresh();
+        IsLoadingSelectedPasswordDetails = false;
+        OnPropertyChanged(nameof(HasCurrentSelectedPasswordDetails));
+
         if (entry is null)
         {
             SelectedPasswordDetails = null;
             return;
         }
 
-        SelectedPasswordDetails = await BuildPasswordDetailViewModelAsync(entry);
+        if (SelectedPasswordDetails?.Entry.Id == entry.Id)
+        {
+            return;
+        }
+
+        var cts = new CancellationTokenSource();
+        _selectedPasswordDetailsCts = cts;
+        AppDiagnostics.Info($"Password selection changed. id={entry.Id}, version={version}");
+        _ = RefreshSelectedPasswordDetailsDeferredAsync(entry, version, cts);
     }
 
-    private async Task<PasswordDetailViewModel> BuildPasswordDetailViewModelAsync(PasswordEntry entry)
+    private async Task RefreshSelectedPasswordDetailsDeferredAsync(PasswordEntry entry, int version, CancellationTokenSource cts)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var cancellationToken = cts.Token;
+        try
+        {
+            _ = ShowSelectedPasswordLoadingDeferredAsync(entry.Id, version, cancellationToken);
+            await Task.Delay(SelectedPasswordDetailsCoalesceDelay, cancellationToken).ConfigureAwait(false);
+            var sourceSnapshot = await Dispatcher.UIThread.InvokeAsync(
+                () =>
+                {
+                    if (cancellationToken.IsCancellationRequested ||
+                        !IsCurrentSelectedPasswordDetailsRequest(version) ||
+                        SelectedPassword?.Id != entry.Id)
+                    {
+                        return null;
+                    }
+
+                    var snapshotStopwatch = Stopwatch.StartNew();
+                    var snapshot = BuildPasswordDetailSourceSnapshot(entry);
+                    AppDiagnostics.Info(
+                        $"Build selected password detail source snapshot completed in {snapshotStopwatch.ElapsedMilliseconds} ms. " +
+                        $"id={entry.Id}, version={version}, candidates={snapshot.SiblingCandidates.Count}, " +
+                        $"categories={snapshot.Categories.Count}, notes={snapshot.NoteItems.Count}");
+                    return snapshot;
+                },
+                DispatcherPriority.ApplicationIdle);
+            if (sourceSnapshot is null)
+            {
+                return;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            var details = await AppDiagnostics.MeasureAsync(
+                $"Build selected password details VM id={entry.Id}",
+                () => Task.Run(
+                    () =>
+                    {
+                        var snapshot = BuildCachedPasswordDetailSnapshot(sourceSnapshot);
+                        AppDiagnostics.Info(
+                            $"Build selected password detail payload ready. id={entry.Id}, version={version}, " +
+                            $"siblings={snapshot.Siblings.Count}, attachments={snapshot.Attachments.Count}, " +
+                            $"customFields={snapshot.CustomFields.Count}, history={snapshot.History.Count}");
+                        return CreatePasswordDetailViewModel(snapshot);
+                    },
+                    cancellationToken));
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (cancellationToken.IsCancellationRequested ||
+                    !IsCurrentSelectedPasswordDetailsRequest(version) ||
+                    SelectedPassword?.Id != entry.Id)
+                {
+                    return;
+                }
+
+                SelectedPasswordDetails = details;
+                IsLoadingSelectedPasswordDetails = false;
+                AppDiagnostics.Info($"Password selection fast details applied in {stopwatch.ElapsedMilliseconds} ms. id={entry.Id}, version={version}");
+                Dispatcher.UIThread.Post(
+                    () => AppDiagnostics.Info($"Password selection details UI idle after {stopwatch.ElapsedMilliseconds} ms. id={entry.Id}, version={version}"),
+                    DispatcherPriority.ApplicationIdle);
+                _ = LoadSelectedPasswordHistoryDeferredAsync(entry.Id, version, details);
+            }, DispatcherPriority.Background);
+        }
+        catch (OperationCanceledException)
+        {
+            AppDiagnostics.Info($"Password selection details cancelled after {stopwatch.ElapsedMilliseconds} ms. id={entry.Id}, version={version}");
+        }
+        catch (Exception ex)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (IsCurrentSelectedPasswordDetailsRequest(version))
+                {
+                    IsLoadingSelectedPasswordDetails = false;
+                    StatusMessage = _localization.Format("PasswordDetailsLoadFailedFormat", ex.Message);
+                }
+            }, DispatcherPriority.Background);
+
+            AppDiagnostics.Error($"Password selection details failed after {stopwatch.ElapsedMilliseconds} ms. id={entry.Id}, version={version}", ex);
+        }
+        finally
+        {
+            if (ReferenceEquals(_selectedPasswordDetailsCts, cts))
+            {
+                _selectedPasswordDetailsCts = null;
+            }
+
+            cts.Dispose();
+        }
+    }
+
+    private async Task ShowSelectedPasswordLoadingDeferredAsync(long entryId, int version, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(SelectedPasswordDetailsLoadingDelay, cancellationToken).ConfigureAwait(false);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (cancellationToken.IsCancellationRequested ||
+                    !IsCurrentSelectedPasswordDetailsRequest(version) ||
+                    SelectedPassword?.Id != entryId ||
+                    SelectedPasswordDetails is not null)
+                {
+                    return;
+                }
+
+                IsLoadingSelectedPasswordDetails = true;
+                AppDiagnostics.Info(
+                    $"Password selection loading state shown after {SelectedPasswordDetailsLoadingDelay.TotalMilliseconds:0} ms. " +
+                    $"id={entryId}, version={version}");
+            }, DispatcherPriority.Background);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task LoadSelectedPasswordHistoryDeferredAsync(long entryId, int version, PasswordDetailViewModel details)
+    {
+        try
+        {
+            var history = await AppDiagnostics.MeasureAsync(
+                $"Load selected password history id={entryId}",
+                async () => await Task.Run(async () => await GetPasswordHistoryDisplayItemsAsync(entryId)));
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (IsCurrentSelectedPasswordDetailsRequest(version) &&
+                    SelectedPassword?.Id == entryId &&
+                    ReferenceEquals(SelectedPasswordDetails, details))
+                {
+                    details.SetPasswordHistory(history);
+                }
+            }, DispatcherPriority.Background);
+        }
+        catch (Exception ex)
+        {
+            AppDiagnostics.Error($"Load selected password history failed. id={entryId}, version={version}", ex);
+        }
+    }
+
+    private bool IsCurrentSelectedPasswordDetailsRequest(int version) =>
+        Volatile.Read(ref _selectedPasswordDetailsVersion) == version;
+
+    private void CancelSelectedPasswordDetailsRefresh()
+    {
+        var cts = _selectedPasswordDetailsCts;
+        if (cts is null)
+        {
+            return;
+        }
+
+        _selectedPasswordDetailsCts = null;
+        cts.Cancel();
+    }
+
+    private async Task<PasswordDetailViewModel> BuildPasswordDetailViewModelAsync(
+        PasswordEntry entry,
+        bool includeHistory = true,
+        bool allowCustomFieldRepositoryFallback = true)
     {
         var siblings = GetPasswordDetailSiblings(entry);
-        var customFields = await GetGroupCustomFieldsAsync(entry, siblings);
+        var customFields = allowCustomFieldRepositoryFallback
+            ? await GetGroupCustomFieldsAsync(entry, siblings)
+            : GetCachedGroupCustomFields(entry, siblings);
         var category = entry.CategoryId is null
             ? null
             : Categories.FirstOrDefault(item => item.Id == entry.CategoryId);
@@ -2101,7 +2870,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ? null
             : NoteItems.FirstOrDefault(item => item.Id == entry.BoundNoteId);
         var attachments = GetGroupAttachments(entry, siblings);
-        var history = await GetPasswordHistoryDisplayItemsAsync(entry.Id);
+        var history = includeHistory
+            ? await GetPasswordHistoryDisplayItemsAsync(entry.Id)
+            : [];
 
         return new PasswordDetailViewModel(
             _localization,
@@ -2121,12 +2892,79 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ClearPasswordHistoryAsync);
     }
 
-    private IReadOnlyList<PasswordEntry> GetPasswordDetailSiblings(PasswordEntry entry) =>
-        entry.IsDeleted
-            ? GetDeletedPasswordSiblings(entry).ToList()
+    private PasswordDetailSourceSnapshot BuildPasswordDetailSourceSnapshot(PasswordEntry entry)
+    {
+        var candidates = entry.IsDeleted
+            ? DeletedPasswords.ToArray()
             : entry.IsArchived
-                ? GetArchivedPasswordSiblings(entry).ToList()
-                : GetPasswordSiblings(entry).ToList();
+                ? ArchivedPasswords.ToArray()
+                : Passwords.ToArray();
+
+        return new PasswordDetailSourceSnapshot(
+            entry,
+            candidates,
+            Categories.ToArray(),
+            NoteItems.ToArray(),
+            _passwordAttachments,
+            _passwordCustomFields);
+    }
+
+    private PasswordDetailSnapshot BuildCachedPasswordDetailSnapshot(PasswordDetailSourceSnapshot source)
+    {
+        var entry = source.Entry;
+        var siblings = GetPasswordDetailSiblings(entry, source.SiblingCandidates).ToArray();
+        var category = entry.CategoryId is null
+            ? null
+            : source.Categories.FirstOrDefault(item => item.Id == entry.CategoryId);
+        var boundNote = entry.BoundNoteId is null
+            ? null
+            : source.NoteItems.FirstOrDefault(item => item.Id == entry.BoundNoteId);
+
+        return new PasswordDetailSnapshot(
+            entry,
+            siblings,
+            category,
+            boundNote,
+            GetGroupAttachments(entry, siblings, source.PasswordAttachments),
+            GetCachedGroupCustomFields(entry, siblings, source.PasswordCustomFields),
+            []);
+    }
+
+    private PasswordDetailViewModel CreatePasswordDetailViewModel(PasswordDetailSnapshot snapshot) =>
+        new(
+            _localization,
+            _clipboardService,
+            _cryptoService,
+            _totpService,
+            snapshot.Entry,
+            snapshot.Siblings,
+            snapshot.Category,
+            snapshot.BoundNote,
+            snapshot.Attachments,
+            snapshot.CustomFields,
+            snapshot.History,
+            AddPasswordAttachmentAsync,
+            DeletePasswordAttachmentAsync,
+            DeletePasswordHistoryAsync,
+            ClearPasswordHistoryAsync);
+
+    private IReadOnlyList<PasswordEntry> GetPasswordDetailSiblings(PasswordEntry entry)
+    {
+        var candidates = entry.IsDeleted
+            ? DeletedPasswords.ToArray()
+            : entry.IsArchived
+                ? ArchivedPasswords.ToArray()
+                : Passwords.ToArray();
+        return GetPasswordDetailSiblings(entry, candidates).ToArray();
+    }
+
+    private static IEnumerable<PasswordEntry> GetPasswordDetailSiblings(PasswordEntry entry, IReadOnlyList<PasswordEntry> candidates)
+    {
+        var key = BuildSiblingGroupKey(entry);
+        return candidates
+            .Where(item => BuildSiblingGroupKey(item) == key)
+            .OrderBy(item => item.Id == 0 ? long.MaxValue : item.Id);
+    }
 
     [RelayCommand]
     private async Task OpenQuickAccessPasswordAsync(PasswordQuickAccessItem? item)
@@ -2148,19 +2986,117 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         entry.IsSelected = !entry.IsSelected;
-        RaisePasswordSelectionState();
     }
 
     [RelayCommand]
     private void ClearPasswordSelection()
     {
-        foreach (var entry in Passwords.Where(item => item.IsSelected))
+        UpdatePasswordSelectionsInBatch(() =>
         {
-            entry.IsSelected = false;
+            foreach (var entry in Passwords.Where(item => item.IsSelected))
+            {
+                entry.IsSelected = false;
+            }
+        });
+        ReconcileSelectedPasswordDetails();
+    }
+
+    [RelayCommand]
+    private void ClearPasswordFilters()
+    {
+        SetPasswordSearchImmediately("");
+        QuickFilterFavorite = false;
+        QuickFilter2Fa = false;
+        QuickFilterNotes = false;
+        QuickFilterPasskey = false;
+        QuickFilterBoundNote = false;
+        QuickFilterUncategorized = false;
+        QuickFilterLocalOnly = false;
+        QuickFilterAttachments = false;
+        SelectedPasswordFolderFilter = PasswordFolderFilters.FirstOrDefault(item =>
+            string.Equals(item.SelectionKey, "system:all", StringComparison.OrdinalIgnoreCase)) ??
+            PasswordFolderFilters.FirstOrDefault();
+        RefreshPasswordFilters();
+        StatusMessage = _localization.Get("ClearedPasswordFilters");
+    }
+
+    private void SetPasswordSearchImmediately(string value)
+    {
+        CancelPasswordSearchDebounce();
+        _isApplyingPasswordSearchImmediately = true;
+        try
+        {
+            PasswordSearchText = value;
+            PasswordSearchQuery = value;
+        }
+        finally
+        {
+            _isApplyingPasswordSearchImmediately = false;
         }
 
-        RaisePasswordSelectionState();
-        ReconcileSelectedPasswordDetails();
+        RaisePasswordFilterState();
+    }
+
+    [RelayCommand]
+    private void SetPasswordSort(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        SelectedPasswordSort = value switch
+        {
+            "updated-desc" or "title-asc" or "website-asc" or "username-asc" or "created-desc" or "favorites-first" => value,
+            _ => SelectedPasswordSort
+        };
+    }
+
+    private void QueuePasswordSearchQuery(string value)
+    {
+        CancelPasswordSearchDebounce();
+        var cts = new CancellationTokenSource();
+        _passwordSearchDebounceCts = cts;
+        _ = ApplyPasswordSearchQueryAsync(value, cts);
+    }
+
+    private async Task ApplyPasswordSearchQueryAsync(string value, CancellationTokenSource cts)
+    {
+        try
+        {
+            await Task.Delay(250, cts.Token);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (ReferenceEquals(_passwordSearchDebounceCts, cts))
+                {
+                    PasswordSearchQuery = value;
+                }
+            });
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            if (ReferenceEquals(_passwordSearchDebounceCts, cts))
+            {
+                _passwordSearchDebounceCts = null;
+            }
+
+            cts.Dispose();
+        }
+    }
+
+    private void CancelPasswordSearchDebounce()
+    {
+        var cts = _passwordSearchDebounceCts;
+        if (cts is null)
+        {
+            return;
+        }
+
+        _passwordSearchDebounceCts = null;
+        cts.Cancel();
     }
 
     [RelayCommand]
@@ -2184,13 +3120,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
         }
 
-        foreach (var entry in selected)
+        UpdatePasswordSelectionsInBatch(() =>
         {
-            entry.IsSelected = false;
-        }
+            foreach (var entry in selected)
+            {
+                entry.IsSelected = false;
+            }
+        });
 
-        RaisePasswordSelectionState();
-        OnPropertyChanged(nameof(FilteredPasswords));
+        RaiseFilteredPasswordsChanged();
         RefreshSecurityAnalysis();
         await LoadTimelineAsync();
         StatusMessage = _localization.Format("FavoritedPasswordCountFormat", selected.Length);
@@ -2200,6 +3138,28 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private async Task DeleteSelectedPasswordsAsync()
     {
         var selected = Passwords.Where(item => item.IsSelected).ToArray();
+        if (selected.Length == 0)
+        {
+            return;
+        }
+
+        if (!await _confirmationDialogService.ConfirmAsync(
+            _localization.Get("DeleteSelectedPasswordsConfirmationTitle"),
+            _localization.Format("DeleteSelectedPasswordsConfirmationMessageFormat", selected.Length),
+            _localization.Get("MoveToRecycleBin"),
+            _localization.Cancel))
+        {
+            return;
+        }
+
+        UpdatePasswordSelectionsInBatch(() =>
+        {
+            foreach (var entry in selected)
+            {
+                entry.IsSelected = false;
+            }
+        });
+
         var handled = new HashSet<long>();
         foreach (var entry in selected)
         {
@@ -2217,7 +3177,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             await DeletePasswordGroupAsync(entry, siblings, updateStatus: false);
         }
 
-        RaisePasswordSelectionState();
+        RefreshPasswordSelectionStateFromPasswords();
         await LoadTimelineAsync();
         StatusMessage = _localization.Format("MovedSelectedPasswordsToRecycleBinFormat", selected.Length);
     }
@@ -2232,6 +3192,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         var handled = new HashSet<long>();
+        UpdatePasswordSelectionsInBatch(() =>
+        {
+            foreach (var entry in selected)
+            {
+                entry.IsSelected = false;
+            }
+        });
+
         foreach (var entry in selected)
         {
             if (!handled.Add(entry.Id))
@@ -2248,7 +3216,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             await ArchivePasswordGroupAsync(entry, siblings, updateStatus: false);
         }
 
-        RaisePasswordSelectionState();
+        RefreshPasswordSelectionStateFromPasswords();
         await LoadTimelineAsync();
         StatusMessage = _localization.Format("ArchivedSelectedPasswordsFormat", selected.Length);
     }
@@ -2300,15 +3268,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
         }
 
-        foreach (var entry in selected)
+        UpdatePasswordSelectionsInBatch(() =>
         {
-            entry.IsSelected = false;
-        }
+            foreach (var entry in selected)
+            {
+                entry.IsSelected = false;
+            }
+        });
 
         await LoadTotpItemsAsync();
-        RaisePasswordSelectionState();
         RefreshPasswordFolderFilters(choice.Id);
-        OnPropertyChanged(nameof(FilteredPasswords));
+        RaiseFilteredPasswordsChanged();
         await LoadTimelineAsync();
         StatusMessage = _localization.Format("MovedSelectedPasswordsToFolderFormat", selected.Length, choice.Name);
     }
@@ -2329,10 +3299,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
             .Select(item => item.ReplicaGroupId)
             .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))
             ?? $"manual-{Guid.NewGuid():N}";
+        UpdatePasswordSelectionsInBatch(() =>
+        {
+            foreach (var entry in selected)
+            {
+                entry.IsSelected = false;
+            }
+        });
+
         foreach (var entry in selected)
         {
             entry.ReplicaGroupId = replicaGroupId;
-            entry.IsSelected = false;
             await _repository.SavePasswordAsync(entry);
             await _repository.LogAsync(new OperationLog
             {
@@ -2344,8 +3321,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             });
         }
 
-        RaisePasswordSelectionState();
-        OnPropertyChanged(nameof(FilteredPasswords));
+        RaiseFilteredPasswordsChanged();
         RefreshSecurityAnalysis();
         await LoadTimelineAsync();
         StatusMessage = _localization.Format("StackedPasswordCountFormat", selected.Length);
@@ -2384,7 +3360,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         });
         await LoadTimelineAsync();
         RefreshSecurityAnalysis();
-        OnPropertyChanged(nameof(FilteredPasswords));
+        RaiseFilteredPasswordsChanged();
     }
 
     [RelayCommand]
@@ -2395,11 +3371,76 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return;
         }
 
+        if (!await _confirmationDialogService.ConfirmAsync(
+            _localization.Get("DeletePasswordConfirmationTitle"),
+            _localization.Format("DeletePasswordConfirmationMessageFormat", entry.Title),
+            _localization.Get("MoveToRecycleBin"),
+            _localization.Cancel))
+        {
+            return;
+        }
+
         var siblings = entry.IsArchived
             ? GetArchivedPasswordSiblings(entry).ToList()
             : GetPasswordSiblings(entry).ToList();
         await DeletePasswordGroupAsync(entry, siblings, updateStatus: true);
     }
+
+    private Task<bool> ConfirmMoveItemToRecycleBinAsync(string itemTitle) =>
+        _confirmationDialogService.ConfirmAsync(
+            _localization.Get("DeleteItemConfirmationTitle"),
+            _localization.Format("DeleteItemConfirmationMessageFormat", itemTitle),
+            _localization.Get("MoveToRecycleBin"),
+            _localization.Cancel);
+
+    private Task<bool> ConfirmMoveSelectedItemsToRecycleBinAsync(int count) =>
+        _confirmationDialogService.ConfirmAsync(
+            _localization.Get("DeleteSelectedItemsConfirmationTitle"),
+            _localization.Format("DeleteSelectedItemsConfirmationMessageFormat", count),
+            _localization.Get("MoveToRecycleBin"),
+            _localization.Cancel);
+
+    private Task<bool> ConfirmPermanentDeleteAsync(string itemTitle) =>
+        _confirmationDialogService.ConfirmAsync(
+            _localization.Get("DeletePermanentlyConfirmationTitle"),
+            _localization.Format("DeletePermanentlyConfirmationMessageFormat", itemTitle),
+            _localization.Get("DeletePermanently"),
+            _localization.Cancel);
+
+    private Task<bool> ConfirmDeleteWebDavBackupAsync(string fileName) =>
+        _confirmationDialogService.ConfirmAsync(
+            _localization.Get("DeleteWebDavBackupConfirmationTitle"),
+            _localization.Format("DeleteWebDavBackupConfirmationMessageFormat", fileName),
+            _localization.Get("Delete"),
+            _localization.Cancel);
+
+    private Task<bool> ConfirmDeleteFolderAsync(string name, int affectedPasswordCount) =>
+        _confirmationDialogService.ConfirmAsync(
+            _localization.Get("DeleteFolderConfirmationTitle"),
+            _localization.Format("DeleteFolderConfirmationMessageFormat", name, affectedPasswordCount),
+            _localization.Get("DeleteFolder"),
+            _localization.Cancel);
+
+    private Task<bool> ConfirmDeleteAttachmentAsync(string fileName) =>
+        _confirmationDialogService.ConfirmAsync(
+            _localization.Get("DeleteAttachmentConfirmationTitle"),
+            _localization.Format("DeleteAttachmentConfirmationMessageFormat", fileName),
+            _localization.Get("Delete"),
+            _localization.Cancel);
+
+    private Task<bool> ConfirmDeletePasswordHistoryAsync() =>
+        _confirmationDialogService.ConfirmAsync(
+            _localization.Get("DeletePasswordHistoryConfirmationTitle"),
+            _localization.Get("DeletePasswordHistoryConfirmationMessage"),
+            _localization.Get("Delete"),
+            _localization.Cancel);
+
+    private Task<bool> ConfirmClearPasswordHistoryAsync() =>
+        _confirmationDialogService.ConfirmAsync(
+            _localization.Get("ClearPasswordHistoryConfirmationTitle"),
+            _localization.Get("ClearPasswordHistoryConfirmationMessage"),
+            _localization.Get("ClearPasswordHistory"),
+            _localization.Cancel);
 
     [RelayCommand]
     private async Task ArchivePasswordAsync(PasswordEntry? entry)
@@ -2443,8 +3484,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         await LoadTotpItemsAsync();
         RaiseCounts();
-        RaisePasswordSelectionState();
-        OnPropertyChanged(nameof(FilteredPasswords));
+        RefreshPasswordSelectionStateFromPasswords();
+        RaiseFilteredPasswordsChanged();
         RefreshSecurityAnalysis();
         await LoadTimelineAsync();
         if (updateStatus)
@@ -2491,7 +3532,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         await LoadTotpItemsAsync();
         await LoadTimelineAsync();
         RaiseCounts();
-        OnPropertyChanged(nameof(FilteredPasswords));
+        RaiseFilteredPasswordsChanged();
         RefreshSecurityAnalysis();
         StatusMessage = _localization.Format("UnarchivedPasswordFormat", entry.Title);
     }
@@ -2536,8 +3577,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         await LoadTotpItemsAsync();
         RaiseCounts();
-        RaisePasswordSelectionState();
-        OnPropertyChanged(nameof(FilteredPasswords));
+        RefreshPasswordSelectionStateFromPasswords();
+        RaiseFilteredPasswordsChanged();
         RefreshSecurityAnalysis();
         await LoadTimelineAsync();
         if (updateStatus)
@@ -2583,7 +3624,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         await LoadTotpItemsAsync();
         await LoadTimelineAsync();
         RaiseCounts();
-        OnPropertyChanged(nameof(FilteredPasswords));
+        RaiseFilteredPasswordsChanged();
         RefreshSecurityAnalysis();
         StatusMessage = _localization.Format("RestoredPasswordFormat", entry.Title);
     }
@@ -2592,6 +3633,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private async Task DeletePasswordPermanentlyAsync(PasswordEntry? entry)
     {
         if (entry is null)
+        {
+            return;
+        }
+
+        if (!await ConfirmPermanentDeleteAsync(entry.Title))
         {
             return;
         }
@@ -2624,6 +3670,78 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void ShowArchivedPasswordDetails(PasswordEntry? entry)
+    {
+        if (entry is not null)
+        {
+            SelectedArchivedPassword = entry;
+        }
+    }
+
+    [RelayCommand]
+    private void ShowDeletedPasswordDetails(PasswordEntry? entry)
+    {
+        if (entry is not null)
+        {
+            SelectedDeletedPassword = entry;
+        }
+    }
+
+    [RelayCommand]
+    private void ShowTimelineEntryDetails(TimelineEntry? entry)
+    {
+        if (entry is not null)
+        {
+            SelectedTimelineEntry = entry;
+        }
+    }
+
+    [RelayCommand]
+    private void ShowSecurityIssueDetails(SecurityIssueItem? issue)
+    {
+        if (issue is not null)
+        {
+            SelectedSecurityIssue = issue;
+        }
+    }
+
+    [RelayCommand]
+    private void ShowTotpDetails(SecureItem? item)
+    {
+        if (item is not null)
+        {
+            SelectedTotpItem = item;
+        }
+    }
+
+    [RelayCommand]
+    private void ShowVaultSourceDetails(VaultSourceDisplayItem? source)
+    {
+        if (source is not null)
+        {
+            SelectedVaultSource = source;
+        }
+    }
+
+    [RelayCommand]
+    private void ShowMdbxDatabaseDetails(MdbxDatabaseDisplayItem? item)
+    {
+        if (item is not null)
+        {
+            SelectedMdbxDatabaseItem = item;
+        }
+    }
+
+    [RelayCommand]
+    private void ShowWebDavBackupDetails(WebDavBackupHistoryItem? item)
+    {
+        if (item is not null)
+        {
+            SelectedWebDavBackupHistoryItem = item;
+        }
+    }
+
+    [RelayCommand]
     private async Task AddTotpAsync()
     {
         var editor = await _totpEditorDialogService.ShowAsync(null);
@@ -2643,8 +3761,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
             OperationType = "CREATE",
             DeviceName = Environment.MachineName
         });
+        TrackTotpSelection(item);
         TotpItems.Insert(0, item);
+        SelectedTotpItem = item;
         RaiseCounts();
+        RaiseTotpSelectionState();
         await LoadTimelineAsync();
         StatusMessage = _localization.Format("SavedTotpFormat", item.Title);
     }
@@ -2700,6 +3821,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             editor.ApplyTo(item);
             RefreshTotpDisplay(item);
             await _repository.SaveSecureItemAsync(item);
+            SelectedTotpItem = item;
+            SelectedTotpDetails = new TotpItemDetailsViewModel(_localization, item);
         }
 
         await _repository.LogAsync(new OperationLog
@@ -2725,6 +3848,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         var next = !item.IsFavorite;
         await SetTotpFavoriteAsync(item, next);
+        if (SelectedTotpItem?.Id == item.Id)
+        {
+            SelectedTotpDetails = new TotpItemDetailsViewModel(_localization, item);
+        }
+
         await LoadTimelineAsync();
         StatusMessage = _localization.Format(next ? "FavoritedTotpFormat" : "UnfavoritedTotpFormat", item.Title);
     }
@@ -2733,6 +3861,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private async Task DeleteTotpAsync(SecureItem? item)
     {
         if (item is null)
+        {
+            return;
+        }
+
+        if (!await ConfirmMoveItemToRecycleBinAsync(item.Title))
         {
             return;
         }
@@ -2785,6 +3918,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
             item.IsSelected = false;
         }
 
+        if (SelectedTotpItem is not null && selected.Any(item => item.Id == SelectedTotpItem.Id))
+        {
+            SelectedTotpDetails = new TotpItemDetailsViewModel(_localization, SelectedTotpItem);
+        }
+
         RaiseTotpSelectionState();
         await LoadTimelineAsync();
         StatusMessage = _localization.Format("FavoritedTotpCountFormat", selected.Length);
@@ -2795,6 +3933,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         var selected = TotpItems.Where(item => item.IsSelected).ToArray();
         if (selected.Length == 0)
+        {
+            return;
+        }
+
+        if (!await ConfirmMoveSelectedItemsToRecycleBinAsync(selected.Length))
         {
             return;
         }
@@ -2885,6 +4028,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return;
         }
 
+        if (!await ConfirmMoveItemToRecycleBinAsync(item.Title))
+        {
+            return;
+        }
+
         await DeleteWalletItemCoreAsync(item, updateStatus: true);
     }
 
@@ -2916,6 +4064,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         var selected = WalletItems.Where(item => item.IsSelected).ToArray();
         if (selected.Length == 0)
+        {
+            return;
+        }
+
+        if (!await ConfirmMoveSelectedItemsToRecycleBinAsync(selected.Length))
         {
             return;
         }
@@ -2969,7 +4122,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         SetPasswordAttachments(entry.Id, [.. GetPasswordAttachments(entry.Id), attachment]);
         RefreshPasswordAttachmentState(entry);
-        OnPropertyChanged(nameof(FilteredPasswords));
+        RaiseFilteredPasswordsChanged();
         await _repository.LogAsync(new OperationLog
         {
             ItemType = "PASSWORD",
@@ -3000,8 +4153,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
         await AddPasswordAttachmentMetadataAsync(entry, draft.FileName, draft.StoragePath, draft.SizeBytes, draft.ContentType, draft.Content);
     }
 
-    private async Task DeletePasswordAttachmentAsync(Attachment attachment)
+    private async Task<bool> DeletePasswordAttachmentAsync(Attachment attachment)
     {
+        if (!await ConfirmDeleteAttachmentAsync(attachment.FileName))
+        {
+            return false;
+        }
+
         await _repository.DeleteAttachmentAsync(attachment.Id, attachment);
         await _passwordAttachmentFileService.DeleteStoredAttachmentAsync(attachment.StoragePath);
         var remaining = GetPasswordAttachments(attachment.OwnerId)
@@ -3016,10 +4174,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (entry is not null)
         {
             RefreshPasswordAttachmentState(entry);
-            OnPropertyChanged(nameof(FilteredPasswords));
+            RaiseFilteredPasswordsChanged();
         }
 
         StatusMessage = _localization.Format("DeletedAttachmentFormat", attachment.FileName);
+        return true;
     }
 
     [RelayCommand]
@@ -3125,15 +4284,27 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(NotePreviewSeparatorColumnWidth));
         OnPropertyChanged(nameof(NotePreviewColumnWidth));
         OnPropertyChanged(nameof(NotePreviewContentPadding));
+        RaiseNoteWorkspaceLayoutState();
+    }
+
+    private void RaiseNoteWorkspaceLayoutState()
+    {
+        OnPropertyChanged(nameof(IsNoteTreePaneVisible));
+        OnPropertyChanged(nameof(NoteTreeColumnWidth));
+        OnPropertyChanged(nameof(NoteTabStripWidth));
+        OnPropertyChanged(nameof(IsNoteInspectorPaneVisible));
+        OnPropertyChanged(nameof(NoteInspectorColumnWidth));
     }
 
     private void RaiseNoteTreeState()
     {
         OnPropertyChanged(nameof(FavoriteNoteItems));
         OnPropertyChanged(nameof(FilteredNoteItems));
+        OnPropertyChanged(nameof(NoteTreeGroups));
         OnPropertyChanged(nameof(FavoriteNoteCount));
         OnPropertyChanged(nameof(HasFavoriteNoteItems));
         OnPropertyChanged(nameof(HasFilteredNoteItems));
+        OnPropertyChanged(nameof(HasNoteTreeGroups));
         OnPropertyChanged(nameof(NoteTreeStatusText));
     }
 
@@ -3157,6 +4328,60 @@ public sealed partial class MainWindowViewModel : ObservableObject
             .ThenByDescending(item => item.UpdatedAt)
             .ThenBy(item => item.Title, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    private static IReadOnlyList<NoteTreeGroup> BuildNoteTreeGroups(IReadOnlyList<SecureItem> notes)
+    {
+        var taggedGroups = new SortedDictionary<string, List<SecureItem>>(StringComparer.OrdinalIgnoreCase);
+        var untagged = new List<SecureItem>();
+
+        foreach (var note in notes)
+        {
+            var tags = GetNoteTreeTags(note);
+            if (tags.Count == 0)
+            {
+                untagged.Add(note);
+                continue;
+            }
+
+            foreach (var tag in tags)
+            {
+                if (!taggedGroups.TryGetValue(tag, out var bucket))
+                {
+                    bucket = [];
+                    taggedGroups[tag] = bucket;
+                }
+
+                bucket.Add(note);
+            }
+        }
+
+        var groups = taggedGroups
+            .Select(pair => new NoteTreeGroup(pair.Key, pair.Value.Count, pair.Value, IsUntagged: false))
+            .ToList();
+
+        if (untagged.Count > 0)
+        {
+            groups.Add(new NoteTreeGroup("未分类", untagged.Count, untagged, IsUntagged: true));
+        }
+
+        return groups;
+    }
+
+    private static IReadOnlyList<string> GetNoteTreeTags(SecureItem item)
+    {
+        try
+        {
+            return NoteContentCodec.DecodeFromItem(item).Tags
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+        catch
+        {
+            return [];
+        }
     }
 
     private static bool MatchesNoteSearch(SecureItem item, string query)
@@ -3535,6 +4760,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return;
         }
 
+        if (!await ConfirmMoveItemToRecycleBinAsync(item.Title))
+        {
+            return;
+        }
+
         await _repository.SoftDeleteSecureItemAsync(item.Id);
         NoteItems.Remove(item);
         if (ReferenceEquals(SelectedNote, item) || SelectedNote?.Id == item.Id)
@@ -3874,6 +5104,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 WebDavBackupHistory.Add(ToWebDavBackupHistoryItem(item));
             }
 
+            SelectedWebDavBackupHistoryItem = WebDavBackupHistory.FirstOrDefault();
             RaiseWebDavBackupHistoryState();
             StatusMessage = _localization.Format("LoadedWebDavBackupsFormat", WebDavBackupHistory.Count);
         }
@@ -3884,6 +5115,31 @@ public sealed partial class MainWindowViewModel : ObservableObject
         finally
         {
             IsLoadingWebDavBackups = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task TestWebDavConnectionAsync()
+    {
+        if (!TryCreateWebDavProfile(out var profile))
+        {
+            return;
+        }
+
+        try
+        {
+            IsLoadingWebDavBackups = true;
+            var entries = await _webDavBackupService.ListAsync(profile, "");
+            StatusMessage = _localization.Format("WebDavConnectionTestSucceededFormat", entries.Count);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = _localization.Format("WebDavConnectionTestFailedFormat", ex.Message);
+        }
+        finally
+        {
+            IsLoadingWebDavBackups = false;
+            RaiseSyncPageState();
         }
     }
 
@@ -3932,12 +5188,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 WebDavBackupHistory.Remove(existing);
             }
 
-            WebDavBackupHistory.Insert(0, new WebDavBackupHistoryItem(
+            var backupItem = new WebDavBackupHistoryItem(
                 fileName,
                 path,
                 DateTimeOffset.UtcNow.ToLocalTime().ToString("yyyy/MM/dd HH:mm", _localization.Culture),
                 FormatByteSize(Encoding.UTF8.GetByteCount(content)),
-                DateTimeOffset.UtcNow));
+                DateTimeOffset.UtcNow);
+            WebDavBackupHistory.Insert(0, backupItem);
+            SelectedWebDavBackupHistoryItem = backupItem;
             RaiseWebDavBackupHistoryState();
             StatusMessage = _localization.Format("CreatedWebDavBackupFormat", fileName);
         }
@@ -4004,10 +5262,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return;
         }
 
+        if (!await ConfirmDeleteWebDavBackupAsync(item.FileName))
+        {
+            return;
+        }
+
         try
         {
             await _webDavBackupService.DeleteAsync(profile, item.FileName);
             WebDavBackupHistory.Remove(item);
+            if (SelectedWebDavBackupHistoryItem == item)
+            {
+                SelectedWebDavBackupHistoryItem = WebDavBackupHistory.FirstOrDefault();
+            }
+
             RaiseWebDavBackupHistoryState();
             StatusMessage = _localization.Format("DeletedWebDavBackupFormat", item.FileName);
         }
@@ -4797,6 +6065,22 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void TogglePasswordFolderExpansion(PasswordFolderFilterChoice? item)
+    {
+        if (item is null || !item.HasChildren || string.IsNullOrWhiteSpace(item.SelectionKey))
+        {
+            return;
+        }
+
+        if (!_collapsedPasswordFolderKeys.Add(item.SelectionKey))
+        {
+            _collapsedPasswordFolderKeys.Remove(item.SelectionKey);
+        }
+
+        RefreshPasswordFolderFilters();
+    }
+
+    [RelayCommand]
     private async Task CreatePasswordFolderAsync()
     {
         var name = NewFolderName.Trim();
@@ -4882,6 +6166,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         var movedPasswords = Passwords.Count(item => item.CategoryId == category.Id);
         var name = category.Name;
+        if (!await ConfirmDeleteFolderAsync(name, movedPasswords))
+        {
+            return;
+        }
+
         await _repository.DeleteCategoryAsync(category.Id);
         Categories.Remove(category);
         foreach (var password in Passwords.Where(item => item.CategoryId == category.Id))
@@ -4935,14 +6224,29 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void RaiseCounts()
     {
+        SelectedArchivedPassword =
+            ArchivedPasswords.FirstOrDefault(item => item.Id == SelectedArchivedPassword?.Id) ??
+            ArchivedPasswords.FirstOrDefault();
+        SelectedDeletedPassword =
+            DeletedPasswords.FirstOrDefault(item => item.Id == SelectedDeletedPassword?.Id) ??
+            DeletedPasswords.FirstOrDefault();
+
         OnPropertyChanged(nameof(PasswordCountText));
         OnPropertyChanged(nameof(ArchivedPasswordCountText));
         OnPropertyChanged(nameof(DeletedPasswordCountText));
+        OnPropertyChanged(nameof(FilteredArchivedPasswords));
+        OnPropertyChanged(nameof(FilteredDeletedPasswords));
+        OnPropertyChanged(nameof(HasFilteredArchivedPasswords));
+        OnPropertyChanged(nameof(HasFilteredDeletedPasswords));
         OnPropertyChanged(nameof(NoteCountText));
         OnPropertyChanged(nameof(TotpCountText));
+        OnPropertyChanged(nameof(HasTotpItems));
         OnPropertyChanged(nameof(WalletCountText));
+        OnPropertyChanged(nameof(HasWalletItems));
         OnPropertyChanged(nameof(TimelineCountText));
+        OnPropertyChanged(nameof(HasTimelineEntries));
         OnPropertyChanged(nameof(SecurityIssueCountText));
+        OnPropertyChanged(nameof(HasSecurityIssues));
         OnPropertyChanged(nameof(LocalDatabaseSummaryText));
         OnPropertyChanged(nameof(MdbxDatabaseCountText));
         RaiseNoteTreeState();
@@ -4954,12 +6258,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void RefreshMdbxVaultState()
     {
+        var selectedId = SelectedMdbxDatabaseItem?.Database.Id;
         MdbxDatabaseItems.Clear();
         foreach (var database in MdbxDatabases.OrderByDescending(item => item.IsDefault).ThenBy(item => item.SortOrder).ThenBy(item => item.Name))
         {
             MdbxDatabaseItems.Add(ToMdbxDisplayItem(database));
         }
 
+        SelectedMdbxDatabaseItem =
+            MdbxDatabaseItems.FirstOrDefault(item => item.Database.Id == selectedId) ??
+            MdbxDatabaseItems.FirstOrDefault(item => item.IsDefault) ??
+            MdbxDatabaseItems.FirstOrDefault();
         RaiseMdbxVaultState();
     }
 
@@ -4972,12 +6281,83 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(MdbxLocalDatabaseCount));
         OnPropertyChanged(nameof(MdbxWebDavDatabaseCount));
         OnPropertyChanged(nameof(MdbxOneDriveDatabaseCount));
+        OnPropertyChanged(nameof(MdbxRemoteDatabaseCount));
+        OnPropertyChanged(nameof(MdbxWorkingCopyCount));
+        OnPropertyChanged(nameof(MdbxOfflineCopyCount));
+        OnPropertyChanged(nameof(MdbxPendingSyncCount));
+        OnPropertyChanged(nameof(MdbxSyncErrorCount));
         OnPropertyChanged(nameof(HasMdbxDatabases));
+        OnPropertyChanged(nameof(HasMdbxSyncErrors));
+        OnPropertyChanged(nameof(MdbxDefaultVaultSummaryText));
+        OnPropertyChanged(nameof(MdbxWorkingCopySummaryText));
+        OnPropertyChanged(nameof(MdbxRemoteSummaryText));
+        OnPropertyChanged(nameof(MdbxSyncDiagnosticsSummaryText));
+        OnPropertyChanged(nameof(MdbxCachePolicyText));
         OnPropertyChanged(nameof(MdbxLocalSourceStatusText));
         OnPropertyChanged(nameof(MdbxWebDavSourceStatusText));
         OnPropertyChanged(nameof(MdbxOneDriveSourceStatusText));
         OnPropertyChanged(nameof(MdbxRuntimeSummaryText));
         OnPropertyChanged(nameof(MdbxSecuritySummaryText));
+        RefreshMdbxHealthItems();
+        RefreshSyncHealthItems();
+    }
+
+    private void RaiseSyncPageState()
+    {
+        OnPropertyChanged(nameof(WebDavConnectionStatusText));
+        OnPropertyChanged(nameof(SyncStatusSummaryText));
+        OnPropertyChanged(nameof(SyncConfigurationSummaryText));
+        OnPropertyChanged(nameof(SyncRecoverySummaryText));
+        OnPropertyChanged(nameof(OneDriveConnectionStatusText));
+        RefreshSyncHealthItems();
+    }
+
+    private void RefreshMdbxHealthItems()
+    {
+        MdbxHealthItems.Clear();
+        MdbxHealthItems.Add(new SyncHealthDisplayItem(
+            _localization.Get("MdbxDefaultVault"),
+            MdbxDefaultVaultSummaryText,
+            MdbxSecuritySummaryText));
+        MdbxHealthItems.Add(new SyncHealthDisplayItem(
+            _localization.Get("MdbxWorkingCopies"),
+            _localization.Format("MdbxWorkingCopyCountFormat", MdbxWorkingCopyCount),
+            MdbxWorkingCopySummaryText));
+        MdbxHealthItems.Add(new SyncHealthDisplayItem(
+            _localization.Get("MdbxRemoteSources"),
+            _localization.Format("MdbxRemoteSourceCountFormat", MdbxRemoteDatabaseCount),
+            MdbxRemoteSummaryText));
+        MdbxHealthItems.Add(new SyncHealthDisplayItem(
+            _localization.Get("MdbxDiagnostics"),
+            HasMdbxSyncErrors ? _localization.Get("NeedsAttention") : _localization.Get("Available"),
+            MdbxSyncDiagnosticsSummaryText));
+        OnPropertyChanged(nameof(MdbxHealthItems));
+    }
+
+    private void RefreshSyncHealthItems()
+    {
+        SyncHealthItems.Clear();
+        SyncHealthItems.Add(new SyncHealthDisplayItem(
+            _localization.WebDav,
+            WebDavEnabled ? BuildWebDavSourceStatus() : _localization.Get("Disabled"),
+            WebDavConnectionStatusText));
+        SyncHealthItems.Add(new SyncHealthDisplayItem(
+            _localization.Get("RemoteSync"),
+            WebDavEnabled ? _localization.Get("Enabled") : _localization.Get("LocalOnly"),
+            SyncConfigurationSummaryText));
+        SyncHealthItems.Add(new SyncHealthDisplayItem(
+            _localization.Get("BackupHistory"),
+            WebDavBackupHistoryCountText,
+            SyncRecoverySummaryText));
+        SyncHealthItems.Add(new SyncHealthDisplayItem(
+            _localization.OneDrive,
+            OneDriveConnectionStatusText,
+            _localization.Get("OneDriveBoundaryDescription")));
+        SyncHealthItems.Add(new SyncHealthDisplayItem(
+            _localization.MdbxVaults,
+            MdbxDatabaseCountText,
+            MdbxSyncDiagnosticsSummaryText));
+        OnPropertyChanged(nameof(SyncHealthItems));
     }
 
     private MdbxDatabaseDisplayItem ToMdbxDisplayItem(LocalMdbxDatabase database)
@@ -4997,6 +6377,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var remotePath = isLocal
             ? _localization.Get("LocalOnly")
             : string.IsNullOrWhiteSpace(database.FilePath) ? _localization.Get("NotConfigured") : database.FilePath;
+        var workingCopyStatus = HasMdbxWorkingCopy(database)
+            ? _localization.Get("MdbxWorkingCopyReady")
+            : _localization.Get("MdbxWorkingCopyMissing");
+        var remoteStatus = isLocal
+            ? _localization.Get("LocalOnly")
+            : _localization.Format("MdbxRemoteStatusFormat", source, remotePath);
+        var cachePath = string.IsNullOrWhiteSpace(database.CacheCopyPath)
+            ? _localization.Get("NotConfigured")
+            : database.CacheCopyPath;
+        var lastSyncError = string.IsNullOrWhiteSpace(database.LastSyncError)
+            ? _localization.Get("MdbxNoSyncErrors")
+            : database.LastSyncError!;
 
         return new MdbxDatabaseDisplayItem(
             database,
@@ -5011,6 +6403,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
             database.LastSyncedAt is null ? _localization.Get("Never") : FormatLocalDate(database.LastSyncedAt.Value),
             LocalizeSyncStatus(database.LastSyncStatus),
             string.IsNullOrWhiteSpace(database.Description) ? _localization.Get("MdbxNoDescription") : database.Description,
+            workingCopyStatus,
+            remoteStatus,
+            cachePath,
+            lastSyncError,
+            !string.IsNullOrWhiteSpace(database.LastSyncError),
             database.IsDefault,
             isLocal,
             !isLocal);
@@ -5019,10 +6416,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private static bool IsLocalMdbxDatabase(LocalMdbxDatabase database) =>
         database.StorageLocation is MdbxStorageLocation.Internal or MdbxStorageLocation.External;
 
+    private static bool HasMdbxWorkingCopy(LocalMdbxDatabase database) =>
+        !string.IsNullOrWhiteSpace(database.WorkingCopyPath) ||
+        (database.StorageLocation is MdbxStorageLocation.Internal or MdbxStorageLocation.External &&
+            !string.IsNullOrWhiteSpace(database.FilePath));
+
+    private static bool HasPendingMdbxSync(LocalMdbxDatabase database) =>
+        database.LastSyncStatus is SyncStatus.Pending or SyncStatus.PendingUpload or SyncStatus.Syncing or SyncStatus.RemoteChanged;
+
+    private static bool HasMdbxSyncIssue(LocalMdbxDatabase database) =>
+        database.LastSyncStatus is SyncStatus.Failed or SyncStatus.Conflict ||
+        !string.IsNullOrWhiteSpace(database.LastSyncError);
+
     private static string BuildMdbxWorkingCopyPath(string fileName)
     {
-        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Monica by Avalonia", "mdbx");
-        return Path.Combine(root, fileName);
+        return MonicaAppDataPaths.GetPath(Path.Combine("mdbx", fileName));
     }
 
     private async Task<LocalMdbxDatabase> CreateRemoteMdbxMetadataAsync(
@@ -5048,6 +6456,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void RefreshVaultSources()
     {
+        var selectedName = SelectedVaultSource?.DisplayName;
+        var selectedKind = SelectedVaultSource?.Kind;
         VaultSources.Clear();
         VaultSources.Add(new VaultSourceDisplayItem(
             _localization.LocalDatabase,
@@ -5119,6 +6529,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 pendingCount > 0 ? _localization.Get("Pending") : _localization.Get("Available")));
         }
 
+        SelectedVaultSource =
+            VaultSources.FirstOrDefault(item =>
+                string.Equals(item.DisplayName, selectedName, StringComparison.Ordinal) &&
+                string.Equals(item.Kind, selectedKind, StringComparison.Ordinal)) ??
+            VaultSources.FirstOrDefault();
+
         OnPropertyChanged(nameof(VaultSourceCountText));
     }
 
@@ -5163,8 +6579,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void RaiseWebDavBackupHistoryState()
     {
+        if (SelectedWebDavBackupHistoryItem is not null &&
+            !WebDavBackupHistory.Contains(SelectedWebDavBackupHistoryItem))
+        {
+            SelectedWebDavBackupHistoryItem = WebDavBackupHistory.FirstOrDefault();
+        }
+
         OnPropertyChanged(nameof(WebDavBackupHistoryCountText));
         OnPropertyChanged(nameof(HasWebDavBackupHistory));
+        OnPropertyChanged(nameof(HasSelectedWebDavBackupHistoryItem));
+        RaiseSyncPageState();
     }
 
     private static string ExtractWebDavFileName(string path)
@@ -5245,6 +6669,44 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(AreAllFilteredPasswordsSelected));
     }
 
+    private void RefreshPasswordSelectionStateFromPasswords()
+    {
+        _selectedPasswordCount = Passwords.Count(item => item.IsSelected);
+        RaisePasswordSelectionState();
+    }
+
+    private void UpdatePasswordSelectionsInBatch(Action updateSelections)
+    {
+        var wasSuppressed = _suppressPasswordSelectionStateNotifications;
+        _suppressPasswordSelectionStateNotifications = true;
+        try
+        {
+            updateSelections();
+        }
+        finally
+        {
+            _suppressPasswordSelectionStateNotifications = wasSuppressed;
+        }
+
+        if (!wasSuppressed)
+        {
+            RefreshPasswordSelectionStateFromPasswords();
+        }
+    }
+
+    private void RaisePasswordFilterState()
+    {
+        OnPropertyChanged(nameof(HasPasswordFilters));
+        OnPropertyChanged(nameof(PasswordFilterSummaryText));
+    }
+
+    private void RaisePasswordFolderFilterCollections()
+    {
+        OnPropertyChanged(nameof(SystemPasswordFolderFilters));
+        OnPropertyChanged(nameof(RegularPasswordFolderFilters));
+        OnPropertyChanged(nameof(HasRegularPasswordFolderFilters));
+    }
+
     private void RaiseTotpSelectionState()
     {
         OnPropertyChanged(nameof(SelectedTotpCount));
@@ -5259,11 +6721,32 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(HasSelectedWalletItems));
     }
 
+    private IReadOnlyList<PasswordEntry> GetFilteredPasswords()
+    {
+        if (_filteredPasswordsDirty)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            _filteredPasswords = ApplyPasswordSort(Passwords.Where(MatchesPasswordFilters)).ToArray();
+            AppDiagnostics.Info($"Rebuild filtered password list completed in {stopwatch.ElapsedMilliseconds} ms. count={_filteredPasswords.Count}");
+            _filteredPasswordsDirty = false;
+        }
+
+        return _filteredPasswords;
+    }
+
+    private void RaiseFilteredPasswordsChanged()
+    {
+        _filteredPasswordsDirty = true;
+        OnPropertyChanged(nameof(FilteredPasswords));
+    }
+
     private void RefreshPasswordFilters()
     {
-        OnPropertyChanged(nameof(FilteredPasswords));
+        RefreshPasswordFolderFilters();
+        RaiseFilteredPasswordsChanged();
         OnPropertyChanged(nameof(FilteredArchivedPasswords));
         OnPropertyChanged(nameof(FilteredDeletedPasswords));
+        RaisePasswordFilterState();
         RaisePasswordSelectionState();
         ReconcileSelectedPasswordDetails();
     }
@@ -5287,6 +6770,24 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         if (e.PropertyName == nameof(PasswordEntry.IsSelected))
         {
+            if (_suppressPasswordSelectionStateNotifications)
+            {
+                return;
+            }
+
+            if (sender is PasswordEntry entry)
+            {
+                if (Passwords.Contains(entry))
+                {
+                    var delta = entry.IsSelected ? 1 : -1;
+                    _selectedPasswordCount = Math.Clamp(_selectedPasswordCount + delta, 0, Passwords.Count);
+                }
+                else
+                {
+                    _selectedPasswordCount = Passwords.Count(item => item.IsSelected);
+                }
+            }
+
             RaisePasswordSelectionState();
         }
     }
@@ -5397,7 +6898,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
             .ToArray();
     }
 
-    private static string BuildQuickAccessSubtitle(PasswordEntry entry)
+    private static string BuildQuickAccessSubtitle(PasswordEntry entry) => BuildPasswordSubtitle(entry);
+
+    private static string BuildPasswordSubtitle(PasswordEntry entry)
     {
         return string.IsNullOrWhiteSpace(entry.Website)
             ? entry.Username
@@ -5451,6 +6954,19 @@ public sealed partial class MainWindowViewModel : ObservableObject
         return string.IsNullOrEmpty(text) ? "\uffff" : text;
     }
 
+    private string GetPasswordSortLabel(string value)
+    {
+        return value switch
+        {
+            "title-asc" => SortTitleText,
+            "website-asc" => SortWebsiteText,
+            "username-asc" => SortUsernameText,
+            "created-desc" => SortCreatedText,
+            "favorites-first" => SortFavoritesText,
+            _ => SortUpdatedText
+        };
+    }
+
     private Category? GetSelectedPasswordFolderCategory()
     {
         var selectedId = SelectedPasswordFolderFilter?.Id;
@@ -5461,28 +6977,170 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void RefreshPasswordFolderFilters(long? preferredCategoryId = null)
     {
-        var selectedId = preferredCategoryId ?? SelectedPasswordFolderFilter?.Id;
-        PasswordFolderFilters.Clear();
-        PasswordFolderFilters.Add(new PasswordFolderFilterChoice(null, _localization.Get("AllFolders"), Passwords.Count));
-        foreach (var category in Categories.OrderBy(item => item.SortOrder).ThenBy(item => item.Name))
+        if (preferredCategoryId is > 0)
         {
-            PasswordFolderFilters.Add(new PasswordFolderFilterChoice(
-                category.Id,
-                category.Name,
-                Passwords.Count(password => password.CategoryId == category.Id)));
+            var preferredCategory = Categories.FirstOrDefault(category => category.Id == preferredCategoryId.Value);
+            if (preferredCategory is not null)
+            {
+                ExpandPasswordFolderPath(preferredCategory.Name);
+            }
+        }
+
+        var selectedKey = preferredCategoryId is not null
+            ? CategorySelectionKey(preferredCategoryId.Value)
+            : SelectedPasswordFolderFilter?.SelectionKey;
+        var folderCountPasswords = Passwords.Where(MatchesPasswordNonFolderFilters).ToArray();
+        PasswordFolderFilters.Clear();
+        PasswordFolderFilters.Add(new PasswordFolderFilterChoice(
+            null,
+            _localization.Get("AllFolders"),
+            folderCountPasswords.Length,
+            IsSystemNode: true,
+            SelectionKey: "system:all"));
+        PasswordFolderFilters.Add(new PasswordFolderFilterChoice(
+            -2,
+            _localization.Get("QuickFilterFavorite"),
+            folderCountPasswords.Count(password => password.IsFavorite),
+            IsSystemNode: true,
+            SelectionKey: "system:favorites"));
+
+        foreach (var root in BuildPasswordFolderTree(folderCountPasswords))
+        {
+            AddVisiblePasswordFolder(root);
         }
 
         PasswordFolderFilters.Add(new PasswordFolderFilterChoice(
             -1,
             _localization.Get("NoFolder"),
-            Passwords.Count(password => password.CategoryId is null)));
+            folderCountPasswords.Count(password => password.CategoryId is null),
+            IsSystemNode: true,
+            SelectionKey: "system:none"));
 
         SelectedPasswordFolderFilter =
-            PasswordFolderFilters.FirstOrDefault(item => item.Id == selectedId) ??
+            PasswordFolderFilters.FirstOrDefault(item => string.Equals(item.SelectionKey, selectedKey, StringComparison.OrdinalIgnoreCase)) ??
+            PasswordFolderFilters.FirstOrDefault(item => item.Id == preferredCategoryId) ??
             PasswordFolderFilters.FirstOrDefault();
-        OnPropertyChanged(nameof(FilteredPasswords));
+        RaiseFilteredPasswordsChanged();
         OnPropertyChanged(nameof(CanManageSelectedPasswordFolder));
+        RaisePasswordFolderFilterCollections();
+        RaisePasswordFilterState();
     }
+
+    private IReadOnlyList<PasswordFolderTreeNode> BuildPasswordFolderTree(IReadOnlyList<PasswordEntry> folderCountPasswords)
+    {
+        var roots = new List<PasswordFolderTreeNode>();
+        var nodes = new Dictionary<string, PasswordFolderTreeNode>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var category in Categories.OrderBy(item => item.SortOrder).ThenBy(item => item.Name))
+        {
+            var pathParts = SplitFolderPath(category.Name);
+            if (pathParts.Length == 0)
+            {
+                pathParts = [category.Name];
+            }
+
+            PasswordFolderTreeNode? parent = null;
+            for (var index = 0; index < pathParts.Length; index++)
+            {
+                var key = string.Join("/", pathParts.Take(index + 1));
+                if (!nodes.TryGetValue(key, out var node))
+                {
+                    node = new PasswordFolderTreeNode(key, pathParts[index], index);
+                    nodes[key] = node;
+                    if (parent is null)
+                    {
+                        roots.Add(node);
+                    }
+                    else
+                    {
+                        parent.Children.Add(node);
+                    }
+                }
+
+                if (index == pathParts.Length - 1)
+                {
+                    node.Category = category;
+                    node.ExactCount = folderCountPasswords.Count(password => password.CategoryId == category.Id);
+                }
+
+                parent = node;
+            }
+        }
+
+        foreach (var root in roots)
+        {
+            UpdatePasswordFolderDescendantCount(root);
+        }
+
+        SortPasswordFolderNodes(roots);
+        return roots;
+    }
+
+    private static int UpdatePasswordFolderDescendantCount(PasswordFolderTreeNode node)
+    {
+        node.DescendantCount = node.ExactCount + node.Children.Sum(UpdatePasswordFolderDescendantCount);
+        return node.DescendantCount;
+    }
+
+    private static void SortPasswordFolderNodes(List<PasswordFolderTreeNode> nodes)
+    {
+        nodes.Sort((left, right) =>
+        {
+            var leftSort = left.Category?.SortOrder ?? int.MaxValue;
+            var rightSort = right.Category?.SortOrder ?? int.MaxValue;
+            var sortCompare = leftSort.CompareTo(rightSort);
+            return sortCompare != 0
+                ? sortCompare
+                : string.Compare(left.DisplayName, right.DisplayName, StringComparison.CurrentCultureIgnoreCase);
+        });
+
+        foreach (var node in nodes)
+        {
+            SortPasswordFolderNodes(node.Children);
+        }
+    }
+
+    private void AddVisiblePasswordFolder(PasswordFolderTreeNode node)
+    {
+        var hasChildren = node.Children.Count > 0;
+        var isExpanded = hasChildren && !_collapsedPasswordFolderKeys.Contains(PathSelectionKey(node.Key));
+        PasswordFolderFilters.Add(new PasswordFolderFilterChoice(
+            node.Category?.Id,
+            node.Category?.Name ?? node.Key,
+            node.DescendantCount,
+            node.DisplayName,
+            node.Level,
+            SelectionKey: node.Category is null ? PathSelectionKey(node.Key) : CategorySelectionKey(node.Category.Id),
+            PathPrefix: node.Key,
+            HasChildren: hasChildren,
+            IsExpanded: isExpanded));
+
+        if (!isExpanded)
+        {
+            return;
+        }
+
+        foreach (var child in node.Children)
+        {
+            AddVisiblePasswordFolder(child);
+        }
+    }
+
+    private static string CategorySelectionKey(long id) => $"category:{id}";
+
+    private static string PathSelectionKey(string path) => $"path:{path}";
+
+    private void ExpandPasswordFolderPath(string name)
+    {
+        var pathParts = SplitFolderPath(name);
+        for (var index = 0; index < pathParts.Length - 1; index++)
+        {
+            _collapsedPasswordFolderKeys.Remove(PathSelectionKey(string.Join("/", pathParts.Take(index + 1))));
+        }
+    }
+
+    private static string[] SplitFolderPath(string value) =>
+        value.Split(['/', '\\'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
     private string ProtectPassword(string password)
     {
@@ -5575,16 +7233,28 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    private async Task DeletePasswordHistoryAsync(PasswordHistoryEntry entry)
+    private async Task<bool> DeletePasswordHistoryAsync(PasswordHistoryEntry entry)
     {
+        if (!await ConfirmDeletePasswordHistoryAsync())
+        {
+            return false;
+        }
+
         await _repository.DeletePasswordHistoryAsync(entry.Id);
         StatusMessage = _localization.Get("DeletedPasswordHistoryEntry");
+        return true;
     }
 
-    private async Task ClearPasswordHistoryAsync(long entryId)
+    private async Task<bool> ClearPasswordHistoryAsync(long entryId)
     {
+        if (!await ConfirmClearPasswordHistoryAsync())
+        {
+            return false;
+        }
+
         await _repository.ClearPasswordHistoryAsync(entryId);
         StatusMessage = _localization.Get("ClearedPasswordHistory");
+        return true;
     }
 
     private PasswordEntry ClonePasswordForExport(PasswordEntry source, bool includeCategory = true)
@@ -6021,7 +7691,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             Passwords.Insert(0, updatedEntries[index]);
         }
 
-        RaisePasswordSelectionState();
+        RefreshPasswordSelectionStateFromPasswords();
     }
 
     private static IReadOnlyList<CustomField> BindCustomFields(long entryId, IReadOnlyList<CustomField> fields)
@@ -6060,13 +7730,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
             : [];
     }
 
-    private IReadOnlyList<Attachment> GetGroupAttachments(PasswordEntry entry, IReadOnlyList<PasswordEntry> siblings)
+    private IReadOnlyList<Attachment> GetGroupAttachments(PasswordEntry entry, IReadOnlyList<PasswordEntry> siblings) =>
+        GetGroupAttachments(entry, siblings, _passwordAttachments);
+
+    private static IReadOnlyList<Attachment> GetGroupAttachments(
+        PasswordEntry entry,
+        IReadOnlyList<PasswordEntry> siblings,
+        IReadOnlyDictionary<long, IReadOnlyList<Attachment>> attachmentsByPasswordId)
     {
         var siblingIds = siblings.Count == 0
             ? [entry.Id]
             : siblings.Select(item => item.Id).ToArray();
         return siblingIds
-            .SelectMany(GetPasswordAttachments)
+            .SelectMany(id => attachmentsByPasswordId.TryGetValue(id, out var attachments)
+                ? attachments
+                : Array.Empty<Attachment>())
             .OrderByDescending(attachment => attachment.CreatedAt)
             .ThenByDescending(attachment => attachment.Id)
             .ToArray();
@@ -6108,8 +7786,31 @@ public sealed partial class MainWindowViewModel : ObservableObject
         return [];
     }
 
+    private IReadOnlyList<CustomField> GetCachedGroupCustomFields(PasswordEntry entry, IReadOnlyList<PasswordEntry> siblings) =>
+        GetCachedGroupCustomFields(entry, siblings, _passwordCustomFields);
+
+    private static IReadOnlyList<CustomField> GetCachedGroupCustomFields(
+        PasswordEntry entry,
+        IReadOnlyList<PasswordEntry> siblings,
+        IReadOnlyDictionary<long, IReadOnlyList<CustomField>> customFieldsByPasswordId)
+    {
+        foreach (var candidate in siblings)
+        {
+            var fields = customFieldsByPasswordId.TryGetValue(candidate.Id, out var cachedFields)
+                ? cachedFields
+                : [];
+            if (fields.Count > 0 || candidate.Id == entry.Id)
+            {
+                return fields;
+            }
+        }
+
+        return [];
+    }
+
     private async Task LoadTotpItemsAsync(IReadOnlyList<SecureItem>? preloadedTotps = null)
     {
+        var selectedId = SelectedTotpItem?.Id;
         var storedTotps = preloadedTotps ?? await AppDiagnostics.MeasureAsync(
             "Load TOTP secure items",
             () => _repository.GetSecureItemsAsync(VaultItemType.Totp));
@@ -6142,6 +7843,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         ReplaceItems(TotpItems, nextItems);
+        SelectedTotpItem = nextItems.FirstOrDefault(item => item.Id == selectedId)
+            ?? nextItems.FirstOrDefault();
+        OnPropertyChanged(nameof(HasTotpItems));
         RaiseTotpSelectionState();
     }
 
@@ -6153,8 +7857,22 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ApplyTimelineLogs(logs);
     }
 
+    private async Task LoadTimelineDeferredAsync()
+    {
+        try
+        {
+            await LoadTimelineAsync();
+        }
+        catch (Exception ex)
+        {
+            AppDiagnostics.Error("Deferred timeline load failed", ex);
+        }
+    }
+
     private void ApplyTimelineLogs(IReadOnlyList<OperationLog> logs)
     {
+        var selectedStamp = SelectedTimelineEntry?.TimestampText;
+        var selectedTitle = SelectedTimelineEntry?.Title;
         var entries = logs
             .Select(log => new TimelineEntry(
                 string.IsNullOrWhiteSpace(log.ItemTitle) ? _localization.Get("Untitled") : log.ItemTitle,
@@ -6164,8 +7882,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 log.ItemType))
             .ToArray();
         ReplaceItems(TimelineEntries, entries);
+        SelectedTimelineEntry =
+            TimelineEntries.FirstOrDefault(item =>
+                string.Equals(item.TimestampText, selectedStamp, StringComparison.Ordinal) &&
+                string.Equals(item.Title, selectedTitle, StringComparison.Ordinal)) ??
+            TimelineEntries.FirstOrDefault();
 
         OnPropertyChanged(nameof(TimelineCountText));
+        OnPropertyChanged(nameof(HasTimelineEntries));
     }
 
     [RelayCommand]
@@ -6272,7 +7996,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
             SecurityIssueItems.Add(issue);
         }
 
+        SelectedSecurityIssue =
+            SecurityIssueItems.FirstOrDefault(item => item.PasswordId == SelectedSecurityIssue?.PasswordId) ??
+            SecurityIssueItems.FirstOrDefault();
+
         OnPropertyChanged(nameof(SecurityIssueCountText));
+        OnPropertyChanged(nameof(HasSecurityIssues));
     }
 
     private async Task RefreshSecurityAnalysisDeferredAsync()
@@ -6354,7 +8083,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
             count++;
             SecurityIssueItems.Add(new SecurityIssueItem(
                 snapshot.Entry.Title,
-                _localization.Format("WeakPasswordIssueFormat", strength.Label),
+                _localization.Format(
+                    "WeakPasswordIssueFormat",
+                    PasswordStrengthLocalization.Label(_localization, strength.Label)),
                 _localization.WeakPasswords,
                 _localization.Get("HighSeverity"),
                 snapshot.Entry.Id,
@@ -6575,6 +8306,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         TotpItems.Remove(item);
         item.IsSelected = false;
+        if (SelectedTotpItem?.Id == item.Id)
+        {
+            SelectedTotpItem = TotpItems.FirstOrDefault();
+        }
+
         await _repository.LogAsync(new OperationLog
         {
             ItemType = "TOTP",
@@ -6693,21 +8429,39 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private bool MatchesPasswordFilters(PasswordEntry item)
     {
-        if (SelectedPasswordFolderFilter?.Id is { } folderId)
+        if (SelectedPasswordFolderFilter is { } folderFilter)
         {
-            if (folderId == -1)
-            {
-                if (item.CategoryId is not null)
-                {
-                    return false;
-                }
-            }
-            else if (item.CategoryId != folderId)
+            if (!MatchesPasswordFolderFilter(item, folderFilter))
             {
                 return false;
             }
         }
 
+        return MatchesPasswordNonFolderFilters(item);
+    }
+
+    private bool MatchesPasswordFolderFilter(PasswordEntry item, PasswordFolderFilterChoice folderFilter)
+    {
+        if (folderFilter.Id == -2)
+        {
+            return item.IsFavorite;
+        }
+
+        if (folderFilter.Id == -1)
+        {
+            return item.CategoryId is null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(folderFilter.PathPrefix))
+        {
+            return PasswordMatchesFolderPath(item, folderFilter.PathPrefix);
+        }
+
+        return folderFilter.Id is not { } folderId || item.CategoryId == folderId;
+    }
+
+    private bool MatchesPasswordNonFolderFilters(PasswordEntry item)
+    {
         if (QuickFilterFavorite && !item.IsFavorite)
         {
             return false;
@@ -6748,7 +8502,28 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return false;
         }
 
-        return MatchesPasswordSearch(item, SearchText);
+        return MatchesPasswordSearch(item, GetEffectivePasswordSearchQuery());
+    }
+
+    private string GetEffectivePasswordSearchQuery() =>
+        string.IsNullOrWhiteSpace(PasswordSearchQuery) ? SearchText : PasswordSearchQuery;
+
+    private bool PasswordMatchesFolderPath(PasswordEntry item, string pathPrefix)
+    {
+        if (item.CategoryId is null)
+        {
+            return false;
+        }
+
+        var category = Categories.FirstOrDefault(category => category.Id == item.CategoryId.Value);
+        if (category is null)
+        {
+            return false;
+        }
+
+        var categoryPath = string.Join("/", SplitFolderPath(category.Name));
+        return string.Equals(categoryPath, pathPrefix, StringComparison.OrdinalIgnoreCase) ||
+               categoryPath.StartsWith($"{pathPrefix}/", StringComparison.OrdinalIgnoreCase);
     }
 
     private bool MatchesPasswordSearch(PasswordEntry item, string query)
@@ -6843,18 +8618,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return $"replica:{entry.ReplicaGroupId.Trim()}";
         }
 
-        var sourceKey = entry.BitwardenCipherId is not null
-            ? $"bw:{entry.BitwardenVaultId}:{entry.BitwardenCipherId}"
-            : entry.BitwardenVaultId is not null
-                ? $"bw-local:{entry.BitwardenVaultId}:{entry.BitwardenFolderId ?? ""}"
-                : entry.KeepassDatabaseId is not null
-                    ? $"kp:{entry.KeepassDatabaseId}:{entry.KeepassGroupPath ?? ""}"
-                    : $"local:{entry.CategoryId?.ToString() ?? "root"}";
-        return string.Join("|",
-            sourceKey,
-            entry.Title.Trim().ToLowerInvariant(),
-            NormalizeWebsiteForSiblingGroupKey(entry.Website),
-            entry.Username.Trim().ToLowerInvariant());
+        if (entry.BitwardenVaultId is not null && !string.IsNullOrWhiteSpace(entry.BitwardenCipherId))
+        {
+            return $"bw:{entry.BitwardenVaultId}:{entry.BitwardenCipherId.Trim()}";
+        }
+
+        if (entry.KeepassDatabaseId is not null && !string.IsNullOrWhiteSpace(entry.KeepassEntryUuid))
+        {
+            return $"kp:{entry.KeepassDatabaseId}:{entry.KeepassEntryUuid.Trim()}";
+        }
+
+        return $"entry:{entry.Id}";
     }
 
     private static string NormalizeWebsiteForSiblingGroupKey(string value)
@@ -7022,6 +8796,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         UpdateSettings(update);
         OnPropertyChanged(nameof(WebDavBackupOptionsSummaryText));
+        RaiseSyncPageState();
     }
 
     private void QueueSaveSettings()
@@ -7058,12 +8833,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(LoginButtonText));
         OnPropertyChanged(nameof(GeneratorLengthText));
         OnPropertyChanged(nameof(GeneratedPasswordStrengthText));
-        OnPropertyChanged(nameof(WebDavConnectionStatusText));
         OnPropertyChanged(nameof(LegacyVaultImportPromptText));
         OnPropertyChanged(nameof(WebDavBackupOptionsSummaryText));
+        RaiseSyncPageState();
         RefreshVaultSources();
         RaiseWebDavBackupHistoryState();
         RaisePasswordQuickAccessState();
+        RaisePasswordFilterState();
+        OnPropertyChanged(nameof(ClearPasswordFiltersText));
+        RaisePasswordSortText();
         RaiseCounts();
         OnPropertyChanged(nameof(SecurityIssueCountText));
         OnPropertyChanged(nameof(NotePreviewMarkdown));
@@ -7139,7 +8917,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 .Select(question => new SettingsChoice(question.Id, question.Text))
                 .ToArray());
 
-        OnPropertyChanged(nameof(FilteredPasswords));
+        RaiseFilteredPasswordsChanged();
     }
 
     private static void ReplaceOptions(ObservableCollection<SettingsChoice> target, params SettingsChoice[] choices)
@@ -7149,6 +8927,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             target.Add(choice);
         }
+    }
+
+    private void RaisePasswordSortText()
+    {
+        OnPropertyChanged(nameof(SortUpdatedText));
+        OnPropertyChanged(nameof(SortTitleText));
+        OnPropertyChanged(nameof(SortWebsiteText));
+        OnPropertyChanged(nameof(SortUsernameText));
+        OnPropertyChanged(nameof(SortCreatedText));
+        OnPropertyChanged(nameof(SortFavoritesText));
+        OnPropertyChanged(nameof(PasswordSortButtonTip));
     }
 
     private void RefreshPlatformIntegrationCapabilities()
@@ -7383,12 +9172,89 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        Application.Current.RequestedThemeVariant = theme switch
+        var themeVariant = theme switch
         {
             "light" => ThemeVariant.Light,
             "dark" => ThemeVariant.Dark,
             _ => ThemeVariant.Default
         };
+        Application.Current.RequestedThemeVariant = themeVariant;
+        if (Application.Current.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime { MainWindow: { } mainWindow })
+        {
+            mainWindow.RequestedThemeVariant = themeVariant;
+        }
+
+        var useDarkTheme = themeVariant == ThemeVariant.Dark ||
+            themeVariant == ThemeVariant.Default && Application.Current.ActualThemeVariant == ThemeVariant.Dark;
+        ApplyMonicaThemeResources(Application.Current.Resources, useDarkTheme);
+    }
+
+    private static void ApplyMonicaThemeResources(IResourceDictionary resources, bool useDarkTheme)
+    {
+        var colors = useDarkTheme
+            ? new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["LayerFillColorDefaultBrush"] = "#202020",
+                ["LayerFillColorAltBrush"] = "#1B1B1B",
+                ["LayerFillColorSubtleBrush"] = "#242424",
+                ["CardBackgroundBrush"] = "#2B2B2B",
+                ["CardBorderBrush"] = "#3A3A3A",
+                ["CardBackgroundFillColorDefaultBrush"] = "#2B2B2B",
+                ["CardBackgroundFillColorSecondaryBrush"] = "#252525",
+                ["CardStrokeColorDefaultBrush"] = "#3A3A3A",
+                ["DividerStrokeColorDefaultBrush"] = "#343434",
+                ["ControlFillColorDefaultBrush"] = "#323232",
+                ["ControlFillColorSecondaryBrush"] = "#383838",
+                ["ControlFillColorTertiaryBrush"] = "#424242",
+                ["ListViewItemBackgroundPointerOver"] = "#343434",
+                ["ListViewItemBackgroundSelected"] = "#3A3A3A",
+                ["ListViewItemBackgroundSelectedPointerOver"] = "#414141",
+                ["TextFillColorPrimaryBrush"] = "#F3F3F3",
+                ["TextFillColorSecondaryBrush"] = "#C9C9C9",
+                ["TextFillColorTertiaryBrush"] = "#9D9D9D",
+                ["AccentFillColorDefaultBrush"] = "#60CDFF",
+                ["AccentFillColorSecondaryBrush"] = "#3AADE2",
+                ["AccentFillColorTertiaryBrush"] = "#275A70",
+                ["AccentTextFillColorPrimaryBrush"] = "#9CDCFE",
+                ["SystemFillColorCautionBrush"] = "#FCE100",
+                ["SystemFillColorCriticalBrush"] = "#FF99A4",
+                ["MutedTextBrush"] = "#99000000",
+                ["OverlayFillColorDefaultBrush"] = "#A0000000"
+            }
+            : new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["LayerFillColorDefaultBrush"] = "#F7F7F7",
+                ["LayerFillColorAltBrush"] = "#FFFFFF",
+                ["LayerFillColorSubtleBrush"] = "#EFEFEF",
+                ["CardBackgroundBrush"] = "#FFFFFF",
+                ["CardBorderBrush"] = "#D8D8D8",
+                ["CardBackgroundFillColorDefaultBrush"] = "#FFFFFF",
+                ["CardBackgroundFillColorSecondaryBrush"] = "#F4F4F4",
+                ["CardStrokeColorDefaultBrush"] = "#D8D8D8",
+                ["DividerStrokeColorDefaultBrush"] = "#E0E0E0",
+                ["ControlFillColorDefaultBrush"] = "#FFFFFF",
+                ["ControlFillColorSecondaryBrush"] = "#F4F4F4",
+                ["ControlFillColorTertiaryBrush"] = "#EAEAEA",
+                ["ListViewItemBackgroundPointerOver"] = "#F0F6FC",
+                ["ListViewItemBackgroundSelected"] = "#E7F2FF",
+                ["ListViewItemBackgroundSelectedPointerOver"] = "#DCEEFF",
+                ["TextFillColorPrimaryBrush"] = "#1A1A1A",
+                ["TextFillColorSecondaryBrush"] = "#5C5C5C",
+                ["TextFillColorTertiaryBrush"] = "#767676",
+                ["AccentFillColorDefaultBrush"] = "#0078D4",
+                ["AccentFillColorSecondaryBrush"] = "#106EBE",
+                ["AccentFillColorTertiaryBrush"] = "#D7EBF8",
+                ["AccentTextFillColorPrimaryBrush"] = "#005A9E",
+                ["SystemFillColorCautionBrush"] = "#FCE100",
+                ["SystemFillColorCriticalBrush"] = "#C42B1C",
+                ["MutedTextBrush"] = "#66000000",
+                ["OverlayFillColorDefaultBrush"] = "#66000000"
+            };
+
+        foreach (var (key, color) in colors)
+        {
+            resources[key] = new SolidColorBrush(Color.Parse(color));
+        }
     }
 
     private void LoadNoteIntoEditor(SecureItem? item)
@@ -7710,6 +9576,57 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private static bool IsCjkCharacter(char character) =>
         character is >= '\u3400' and <= '\u9fff' or >= '\uf900' and <= '\ufaff';
 
+    private static string BuildNotePreviewMarkdown(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return "";
+        }
+
+        var builder = new StringBuilder(content.Length);
+        var inCodeFence = false;
+        var lines = content.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        for (var index = 0; index < lines.Length; index++)
+        {
+            var line = lines[index];
+            if (line.TrimStart().StartsWith("```", StringComparison.Ordinal))
+            {
+                inCodeFence = !inCodeFence;
+                AppendPreviewMarkdownLine(builder, line, index < lines.Length - 1);
+                continue;
+            }
+
+            var previewLine = inCodeFence
+                ? line
+                : MarkdownLinkRegex().Replace(line, match =>
+                {
+                    var isImage = match.Groups[1].Value == "!";
+                    var label = match.Groups[2].Value.Trim();
+                    var target = match.Groups[3].Value.Trim();
+                    if (!isImage || !target.StartsWith("monica-image://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return match.Value;
+                    }
+
+                    return string.IsNullOrWhiteSpace(label)
+                        ? "[图片附件]"
+                        : $"[图片附件: {label}]";
+                });
+            AppendPreviewMarkdownLine(builder, previewLine, index < lines.Length - 1);
+        }
+
+        return builder.ToString();
+    }
+
+    private static void AppendPreviewMarkdownLine(StringBuilder builder, string line, bool appendLineBreak)
+    {
+        builder.Append(line);
+        if (appendLineBreak)
+        {
+            builder.Append('\n');
+        }
+    }
+
     private static IReadOnlyList<NoteOutlineItem> BuildNoteOutlineItems(string content)
     {
         if (string.IsNullOrWhiteSpace(content))
@@ -7876,6 +9793,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 ? WalletItems.FirstOrDefault(item => item.Id == SelectedWalletItem.Id)
                 : null;
         }
+
+        SelectedWalletItem ??= WalletItems.FirstOrDefault();
     }
 
     private void ResetNoteEditor()

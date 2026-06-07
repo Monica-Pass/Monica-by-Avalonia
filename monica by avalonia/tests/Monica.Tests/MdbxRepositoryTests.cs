@@ -123,6 +123,44 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
+    public async Task Repository_reuses_mdbx_read_caches_across_vault_load_queries()
+    {
+        var repository = CreateRepository(out var bridge);
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "Cached load",
+            Username = "cache-user",
+            Password = "secret"
+        };
+        var note = new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = "Cached note",
+            Notes = "note"
+        };
+        await repository.SavePasswordAsync(password);
+        await repository.SaveSecureItemAsync(note);
+
+        bridge.OpenedPaths.Clear();
+        var passwords = await repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true);
+        var passwordIds = passwords.Select(item => item.Id).ToArray();
+        var fields = await repository.GetCustomFieldsByEntryIdsAsync(passwordIds);
+        var attachments = await repository.GetAttachmentsByOwnerIdsAsync("PASSWORD", passwordIds);
+        var secureItems = await repository.GetSecureItemsAsync();
+        var categories = await repository.GetCategoriesAsync();
+
+        Assert.Single(passwords);
+        Assert.Empty(fields.Values.SelectMany(item => item));
+        Assert.Empty(attachments.Values.SelectMany(item => item));
+        Assert.Single(secureItems);
+        Assert.Empty(categories);
+        Assert.True(
+            bridge.OpenedPaths.Count <= 3,
+            $"Expected the vault-load read path to reuse MDBX read caches, but MDBX was opened {bridge.OpenedPaths.Count} times.");
+    }
+
+    [Fact]
     public async Task Repository_cascades_password_delete_restore_to_mdbx_bound_totps_when_sqlite_cache_is_missing()
     {
         var repository = CreateRepository(out var bridge, out var sqliteRepository);

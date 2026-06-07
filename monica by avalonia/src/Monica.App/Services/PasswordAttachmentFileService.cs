@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Monica.Core.Models;
 using Monica.Core.Services;
+using Monica.Data;
 using Monica.Data.Services;
 
 namespace Monica.App.Services;
@@ -131,13 +132,7 @@ public sealed class PasswordAttachmentFileService(
 
     private static string GetAttachmentRoot()
     {
-        var basePath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        if (string.IsNullOrWhiteSpace(basePath))
-        {
-            basePath = AppContext.BaseDirectory;
-        }
-
-        return Path.Combine(basePath, "Monica by Avalonia", AttachmentFolderName);
+        return MonicaAppDataPaths.GetPath(AttachmentFolderName);
     }
 
     private static string InferContentType(string fileName)

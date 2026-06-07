@@ -283,6 +283,29 @@ public sealed class AppSettingsTests
     }
 
     [Fact]
+    public async Task ViewModel_updates_mdbx_management_summaries()
+    {
+        var viewModel = CreateViewModel(GetTempPath());
+        viewModel.WebDavEnabled = true;
+        viewModel.WebDavRemotePath = "/Monica";
+        viewModel.OneDriveEnabled = true;
+
+        await viewModel.CreateMdbxVaultCommand.ExecuteAsync(null);
+        await viewModel.CreateWebDavMdbxVaultCommand.ExecuteAsync(null);
+        await viewModel.CreateOneDriveMdbxVaultCommand.ExecuteAsync(null);
+
+        Assert.Equal(3, viewModel.MdbxDatabaseItems.Count);
+        Assert.Equal(3, viewModel.MdbxWorkingCopyCount);
+        Assert.Equal(3, viewModel.MdbxOfflineCopyCount);
+        Assert.Equal(2, viewModel.MdbxRemoteDatabaseCount);
+        Assert.Equal(2, viewModel.MdbxPendingSyncCount);
+        Assert.Contains(viewModel.L.Get("MdbxWorkingCopies"), viewModel.MdbxHealthItems.Select(item => item.Label));
+        Assert.Contains(viewModel.L.Get("MdbxRemoteSources"), viewModel.MdbxHealthItems.Select(item => item.Label));
+        Assert.All(viewModel.MdbxDatabaseItems, item => Assert.Equal(viewModel.L.Get("MdbxWorkingCopyReady"), item.WorkingCopyStatus));
+        Assert.Equal(viewModel.L.Format("MdbxPendingSyncFormat", 2), viewModel.MdbxSyncDiagnosticsSummaryText);
+    }
+
+    [Fact]
     public async Task ViewModel_opening_remote_mdbx_preserves_sync_status()
     {
         var viewModel = CreateViewModel(GetTempPath());
@@ -299,6 +322,29 @@ public sealed class AppSettingsTests
         Assert.Equal(SyncStatus.Synced, viewModel.MdbxDatabases.Single().LastSyncStatus);
         Assert.True(viewModel.MdbxDatabases.Single().LastAccessedAt >= previousAccessedAt);
         Assert.Equal(viewModel.L.Get("Synced"), Assert.Single(viewModel.VaultSources, source => source.DisplayName == item.Name).SyncStatus);
+    }
+
+    [Fact]
+    public async Task ViewModel_tests_webdav_connection_without_changing_backup_history()
+    {
+        var webDav = new CapturingWebDavBackupService(
+        [
+            new RemoteFileEntry("/Monica/monica_backup_20260607.monica.json", false, 120, DateTimeOffset.UtcNow)
+        ]);
+        var viewModel = CreateViewModel(GetTempPath(), webDavBackupService: webDav);
+        viewModel.WebDavEnabled = true;
+        viewModel.WebDavServerUrl = "https://dav.example.com";
+        viewModel.WebDavUsername = "user";
+        viewModel.WebDavPassword = "secret";
+        viewModel.WebDavRemotePath = "/Monica";
+
+        await viewModel.TestWebDavConnectionCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, webDav.ListCallCount);
+        Assert.Equal("/Monica", webDav.LastProfile?.RootPath);
+        Assert.Empty(viewModel.WebDavBackupHistory);
+        Assert.Contains("1", viewModel.StatusMessage, StringComparison.Ordinal);
+        Assert.Contains(viewModel.SyncHealthItems, item => item.Label == viewModel.L.WebDav);
     }
 
     [Fact]
@@ -907,12 +953,14 @@ public sealed class AppSettingsTests
     {
         public WebDavProfile? LastProfile { get; private set; }
         public string DeletedPath { get; private set; } = "";
+        public int ListCallCount { get; private set; }
 
         public string NormalizeRemotePath(string rootPath, string relativePath) => relativePath;
 
         public Task<IReadOnlyList<RemoteFileEntry>> ListAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default)
         {
             LastProfile = profile;
+            ListCallCount++;
             return Task.FromResult(entries);
         }
 
@@ -986,9 +1034,9 @@ public sealed class AppSettingsTests
             IReadOnlyList<CustomField> customFields,
             IReadOnlyList<PasswordHistoryDisplayItem> passwordHistory,
             Func<PasswordEntry, Task>? addAttachment,
-            Func<Attachment, Task>? deleteAttachment,
-            Func<PasswordHistoryEntry, Task>? deletePasswordHistory,
-            Func<long, Task>? clearPasswordHistory,
+            Func<Attachment, Task<bool>>? deleteAttachment,
+            Func<PasswordHistoryEntry, Task<bool>>? deletePasswordHistory,
+            Func<long, Task<bool>>? clearPasswordHistory,
             CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
     }

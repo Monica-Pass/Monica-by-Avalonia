@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Collections.Concurrent;
 using Monica.App.Services;
 using Monica.App.ViewModels;
 using Monica.Core.ImportExport;
@@ -8,6 +10,7 @@ using Monica.Data.Repositories;
 using Monica.Data.Services;
 using Monica.Platform.Services;
 using Avalonia;
+using Avalonia.Threading;
 using Microsoft.Data.Sqlite;
 
 namespace Monica.Tests;
@@ -278,6 +281,8 @@ public sealed class PasswordManagementTests
         });
         Assert.Equal("first-secret", harness.Crypto.DecryptString(saved[0].Password));
         Assert.Equal("second-secret", harness.Crypto.DecryptString(saved[1].Password));
+        Assert.NotNull(saved[0].ReplicaGroupId);
+        Assert.Equal(saved[0].ReplicaGroupId, saved[1].ReplicaGroupId);
         Assert.Equal(2, harness.ViewModel.Passwords.Count);
     }
 
@@ -292,13 +297,15 @@ public sealed class PasswordManagementTests
         {
             new CustomField { Title = "Old field", Value = "old", IsProtected = false }
         };
+        const string replicaGroupId = "test-edit-group";
         var entry = new PasswordEntry
         {
             Title = "Old",
             Website = "https://old.example",
             Username = "old-user",
             Password = harness.Crypto.EncryptString("old-secret"),
-            Notes = "old notes"
+            Notes = "old notes",
+            ReplicaGroupId = replicaGroupId
         };
         await harness.Repository.SavePasswordAsync(entry);
         await harness.Repository.ReplaceCustomFieldsAsync(entry.Id, existingFields);
@@ -307,7 +314,8 @@ public sealed class PasswordManagementTests
             Title = "Old",
             Website = "https://old.example",
             Username = "old-user",
-            Password = harness.Crypto.EncryptString("sibling-secret")
+            Password = harness.Crypto.EncryptString("sibling-secret"),
+            ReplicaGroupId = replicaGroupId
         };
         await harness.Repository.SavePasswordAsync(sibling);
         var removedSibling = new PasswordEntry
@@ -315,7 +323,8 @@ public sealed class PasswordManagementTests
             Title = "Old",
             Website = "https://old.example",
             Username = "old-user",
-            Password = harness.Crypto.EncryptString("remove-me")
+            Password = harness.Crypto.EncryptString("remove-me"),
+            ReplicaGroupId = replicaGroupId
         };
         await harness.Repository.SavePasswordAsync(removedSibling);
         await harness.ViewModel.LoadAsync();
@@ -474,8 +483,9 @@ public sealed class PasswordManagementTests
     public async Task ViewModel_delete_password_moves_entire_password_group_to_recycle_bin()
     {
         var harness = CreateHarness();
-        var first = new PasswordEntry { Title = "Grouped", Website = "example.com", Username = "dev", Password = "one" };
-        var second = new PasswordEntry { Title = "Grouped", Website = "example.com", Username = "dev", Password = "two" };
+        const string replicaGroupId = "test-delete-group";
+        var first = new PasswordEntry { Title = "Grouped", Website = "example.com", Username = "dev", Password = "one", ReplicaGroupId = replicaGroupId };
+        var second = new PasswordEntry { Title = "Grouped", Website = "example.com", Username = "dev", Password = "two", ReplicaGroupId = replicaGroupId };
         await harness.Repository.SavePasswordAsync(first);
         await harness.Repository.SavePasswordAsync(second);
         await harness.ViewModel.LoadAsync();
@@ -489,23 +499,46 @@ public sealed class PasswordManagementTests
     }
 
     [Fact]
+    public async Task ViewModel_similar_passwords_without_replica_group_stay_independent()
+    {
+        var harness = CreateHarness();
+        var first = new PasswordEntry { Title = "GitHub", Website = "github.com", Username = "dev", Password = "one" };
+        var second = new PasswordEntry { Title = "GitHub", Website = "github.com", Username = "dev", Password = "two" };
+        await harness.Repository.SavePasswordAsync(first);
+        await harness.Repository.SavePasswordAsync(second);
+        await harness.ViewModel.LoadAsync();
+
+        await harness.ViewModel.ShowPasswordDetailsCommand.ExecuteAsync(harness.ViewModel.Passwords.First(item => item.Id == first.Id));
+
+        Assert.Single(harness.DetailDialog.LastSiblings);
+
+        await harness.ViewModel.DeletePasswordCommand.ExecuteAsync(harness.ViewModel.Passwords.First(item => item.Id == first.Id));
+
+        Assert.Single(harness.ViewModel.Passwords, item => item.Id == second.Id);
+        Assert.Single(harness.ViewModel.DeletedPasswords, item => item.Id == first.Id);
+    }
+
+    [Fact]
     public async Task ViewModel_restores_and_permanently_deletes_password_group_from_recycle_bin()
     {
         var harness = CreateHarness();
+        const string replicaGroupId = "test-recycle-group";
         var first = new PasswordEntry
         {
             Title = "Recoverable",
             Website = "example.com",
             Username = "dev",
             Password = "one",
-            AuthenticatorKey = "JBSWY3DPEHPK3PXP"
+            AuthenticatorKey = "JBSWY3DPEHPK3PXP",
+            ReplicaGroupId = replicaGroupId
         };
         var second = new PasswordEntry
         {
             Title = "Recoverable",
             Website = "example.com",
             Username = "dev",
-            Password = "two"
+            Password = "two",
+            ReplicaGroupId = replicaGroupId
         };
         await harness.Repository.SavePasswordAsync(first);
         await harness.Repository.SavePasswordAsync(second);
@@ -546,23 +579,115 @@ public sealed class PasswordManagementTests
     }
 
     [Fact]
+    public async Task Dangerous_delete_commands_do_not_mutate_when_confirmation_is_cancelled()
+    {
+        var confirmation = new FakeConfirmationDialogService(result: false);
+        var webDav = new FakeWebDavBackupService();
+        var harness = CreateHarness(webDavBackupService: webDav, confirmationDialogService: confirmation);
+        harness.Crypto.InitializeSession("correct password", new byte[16]);
+
+        var deletedPassword = new PasswordEntry { Title = "Deleted login", Password = harness.Crypto.EncryptString("deleted-secret") };
+        var attachmentPassword = new PasswordEntry { Title = "Attachment login", Password = harness.Crypto.EncryptString("attachment-secret") };
+        await harness.Repository.SavePasswordAsync(deletedPassword);
+        await harness.Repository.SavePasswordAsync(attachmentPassword);
+        await harness.Repository.SoftDeletePasswordAsync(deletedPassword.Id);
+        await harness.Repository.SaveAttachmentAsync(new Attachment
+        {
+            OwnerType = "PASSWORD",
+            OwnerId = attachmentPassword.Id,
+            FileName = "cancelled.txt",
+            StoragePath = "secure_attachments/cancelled.enc",
+            SizeBytes = 64
+        });
+        await harness.Repository.SavePasswordHistoryAsync(new PasswordHistoryEntry
+        {
+            EntryId = attachmentPassword.Id,
+            Password = harness.Crypto.EncryptString("old-secret"),
+            LastUsedAt = DateTimeOffset.UtcNow
+        });
+
+        var note = new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = "Cancel note",
+            ItemData = NoteContentCodec.BuildSavePayload("Cancel note", "body", "", true).ItemData
+        };
+        var totp = new SecureItem
+        {
+            ItemType = VaultItemType.Totp,
+            Title = "Cancel totp",
+            ItemData = TotpDataResolver.ToItemData(TotpDataResolver.FromAuthenticatorKey("JBSWY3DPEHPK3PXP")!)
+        };
+        var wallet = new SecureItem
+        {
+            ItemType = VaultItemType.BankCard,
+            Title = "Cancel card",
+            ItemData = WalletItemDataCodec.EncodeBankCard(new BankCardWalletData
+            {
+                CardNumber = "4111111111111111",
+                CardholderName = "Monica"
+            })
+        };
+        await harness.Repository.SaveSecureItemAsync(note);
+        await harness.Repository.SaveSecureItemAsync(totp);
+        await harness.Repository.SaveSecureItemAsync(wallet);
+
+        await harness.ViewModel.LoadAsync();
+        await webDav.UploadTextAsync(new WebDavProfile { RootPath = "/Monica" }, "cancelled.monica.json", "{}");
+        harness.ViewModel.WebDavEnabled = true;
+        harness.ViewModel.WebDavServerUrl = "https://dav.example.com/";
+        harness.ViewModel.WebDavRemotePath = "/Monica";
+        await harness.ViewModel.LoadWebDavBackupsCommand.ExecuteAsync(null);
+
+        await harness.ViewModel.DeletePasswordPermanentlyCommand.ExecuteAsync(harness.ViewModel.DeletedPasswords.Single(item => item.Id == deletedPassword.Id));
+        await harness.ViewModel.DeleteNoteCommand.ExecuteAsync(harness.ViewModel.NoteItems.Single(item => item.Id == note.Id));
+        await harness.ViewModel.DeleteTotpCommand.ExecuteAsync(harness.ViewModel.TotpItems.Single(item => item.Id == totp.Id));
+        await harness.ViewModel.DeleteWalletItemCommand.ExecuteAsync(harness.ViewModel.WalletItems.Single(item => item.Id == wallet.Id));
+        await harness.ViewModel.DeleteWebDavBackupCommand.ExecuteAsync(harness.ViewModel.WebDavBackupHistory.Single());
+
+        await harness.ViewModel.ShowPasswordDetailsCommand.ExecuteAsync(harness.ViewModel.Passwords.Single(item => item.Id == attachmentPassword.Id));
+        var details = Assert.IsType<PasswordDetailViewModel>(harness.DetailDialog.LastDetails);
+        var attachment = Assert.Single(details.Attachments);
+        var history = Assert.Single(details.PasswordHistory);
+        await details.DeleteAttachmentCommand.ExecuteAsync(attachment);
+        await details.DeleteHistoryPasswordCommand.ExecuteAsync(history);
+        await details.ClearPasswordHistoryCommand.ExecuteAsync(null);
+
+        Assert.Single(harness.ViewModel.DeletedPasswords, item => item.Id == deletedPassword.Id);
+        Assert.Single(await harness.Repository.GetPasswordsAsync(includeDeleted: true), item => item.Id == deletedPassword.Id && item.IsDeleted);
+        Assert.Single(await harness.Repository.GetSecureItemsAsync(VaultItemType.Note), item => item.Id == note.Id);
+        Assert.Single(await harness.Repository.GetSecureItemsAsync(VaultItemType.Totp), item => item.Id == totp.Id);
+        Assert.Single(await harness.Repository.GetSecureItemsAsync(VaultItemType.BankCard), item => item.Id == wallet.Id);
+        Assert.Single(harness.ViewModel.WebDavBackupHistory);
+        Assert.Empty(webDav.DeletedPaths);
+        Assert.Single(await harness.Repository.GetAttachmentsAsync("PASSWORD", attachmentPassword.Id));
+        Assert.Single(await harness.Repository.GetPasswordHistoryAsync(attachmentPassword.Id));
+        Assert.Single(details.Attachments);
+        Assert.Single(details.PasswordHistory);
+        Assert.Equal(8, confirmation.Requests.Count);
+    }
+
+    [Fact]
     public async Task ViewModel_archives_unarchives_and_deletes_password_group()
     {
         var harness = CreateHarness();
+        const string replicaGroupId = "test-archive-group";
         var first = new PasswordEntry
         {
             Title = "Archive me",
             Website = "archive.example",
             Username = "dev",
             Password = "one",
-            AuthenticatorKey = "JBSWY3DPEHPK3PXP"
+            AuthenticatorKey = "JBSWY3DPEHPK3PXP",
+            ReplicaGroupId = replicaGroupId
         };
         var second = new PasswordEntry
         {
             Title = "Archive me",
             Website = "archive.example",
             Username = "dev",
-            Password = "two"
+            Password = "two",
+            ReplicaGroupId = replicaGroupId
         };
         await harness.Repository.SavePasswordAsync(first);
         await harness.Repository.SavePasswordAsync(second);
@@ -620,6 +745,47 @@ public sealed class PasswordManagementTests
     }
 
     [Fact]
+    public async Task ViewModel_refreshes_archive_and_recycle_items_source_after_load()
+    {
+        var harness = CreateHarness();
+        await harness.Repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "Archived on load",
+            Website = "archive-load.example",
+            Username = "archived-user",
+            Password = "one",
+            IsArchived = true,
+            ArchivedAt = DateTimeOffset.UtcNow
+        });
+        await harness.Repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "Deleted on load",
+            Website = "deleted-load.example",
+            Username = "deleted-user",
+            Password = "two",
+            IsDeleted = true,
+            DeletedAt = DateTimeOffset.UtcNow
+        });
+        var changed = new HashSet<string>();
+        harness.ViewModel.PropertyChanged += (_, e) =>
+        {
+            if (!string.IsNullOrWhiteSpace(e.PropertyName))
+            {
+                changed.Add(e.PropertyName);
+            }
+        };
+
+        await harness.ViewModel.LoadAsync();
+
+        Assert.Single(harness.ViewModel.FilteredArchivedPasswords);
+        Assert.Single(harness.ViewModel.FilteredDeletedPasswords);
+        Assert.Contains(nameof(MainWindowViewModel.FilteredArchivedPasswords), changed);
+        Assert.Contains(nameof(MainWindowViewModel.FilteredDeletedPasswords), changed);
+        Assert.Contains(nameof(MainWindowViewModel.HasFilteredArchivedPasswords), changed);
+        Assert.Contains(nameof(MainWindowViewModel.HasFilteredDeletedPasswords), changed);
+    }
+
+    [Fact]
     public async Task ViewModel_archives_selected_passwords()
     {
         var harness = CreateHarness();
@@ -649,6 +815,7 @@ public sealed class PasswordManagementTests
         var harness = CreateHarness();
         harness.Crypto.InitializeSession("correct password", new byte[16]);
         var category = new Category { Name = "Engineering", SortOrder = 1 };
+        const string replicaGroupId = "test-detail-group";
         await harness.Repository.SaveCategoryAsync(category);
         var notePayload = NoteContentCodec.BuildSavePayload("Recovery", "backup codes stored here", "ops", true);
         var note = new SecureItem
@@ -674,7 +841,8 @@ public sealed class PasswordManagementTests
             PasskeyBindings = """[{"rpId":"github.com"}]""",
             CustomIconType = "SIMPLE_ICON",
             CustomIconValue = "github",
-            CustomIconUpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            CustomIconUpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            ReplicaGroupId = replicaGroupId
         };
         await harness.Repository.SavePasswordAsync(first);
         var second = new PasswordEntry
@@ -684,7 +852,8 @@ public sealed class PasswordManagementTests
             Username = "dev@example.com",
             Password = harness.Crypto.EncryptString("backup-secret"),
             CategoryId = category.Id,
-            BoundNoteId = note.Id
+            BoundNoteId = note.Id,
+            ReplicaGroupId = replicaGroupId
         };
         await harness.Repository.SavePasswordAsync(second);
         await harness.Repository.ReplaceCustomFieldsAsync(first.Id, [
@@ -714,7 +883,20 @@ public sealed class PasswordManagementTests
         Assert.Contains(fields, field => field.Label == "Backup code" && field.DisplayValue == "654321" && field.IsSensitive);
         Assert.Empty(details.PasswordHistory);
 
+        var customFieldsGroup = details.Groups.Single(group => group.Title == details.L.CustomFields);
+        Assert.False(customFieldsGroup.IsExpanded);
+        Assert.Empty(customFieldsGroup.VisibleFields);
+        customFieldsGroup.IsExpanded = true;
+        Assert.Contains(customFieldsGroup.VisibleFields, field => field.Label == "Backup code");
+
         var backupCode = fields.Single(field => field.Label == "Backup code");
+        Assert.True(backupCode.CanToggleVisibility);
+        Assert.Equal("************", backupCode.DisplayText);
+        details.ToggleFieldVisibilityCommand.Execute(backupCode);
+        Assert.Equal("654321", backupCode.DisplayText);
+        details.ToggleFieldVisibilityCommand.Execute(backupCode);
+        Assert.Equal("************", backupCode.DisplayText);
+
         await details.CopyFieldCommand.ExecuteAsync(backupCode);
 
         Assert.Equal("654321", harness.Clipboard.Text);
@@ -771,6 +953,378 @@ public sealed class PasswordManagementTests
         await details.ClearPasswordHistoryCommand.ExecuteAsync(null);
         Assert.Empty(await harness.Repository.GetPasswordHistoryAsync(entry.Id));
         Assert.False(details.HasPasswordHistory);
+    }
+
+    [Fact]
+    public void ViewModel_embedded_password_details_keeps_latest_selection_when_switching_quickly()
+    {
+        RunOnStaThread(ViewModelEmbeddedPasswordDetailsKeepsLatestSelectionWhenSwitchingQuicklyCore);
+    }
+
+    private static void ViewModelEmbeddedPasswordDetailsKeepsLatestSelectionWhenSwitchingQuicklyCore()
+    {
+        var harness = CreateHarness();
+        harness.Crypto.InitializeSession("correct password", new byte[16]);
+        var first = new PasswordEntry
+        {
+            Title = "First",
+            Username = "first-user",
+            Password = harness.Crypto.EncryptString("first-secret")
+        };
+        var second = new PasswordEntry
+        {
+            Title = "Second",
+            Username = "second-user",
+            Password = harness.Crypto.EncryptString("second-secret")
+        };
+        harness.Repository.SavePasswordAsync(first).GetAwaiter().GetResult();
+        harness.Repository.SavePasswordAsync(second).GetAwaiter().GetResult();
+        harness.ViewModel.LoadAsync().GetAwaiter().GetResult();
+
+        var displayedFirst = harness.ViewModel.Passwords.Single(item => item.Id == first.Id);
+        var displayedSecond = harness.ViewModel.Passwords.Single(item => item.Id == second.Id);
+
+        harness.ViewModel.SelectedPassword = displayedFirst;
+        Assert.False(harness.ViewModel.IsLoadingSelectedPasswordDetails);
+        Assert.Null(harness.ViewModel.SelectedPasswordDetails);
+
+        harness.ViewModel.SelectedPassword = displayedSecond;
+
+        WaitForCondition(() =>
+            harness.ViewModel.SelectedPasswordDetails?.Entry.Id == second.Id &&
+            !harness.ViewModel.IsLoadingSelectedPasswordDetails);
+
+        Assert.Equal(second.Id, harness.ViewModel.SelectedPassword?.Id);
+        Assert.Equal(second.Id, harness.ViewModel.SelectedPasswordDetails?.Entry.Id);
+        Assert.DoesNotContain(
+            harness.ViewModel.SelectedPasswordDetails!.Groups.SelectMany(group => group.Fields),
+            field => field.DisplayValue == "first-secret");
+
+        Thread.Sleep(150);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(second.Id, harness.ViewModel.SelectedPasswordDetails?.Entry.Id);
+    }
+
+    [Fact]
+    public void ViewModel_embedded_password_details_handles_many_rapid_selection_changes()
+    {
+        RunOnStaThread(ViewModelEmbeddedPasswordDetailsHandlesManyRapidSelectionChangesCore);
+    }
+
+    private static void ViewModelEmbeddedPasswordDetailsHandlesManyRapidSelectionChangesCore()
+    {
+        var harness = CreateHarness();
+        harness.Crypto.InitializeSession("correct password", new byte[16]);
+        const int passwordCount = 30;
+        for (var index = 0; index < passwordCount; index++)
+        {
+            var entry = new PasswordEntry
+            {
+                Title = $"Account {index:00}",
+                Website = $"https://account-{index:00}.example.com",
+                Username = $"user-{index:00}",
+                Password = harness.Crypto.EncryptString($"secret-{index:00}")
+            };
+            harness.Repository.SavePasswordAsync(entry).GetAwaiter().GetResult();
+            if (index % 3 == 0)
+            {
+                harness.Repository.ReplaceCustomFieldsAsync(entry.Id,
+                [
+                    new CustomField { Title = "Recovery", Value = $"field-{index:00}", SortOrder = 0 }
+                ]).GetAwaiter().GetResult();
+            }
+
+            if (index % 4 == 0)
+            {
+                harness.Repository.SaveAttachmentAsync(new Attachment
+                {
+                    OwnerType = "PASSWORD",
+                    OwnerId = entry.Id,
+                    FileName = $"file-{index:00}.txt",
+                    ContentType = "text/plain",
+                    StoragePath = $"secure_attachments/file-{index:00}.enc",
+                    SizeBytes = 128 + index
+                }).GetAwaiter().GetResult();
+            }
+
+            if (index % 5 == 0)
+            {
+                harness.Repository.SavePasswordHistoryAsync(new PasswordHistoryEntry
+                {
+                    EntryId = entry.Id,
+                    Password = harness.Crypto.EncryptString($"old-secret-{index:00}"),
+                    LastUsedAt = DateTimeOffset.UtcNow.AddMinutes(-index)
+                }).GetAwaiter().GetResult();
+            }
+        }
+
+        harness.ViewModel.LoadAsync().GetAwaiter().GetResult();
+        var visiblePasswords = harness.ViewModel.Passwords
+            .OrderBy(item => item.Title, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(passwordCount, visiblePasswords.Length);
+
+        var stopwatch = Stopwatch.StartNew();
+        foreach (var entry in visiblePasswords)
+        {
+            harness.ViewModel.SelectedPassword = entry;
+            Assert.Equal(entry.Id, harness.ViewModel.SelectedPassword?.Id);
+        }
+
+        stopwatch.Stop();
+        Assert.True(stopwatch.ElapsedMilliseconds < 500, $"Rapid selection setters took {stopwatch.ElapsedMilliseconds} ms.");
+
+        var latest = visiblePasswords[^1];
+        WaitForCondition(() =>
+            harness.ViewModel.SelectedPasswordDetails?.Entry.Id == latest.Id &&
+            !harness.ViewModel.IsLoadingSelectedPasswordDetails);
+
+        Assert.Equal(latest.Id, harness.ViewModel.SelectedPassword?.Id);
+        Assert.Equal(latest.Id, harness.ViewModel.SelectedPasswordDetails?.Entry.Id);
+        Assert.Contains(
+            harness.ViewModel.SelectedPasswordDetails!.Groups.SelectMany(group => group.Fields),
+            field => field.DisplayValue == "secret-29");
+
+        Thread.Sleep(200);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(latest.Id, harness.ViewModel.SelectedPasswordDetails?.Entry.Id);
+        Assert.DoesNotContain(
+            harness.ViewModel.SelectedPasswordDetails!.Groups.SelectMany(group => group.Fields),
+            field => field.DisplayValue.StartsWith("secret-", StringComparison.Ordinal) &&
+                field.DisplayValue != "secret-29");
+    }
+
+    [Fact]
+    public void ViewModel_selecting_password_with_large_detail_payload_returns_immediately()
+    {
+        RunOnStaThread(ViewModelSelectingPasswordWithLargeDetailPayloadReturnsImmediatelyCore);
+    }
+
+    private static void ViewModelSelectingPasswordWithLargeDetailPayloadReturnsImmediatelyCore()
+    {
+        var harness = CreateHarness();
+        harness.Crypto.InitializeSession("correct password", new byte[16]);
+        var entry = new PasswordEntry
+        {
+            Title = "Large detail account",
+            Website = "https://large.example.com",
+            Username = "large-user",
+            Password = harness.Crypto.EncryptString("large-secret"),
+            Notes = new string('n', 4000),
+            SshKeyData = new string('s', 4000)
+        };
+        harness.Repository.SavePasswordAsync(entry).GetAwaiter().GetResult();
+
+        harness.Repository.ReplaceCustomFieldsAsync(
+            entry.Id,
+            Enumerable.Range(0, 150)
+                .Select(index => new CustomField
+                {
+                    Title = $"Field {index:000}",
+                    Value = $"value-{index:000}",
+                    SortOrder = index
+                })
+                .ToArray()).GetAwaiter().GetResult();
+
+        for (var index = 0; index < 40; index++)
+        {
+            harness.Repository.SaveAttachmentAsync(new Attachment
+            {
+                OwnerType = "PASSWORD",
+                OwnerId = entry.Id,
+                FileName = $"attachment-{index:000}.txt",
+                ContentType = "text/plain",
+                StoragePath = $"secure_attachments/attachment-{index:000}.enc",
+                SizeBytes = 1024 + index
+            }).GetAwaiter().GetResult();
+            harness.Repository.SavePasswordHistoryAsync(new PasswordHistoryEntry
+            {
+                EntryId = entry.Id,
+                Password = harness.Crypto.EncryptString($"history-secret-{index:000}"),
+                LastUsedAt = DateTimeOffset.UtcNow.AddMinutes(-index)
+            }).GetAwaiter().GetResult();
+        }
+
+        harness.ViewModel.LoadAsync().GetAwaiter().GetResult();
+        var displayed = Assert.Single(harness.ViewModel.Passwords);
+
+        var stopwatch = Stopwatch.StartNew();
+        harness.ViewModel.SelectedPassword = displayed;
+        stopwatch.Stop();
+
+        Assert.True(stopwatch.ElapsedMilliseconds < 100, $"Selecting a large detail payload took {stopwatch.ElapsedMilliseconds} ms.");
+        Assert.Equal(displayed.Id, harness.ViewModel.SelectedPassword?.Id);
+        Assert.False(harness.ViewModel.IsLoadingSelectedPasswordDetails);
+        Assert.Null(harness.ViewModel.SelectedPasswordDetails);
+
+        WaitForCondition(() =>
+            harness.ViewModel.SelectedPasswordDetails?.Entry.Id == displayed.Id &&
+            !harness.ViewModel.IsLoadingSelectedPasswordDetails);
+
+        Assert.Contains(
+            harness.ViewModel.SelectedPasswordDetails!.Groups.SelectMany(group => group.Fields),
+            field => field.DisplayValue == "large-secret");
+    }
+
+    [Fact]
+    public void ViewModel_switching_password_after_details_rendered_keeps_selection_setter_light()
+    {
+        RunOnStaThread(ViewModelSwitchingPasswordAfterDetailsRenderedKeepsSelectionSetterLightCore);
+    }
+
+    private static void ViewModelSwitchingPasswordAfterDetailsRenderedKeepsSelectionSetterLightCore()
+    {
+        var harness = CreateHarness();
+        harness.Crypto.InitializeSession("correct password", new byte[16]);
+        var first = new PasswordEntry
+        {
+            Title = "Rendered detail",
+            Website = "https://rendered.example.com",
+            Username = "rendered-user",
+            Password = harness.Crypto.EncryptString("rendered-secret"),
+            Notes = new string('a', 3000)
+        };
+        var second = new PasswordEntry
+        {
+            Title = "Next detail",
+            Website = "https://next.example.com",
+            Username = "next-user",
+            Password = harness.Crypto.EncryptString("next-secret")
+        };
+        harness.Repository.SavePasswordAsync(first).GetAwaiter().GetResult();
+        harness.Repository.SavePasswordAsync(second).GetAwaiter().GetResult();
+        harness.Repository.ReplaceCustomFieldsAsync(
+            first.Id,
+            Enumerable.Range(0, 120)
+                .Select(index => new CustomField
+                {
+                    Title = $"Rendered field {index:000}",
+                    Value = $"rendered-value-{index:000}",
+                    SortOrder = index
+                })
+                .ToArray()).GetAwaiter().GetResult();
+        harness.ViewModel.LoadAsync().GetAwaiter().GetResult();
+
+        var displayedFirst = harness.ViewModel.Passwords.Single(item => item.Id == first.Id);
+        var displayedSecond = harness.ViewModel.Passwords.Single(item => item.Id == second.Id);
+        harness.ViewModel.SelectedPassword = displayedFirst;
+        WaitForCondition(() =>
+            harness.ViewModel.SelectedPasswordDetails?.Entry.Id == first.Id &&
+            harness.ViewModel.HasCurrentSelectedPasswordDetails);
+        var renderedFirstDetails = harness.ViewModel.SelectedPasswordDetails;
+        Assert.NotNull(renderedFirstDetails);
+
+        var stopwatch = Stopwatch.StartNew();
+        harness.ViewModel.SelectedPassword = displayedSecond;
+        stopwatch.Stop();
+
+        Assert.True(stopwatch.ElapsedMilliseconds < 100, $"Switching away from a rendered detail took {stopwatch.ElapsedMilliseconds} ms.");
+        Assert.Equal(second.Id, harness.ViewModel.SelectedPassword?.Id);
+        Assert.Same(renderedFirstDetails, harness.ViewModel.SelectedPasswordDetails);
+        Assert.False(harness.ViewModel.HasCurrentSelectedPasswordDetails);
+
+        WaitForCondition(() =>
+            harness.ViewModel.SelectedPasswordDetails?.Entry.Id == second.Id &&
+            harness.ViewModel.HasCurrentSelectedPasswordDetails &&
+            !harness.ViewModel.IsLoadingSelectedPasswordDetails);
+
+        Assert.Contains(
+            harness.ViewModel.SelectedPasswordDetails!.Groups.SelectMany(group => group.Fields),
+            field => field.DisplayValue == "next-secret");
+    }
+
+    [Fact]
+    public async Task ViewModel_caches_filtered_passwords_between_filter_changes()
+    {
+        var harness = CreateHarness();
+        const int passwordCount = 200;
+        for (var index = 0; index < passwordCount; index++)
+        {
+            await harness.Repository.SavePasswordAsync(new PasswordEntry
+            {
+                Title = $"Account {index:000}",
+                Website = index % 2 == 0 ? "https://work.example.com" : "https://personal.example.com",
+                Username = $"user-{index:000}",
+                Password = $"secret-{index:000}",
+                IsFavorite = index % 5 == 0,
+                UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-index)
+            });
+        }
+
+        await harness.ViewModel.LoadAsync();
+
+        var firstSnapshot = harness.ViewModel.FilteredPasswords;
+        var secondSnapshot = harness.ViewModel.FilteredPasswords;
+
+        Assert.Same(firstSnapshot, secondSnapshot);
+        Assert.Equal(passwordCount, firstSnapshot.Count);
+
+        harness.ViewModel.SelectedPasswordSort = "title-asc";
+        var sortedSnapshot = harness.ViewModel.FilteredPasswords;
+
+        Assert.NotSame(firstSnapshot, sortedSnapshot);
+        Assert.Same(sortedSnapshot, harness.ViewModel.FilteredPasswords);
+
+        harness.ViewModel.QuickFilterFavorite = true;
+        var favoriteSnapshot = harness.ViewModel.FilteredPasswords;
+
+        Assert.NotSame(sortedSnapshot, favoriteSnapshot);
+        Assert.Same(favoriteSnapshot, harness.ViewModel.FilteredPasswords);
+        Assert.All(favoriteSnapshot, item => Assert.True(item.IsFavorite));
+    }
+
+    [Fact]
+    public async Task ViewModel_batches_password_selection_state_notifications()
+    {
+        var harness = CreateHarness();
+        const int passwordCount = 24;
+        for (var index = 0; index < passwordCount; index++)
+        {
+            await harness.Repository.SavePasswordAsync(new PasswordEntry
+            {
+                Title = $"Account {index:000}",
+                Website = "https://selection.example.com",
+                Username = $"user-{index:000}",
+                Password = $"secret-{index:000}"
+            });
+        }
+
+        await harness.ViewModel.LoadAsync();
+
+        var selectedCountNotifications = 0;
+        var allFilteredNotifications = 0;
+        harness.ViewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MainWindowViewModel.SelectedPasswordCount))
+            {
+                selectedCountNotifications++;
+            }
+
+            if (e.PropertyName == nameof(MainWindowViewModel.AreAllFilteredPasswordsSelected))
+            {
+                allFilteredNotifications++;
+            }
+        };
+
+        harness.ViewModel.AreAllFilteredPasswordsSelected = true;
+
+        Assert.Equal(passwordCount, harness.ViewModel.SelectedPasswordCount);
+        Assert.True(harness.ViewModel.AreAllFilteredPasswordsSelected);
+        Assert.True(selectedCountNotifications <= 2, $"Selecting all raised {selectedCountNotifications} selected-count notifications.");
+        Assert.True(allFilteredNotifications <= 2, $"Selecting all raised {allFilteredNotifications} all-filtered notifications.");
+
+        selectedCountNotifications = 0;
+        allFilteredNotifications = 0;
+
+        harness.ViewModel.ClearPasswordSelectionCommand.Execute(null);
+
+        Assert.Equal(0, harness.ViewModel.SelectedPasswordCount);
+        Assert.False(harness.ViewModel.HasSelectedPasswords);
+        Assert.False(harness.ViewModel.AreAllFilteredPasswordsSelected);
+        Assert.True(selectedCountNotifications <= 2, $"Clearing selection raised {selectedCountNotifications} selected-count notifications.");
+        Assert.True(allFilteredNotifications <= 2, $"Clearing selection raised {allFilteredNotifications} all-filtered notifications.");
     }
 
     [Fact]
@@ -1178,7 +1732,9 @@ public sealed class PasswordManagementTests
         await harness.Repository.SavePasswordAsync(new PasswordEntry { Title = "Personal Portal", Password = "two" });
         await harness.ViewModel.LoadAsync();
 
-        Assert.Equal(["All folders", "Work", "No folder"], harness.ViewModel.PasswordFolderFilters.Select(item => item.Name).ToArray());
+        Assert.Contains(harness.ViewModel.PasswordFolderFilters, item => item.Name == "All folders");
+        Assert.Contains(harness.ViewModel.PasswordFolderFilters, item => item.Name == "Work");
+        Assert.Contains(harness.ViewModel.PasswordFolderFilters, item => item.Name == "No folder");
         harness.ViewModel.SelectedPasswordFolderFilter = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == work.Id);
         Assert.Equal(["Work Portal"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
 
@@ -1198,6 +1754,59 @@ public sealed class PasswordManagementTests
 
         Assert.Equal(work.Id, harness.ViewModel.SelectedPasswordFolderFilter?.Id);
         Assert.Equal(harness.ViewModel.L.Format("SelectedFolderFormat", "Work"), harness.ViewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task ViewModel_builds_nested_password_folder_tree_and_counts_current_query_scope()
+    {
+        var harness = CreateHarness();
+        var work = new Category { Name = "Work", SortOrder = 1 };
+        var infra = new Category { Name = "Work/Infra", SortOrder = 2 };
+        var prod = new Category { Name = "Work/Infra/Prod", SortOrder = 3 };
+        var personal = new Category { Name = "Personal", SortOrder = 4 };
+        await harness.Repository.SaveCategoryAsync(work);
+        await harness.Repository.SaveCategoryAsync(infra);
+        await harness.Repository.SaveCategoryAsync(prod);
+        await harness.Repository.SaveCategoryAsync(personal);
+        await harness.Repository.SavePasswordAsync(new PasswordEntry { Title = "Work Root", CategoryId = work.Id, Password = "one" });
+        await harness.Repository.SavePasswordAsync(new PasswordEntry { Title = "Infra Portal", CategoryId = infra.Id, Password = "two" });
+        await harness.Repository.SavePasswordAsync(new PasswordEntry { Title = "Prod Portal", CategoryId = prod.Id, Password = "three" });
+        await harness.Repository.SavePasswordAsync(new PasswordEntry { Title = "Personal Prod", CategoryId = personal.Id, Password = "four" });
+        await harness.ViewModel.LoadAsync();
+
+        var workNode = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == work.Id);
+        var infraNode = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == infra.Id);
+        var prodNode = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == prod.Id);
+
+        Assert.Equal(0, workNode.Level);
+        Assert.Equal(1, infraNode.Level);
+        Assert.Equal(2, prodNode.Level);
+        Assert.True(workNode.HasChildren);
+        Assert.Equal(3, workNode.Count);
+        Assert.Equal(2, infraNode.Count);
+        Assert.Equal(1, prodNode.Count);
+
+        harness.ViewModel.SelectedPasswordFolderFilter = workNode;
+        Assert.Equal(
+            ["Prod Portal", "Infra Portal", "Work Root"],
+            harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
+
+        harness.ViewModel.SelectedPasswordFolderFilter = infraNode;
+        Assert.Equal(
+            ["Prod Portal", "Infra Portal"],
+            harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
+
+        harness.ViewModel.PasswordSearchQuery = "Prod";
+        workNode = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == work.Id);
+        infraNode = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == infra.Id);
+        prodNode = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == prod.Id);
+        var personalNode = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == personal.Id);
+
+        Assert.Equal(1, workNode.Count);
+        Assert.Equal(1, infraNode.Count);
+        Assert.Equal(1, prodNode.Count);
+        Assert.Equal(1, personalNode.Count);
+        Assert.Equal(2, harness.ViewModel.PasswordFolderFilters.Single(item => item.SelectionKey == "system:all").Count);
     }
 
     [Fact]
@@ -2173,7 +2782,10 @@ public sealed class PasswordManagementTests
         Assert.DoesNotContain("cached-export-secret", harness.ViewModel.ExportCsvPreview);
     }
 
-    private static PasswordHarness CreateHarness(IPwnedPasswordService? pwnedPasswordService = null, IWebDavBackupService? webDavBackupService = null)
+    private static PasswordHarness CreateHarness(
+        IPwnedPasswordService? pwnedPasswordService = null,
+        IWebDavBackupService? webDavBackupService = null,
+        IConfirmationDialogService? confirmationDialogService = null)
     {
         var databasePath = GetTempDatabasePath();
         var factory = new SqliteConnectionFactory(databasePath);
@@ -2209,10 +2821,11 @@ public sealed class PasswordManagementTests
             new AppSettingsService(GetTempSettingsPath()),
             localization,
             pwnedPasswordService: pwnedPasswordService,
+            confirmationDialogService: confirmationDialogService,
             totpEditorDialogService: totpDialog,
             walletItemEditorDialogService: walletDialog);
 
-        return new PasswordHarness(viewModel, repository, crypto, dialog, detailDialog, categoryPicker, totpDialog, walletDialog, clipboard, attachmentFileService, databasePath);
+        return new PasswordHarness(viewModel, repository, crypto, dialog, detailDialog, categoryPicker, totpDialog, walletDialog, clipboard, attachmentFileService, confirmationDialogService, databasePath);
     }
 
     private static async Task SetPasswordUpdatedAtAsync(string databasePath, long id, DateTimeOffset updatedAt)
@@ -2245,6 +2858,76 @@ public sealed class PasswordManagementTests
         return value.Split(["\r\n", "\n", "\r"], StringSplitOptions.RemoveEmptyEntries);
     }
 
+    private static void WaitForCondition(Func<bool> predicate, int timeoutMilliseconds = 2000)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddMilliseconds(timeoutMilliseconds);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            Dispatcher.UIThread.RunJobs();
+            if (predicate())
+            {
+                return;
+            }
+
+            Thread.Sleep(20);
+        }
+
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(predicate(), "Condition was not satisfied before timeout.");
+    }
+
+    private static void RunOnStaThread(Action action) => SharedStaTestThread.Run(action);
+
+    private static readonly StaTestThread SharedStaTestThread = new();
+
+    private sealed class StaTestThread
+    {
+        private readonly BlockingCollection<StaTestWorkItem> _workItems = [];
+        private readonly Thread _thread;
+
+        public StaTestThread()
+        {
+            _thread = new Thread(RunLoop)
+            {
+                IsBackground = true,
+                Name = "Monica password tests STA"
+            };
+            if (OperatingSystem.IsWindows())
+            {
+                _thread.SetApartmentState(ApartmentState.STA);
+            }
+
+            _thread.Start();
+        }
+
+        public void Run(Action action)
+        {
+            var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _workItems.Add(new StaTestWorkItem(action, completion));
+            Assert.True(completion.Task.Wait(TimeSpan.FromSeconds(10)), "STA test thread timed out.");
+            completion.Task.GetAwaiter().GetResult();
+        }
+
+        private void RunLoop()
+        {
+            _ = Dispatcher.UIThread;
+            foreach (var workItem in _workItems.GetConsumingEnumerable())
+            {
+                try
+                {
+                    workItem.Action();
+                    workItem.Completion.SetResult(null);
+                }
+                catch (Exception ex)
+                {
+                    workItem.Completion.SetException(ex);
+                }
+            }
+        }
+    }
+
+    private sealed record StaTestWorkItem(Action Action, TaskCompletionSource<object?> Completion);
+
     private sealed record PasswordHarness(
         MainWindowViewModel ViewModel,
         IMonicaRepository Repository,
@@ -2256,6 +2939,7 @@ public sealed class PasswordManagementTests
         FakeWalletItemEditorDialogService WalletDialog,
         CapturingClipboardService Clipboard,
         FakePasswordAttachmentFileService Attachments,
+        IConfirmationDialogService? ConfirmationDialog,
         string DatabasePath);
 
     private sealed class CapturingClipboardService : IClipboardService
@@ -2348,6 +3032,7 @@ public sealed class PasswordManagementTests
         public string UploadedPath { get; private set; } = "";
         public string UploadedContent { get; private set; } = "";
         public string DownloadContent { get; init; } = "";
+        public List<string> DeletedPaths { get; } = [];
 
         public string NormalizeRemotePath(string rootPath, string relativePath)
         {
@@ -2373,7 +3058,29 @@ public sealed class PasswordManagementTests
         public Task<string> DownloadTextAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) =>
             Task.FromResult(string.IsNullOrEmpty(DownloadContent) ? UploadedContent : DownloadContent);
 
-        public Task DeleteAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task DeleteAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default)
+        {
+            DeletedPaths.Add(relativePath);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeConfirmationDialogService(bool result = true) : IConfirmationDialogService
+    {
+        public List<(string Title, string Message, string PrimaryButtonText)> Requests { get; } = [];
+
+        public bool Result { get; set; } = result;
+
+        public Task<bool> ConfirmAsync(
+            string title,
+            string message,
+            string primaryButtonText,
+            string? closeButtonText = null,
+            CancellationToken cancellationToken = default)
+        {
+            Requests.Add((title, message, primaryButtonText));
+            return Task.FromResult(Result);
+        }
     }
 
     private sealed class FakePasswordEditorDialogService(
@@ -2504,9 +3211,9 @@ public sealed class PasswordManagementTests
             IReadOnlyList<CustomField> customFields,
             IReadOnlyList<PasswordHistoryDisplayItem> passwordHistory,
             Func<PasswordEntry, Task>? addAttachment,
-            Func<Attachment, Task>? deleteAttachment,
-            Func<PasswordHistoryEntry, Task>? deletePasswordHistory,
-            Func<long, Task>? clearPasswordHistory,
+            Func<Attachment, Task<bool>>? deleteAttachment,
+            Func<PasswordHistoryEntry, Task<bool>>? deletePasswordHistory,
+            Func<long, Task<bool>>? clearPasswordHistory,
             CancellationToken cancellationToken = default)
         {
             LastSiblings = siblings;
