@@ -93,16 +93,16 @@
             <Setter Property="Margin" Value="0,0,4,4" />
         </Style>
         <Style Selector="Button.passwordPrimaryCommand">
-            <Setter Property="MinHeight" Value="36" />
-            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="Padding" Value="10,5" />
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
             <Setter Property="Foreground" Value="#101010" />
         </Style>
         <Style Selector="Button.passwordCommand">
-            <Setter Property="MinWidth" Value="36" />
-            <Setter Property="MinHeight" Value="36" />
-            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="MinWidth" Value="32" />
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="Padding" Value="7,5" />
             <Setter Property="CornerRadius" Value="6" />
         </Style>
         <Style Selector="Button.passwordInlineCommand">
@@ -112,13 +112,35 @@
             <Setter Property="CornerRadius" Value="6" />
         </Style>
         <Style Selector="ToggleButton.passwordFilterChip">
-            <Setter Property="MinWidth" Value="40" />
-            <Setter Property="MinHeight" Value="30" />
-            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="MinWidth" Value="34" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Padding" Value="7,4" />
             <Setter Property="CornerRadius" Value="6" />
         </Style>
+        <Style Selector="ToggleButton.passwordFilterChip:checked">
+            <Setter Property="Background" Value="{DynamicResource AccentFillColorTertiaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+        </Style>
+        <Style Selector="Border.passwordChromeToolbar">
+            <Setter Property="Background" Value="{DynamicResource LayerFillColorSubtleBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="8" />
+        </Style>
+        <Style Selector="Border.passwordFolderStrip">
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="Padding" Value="0,2,0,8" />
+        </Style>
+        <Style Selector="Border.passwordSidebar">
+            <Setter Property="Background" Value="{DynamicResource LayerFillColorSubtleBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="0,0,1,0" />
+            <Setter Property="Padding" Value="10,8" />
+        </Style>
         <Style Selector="ListBox.passwordVaultList ListBoxItem">
-            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Padding" Value="0" />
@@ -130,6 +152,22 @@
             <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
             <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
         </Style>
+        <Style Selector="ListBox.passwordVaultList ListBoxItem CheckBox.passwordRowSelection">
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+        </Style>
+        <Style Selector="ListBox.passwordVaultList ListBoxItem:pointerover CheckBox.passwordRowSelection">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="IsHitTestVisible" Value="True" />
+        </Style>
+        <Style Selector="ListBox.passwordVaultList ListBoxItem:selected CheckBox.passwordRowSelection">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="IsHitTestVisible" Value="True" />
+        </Style>
+        <Style Selector="ListBox.passwordVaultList ListBoxItem CheckBox.passwordRowSelection:checked">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="IsHitTestVisible" Value="True" />
+        </Style>
         <Style Selector="ListBox.passwordVaultList ListBoxItem StackPanel.passwordRowActions">
             <Setter Property="IsVisible" Value="False" />
         </Style>
@@ -140,7 +178,7 @@
             <Setter Property="IsVisible" Value="True" />
         </Style>
         <Style Selector="ListBox.passwordFolderList ListBoxItem">
-            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Padding" Value="0" />
@@ -151,6 +189,19 @@
         <Style Selector="ListBox.passwordFolderList ListBoxItem:selected">
             <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
             <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
+        </Style>
+        <Style Selector="ListBox.passwordFolderBar ListBoxItem">
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="Margin" Value="0,0,4,0" />
+            <Setter Property="Background" Value="{DynamicResource LayerFillColorSubtleBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="ListBox.passwordFolderBar ListBoxItem:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+        </Style>
+        <Style Selector="ListBox.passwordFolderBar ListBoxItem:selected">
+            <Setter Property="Background" Value="{DynamicResource AccentFillColorTertiaryBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
         </Style>
         <Style Selector="Button.workspaceCommand">
             <Setter Property="MinWidth" Value="36" />
@@ -169,7 +220,7 @@
             <Setter Property="Foreground" Value="#101010" />
         </Style>
         <Style Selector="ListBox.workspaceList ListBoxItem">
-            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Padding" Value="0" />
@@ -233,7 +284,7 @@
             <Setter Property="Background" Value="Transparent" />
         </Style>
         <Style Selector="ListBox.totpAccountList ListBoxItem">
-            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Padding" Value="0" />
@@ -299,7 +350,7 @@
             <Setter Property="Background" Value="Transparent" />
         </Style>
         <Style Selector="ListBox.walletItemList ListBoxItem">
-            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Padding" Value="0" />
@@ -356,7 +407,7 @@
             <Setter Property="VerticalContentAlignment" Value="Top" />
         </Style>
         <Style Selector="ListBox.archiveRecoveryList ListBoxItem">
-            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Padding" Value="0" />
@@ -400,7 +451,7 @@
             <Setter Property="Background" Value="{DynamicResource LayerFillColorDefaultBrush}" />
         </Style>
         <Style Selector="ListBox.recycleQueueList ListBoxItem">
-            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Padding" Value="0" />
@@ -450,7 +501,7 @@
             <Setter Property="Background" Value="{DynamicResource LayerFillColorSubtleBrush}" />
         </Style>
         <Style Selector="ListBox.timelineEventStream ListBoxItem">
-            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Padding" Value="0" />
@@ -494,7 +545,7 @@
             <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
         </Style>
         <Style Selector="ListBox.mdbxWorkingCopyList ListBoxItem">
-            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Padding" Value="0" />
@@ -554,10 +605,10 @@
         <Style Selector="Button.mdbxPivotButton.accent">
             <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
             <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
-            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderThickness" Value="0" />
         </Style>
         <Style Selector="ListBox.databaseSourceList ListBoxItem">
-            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Padding" Value="0" />
@@ -611,7 +662,7 @@
         <Style Selector="Button.databasePivotButton.accent">
             <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
             <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
-            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderThickness" Value="0" />
         </Style>
         <Style Selector="StackPanel.workspaceEmptyState">
             <Setter Property="Margin" Value="24" />
@@ -723,12 +774,12 @@
         <Style Selector="TextBox.unlockInput:pointerover">
             <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
         </Style>
         <Style Selector="TextBox.unlockInput:focus">
             <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
         </Style>
         <Style Selector="Button.unlockPrimaryCommand">
             <Setter Property="MinHeight" Value="42" />
@@ -918,69 +969,27 @@
 
                     <Grid x:Name="WorkspaceHost" Grid.Row="2" SizeChanged="WorkspaceHost_OnSizeChanged">
                         <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsPasswords}}" RowDefinitions="Auto,Auto,Auto,*">
-                            <Border Grid.Row="0" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,10">
-                                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
-                                    <StackPanel MinWidth="132">
-                                        <TextBlock Text="{Binding L.PasswordManager}" FontSize="20" FontWeight="SemiBold" />
-                                        <TextBlock Text="{Binding PasswordCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                    </StackPanel>
-
+                            <Border Grid.Row="0" Classes="passwordChromeToolbar" Margin="0,0,0,6">
+                                <Grid ColumnDefinitions="320,Auto,*" ColumnSpacing="8">
                                     <TextBox x:Name="PasswordSearchBox"
-                                             Grid.Row="1"
                                              PlaceholderText="{Binding L.Search}"
                                              Text="{Binding PasswordSearchText}"
-                                             Width="420"
-                                             MaxWidth="720"
-                                             HorizontalAlignment="Left"
+                                             Width="320"
+                                             Height="34"
                                              VerticalAlignment="Center" />
 
-                                    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Left" VerticalAlignment="Center">
                                         <Button Classes="passwordPrimaryCommand" Command="{Binding AddPasswordCommand}" ToolTip.Tip="{Binding L.AddPassword}">
-                                            <StackPanel Orientation="Horizontal" Spacing="7">
-                                                <ic:FluentIcon Icon="Add" FontSize="18" VerticalAlignment="Center" />
-                                                <TextBlock Text="{Binding L.AddPassword}" VerticalAlignment="Center" />
-                                            </StackPanel>
+                                            <ic:FluentIcon Icon="Add" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         </Button>
                                         <Button Classes="passwordCommand" Command="{Binding SelectSectionCommand}" CommandParameter="Generator" ToolTip.Tip="{Binding L.PasswordGenerator}">
-                                            <ic:FluentIcon Icon="Key" FontSize="19" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            <ic:FluentIcon Icon="Key" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         </Button>
                                         <Button Classes="passwordCommand" Command="{Binding LoadCommand}" ToolTip.Tip="{Binding L.Refresh}">
-                                            <ic:FluentIcon Icon="ArrowSync" FontSize="19" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        </Button>
-                                        <Button Classes="passwordCommand" ToolTip.Tip="{Binding L.MoreOptions}">
-                                            <ic:FluentIcon Icon="MoreHorizontal" FontSize="19" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            <Button.Flyout>
-                                                <MenuFlyout>
-                                                    <MenuItem Header="{Binding L.ImportPasswordCsv}" Command="{Binding ImportPasswordCsvFileCommand}">
-                                                        <MenuItem.Icon>
-                                                            <ic:FluentIcon Icon="FolderOpen" FontSize="16" />
-                                                        </MenuItem.Icon>
-                                                    </MenuItem>
-                                                    <MenuItem Header="{Binding L.ExportPasswordCsv}" Command="{Binding SavePasswordCsvExportCommand}">
-                                                        <MenuItem.Icon>
-                                                            <ic:FluentIcon Icon="ArrowDownload" FontSize="16" />
-                                                        </MenuItem.Icon>
-                                                    </MenuItem>
-                                                    <MenuItem Header="{Binding L.ExportData}" Command="{Binding SaveMonicaJsonExportCommand}">
-                                                        <MenuItem.Icon>
-                                                            <ic:FluentIcon Icon="Document" FontSize="16" />
-                                                        </MenuItem.Icon>
-                                                    </MenuItem>
-                                                    <MenuItem Header="{Binding L.Archive}" Command="{Binding SelectSectionCommand}" CommandParameter="Archive">
-                                                        <MenuItem.Icon>
-                                                            <ic:FluentIcon Icon="FolderOpen" FontSize="16" />
-                                                        </MenuItem.Icon>
-                                                    </MenuItem>
-                                                    <MenuItem Header="{Binding L.DeletedPasswords}" Command="{Binding SelectSectionCommand}" CommandParameter="RecycleBin">
-                                                        <MenuItem.Icon>
-                                                            <ic:FluentIcon Icon="Delete" FontSize="16" />
-                                                        </MenuItem.Icon>
-                                                    </MenuItem>
-                                                </MenuFlyout>
-                                            </Button.Flyout>
+                                            <ic:FluentIcon Icon="ArrowSync" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         </Button>
                                         <Button Classes="passwordCommand" ToolTip.Tip="{Binding PasswordSortButtonTip}">
-                                            <ic:FluentIcon Icon="TextBulletList" FontSize="19" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            <ic:FluentIcon Icon="TextBulletList" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                             <Button.Flyout>
                                                 <MenuFlyout>
                                                     <MenuItem Header="{Binding SortUpdatedText}" Command="{Binding SetPasswordSortCommand}" CommandParameter="updated-desc">
@@ -1016,7 +1025,75 @@
                                                 </MenuFlyout>
                                             </Button.Flyout>
                                         </Button>
+                                        <Button Classes="passwordCommand" ToolTip.Tip="{Binding L.MoreOptions}">
+                                            <ic:FluentIcon Icon="MoreHorizontal" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            <Button.Flyout>
+                                                <MenuFlyout>
+                                                    <MenuItem Header="{Binding L.ImportPasswordCsv}" Command="{Binding ImportPasswordCsvFileCommand}">
+                                                        <MenuItem.Icon>
+                                                            <ic:FluentIcon Icon="FolderOpen" FontSize="16" />
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
+                                                    <MenuItem Header="{Binding L.ExportPasswordCsv}" Command="{Binding SavePasswordCsvExportCommand}">
+                                                        <MenuItem.Icon>
+                                                            <ic:FluentIcon Icon="ArrowDownload" FontSize="16" />
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
+                                                    <MenuItem Header="{Binding L.ExportData}" Command="{Binding SaveMonicaJsonExportCommand}">
+                                                        <MenuItem.Icon>
+                                                            <ic:FluentIcon Icon="Document" FontSize="16" />
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
+                                                    <MenuItem Header="{Binding L.Archive}" Command="{Binding SelectSectionCommand}" CommandParameter="Archive">
+                                                        <MenuItem.Icon>
+                                                            <ic:FluentIcon Icon="FolderOpen" FontSize="16" />
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
+                                                    <MenuItem Header="{Binding L.DeletedPasswords}" Command="{Binding SelectSectionCommand}" CommandParameter="RecycleBin">
+                                                        <MenuItem.Icon>
+                                                            <ic:FluentIcon Icon="Delete" FontSize="16" />
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
+                                                </MenuFlyout>
+                                            </Button.Flyout>
+                                        </Button>
                                     </StackPanel>
+
+                                    <WrapPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border IsVisible="{Binding HasPasswordFilters}" Padding="8,4" CornerRadius="6" Background="{DynamicResource LayerFillColorSubtleBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" MaxWidth="220" Margin="0,0,6,4" VerticalAlignment="Center">
+                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                                                <ic:FluentIcon Icon="Info" FontSize="14" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="1" Text="{Binding PasswordFilterSummaryText}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
+                                        <Button Classes="passwordCommand" Command="{Binding ClearPasswordFiltersCommand}" IsVisible="{Binding HasPasswordFilters}" ToolTip.Tip="{Binding ClearPasswordFiltersText}" Margin="0,0,6,4">
+                                            <ic:FluentIcon Icon="Dismiss" FontSize="17" />
+                                        </Button>
+                                        <ToggleButton Classes="passwordFilterChip" Margin="0,0,6,4" IsChecked="{Binding QuickFilterFavorite}" ToolTip.Tip="{Binding L.QuickFilterFavorite}">
+                                            <ic:FluentIcon Icon="Star" FontSize="15" HorizontalAlignment="Center" />
+                                        </ToggleButton>
+                                        <ToggleButton Classes="passwordFilterChip" Margin="0,0,6,4" IsChecked="{Binding QuickFilter2Fa}" ToolTip.Tip="{Binding L.QuickFilter2Fa}">
+                                            <ic:FluentIcon Icon="Key" FontSize="15" HorizontalAlignment="Center" />
+                                        </ToggleButton>
+                                        <ToggleButton Classes="passwordFilterChip" Margin="0,0,6,4" IsChecked="{Binding QuickFilterNotes}" ToolTip.Tip="{Binding L.QuickFilterNotes}">
+                                            <ic:FluentIcon Icon="Note" FontSize="15" HorizontalAlignment="Center" />
+                                        </ToggleButton>
+                                        <ToggleButton Classes="passwordFilterChip" Margin="0,0,6,4" IsChecked="{Binding QuickFilterPasskey}" ToolTip.Tip="{Binding L.QuickFilterPasskey}">
+                                            <ic:FluentIcon Icon="Fingerprint" FontSize="15" HorizontalAlignment="Center" />
+                                        </ToggleButton>
+                                        <ToggleButton Classes="passwordFilterChip" Margin="0,0,6,4" IsChecked="{Binding QuickFilterBoundNote}" ToolTip.Tip="{Binding L.QuickFilterBoundNote}">
+                                            <ic:FluentIcon Icon="Document" FontSize="15" HorizontalAlignment="Center" />
+                                        </ToggleButton>
+                                        <ToggleButton Classes="passwordFilterChip" Margin="0,0,6,4" IsChecked="{Binding QuickFilterUncategorized}" ToolTip.Tip="{Binding L.QuickFilterUncategorized}">
+                                            <ic:FluentIcon Icon="Folder" FontSize="15" HorizontalAlignment="Center" />
+                                        </ToggleButton>
+                                        <ToggleButton Classes="passwordFilterChip" Margin="0,0,6,4" IsChecked="{Binding QuickFilterLocalOnly}" ToolTip.Tip="{Binding L.QuickFilterLocalOnly}">
+                                            <ic:FluentIcon Icon="Desktop" FontSize="15" HorizontalAlignment="Center" />
+                                        </ToggleButton>
+                                        <ToggleButton Classes="passwordFilterChip" Margin="0,0,6,4" IsChecked="{Binding QuickFilterAttachments}" ToolTip.Tip="{Binding L.QuickFilterAttachments}">
+                                            <ic:FluentIcon Icon="Attach" FontSize="15" HorizontalAlignment="Center" />
+                                        </ToggleButton>
+                                    </WrapPanel>
                                 </Grid>
                             </Border>
 
@@ -1040,6 +1117,9 @@
                                         <Button Classes="passwordCommand" Margin="0,0,6,6" Command="{Binding MoveSelectedPasswordsToCategoryCommand}" ToolTip.Tip="{Binding L.MoveToFolder}">
                                             <ic:FluentIcon Icon="Folder" FontSize="18" />
                                         </Button>
+                                        <Button Classes="passwordCommand" Margin="0,0,6,6" Command="{Binding StackSelectedPasswordsCommand}" IsEnabled="{Binding CanStackSelectedPasswords}" ToolTip.Tip="{Binding L.StackSelectedPasswords}">
+                                            <ic:FluentIcon Icon="Library" FontSize="18" />
+                                        </Button>
                                         <Button Classes="passwordCommand" Margin="0,0,6,6" Command="{Binding ArchiveSelectedPasswordsCommand}" ToolTip.Tip="{Binding L.BatchArchive}">
                                             <ic:FluentIcon Icon="FolderOpen" FontSize="18" />
                                         </Button>
@@ -1053,54 +1133,108 @@
                                 </Grid>
                             </Border>
 
-                            <Grid Grid.Row="2" RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto" RowSpacing="8" ColumnSpacing="10" Margin="0,0,0,12">
-                                <Border IsVisible="{Binding HasPasswordFilters}" Padding="10,5" CornerRadius="6" Background="{DynamicResource LayerFillColorSubtleBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" MaxWidth="260" VerticalAlignment="Center">
-                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
-                                        <ic:FluentIcon Icon="Info" FontSize="14" VerticalAlignment="Center" />
-                                        <TextBlock Grid.Column="1" Text="{Binding PasswordFilterSummaryText}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                    </Grid>
-                                </Border>
-                                <Button Grid.Column="1"
-                                        Classes="passwordCommand"
-                                        Command="{Binding ClearPasswordFiltersCommand}"
-                                        IsVisible="{Binding HasPasswordFilters}"
-                                        ToolTip.Tip="{Binding ClearPasswordFiltersText}">
-                                    <ic:FluentIcon Icon="Dismiss" FontSize="18" />
-                                </Button>
-                                <WrapPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal">
-                                    <ToggleButton Classes="passwordFilterChip" Margin="0,0,8,6" IsChecked="{Binding QuickFilterFavorite}" ToolTip.Tip="{Binding L.QuickFilterFavorite}">
-                                        <ic:FluentIcon Icon="Star" FontSize="16" HorizontalAlignment="Center" />
-                                    </ToggleButton>
-                                    <ToggleButton Classes="passwordFilterChip" Margin="0,0,8,6" IsChecked="{Binding QuickFilter2Fa}" ToolTip.Tip="{Binding L.QuickFilter2Fa}">
-                                        <ic:FluentIcon Icon="Key" FontSize="16" HorizontalAlignment="Center" />
-                                    </ToggleButton>
-                                    <ToggleButton Classes="passwordFilterChip" Margin="0,0,8,6" IsChecked="{Binding QuickFilterNotes}" ToolTip.Tip="{Binding L.QuickFilterNotes}">
-                                        <ic:FluentIcon Icon="Note" FontSize="16" HorizontalAlignment="Center" />
-                                    </ToggleButton>
-                                    <ToggleButton Classes="passwordFilterChip" Margin="0,0,8,6" IsChecked="{Binding QuickFilterPasskey}" ToolTip.Tip="{Binding L.QuickFilterPasskey}">
-                                        <ic:FluentIcon Icon="Fingerprint" FontSize="16" HorizontalAlignment="Center" />
-                                    </ToggleButton>
-                                    <ToggleButton Classes="passwordFilterChip" Margin="0,0,8,6" IsChecked="{Binding QuickFilterBoundNote}" ToolTip.Tip="{Binding L.QuickFilterBoundNote}">
-                                        <ic:FluentIcon Icon="Document" FontSize="16" HorizontalAlignment="Center" />
-                                    </ToggleButton>
-                                    <ToggleButton Classes="passwordFilterChip" Margin="0,0,8,6" IsChecked="{Binding QuickFilterUncategorized}" ToolTip.Tip="{Binding L.QuickFilterUncategorized}">
-                                        <ic:FluentIcon Icon="Folder" FontSize="16" HorizontalAlignment="Center" />
-                                    </ToggleButton>
-                                    <ToggleButton Classes="passwordFilterChip" Margin="0,0,8,6" IsChecked="{Binding QuickFilterLocalOnly}" ToolTip.Tip="{Binding L.QuickFilterLocalOnly}">
-                                        <ic:FluentIcon Icon="Desktop" FontSize="16" HorizontalAlignment="Center" />
-                                    </ToggleButton>
-                                    <ToggleButton Classes="passwordFilterChip" Margin="0,0,8,6" IsChecked="{Binding QuickFilterAttachments}" ToolTip.Tip="{Binding L.QuickFilterAttachments}">
-                                        <ic:FluentIcon Icon="Attach" FontSize="16" HorizontalAlignment="Center" />
-                                    </ToggleButton>
-                                </WrapPanel>
-                            </Grid>
+                            <Border Grid.Row="2" Classes="passwordFolderStrip" Margin="0,0,0,8">
+                                <Grid ColumnDefinitions="*,150,Auto,Auto,Auto" ColumnSpacing="8" MinHeight="34">
+                                    <ScrollViewer
+                                                  HorizontalScrollBarVisibility="Auto"
+                                                  VerticalScrollBarVisibility="Disabled"
+                                                  VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <ListBox Classes="passwordFolderList passwordFolderBar"
+                                                     ItemsSource="{Binding SystemPasswordFolderFilters}"
+                                                     SelectedItem="{Binding SelectedPasswordFolderFilter}"
+                                                     SelectionMode="Single"
+                                                     Padding="0"
+                                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                     ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                                     Background="Transparent">
+                                                <ListBox.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Horizontal" />
+                                                    </ItemsPanelTemplate>
+                                                </ListBox.ItemsPanel>
+                                                <ListBox.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:PasswordFolderFilterChoice">
+                                                        <Border Padding="9,6" CornerRadius="6" Background="Transparent" HorizontalAlignment="Stretch">
+                                                            <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="7" MinHeight="28">
+                                                                <ic:FluentIcon Icon="Folder" FontSize="15" VerticalAlignment="Center" />
+                                                                <TextBlock Grid.Column="1" Text="{Binding FolderDisplayName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip.Tip="{Binding Name}" />
+                                                                <Border Grid.Column="2" Padding="7,2" CornerRadius="9" Background="{DynamicResource LayerFillColorSubtleBrush}" VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding Count}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                                </Border>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ListBox.ItemTemplate>
+                                            </ListBox>
 
-                            <Grid Grid.Row="3" ColumnDefinitions="320,*" ColumnSpacing="12" MinWidth="0" ClipToBounds="True">
-                                <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Background="{DynamicResource LayerFillColorDefaultBrush}">
-                                    <Grid RowDefinitions="Auto,2*,Auto,Auto,*" Margin="10" RowSpacing="8">
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                            <ListBox Classes="passwordFolderList passwordFolderBar"
+                                                     ItemsSource="{Binding RegularPasswordFolderFilters}"
+                                                     SelectedItem="{Binding SelectedPasswordFolderFilter}"
+                                                     SelectionMode="Single"
+                                                     Padding="0"
+                                                     IsVisible="{Binding HasRegularPasswordFolderFilters}"
+                                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                     ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                                     Background="Transparent">
+                                                <ListBox.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Horizontal" />
+                                                    </ItemsPanelTemplate>
+                                                </ListBox.ItemsPanel>
+                                                <ListBox.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:PasswordFolderFilterChoice">
+                                                        <Border Padding="7,6" CornerRadius="6" Background="Transparent" HorizontalAlignment="Stretch">
+                                                            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="6" Margin="{Binding Indent}" MinHeight="28">
+                                                                <Button Classes="passwordInlineCommand"
+                                                                        Command="{Binding #Root.DataContext.TogglePasswordFolderExpansionCommand}"
+                                                                        CommandParameter="{Binding}"
+                                                                        IsEnabled="{Binding HasChildren}"
+                                                                        Opacity="{Binding HasChildren, Converter={x:Static local:BoolConverters.ToOpacity}}"
+                                                                        Width="24"
+                                                                        Height="24"
+                                                                        Padding="0"
+                                                                        ToolTip.Tip="{Binding Name}">
+                                                                    <Panel>
+                                                                        <ic:FluentIcon Icon="ChevronDown" FontSize="12" IsVisible="{Binding IsExpanded}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                        <ic:FluentIcon Icon="ChevronRight" FontSize="12" IsVisible="{Binding IsExpanded, Converter={x:Static local:BoolConverters.Not}}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                    </Panel>
+                                                                </Button>
+                                                                <Panel Grid.Column="1" Width="17" Height="17" VerticalAlignment="Center">
+                                                                    <ic:FluentIcon Icon="FolderOpen" FontSize="14" IsVisible="{Binding IsExpanded}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                    <ic:FluentIcon Icon="Folder" FontSize="14" IsVisible="{Binding IsExpanded, Converter={x:Static local:BoolConverters.Not}}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                </Panel>
+                                                                <TextBlock Grid.Column="2" Text="{Binding FolderDisplayName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip.Tip="{Binding Name}" />
+                                                                <Border Grid.Column="3" Padding="7,2" CornerRadius="9" Background="{DynamicResource LayerFillColorSubtleBrush}" VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding Count}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                                </Border>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ListBox.ItemTemplate>
+                                            </ListBox>
+                                        </StackPanel>
+                                    </ScrollViewer>
+
+                                    <TextBox Grid.Column="1" Text="{Binding NewFolderName}" PlaceholderText="{Binding L.NewFolder}" Height="32" VerticalAlignment="Center" />
+                                    <Button Grid.Column="2" Command="{Binding CreatePasswordFolderCommand}" ToolTip.Tip="{Binding L.CreateFolder}" Width="34" Height="32" Padding="0" VerticalAlignment="Center">
+                                        <ic:FluentIcon Icon="FolderAdd" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Button>
+                                    <Button Grid.Column="3" Command="{Binding RenameSelectedPasswordFolderCommand}" IsEnabled="{Binding CanManageSelectedPasswordFolder}" ToolTip.Tip="{Binding L.RenameFolder}" Width="32" Height="32" Padding="0" VerticalAlignment="Center">
+                                        <ic:FluentIcon Icon="Edit" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Button>
+                                    <Button Grid.Column="4" Command="{Binding DeleteSelectedPasswordFolderCommand}" IsEnabled="{Binding CanManageSelectedPasswordFolder}" ToolTip.Tip="{Binding L.DeleteFolder}" Width="32" Height="32" Padding="0" VerticalAlignment="Center">
+                                        <ic:FluentIcon Icon="Delete" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Button>
+                                </Grid>
+                            </Border>
+
+                            <Grid Grid.Row="3" ColumnDefinitions="300,*" ColumnSpacing="0" MinWidth="0" ClipToBounds="True">
+                                <Border Classes="passwordSidebar">
+                                    <Grid RowDefinitions="Auto,*" RowSpacing="8">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" MinHeight="32">
                                             <StackPanel>
-                                                <TextBlock Text="密码列表" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Text="密码" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
                                                 <TextBlock Text="{Binding PasswordCountText}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                             </StackPanel>
                                             <CheckBox Grid.Column="1" IsChecked="{Binding AreAllFilteredPasswordsSelected}" ToolTip.Tip="全选当前列表" VerticalAlignment="Center" />
@@ -1109,8 +1243,8 @@
                                         <ListBox x:Name="PasswordListBox"
                                                  Grid.Row="1"
                                                  Classes="passwordVaultList"
-                                                 ItemsSource="{Binding FilteredPasswords}"
-                                                 SelectedItem="{Binding SelectedPassword}"
+                                                 ItemsSource="{Binding FilteredPasswordRows}"
+                                                 SelectedItem="{Binding SelectedPasswordListRow}"
                                                  SelectionMode="Single"
                                                  Padding="0"
                                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -1121,143 +1255,108 @@
                                                 </ItemsPanelTemplate>
                                             </ListBox.ItemsPanel>
                                             <ListBox.ItemTemplate>
-                                                <DataTemplate x:DataType="models:PasswordEntry">
-                                                    <Border Margin="0,0,0,4" Padding="8,6" CornerRadius="7" Background="Transparent" HorizontalAlignment="Stretch" MinHeight="58">
-                                                        <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
-                                                            <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" />
-                                                            <Border Grid.Column="1" Width="34" Height="34" CornerRadius="17" Background="{DynamicResource AccentFillColorDefaultBrush}">
-                                                                <TextBlock Text="{Binding AvatarText}" Foreground="White" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                            </Border>
-                                                            <Grid Grid.Column="2" RowDefinitions="Auto,Auto" VerticalAlignment="Center">
-                                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
-                                                                        <ic:FluentIcon Icon="Star" FontSize="13" IsVisible="{Binding IsFavorite}" />
-                                                                        <ic:FluentIcon Icon="Key" FontSize="13" IsVisible="{Binding HasAuthenticator}" />
-                                                                        <ic:FluentIcon Icon="Attach" FontSize="13" IsVisible="{Binding HasAttachments}" />
+                                                <DataTemplate x:DataType="vm:PasswordListRow">
+                                                    <Border Margin="{Binding RowMargin}" Padding="8,6" CornerRadius="7" Background="Transparent" HorizontalAlignment="Stretch" MinHeight="{Binding RowMinHeight}">
+                                                        <Grid>
+                                                            <Border Width="2"
+                                                                    HorizontalAlignment="Left"
+                                                                    VerticalAlignment="Stretch"
+                                                                    Background="{DynamicResource ControlStrokeColorDefaultBrush}"
+                                                                    Opacity="0.85"
+                                                                    IsVisible="{Binding IsStackChild}"
+                                                                    Margin="-5,-10,0,-10" />
+                                                            <Grid RowDefinitions="Auto,Auto">
+                                                                <Grid IsVisible="{Binding IsStackHeader}" ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="8">
+                                                                    <Button Classes="passwordInlineCommand"
+                                                                            Command="{Binding #Root.DataContext.TogglePasswordStackRowCommand}"
+                                                                            CommandParameter="{Binding}"
+                                                                            ToolTip.Tip="{Binding #Root.DataContext.L.StackSelectedPasswords}">
+                                                                        <Grid Width="16" Height="16">
+                                                                            <ic:FluentIcon Icon="ChevronRight" FontSize="15" IsVisible="{Binding IsCollapsed}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                            <ic:FluentIcon Icon="ChevronDown" FontSize="15" IsVisible="{Binding IsExpanded}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                        </Grid>
+                                                                    </Button>
+                                                                    <CheckBox Grid.Column="1" Classes="passwordRowSelection" IsChecked="{Binding IsGroupSelected}" VerticalAlignment="Center" />
+                                                                    <Border Grid.Column="2" Width="34" Height="34" CornerRadius="17" Background="{DynamicResource AccentFillColorDefaultBrush}">
+                                                                        <TextBlock Text="{Binding Entry.AvatarText}" Foreground="White" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                    </Border>
+                                                                    <Grid Grid.Column="3" RowDefinitions="Auto,Auto" VerticalAlignment="Center">
+                                                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                                            <TextBlock Text="{Binding Entry.Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                                                                                <Border Padding="6,1" CornerRadius="8" Background="{DynamicResource AccentFillColorTertiaryBrush}">
+                                                                                    <TextBlock Text="{Binding StackCountText}" FontSize="11" FontWeight="SemiBold" />
+                                                                                </Border>
+                                                                                <ic:FluentIcon Icon="Star" FontSize="13" IsVisible="{Binding HasGroupFavorite}" />
+                                                                                <ic:FluentIcon Icon="Key" FontSize="13" IsVisible="{Binding HasGroupAuthenticator}" />
+                                                                                <ic:FluentIcon Icon="Attach" FontSize="13" IsVisible="{Binding HasGroupAttachments}" />
+                                                                            </StackPanel>
+                                                                        </Grid>
+                                                                        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                                            <TextBlock Text="{Binding StackSubtitle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" />
+                                                                            <TextBlock Grid.Column="1" Text="{Binding Entry.Website}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" MaxWidth="120" />
+                                                                        </Grid>
+                                                                    </Grid>
+                                                                    <StackPanel Grid.Column="4" Classes="passwordRowActions" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                                        <Button Classes="passwordInlineCommand"
+                                                                                Command="{Binding #Root.DataContext.CopyUsernameCommand}"
+                                                                                CommandParameter="{Binding Entry}"
+                                                                                ToolTip.Tip="{Binding #Root.DataContext.L.CopyUsername}">
+                                                                            <ic:FluentIcon Icon="Copy" FontSize="14" />
+                                                                        </Button>
+                                                                        <Button Classes="passwordInlineCommand"
+                                                                                Command="{Binding #Root.DataContext.CopyPasswordCommand}"
+                                                                                CommandParameter="{Binding Entry}"
+                                                                                ToolTip.Tip="{Binding #Root.DataContext.L.CopyPassword}">
+                                                                            <ic:FluentIcon Icon="Key" FontSize="14" />
+                                                                        </Button>
                                                                     </StackPanel>
                                                                 </Grid>
-                                                                <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                                                    <TextBlock Text="{Binding Username}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" />
-                                                                    <TextBlock Grid.Column="1" Text="{Binding Website}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" MaxWidth="120" />
+                                                                <Grid IsVisible="{Binding IsPasswordEntryRow}" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
+                                                                    <CheckBox Classes="passwordRowSelection" IsChecked="{Binding Entry.IsSelected}" VerticalAlignment="Center" />
+                                                                    <Border Grid.Column="1" Width="34" Height="34" CornerRadius="17" Background="{DynamicResource AccentFillColorDefaultBrush}">
+                                                                        <TextBlock Text="{Binding Entry.AvatarText}" Foreground="White" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                    </Border>
+                                                                    <Grid Grid.Column="2" RowDefinitions="Auto,Auto" VerticalAlignment="Center">
+                                                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                                            <TextBlock Text="{Binding Entry.Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                                                                                <ic:FluentIcon Icon="Star" FontSize="13" IsVisible="{Binding Entry.IsFavorite}" />
+                                                                                <ic:FluentIcon Icon="Key" FontSize="13" IsVisible="{Binding Entry.HasAuthenticator}" />
+                                                                                <ic:FluentIcon Icon="Attach" FontSize="13" IsVisible="{Binding Entry.HasAttachments}" />
+                                                                            </StackPanel>
+                                                                        </Grid>
+                                                                        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                                            <TextBlock Text="{Binding Entry.Username}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" />
+                                                                            <TextBlock Grid.Column="1" Text="{Binding Entry.Website}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" MaxWidth="120" />
+                                                                        </Grid>
+                                                                    </Grid>
+                                                                    <StackPanel Grid.Column="3" Classes="passwordRowActions" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                                        <Button Classes="passwordInlineCommand"
+                                                                                Command="{Binding #Root.DataContext.CopyUsernameCommand}"
+                                                                                CommandParameter="{Binding Entry}"
+                                                                                ToolTip.Tip="{Binding #Root.DataContext.L.CopyUsername}">
+                                                                            <ic:FluentIcon Icon="Copy" FontSize="14" />
+                                                                        </Button>
+                                                                        <Button Classes="passwordInlineCommand"
+                                                                                Command="{Binding #Root.DataContext.CopyPasswordCommand}"
+                                                                                CommandParameter="{Binding Entry}"
+                                                                                ToolTip.Tip="{Binding #Root.DataContext.L.CopyPassword}">
+                                                                            <ic:FluentIcon Icon="Key" FontSize="14" />
+                                                                        </Button>
+                                                                    </StackPanel>
                                                                 </Grid>
                                                             </Grid>
-                                                            <StackPanel Grid.Column="3" Classes="passwordRowActions" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                                                <Button Classes="passwordInlineCommand"
-                                                                        Command="{Binding #Root.DataContext.CopyUsernameCommand}"
-                                                                        CommandParameter="{Binding}"
-                                                                        ToolTip.Tip="{Binding #Root.DataContext.L.CopyUsername}">
-                                                                    <ic:FluentIcon Icon="Copy" FontSize="14" />
-                                                                </Button>
-                                                                <Button Classes="passwordInlineCommand"
-                                                                        Command="{Binding #Root.DataContext.CopyPasswordCommand}"
-                                                                        CommandParameter="{Binding}"
-                                                                        ToolTip.Tip="{Binding #Root.DataContext.L.CopyPassword}">
-                                                                    <ic:FluentIcon Icon="Key" FontSize="14" />
-                                                                </Button>
-                                                            </StackPanel>
                                                         </Grid>
                                                     </Border>
                                                 </DataTemplate>
                                             </ListBox.ItemTemplate>
                                         </ListBox>
 
-                                        <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6" Margin="0,6,0,0">
-                                            <StackPanel>
-                                                <TextBlock Text="文件夹" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                <TextBlock Text="{Binding SelectedPasswordFolderFilter.Name}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                                            </StackPanel>
-                                            <Button Grid.Column="1" Command="{Binding RenameSelectedPasswordFolderCommand}" IsEnabled="{Binding CanManageSelectedPasswordFolder}" ToolTip.Tip="{Binding L.RenameFolder}" Width="30" Height="30" Padding="0">
-                                                <ic:FluentIcon Icon="Edit" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            </Button>
-                                            <Button Grid.Column="2" Command="{Binding DeleteSelectedPasswordFolderCommand}" IsEnabled="{Binding CanManageSelectedPasswordFolder}" ToolTip.Tip="{Binding L.DeleteFolder}" Width="30" Height="30" Padding="0">
-                                                <ic:FluentIcon Icon="Delete" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            </Button>
-                                        </Grid>
-
-                                        <Grid Grid.Row="3" ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                                            <TextBox Text="{Binding NewFolderName}" PlaceholderText="{Binding L.NewFolder}" Height="32" />
-                                            <Button Grid.Column="1" Command="{Binding CreatePasswordFolderCommand}" ToolTip.Tip="{Binding L.CreateFolder}" Width="34" Height="32" Padding="0">
-                                                <ic:FluentIcon Icon="FolderAdd" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            </Button>
-                                        </Grid>
-
-                                        <ScrollViewer Grid.Row="4" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                                            <StackPanel Spacing="8">
-                                                <StackPanel Spacing="4">
-                                                    <TextBlock Text="{Binding L.FolderScopes}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="6,0,0,0" />
-                                                    <ListBox Classes="passwordFolderList"
-                                                             ItemsSource="{Binding SystemPasswordFolderFilters}"
-                                                             SelectedItem="{Binding SelectedPasswordFolderFilter}"
-                                                             SelectionMode="Single"
-                                                             Padding="0"
-                                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                                             ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                                                             Background="Transparent">
-                                                        <ListBox.ItemTemplate>
-                                                            <DataTemplate x:DataType="vm:PasswordFolderFilterChoice">
-                                                                <Border Padding="8,7" CornerRadius="6" Background="Transparent" HorizontalAlignment="Stretch">
-                                                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" MinHeight="34">
-                                                                        <ic:FluentIcon Icon="Folder" FontSize="15" VerticalAlignment="Center" />
-                                                                        <TextBlock Grid.Column="1" Text="{Binding FolderDisplayName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip.Tip="{Binding Name}" />
-                                                                        <Border Grid.Column="2" Padding="7,2" CornerRadius="9" Background="{DynamicResource LayerFillColorSubtleBrush}" VerticalAlignment="Center">
-                                                                            <TextBlock Text="{Binding Count}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                                        </Border>
-                                                                    </Grid>
-                                                                </Border>
-                                                            </DataTemplate>
-                                                        </ListBox.ItemTemplate>
-                                                    </ListBox>
-                                                </StackPanel>
-
-                                                <StackPanel IsVisible="{Binding HasRegularPasswordFolderFilters}" Spacing="4">
-                                                    <TextBlock Text="{Binding L.Folders}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="6,4,0,0" />
-                                                    <ListBox Classes="passwordFolderList"
-                                                             ItemsSource="{Binding RegularPasswordFolderFilters}"
-                                                             SelectedItem="{Binding SelectedPasswordFolderFilter}"
-                                                             SelectionMode="Single"
-                                                             Padding="0"
-                                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                                             ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                                                             Background="Transparent">
-                                                        <ListBox.ItemTemplate>
-                                                            <DataTemplate x:DataType="vm:PasswordFolderFilterChoice">
-                                                                <Border Padding="8,7" CornerRadius="6" Background="Transparent" HorizontalAlignment="Stretch">
-                                                                    <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="7" Margin="{Binding Indent}" MinHeight="34">
-                                                                        <Button Classes="passwordInlineCommand"
-                                                                                Command="{Binding #Root.DataContext.TogglePasswordFolderExpansionCommand}"
-                                                                                CommandParameter="{Binding}"
-                                                                                IsEnabled="{Binding HasChildren}"
-                                                                                Opacity="{Binding HasChildren, Converter={x:Static local:BoolConverters.ToOpacity}}"
-                                                                                Width="28"
-                                                                                Height="28"
-                                                                                Padding="0"
-                                                                                ToolTip.Tip="{Binding Name}">
-                                                                            <Panel>
-                                                                                <ic:FluentIcon Icon="ChevronDown" FontSize="13" IsVisible="{Binding IsExpanded}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                                                <ic:FluentIcon Icon="ChevronRight" FontSize="13" IsVisible="{Binding IsExpanded, Converter={x:Static local:BoolConverters.Not}}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                                            </Panel>
-                                                                        </Button>
-                                                                        <Panel Grid.Column="1" Width="18" Height="18" VerticalAlignment="Center">
-                                                                            <ic:FluentIcon Icon="FolderOpen" FontSize="15" IsVisible="{Binding IsExpanded}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                                            <ic:FluentIcon Icon="Folder" FontSize="15" IsVisible="{Binding IsExpanded, Converter={x:Static local:BoolConverters.Not}}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                                        </Panel>
-                                                                        <TextBlock Grid.Column="2" Text="{Binding FolderDisplayName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip.Tip="{Binding Name}" />
-                                                                        <Border Grid.Column="3" Padding="7,2" CornerRadius="9" Background="{DynamicResource LayerFillColorSubtleBrush}" VerticalAlignment="Center">
-                                                                            <TextBlock Text="{Binding Count}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                                        </Border>
-                                                                    </Grid>
-                                                                </Border>
-                                                            </DataTemplate>
-                                                        </ListBox.ItemTemplate>
-                                                    </ListBox>
-                                                </StackPanel>
-                                            </StackPanel>
-                                        </ScrollViewer>
                                     </Grid>
                                 </Border>
 
-                                <Border x:Name="PasswordDetailRegion" Grid.Column="1" Focusable="True" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}" MinWidth="0" ClipToBounds="True">
+                                <Border x:Name="PasswordDetailRegion" Grid.Column="1" Focusable="True" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}" Margin="12,0,0,0" MinWidth="0" ClipToBounds="True">
                                     <Grid RowDefinitions="Auto,*">
                                         <Border IsVisible="{Binding HasSelectedPassword}"
                                                 BorderBrush="{DynamicResource CardBorderBrush}"
@@ -1924,14 +2023,9 @@
                                                                 Command="{Binding #Root.DataContext.SelectTotpFilterCommand}"
                                                                 CommandParameter="{Binding Key}"
                                                                 ToolTip.Tip="{Binding Label}">
-                                                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" MinWidth="0" Margin="{Binding Indent}">
-                                                                <Border Width="3"
-                                                                        Height="18"
-                                                                        CornerRadius="2"
-                                                                        Background="{DynamicResource AccentFillColorDefaultBrush}"
-                                                                        IsVisible="{Binding IsSelected}" />
-                                                                <TextBlock Grid.Column="1" Text="{Binding Label}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                                                <Border Grid.Column="2" Classes="workspaceStatusChip">
+                                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" MinWidth="0" Margin="{Binding Indent}">
+                                                                <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                                <Border Grid.Column="1" Classes="workspaceStatusChip">
                                                                     <TextBlock Text="{Binding Count}" FontSize="12" />
                                                                 </Border>
                                                             </Grid>

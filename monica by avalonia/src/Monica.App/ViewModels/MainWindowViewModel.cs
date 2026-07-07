@@ -35,6 +35,59 @@ public sealed record NoteReferenceItem(string Label, string Target, int LineNumb
 public sealed record NoteImagePreviewItem(string StoragePath, string DisplayName, string SizeText, Bitmap Image);
 public sealed record NoteTreeGroup(string Name, int Count, IReadOnlyList<SecureItem> Items, bool IsUntagged);
 public sealed record GeneratorHistoryItem(string Value, string ModeLabel, string StrengthText, string CreatedAtText);
+public sealed class PasswordListRow
+{
+    public PasswordListRow(
+        string key,
+        PasswordEntry entry,
+        IReadOnlyList<PasswordEntry> members,
+        bool isStackHeader,
+        bool isStackChild,
+        bool isExpanded)
+    {
+        Key = key;
+        Entry = entry;
+        Members = members;
+        IsStackHeader = isStackHeader;
+        IsStackChild = isStackChild;
+        IsExpanded = isExpanded;
+    }
+
+    public string Key { get; }
+    public PasswordEntry Entry { get; }
+    public IReadOnlyList<PasswordEntry> Members { get; }
+    public bool IsStackHeader { get; }
+    public bool IsStackChild { get; }
+    public bool IsPasswordEntryRow => !IsStackHeader;
+    public bool IsPlainPassword => IsPasswordEntryRow && !IsStackChild;
+    public bool IsExpanded { get; }
+    public bool IsCollapsed => IsStackHeader && !IsExpanded;
+    public string StackCountText => Members.Count.ToString(CultureInfo.InvariantCulture);
+    public string StackSubtitle => Members.Count == 1
+        ? Entry.Username
+        : string.Join(" / ", Members
+            .Select(item => string.IsNullOrWhiteSpace(item.Username) ? item.Website : item.Username)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(2));
+    public bool HasGroupFavorite => Members.Any(item => item.IsFavorite);
+    public bool HasGroupAuthenticator => Members.Any(item => item.HasAuthenticator);
+    public bool HasGroupAttachments => Members.Any(item => item.HasAttachments);
+    public Thickness RowMargin => IsStackChild ? new Thickness(22, 0, 0, 0) : new Thickness(0, 0, 0, 4);
+    public double RowMinHeight => IsStackChild ? 50 : 58;
+    public bool IsGroupSelected
+    {
+        get => Members.Count > 0 && Members.All(item => item.IsSelected);
+        set
+        {
+            foreach (var member in Members)
+            {
+                member.IsSelected = value;
+            }
+        }
+    }
+}
+
 public sealed partial class NoteEditorTab : ObservableObject
 {
     public NoteEditorTab(long id, SecureItem? source, string title)
@@ -415,9 +468,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private IReadOnlyDictionary<long, PasswordQuickAccessRecord> _passwordQuickAccessRecords = new Dictionary<long, PasswordQuickAccessRecord>();
     private IReadOnlyDictionary<long, CompromisedPasswordResult> _compromisedPasswordResults = new Dictionary<long, CompromisedPasswordResult>();
     private IReadOnlyList<PasswordEntry> _filteredPasswords = [];
+    private IReadOnlyList<PasswordListRow> _filteredPasswordRows = [];
     private bool _filteredPasswordsDirty = true;
+    private bool _filteredPasswordRowsDirty = true;
     private int _selectedPasswordCount;
     private bool _suppressPasswordSelectionStateNotifications;
+    private bool _isSyncingSelectedPasswordListRow;
     private bool _hasCompromisedPasswordCheckResults;
     private bool _isApplyingSettings;
     private bool _isApplyingPasswordSearchImmediately;
@@ -428,6 +484,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private int _noteImagePreviewVersion;
     private LegacyVaultDetection _legacyVaultDetection = LegacyVaultDetection.Empty;
     private readonly HashSet<string> _collapsedPasswordFolderKeys = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _expandedPasswordStackKeys = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _settingsSaveSync = new();
     private bool _isSavingSettings;
     private bool _hasPendingSettingsSave;
@@ -1215,6 +1272,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private PasswordEntry? _selectedPassword;
 
     [ObservableProperty]
+    private PasswordListRow? _selectedPasswordListRow;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelectedPasswordDetails))]
     [NotifyPropertyChangedFor(nameof(HasCurrentSelectedPasswordDetails))]
     [NotifyPropertyChangedFor(nameof(HasSelectedPasswordLoadingState))]
@@ -1644,6 +1704,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public bool HasPasswordQuickAccessItems => RecentPasswordQuickAccessItems.Any() || FrequentPasswordQuickAccessItems.Any();
 
     public IReadOnlyList<PasswordEntry> FilteredPasswords => GetFilteredPasswords();
+    public IReadOnlyList<PasswordListRow> FilteredPasswordRows => GetFilteredPasswordRows();
+    public IReadOnlyList<PasswordEntry> VisiblePasswordNavigationEntries =>
+        FilteredPasswordRows
+            .Where(row => row.IsPasswordEntryRow || row.IsStackHeader)
+            .Select(row => row.Entry)
+            .ToArray();
     public IReadOnlyList<SecureItem> FilteredTotpItems => TotpItems.Where(MatchesTotpFilters).ToArray();
     public IEnumerable<PasswordEntry> FilteredArchivedPasswords =>
         ArchivedPasswords.Where(item => MatchesPasswordSearch(item, SearchText));
@@ -1717,7 +1783,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     partial void OnSelectedPasswordChanged(PasswordEntry? value)
     {
+        SyncSelectedPasswordListRow(value);
         QueueSelectedPasswordDetailsRefresh(value);
+    }
+
+    partial void OnSelectedPasswordListRowChanged(PasswordListRow? value)
+    {
+        if (_isSyncingSelectedPasswordListRow)
+        {
+            return;
+        }
+
+        SelectedPassword = value?.Entry;
     }
 
     partial void OnSelectedSectionChanged(string value)
@@ -3247,6 +3324,26 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         await ShowPasswordDetailsAsync(item.Entry);
+    }
+
+    [RelayCommand]
+    private void TogglePasswordStackRow(PasswordListRow? row)
+    {
+        if (row is null || !row.IsStackHeader)
+        {
+            return;
+        }
+
+        if (row.IsExpanded)
+        {
+            _expandedPasswordStackKeys.Remove(row.Key);
+        }
+        else
+        {
+            _expandedPasswordStackKeys.Add(row.Key);
+        }
+
+        RaiseFilteredPasswordRowsChanged();
     }
 
     [RelayCommand]
@@ -7305,6 +7402,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(HasSelectedPasswords));
         OnPropertyChanged(nameof(CanStackSelectedPasswords));
         OnPropertyChanged(nameof(AreAllFilteredPasswordsSelected));
+        RaiseFilteredPasswordRowsChanged();
     }
 
     private void RefreshPasswordSelectionStateFromPasswords()
@@ -7422,10 +7520,90 @@ public sealed partial class MainWindowViewModel : ObservableObject
         return _filteredPasswords;
     }
 
+    private IReadOnlyList<PasswordListRow> GetFilteredPasswordRows()
+    {
+        if (!_filteredPasswordRowsDirty)
+        {
+            return _filteredPasswordRows;
+        }
+
+        var visiblePasswords = FilteredPasswords.ToArray();
+        var groupsByKey = visiblePasswords
+            .GroupBy(BuildSiblingGroupKey)
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.OrdinalIgnoreCase);
+        var handledGroupKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var rows = new List<PasswordListRow>(visiblePasswords.Length);
+
+        foreach (var entry in visiblePasswords)
+        {
+            var groupKey = BuildSiblingGroupKey(entry);
+            var members = groupsByKey[groupKey];
+            if (members.Length < 2)
+            {
+                rows.Add(new PasswordListRow(
+                    $"password:{entry.Id}",
+                    entry,
+                    [entry],
+                    isStackHeader: false,
+                    isStackChild: false,
+                    isExpanded: false));
+                continue;
+            }
+
+            if (!handledGroupKeys.Add(groupKey))
+            {
+                continue;
+            }
+
+            var lead = members.FirstOrDefault(item => item.IsGroupCover) ?? members[0];
+            var rowKey = $"stack:{groupKey}";
+            var isExpanded = _expandedPasswordStackKeys.Contains(rowKey);
+            rows.Add(new PasswordListRow(
+                rowKey,
+                lead,
+                members,
+                isStackHeader: true,
+                isStackChild: false,
+                isExpanded));
+
+            if (!isExpanded)
+            {
+                continue;
+            }
+
+            foreach (var member in members)
+            {
+                rows.Add(new PasswordListRow(
+                    $"{rowKey}:password:{member.Id}",
+                    member,
+                    [member],
+                    isStackHeader: false,
+                    isStackChild: true,
+                    isExpanded: false));
+            }
+        }
+
+        _filteredPasswordRows = rows;
+        _filteredPasswordRowsDirty = false;
+        return _filteredPasswordRows;
+    }
+
     private void RaiseFilteredPasswordsChanged()
     {
         _filteredPasswordsDirty = true;
+        _filteredPasswordRowsDirty = true;
         OnPropertyChanged(nameof(FilteredPasswords));
+        OnPropertyChanged(nameof(FilteredPasswordRows));
+        OnPropertyChanged(nameof(VisiblePasswordNavigationEntries));
+        SyncSelectedPasswordListRow(SelectedPassword);
+    }
+
+    private void RaiseFilteredPasswordRowsChanged()
+    {
+        _filteredPasswordRowsDirty = true;
+        OnPropertyChanged(nameof(FilteredPasswordRows));
+        OnPropertyChanged(nameof(VisiblePasswordNavigationEntries));
+        SyncSelectedPasswordListRow(SelectedPassword);
     }
 
     private void RefreshPasswordFilters()
@@ -7446,6 +7624,30 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             SelectedPassword = null;
         }
+
+        SyncSelectedPasswordListRow(SelectedPassword);
+    }
+
+    private void SyncSelectedPasswordListRow(PasswordEntry? selectedPassword)
+    {
+        _isSyncingSelectedPasswordListRow = true;
+        try
+        {
+            SelectedPasswordListRow = selectedPassword is null
+                ? null
+                : FindPasswordListRowForSelection(selectedPassword);
+        }
+        finally
+        {
+            _isSyncingSelectedPasswordListRow = false;
+        }
+    }
+
+    private PasswordListRow? FindPasswordListRowForSelection(PasswordEntry selectedPassword)
+    {
+        var rows = FilteredPasswordRows;
+        return rows.FirstOrDefault(row => row.IsPasswordEntryRow && row.Entry.Id == selectedPassword.Id) ??
+            rows.FirstOrDefault(row => row.IsStackHeader && row.Members.Any(item => item.Id == selectedPassword.Id));
     }
 
     private void TrackPasswordSelection(PasswordEntry entry)

@@ -288,7 +288,7 @@ public partial class MainWindow : Window
 
     private void SelectAdjacentPassword(MainWindowViewModel viewModel, int delta)
     {
-        var visiblePasswords = viewModel.FilteredPasswords.ToList();
+        var visiblePasswords = viewModel.VisiblePasswordNavigationEntries.ToList();
         if (visiblePasswords.Count == 0)
         {
             return;
@@ -302,7 +302,10 @@ public partial class MainWindow : Window
             : Math.Clamp(currentIndex + delta, 0, visiblePasswords.Count - 1);
 
         viewModel.SelectedPassword = visiblePasswords[nextIndex];
-        Dispatcher.UIThread.Post(() => PasswordListBox.ScrollIntoView(viewModel.SelectedPassword));
+        if (viewModel.SelectedPasswordListRow is { } row)
+        {
+            Dispatcher.UIThread.Post(() => PasswordListBox.ScrollIntoView(row));
+        }
     }
 
     private bool IsNonSearchPasswordTextEditingSource(object? source) =>

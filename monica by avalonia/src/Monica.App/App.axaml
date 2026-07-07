@@ -88,13 +88,13 @@
         <Style Selector="TextBox:pointerover">
             <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
         </Style>
 
         <Style Selector="TextBox:focus">
             <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
         </Style>
 
         <Style Selector="Button">
