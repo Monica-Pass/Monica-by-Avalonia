@@ -43,6 +43,8 @@ public sealed class PasswordListRow
         IReadOnlyList<PasswordEntry> members,
         bool isStackHeader,
         bool isStackChild,
+        bool isFirstStackChild,
+        bool isLastStackChild,
         bool isExpanded)
     {
         Key = key;
@@ -50,6 +52,8 @@ public sealed class PasswordListRow
         Members = members;
         IsStackHeader = isStackHeader;
         IsStackChild = isStackChild;
+        IsFirstStackChild = isFirstStackChild;
+        IsLastStackChild = isLastStackChild;
         IsExpanded = isExpanded;
     }
 
@@ -58,6 +62,8 @@ public sealed class PasswordListRow
     public IReadOnlyList<PasswordEntry> Members { get; }
     public bool IsStackHeader { get; }
     public bool IsStackChild { get; }
+    public bool IsFirstStackChild { get; }
+    public bool IsLastStackChild { get; }
     public bool IsPasswordEntryRow => !IsStackHeader;
     public bool IsPlainPassword => IsPasswordEntryRow && !IsStackChild;
     public bool IsExpanded { get; }
@@ -75,6 +81,7 @@ public sealed class PasswordListRow
     public bool HasGroupAttachments => Members.Any(item => item.HasAttachments);
     public Thickness RowMargin => IsStackChild ? new Thickness(22, 0, 0, 0) : new Thickness(0, 0, 0, 4);
     public double RowMinHeight => IsStackChild ? 50 : 58;
+    public Thickness StackLineMargin => new(-5, IsFirstStackChild ? -8 : -34, 0, IsLastStackChild ? -8 : -34);
     public bool IsGroupSelected
     {
         get => Members.Count > 0 && Members.All(item => item.IsSelected);
@@ -3355,6 +3362,30 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         entry.IsSelected = !entry.IsSelected;
+    }
+
+    [RelayCommand]
+    private void TogglePasswordRowSelection(PasswordListRow? row)
+    {
+        if (row is null)
+        {
+            return;
+        }
+
+        if (row.IsStackHeader)
+        {
+            var nextValue = !row.IsGroupSelected;
+            UpdatePasswordSelectionsInBatch(() =>
+            {
+                foreach (var member in row.Members)
+                {
+                    member.IsSelected = nextValue;
+                }
+            });
+            return;
+        }
+
+        row.Entry.IsSelected = !row.Entry.IsSelected;
     }
 
     [RelayCommand]
@@ -7546,6 +7577,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     [entry],
                     isStackHeader: false,
                     isStackChild: false,
+                    isFirstStackChild: false,
+                    isLastStackChild: false,
                     isExpanded: false));
                 continue;
             }
@@ -7564,6 +7597,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 members,
                 isStackHeader: true,
                 isStackChild: false,
+                isFirstStackChild: false,
+                isLastStackChild: false,
                 isExpanded));
 
             if (!isExpanded)
@@ -7571,14 +7606,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 continue;
             }
 
-            foreach (var member in members)
+            for (var index = 0; index < members.Length; index++)
             {
+                var member = members[index];
                 rows.Add(new PasswordListRow(
                     $"{rowKey}:password:{member.Id}",
                     member,
                     [member],
                     isStackHeader: false,
                     isStackChild: true,
+                    isFirstStackChild: index == 0,
+                    isLastStackChild: index == members.Length - 1,
                     isExpanded: false));
             }
         }
