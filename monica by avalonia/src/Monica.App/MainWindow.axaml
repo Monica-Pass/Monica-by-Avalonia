@@ -736,6 +736,17 @@
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
+        <Style Selector="Border.settingsFlatGroup">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <Style Selector="ItemsControl.settingsFlatGroup">
+            <Setter Property="MaxWidth" Value="760" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
         <Style Selector="Grid.unlockSurface TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
         </Style>
@@ -2584,11 +2595,8 @@
                                 <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Disabled" ClipToBounds="True">
                                     <StackPanel Spacing="14" MaxWidth="760" HorizontalAlignment="Stretch">
 
-                                <fa:FASettingsExpander Header="{Binding L.General}" Description="{Binding L.GeneralSettingsDescription}" IsExpanded="True" IsVisible="{Binding IsSettingsGeneralSelected}">
-                                    <fa:FASettingsExpander.IconSource>
-                                        <fa:FASymbolIconSource Symbol="Setting" />
-                                    </fa:FASettingsExpander.IconSource>
-                                    <fa:FASettingsExpander.Items>
+                                <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsGeneralSelected}">
+                                    <StackPanel>                                    
                                         <fa:FASettingsExpanderItem Content="{Binding L.Language}" Description="{Binding L.LanguageDescription}">
                                             <fa:FASettingsExpanderItem.Footer>
                                                 <ComboBox Width="220" ItemsSource="{Binding LanguageOptions}" SelectedValue="{Binding SettingsLanguage}" SelectedValueBinding="{Binding Value}">
@@ -2624,14 +2632,12 @@
                                                 </ComboBox>
                                             </fa:FASettingsExpanderItem.Footer>
                                         </fa:FASettingsExpanderItem>
-                                    </fa:FASettingsExpander.Items>
-                                </fa:FASettingsExpander>
+                                    
+                                                                    </StackPanel>
+                                </Border>
 
-                                <fa:FASettingsExpander Header="{Binding L.Security}" Description="{Binding L.SecuritySettingsDescription}" IsExpanded="True" IsVisible="{Binding IsSettingsSecuritySelected}">
-                                    <fa:FASettingsExpander.IconSource>
-                                        <fa:FASymbolIconSource Symbol="Permissions" />
-                                    </fa:FASettingsExpander.IconSource>
-                                    <fa:FASettingsExpander.Items>
+                                <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsSecuritySelected}">
+                                    <StackPanel>                                    
                                         <fa:FASettingsExpanderItem Content="{Binding L.AutoLock}" Description="{Binding L.AutoLockDescription}">
                                             <fa:FASettingsExpanderItem.Footer>
                                                 <ToggleSwitch IsChecked="{Binding AutoLockEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
@@ -2689,14 +2695,12 @@
                                                 </StackPanel>
                                             </fa:FASettingsExpanderItem.Footer>
                                         </fa:FASettingsExpanderItem>
-                                    </fa:FASettingsExpander.Items>
-                                </fa:FASettingsExpander>
+                                    
+                                                                    </StackPanel>
+                                </Border>
 
-                                <fa:FASettingsExpander Header="{Binding SecurityRecoveryTitle}" Description="{Binding SecurityRecoveryDescription}" IsExpanded="True" IsVisible="{Binding IsSettingsSecurityRecoverySelected}">
-                                    <fa:FASettingsExpander.IconSource>
-                                        <fa:FASymbolIconSource Symbol="ProtectedDocument" />
-                                    </fa:FASettingsExpander.IconSource>
-                                    <fa:FASettingsExpander.Items>
+                                <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsSecurityRecoverySelected}">
+                                    <StackPanel>                                    
                                         <fa:FASettingsExpanderItem Content="{Binding SecurityRecoveryEnabledText}" Description="{Binding SecurityRecoveryStatusText}">
                                             <fa:FASettingsExpanderItem.Footer>
                                                 <ToggleSwitch IsChecked="{Binding SecurityRecoveryEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
@@ -2761,14 +2765,12 @@
                                                 </StackPanel>
                                             </fa:FASettingsExpanderItem.Footer>
                                         </fa:FASettingsExpanderItem>
-                                    </fa:FASettingsExpander.Items>
-                                </fa:FASettingsExpander>
+                                    
+                                                                    </StackPanel>
+                                </Border>
 
-                                <fa:FASettingsExpander Header="{Binding L.DataManagement}" Description="{Binding L.DataManagementDescription}" IsExpanded="True" IsVisible="{Binding IsSettingsDataSelected}">
-                                    <fa:FASettingsExpander.IconSource>
-                                        <fa:FASymbolIconSource Symbol="Save" />
-                                    </fa:FASettingsExpander.IconSource>
-                                    <fa:FASettingsExpander.Items>
+                                <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsDataSelected}">
+                                    <StackPanel>                                    
                                         <fa:FASettingsExpanderItem Content="{Binding L.ImportData}" Description="{Binding L.ImportDataDescription}">
                                             <fa:FASettingsExpanderItem.Footer>
                                                 <StackPanel Orientation="Horizontal" Spacing="12" Margin="16,0,0,0" VerticalAlignment="Center">
@@ -2843,14 +2845,12 @@
                                                 </Button>
                                             </fa:FASettingsExpanderItem.Footer>
                                         </fa:FASettingsExpanderItem>
-                                    </fa:FASettingsExpander.Items>
-                                </fa:FASettingsExpander>
+                                    
+                                                                    </StackPanel>
+                                </Border>
 
-                                <fa:FASettingsExpander Header="{Binding L.Desktop}" Description="{Binding L.DesktopSettingsDescription}" IsExpanded="True" IsVisible="{Binding IsSettingsDesktopSelected}">
-                                    <fa:FASettingsExpander.IconSource>
-                                        <fa:FASymbolIconSource Symbol="ContactInfo" />
-                                    </fa:FASettingsExpander.IconSource>
-                                    <fa:FASettingsExpander.Items>
+                                <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsDesktopSelected}">
+                                    <StackPanel>                                    
                                         <fa:FASettingsExpanderItem Content="{Binding L.MinimizeToTray}" Description="{Binding L.MinimizeToTrayDescription}">
                                             <fa:FASettingsExpanderItem.Footer>
                                                 <StackPanel Orientation="Horizontal" Spacing="12" Margin="16,0,0,0" VerticalAlignment="Center">
@@ -2895,14 +2895,11 @@
                                                 <ToggleSwitch IsChecked="{Binding CompactPasswordList}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
                                             </fa:FASettingsExpanderItem.Footer>
                                         </fa:FASettingsExpanderItem>
-                                    </fa:FASettingsExpander.Items>
-                                </fa:FASettingsExpander>
+                                    
+                                                                    </StackPanel>
+                                </Border>
 
-                                <fa:FASettingsExpander Header="{Binding PlatformIntegrationsTitle}" Description="{Binding PlatformIntegrationSummaryText}" IsExpanded="True" IsVisible="{Binding IsSettingsIntegrationsSelected}" ItemsSource="{Binding PlatformIntegrationCapabilities}">
-                                    <fa:FASettingsExpander.IconSource>
-                                        <fa:FASymbolIconSource Symbol="Permissions" />
-                                    </fa:FASettingsExpander.IconSource>
-                                    <fa:FASettingsExpander.ItemTemplate>
+                                <ItemsControl Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsIntegrationsSelected}" ItemsSource="{Binding PlatformIntegrationCapabilities}">                                    <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:LocalizedPlatformIntegrationCapability">
                                             <fa:FASettingsExpanderItem Content="{Binding Title}" Description="{Binding Description}">
                                                 <fa:FASettingsExpanderItem.Footer>
@@ -2913,15 +2910,11 @@
                                                 </fa:FASettingsExpanderItem.Footer>
                                             </fa:FASettingsExpanderItem>
                                         </DataTemplate>
-                                    </fa:FASettingsExpander.ItemTemplate>
-                                </fa:FASettingsExpander>
+                                    </ItemsControl.ItemTemplate>
+                                                                </ItemsControl>
 
                                 <fa:FAInfoBar IsOpen="True" IsVisible="{Binding IsSettingsIntegrationsSelected}" Severity="Informational" Title="{Binding L.DesktopEquivalents}" Message="{Binding L.DesktopEquivalentsMessage}" />
-                                <fa:FASettingsExpander Header="{Binding L.FeatureParityMap}" Description="{Binding L.FeatureParityMapDescription}" IsExpanded="True" IsVisible="{Binding IsSettingsIntegrationsSelected}" ItemsSource="{Binding Capabilities}">
-                                    <fa:FASettingsExpander.IconSource>
-                                        <fa:FASymbolIconSource Symbol="Sync" />
-                                    </fa:FASettingsExpander.IconSource>
-                                    <fa:FASettingsExpander.ItemTemplate>
+                                <ItemsControl Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsIntegrationsSelected}" ItemsSource="{Binding Capabilities}">                                    <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:LocalizedPlatformCapability">
                                             <fa:FASettingsExpanderItem Content="{Binding Title}" Description="{Binding Description}">
                                                 <fa:FASettingsExpanderItem.Footer>
@@ -2936,14 +2929,11 @@
                                                 </fa:FASettingsExpanderItem.Footer>
                                             </fa:FASettingsExpanderItem>
                                         </DataTemplate>
-                                    </fa:FASettingsExpander.ItemTemplate>
-                                </fa:FASettingsExpander>
+                                    </ItemsControl.ItemTemplate>
+                                                                </ItemsControl>
 
-                                <fa:FASettingsExpander Header="{Binding AboutTitle}" Description="{Binding AboutDescription}" IsExpanded="True" IsVisible="{Binding IsSettingsAboutSelected}">
-                                    <fa:FASettingsExpander.IconSource>
-                                        <fa:FASymbolIconSource Symbol="ContactInfo" />
-                                    </fa:FASettingsExpander.IconSource>
-                                    <fa:FASettingsExpander.Items>
+                                <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsAboutSelected}">
+                                    <StackPanel>                                    
                                         <fa:FASettingsExpanderItem Content="Monica" Description="{Binding AppVersionText}">
                                             <fa:FASettingsExpanderItem.Footer>
                                                 <StackPanel Orientation="Horizontal" Spacing="12" Margin="16,0,0,0" VerticalAlignment="Center">
@@ -2969,14 +2959,12 @@
                                                 </StackPanel>
                                             </fa:FASettingsExpanderItem.Footer>
                                         </fa:FASettingsExpanderItem>
-                                    </fa:FASettingsExpander.Items>
-                                </fa:FASettingsExpander>
+                                    
+                                                                    </StackPanel>
+                                </Border>
 
-                                <fa:FASettingsExpander Header="{Binding DangerZoneTitle}" Description="{Binding DangerZoneDescription}" IsExpanded="True" IsVisible="{Binding IsSettingsDangerSelected}">
-                                    <fa:FASettingsExpander.IconSource>
-                                        <fa:FASymbolIconSource Symbol="Delete" />
-                                    </fa:FASettingsExpander.IconSource>
-                                    <fa:FASettingsExpander.Items>
+                                <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsDangerSelected}">
+                                    <StackPanel>                                    
                                         <fa:FASettingsExpanderItem Content="{Binding ClearVaultDataTitle}" Description="{Binding ClearVaultDataDescription}">
                                             <fa:FASettingsExpanderItem.Footer>
                                                 <StackPanel Spacing="8" Margin="16,0,0,0" MaxWidth="520">
@@ -2996,8 +2984,9 @@
                                                 </StackPanel>
                                             </fa:FASettingsExpanderItem.Footer>
                                         </fa:FASettingsExpanderItem>
-                                    </fa:FASettingsExpander.Items>
-                                </fa:FASettingsExpander>
+                                    
+                                                                    </StackPanel>
+                                </Border>
                                     </StackPanel>
                                 </ScrollViewer>
                             </Grid>
