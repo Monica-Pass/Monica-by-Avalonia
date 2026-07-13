@@ -112,8 +112,7 @@ public partial class MainWindow : Window
 
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.F)
         {
-            PasswordSearchBox.Focus();
-            PasswordSearchBox.SelectAll();
+            PasswordVaultView.FocusSearch();
             e.Handled = true;
             return;
         }
@@ -152,7 +151,7 @@ public partial class MainWindow : Window
 
         if (e.Key == Key.Enter && viewModel.HasCurrentSelectedPasswordDetails && !IsNonSearchPasswordTextEditingSource(e.Source))
         {
-            PasswordDetailRegion.Focus();
+            PasswordVaultView.FocusDetails();
             e.Handled = true;
             return;
         }
@@ -304,12 +303,12 @@ public partial class MainWindow : Window
         viewModel.SelectedPassword = visiblePasswords[nextIndex];
         if (viewModel.SelectedPasswordListRow is { } row)
         {
-            Dispatcher.UIThread.Post(() => PasswordListBox.ScrollIntoView(row));
+            Dispatcher.UIThread.Post(() => PasswordVaultView.ScrollIntoView(row));
         }
     }
 
     private bool IsNonSearchPasswordTextEditingSource(object? source) =>
-        source is TextBox textBox && textBox != PasswordSearchBox;
+        source is TextBox textBox && !PasswordVaultView.IsSearchBox(textBox);
 
     private static bool IsTextEditingSource(object? source) => source is TextBox;
 
@@ -1920,9 +1919,8 @@ public partial class MainWindow : Window
 
             viewModel.SelectSectionCommand.Execute("Passwords");
             await Task.Delay(50);
-            PasswordSearchBox.Focus();
-            PasswordSearchBox.SelectAll();
-            Check("password-search-focus", PasswordSearchBox.IsFocused, $"section={viewModel.SelectedSection}");
+            PasswordVaultView.FocusSearch();
+            Check("password-search-focus", PasswordVaultView.IsSearchFocused, $"section={viewModel.SelectedSection}");
 
             viewModel.PasswordSearchText = "Smoke";
             await Task.Delay(50);
@@ -1956,8 +1954,8 @@ public partial class MainWindow : Window
                           !viewModel.IsLoadingSelectedPasswordDetails,
                     TimeSpan.FromSeconds(3));
                 Check("password-details-ready", detailsReady, $"selected={viewModel.SelectedPassword?.Title}");
-                PasswordDetailRegion.Focus();
-                Check("password-enter-focus-details", PasswordDetailRegion.IsFocused, $"hasDetails={viewModel.HasCurrentSelectedPasswordDetails}");
+                PasswordVaultView.FocusDetails();
+                Check("password-enter-focus-details", PasswordVaultView.IsDetailFocused, $"hasDetails={viewModel.HasCurrentSelectedPasswordDetails}");
                 Check(
                     "password-delete-command-available",
                     viewModel.SelectedPassword is not null &&
