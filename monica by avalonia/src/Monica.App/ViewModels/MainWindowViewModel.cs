@@ -41,27 +41,6 @@ internal sealed record VaultLoadSnapshot(
     IReadOnlyList<Category> Categories,
     IReadOnlyDictionary<long, PasswordQuickAccessRecord> PasswordQuickAccessRecords,
     IReadOnlyList<LocalMdbxDatabase> MdbxDatabases);
-public sealed record MdbxDatabaseDisplayItem(
-    LocalMdbxDatabase Database,
-    string Name,
-    string Source,
-    string LocalPath,
-    string RemotePath,
-    string Mode,
-    string UnlockMethod,
-    string CreatedText,
-    string LastAccessedText,
-    string LastSyncedText,
-    string SyncStatus,
-    string Description,
-    string WorkingCopyStatus,
-    string RemoteStatus,
-    string CachePath,
-    string LastSyncErrorText,
-    bool HasLastSyncError,
-    bool IsDefault,
-    bool IsLocal,
-    bool IsRemote);
 public sealed record MonicaJsonImportResult(int Passwords, int SecureItems, int Categories);
 
 internal sealed class DisabledTotpEditorDialogService : ITotpEditorDialogService
@@ -148,7 +127,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IPwnedPasswordService _pwnedPasswordService;
     private readonly IImportExportService _importExportService;
     private readonly IClipboardService _clipboardService;
-    private readonly IMdbxVaultService _mdbxVaultService;
     private readonly IPasswordAttachmentFileService _passwordAttachmentFileService;
     private readonly IPasswordEditorDialogService _passwordEditorDialogService;
     private readonly IPasswordDetailDialogService _passwordDetailDialogService;
@@ -242,10 +220,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ILocalizationService L => _localization;
     public ObservableCollection<PasswordEntry> Passwords { get; } = new ObservableRangeCollection<PasswordEntry>();
     public ObservableCollection<Category> Categories { get; } = new ObservableRangeCollection<Category>();
-    public ObservableCollection<LocalMdbxDatabase> MdbxDatabases { get; } = new ObservableRangeCollection<LocalMdbxDatabase>();
-    public ObservableCollection<MdbxDatabaseDisplayItem> MdbxDatabaseItems { get; } = [];
     public ObservableCollection<TimelineEntry> TimelineEntries { get; } = new ObservableRangeCollection<TimelineEntry>();
-    public ObservableCollection<SyncHealthDisplayItem> MdbxHealthItems { get; } = [];
     public ObservableCollection<SettingsChoice> PasswordSortOptions { get; } = [];
     public ObservableCollection<PasswordFolderFilterChoice> PasswordFolderFilters { get; } = [];
     public IEnumerable<PasswordFolderFilterChoice> SystemPasswordFolderFilters =>
@@ -366,10 +341,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private TimelineEntry? _selectedTimelineEntry;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasSelectedMdbxDatabaseItem))]
-    private MdbxDatabaseDisplayItem? _selectedMdbxDatabaseItem;
-
-    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsDatabaseSourceSelected))]
     [NotifyPropertyChangedFor(nameof(IsDatabaseOverviewSelected))]
     [NotifyPropertyChangedFor(nameof(IsDatabaseCloudSelected))]
@@ -377,17 +348,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _selectedDatabaseManagementPage = "Source";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsMdbxDetailsSelected))]
-    [NotifyPropertyChangedFor(nameof(IsMdbxHealthSelected))]
-    [NotifyPropertyChangedFor(nameof(IsMdbxSourcesSelected))]
-    [NotifyPropertyChangedFor(nameof(IsMdbxRuntimeSelected))]
-    private string _selectedMdbxWorkspacePage = "Details";
-
-    [ObservableProperty]
     private bool _compactPasswordList;
-
-    [ObservableProperty]
-    private bool _mdbxLocalCacheEnabled = true;
 
     [ObservableProperty]
     private bool _quickFilterFavorite;
@@ -574,68 +535,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public string NoteCountText => _localization.Format("NoteCountFormat", NoteItems.Count);
     public string TimelineCountText => _localization.Format("TimelineCountFormat", TimelineEntries.Count);
     public string LocalDatabaseSummaryText => _localization.Format("DatabaseSummaryFormat", Passwords.Count, NoteItems.Count, TotpItems.Count, WalletItems.Count);
-    public string MdbxDatabaseCountText => _localization.Format("MdbxDatabaseCountFormat", MdbxDatabases.Count);
-    public string MdbxLocalCountText => _localization.Format("MdbxSourceCountFormat", MdbxLocalDatabaseCount);
-    public string MdbxWebDavCountText => _localization.Format("MdbxSourceCountFormat", MdbxWebDavDatabaseCount);
-    public string MdbxOneDriveCountText => _localization.Format("MdbxSourceCountFormat", MdbxOneDriveDatabaseCount);
-    public int MdbxLocalDatabaseCount => MdbxDatabases.Count(IsLocalMdbxDatabase);
-    public int MdbxWebDavDatabaseCount => MdbxDatabases.Count(item => item.StorageLocation == MdbxStorageLocation.RemoteWebDav);
-    public int MdbxOneDriveDatabaseCount => MdbxDatabases.Count(item => item.StorageLocation == MdbxStorageLocation.RemoteOneDrive);
-    public int MdbxRemoteDatabaseCount => MdbxWebDavDatabaseCount + MdbxOneDriveDatabaseCount;
-    public int MdbxWorkingCopyCount => MdbxDatabases.Count(HasMdbxWorkingCopy);
-    public int MdbxOfflineCopyCount => MdbxDatabases.Count(item => item.IsOfflineAvailable || HasMdbxWorkingCopy(item));
-    public int MdbxPendingSyncCount => MdbxDatabases.Count(HasPendingMdbxSync);
-    public int MdbxSyncErrorCount => MdbxDatabases.Count(HasMdbxSyncIssue);
-    public bool HasMdbxDatabases => MdbxDatabases.Count > 0;
-    public bool HasMdbxSyncErrors => MdbxSyncErrorCount > 0;
-    public string MdbxDefaultVaultSummaryText
-    {
-        get
-        {
-            var defaultVault = MdbxDatabases.FirstOrDefault(item => item.IsDefault);
-            return defaultVault is null
-                ? _localization.Get("MdbxDefaultVaultMissing")
-                : _localization.Format("MdbxDefaultVaultFormat", string.IsNullOrWhiteSpace(defaultVault.Name) ? "MDBX" : defaultVault.Name);
-        }
-    }
-    public string MdbxWorkingCopySummaryText => MdbxWorkingCopyCount == 0
-        ? _localization.Get("MdbxNoWorkingCopies")
-        : _localization.Format("MdbxWorkingCopySummaryFormat", MdbxWorkingCopyCount, MdbxDatabases.Count, MdbxOfflineCopyCount);
-    public string MdbxRemoteSummaryText => MdbxRemoteDatabaseCount == 0
-        ? _localization.Get("MdbxRemoteSourceEmpty")
-        : _localization.Format("MdbxRemoteSummaryFormat", MdbxRemoteDatabaseCount, MdbxPendingSyncCount);
-    public string MdbxSyncDiagnosticsSummaryText => MdbxSyncErrorCount > 0
-        ? _localization.Format("MdbxSyncErrorsFormat", MdbxSyncErrorCount)
-        : MdbxPendingSyncCount > 0
-            ? _localization.Format("MdbxPendingSyncFormat", MdbxPendingSyncCount)
-            : _localization.Get("MdbxNoSyncErrors");
-    public string MdbxCachePolicyText => MdbxLocalCacheEnabled
-        ? _localization.Get("MdbxCacheEnabled")
-        : _localization.Get("MdbxCacheDisabled");
-    public string MdbxLocalSourceStatusText => MdbxLocalDatabaseCount > 0
-        ? _localization.Format("MdbxLocalSourceReadyFormat", MdbxLocalDatabaseCount)
-        : _localization.Get("MdbxLocalSourceEmpty");
-    public string MdbxWebDavSourceStatusText => !WebDavEnabled
-        ? _localization.Get("WebDavDisabled")
-        : MdbxWebDavDatabaseCount > 0
-            ? _localization.Format("MdbxWebDavSourceReadyFormat", MdbxWebDavDatabaseCount)
-            : _localization.Get("MdbxWebDavSourceEmpty");
-    public string MdbxOneDriveSourceStatusText => !OneDriveEnabled
-        ? _localization.Get("FeatureDisabled")
-        : MdbxOneDriveDatabaseCount > 0
-            ? _localization.Format("MdbxOneDriveSourceReadyFormat", MdbxOneDriveDatabaseCount)
-            : _localization.Get("MdbxOneDriveSourceEmpty");
-    public string MdbxRuntimeSummaryText => _localization.Get("MdbxRuntimeSummary");
-    public string MdbxSecuritySummaryText => _localization.Get("MdbxSecuritySummary");
     public int SmokeVaultLoadDelayMilliseconds { get; set; }
     public bool IsDatabaseSourceSelected => IsWorkspacePageSelected(SelectedDatabaseManagementPage, "Source");
     public bool IsDatabaseOverviewSelected => IsWorkspacePageSelected(SelectedDatabaseManagementPage, "Overview");
     public bool IsDatabaseCloudSelected => IsWorkspacePageSelected(SelectedDatabaseManagementPage, "Cloud");
     public bool IsDatabaseCapabilitiesSelected => IsWorkspacePageSelected(SelectedDatabaseManagementPage, "Capabilities");
-    public bool IsMdbxDetailsSelected => IsWorkspacePageSelected(SelectedMdbxWorkspacePage, "Details");
-    public bool IsMdbxHealthSelected => IsWorkspacePageSelected(SelectedMdbxWorkspacePage, "Health");
-    public bool IsMdbxSourcesSelected => IsWorkspacePageSelected(SelectedMdbxWorkspacePage, "Sources");
-    public bool IsMdbxRuntimeSelected => IsWorkspacePageSelected(SelectedMdbxWorkspacePage, "Runtime");
     public string NotePreviewMarkdown => NoteIsMarkdown ? BuildNotePreviewMarkdown(NoteContent) : "";
     public string NotePlainPreview => NoteContentCodec.ToPlainPreview(NoteContent, NoteIsMarkdown);
     public int SelectedPasswordCount => _selectedPasswordCount;
@@ -650,7 +554,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         SelectedPassword is not null &&
         IsLoadingSelectedPasswordDetails;
     public bool HasSelectedTimelineEntry => SelectedTimelineEntry is not null;
-    public bool HasSelectedMdbxDatabaseItem => SelectedMdbxDatabaseItem is not null;
     public bool HasRecoverableStatusMessage =>
         IsUnlocked &&
         !IsLoadingVault &&
@@ -791,13 +694,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(PasswordListContentMargin));
         OnPropertyChanged(nameof(ShowPasswordListDetails));
     }
-    partial void OnMdbxLocalCacheEnabledChanged(bool value)
-    {
-        UpdateSettings(settings => settings.MdbxLocalCacheEnabled = value);
-        RaiseSyncPageState();
-        RefreshMdbxVaultState();
-    }
-
     private void RaiseShellStatus()
     {
         OnPropertyChanged(nameof(ShellVaultText));
