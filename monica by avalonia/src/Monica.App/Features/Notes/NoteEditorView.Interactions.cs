@@ -4,9 +4,9 @@ using Avalonia.Interactivity;
 using Monica.App.Features.Notes;
 using Monica.App.ViewModels;
 
-namespace Monica.App;
+namespace Monica.App.Features.Notes;
 
-public partial class MainWindow
+public partial class NoteEditorView
 {
     private async void NoteEditorToolbarView_OnActionRequested(object? sender, NoteEditorActionRequestedEventArgs e)
     {
@@ -47,39 +47,6 @@ public partial class MainWindow
         {
             InsertMarkdownBlock(markdown);
         }
-    }
-
-    private void SetNoteEditModeMenuItem_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is not MainWindowViewModel viewModel)
-        {
-            return;
-        }
-
-        viewModel.NotePreviewMode = false;
-        viewModel.NoteSplitPreviewMode = false;
-    }
-
-    private void SetNotePreviewModeMenuItem_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is not MainWindowViewModel viewModel)
-        {
-            return;
-        }
-
-        viewModel.NoteSplitPreviewMode = false;
-        viewModel.NotePreviewMode = true;
-    }
-
-    private void SetNoteSplitModeMenuItem_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is not MainWindowViewModel viewModel)
-        {
-            return;
-        }
-
-        viewModel.NotePreviewMode = false;
-        viewModel.NoteSplitPreviewMode = true;
     }
 
     private async void NoteContentEditor_OnKeyDown(object? sender, KeyEventArgs e)
@@ -169,7 +136,7 @@ public partial class MainWindow
             if (e.Key == Key.W && e.KeyModifiers == KeyModifiers.Control && noteViewModel.SelectedNoteTab is not null)
             {
                 e.Handled = true;
-                await CloseNoteTabWithPromptAsync(noteViewModel, noteViewModel.SelectedNoteTab);
+                RequestClose(noteViewModel.SelectedNoteTab);
                 UpdateNoteEditorStatus();
                 return;
             }
@@ -273,9 +240,6 @@ public partial class MainWindow
             UpdateNoteEditorStatus();
         }
     }
-
-    private void NoteInspectorView_OnLineRequested(object? sender, NoteLineRequestedEventArgs e) =>
-        JumpToNoteLine(e.LineNumber);
 
     private void ApplyMarkdownAction(string action)
     {

@@ -121,24 +121,7 @@ public partial class MainWindow
     }
 
     private void RestoreSelectedNoteTabSelection()
-    {
-        if (DataContext is not MainWindowViewModel viewModel || viewModel.SelectedNoteTab is null)
-        {
-            return;
-        }
-
-        var textLength = (NoteContentEditor.Text ?? "").Length;
-        var start = Math.Clamp(viewModel.SelectedNoteTab.DraftSelectionStart, 0, textLength);
-        var end = Math.Clamp(viewModel.SelectedNoteTab.DraftSelectionEnd, 0, textLength);
-        NoteContentEditor.SelectionStart = start;
-        NoteContentEditor.SelectionEnd = end;
-        if (viewModel.IsNoteEditorPaneVisible)
-        {
-            NoteContentEditor.Focus();
-        }
-
-        UpdateNoteEditorStatus();
-    }
+        => NoteEditorView.RestoreSelectedTabSelection();
 
     private async void CloseNoteTabButton_OnClick(object? sender, RoutedEventArgs e)
     {
@@ -182,7 +165,7 @@ public partial class MainWindow
     private void CloseNoteTab(MainWindowViewModel viewModel, NoteEditorTab tab)
     {
         viewModel.CloseNoteTabCommand.Execute(tab);
-        _noteEditorHistories.Remove(tab);
+        NoteEditorView.RemoveHistory(tab);
     }
 
     private async Task<FAContentDialogResult> ShowUnsavedNoteTabDialogAsync(NoteEditorTab tab)

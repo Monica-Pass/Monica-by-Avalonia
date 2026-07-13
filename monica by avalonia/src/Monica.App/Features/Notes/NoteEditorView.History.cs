@@ -3,9 +3,9 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Monica.App.ViewModels;
 
-namespace Monica.App;
+namespace Monica.App.Features.Notes;
 
-public partial class MainWindow
+public partial class NoteEditorView
 {
     private const int MaxNoteEditorHistoryEntries = 100;
     private readonly Dictionary<NoteEditorTab, NoteEditorHistoryState> _noteEditorHistories = [];

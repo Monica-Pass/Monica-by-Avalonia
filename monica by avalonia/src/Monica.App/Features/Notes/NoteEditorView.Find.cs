@@ -5,9 +5,9 @@ using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Monica.App.ViewModels;
 
-namespace Monica.App;
+namespace Monica.App.Features.Notes;
 
-public partial class MainWindow
+public partial class NoteEditorView
 {
     private void NoteFindTextBox_OnTextChanged(object? sender, TextChangedEventArgs e)
     {

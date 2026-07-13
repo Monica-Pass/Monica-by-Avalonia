@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Threading;
 using FluentAvalonia.UI.Controls;
+using Monica.App.Features.Notes;
 using Monica.App.ViewModels;
 
 namespace Monica.App;
@@ -15,36 +16,13 @@ public partial class MainWindow
 
     private async void HandleNoteWorkspaceShortcut(MainWindowViewModel viewModel, KeyEventArgs e)
     {
-        if (e.Key == Key.Escape && NoteFindPanel.IsVisible)
+        if (NoteEditorView.TryHandleWorkspaceShortcut(e))
         {
-            HideNoteFindPanel();
-            e.Handled = true;
-            return;
-        }
-
-        if (e.Key == Key.F3)
-        {
-            SelectNoteFindMatch(forward: !e.KeyModifiers.HasFlag(KeyModifiers.Shift), focusEditor: true);
-            e.Handled = true;
             return;
         }
 
         if (!e.KeyModifiers.HasFlag(KeyModifiers.Control))
         {
-            return;
-        }
-
-        if (e.Key == Key.F)
-        {
-            ShowNoteFindPanel(replaceMode: false);
-            e.Handled = true;
-            return;
-        }
-
-        if (e.Key == Key.H)
-        {
-            ShowNoteFindPanel(replaceMode: true);
-            e.Handled = true;
             return;
         }
 
@@ -155,8 +133,8 @@ public partial class MainWindow
         {
             Dispatcher.UIThread.Post(() =>
             {
-                RestoreSelectedNoteTabSelection();
-                EnsureSelectedNoteEditorHistory();
+                NoteEditorView.RestoreSelectedTabSelection();
+                NoteEditorView.EnsureSelectedHistory();
                 ScrollSelectedNoteTabIntoView();
                 UpdateNoteTabScrollButtons();
             });
@@ -174,4 +152,19 @@ public partial class MainWindow
             QueueWorkspaceScrollResetForSelectedSection();
         }
     }
+
+    private async void NoteEditorView_OnCloseRequested(object? sender, NoteEditorCloseRequestedEventArgs e) =>
+        await CloseNoteTabWithPromptAsync((MainWindowViewModel)DataContext!, e.Tab);
+
+    private void NoteInspectorView_OnLineRequested(object? sender, NoteLineRequestedEventArgs e) =>
+        NoteEditorView.JumpToLine(e.LineNumber);
+
+    private void SetNoteEditModeMenuItem_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
+        NoteEditorView.SetMode("edit");
+
+    private void SetNotePreviewModeMenuItem_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
+        NoteEditorView.SetMode("preview");
+
+    private void SetNoteSplitModeMenuItem_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
+        NoteEditorView.SetMode("split");
 }

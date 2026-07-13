@@ -376,44 +376,7 @@ public partial class MainWindow : Window
                     $"selected={viewModel.SelectedNoteTab?.Title}");
             }
 
-            viewModel.NotePreviewMode = false;
-            viewModel.NoteSplitPreviewMode = false;
-            viewModel.NoteContent = "alpha\nbeta";
-            NoteContentEditor.Text = viewModel.NoteContent;
-            NoteContentEditor.SelectionStart = 0;
-            NoteContentEditor.SelectionEnd = NoteContentEditor.Text?.Length ?? 0;
-            NoteContentEditor.Focus();
-            Check("note-editor-focus", NoteContentEditor.IsFocused, $"section={viewModel.SelectedSection}");
-
-            IndentSelectedLines(outdent: false);
-            Check(
-                "note-tab-indents-lines",
-                (NoteContentEditor.Text ?? "").StartsWith("    alpha", StringComparison.Ordinal),
-                $"content='{FormatSmokeLogValue(NoteContentEditor.Text)}'");
-            IndentSelectedLines(outdent: true);
-            Check(
-                "note-shift-tab-outdents-lines",
-                string.Equals(NoteContentEditor.Text, "alpha\nbeta", StringComparison.Ordinal),
-                $"content='{FormatSmokeLogValue(NoteContentEditor.Text)}'");
-
-            ShowNoteFindPanel(replaceMode: false);
-            await Task.Delay(50);
-            Check(
-                "note-ctrl-f-focus-find",
-                NoteFindPanel.IsVisible && NoteFindTextBox.IsFocused,
-                $"findVisible={NoteFindPanel.IsVisible}");
-            HideNoteFindPanel();
-            Check(
-                "note-escape-closes-find",
-                !NoteFindPanel.IsVisible && NoteContentEditor.IsFocused,
-                $"findVisible={NoteFindPanel.IsVisible}");
-            ShowNoteFindPanel(replaceMode: true);
-            await Task.Delay(50);
-            Check(
-                "note-ctrl-h-focus-replace",
-                NoteFindPanel.IsVisible && NoteReplaceTextBox.IsVisible && NoteReplaceTextBox.IsFocused,
-                $"replaceVisible={NoteReplaceTextBox.IsVisible}");
-            HideNoteFindPanel();
+            await NoteEditorView.RunKeyboardSmokeChecksAsync(Check);
 
             viewModel.SelectSectionCommand.Execute("Generator");
             await Task.Delay(50);

@@ -2,9 +2,9 @@ using System.Text.RegularExpressions;
 using Avalonia.Controls;
 using Monica.App.ViewModels;
 
-namespace Monica.App;
+namespace Monica.App.Features.Notes;
 
-public partial class MainWindow
+public partial class NoteEditorView
 {
     private static readonly Regex OrderedListLineRegex = new(@"^(\s*)(\d+)([.)])\s+(.*)$", RegexOptions.Compiled);
     private static readonly Regex TaskListLineRegex = new(@"^(\s*)([-*+])\s+\[(?: |x|X)\]\s+(.*)$", RegexOptions.Compiled);

@@ -18,59 +18,7 @@ public partial class MainWindow
             return false;
         }
 
-        viewModel.SelectSectionCommand.Execute("Notes");
-        if (viewModel.SelectedNoteTab is null)
-        {
-            viewModel.AddNoteCommand.Execute(null);
-        }
-
-        viewModel.NoteTitle = "Smoke Markdown editor";
-        viewModel.NoteIsMarkdown = true;
-        viewModel.NotePreviewMode = false;
-        viewModel.NoteSplitPreviewMode = false;
-        var content = string.Join("\n",
-            "# Smoke Markdown editor",
-            "",
-            "This line contains NEEDLE and a second needle for replace-all.",
-            "",
-            "## Links and images",
-            "",
-            "![inline](monica-image://smoke-image)",
-            "[reference](https://example.invalid/smoke)",
-            "",
-            "- [ ] Task item",
-            "1. Ordered item",
-            "",
-            "```",
-            "needle inside code is intentionally replaceable in plain editor search",
-            "```");
-
-        viewModel.NoteContent = content;
-        NoteContentEditor.Text = content;
-        NoteContentEditor.SelectionStart = 0;
-        NoteContentEditor.SelectionEnd = 0;
-        CaptureNoteEditorHistorySnapshot(force: true);
-        UpdateNoteEditorStatus();
-
-        ShowNoteFindPanel(replaceMode: true);
-        NoteFindTextBox.Text = "needle";
-        NoteReplaceTextBox.Text = "thread";
-        ReplaceAllNoteMatches();
-
-        viewModel.NoteSplitPreviewMode = true;
-        await viewModel.SaveNoteCommand.ExecuteAsync(null);
-
-        var updatedContent = viewModel.NoteContent;
-        var success =
-            viewModel.SelectedNote is not null &&
-            viewModel.NoteItems.Any(item => item.Id == viewModel.SelectedNote.Id) &&
-            updatedContent.Contains("thread", StringComparison.OrdinalIgnoreCase) &&
-            !updatedContent.Contains("needle", StringComparison.OrdinalIgnoreCase) &&
-            viewModel.HasNoteOutlineItems &&
-            viewModel.HasNoteReferenceItems &&
-            viewModel.NoteReferenceItems.Any(item => item.IsImage) &&
-            viewModel.NoteLineCount >= 12 &&
-            viewModel.NoteSplitPreviewMode;
+        var success = await NoteEditorView.RunSmokeChecksAsync(viewModel);
 
         AppDiagnostics.Info(
             $"Smoke UI note editor checks completed. success={success}, " +
