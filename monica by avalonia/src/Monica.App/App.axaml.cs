@@ -90,6 +90,7 @@ public partial class App : Application
         services.AddSingleton<ISqliteConnectionFactory, SqliteConnectionFactory>();
         services.AddSingleton<ILegacyVaultDetector, LegacyVaultDetector>();
         services.AddSingleton<IDatabaseMigrator, DatabaseMigrator>();
+        services.AddSingleton<ILegacyBusinessDataInspector, LegacyBusinessDataInspector>();
         services.AddSingleton<IVaultCredentialStore, VaultCredentialStore>();
         services.AddSingleton<MonicaRepository>(provider => new MonicaRepository(
             provider.GetRequiredService<ISqliteConnectionFactory>(),
@@ -126,6 +127,8 @@ public partial class App : Application
         services.AddSingleton<IKeePassVaultService, KeePassVaultService>();
         services.AddSingleton<IMdbxVaultService>(provider => new MdbxVaultService(
             nativeBridge: provider.GetRequiredService<IMdbxNativeBridge>()));
+        services.AddSingleton<ICanonicalVaultPathProvider, CanonicalVaultPathProvider>();
+        services.AddSingleton<ICanonicalVaultBootstrapService, CanonicalVaultBootstrapService>();
         services.AddSingleton<IClipboardService>(_ => new AvaloniaClipboardService(() => mainWindow));
         services.AddSingleton<PasswordAttachmentFileService>(_ => new PasswordAttachmentFileService(
             () => mainWindow,

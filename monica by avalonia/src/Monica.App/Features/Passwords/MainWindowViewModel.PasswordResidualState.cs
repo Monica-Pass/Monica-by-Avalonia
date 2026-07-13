@@ -256,7 +256,7 @@ public sealed partial class MainWindowViewModel
     public bool HasRecoverableStatusMessage =>
         IsUnlocked &&
         !IsLoadingVault &&
-        IsRecoverableStatusMessage(StatusMessage);
+        (HasPendingLegacyBusinessData || IsRecoverableStatusMessage(StatusMessage));
     public bool AreAllFilteredPasswordsSelected
     {
         get

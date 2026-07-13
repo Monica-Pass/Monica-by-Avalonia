@@ -9,7 +9,7 @@ public interface IDatabaseMigrator
 
 public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory) : IDatabaseMigrator
 {
-    public const int CurrentSchemaVersion = 69;
+    public const int CurrentSchemaVersion = 70;
 
     public async Task MigrateAsync(CancellationToken cancellationToken = default)
     {
@@ -33,6 +33,7 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
         }
 
         await CreateCurrentSchemaAsync(connection, cancellationToken);
+        await EnsurePasswordQuickAccessTableWithoutForeignKeyAsync(connection, cancellationToken);
         await EnsureColumnAsync(connection, "categories", "mdbx_folder_id", "TEXT DEFAULT NULL", cancellationToken);
         await EnsureColumnAsync(connection, "secure_items", "bound_password_id", "INTEGER DEFAULT NULL", cancellationToken);
         await ExecuteAsync(connection, "CREATE INDEX IF NOT EXISTS index_secure_items_bound_password_id ON secure_items(bound_password_id);", cancellationToken);
@@ -71,9 +72,75 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
         await ExecuteAsync(connection, $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};", cancellationToken);
     }
 
-    private static async Task ExecuteAsync(SqliteConnection connection, string sql, CancellationToken cancellationToken)
+    private static async Task EnsurePasswordQuickAccessTableWithoutForeignKeyAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        await using var inspection = connection.CreateCommand();
+        inspection.CommandText = "PRAGMA foreign_key_list(password_quick_access_records);";
+        await using var reader = await inspection.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return;
+        }
+
+        await reader.DisposeAsync();
+        await ExecuteAsync(connection, "PRAGMA foreign_keys=OFF;", cancellationToken);
+        try
+        {
+            await using var transaction = connection.BeginTransaction();
+            await ExecuteAsync(
+                connection,
+                """
+                CREATE TABLE password_quick_access_records_v70 (
+                    password_id INTEGER PRIMARY KEY NOT NULL,
+                    open_count INTEGER NOT NULL DEFAULT 0,
+                    last_opened_at INTEGER NOT NULL
+                );
+                """,
+                cancellationToken,
+                transaction);
+            await ExecuteAsync(
+                connection,
+                """
+                INSERT INTO password_quick_access_records_v70(password_id, open_count, last_opened_at)
+                SELECT password_id, open_count, last_opened_at
+                FROM password_quick_access_records;
+                """,
+                cancellationToken,
+                transaction);
+            await ExecuteAsync(connection, "DROP TABLE password_quick_access_records;", cancellationToken, transaction);
+            await ExecuteAsync(
+                connection,
+                "ALTER TABLE password_quick_access_records_v70 RENAME TO password_quick_access_records;",
+                cancellationToken,
+                transaction);
+            await ExecuteAsync(
+                connection,
+                "CREATE INDEX index_password_quick_access_records_last_opened_at ON password_quick_access_records(last_opened_at);",
+                cancellationToken,
+                transaction);
+            await ExecuteAsync(
+                connection,
+                "CREATE INDEX index_password_quick_access_records_open_count ON password_quick_access_records(open_count);",
+                cancellationToken,
+                transaction);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        finally
+        {
+            await ExecuteAsync(connection, "PRAGMA foreign_keys=ON;", cancellationToken);
+        }
+    }
+
+    private static async Task ExecuteAsync(
+        SqliteConnection connection,
+        string sql,
+        CancellationToken cancellationToken,
+        SqliteTransaction? transaction = null)
     {
         await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = sql;
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -181,8 +248,7 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
         CREATE TABLE IF NOT EXISTS password_quick_access_records (
             password_id INTEGER PRIMARY KEY NOT NULL,
             open_count INTEGER NOT NULL DEFAULT 0,
-            last_opened_at INTEGER NOT NULL,
-            FOREIGN KEY(password_id) REFERENCES password_entries(id) ON DELETE CASCADE
+            last_opened_at INTEGER NOT NULL
         );
         """,
         "CREATE INDEX IF NOT EXISTS index_password_quick_access_records_last_opened_at ON password_quick_access_records(last_opened_at);",

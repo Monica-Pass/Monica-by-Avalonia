@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Monica.Core.Models;
 using Monica.Data.Mdbx;
 using Monica.Data.Services;
@@ -9,11 +11,9 @@ public sealed class MdbxBackedMonicaRepository(
     IMdbxVaultStore mdbxVaultStore,
     IAttachmentContentStore? attachmentContentStore = null) : IMonicaRepository
 {
-    private static readonly TimeSpan MirrorCacheTtl = TimeSpan.FromMinutes(2);
-    private long? _passwordMirrorDatabaseId;
-    private DateTimeOffset _passwordMirrorCachedAt;
-    private long? _secureItemMirrorDatabaseId;
-    private DateTimeOffset _secureItemMirrorCachedAt;
+    private static readonly TimeSpan ReadCacheTtl = TimeSpan.FromMinutes(2);
+    private readonly IPasswordQuickAccessStore _quickAccessStore = inner as IPasswordQuickAccessStore
+        ?? throw new ArgumentException("The local repository must provide password quick-access storage.", nameof(inner));
     private long? _defaultLocalMdbxDatabaseId;
     private DateTimeOffset _defaultLocalMdbxDatabaseCachedAt;
     private LocalMdbxDatabase? _defaultLocalMdbxDatabase;
@@ -32,20 +32,15 @@ public sealed class MdbxBackedMonicaRepository(
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         if (database is null)
         {
-            return await inner.GetPasswordsAsync(includeDeleted, includeArchived, cancellationToken);
+            return [];
         }
 
         var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        var categoryById = categories.ToDictionary(category => category.Id);
-        await EnsurePasswordMirrorAsync(database, categoryById, cancellationToken);
         var snapshot = await GetPasswordReadSnapshotAsync(database, categories, cancellationToken);
-        var entries = snapshot.Passwords
+        return snapshot.Passwords
             .Where(entry => includeDeleted || !entry.IsDeleted)
             .Where(entry => includeArchived || !entry.IsArchived)
             .ToList();
-        return includeDeleted
-            ? await FilterDeletedPasswordsBySqliteTombstonesAsync(entries, cancellationToken)
-            : entries;
     }
 
     public async Task<long> SavePasswordAsync(PasswordEntry entry, CancellationToken cancellationToken = default)
@@ -54,173 +49,92 @@ public sealed class MdbxBackedMonicaRepository(
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         if (database is null)
         {
-            return await inner.SavePasswordAsync(entry, cancellationToken);
+            throw CreateCanonicalVaultUnavailableException();
         }
 
-        await inner.SavePasswordAsync(entry, cancellationToken);
+        if (entry.Id <= 0)
+        {
+            entry.Id = await AllocatePasswordIdAsync(database, cancellationToken);
+        }
+
+        entry.MdbxDatabaseId = database.Id;
         var categories = await EnsureMdbxCategoriesAsync(
             database,
             cancellationToken,
             recoverMdbxCategories: entry.CategoryId is not null);
-        await SavePasswordToMdbxAsync(database, entry, categories.ToDictionary(category => category.Id), cancellationToken);
-        await inner.SavePasswordAsync(entry, cancellationToken);
+        await SavePasswordAggregateAsync(database, categories, entry, cancellationToken: cancellationToken);
         ClearPasswordReadSnapshot();
         return entry.Id;
     }
 
     public async Task SoftDeletePasswordAsync(long id, CancellationToken cancellationToken = default)
     {
-        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
-        if (database is not null)
+        var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var entry = await FindPasswordForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
+        if (entry is not null)
         {
-            var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-            var entry = await FindPasswordForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
-            if (entry is not null)
+            await mdbxVaultStore.SoftDeletePasswordAsync(database, entry, cancellationToken);
+            entry.IsDeleted = true;
+            entry.DeletedAt = DateTimeOffset.UtcNow;
+            entry.IsArchived = false;
+            entry.ArchivedAt = null;
+            var boundTotps = await GetMdbxBoundTotpsByPasswordIdAsync(database, id, includeDeleted: true, cancellationToken);
+            foreach (var item in boundTotps)
             {
-                await mdbxVaultStore.SoftDeletePasswordAsync(database, entry, cancellationToken);
-                entry.IsDeleted = true;
-                entry.DeletedAt = DateTimeOffset.UtcNow;
-                entry.IsArchived = false;
-                entry.ArchivedAt = null;
-                await inner.SavePasswordAsync(entry, cancellationToken);
-                var boundTotps = await GetMdbxBoundTotpsByPasswordIdAsync(database, id, includeDeleted: true, cancellationToken);
-                foreach (var item in boundTotps)
-                {
-                    await mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken);
-                    item.IsDeleted = true;
-                    item.DeletedAt = entry.DeletedAt;
-                    await inner.SaveSecureItemAsync(item, cancellationToken);
-                }
+                await mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken);
+                item.IsDeleted = true;
+                item.DeletedAt = entry.DeletedAt;
             }
         }
-
-        await inner.SoftDeletePasswordAsync(id, cancellationToken);
         ClearPasswordReadSnapshot();
         ClearSecureItemReadSnapshot();
     }
 
     public async Task RestorePasswordAsync(long id, CancellationToken cancellationToken = default)
     {
-        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
-        if (database is not null)
+        var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var entry = await FindPasswordForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
+        if (entry is not null)
         {
-            var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-            var entry = await FindPasswordForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
-            if (entry is not null)
+            await mdbxVaultStore.RestorePasswordAsync(database, entry, cancellationToken);
+            entry.IsDeleted = false;
+            entry.DeletedAt = null;
+            var boundTotps = await GetMdbxBoundTotpsByPasswordIdAsync(database, id, includeDeleted: true, cancellationToken);
+            foreach (var item in boundTotps)
             {
-                await mdbxVaultStore.RestorePasswordAsync(database, entry, cancellationToken);
-                entry.IsDeleted = false;
-                entry.DeletedAt = null;
-                await inner.SavePasswordAsync(entry, cancellationToken);
-                var boundTotps = await GetMdbxBoundTotpsByPasswordIdAsync(database, id, includeDeleted: true, cancellationToken);
-                foreach (var item in boundTotps)
-                {
-                    await mdbxVaultStore.RestoreSecureItemAsync(database, item, cancellationToken);
-                    item.IsDeleted = false;
-                    item.DeletedAt = null;
-                    await inner.SaveSecureItemAsync(item, cancellationToken);
-                }
+                await mdbxVaultStore.RestoreSecureItemAsync(database, item, cancellationToken);
+                item.IsDeleted = false;
+                item.DeletedAt = null;
             }
         }
-
-        await inner.RestorePasswordAsync(id, cancellationToken);
         ClearPasswordReadSnapshot();
         ClearSecureItemReadSnapshot();
     }
 
     public async Task DeletePasswordPermanentlyAsync(long id, CancellationToken cancellationToken = default)
     {
-        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
-        if (database is not null)
+        var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var entry = await FindPasswordForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
+        if (entry is not null)
         {
-            var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-            var entry = await FindPasswordForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
-            if (entry is not null)
+            foreach (var attachment in await GetPasswordAttachmentsFromMdbxAsync(database, id, cancellationToken))
             {
-                foreach (var attachment in await GetPasswordAttachmentsForMdbxSaveAsync(
-                             database,
-                             id,
-                             excludeAttachment: null,
-                             includeMdbxOnlyAttachments: true,
-                             preferMdbxPayload: false,
-                             cancellationToken))
-                {
-                    await mdbxVaultStore.DeleteAttachmentAsync(database, attachment, cancellationToken);
-                }
+                await mdbxVaultStore.DeleteAttachmentAsync(database, attachment, cancellationToken);
+            }
 
-                await mdbxVaultStore.SoftDeletePasswordAsync(database, entry, cancellationToken);
-                var boundTotps = await GetMdbxBoundTotpsByPasswordIdAsync(database, id, includeDeleted: true, cancellationToken);
-                foreach (var item in boundTotps)
-                {
-                    await mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken);
-                }
+            await mdbxVaultStore.SoftDeletePasswordAsync(database, entry, cancellationToken);
+            var boundTotps = await GetMdbxBoundTotpsByPasswordIdAsync(database, id, includeDeleted: true, cancellationToken);
+            foreach (var item in boundTotps)
+            {
+                await mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken);
             }
         }
 
-        await inner.DeletePasswordPermanentlyAsync(id, cancellationToken);
         ClearPasswordReadSnapshot();
         ClearSecureItemReadSnapshot();
-    }
-
-    private async Task<IReadOnlyList<Attachment>> GetPasswordAttachmentsForMdbxSaveAsync(
-        LocalMdbxDatabase database,
-        long entryId,
-        Attachment? excludeAttachment,
-        bool includeMdbxOnlyAttachments,
-        bool preferMdbxPayload,
-        CancellationToken cancellationToken)
-    {
-        var result = new List<Attachment>();
-        var seenKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var excludedKey = excludeAttachment is null ? null : GetAttachmentIdentityKey(excludeAttachment);
-        var sqliteAttachments = await inner.GetAttachmentsAsync("PASSWORD", entryId, cancellationToken);
-        if (!includeMdbxOnlyAttachments)
-        {
-            AddUniqueAttachments(result, seenKeys, sqliteAttachments, excludedKey);
-            return result;
-        }
-
-        var mdbxAttachmentsByEntryId = await mdbxVaultStore.GetPasswordAttachmentsByEntryIdsAsync(database, [entryId], cancellationToken);
-        if (preferMdbxPayload && mdbxAttachmentsByEntryId.TryGetValue(entryId, out var preferredMdbxAttachments))
-        {
-            AddUniqueAttachments(result, seenKeys, preferredMdbxAttachments, excludedKey);
-            return result;
-        }
-
-        AddUniqueAttachments(result, seenKeys, sqliteAttachments, excludedKey);
-        if (mdbxAttachmentsByEntryId.TryGetValue(entryId, out var mdbxAttachments))
-        {
-            AddUniqueAttachments(result, seenKeys, mdbxAttachments, excludedKey);
-        }
-
-        return result;
-    }
-
-    private static void AddUniqueAttachments(List<Attachment> result, HashSet<string> seenKeys, IReadOnlyList<Attachment> attachments, string? excludedKey)
-    {
-        foreach (var attachment in attachments)
-        {
-            var key = GetAttachmentIdentityKey(attachment);
-            if (!string.Equals(key, excludedKey, StringComparison.OrdinalIgnoreCase) && seenKeys.Add(key))
-            {
-                result.Add(attachment);
-            }
-        }
-    }
-
-    private static string GetAttachmentIdentityKey(Attachment attachment)
-    {
-        if (attachment.Id > 0)
-        {
-            return $"id:{attachment.Id}";
-        }
-
-        if (!string.IsNullOrWhiteSpace(attachment.StoragePath))
-        {
-            return $"path:{attachment.StoragePath.Trim()}";
-        }
-
-        return $"name:{attachment.OwnerType}:{attachment.OwnerId}:{attachment.FileName}:{attachment.CreatedAt.ToUnixTimeMilliseconds()}";
     }
 
     public async Task<IReadOnlyList<CustomField>> GetCustomFieldsAsync(long entryId, CancellationToken cancellationToken = default)
@@ -240,14 +154,15 @@ public sealed class MdbxBackedMonicaRepository(
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         if (database is null)
         {
-            return await inner.GetCustomFieldsByEntryIdsAsync(ids, cancellationToken);
+            return new Dictionary<long, IReadOnlyList<CustomField>>();
         }
 
         var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        await EnsurePasswordMirrorAsync(database, categories.ToDictionary(category => category.Id), cancellationToken);
-
         var snapshot = await GetPasswordReadSnapshotAsync(database, categories, cancellationToken);
-        var existingIds = await GetPasswordIdsKnownToMdbxOrSqliteAsync(database, categories, snapshot, includeDeletedMdbx: false, cancellationToken);
+        var existingIds = snapshot.Passwords
+            .Where(entry => !entry.IsDeleted)
+            .Select(entry => entry.Id)
+            .ToHashSet();
         ids = ids.Where(existingIds.Contains).ToArray();
         if (ids.Length == 0)
         {
@@ -262,17 +177,6 @@ public sealed class MdbxBackedMonicaRepository(
                 mdbxFields[id] = fields;
             }
         }
-        var missingIds = ids.Where(id => !mdbxFields.ContainsKey(id)).ToArray();
-        if (missingIds.Length == 0)
-        {
-            return mdbxFields;
-        }
-
-        foreach (var item in await inner.GetCustomFieldsByEntryIdsAsync(missingIds, cancellationToken))
-        {
-            mdbxFields[item.Key] = item.Value;
-        }
-
         return mdbxFields;
     }
 
@@ -281,27 +185,38 @@ public sealed class MdbxBackedMonicaRepository(
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         if (database is null)
         {
-            await inner.ReplaceCustomFieldsAsync(entryId, fields, cancellationToken);
-            return;
+            throw CreateCanonicalVaultUnavailableException();
         }
 
         var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
         var entry = await FindPasswordForMdbxOperationAsync(database, categories, entryId, includeDeleted: false, cancellationToken);
         if (entry is null)
         {
-            await inner.ReplaceCustomFieldsAsync(entryId, fields, cancellationToken);
-            return;
+            throw new InvalidOperationException($"Password entry {entryId} was not found in the canonical MDBX vault.");
         }
 
-        await inner.SavePasswordAsync(entry, cancellationToken);
-        await inner.ReplaceCustomFieldsAsync(entryId, fields, cancellationToken);
-        await SavePasswordToMdbxAsync(
+        var normalizedFields = fields
+            .Where(field => !string.IsNullOrWhiteSpace(field.Title))
+            .Select((field, index) => new CustomField
+            {
+                Id = field.Id,
+                EntryId = entryId,
+                Title = field.Title,
+                Value = field.Value,
+                IsProtected = field.IsProtected,
+                SortOrder = index
+            })
+            .ToArray();
+        var passwordHistory = await mdbxVaultStore.GetPasswordHistoryAsync(database, entryId, cancellationToken) ?? [];
+        var attachments = await GetPasswordAttachmentsFromMdbxAsync(database, entryId, cancellationToken);
+        await mdbxVaultStore.SavePasswordAsync(
             database,
             entry,
+            normalizedFields,
+            passwordHistory,
+            attachments,
             categories.ToDictionary(category => category.Id),
-            cancellationToken,
-            preferMdbxCustomFields: false);
-        await inner.SavePasswordAsync(entry, cancellationToken);
+            cancellationToken);
         ClearPasswordReadSnapshot();
     }
 
@@ -315,29 +230,21 @@ public sealed class MdbxBackedMonicaRepository(
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         if (database is null)
         {
-            return await inner.SearchEntryIdsByCustomFieldContentAsync(query, cancellationToken);
+            return [];
         }
 
         var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        await EnsurePasswordMirrorAsync(database, categories.ToDictionary(category => category.Id), cancellationToken);
-
-        var existingIds = await GetPasswordIdsKnownToMdbxOrSqliteAsync(database, categories, includeDeletedMdbx: false, cancellationToken);
+        var existingIds = (await GetPasswordReadSnapshotAsync(database, categories, cancellationToken)).Passwords
+            .Where(entry => !entry.IsDeleted)
+            .Select(entry => entry.Id)
+            .ToHashSet();
         if (existingIds.Count == 0)
         {
             return [];
         }
 
-        var mdbxMatches = await mdbxVaultStore.SearchPasswordEntryIdsByCustomFieldContentAsync(database, query, cancellationToken);
-        mdbxMatches = mdbxMatches.Where(existingIds.Contains).ToList();
-        var sqliteMatches = await inner.SearchEntryIdsByCustomFieldContentAsync(query, cancellationToken);
-        if (sqliteMatches.Count == 0)
-        {
-            return mdbxMatches;
-        }
-
-        var mdbxFieldCoverage = await mdbxVaultStore.GetPasswordCustomFieldsByEntryIdsAsync(database, sqliteMatches, cancellationToken);
-        return mdbxMatches
-            .Concat(sqliteMatches.Where(id => !mdbxFieldCoverage.ContainsKey(id)))
+        return (await mdbxVaultStore.SearchPasswordEntryIdsByCustomFieldContentAsync(database, query, cancellationToken))
+            .Where(existingIds.Contains)
             .Distinct()
             .OrderBy(id => id)
             .ToList();
@@ -347,7 +254,7 @@ public sealed class MdbxBackedMonicaRepository(
     {
         if (!IsPasswordOwnerType(ownerType) && !IsSecureItemOwnerType(ownerType))
         {
-            return await inner.GetAttachmentsAsync(ownerType, ownerId, cancellationToken);
+            return [];
         }
 
         var attachmentsByOwnerId = await GetAttachmentsByOwnerIdsAsync(ownerType, [ownerId], cancellationToken);
@@ -358,7 +265,7 @@ public sealed class MdbxBackedMonicaRepository(
     {
         if (!IsPasswordOwnerType(ownerType) && !IsSecureItemOwnerType(ownerType))
         {
-            return await inner.GetAttachmentsByOwnerIdsAsync(ownerType, ownerIds, cancellationToken);
+            return new Dictionary<long, IReadOnlyList<Attachment>>();
         }
 
         var ids = ownerIds.Where(id => id > 0).Distinct().ToArray();
@@ -370,19 +277,20 @@ public sealed class MdbxBackedMonicaRepository(
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         if (database is null)
         {
-            return await inner.GetAttachmentsByOwnerIdsAsync(ownerType, ids, cancellationToken);
+            return new Dictionary<long, IReadOnlyList<Attachment>>();
         }
 
         if (IsSecureItemOwnerType(ownerType))
         {
-            return await GetSecureItemAttachmentsByOwnerIdsAsync(database, ownerType, ids, cancellationToken);
+            return await mdbxVaultStore.GetSecureItemAttachmentsByItemIdsAsync(database, ids, cancellationToken);
         }
 
         var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        await EnsurePasswordMirrorAsync(database, categories.ToDictionary(category => category.Id), cancellationToken);
-
         var snapshot = await GetPasswordReadSnapshotAsync(database, categories, cancellationToken);
-        var existingIds = await GetPasswordIdsKnownToMdbxOrSqliteAsync(database, categories, snapshot, includeDeletedMdbx: false, cancellationToken);
+        var existingIds = snapshot.Passwords
+            .Where(entry => !entry.IsDeleted)
+            .Select(entry => entry.Id)
+            .ToHashSet();
         ids = ids.Where(existingIds.Contains).ToArray();
         if (ids.Length == 0)
         {
@@ -397,96 +305,6 @@ public sealed class MdbxBackedMonicaRepository(
                 mdbxAttachments[id] = attachments;
             }
         }
-        if (attachmentContentStore is not null)
-        {
-            var payloadMigrationCandidates = mdbxAttachments.Values
-                .SelectMany(item => item)
-                .Where(attachment => MdbxVaultStore.TryParseAttachmentStoragePath(attachment.StoragePath) is null)
-                .ToArray();
-            if (payloadMigrationCandidates.Length > 0)
-            {
-                var migratedPayloadAttachments = await MigratePasswordAttachmentsAsync(ownerType, payloadMigrationCandidates, cancellationToken);
-                foreach (var group in migratedPayloadAttachments
-                             .GroupBy(attachment => attachment.OwnerId)
-                             .ToDictionary(group => group.Key, group => (IReadOnlyList<Attachment>)group.ToList()))
-                {
-                    mdbxAttachments[group.Key] = group.Value;
-                }
-            }
-        }
-
-        var missingIds = ids.Where(id => !mdbxAttachments.ContainsKey(id)).ToArray();
-        if (missingIds.Length == 0)
-        {
-            return mdbxAttachments;
-        }
-
-        var sqliteAttachments = await inner.GetAttachmentsByOwnerIdsAsync(ownerType, missingIds, cancellationToken);
-        if (attachmentContentStore is null)
-        {
-            foreach (var item in sqliteAttachments)
-            {
-                mdbxAttachments[item.Key] = item.Value;
-            }
-
-            return mdbxAttachments;
-        }
-
-        var migrated = await MigratePasswordAttachmentsAsync(
-            ownerType,
-            sqliteAttachments.Values.SelectMany(item => item).ToArray(),
-            cancellationToken);
-
-        foreach (var group in migrated
-            .GroupBy(attachment => attachment.OwnerId)
-            .ToDictionary(group => group.Key, group => (IReadOnlyList<Attachment>)group.ToList()))
-        {
-            mdbxAttachments[group.Key] = group.Value;
-        }
-
-        return mdbxAttachments;
-    }
-
-    private async Task<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>> GetSecureItemAttachmentsByOwnerIdsAsync(
-        LocalMdbxDatabase database,
-        string ownerType,
-        IReadOnlyList<long> ownerIds,
-        CancellationToken cancellationToken)
-    {
-        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        await EnsureSecureItemMirrorAsync(database, categories.ToDictionary(category => category.Id), cancellationToken);
-
-        var activeIds = new HashSet<long>(
-            (await inner.GetSecureItemsAsync(includeDeleted: false, cancellationToken: cancellationToken))
-            .Where(item => item.Id > 0)
-            .Select(item => item.Id));
-        foreach (var item in await mdbxVaultStore.GetSecureItemsAsync(database, categories, itemType: null, includeDeleted: false, cancellationToken))
-        {
-            if (item.Id > 0)
-            {
-                activeIds.Add(item.Id);
-            }
-        }
-
-        var ids = ownerIds.Where(activeIds.Contains).ToArray();
-        if (ids.Length == 0)
-        {
-            return new Dictionary<long, IReadOnlyList<Attachment>>();
-        }
-
-        var mdbxAttachments = new Dictionary<long, IReadOnlyList<Attachment>>(
-            await mdbxVaultStore.GetSecureItemAttachmentsByItemIdsAsync(database, ids, cancellationToken));
-        var missingIds = ids.Where(id => !mdbxAttachments.ContainsKey(id)).ToArray();
-        if (missingIds.Length == 0)
-        {
-            return mdbxAttachments;
-        }
-
-        foreach (var item in await inner.GetAttachmentsByOwnerIdsAsync(ownerType, missingIds, cancellationToken))
-        {
-            mdbxAttachments[item.Key] = item.Value;
-        }
-
         return mdbxAttachments;
     }
 
@@ -495,107 +313,128 @@ public sealed class MdbxBackedMonicaRepository(
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         if (database is not null && MdbxVaultStore.TryParseAttachmentStoragePath(attachment.StoragePath) is not null)
         {
-            var content = await mdbxVaultStore.TryReadAttachmentContentAsync(database, attachment, cancellationToken);
-            if (content is not null)
-            {
-                return content;
-            }
+            return await mdbxVaultStore.TryReadAttachmentContentAsync(database, attachment, cancellationToken);
         }
 
-        return attachmentContentStore is null
-            ? await inner.TryReadAttachmentContentAsync(attachment, cancellationToken)
-            : await attachmentContentStore.TryReadAttachmentContentAsync(attachment, cancellationToken);
+        return null;
     }
 
     public async Task<long> SaveAttachmentAsync(Attachment attachment, CancellationToken cancellationToken = default)
     {
-        if (IsPasswordOwnerType(attachment.OwnerType))
+        var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
+        if (!IsPasswordOwnerType(attachment.OwnerType))
         {
-            await EnsurePasswordAttachmentOwnerCacheAsync(attachment.OwnerId, cancellationToken);
+            throw new InvalidOperationException("Metadata-only attachments are supported only for canonical password entries.");
         }
 
-        var id = await inner.SaveAttachmentAsync(attachment, cancellationToken);
-        if (IsPasswordOwnerType(attachment.OwnerType))
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var entry = await mdbxVaultStore.FindPasswordAsync(database, categories, attachment.OwnerId, includeDeleted: true, cancellationToken)
+            ?? throw new InvalidOperationException($"Password entry {attachment.OwnerId} was not found in the canonical MDBX vault.");
+        if (attachment.Id <= 0)
         {
-            await SyncPasswordAttachmentsOwnerToMdbxAsync(attachment.OwnerId, cancellationToken);
-            ClearPasswordReadSnapshot();
+            attachment.Id = await AllocateAttachmentIdAsync(database, cancellationToken);
         }
 
-        return id;
+        attachment.OwnerType = "PASSWORD";
+        attachment.OwnerId = entry.Id;
+        var attachments = UpsertAttachment(await GetPasswordAttachmentsFromMdbxAsync(database, entry.Id, cancellationToken), attachment);
+        await SavePasswordAggregateAsync(database, categories, entry, attachments: attachments, cancellationToken: cancellationToken);
+        ClearPasswordReadSnapshot();
+        return attachment.Id;
     }
 
     public async Task<long> SaveAttachmentAsync(Attachment attachment, byte[] content, CancellationToken cancellationToken = default)
     {
-        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
-        if (database is not null &&
-            content.Length > 0 &&
-            string.Equals(attachment.OwnerType, "PASSWORD", StringComparison.OrdinalIgnoreCase))
+        if (content.Length == 0)
         {
-            var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-            var entry = await FindPasswordForMdbxOperationAsync(database, categories, attachment.OwnerId, includeDeleted: true, cancellationToken);
-            if (entry is not null)
-            {
-                if (IsUnboundFromMdbx(entry))
-                {
-                    await SavePasswordToMdbxAsync(database, entry, categories.ToDictionary(category => category.Id), cancellationToken);
-                    await inner.SavePasswordAsync(entry, cancellationToken);
-                }
-
-                await mdbxVaultStore.SavePasswordAttachmentAsync(database, entry, attachment, content, cancellationToken);
-            }
+            return await SaveAttachmentAsync(attachment, cancellationToken);
         }
 
-        var id = await inner.SaveAttachmentAsync(attachment, cancellationToken);
-        if (string.Equals(attachment.OwnerType, "PASSWORD", StringComparison.OrdinalIgnoreCase))
+        var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
+        if (attachment.Id <= 0)
         {
-            await SyncPasswordAttachmentsOwnerToMdbxAsync(attachment.OwnerId, cancellationToken);
+            attachment.Id = await AllocateAttachmentIdAsync(database, cancellationToken);
+        }
+
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        if (IsPasswordOwnerType(attachment.OwnerType))
+        {
+            var entry = await mdbxVaultStore.FindPasswordAsync(database, categories, attachment.OwnerId, includeDeleted: true, cancellationToken)
+                ?? throw new InvalidOperationException($"Password entry {attachment.OwnerId} was not found in the canonical MDBX vault.");
+            attachment.OwnerType = "PASSWORD";
+            attachment.OwnerId = entry.Id;
+            await mdbxVaultStore.SavePasswordAttachmentAsync(database, entry, attachment, content, cancellationToken);
+            var attachments = UpsertAttachment(await GetPasswordAttachmentsFromMdbxAsync(database, entry.Id, cancellationToken), attachment);
+            await SavePasswordAggregateAsync(database, categories, entry, attachments: attachments, cancellationToken: cancellationToken);
             ClearPasswordReadSnapshot();
+            return attachment.Id;
         }
 
-        return id;
+        if (IsSecureItemOwnerType(attachment.OwnerType))
+        {
+            var item = await mdbxVaultStore.FindSecureItemAsync(database, categories, attachment.OwnerId, includeDeleted: true, cancellationToken)
+                ?? throw new InvalidOperationException($"Secure item {attachment.OwnerId} was not found in the canonical MDBX vault.");
+            await mdbxVaultStore.SaveSecureItemAttachmentAsync(database, item, attachment, content, cancellationToken);
+            var paths = DecodeSecureItemImagePaths(item).ToList();
+            if (!paths.Contains(attachment.StoragePath, StringComparer.OrdinalIgnoreCase))
+            {
+                paths.Add(attachment.StoragePath);
+                ApplySecureItemImagePaths(item, paths);
+                await mdbxVaultStore.SaveSecureItemAsync(database, item, categories.ToDictionary(category => category.Id), cancellationToken);
+            }
+
+            ClearSecureItemReadSnapshot();
+            return attachment.Id;
+        }
+
+        throw new InvalidOperationException($"Unsupported canonical attachment owner type '{attachment.OwnerType}'.");
     }
 
     public async Task DeleteAttachmentAsync(long id, CancellationToken cancellationToken = default)
     {
-        var attachment = await FindPasswordAttachmentAsync(id, cancellationToken);
+        await RequireDefaultMdbxDatabaseAsync(cancellationToken);
+        var attachment = await FindCanonicalAttachmentAsync(id, cancellationToken);
         if (attachment is null)
         {
-            await inner.DeleteAttachmentAsync(id, cancellationToken);
             return;
         }
 
         await DeleteAttachmentAsync(id, attachment, cancellationToken);
     }
 
-    private async Task DeletePasswordAttachmentContentAsync(Attachment attachment, CancellationToken cancellationToken)
-    {
-        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
-        if (database is not null)
-        {
-            await mdbxVaultStore.DeleteAttachmentAsync(database, attachment, cancellationToken);
-        }
-    }
-
-    private async Task SyncPasswordAttachmentOwnerAfterDeleteAsync(long? ownerId, Attachment deletedAttachment, CancellationToken cancellationToken)
-    {
-        if (ownerId is not null)
-        {
-            await SyncPasswordAttachmentsOwnerToMdbxAsync(ownerId.Value, deletedAttachment, cancellationToken);
-        }
-    }
-
     public async Task DeleteAttachmentAsync(long id, Attachment attachment, CancellationToken cancellationToken = default)
     {
-        var ownerId = IsPasswordOwnerType(attachment.OwnerType) && attachment.OwnerId > 0
-            ? attachment.OwnerId
-            : await FindPasswordAttachmentOwnerIdAsync(id, cancellationToken);
-        await DeletePasswordAttachmentContentAsync(attachment, cancellationToken);
-
-        await inner.DeleteAttachmentAsync(id, attachment, cancellationToken);
-        await SyncPasswordAttachmentOwnerAfterDeleteAsync(ownerId, attachment, cancellationToken);
-        if (ownerId is not null)
+        var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        await mdbxVaultStore.DeleteAttachmentAsync(database, attachment, cancellationToken);
+        if (IsPasswordOwnerType(attachment.OwnerType))
         {
+            var entry = await mdbxVaultStore.FindPasswordAsync(database, categories, attachment.OwnerId, includeDeleted: true, cancellationToken);
+            if (entry is not null)
+            {
+                var attachments = (await GetPasswordAttachmentsFromMdbxAsync(database, entry.Id, cancellationToken))
+                    .Where(item => item.Id != id && !string.Equals(item.StoragePath, attachment.StoragePath, StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
+                await SavePasswordAggregateAsync(database, categories, entry, attachments: attachments, cancellationToken: cancellationToken);
+            }
+
             ClearPasswordReadSnapshot();
+            return;
+        }
+
+        if (IsSecureItemOwnerType(attachment.OwnerType))
+        {
+            var item = await mdbxVaultStore.FindSecureItemAsync(database, categories, attachment.OwnerId, includeDeleted: true, cancellationToken);
+            if (item is not null)
+            {
+                var paths = DecodeSecureItemImagePaths(item)
+                    .Where(path => !string.Equals(path, attachment.StoragePath, StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
+                ApplySecureItemImagePaths(item, paths);
+                await mdbxVaultStore.SaveSecureItemAsync(database, item, categories.ToDictionary(category => category.Id), cancellationToken);
+            }
+
+            ClearSecureItemReadSnapshot();
         }
     }
 
@@ -604,89 +443,127 @@ public sealed class MdbxBackedMonicaRepository(
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         if (database is null)
         {
-            return await inner.GetPasswordHistoryAsync(entryId, cancellationToken);
+            return [];
         }
 
         var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        await EnsurePasswordMirrorAsync(database, categories.ToDictionary(category => category.Id), cancellationToken);
-
-        var existing = (await GetPasswordIdsKnownToMdbxOrSqliteAsync(database, categories, includeDeletedMdbx: false, cancellationToken)).Contains(entryId);
+        var existing = (await GetPasswordReadSnapshotAsync(database, categories, cancellationToken)).Passwords
+            .Any(entry => entry.Id == entryId && !entry.IsDeleted);
         if (!existing)
         {
             return [];
         }
 
-        return await mdbxVaultStore.GetPasswordHistoryAsync(database, entryId, cancellationToken)
-            ?? await inner.GetPasswordHistoryAsync(entryId, cancellationToken);
+        return await mdbxVaultStore.GetPasswordHistoryAsync(database, entryId, cancellationToken) ?? [];
     }
 
     public async Task<long> SavePasswordHistoryAsync(PasswordHistoryEntry entry, CancellationToken cancellationToken = default)
     {
-        await EnsurePasswordHistoryOwnerCacheAsync(entry.EntryId, cancellationToken);
-        var id = await inner.SavePasswordHistoryAsync(entry, cancellationToken);
-        await SyncPasswordHistoryOwnerToMdbxAsync(entry.EntryId, cancellationToken);
-        return id;
+        var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var owner = await mdbxVaultStore.FindPasswordAsync(database, categories, entry.EntryId, includeDeleted: true, cancellationToken)
+            ?? throw new InvalidOperationException($"Password entry {entry.EntryId} was not found in the canonical MDBX vault.");
+        if (entry.Id <= 0)
+        {
+            entry.Id = await AllocatePasswordHistoryIdAsync(database, cancellationToken);
+        }
+
+        var history = (await mdbxVaultStore.GetPasswordHistoryAsync(database, entry.EntryId, cancellationToken) ?? [])
+            .Where(item => item.Id != entry.Id)
+            .Append(entry)
+            .ToArray();
+        await SavePasswordAggregateAsync(database, categories, owner, passwordHistory: history, cancellationToken: cancellationToken);
+        ClearPasswordReadSnapshot();
+        return entry.Id;
     }
 
     public async Task TrimPasswordHistoryAsync(long entryId, int limit, CancellationToken cancellationToken = default)
     {
-        await EnsurePasswordHistoryCacheAsync(entryId, cancellationToken);
-        await inner.TrimPasswordHistoryAsync(entryId, limit, cancellationToken);
-        await SyncPasswordHistoryOwnerToMdbxAsync(entryId, cancellationToken);
+        var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var owner = await mdbxVaultStore.FindPasswordAsync(database, categories, entryId, includeDeleted: true, cancellationToken);
+        if (owner is null)
+        {
+            return;
+        }
+
+        var history = (await mdbxVaultStore.GetPasswordHistoryAsync(database, entryId, cancellationToken) ?? [])
+            .OrderByDescending(item => item.LastUsedAt)
+            .ThenByDescending(item => item.Id)
+            .Take(Math.Max(0, limit))
+            .ToArray();
+        await SavePasswordAggregateAsync(database, categories, owner, passwordHistory: history, cancellationToken: cancellationToken);
+        ClearPasswordReadSnapshot();
     }
 
     public async Task DeletePasswordHistoryAsync(long id, CancellationToken cancellationToken = default)
     {
+        await RequireDefaultMdbxDatabaseAsync(cancellationToken);
         var entryId = await FindPasswordHistoryOwnerIdAsync(id, cancellationToken);
-        if (entryId is not null)
+        if (entryId is null)
         {
-            await EnsurePasswordHistoryCacheAsync(entryId.Value, cancellationToken);
+            return;
         }
 
-        await inner.DeletePasswordHistoryAsync(id, cancellationToken);
-        if (entryId is not null)
+        var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var owner = await mdbxVaultStore.FindPasswordAsync(database, categories, entryId.Value, includeDeleted: true, cancellationToken);
+        if (owner is not null)
         {
-            await SyncPasswordHistoryOwnerToMdbxAsync(entryId.Value, cancellationToken);
+            var history = (await mdbxVaultStore.GetPasswordHistoryAsync(database, entryId.Value, cancellationToken) ?? [])
+                .Where(item => item.Id != id)
+                .ToArray();
+            await SavePasswordAggregateAsync(database, categories, owner, passwordHistory: history, cancellationToken: cancellationToken);
+            ClearPasswordReadSnapshot();
         }
     }
 
     public async Task ClearPasswordHistoryAsync(long entryId, CancellationToken cancellationToken = default)
     {
-        await EnsurePasswordHistoryOwnerCacheAsync(entryId, cancellationToken);
-        await inner.ClearPasswordHistoryAsync(entryId, cancellationToken);
-        await SyncPasswordHistoryOwnerToMdbxAsync(entryId, cancellationToken);
+        var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var owner = await mdbxVaultStore.FindPasswordAsync(database, categories, entryId, includeDeleted: true, cancellationToken);
+        if (owner is not null)
+        {
+            await SavePasswordAggregateAsync(database, categories, owner, passwordHistory: [], cancellationToken: cancellationToken);
+            ClearPasswordReadSnapshot();
+        }
     }
 
     public async Task RecordPasswordQuickAccessAsync(long passwordId, CancellationToken cancellationToken = default)
     {
-        await EnsurePasswordQuickAccessOwnerCacheAsync(passwordId, cancellationToken);
-        await inner.RecordPasswordQuickAccessAsync(passwordId, cancellationToken);
+        if ((await GetPasswordsAsync(includeDeleted: false, includeArchived: false, cancellationToken)).Any(entry => entry.Id == passwordId))
+        {
+            await _quickAccessStore.RecordPasswordQuickAccessAsync(passwordId, cancellationToken);
+        }
     }
 
-    public Task<IReadOnlyList<PasswordQuickAccessRecord>> GetPasswordQuickAccessRecordsAsync(CancellationToken cancellationToken = default) =>
-        inner.GetPasswordQuickAccessRecordsAsync(cancellationToken);
+    public async Task<IReadOnlyList<PasswordQuickAccessRecord>> GetPasswordQuickAccessRecordsAsync(CancellationToken cancellationToken = default)
+    {
+        var activeIds = (await GetPasswordsAsync(includeDeleted: false, includeArchived: false, cancellationToken))
+            .Select(entry => entry.Id)
+            .ToHashSet();
+        return (await _quickAccessStore.GetAllPasswordQuickAccessRecordsAsync(cancellationToken))
+            .Where(record => activeIds.Contains(record.PasswordId))
+            .ToArray();
+    }
 
     public async Task<IReadOnlyList<SecureItem>> GetSecureItemsAsync(VaultItemType? itemType = null, bool includeDeleted = false, CancellationToken cancellationToken = default)
     {
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         if (database is null)
         {
-            return await inner.GetSecureItemsAsync(itemType, includeDeleted, cancellationToken);
+            return [];
         }
 
         var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        var categoryById = categories.ToDictionary(category => category.Id);
-        await EnsureSecureItemMirrorAsync(database, categoryById, cancellationToken);
-        var items = (await GetSecureItemReadSnapshotAsync(database, categories, cancellationToken))
+        return (await GetSecureItemReadSnapshotAsync(database, categories, cancellationToken))
             .Where(item => itemType is null || item.ItemType == itemType)
             .Where(item => includeDeleted || !item.IsDeleted)
             .OrderByDescending(item => item.IsFavorite)
             .ThenBy(item => item.SortOrder)
             .ThenByDescending(item => item.UpdatedAt)
             .ToList();
-        return includeDeleted
-            ? await FilterDeletedSecureItemsBySqliteTombstonesAsync(items, cancellationToken)
-            : items;
     }
 
     public async Task<IReadOnlyList<SecureItem>> GetSecureItemsByBoundPasswordIdAsync(long passwordId, bool includeDeleted = false, CancellationToken cancellationToken = default)
@@ -694,22 +571,15 @@ public sealed class MdbxBackedMonicaRepository(
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         if (database is null)
         {
-            return await inner.GetSecureItemsByBoundPasswordIdAsync(passwordId, includeDeleted, cancellationToken);
+            return [];
         }
 
         var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        var categoryById = categories.ToDictionary(category => category.Id);
-        await EnsureSecureItemMirrorAsync(database, categoryById, cancellationToken);
-        IReadOnlyList<SecureItem> items = (await GetSecureItemReadSnapshotAsync(database, categories, cancellationToken))
+        return (await GetSecureItemReadSnapshotAsync(database, categories, cancellationToken))
             .Where(item => item.ItemType == VaultItemType.Totp)
             .Where(item => includeDeleted || !item.IsDeleted)
+            .Where(item => item.BoundPasswordId == passwordId)
             .ToList();
-        if (includeDeleted)
-        {
-            items = await FilterDeletedSecureItemsBySqliteTombstonesAsync(items, cancellationToken);
-        }
-
-        return items.Where(item => item.BoundPasswordId == passwordId).ToList();
     }
 
     public async Task<long> SaveSecureItemAsync(SecureItem item, CancellationToken cancellationToken = default)
@@ -718,37 +588,35 @@ public sealed class MdbxBackedMonicaRepository(
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         if (database is null)
         {
-            return await inner.SaveSecureItemAsync(item, cancellationToken);
+            throw CreateCanonicalVaultUnavailableException();
         }
 
-        await inner.SaveSecureItemAsync(item, cancellationToken);
+        if (item.Id <= 0)
+        {
+            item.Id = await AllocateSecureItemIdAsync(database, cancellationToken);
+        }
+
+        item.MdbxDatabaseId = database.Id;
         var categories = await EnsureMdbxCategoriesAsync(
             database,
             cancellationToken,
             recoverMdbxCategories: item.CategoryId is not null);
         await SaveSecureItemToMdbxAsync(database, item, categories.ToDictionary(category => category.Id), cancellationToken);
-        await inner.SaveSecureItemAsync(item, cancellationToken);
         ClearSecureItemReadSnapshot();
         return item.Id;
     }
 
     public async Task SoftDeleteSecureItemAsync(long id, CancellationToken cancellationToken = default)
     {
-        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
-        if (database is not null)
+        var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var item = await FindSecureItemForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
+        if (item is not null)
         {
-            var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-            var item = await FindSecureItemForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
-            if (item is not null)
-            {
-                await mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken);
-                item.IsDeleted = true;
-                item.DeletedAt = DateTimeOffset.UtcNow;
-                await inner.SaveSecureItemAsync(item, cancellationToken);
-            }
+            await mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken);
+            item.IsDeleted = true;
+            item.DeletedAt = DateTimeOffset.UtcNow;
         }
-
-        await inner.SoftDeleteSecureItemAsync(id, cancellationToken);
         ClearSecureItemReadSnapshot();
     }
 
@@ -756,20 +624,16 @@ public sealed class MdbxBackedMonicaRepository(
     {
         var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
         return database is null
-            ? await inner.GetCategoriesAsync(cancellationToken)
+            ? []
             : await EnsureMdbxCategoriesAsync(database, cancellationToken);
     }
 
     public async Task<long> SaveCategoryAsync(Category category, CancellationToken cancellationToken = default)
     {
         ClearForeignMdbxBindingForNewCategory(category);
-        await inner.SaveCategoryAsync(category, cancellationToken);
-        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
-        if (database is not null)
-        {
-            await mdbxVaultStore.SaveCategoryAsync(database, category, cancellationToken);
-            await inner.SaveCategoryAsync(category, cancellationToken);
-        }
+        var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
+        await mdbxVaultStore.SaveCategoryAsync(database, category, cancellationToken);
+        category.Id = GetStableCategoryId(category.MdbxFolderId!);
 
         ClearCategoryReadCache();
         ClearPasswordReadSnapshot();
@@ -779,32 +643,13 @@ public sealed class MdbxBackedMonicaRepository(
 
     public async Task DeleteCategoryAsync(long id, CancellationToken cancellationToken = default)
     {
-        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
-        if (database is not null)
+        var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var category = categories.FirstOrDefault(category => category.Id == id);
+        if (category is not null)
         {
-            var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-            var category = categories.FirstOrDefault(category => category.Id == id);
-            if (category is not null)
-            {
-                await mdbxVaultStore.UnassignCategoryAsync(database, category, cancellationToken);
-            }
-
-            foreach (var entry in (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
-                         .Where(entry => entry.CategoryId == id))
-            {
-                entry.CategoryId = null;
-                await inner.SavePasswordAsync(entry, cancellationToken);
-            }
-
-            foreach (var item in (await inner.GetSecureItemsAsync(includeDeleted: true, cancellationToken: cancellationToken))
-                         .Where(item => item.CategoryId == id))
-            {
-                item.CategoryId = null;
-                await inner.SaveSecureItemAsync(item, cancellationToken);
-            }
+            await mdbxVaultStore.UnassignCategoryAsync(database, category, cancellationToken);
         }
-
-        await inner.DeleteCategoryAsync(id, cancellationToken);
         ClearCategoryReadCache();
         ClearPasswordReadSnapshot();
         ClearSecureItemReadSnapshot();
@@ -828,27 +673,23 @@ public sealed class MdbxBackedMonicaRepository(
 
     public async Task ClearVaultDataAsync(VaultClearScope scope, CancellationToken cancellationToken = default)
     {
-        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
-        if (database is not null)
+        var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        switch (scope)
         {
-            var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-            switch (scope)
-            {
-                case VaultClearScope.Passwords:
-                    await mdbxVaultStore.DetachSecureItemsFromPasswordsAsync(database, categories, cancellationToken);
-                    await mdbxVaultStore.SoftDeletePasswordEntriesAsync(database, cancellationToken);
-                    break;
-                case VaultClearScope.SecureItems:
-                    await mdbxVaultStore.SoftDeleteSecureItemEntriesAsync(database, cancellationToken);
-                    break;
-                default:
-                    await mdbxVaultStore.SoftDeletePasswordEntriesAsync(database, cancellationToken);
-                    await mdbxVaultStore.SoftDeleteSecureItemEntriesAsync(database, cancellationToken);
-                    break;
-            }
+            case VaultClearScope.Passwords:
+                await mdbxVaultStore.DetachSecureItemsFromPasswordsAsync(database, categories, cancellationToken);
+                await mdbxVaultStore.SoftDeletePasswordEntriesAsync(database, cancellationToken);
+                break;
+            case VaultClearScope.SecureItems:
+                await mdbxVaultStore.SoftDeleteSecureItemEntriesAsync(database, cancellationToken);
+                break;
+            default:
+                await mdbxVaultStore.SoftDeletePasswordEntriesAsync(database, cancellationToken);
+                await mdbxVaultStore.SoftDeleteSecureItemEntriesAsync(database, cancellationToken);
+                break;
         }
 
-        await inner.ClearVaultDataAsync(scope, cancellationToken);
         ClearMdbxReadCaches();
     }
 
@@ -860,7 +701,7 @@ public sealed class MdbxBackedMonicaRepository(
         }
 
         if (_defaultLocalMdbxDatabase is not null &&
-            IsMirrorCacheFresh(_defaultLocalMdbxDatabaseId, _defaultLocalMdbxDatabaseCachedAt, _defaultLocalMdbxDatabase.Id))
+            IsCacheFresh(_defaultLocalMdbxDatabaseId, _defaultLocalMdbxDatabaseCachedAt, _defaultLocalMdbxDatabase.Id))
         {
             return _defaultLocalMdbxDatabase;
         }
@@ -879,6 +720,175 @@ public sealed class MdbxBackedMonicaRepository(
         return _defaultLocalMdbxDatabase;
     }
 
+    private async Task<LocalMdbxDatabase> RequireDefaultMdbxDatabaseAsync(CancellationToken cancellationToken) =>
+        await GetDefaultLocalMdbxDatabaseAsync(cancellationToken) ?? throw CreateCanonicalVaultUnavailableException();
+
+    private static InvalidOperationException CreateCanonicalVaultUnavailableException() =>
+        new("A usable default MDBX vault is required for canonical business-data operations.");
+
+    private static long GetStableCategoryId(string projectId) =>
+        MdbxStableId.FromString("category", projectId);
+
+    private async Task<long> AllocatePasswordIdAsync(LocalMdbxDatabase database, CancellationToken cancellationToken)
+    {
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var ids = (await GetPasswordReadSnapshotAsync(database, categories, cancellationToken)).Passwords
+            .Select(entry => entry.Id)
+            .Where(id => id > 0)
+            .ToHashSet();
+        return AllocateRandomDomainId(ids);
+    }
+
+    private async Task<long> AllocateSecureItemIdAsync(LocalMdbxDatabase database, CancellationToken cancellationToken)
+    {
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var ids = (await GetSecureItemReadSnapshotAsync(database, categories, cancellationToken))
+            .Select(item => item.Id)
+            .Where(id => id > 0)
+            .ToHashSet();
+        return AllocateRandomDomainId(ids);
+    }
+
+    private async Task<long> AllocatePasswordHistoryIdAsync(LocalMdbxDatabase database, CancellationToken cancellationToken)
+    {
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var ids = new HashSet<long>();
+        foreach (var entry in (await GetPasswordReadSnapshotAsync(database, categories, cancellationToken)).Passwords)
+        {
+            foreach (var history in await mdbxVaultStore.GetPasswordHistoryAsync(database, entry.Id, cancellationToken) ?? [])
+            {
+                if (history.Id > 0)
+                {
+                    ids.Add(history.Id);
+                }
+            }
+        }
+
+        return AllocateRandomDomainId(ids);
+    }
+
+    private async Task<long> AllocateAttachmentIdAsync(LocalMdbxDatabase database, CancellationToken cancellationToken)
+    {
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var ids = new HashSet<long>();
+        var passwordSnapshot = await GetPasswordReadSnapshotAsync(database, categories, cancellationToken);
+        foreach (var attachment in passwordSnapshot.AttachmentsByEntryId.Values.SelectMany(items => items))
+        {
+            if (attachment.Id > 0)
+            {
+                ids.Add(attachment.Id);
+            }
+        }
+
+        var secureItems = await GetSecureItemReadSnapshotAsync(database, categories, cancellationToken);
+        var secureAttachments = await mdbxVaultStore.GetSecureItemAttachmentsByItemIdsAsync(
+            database,
+            secureItems.Select(item => item.Id).Where(id => id > 0).ToArray(),
+            cancellationToken);
+        foreach (var attachment in secureAttachments.Values.SelectMany(items => items))
+        {
+            if (attachment.Id > 0)
+            {
+                ids.Add(attachment.Id);
+            }
+        }
+
+        return AllocateRandomDomainId(ids);
+    }
+
+    private static long AllocateRandomDomainId(IReadOnlySet<long> existingIds)
+    {
+        Span<byte> bytes = stackalloc byte[sizeof(long)];
+        while (true)
+        {
+            RandomNumberGenerator.Fill(bytes);
+            var id = BitConverter.ToInt64(bytes) & long.MaxValue;
+            if (id > 0 && !existingIds.Contains(id))
+            {
+                return id;
+            }
+        }
+    }
+
+    private async Task<IReadOnlyList<Attachment>> GetPasswordAttachmentsFromMdbxAsync(
+        LocalMdbxDatabase database,
+        long entryId,
+        CancellationToken cancellationToken)
+    {
+        var attachmentsByEntryId = await mdbxVaultStore.GetPasswordAttachmentsByEntryIdsAsync(database, [entryId], cancellationToken);
+        return attachmentsByEntryId.TryGetValue(entryId, out var attachments) ? attachments : [];
+    }
+
+    private async Task SavePasswordAggregateAsync(
+        LocalMdbxDatabase database,
+        IReadOnlyList<Category> categories,
+        PasswordEntry entry,
+        IReadOnlyList<CustomField>? customFields = null,
+        IReadOnlyList<PasswordHistoryEntry>? passwordHistory = null,
+        IReadOnlyList<Attachment>? attachments = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (customFields is null)
+        {
+            var fieldsByEntryId = await mdbxVaultStore.GetPasswordCustomFieldsByEntryIdsAsync(database, [entry.Id], cancellationToken);
+            customFields = fieldsByEntryId.TryGetValue(entry.Id, out var fields) ? fields : [];
+        }
+
+        passwordHistory ??= await mdbxVaultStore.GetPasswordHistoryAsync(database, entry.Id, cancellationToken) ?? [];
+        attachments ??= await GetPasswordAttachmentsFromMdbxAsync(database, entry.Id, cancellationToken);
+        await mdbxVaultStore.SavePasswordAsync(
+            database,
+            entry,
+            customFields,
+            passwordHistory,
+            attachments,
+            categories.ToDictionary(category => category.Id),
+            cancellationToken);
+    }
+
+    private static IReadOnlyList<Attachment> UpsertAttachment(
+        IReadOnlyList<Attachment> attachments,
+        Attachment attachment) =>
+        attachments
+            .Where(item => item.Id != attachment.Id)
+            .Where(item => string.IsNullOrWhiteSpace(attachment.StoragePath) ||
+                           !string.Equals(item.StoragePath, attachment.StoragePath, StringComparison.OrdinalIgnoreCase))
+            .Append(attachment)
+            .ToArray();
+
+    private async Task<Attachment?> FindCanonicalAttachmentAsync(long attachmentId, CancellationToken cancellationToken)
+    {
+        if (attachmentId <= 0)
+        {
+            return null;
+        }
+
+        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
+        if (database is null)
+        {
+            return null;
+        }
+
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var passwordSnapshot = await GetPasswordReadSnapshotAsync(database, categories, cancellationToken);
+        var passwordAttachment = passwordSnapshot.AttachmentsByEntryId.Values
+            .SelectMany(items => items)
+            .FirstOrDefault(attachment => attachment.Id == attachmentId);
+        if (passwordAttachment is not null)
+        {
+            return passwordAttachment;
+        }
+
+        var secureItems = await GetSecureItemReadSnapshotAsync(database, categories, cancellationToken);
+        var secureAttachments = await mdbxVaultStore.GetSecureItemAttachmentsByItemIdsAsync(
+            database,
+            secureItems.Select(item => item.Id).Where(id => id > 0).ToArray(),
+            cancellationToken);
+        return secureAttachments.Values
+            .SelectMany(items => items)
+            .FirstOrDefault(attachment => attachment.Id == attachmentId);
+    }
+
     private static bool CanUseMdbxWorkingCopy(LocalMdbxDatabase database) =>
         database.StorageLocation is MdbxStorageLocation.Internal or MdbxStorageLocation.External ||
         !string.IsNullOrWhiteSpace(database.WorkingCopyPath);
@@ -888,170 +898,39 @@ public sealed class MdbxBackedMonicaRepository(
         CancellationToken cancellationToken,
         bool recoverMdbxCategories = true)
     {
-        if (recoverMdbxCategories &&
-            _categoryReadCache is not null &&
-            IsMirrorCacheFresh(_categoryReadCacheDatabaseId, _categoryReadCacheCachedAt, database.Id))
+        if (_categoryReadCache is not null &&
+            IsCacheFresh(_categoryReadCacheDatabaseId, _categoryReadCacheCachedAt, database.Id))
         {
             return _categoryReadCache;
         }
 
-        var categories = (await inner.GetCategoriesAsync(cancellationToken)).ToList();
-        if (recoverMdbxCategories)
-        {
-            foreach (var mdbxCategory in await mdbxVaultStore.GetCategoriesAsync(database, cancellationToken))
+        var categories = (await mdbxVaultStore.GetCategoriesAsync(database, cancellationToken))
+            .Select(category =>
             {
-                var existing = categories.FirstOrDefault(category =>
-                    (!string.IsNullOrWhiteSpace(category.MdbxFolderId) &&
-                     string.Equals(category.MdbxFolderId, mdbxCategory.MdbxFolderId, StringComparison.OrdinalIgnoreCase)) ||
-                    (string.IsNullOrWhiteSpace(category.MdbxFolderId) &&
-                     string.Equals(category.Name, mdbxCategory.Name, StringComparison.OrdinalIgnoreCase)));
-                if (existing is null)
-                {
-                    await inner.SaveCategoryAsync(mdbxCategory, cancellationToken);
-                    categories.Add(mdbxCategory);
-                    continue;
-                }
-
-                if (existing.MdbxDatabaseId != database.Id ||
-                    !string.Equals(existing.MdbxFolderId, mdbxCategory.MdbxFolderId, StringComparison.OrdinalIgnoreCase))
-                {
-                    existing.MdbxDatabaseId = database.Id;
-                    existing.MdbxFolderId = mdbxCategory.MdbxFolderId;
-                    await inner.SaveCategoryAsync(existing, cancellationToken);
-                }
-            }
-        }
-
-        foreach (var category in categories.Where(category => category.MdbxDatabaseId != database.Id || string.IsNullOrWhiteSpace(category.MdbxFolderId)))
+                category.Id = GetStableCategoryId(category.MdbxFolderId!);
+                category.MdbxDatabaseId = database.Id;
+                return category;
+            })
+            .OrderBy(category => category.SortOrder)
+            .ThenBy(category => category.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var duplicateId = categories
+            .GroupBy(category => category.Id)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicateId is not null)
         {
-            await mdbxVaultStore.SaveCategoryAsync(database, category, cancellationToken);
-            await inner.SaveCategoryAsync(category, cancellationToken);
+            throw new InvalidOperationException($"MDBX category identity collision detected for {duplicateId.Key}.");
         }
 
-        if (recoverMdbxCategories)
-        {
-            _categoryReadCache = categories.ToArray();
-            _categoryReadCacheDatabaseId = database.Id;
-            _categoryReadCacheCachedAt = DateTimeOffset.UtcNow;
-        }
+        _categoryReadCache = categories;
+        _categoryReadCacheDatabaseId = database.Id;
+        _categoryReadCacheCachedAt = DateTimeOffset.UtcNow;
 
         return categories;
     }
 
-    private async Task MirrorUnboundPasswordsAsync(LocalMdbxDatabase database, IReadOnlyDictionary<long, Category> categories, CancellationToken cancellationToken)
-    {
-        var sqlitePasswords = await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken);
-        var customFieldsByEntryId = await inner.GetCustomFieldsByEntryIdsAsync(
-            sqlitePasswords.Select(entry => entry.Id).ToArray(),
-            cancellationToken);
-        var attachmentsByEntryId = await inner.GetAttachmentsByOwnerIdsAsync(
-            "PASSWORD",
-            sqlitePasswords.Select(entry => entry.Id).ToArray(),
-            cancellationToken);
-        foreach (var entry in sqlitePasswords.Where(IsUnboundFromMdbx))
-        {
-            await mdbxVaultStore.SavePasswordAsync(
-                database,
-                entry,
-                customFieldsByEntryId.TryGetValue(entry.Id, out var fields) ? fields : [],
-                await inner.GetPasswordHistoryAsync(entry.Id, cancellationToken),
-                attachmentsByEntryId.TryGetValue(entry.Id, out var attachments) ? attachments : [],
-                categories,
-                cancellationToken);
-            if (entry.IsDeleted)
-            {
-                await mdbxVaultStore.SoftDeletePasswordAsync(database, entry, cancellationToken);
-            }
-
-            await inner.SavePasswordAsync(entry, cancellationToken);
-        }
-    }
-
-    private async Task EnsurePasswordMirrorAsync(
-        LocalMdbxDatabase database,
-        IReadOnlyDictionary<long, Category> categories,
-        CancellationToken cancellationToken)
-    {
-        if (IsMirrorCacheFresh(_passwordMirrorDatabaseId, _passwordMirrorCachedAt, database.Id))
-        {
-            return;
-        }
-
-        await MirrorUnboundPasswordsAsync(database, categories, cancellationToken);
-        _passwordMirrorDatabaseId = database.Id;
-        _passwordMirrorCachedAt = DateTimeOffset.UtcNow;
-    }
-
-    private async Task<IReadOnlyList<PasswordEntry>> FilterDeletedPasswordsBySqliteTombstonesAsync(
-        IReadOnlyList<PasswordEntry> entries,
-        CancellationToken cancellationToken)
-    {
-        if (!entries.Any(entry => entry.IsDeleted))
-        {
-            return entries;
-        }
-
-        var deletedMdbxEntryIds = (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
-            .Where(entry => entry.IsDeleted)
-            .Select(entry => entry.MdbxFolderId)
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return entries
-            .Where(entry => !entry.IsDeleted || (!string.IsNullOrWhiteSpace(entry.MdbxFolderId) && deletedMdbxEntryIds.Contains(entry.MdbxFolderId)))
-            .ToList();
-    }
-
-    private async Task MirrorUnboundSecureItemsAsync(LocalMdbxDatabase database, IReadOnlyDictionary<long, Category> categories, CancellationToken cancellationToken)
-    {
-        var sqliteItems = await inner.GetSecureItemsAsync(includeDeleted: true, cancellationToken: cancellationToken);
-        foreach (var item in sqliteItems.Where(IsUnboundFromMdbx))
-        {
-            await SaveSecureItemToMdbxAsync(database, item, categories, cancellationToken);
-            if (item.IsDeleted)
-            {
-                await mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken);
-            }
-
-            await inner.SaveSecureItemAsync(item, cancellationToken);
-        }
-    }
-
-    private async Task EnsureSecureItemMirrorAsync(
-        LocalMdbxDatabase database,
-        IReadOnlyDictionary<long, Category> categories,
-        CancellationToken cancellationToken)
-    {
-        if (IsMirrorCacheFresh(_secureItemMirrorDatabaseId, _secureItemMirrorCachedAt, database.Id))
-        {
-            return;
-        }
-
-        await MirrorUnboundSecureItemsAsync(database, categories, cancellationToken);
-        _secureItemMirrorDatabaseId = database.Id;
-        _secureItemMirrorCachedAt = DateTimeOffset.UtcNow;
-    }
-
-    private static bool IsMirrorCacheFresh(long? cachedDatabaseId, DateTimeOffset cachedAt, long databaseId) =>
-        cachedDatabaseId == databaseId && DateTimeOffset.UtcNow - cachedAt < MirrorCacheTtl;
-
-    private async Task<IReadOnlyList<SecureItem>> FilterDeletedSecureItemsBySqliteTombstonesAsync(
-        IReadOnlyList<SecureItem> items,
-        CancellationToken cancellationToken)
-    {
-        if (!items.Any(item => item.IsDeleted))
-        {
-            return items;
-        }
-
-        var deletedMdbxEntryIds = (await inner.GetSecureItemsAsync(includeDeleted: true, cancellationToken: cancellationToken))
-            .Where(item => item.IsDeleted)
-            .Select(item => item.MdbxFolderId)
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return items
-            .Where(item => !item.IsDeleted || (!string.IsNullOrWhiteSpace(item.MdbxFolderId) && deletedMdbxEntryIds.Contains(item.MdbxFolderId)))
-            .ToList();
-    }
+    private static bool IsCacheFresh(long? cachedDatabaseId, DateTimeOffset cachedAt, long databaseId) =>
+        cachedDatabaseId == databaseId && DateTimeOffset.UtcNow - cachedAt < ReadCacheTtl;
 
     private async Task<IReadOnlyList<SecureItem>> GetMdbxBoundTotpsByPasswordIdAsync(
         LocalMdbxDatabase database,
@@ -1060,7 +939,6 @@ public sealed class MdbxBackedMonicaRepository(
         CancellationToken cancellationToken)
     {
         var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        await EnsureSecureItemMirrorAsync(database, categories.ToDictionary(category => category.Id), cancellationToken);
         var items = (await GetSecureItemReadSnapshotAsync(database, categories, cancellationToken))
             .Where(item => item.ItemType == VaultItemType.Totp)
             .Where(item => includeDeleted || !item.IsDeleted)
@@ -1070,163 +948,13 @@ public sealed class MdbxBackedMonicaRepository(
             .ToList();
     }
 
-    private async Task<IReadOnlyList<Attachment>> MigratePasswordAttachmentsAsync(
-        string ownerType,
-        IReadOnlyList<Attachment> attachments,
-        CancellationToken cancellationToken)
-    {
-        if (!IsPasswordOwnerType(ownerType) || attachmentContentStore is null || attachments.Count == 0)
-        {
-            return attachments;
-        }
-
-        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
-        if (database is null)
-        {
-            return attachments;
-        }
-
-        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        var categoryById = categories.ToDictionary(category => category.Id);
-        var candidates = attachments
-            .Where(attachment => attachment.OwnerId > 0)
-            .Where(attachment => !string.IsNullOrWhiteSpace(attachment.StoragePath))
-            .Where(attachment => MdbxVaultStore.TryParseAttachmentStoragePath(attachment.StoragePath) is null)
-            .ToArray();
-        if (candidates.Length == 0)
-        {
-            return attachments;
-        }
-
-        var ownerIds = candidates.Select(attachment => attachment.OwnerId).Distinct().ToHashSet();
-        var passwords = (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
-            .Where(password => ownerIds.Contains(password.Id))
-            .ToDictionary(password => password.Id);
-        var migratedById = new Dictionary<long, Attachment>();
-
-        foreach (var attachment in candidates)
-        {
-            try
-            {
-                var entry = await FindPasswordForAttachmentMigrationAsync(
-                    database,
-                    categories,
-                    passwords,
-                    attachment.OwnerId,
-                    cancellationToken);
-                if (entry is null)
-                {
-                    continue;
-                }
-
-                var content = await attachmentContentStore.TryReadAttachmentContentAsync(attachment, cancellationToken);
-                if (content is null || content.Length == 0)
-                {
-                    continue;
-                }
-
-                var original = new Attachment
-                {
-                    Id = attachment.Id,
-                    OwnerType = attachment.OwnerType,
-                    OwnerId = attachment.OwnerId,
-                    FileName = attachment.FileName,
-                    ContentType = attachment.ContentType,
-                    StoragePath = attachment.StoragePath,
-                    SizeBytes = attachment.SizeBytes,
-                    CreatedAt = attachment.CreatedAt,
-                    BitwardenVaultId = attachment.BitwardenVaultId,
-                    KeepassBinaryRef = attachment.KeepassBinaryRef
-                };
-
-                if (IsUnboundFromMdbx(entry))
-                {
-                    await SavePasswordToMdbxAsync(database, entry, categoryById, cancellationToken);
-                }
-
-                await inner.SavePasswordAsync(entry, cancellationToken);
-
-                await mdbxVaultStore.SavePasswordAttachmentAsync(database, entry, attachment, content, cancellationToken);
-                await inner.SaveAttachmentAsync(attachment, cancellationToken);
-                await SyncPasswordAttachmentsOwnerToMdbxAsync(entry.Id, cancellationToken);
-                await attachmentContentStore.DeleteAttachmentContentAsync(original, cancellationToken);
-                migratedById[attachment.Id] = attachment;
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch
-            {
-                continue;
-            }
-        }
-
-        if (migratedById.Count == 0)
-        {
-            return attachments;
-        }
-
-        ClearPasswordReadSnapshot();
-        return attachments
-            .Select(attachment => migratedById.TryGetValue(attachment.Id, out var migrated) ? migrated : attachment)
-            .ToArray();
-    }
-
-    private async Task<PasswordEntry?> FindPasswordForAttachmentMigrationAsync(
-        LocalMdbxDatabase database,
-        IReadOnlyList<Category> categories,
-        IReadOnlyDictionary<long, PasswordEntry> sqlitePasswords,
-        long ownerId,
-        CancellationToken cancellationToken)
-    {
-        return sqlitePasswords.TryGetValue(ownerId, out var entry)
-            ? entry
-            : await FindPasswordForMdbxOperationAsync(database, categories, ownerId, includeDeleted: false, cancellationToken);
-    }
-
-    private static bool IsUnboundFromMdbx(PasswordEntry entry) =>
-        entry.MdbxDatabaseId is null && string.IsNullOrWhiteSpace(entry.MdbxFolderId);
-
-    private async Task<HashSet<long>> GetPasswordIdsKnownToMdbxOrSqliteAsync(
-        LocalMdbxDatabase database,
-        IReadOnlyList<Category> categories,
-        bool includeDeletedMdbx,
-        CancellationToken cancellationToken)
-    {
-        var snapshot = await GetPasswordReadSnapshotAsync(database, categories, cancellationToken);
-        return await GetPasswordIdsKnownToMdbxOrSqliteAsync(database, categories, snapshot, includeDeletedMdbx, cancellationToken);
-    }
-
-    private async Task<HashSet<long>> GetPasswordIdsKnownToMdbxOrSqliteAsync(
-        LocalMdbxDatabase database,
-        IReadOnlyList<Category> categories,
-        MdbxPasswordReadSnapshot snapshot,
-        bool includeDeletedMdbx,
-        CancellationToken cancellationToken)
-    {
-        var ids = (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
-            .Select(entry => entry.Id)
-            .Where(id => id > 0)
-            .ToHashSet();
-        foreach (var entry in snapshot.Passwords.Where(entry => includeDeletedMdbx || !entry.IsDeleted))
-        {
-            if (entry.Id > 0)
-            {
-                ids.Add(entry.Id);
-            }
-        }
-
-        return ids;
-    }
-
     private async Task<MdbxPasswordReadSnapshot> GetPasswordReadSnapshotAsync(
         LocalMdbxDatabase database,
         IReadOnlyList<Category> categories,
         CancellationToken cancellationToken)
     {
         if (_passwordReadSnapshot is not null &&
-            IsMirrorCacheFresh(_passwordReadSnapshotDatabaseId, _passwordReadSnapshotCachedAt, database.Id))
+            IsCacheFresh(_passwordReadSnapshotDatabaseId, _passwordReadSnapshotCachedAt, database.Id))
         {
             return _passwordReadSnapshot;
         }
@@ -1243,7 +971,7 @@ public sealed class MdbxBackedMonicaRepository(
         CancellationToken cancellationToken)
     {
         if (_secureItemReadSnapshot is not null &&
-            IsMirrorCacheFresh(_secureItemReadSnapshotDatabaseId, _secureItemReadSnapshotCachedAt, database.Id))
+            IsCacheFresh(_secureItemReadSnapshotDatabaseId, _secureItemReadSnapshotCachedAt, database.Id))
         {
             return _secureItemReadSnapshot;
         }
@@ -1303,15 +1031,7 @@ public sealed class MdbxBackedMonicaRepository(
         bool includeDeleted,
         CancellationToken cancellationToken)
     {
-        var sqliteEntry = (await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
-            .FirstOrDefault(item => item.Id == id);
-        if (sqliteEntry is not null && !IsBoundToCurrentMdbxDatabase(database, sqliteEntry))
-        {
-            return sqliteEntry;
-        }
-
-        return await mdbxVaultStore.FindPasswordAsync(database, categories, id, includeDeleted, cancellationToken)
-            ?? sqliteEntry;
+        return await mdbxVaultStore.FindPasswordAsync(database, categories, id, includeDeleted, cancellationToken);
     }
 
     private async Task<SecureItem?> FindSecureItemForMdbxOperationAsync(
@@ -1321,15 +1041,7 @@ public sealed class MdbxBackedMonicaRepository(
         bool includeDeleted,
         CancellationToken cancellationToken)
     {
-        var sqliteItem = (await inner.GetSecureItemsAsync(includeDeleted: true, cancellationToken: cancellationToken))
-            .FirstOrDefault(item => item.Id == id);
-        if (sqliteItem is not null && !IsBoundToCurrentMdbxDatabase(database, sqliteItem))
-        {
-            return sqliteItem;
-        }
-
-        return await mdbxVaultStore.FindSecureItemAsync(database, categories, id, includeDeleted, cancellationToken)
-            ?? sqliteItem;
+        return await mdbxVaultStore.FindSecureItemAsync(database, categories, id, includeDeleted, cancellationToken);
     }
 
     private static void ClearForeignMdbxBindingForNewPassword(PasswordEntry entry)
@@ -1343,244 +1055,6 @@ public sealed class MdbxBackedMonicaRepository(
         entry.MdbxFolderId = null;
     }
 
-    private async Task SavePasswordToMdbxAsync(
-        LocalMdbxDatabase database,
-        PasswordEntry entry,
-        IReadOnlyDictionary<long, Category> categories,
-        CancellationToken cancellationToken,
-        bool preferMdbxCustomFields = true,
-        bool preferMdbxPasswordHistory = true)
-    {
-        var customFields = await GetPasswordCustomFieldsForMdbxSaveAsync(database, entry, preferMdbxCustomFields, cancellationToken);
-        var passwordHistory = await GetPasswordHistoryForMdbxSaveAsync(database, entry, preferMdbxPasswordHistory, cancellationToken);
-        var attachments = entry.Id > 0
-            ? await GetPasswordAttachmentsForMdbxSaveAsync(
-                database,
-                entry.Id,
-                excludeAttachment: null,
-                includeMdbxOnlyAttachments: entry.MdbxDatabaseId is not null,
-                preferMdbxPayload: true,
-                cancellationToken)
-            : [];
-        await mdbxVaultStore.SavePasswordAsync(database, entry, customFields, passwordHistory, attachments, categories, cancellationToken);
-    }
-
-    private async Task<IReadOnlyList<CustomField>> GetPasswordCustomFieldsForMdbxSaveAsync(
-        LocalMdbxDatabase database,
-        PasswordEntry entry,
-        bool preferMdbxPayload,
-        CancellationToken cancellationToken)
-    {
-        if (entry.Id <= 0)
-        {
-            return [];
-        }
-
-        if (preferMdbxPayload && IsBoundToCurrentMdbxDatabase(database, entry))
-        {
-            var fieldsByEntryId = await mdbxVaultStore.GetPasswordCustomFieldsByEntryIdsAsync(database, [entry.Id], cancellationToken);
-            if (fieldsByEntryId.TryGetValue(entry.Id, out var mdbxFields))
-            {
-                return mdbxFields;
-            }
-        }
-
-        return await inner.GetCustomFieldsAsync(entry.Id, cancellationToken);
-    }
-
-    private async Task<IReadOnlyList<PasswordHistoryEntry>> GetPasswordHistoryForMdbxSaveAsync(
-        LocalMdbxDatabase database,
-        PasswordEntry entry,
-        bool preferMdbxPayload,
-        CancellationToken cancellationToken)
-    {
-        if (entry.Id <= 0)
-        {
-            return [];
-        }
-
-        if (preferMdbxPayload && IsBoundToCurrentMdbxDatabase(database, entry))
-        {
-            var mdbxHistory = await mdbxVaultStore.GetPasswordHistoryAsync(database, entry.Id, cancellationToken);
-            if (mdbxHistory is not null)
-            {
-                return mdbxHistory;
-            }
-        }
-
-        return await inner.GetPasswordHistoryAsync(entry.Id, cancellationToken);
-    }
-
-    private Task SyncPasswordAttachmentsOwnerToMdbxAsync(long entryId, CancellationToken cancellationToken) =>
-        SyncPasswordAttachmentsOwnerToMdbxAsync(entryId, deletedAttachment: null, cancellationToken);
-
-    private async Task SyncPasswordAttachmentsOwnerToMdbxAsync(long entryId, Attachment? deletedAttachment, CancellationToken cancellationToken)
-    {
-        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
-        if (database is null)
-        {
-            return;
-        }
-
-        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        var entry = await FindPasswordForMdbxOperationAsync(database, categories, entryId, includeDeleted: true, cancellationToken);
-        if (entry is null)
-        {
-            return;
-        }
-
-        var customFields = await GetPasswordCustomFieldsForMdbxSaveAsync(database, entry, true, cancellationToken);
-        var passwordHistory = await GetPasswordHistoryForMdbxSaveAsync(database, entry, true, cancellationToken);
-        var attachments = entry.Id > 0
-            ? await GetPasswordAttachmentsForMdbxSaveAsync(
-                database,
-                entry.Id,
-                deletedAttachment,
-                includeMdbxOnlyAttachments: entry.MdbxDatabaseId is not null,
-                preferMdbxPayload: false,
-                cancellationToken)
-            : [];
-        await mdbxVaultStore.SavePasswordAsync(database, entry, customFields, passwordHistory, attachments, categories.ToDictionary(category => category.Id), cancellationToken);
-        await inner.SavePasswordAsync(entry, cancellationToken);
-        ClearPasswordReadSnapshot();
-    }
-
-    private async Task EnsurePasswordAttachmentOwnerCacheAsync(long entryId, CancellationToken cancellationToken)
-    {
-        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
-        if (database is null)
-        {
-            return;
-        }
-
-        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        var entry = await FindPasswordForMdbxOperationAsync(database, categories, entryId, includeDeleted: false, cancellationToken);
-        if (entry is not null)
-        {
-            await inner.SavePasswordAsync(entry, cancellationToken);
-        }
-    }
-
-    private async Task<long?> FindPasswordAttachmentOwnerIdAsync(long attachmentId, CancellationToken cancellationToken)
-    {
-        return (await FindPasswordAttachmentAsync(attachmentId, cancellationToken))?.OwnerId;
-    }
-
-    private async Task<Attachment?> FindPasswordAttachmentAsync(long attachmentId, CancellationToken cancellationToken)
-    {
-        if (attachmentId <= 0)
-        {
-            return null;
-        }
-
-        var passwords = await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken);
-        foreach (var password in passwords)
-        {
-            var attachment = (await inner.GetAttachmentsAsync("PASSWORD", password.Id, cancellationToken))
-                .FirstOrDefault(attachment => attachment.Id == attachmentId);
-            if (attachment is not null)
-            {
-                return attachment;
-            }
-        }
-
-        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
-        if (database is null)
-        {
-            return null;
-        }
-
-        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        var ids = passwords
-            .Select(password => password.Id)
-            .Concat((await mdbxVaultStore.GetPasswordsAsync(database, categories, includeDeleted: false, includeArchived: true, cancellationToken))
-                .Select(password => password.Id))
-            .Where(id => id > 0)
-            .Distinct()
-            .ToArray();
-        var mdbxAttachmentsByEntryId = await mdbxVaultStore.GetPasswordAttachmentsByEntryIdsAsync(database, ids, cancellationToken);
-        return mdbxAttachmentsByEntryId.Values
-            .SelectMany(attachments => attachments)
-            .FirstOrDefault(attachment => attachment.Id == attachmentId);
-    }
-
-    private async Task SyncPasswordHistoryOwnerToMdbxAsync(long entryId, CancellationToken cancellationToken)
-    {
-        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
-        if (database is null)
-        {
-            return;
-        }
-
-        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        var entry = await FindPasswordForMdbxOperationAsync(database, categories, entryId, includeDeleted: true, cancellationToken);
-        if (entry is null)
-        {
-            return;
-        }
-
-        await SavePasswordToMdbxAsync(
-            database,
-            entry,
-            categories.ToDictionary(category => category.Id),
-            cancellationToken,
-            preferMdbxPasswordHistory: false);
-        await inner.SavePasswordAsync(entry, cancellationToken);
-    }
-
-    private async Task EnsurePasswordHistoryOwnerCacheAsync(long entryId, CancellationToken cancellationToken)
-    {
-        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
-        if (database is null)
-        {
-            return;
-        }
-
-        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        var entry = await FindPasswordForMdbxOperationAsync(database, categories, entryId, includeDeleted: false, cancellationToken);
-        if (entry is not null)
-        {
-            await inner.SavePasswordAsync(entry, cancellationToken);
-        }
-    }
-
-    private async Task EnsurePasswordQuickAccessOwnerCacheAsync(long entryId, CancellationToken cancellationToken)
-    {
-        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
-        if (database is null)
-        {
-            return;
-        }
-
-        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        var entry = await FindPasswordForMdbxOperationAsync(database, categories, entryId, includeDeleted: false, cancellationToken);
-        if (entry is not null)
-        {
-            await inner.SavePasswordAsync(entry, cancellationToken);
-        }
-    }
-
-    private async Task EnsurePasswordHistoryCacheAsync(long entryId, CancellationToken cancellationToken)
-    {
-        await EnsurePasswordHistoryOwnerCacheAsync(entryId, cancellationToken);
-        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
-        if (database is null)
-        {
-            return;
-        }
-
-        var history = await mdbxVaultStore.GetPasswordHistoryAsync(database, entryId, cancellationToken);
-        if (history is null || history.Count == 0)
-        {
-            return;
-        }
-
-        foreach (var item in history)
-        {
-            await inner.SavePasswordHistoryAsync(item, cancellationToken);
-        }
-    }
-
     private async Task<long?> FindPasswordHistoryOwnerIdAsync(long historyId, CancellationToken cancellationToken)
     {
         if (historyId <= 0)
@@ -1588,25 +1062,8 @@ public sealed class MdbxBackedMonicaRepository(
             return null;
         }
 
-        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
-        if (database is not null)
-        {
-            var ownerId = await mdbxVaultStore.FindPasswordHistoryOwnerIdAsync(database, historyId, cancellationToken);
-            if (ownerId is not null)
-            {
-                return ownerId;
-            }
-        }
-
-        foreach (var password in await inner.GetPasswordsAsync(includeDeleted: true, includeArchived: true, cancellationToken))
-        {
-            if ((await inner.GetPasswordHistoryAsync(password.Id, cancellationToken)).Any(entry => entry.Id == historyId))
-            {
-                return password.Id;
-            }
-        }
-
-        return null;
+        var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
+        return await mdbxVaultStore.FindPasswordHistoryOwnerIdAsync(database, historyId, cancellationToken);
     }
 
     private async Task SaveSecureItemToMdbxAsync(
@@ -1742,15 +1199,6 @@ public sealed class MdbxBackedMonicaRepository(
             _ => ""
         };
     }
-
-    private static bool IsUnboundFromMdbx(SecureItem item) =>
-        item.MdbxDatabaseId is null && string.IsNullOrWhiteSpace(item.MdbxFolderId);
-
-    private static bool IsBoundToCurrentMdbxDatabase(LocalMdbxDatabase database, PasswordEntry entry) =>
-        entry.MdbxDatabaseId == database.Id && !string.IsNullOrWhiteSpace(entry.MdbxFolderId);
-
-    private static bool IsBoundToCurrentMdbxDatabase(LocalMdbxDatabase database, SecureItem item) =>
-        item.MdbxDatabaseId == database.Id && !string.IsNullOrWhiteSpace(item.MdbxFolderId);
 
     private static void ClearForeignMdbxBindingForNewSecureItem(SecureItem item)
     {

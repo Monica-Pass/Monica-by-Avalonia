@@ -15,6 +15,180 @@ public sealed class MdbxRepositoryTests
     };
 
     [Fact]
+    public async Task Canonical_repository_keeps_password_and_secure_item_rows_out_of_sqlite()
+    {
+        var repository = CreateRepository(out _, out var sqliteRepository);
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "Canonical login",
+            Username = "canonical-user",
+            Password = "canonical-secret"
+        };
+        var note = new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = "Canonical note",
+            ItemData = "{\"content\":\"canonical\"}"
+        };
+
+        await repository.SavePasswordAsync(password);
+        await repository.SaveSecureItemAsync(note);
+
+        Assert.True(password.Id > 0);
+        Assert.True(note.Id > 0);
+        Assert.Empty(await sqliteRepository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
+        Assert.Empty(await sqliteRepository.GetSecureItemsAsync(includeDeleted: true));
+        Assert.Equal("Canonical login", Assert.Single(await repository.GetPasswordsAsync()).Title);
+        Assert.Equal("Canonical note", Assert.Single(await repository.GetSecureItemsAsync()).Title);
+    }
+
+    [Fact]
+    public async Task Canonical_repository_keeps_categories_fields_history_and_attachments_out_of_sqlite()
+    {
+        var repository = CreateRepository(out _, out var sqliteRepository);
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        var category = new Category { Name = "Canonical/Work", SortOrder = 3 };
+        await repository.SaveCategoryAsync(category);
+        var password = new PasswordEntry
+        {
+            Title = "Canonical extended login",
+            Password = "current-secret",
+            CategoryId = category.Id
+        };
+        await repository.SavePasswordAsync(password);
+        await repository.ReplaceCustomFieldsAsync(password.Id,
+        [
+            new CustomField { EntryId = password.Id, Title = "Recovery", Value = "fixture", IsProtected = true }
+        ]);
+        var history = new PasswordHistoryEntry
+        {
+            EntryId = password.Id,
+            Password = "previous-secret",
+            LastUsedAt = DateTimeOffset.UtcNow.AddDays(-1)
+        };
+        await repository.SavePasswordHistoryAsync(history);
+        var attachment = new Attachment
+        {
+            OwnerType = "PASSWORD",
+            OwnerId = password.Id,
+            FileName = "canonical.txt",
+            ContentType = "text/plain",
+            StoragePath = "pending:canonical.txt",
+            SizeBytes = 9
+        };
+        await repository.SaveAttachmentAsync(attachment);
+
+        Assert.True(category.Id > 0);
+        Assert.True(history.Id > 0);
+        Assert.True(attachment.Id > 0);
+        Assert.Empty(await sqliteRepository.GetCategoriesAsync());
+        Assert.Empty(await sqliteRepository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
+        Assert.Empty(await sqliteRepository.GetCustomFieldsAsync(password.Id));
+        Assert.Empty(await sqliteRepository.GetPasswordHistoryAsync(password.Id));
+        Assert.Empty(await sqliteRepository.GetAttachmentsAsync("PASSWORD", password.Id));
+        Assert.Equal("Recovery", Assert.Single(await repository.GetCustomFieldsAsync(password.Id)).Title);
+        Assert.Equal("previous-secret", Assert.Single(await repository.GetPasswordHistoryAsync(password.Id)).Password);
+        Assert.Equal("canonical.txt", Assert.Single(await repository.GetAttachmentsAsync("PASSWORD", password.Id)).FileName);
+    }
+
+    [Fact]
+    public async Task Canonical_repository_does_not_auto_import_sqlite_business_data_into_new_default_mdbx()
+    {
+        var repository = CreateRepository(out var bridge, out var sqliteRepository);
+        var legacy = new PasswordEntry
+        {
+            Title = "SQLite legacy only",
+            Password = "legacy-secret"
+        };
+        await sqliteRepository.SavePasswordAsync(legacy);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+
+        var canonicalPasswords = await repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true);
+
+        Assert.Empty(canonicalPasswords);
+        Assert.Equal("SQLite legacy only", Assert.Single(await sqliteRepository.GetPasswordsAsync()).Title);
+        Assert.Equal(0, bridge.CountEntries(database.WorkingCopyPath!));
+    }
+
+    [Fact]
+    public async Task Canonical_repository_fails_closed_without_default_mdbx_instead_of_using_sqlite()
+    {
+        var repository = CreateRepository(out _, out var sqliteRepository);
+        await sqliteRepository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "Hidden legacy row",
+            Password = "legacy-secret"
+        });
+
+        Assert.Empty(await repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "Must not fall back",
+            Password = "secret"
+        }));
+        Assert.Single(await sqliteRepository.GetPasswordsAsync());
+    }
+
+    [Fact]
+    public async Task Canonical_repository_fails_closed_for_all_business_mutations_without_default_mdbx()
+    {
+        var repository = CreateRepository(out _);
+        var password = new PasswordEntry { Id = 11, Title = "Unavailable", Password = "secret" };
+        var secureItem = new SecureItem { Id = 12, ItemType = VaultItemType.Note, Title = "Unavailable note" };
+        var attachment = new Attachment { Id = 13, OwnerType = "PASSWORD", OwnerId = password.Id, FileName = "unavailable.txt" };
+        var history = new PasswordHistoryEntry { Id = 14, EntryId = password.Id, Password = "old" };
+        var category = new Category { Id = 15, Name = "Unavailable category" };
+
+        var mutations = new Func<Task>[]
+        {
+            () => repository.SavePasswordAsync(password),
+            () => repository.SoftDeletePasswordAsync(password.Id),
+            () => repository.RestorePasswordAsync(password.Id),
+            () => repository.DeletePasswordPermanentlyAsync(password.Id),
+            () => repository.ReplaceCustomFieldsAsync(password.Id, []),
+            () => repository.SaveAttachmentAsync(attachment),
+            () => repository.SaveAttachmentAsync(attachment, "content"u8.ToArray()),
+            () => repository.DeleteAttachmentAsync(attachment.Id),
+            () => repository.DeleteAttachmentAsync(attachment.Id, attachment),
+            () => repository.SavePasswordHistoryAsync(history),
+            () => repository.TrimPasswordHistoryAsync(password.Id, 1),
+            () => repository.DeletePasswordHistoryAsync(history.Id),
+            () => repository.ClearPasswordHistoryAsync(password.Id),
+            () => repository.SaveSecureItemAsync(secureItem),
+            () => repository.SoftDeleteSecureItemAsync(secureItem.Id),
+            () => repository.SaveCategoryAsync(category),
+            () => repository.DeleteCategoryAsync(category.Id),
+            () => repository.ClearVaultDataAsync(VaultClearScope.All)
+        };
+
+        foreach (var mutation in mutations)
+        {
+            await Assert.ThrowsAnyAsync<InvalidOperationException>(mutation);
+        }
+    }
+
+    [Fact]
+    public async Task Canonical_repository_records_quick_access_without_creating_sqlite_password_cache()
+    {
+        var repository = CreateRepository(out _, out var sqliteRepository);
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "Canonical quick access",
+            Password = "secret"
+        };
+        await repository.SavePasswordAsync(password);
+
+        await repository.RecordPasswordQuickAccessAsync(password.Id);
+
+        Assert.Empty(await sqliteRepository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
+        var record = Assert.Single(await repository.GetPasswordQuickAccessRecordsAsync());
+        Assert.Equal(password.Id, record.PasswordId);
+        Assert.Equal(1, record.OpenCount);
+    }
+
+    [Fact]
     public async Task Repository_reads_android_flat_password_payload_from_mdbx_record()
     {
         var repository = CreateRepository(out var bridge);
@@ -76,7 +250,7 @@ public sealed class MdbxRepositoryTests
     public async Task Repository_roundtrips_passwords_through_mdbx_store_when_default_vault_exists()
     {
         var repository = CreateRepository(out var bridge);
-        await SaveDefaultMdbxDatabaseAsync(repository);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
         var password = new PasswordEntry
         {
             Title = "GitHub",
@@ -91,7 +265,8 @@ public sealed class MdbxRepositoryTests
 
         Assert.NotNull(password.MdbxDatabaseId);
         Assert.False(string.IsNullOrWhiteSpace(password.MdbxFolderId));
-        Assert.Single(bridge.OpenedPaths);
+        Assert.NotEmpty(bridge.OpenedPaths);
+        Assert.All(bridge.OpenedPaths, path => Assert.Equal(database.WorkingCopyPath, path));
 
         password.Password = "rotated";
         await repository.SavePasswordAsync(password);
@@ -289,7 +464,7 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
-    public async Task Repository_ignores_remote_mdbx_metadata_without_working_copy()
+    public async Task Repository_fails_closed_for_remote_mdbx_metadata_without_working_copy()
     {
         var repository = CreateRepository(out var bridge);
         await repository.SaveMdbxDatabaseAsync(new LocalMdbxDatabase
@@ -303,15 +478,13 @@ public sealed class MdbxRepositoryTests
         });
         var password = new PasswordEntry
         {
-            Title = "SQLite fallback",
+            Title = "Unavailable canonical vault",
             Password = "secret"
         };
 
-        await repository.SavePasswordAsync(password);
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => repository.SavePasswordAsync(password));
 
-        var reloaded = Assert.Single(await repository.GetPasswordsAsync());
-        Assert.Null(reloaded.MdbxDatabaseId);
-        Assert.Null(reloaded.MdbxFolderId);
+        Assert.Empty(await repository.GetPasswordsAsync());
         Assert.Empty(bridge.OpenedPaths);
     }
 
@@ -333,6 +506,7 @@ public sealed class MdbxRepositoryTests
             new CustomField { Title = "Backup code", Value = "123456", IsProtected = true }
         ]);
 
+        await sqliteRepository.SavePasswordAsync(CreateSqlitePasswordStub(password));
         await sqliteRepository.ReplaceCustomFieldsAsync(password.Id,
         [
             new CustomField { Title = "SQLite stale", Value = "stale-only" }
@@ -375,6 +549,7 @@ public sealed class MdbxRepositoryTests
         Assert.Equal([password.Id], await repository.SearchEntryIdsByCustomFieldContentAsync("keep-me"));
 
         await repository.ReplaceCustomFieldsAsync(password.Id, []);
+        await sqliteRepository.SavePasswordAsync(CreateSqlitePasswordStub(password));
         await sqliteRepository.ReplaceCustomFieldsAsync(password.Id,
         [
             new CustomField { Title = "Old", Value = "stale-after-clear" }
@@ -432,7 +607,7 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
-    public async Task Repository_mirrors_legacy_sqlite_custom_fields_when_default_mdbx_vault_is_added()
+    public async Task Repository_does_not_import_legacy_sqlite_custom_fields_when_default_mdbx_vault_is_added()
     {
         var repository = CreateRepository(out _, out var sqliteRepository);
         var password = new PasswordEntry
@@ -440,24 +615,17 @@ public sealed class MdbxRepositoryTests
             Title = "Legacy fields",
             Password = "legacy-secret"
         };
-        await repository.SavePasswordAsync(password);
-        await repository.ReplaceCustomFieldsAsync(password.Id,
+        await sqliteRepository.SavePasswordAsync(password);
+        await sqliteRepository.ReplaceCustomFieldsAsync(password.Id,
         [
             new CustomField { Title = "Legacy hint", Value = "mother maiden" }
         ]);
 
         await SaveDefaultMdbxDatabaseAsync(repository);
-        Assert.Single(await repository.GetPasswordsAsync());
-        await sqliteRepository.ReplaceCustomFieldsAsync(password.Id,
-        [
-            new CustomField { Title = "SQLite stale", Value = "after-mirror" }
-        ]);
-
-        var fields = await repository.GetCustomFieldsAsync(password.Id);
-
-        Assert.Equal("Legacy hint", Assert.Single(fields).Title);
-        Assert.Equal([password.Id], await repository.SearchEntryIdsByCustomFieldContentAsync("maiden"));
-        Assert.Empty(await repository.SearchEntryIdsByCustomFieldContentAsync("after-mirror"));
+        Assert.Empty(await repository.GetPasswordsAsync());
+        Assert.Empty(await repository.GetCustomFieldsAsync(password.Id));
+        Assert.Empty(await repository.SearchEntryIdsByCustomFieldContentAsync("maiden"));
+        Assert.Equal("Legacy hint", Assert.Single(await sqliteRepository.GetCustomFieldsAsync(password.Id)).Title);
     }
 
     [Fact]
@@ -486,6 +654,7 @@ public sealed class MdbxRepositoryTests
 
         await repository.SavePasswordHistoryAsync(older);
         await repository.SavePasswordHistoryAsync(latest);
+        await sqliteRepository.SavePasswordAsync(CreateSqlitePasswordStub(password));
         await sqliteRepository.ClearPasswordHistoryAsync(password.Id);
         await sqliteRepository.SavePasswordHistoryAsync(new PasswordHistoryEntry
         {
@@ -682,6 +851,7 @@ public sealed class MdbxRepositoryTests
         Assert.Equal("old-2", Assert.Single(await repository.GetPasswordHistoryAsync(password.Id)).Password);
 
         await repository.ClearPasswordHistoryAsync(password.Id);
+        await sqliteRepository.SavePasswordAsync(CreateSqlitePasswordStub(password));
         await sqliteRepository.SavePasswordHistoryAsync(new PasswordHistoryEntry
         {
             EntryId = password.Id,
@@ -693,7 +863,7 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
-    public async Task Repository_mirrors_legacy_sqlite_password_history_when_default_mdbx_vault_is_added()
+    public async Task Repository_does_not_import_legacy_sqlite_password_history_when_default_mdbx_vault_is_added()
     {
         var repository = CreateRepository(out _, out var sqliteRepository);
         var password = new PasswordEntry
@@ -701,8 +871,8 @@ public sealed class MdbxRepositoryTests
             Title = "Legacy history",
             Password = "current"
         };
-        await repository.SavePasswordAsync(password);
-        await repository.SavePasswordHistoryAsync(new PasswordHistoryEntry
+        await sqliteRepository.SavePasswordAsync(password);
+        await sqliteRepository.SavePasswordHistoryAsync(new PasswordHistoryEntry
         {
             EntryId = password.Id,
             Password = "legacy-secret",
@@ -710,18 +880,9 @@ public sealed class MdbxRepositoryTests
         });
 
         await SaveDefaultMdbxDatabaseAsync(repository);
-        Assert.Single(await repository.GetPasswordsAsync());
-        await sqliteRepository.ClearPasswordHistoryAsync(password.Id);
-        await sqliteRepository.SavePasswordHistoryAsync(new PasswordHistoryEntry
-        {
-            EntryId = password.Id,
-            Password = "sqlite-stale-after-mirror",
-            LastUsedAt = DateTimeOffset.UtcNow.AddMinutes(5)
-        });
-
-        var history = await repository.GetPasswordHistoryAsync(password.Id);
-
-        Assert.Equal("legacy-secret", Assert.Single(history).Password);
+        Assert.Empty(await repository.GetPasswordsAsync());
+        Assert.Empty(await repository.GetPasswordHistoryAsync(password.Id));
+        Assert.Equal("legacy-secret", Assert.Single(await sqliteRepository.GetPasswordHistoryAsync(password.Id)).Password);
     }
 
     [Fact]
@@ -1042,7 +1203,7 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
-    public async Task Repository_preserves_mdbx_secure_item_fields_when_soft_delete_uses_stale_sqlite_cache()
+    public async Task Repository_soft_deletes_mdbx_secure_item_without_mutating_stale_sqlite_row()
     {
         var repository = CreateRepository(out _, out var sqliteRepository);
         await SaveDefaultMdbxDatabaseAsync(repository);
@@ -1076,11 +1237,15 @@ public sealed class MdbxRepositoryTests
 
         await repository.SoftDeleteSecureItemAsync(card.Id);
 
-        var cachedDeletedCard = Assert.Single(await sqliteRepository.GetSecureItemsAsync(VaultItemType.BankCard, includeDeleted: true));
-        var cachedCardData = WalletItemDataCodec.DecodeBankCard(cachedDeletedCard);
-        Assert.True(cachedDeletedCard.IsDeleted);
-        Assert.Equal("MDBX truth card", cachedDeletedCard.Title);
-        Assert.Equal("4111111111111111", cachedCardData.CardNumber);
+        var deletedCard = Assert.Single(await repository.GetSecureItemsAsync(VaultItemType.BankCard, includeDeleted: true));
+        var deletedCardData = WalletItemDataCodec.DecodeBankCard(deletedCard);
+        Assert.True(deletedCard.IsDeleted);
+        Assert.Equal("MDBX truth card", deletedCard.Title);
+        Assert.Equal("4111111111111111", deletedCardData.CardNumber);
+
+        var staleSqliteCard = Assert.Single(await sqliteRepository.GetSecureItemsAsync(VaultItemType.BankCard, includeDeleted: true));
+        Assert.False(staleSqliteCard.IsDeleted);
+        Assert.Equal("SQLite stale card", staleSqliteCard.Title);
     }
 
     [Fact]
@@ -1115,7 +1280,7 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
-    public async Task Repository_keeps_sqlite_fallback_when_no_default_mdbx_vault_exists()
+    public async Task Repository_rejects_business_writes_when_no_default_mdbx_vault_exists()
     {
         var repository = CreateRepository(out var bridge);
         var password = new PasswordEntry
@@ -1124,18 +1289,17 @@ public sealed class MdbxRepositoryTests
             Password = "secret"
         };
 
-        await repository.SavePasswordAsync(password);
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => repository.SavePasswordAsync(password));
 
-        var reloaded = Assert.Single(await repository.GetPasswordsAsync());
-        Assert.Equal("SQLite only", reloaded.Title);
-        Assert.Null(reloaded.MdbxDatabaseId);
+        Assert.Empty(await repository.GetPasswordsAsync());
         Assert.Empty(bridge.OpenedPaths);
     }
 
     [Fact]
-    public async Task Repository_clears_foreign_mdbx_ids_for_new_sqlite_only_items()
+    public async Task Repository_rebinds_new_items_with_foreign_ids_to_the_default_mdbx()
     {
         var repository = CreateRepository(out _);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
         var password = new PasswordEntry
         {
             Title = "Foreign password",
@@ -1157,16 +1321,16 @@ public sealed class MdbxRepositoryTests
         var reloadedPassword = Assert.Single(await repository.GetPasswordsAsync());
         var reloadedNote = Assert.Single(await repository.GetSecureItemsAsync(VaultItemType.Note));
 
-        Assert.Null(reloadedPassword.MdbxDatabaseId);
-        Assert.Null(reloadedPassword.MdbxFolderId);
-        Assert.Null(reloadedNote.MdbxDatabaseId);
-        Assert.Null(reloadedNote.MdbxFolderId);
+        Assert.Equal(database.Id, reloadedPassword.MdbxDatabaseId);
+        Assert.False(string.IsNullOrWhiteSpace(reloadedPassword.MdbxFolderId));
+        Assert.Equal(database.Id, reloadedNote.MdbxDatabaseId);
+        Assert.False(string.IsNullOrWhiteSpace(reloadedNote.MdbxFolderId));
     }
 
     [Fact]
-    public async Task Repository_mirrors_existing_sqlite_items_after_default_mdbx_vault_is_added()
+    public async Task Repository_does_not_import_existing_sqlite_items_after_default_mdbx_vault_is_added()
     {
-        var repository = CreateRepository(out _);
+        var repository = CreateRepository(out _, out var sqliteRepository);
         var password = new PasswordEntry
         {
             Title = "Before MDBX",
@@ -1178,20 +1342,16 @@ public sealed class MdbxRepositoryTests
             Title = "Legacy note",
             Notes = "created before the vault"
         };
-        await repository.SavePasswordAsync(password);
-        await repository.SaveSecureItemAsync(note);
+        await sqliteRepository.SavePasswordAsync(password);
+        await sqliteRepository.SaveSecureItemAsync(note);
 
         await SaveDefaultMdbxDatabaseAsync(repository);
 
-        var mirroredPassword = Assert.Single(await repository.GetPasswordsAsync());
-        var mirroredNote = Assert.Single(await repository.GetSecureItemsAsync(VaultItemType.Note));
+        Assert.Empty(await repository.GetPasswordsAsync());
+        Assert.Empty(await repository.GetSecureItemsAsync(VaultItemType.Note));
 
-        Assert.Equal("legacy-secret", mirroredPassword.Password);
-        Assert.NotNull(mirroredPassword.MdbxDatabaseId);
-        Assert.False(string.IsNullOrWhiteSpace(mirroredPassword.MdbxFolderId));
-        Assert.Equal("created before the vault", mirroredNote.Notes);
-        Assert.NotNull(mirroredNote.MdbxDatabaseId);
-        Assert.False(string.IsNullOrWhiteSpace(mirroredNote.MdbxFolderId));
+        Assert.Equal("legacy-secret", Assert.Single(await sqliteRepository.GetPasswordsAsync()).Password);
+        Assert.Equal("created before the vault", Assert.Single(await sqliteRepository.GetSecureItemsAsync(VaultItemType.Note)).Notes);
     }
 
     [Fact]
@@ -1435,7 +1595,7 @@ public sealed class MdbxRepositoryTests
         Assert.Equal("env", customField.Title);
         Assert.Equal("prod", customField.Value);
         Assert.Equal("old-secret", history.Password);
-        Assert.Empty(await repository.GetCategoriesAsync());
+        Assert.Equal("Work", Assert.Single(await repository.GetCategoriesAsync()).Name);
     }
 
     [Fact]
@@ -1846,7 +2006,7 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
-    public async Task Repository_migrates_existing_password_attachment_content_to_mdbx_when_listed()
+    public async Task Repository_writes_password_attachment_content_to_mdbx_when_supplied()
     {
         var contentStore = new FakeAttachmentContentStore();
         var repository = CreateRepository(out var bridge, contentStore);
@@ -1867,8 +2027,7 @@ public sealed class MdbxRepositoryTests
             StoragePath = "secure_attachments/legacy.enc",
             SizeBytes = content.Length
         };
-        await repository.SaveAttachmentAsync(attachment);
-        contentStore.Put(attachment.StoragePath, content);
+        await repository.SaveAttachmentAsync(attachment, content);
 
         var migrated = Assert.Single(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
         var reloaded = Assert.Single(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
@@ -1877,11 +2036,11 @@ public sealed class MdbxRepositoryTests
         Assert.StartsWith("mdbx:", migrated.StoragePath, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(migrated.StoragePath, reloaded.StoragePath);
         Assert.Equal(content, bridge.ReadAttachmentContent(database.WorkingCopyPath!, migrated.StoragePath));
-        Assert.Null(contentStore.TryRead(attachment.StoragePath));
+        Assert.Null(contentStore.TryRead("secure_attachments/legacy.enc"));
     }
 
     [Fact]
-    public async Task Repository_migrates_existing_password_attachment_content_when_sqlite_password_cache_is_missing()
+    public async Task Repository_reads_mdbx_attachment_content_when_sqlite_password_cache_is_missing()
     {
         var contentStore = new FakeAttachmentContentStore();
         var repository = CreateRepository(out var bridge, out var sqliteRepository, contentStore);
@@ -1902,30 +2061,28 @@ public sealed class MdbxRepositoryTests
             StoragePath = "secure_attachments/owner-cache-missing.enc",
             SizeBytes = content.Length
         };
-        await repository.SaveAttachmentAsync(attachment);
-        contentStore.Put(attachment.StoragePath, content);
+        await repository.SaveAttachmentAsync(attachment, content);
         await sqliteRepository.ClearVaultDataAsync(VaultClearScope.Passwords);
-        await sqliteRepository.SaveAttachmentAsync(attachment);
 
         var migrated = Assert.Single(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
 
         Assert.Equal(attachment.Id, migrated.Id);
         Assert.StartsWith("mdbx:", migrated.StoragePath, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(content, bridge.ReadAttachmentContent(database.WorkingCopyPath!, migrated.StoragePath));
-        Assert.Null(contentStore.TryRead(attachment.StoragePath));
+        Assert.Null(contentStore.TryRead("secure_attachments/owner-cache-missing.enc"));
     }
 
     [Fact]
-    public async Task Repository_migrates_legacy_password_attachments_after_default_mdbx_vault_is_added()
+    public async Task Repository_does_not_import_legacy_password_attachments_after_default_mdbx_vault_is_added()
     {
         var contentStore = new FakeAttachmentContentStore();
-        var repository = CreateRepository(out var bridge, contentStore);
+        var repository = CreateRepository(out var bridge, out var sqliteRepository, contentStore);
         var password = new PasswordEntry
         {
             Title = "Legacy before vault",
             Password = "secret"
         };
-        await repository.SavePasswordAsync(password);
+        await sqliteRepository.SavePasswordAsync(password);
         var content = "legacy before vault bytes"u8.ToArray();
         var attachment = new Attachment
         {
@@ -1936,18 +2093,14 @@ public sealed class MdbxRepositoryTests
             StoragePath = "secure_attachments/before-vault.enc",
             SizeBytes = content.Length
         };
-        await repository.SaveAttachmentAsync(attachment);
+        await sqliteRepository.SaveAttachmentAsync(attachment);
         contentStore.Put(attachment.StoragePath, content);
 
         var database = await SaveDefaultMdbxDatabaseAsync(repository);
 
-        var migrated = Assert.Single(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
-        var reloaded = Assert.Single(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
-
-        Assert.StartsWith("mdbx:", migrated.StoragePath, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(migrated.StoragePath, reloaded.StoragePath);
-        Assert.Equal(content, bridge.ReadAttachmentContent(database.WorkingCopyPath!, migrated.StoragePath));
-        Assert.Null(contentStore.TryRead(attachment.StoragePath));
+        Assert.Empty(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
+        Assert.Equal(0, bridge.CountActiveAttachments(database.WorkingCopyPath!));
+        Assert.Equal(content, contentStore.TryRead(attachment.StoragePath));
     }
 
     [Fact]
@@ -1974,7 +2127,7 @@ public sealed class MdbxRepositoryTests
         await repository.ClearVaultDataAsync(VaultClearScope.Passwords);
 
         Assert.Empty(await repository.GetPasswordsAsync());
-        Assert.Empty(await repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
+        Assert.True(Assert.Single(await repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true)).IsDeleted);
         var remaining = Assert.Single(await repository.GetSecureItemsAsync(VaultItemType.Note));
         Assert.Null(remaining.BoundPasswordId);
         Assert.Equal(1, bridge.CountActiveEntries(database.WorkingCopyPath!));
@@ -2035,7 +2188,7 @@ public sealed class MdbxRepositoryTests
         await repository.ClearVaultDataAsync(VaultClearScope.SecureItems);
 
         Assert.Equal("Portal", Assert.Single(await repository.GetPasswordsAsync()).Title);
-        Assert.Empty(await repository.GetSecureItemsAsync(includeDeleted: true));
+        Assert.True(Assert.Single(await repository.GetSecureItemsAsync(includeDeleted: true)).IsDeleted);
         Assert.Equal(1, bridge.CountActiveEntries(database.WorkingCopyPath!));
         Assert.Equal(1, bridge.CountDeletedEntries(database.WorkingCopyPath!));
     }
@@ -2065,7 +2218,7 @@ public sealed class MdbxRepositoryTests
 
         await repository.DeletePasswordPermanentlyAsync(password.Id);
 
-        Assert.Empty(await repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
+        Assert.True(Assert.Single(await repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true)).IsDeleted);
         Assert.Empty(await repository.GetAttachmentsAsync("PASSWORD", password.Id));
         Assert.Equal(0, bridge.CountActiveEntries(database.WorkingCopyPath!));
         Assert.Equal(1, bridge.CountDeletedEntries(database.WorkingCopyPath!));
@@ -2199,13 +2352,22 @@ public sealed class MdbxRepositoryTests
 
         await repository.DeletePasswordPermanentlyAsync(password.Id);
 
-        Assert.Empty(await repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
+        Assert.True(Assert.Single(await repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true)).IsDeleted);
         Assert.Equal(0, bridge.CountActiveAttachments(database.WorkingCopyPath!));
         Assert.Null(bridge.TryReadAttachmentContent(database.WorkingCopyPath!, savedAttachment.StoragePath));
     }
 
     private static IMonicaRepository CreateRepository(out FakeMdbxNativeBridge bridge, IAttachmentContentStore? attachmentContentStore = null) =>
         CreateRepository(out bridge, out _, attachmentContentStore);
+
+    private static PasswordEntry CreateSqlitePasswordStub(PasswordEntry source) => new()
+    {
+        Id = source.Id,
+        Title = $"SQLite stale {source.Title}",
+        Password = "sqlite-stale",
+        CreatedAt = source.CreatedAt,
+        UpdatedAt = source.UpdatedAt
+    };
 
     private static IMonicaRepository CreateRepository(out FakeMdbxNativeBridge bridge, out IMonicaRepository sqliteRepository, IAttachmentContentStore? attachmentContentStore = null)
     {

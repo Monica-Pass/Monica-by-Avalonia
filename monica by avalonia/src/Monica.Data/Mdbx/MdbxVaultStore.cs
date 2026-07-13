@@ -76,11 +76,6 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge, ICryptoServic
                      .Where(project => !string.Equals(project.Title, DefaultProjectTitle, StringComparison.OrdinalIgnoreCase))
                      .OrderBy(project => project.Title, StringComparer.OrdinalIgnoreCase))
         {
-            if (!await HasBusinessEntriesAsync(vault, project.ProjectId, cancellationToken))
-            {
-                continue;
-            }
-
             categories.Add(new Category
             {
                 Name = project.Title,
@@ -772,6 +767,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge, ICryptoServic
         attachment.OwnerType = "SECURE_ITEM";
         attachment.OwnerId = item.Id;
         attachment.StoragePath = ToAttachmentStoragePath(written.AttachmentId);
+        attachment.Id = MdbxStableId.FromString("attachment", attachment.StoragePath);
         attachment.SizeBytes = checked((long)Math.Min(written.OriginalSize, (ulong)long.MaxValue));
         if (string.IsNullOrWhiteSpace(attachment.ContentType) && !string.IsNullOrWhiteSpace(written.MediaType))
         {
@@ -805,6 +801,10 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge, ICryptoServic
         var written = await vault.WriteAttachmentInlineContentAsync(metadata.AttachmentId, content, cancellationToken);
 
         attachment.StoragePath = ToAttachmentStoragePath(written.AttachmentId);
+        if (attachment.Id <= 0)
+        {
+            attachment.Id = MdbxStableId.FromString("attachment", attachment.StoragePath);
+        }
         attachment.SizeBytes = checked((long)Math.Min(written.OriginalSize, (ulong)long.MaxValue));
         if (string.IsNullOrWhiteSpace(attachment.ContentType) && !string.IsNullOrWhiteSpace(written.MediaType))
         {
@@ -1316,6 +1316,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge, ICryptoServic
             .Where(path => TryParseAttachmentStoragePath(path) is not null)
             .Select((path, index) => new Attachment
             {
+                Id = MdbxStableId.FromString("attachment", path),
                 OwnerType = "SECURE_ITEM",
                 OwnerId = itemId,
                 FileName = $"image-{index + 1}",
@@ -1331,7 +1332,9 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge, ICryptoServic
             .Where(attachment => TryParseAttachmentStoragePath(attachment.StoragePath.Trim()) is not null)
             .Select((attachment, index) => new Attachment
             {
-                Id = attachment.Id,
+                Id = attachment.Id > 0
+                    ? attachment.Id
+                    : MdbxStableId.FromString("attachment", attachment.StoragePath.Trim()),
                 OwnerType = "SECURE_ITEM",
                 OwnerId = itemId,
                 FileName = string.IsNullOrWhiteSpace(attachment.FileName) ? $"image-{index + 1}" : attachment.FileName.Trim(),
@@ -1350,6 +1353,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge, ICryptoServic
             .ThenBy(attachment => attachment.AttachmentId, StringComparer.OrdinalIgnoreCase)
             .Select(attachment => new Attachment
             {
+                Id = MdbxStableId.FromString("attachment", ToAttachmentStoragePath(attachment.AttachmentId)),
                 OwnerType = "SECURE_ITEM",
                 OwnerId = itemId,
                 FileName = attachment.FileName.Trim(),

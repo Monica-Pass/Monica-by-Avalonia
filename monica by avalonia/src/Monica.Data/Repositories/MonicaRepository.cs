@@ -43,11 +43,17 @@ public interface IMonicaRepository
     Task ClearVaultDataAsync(VaultClearScope scope, CancellationToken cancellationToken = default);
 }
 
+public interface IPasswordQuickAccessStore
+{
+    Task RecordPasswordQuickAccessAsync(long passwordId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PasswordQuickAccessRecord>> GetAllPasswordQuickAccessRecordsAsync(CancellationToken cancellationToken = default);
+}
+
 public sealed class MonicaRepository(
     ISqliteConnectionFactory connectionFactory,
     IDatabaseMigrator migrator,
     IVaultDataProtector? vaultDataProtector = null,
-    IAttachmentContentStore? attachmentContentStore = null) : IMonicaRepository
+    IAttachmentContentStore? attachmentContentStore = null) : IMonicaRepository, IPasswordQuickAccessStore
 {
     private readonly IVaultDataProtector _vaultDataProtector = vaultDataProtector ?? NoopVaultDataProtector.Instance;
 
@@ -552,13 +558,24 @@ public sealed class MonicaRepository(
         await using var connection = connectionFactory.CreateConnection();
         var rows = await connection.QueryAsync<PasswordQuickAccessRecordRow>(
             """
+            SELECT quick_access.password_id, quick_access.open_count, quick_access.last_opened_at
+            FROM password_quick_access_records quick_access
+            INNER JOIN password_entries password ON password.id = quick_access.password_id
+            WHERE password.is_deleted = 0 AND password.is_archived = 0
+            ORDER BY quick_access.last_opened_at DESC
+            """);
+
+        return rows.Select(ToModel).ToList();
+    }
+
+    public async Task<IReadOnlyList<PasswordQuickAccessRecord>> GetAllPasswordQuickAccessRecordsAsync(CancellationToken cancellationToken = default)
+    {
+        await migrator.MigrateAsync(cancellationToken);
+        await using var connection = connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<PasswordQuickAccessRecordRow>(
+            """
             SELECT password_id, open_count, last_opened_at
             FROM password_quick_access_records
-            WHERE password_id IN (
-                SELECT id
-                FROM password_entries
-                WHERE is_deleted = 0 AND is_archived = 0
-            )
             ORDER BY last_opened_at DESC
             """);
 

@@ -25,6 +25,62 @@ public sealed class DataRepositoryTests
     }
 
     [Fact]
+    public async Task Migration_v70_removes_quick_access_foreign_key_and_preserves_existing_counters()
+    {
+        var path = GetTempDatabasePath();
+        var factory = new SqliteConnectionFactory(path);
+        var migrator = new DatabaseMigrator(factory);
+        await migrator.MigrateAsync();
+        var legacyPassword = new PasswordEntry { Title = "Legacy quick access", Password = "secret" };
+        await new MonicaRepository(factory, migrator).SavePasswordAsync(legacyPassword);
+
+        await using (var connection = factory.CreateConnection())
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                PRAGMA foreign_keys=ON;
+                DROP TABLE password_quick_access_records;
+                CREATE TABLE password_quick_access_records (
+                    password_id INTEGER PRIMARY KEY NOT NULL,
+                    open_count INTEGER NOT NULL DEFAULT 0,
+                    last_opened_at INTEGER NOT NULL,
+                    FOREIGN KEY(password_id) REFERENCES password_entries(id) ON DELETE CASCADE
+                );
+                INSERT INTO password_quick_access_records(password_id, open_count, last_opened_at) VALUES(@PasswordId, 7, 1234);
+                PRAGMA user_version=69;
+                """;
+            command.Parameters.AddWithValue("@PasswordId", legacyPassword.Id);
+            await command.ExecuteNonQueryAsync();
+        }
+
+        await migrator.MigrateAsync();
+
+        await using var verifyConnection = factory.CreateConnection();
+        await verifyConnection.OpenAsync();
+        await using (var foreignKeyCommand = verifyConnection.CreateCommand())
+        {
+            foreignKeyCommand.CommandText = "PRAGMA foreign_key_list(password_quick_access_records);";
+            await using var reader = await foreignKeyCommand.ExecuteReaderAsync();
+            Assert.False(await reader.ReadAsync());
+        }
+
+        await using (var preservedCommand = verifyConnection.CreateCommand())
+        {
+            preservedCommand.CommandText = "SELECT open_count FROM password_quick_access_records WHERE password_id = @PasswordId;";
+            preservedCommand.Parameters.AddWithValue("@PasswordId", legacyPassword.Id);
+            Assert.Equal(7L, Convert.ToInt64(await preservedCommand.ExecuteScalarAsync()));
+        }
+
+        await using (var canonicalIdCommand = verifyConnection.CreateCommand())
+        {
+            canonicalIdCommand.CommandText = "INSERT INTO password_quick_access_records(password_id, open_count, last_opened_at) VALUES(9001, 1, 5678);";
+            Assert.Equal(1, await canonicalIdCommand.ExecuteNonQueryAsync());
+        }
+    }
+
+    [Fact]
     public async Task Migration_refuses_legacy_pascal_case_windows_vault()
     {
         var path = GetTempDatabasePath();

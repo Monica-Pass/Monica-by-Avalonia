@@ -23,6 +23,10 @@ public sealed partial class MainWindowViewModel
     [ObservableProperty]
     private string _confirmMasterPassword = "";
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasRecoverableStatusMessage))]
+    private bool _hasPendingLegacyBusinessData;
+
     public string LoginTitle => IsVaultInitialized
         ? _localization.UnlockMonica
         : _localization.CreateMonicaVault;
@@ -80,6 +84,7 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private async Task UnlockAsync()
     {
+        HasPendingLegacyBusinessData = false;
         AppDiagnostics.Info(
             $"Unlock requested. initialized={IsVaultInitialized}, " +
             $"legacyImportRequired={_legacyVaultDetection.RequiresImport}");
@@ -116,6 +121,7 @@ public sealed partial class MainWindowViewModel
             case VaultUnlockStatus.Unlocked:
                 IsVaultInitialized = result.IsVaultInitialized;
                 IsUnlocked = true;
+                HasPendingLegacyBusinessData = result.LegacyBusinessDataPending;
                 MasterPassword = "";
                 ConfirmMasterPassword = "";
                 StatusMessage = $"{_localization.Get(result.MessageKey)}，正在加载保险库数据...";

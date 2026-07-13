@@ -19,7 +19,8 @@ public sealed record VaultUnlockResult(
     VaultUnlockStatus Status,
     bool IsVaultInitialized,
     string MessageKey,
-    Exception? Error = null);
+    Exception? Error = null,
+    bool LegacyBusinessDataPending = false);
 
 public enum VaultUnlockStatus
 {
@@ -36,7 +37,8 @@ public enum VaultUnlockStatus
 public sealed class VaultUnlockCoordinator(
     IVaultCredentialStore credentialStore,
     ICryptoService cryptoService,
-    ILegacyVaultDetector legacyVaultDetector) : IVaultUnlockCoordinator
+    ILegacyVaultDetector legacyVaultDetector,
+    ICanonicalVaultBootstrapService? canonicalVaultBootstrapService = null) : IVaultUnlockCoordinator
 {
     public async Task<VaultInitializationState> InitializeAsync(CancellationToken cancellationToken = default)
     {
@@ -92,10 +94,16 @@ public sealed class VaultUnlockCoordinator(
                 return new VaultUnlockResult(VaultUnlockStatus.WrongPassword, true, "WrongMasterPassword");
             }
 
+            var bootstrap = canonicalVaultBootstrapService is null
+                ? null
+                : await canonicalVaultBootstrapService.EnsureReadyAsync(cancellationToken);
+            var legacyBusinessDataPending = bootstrap?.LegacyBusinessData.HasData == true;
+
             return new VaultUnlockResult(
                 created ? VaultUnlockStatus.CreatedAndUnlocked : VaultUnlockStatus.Unlocked,
                 true,
-                "VaultUnlocked");
+                legacyBusinessDataPending ? "VaultUnlockedLegacyBusinessDataPending" : "VaultUnlocked",
+                LegacyBusinessDataPending: legacyBusinessDataPending);
         }
         catch (Exception ex)
         {

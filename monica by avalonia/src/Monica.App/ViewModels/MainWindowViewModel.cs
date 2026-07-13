@@ -380,7 +380,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 RaiseCounts();
                 RaiseFilteredPasswordsChanged();
             });
-            StatusMessage = _localization.Get("VaultUnlocked");
+            StatusMessage = _localization.Get(
+                HasPendingLegacyBusinessData
+                    ? "VaultUnlockedLegacyBusinessDataPending"
+                    : "VaultUnlocked");
             VaultLoadStageText = "保险库已就绪";
             _ = LoadTimelineDeferredAsync();
             if (deferSecurityAnalysis)
