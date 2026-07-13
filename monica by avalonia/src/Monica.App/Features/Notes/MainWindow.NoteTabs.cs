@@ -29,14 +29,6 @@ public partial class MainWindow
     private void NoteTabsScrollViewer_OnScrollChanged(object? sender, ScrollChangedEventArgs e) =>
         UpdateNoteTabScrollButtons();
 
-    private void NoteWorkspaceGrid_OnSizeChanged(object? sender, SizeChangedEventArgs e)
-    {
-        if (DataContext is MainWindowViewModel viewModel)
-        {
-            viewModel.NoteWorkspaceViewportWidth = e.NewSize.Width;
-        }
-    }
-
     private double GetNoteTabPageScrollAmount()
     {
         var viewportWidth = NoteTabsScrollViewer.Viewport.Width;
@@ -119,9 +111,6 @@ public partial class MainWindow
         PreviousNoteTabButton.IsEnabled = offset > 0.5;
         NextNoteTabButton.IsEnabled = offset < maxOffset - 0.5;
     }
-
-    private void RestoreSelectedNoteTabSelection()
-        => NoteEditorView.RestoreSelectedTabSelection();
 
     private async void CloseNoteTabButton_OnClick(object? sender, RoutedEventArgs e)
     {
