@@ -9,6 +9,13 @@ using Monica.Platform.Services;
 
 namespace Monica.Tests;
 
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class VaultCredentialTestCollection
+{
+    public const string Name = "Vault credentials";
+}
+
+[Collection(VaultCredentialTestCollection.Name)]
 public sealed class VaultCredentialTests
 {
     [Fact]

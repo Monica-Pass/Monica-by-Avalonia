@@ -48,6 +48,8 @@ public sealed partial class MainWindowViewModel
     {
         OnPropertyChanged(nameof(HasPasswordFilters));
         OnPropertyChanged(nameof(PasswordFilterSummaryText));
+        OnPropertyChanged(nameof(PasswordEmptyStateText));
+        OnPropertyChanged(nameof(ShowClearPasswordFiltersInEmptyState));
     }
 
     private void RaisePasswordFolderFilterCollections()
@@ -151,6 +153,10 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(FilteredPasswords));
         OnPropertyChanged(nameof(FilteredPasswordRows));
         OnPropertyChanged(nameof(VisiblePasswordNavigationEntries));
+        OnPropertyChanged(nameof(HasFilteredPasswordRows));
+        OnPropertyChanged(nameof(PasswordEmptyStateText));
+        OnPropertyChanged(nameof(ShowAddPasswordInEmptyState));
+        OnPropertyChanged(nameof(ShowClearPasswordFiltersInEmptyState));
         SyncSelectedPasswordListRow(SelectedPassword);
     }
 
@@ -159,6 +165,7 @@ public sealed partial class MainWindowViewModel
         _filteredPasswordRowsDirty = true;
         OnPropertyChanged(nameof(FilteredPasswordRows));
         OnPropertyChanged(nameof(VisiblePasswordNavigationEntries));
+        OnPropertyChanged(nameof(HasFilteredPasswordRows));
         SyncSelectedPasswordListRow(SelectedPassword);
     }
 

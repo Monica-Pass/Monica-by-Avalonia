@@ -124,6 +124,7 @@ public sealed partial class MainWindowViewModel
 
     private async Task SaveSettingsAsync()
     {
+        var statusBeforeSave = StatusMessage;
         try
         {
             while (true)
@@ -150,7 +151,11 @@ public sealed partial class MainWindowViewModel
                 _hasPendingSettingsSave = false;
             }
 
-            StatusMessage = _localization.Format("VaultMetadataLoadFailedFormat", ex.Message);
+            AppDiagnostics.Error("Settings save failed", ex);
+            if (string.Equals(StatusMessage, statusBeforeSave, StringComparison.Ordinal))
+            {
+                StatusMessage = _localization.Format("SettingsSaveFailedFormat", ex.Message);
+            }
         }
     }
 }

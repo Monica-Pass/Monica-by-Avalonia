@@ -541,6 +541,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RefreshRecycleBinCountState();
 
         OnPropertyChanged(nameof(PasswordCountText));
+        OnPropertyChanged(nameof(HasFilteredPasswordRows));
+        OnPropertyChanged(nameof(PasswordEmptyStateText));
+        OnPropertyChanged(nameof(ShowAddPasswordInEmptyState));
+        OnPropertyChanged(nameof(ShowClearPasswordFiltersInEmptyState));
         OnPropertyChanged(nameof(NoteCountText));
         OnPropertyChanged(nameof(TotpCountText));
         OnPropertyChanged(nameof(HasTotpItems));
@@ -608,6 +612,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RaisePasswordQuickAccessState();
         RaisePasswordFilterState();
         OnPropertyChanged(nameof(ClearPasswordFiltersText));
+        OnPropertyChanged(nameof(PasswordEmptyStateText));
+        OnPropertyChanged(nameof(SelectPasswordItemsText));
+        OnPropertyChanged(nameof(SelectAllVisiblePasswordsText));
         RaisePasswordSortText();
         OnPropertyChanged(nameof(TotpScanQrText));
         OnPropertyChanged(nameof(TotpManualAddText));

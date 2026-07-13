@@ -576,6 +576,12 @@ public sealed partial class MainWindowViewModel
     }
 
     [RelayCommand]
+    private void ClearPasswordSearch()
+    {
+        SetPasswordSearchImmediately("");
+    }
+
+    [RelayCommand]
     private void ClearPasswordFilters()
     {
         SetPasswordSearchImmediately("");

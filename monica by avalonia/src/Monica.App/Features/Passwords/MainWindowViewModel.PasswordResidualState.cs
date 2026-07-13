@@ -132,6 +132,15 @@ public sealed partial class MainWindowViewModel
     [NotifyPropertyChangedFor(nameof(HasSelectedPasswordLoadingState))]
     private bool _isLoadingSelectedPasswordDetails;
     public string PasswordCountText => _localization.Format("PasswordCountFormat", Passwords.Count);
+    public bool HasFilteredPasswordRows => FilteredPasswordRows.Count > 0;
+    public bool HasPasswordSearchText => !string.IsNullOrEmpty(PasswordSearchText);
+    public bool ShowAddPasswordInEmptyState => Passwords.Count == 0;
+    public bool ShowClearPasswordFiltersInEmptyState => Passwords.Count > 0 && HasPasswordFilters;
+    public string PasswordEmptyStateText => ShowClearPasswordFiltersInEmptyState
+        ? _localization.Get("PasswordNoFilteredResults")
+        : _localization.Get("PasswordEmptyHint");
+    public string SelectPasswordItemsText => _localization.Get("SelectPasswordItems");
+    public string SelectAllVisiblePasswordsText => _localization.Get("SelectAllVisiblePasswords");
     public string SelectedPasswordCountText => _localization.Format("SelectedPasswordCountFormat", SelectedPasswordCount);
     public string SelectedPasswordTitle => SelectedPassword?.Title ?? _localization.Get("PasswordDetails");
     public string SelectedPasswordSubtitle => SelectedPassword is null
@@ -293,6 +302,7 @@ public sealed partial class MainWindowViewModel
             .ToArray();
     partial void OnPasswordSearchTextChanged(string value)
     {
+        OnPropertyChanged(nameof(HasPasswordSearchText));
         RaisePasswordFilterState();
         if (_isApplyingPasswordSearchImmediately)
         {

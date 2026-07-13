@@ -25,6 +25,46 @@ public sealed class PasswordManagementTestCollection
 public sealed class PasswordManagementTests
 {
     [Fact]
+    public async Task Password_workflow_distinguishes_empty_vault_from_empty_search_results()
+    {
+        var harness = CreateHarness();
+        await harness.ViewModel.LoadAsync();
+
+        Assert.False(harness.ViewModel.HasFilteredPasswordRows);
+        Assert.True(harness.ViewModel.ShowAddPasswordInEmptyState);
+        Assert.False(harness.ViewModel.ShowClearPasswordFiltersInEmptyState);
+
+        var entry = new PasswordEntry
+        {
+            Title = "GitHub",
+            Website = "https://github.com",
+            Username = "dev",
+            Password = "secret"
+        };
+        await harness.Repository.SavePasswordAsync(entry);
+        await harness.ViewModel.LoadAsync();
+
+        harness.ViewModel.PasswordSearchText = "no-match";
+        harness.ViewModel.PasswordSearchQuery = "no-match";
+
+        Assert.False(harness.ViewModel.ShowAddPasswordInEmptyState);
+        Assert.True(harness.ViewModel.ShowClearPasswordFiltersInEmptyState);
+        Assert.Equal(harness.ViewModel.L.Get("PasswordNoFilteredResults"), harness.ViewModel.PasswordEmptyStateText);
+
+        harness.ViewModel.ClearPasswordSearchCommand.Execute(null);
+
+        Assert.True(harness.ViewModel.HasFilteredPasswordRows);
+        Assert.Equal("", harness.ViewModel.PasswordSearchText);
+
+        harness.ViewModel.AreAllFilteredPasswordsSelected = true;
+        Assert.True(harness.ViewModel.HasSelectedPasswords);
+        Assert.True(harness.ViewModel.Passwords.Single().IsSelected);
+
+        harness.ViewModel.AreAllFilteredPasswordsSelected = false;
+        Assert.False(harness.ViewModel.HasSelectedPasswords);
+    }
+
+    [Fact]
     public async Task Performance_budget_add_password_does_not_rebuild_all_derived_collections()
     {
         var harness = CreateHarness();
