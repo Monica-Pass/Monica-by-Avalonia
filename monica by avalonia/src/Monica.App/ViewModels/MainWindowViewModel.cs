@@ -359,7 +359,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public ILocalizationService L => _localization;
     public ObservableCollection<PasswordEntry> Passwords { get; } = new ObservableRangeCollection<PasswordEntry>();
-    public ObservableCollection<PasswordEntry> ArchivedPasswords { get; } = new ObservableRangeCollection<PasswordEntry>();
     public ObservableCollection<PasswordEntry> DeletedPasswords { get; } = new ObservableRangeCollection<PasswordEntry>();
     public ObservableCollection<Category> Categories { get; } = new ObservableRangeCollection<Category>();
     public ObservableCollection<LocalizedPlatformIntegrationCapability> PlatformIntegrationCapabilities { get; } = [];
@@ -510,10 +509,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsSortCreatedSelected))]
     [NotifyPropertyChangedFor(nameof(IsSortFavoritesSelected))]
     private string _selectedPasswordSort = "updated-desc";
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasSelectedArchivedPassword))]
-    private PasswordEntry? _selectedArchivedPassword;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelectedDeletedPassword))]
@@ -838,7 +833,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OperatingSystem.IsLinux() ? "Linux" :
         "Desktop";
     public string PasswordCountText => _localization.Format("PasswordCountFormat", Passwords.Count);
-    public string ArchivedPasswordCountText => _localization.Format("ArchivedPasswordCountFormat", ArchivedPasswords.Count);
     public string DeletedPasswordCountText => _localization.Format("DeletedPasswordCountFormat", DeletedPasswords.Count);
     public bool HasDeletedPasswords => DeletedPasswords.Count > 0;
     public string SelectedPasswordCountText => _localization.Format("SelectedPasswordCountFormat", SelectedPasswordCount);
@@ -1081,7 +1075,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public bool HasSelectedPasswords => SelectedPasswordCount > 0;
     public bool HasSelectedPassword => SelectedPassword is not null;
     public bool HasNoSelectedPassword => SelectedPassword is null;
-    public bool HasSelectedArchivedPassword => SelectedArchivedPassword is not null;
     public bool HasSelectedDeletedPassword => SelectedDeletedPassword is not null;
     public bool HasSelectedPasswordDetails => SelectedPasswordDetails is not null;
     public bool HasCurrentSelectedPasswordDetails =>
@@ -1132,11 +1125,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             .Where(row => row.IsPasswordEntryRow || row.IsStackHeader)
             .Select(row => row.Entry)
             .ToArray();
-    public IEnumerable<PasswordEntry> FilteredArchivedPasswords =>
-        ArchivedPasswords.Where(item => MatchesPasswordSearch(item, SearchText));
     public IEnumerable<PasswordEntry> FilteredDeletedPasswords =>
         DeletedPasswords.Where(item => MatchesPasswordSearch(item, SearchText));
-    public bool HasFilteredArchivedPasswords => FilteredArchivedPasswords.Any();
     public bool HasFilteredDeletedPasswords => FilteredDeletedPasswords.Any();
     public bool HasTimelineEntries => TimelineEntries.Count > 0;
 
