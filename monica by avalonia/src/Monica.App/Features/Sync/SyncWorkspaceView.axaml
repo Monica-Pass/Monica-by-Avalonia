@@ -1,0 +1,568 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:fa="using:FluentAvalonia.UI.Controls"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:local="using:Monica.App"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Sync.SyncWorkspaceView"
+             x:Name="SyncWorkspaceRoot"
+             x:DataType="vm:MainWindowViewModel">
+<Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsSync}}"
+      RowDefinitions="Auto,*"
+      MaxWidth="1080"
+      Width="{Binding Bounds.Width, ElementName=SyncWorkspaceRoot}"
+      HorizontalAlignment="Left"
+      ClipToBounds="True">
+    <Border Classes="workspacePageHeader">
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+            <TextBlock Classes="workspacePageTitle" Text="{Binding L.SyncAndBackup}" />
+            <TextBlock Grid.Row="1" Classes="workspacePageSubtitle" Text="{Binding L.SyncSubtitle}" MaxWidth="540" HorizontalAlignment="Left" />
+            <WrapPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" VerticalAlignment="Top">
+                <Button Classes="workspaceCommand" Command="{Binding TestWebDavConnectionCommand}" IsEnabled="{Binding !IsWebDavBusy}" Margin="0,0,8,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="ArrowSync" FontSize="18" />
+                        <TextBlock Text="{Binding L.TestConnection}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspacePrimaryCommand" Command="{Binding CreateWebDavBackupCommand}" IsEnabled="{Binding !IsWebDavBusy}" Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
+                        <TextBlock Text="{Binding L.BackupNow}" />
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+        </Grid>
+    </Border>
+
+    <Grid Grid.Row="1" ColumnDefinitions="320,*" ColumnSpacing="16" MinWidth="0">
+        <Border Classes="workspaceSidebar" Padding="14" ClipToBounds="True">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Spacing="14">
+                    <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.SyncOverview}" Margin="2,0,0,0" />
+                    <ItemsControl ItemsSource="{Binding SyncHealthItems}" HorizontalAlignment="Stretch">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SyncHealthDisplayItem">
+                                <Border Width="130" MinHeight="96" Margin="0,0,8,8" Padding="10" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="{Binding Label}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Value}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" MaxLines="2" />
+                                        <TextBlock Text="{Binding Detail}" FontSize="12" TextWrapping="Wrap" MaxLines="2" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Border Padding="14" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}">
+                        <StackPanel Spacing="10">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="{Binding L.SyncOverview}" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding SyncStatusSummaryText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Text="{Binding SyncRecoverySummaryText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                            <WrapPanel Orientation="Horizontal">
+                                <Button Classes="workspaceCommand" Command="{Binding RestoreLatestWebDavBackupCommand}" IsEnabled="{Binding !IsWebDavBusy}" Margin="0,0,8,8">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <ic:FluentIcon Icon="ArrowDownload" FontSize="18" />
+                                        <TextBlock Text="{Binding L.RestoreLatest}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="workspaceCommand" Command="{Binding SelectSectionCommand}" CommandParameter="DatabaseManagement" Margin="0,0,0,8">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <ic:FluentIcon Icon="Database" FontSize="18" />
+                                <TextBlock Text="{Binding L.DatabaseManagement}" />
+                            </StackPanel>
+                        </Button>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+
+            <StackPanel Spacing="8">
+                <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.SyncAndBackup}" Margin="2,4,0,0" />
+                <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSyncConfigurationSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Configuration">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <ic:FluentIcon Icon="ArrowSync" FontSize="17" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding L.SyncConfiguration}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSyncBackupSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Backup">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <ic:FluentIcon Icon="Save" FontSize="17" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding L.BackupHistory}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSyncSourcesSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Sources">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <ic:FluentIcon Icon="Database" FontSize="17" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding L.CloudAndLocalVaults}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSyncImportSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Import">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <ic:FluentIcon Icon="ArrowUpload" FontSize="17" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding L.ImportData}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSyncExportSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Export">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <ic:FluentIcon Icon="ArrowDownload" FontSize="17" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding L.ExportData}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Border>
+
+<ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Disabled" ClipToBounds="True">
+    <StackPanel Spacing="14" MaxWidth="720" HorizontalAlignment="Stretch">
+<fa:FASettingsExpander Header="{Binding L.SyncConfiguration}" Description="{Binding SyncConfigurationSummaryText}" IsExpanded="True" IsVisible="{Binding IsSyncConfigurationSelected}">
+    <fa:FASettingsExpander.IconSource>
+        <fa:FASymbolIconSource Symbol="Sync" />
+    </fa:FASettingsExpander.IconSource>
+    <fa:FASettingsExpander.Items>
+        <fa:FASettingsExpanderItem Content="{Binding L.EnableWebDav}" Description="{Binding L.EnableWebDavDescription}">
+            <fa:FASettingsExpanderItem.Footer>
+                <ToggleSwitch IsChecked="{Binding WebDavEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+            </fa:FASettingsExpanderItem.Footer>
+        </fa:FASettingsExpanderItem>
+
+        <fa:FASettingsExpanderItem Content="{Binding L.WebDavServerUrl}" Description="{Binding L.WebDavServerUrlDescription}">
+            <fa:FASettingsExpanderItem.Footer>
+                <TextBox Width="260" Text="{Binding WebDavServerUrl}" PlaceholderText="https://dav.example.com" />
+            </fa:FASettingsExpanderItem.Footer>
+        </fa:FASettingsExpanderItem>
+
+        <fa:FASettingsExpanderItem Content="{Binding L.WebDavUsername}" Description="{Binding L.WebDavUsernameDescription}">
+            <fa:FASettingsExpanderItem.Footer>
+                <TextBox Width="220" Text="{Binding WebDavUsername}" />
+            </fa:FASettingsExpanderItem.Footer>
+        </fa:FASettingsExpanderItem>
+
+        <fa:FASettingsExpanderItem Content="{Binding L.WebDavPassword}" Description="{Binding L.WebDavPasswordDescription}">
+            <fa:FASettingsExpanderItem.Footer>
+                <TextBox Width="220" PasswordChar="*" Text="{Binding WebDavPassword}" />
+            </fa:FASettingsExpanderItem.Footer>
+        </fa:FASettingsExpanderItem>
+
+        <fa:FASettingsExpanderItem Content="{Binding L.WebDavRemotePath}" Description="{Binding L.WebDavRemotePathDescription}">
+            <fa:FASettingsExpanderItem.Footer>
+                <TextBox Width="220" Text="{Binding WebDavRemotePath}" />
+            </fa:FASettingsExpanderItem.Footer>
+        </fa:FASettingsExpanderItem>
+
+        <fa:FASettingsExpanderItem Content="{Binding L.SyncOnStartup}" Description="{Binding L.SyncOnStartupDescription}">
+            <fa:FASettingsExpanderItem.Footer>
+                <ToggleSwitch IsChecked="{Binding WebDavSyncOnStartup}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+            </fa:FASettingsExpanderItem.Footer>
+        </fa:FASettingsExpanderItem>
+
+        <fa:FASettingsExpanderItem Content="{Binding L.SyncAfterChanges}" Description="{Binding L.SyncAfterChangesDescription}">
+            <fa:FASettingsExpanderItem.Footer>
+                <ToggleSwitch IsChecked="{Binding WebDavSyncAfterChanges}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+            </fa:FASettingsExpanderItem.Footer>
+        </fa:FASettingsExpanderItem>
+
+        <fa:FASettingsExpanderItem Content="{Binding L.ConflictStrategy}" Description="{Binding L.ConflictStrategyDescription}">
+            <fa:FASettingsExpanderItem.Footer>
+                <ComboBox Width="220" ItemsSource="{Binding ConflictStrategyOptions}" SelectedValue="{Binding SyncConflictStrategy}" SelectedValueBinding="{Binding Value}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:SettingsChoice">
+                            <TextBlock Text="{Binding Label}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </fa:FASettingsExpanderItem.Footer>
+        </fa:FASettingsExpanderItem>
+    </fa:FASettingsExpander.Items>
+</fa:FASettingsExpander>
+
+<fa:FASettingsExpander Header="{Binding L.WebDavBackupOptions}" Description="{Binding WebDavBackupOptionsSummaryText}" IsExpanded="True" IsVisible="{Binding IsSyncBackupSelected}" MaxWidth="660" HorizontalAlignment="Left">
+    <fa:FASettingsExpander.IconSource>
+        <fa:FASymbolIconSource Symbol="Save" />
+    </fa:FASettingsExpander.IconSource>
+    <fa:FASettingsExpander.Items>
+        <fa:FASettingsExpanderItem Content="{Binding L.IncludePasswords}" Description="{Binding L.WebDavBackupOptionsDescription}">
+            <fa:FASettingsExpanderItem.Footer>
+                <CheckBox IsChecked="{Binding WebDavBackupIncludePasswords}" />
+            </fa:FASettingsExpanderItem.Footer>
+        </fa:FASettingsExpanderItem>
+
+        <fa:FASettingsExpanderItem Content="{Binding L.IncludeTotp}">
+            <fa:FASettingsExpanderItem.Footer>
+                <CheckBox IsChecked="{Binding WebDavBackupIncludeTotp}" />
+            </fa:FASettingsExpanderItem.Footer>
+        </fa:FASettingsExpanderItem>
+
+        <fa:FASettingsExpanderItem Content="{Binding L.IncludeNotes}">
+            <fa:FASettingsExpanderItem.Footer>
+                <CheckBox IsChecked="{Binding WebDavBackupIncludeNotes}" />
+            </fa:FASettingsExpanderItem.Footer>
+        </fa:FASettingsExpanderItem>
+
+        <fa:FASettingsExpanderItem Content="{Binding L.IncludeCards}">
+            <fa:FASettingsExpanderItem.Footer>
+                <CheckBox IsChecked="{Binding WebDavBackupIncludeCards}" />
+            </fa:FASettingsExpanderItem.Footer>
+        </fa:FASettingsExpanderItem>
+
+        <fa:FASettingsExpanderItem Content="{Binding L.IncludeDocuments}">
+            <fa:FASettingsExpanderItem.Footer>
+                <CheckBox IsChecked="{Binding WebDavBackupIncludeDocuments}" />
+            </fa:FASettingsExpanderItem.Footer>
+        </fa:FASettingsExpanderItem>
+
+        <fa:FASettingsExpanderItem Content="{Binding L.IncludeImages}">
+            <fa:FASettingsExpanderItem.Footer>
+                <CheckBox IsChecked="{Binding WebDavBackupIncludeImages}" />
+            </fa:FASettingsExpanderItem.Footer>
+        </fa:FASettingsExpanderItem>
+
+        <fa:FASettingsExpanderItem Content="{Binding L.IncludeCategories}">
+            <fa:FASettingsExpanderItem.Footer>
+                <CheckBox IsChecked="{Binding WebDavBackupIncludeCategories}" />
+            </fa:FASettingsExpanderItem.Footer>
+        </fa:FASettingsExpanderItem>
+
+        <fa:FASettingsExpanderItem Content="{Binding L.EncryptBackup}" Description="{Binding L.EncryptBackupDescription}">
+            <fa:FASettingsExpanderItem.Footer>
+                <ToggleSwitch IsChecked="{Binding WebDavBackupEncryptionEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+            </fa:FASettingsExpanderItem.Footer>
+        </fa:FASettingsExpanderItem>
+
+        <fa:FASettingsExpanderItem Content="{Binding L.BackupEncryptionPassword}" Description="{Binding L.BackupEncryptionPasswordDescription}">
+            <fa:FASettingsExpanderItem.Footer>
+                <TextBox Width="260" PasswordChar="*" Text="{Binding WebDavBackupEncryptionPassword}" />
+            </fa:FASettingsExpanderItem.Footer>
+        </fa:FASettingsExpanderItem>
+    </fa:FASettingsExpander.Items>
+</fa:FASettingsExpander>
+
+<Border Padding="0" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}" IsVisible="{Binding IsSyncBackupSelected}" MaxWidth="660" HorizontalAlignment="Left">
+    <Grid RowDefinitions="Auto,Auto,*" MinHeight="260">
+        <Grid Margin="18,16,18,10" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <StackPanel Spacing="3">
+                <TextBlock Text="{Binding L.BackupHistory}" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding WebDavBackupHistoryCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+            <Button Grid.Column="1" Command="{Binding LoadWebDavBackupsCommand}" IsEnabled="{Binding !IsLoadingWebDavBackups}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <ic:FluentIcon Icon="ArrowClockwise" FontSize="18" />
+                    <TextBlock Text="{Binding L.Refresh}" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <Border Grid.Row="1"
+                Margin="14,0,14,10"
+                Padding="12"
+                CornerRadius="8"
+                Background="{DynamicResource LayerFillColorSubtleBrush}"
+                IsVisible="{Binding HasSelectedWebDavBackupHistoryItem}">
+            <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto" ColumnSpacing="12" RowSpacing="4">
+                <TextBlock Text="{Binding SelectedWebDavBackupHistoryItem.FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                <WrapPanel Grid.Row="1" Orientation="Horizontal">
+                    <TextBlock Text="{Binding SelectedWebDavBackupHistoryItem.DateString}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,12,4" />
+                    <TextBlock Text="{Binding SelectedWebDavBackupHistoryItem.SizeText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                </WrapPanel>
+                <TextBlock Grid.Row="2" Text="{Binding SelectedWebDavBackupHistoryItem.Path}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                <WrapPanel Grid.Column="1" Grid.RowSpan="3" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Classes="workspaceCommand" Command="{Binding RestoreWebDavBackupCommand}" CommandParameter="{Binding SelectedWebDavBackupHistoryItem}" ToolTip.Tip="{Binding L.OperationRestore}" Margin="0,0,8,4">
+                        <ic:FluentIcon Icon="ArrowDownload" FontSize="18" />
+                    </Button>
+                    <Button Classes="workspaceCommand" Command="{Binding DeleteWebDavBackupCommand}" CommandParameter="{Binding SelectedWebDavBackupHistoryItem}" ToolTip.Tip="{Binding L.Delete}" Margin="0,0,0,4">
+                        <ic:FluentIcon Icon="Delete" FontSize="18" />
+                    </Button>
+                </WrapPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2">
+            <TextBlock Text="{Binding L.NoBackupsFound}"
+                       IsVisible="{Binding !HasWebDavBackupHistory}"
+                       HorizontalAlignment="Left"
+                       VerticalAlignment="Top"
+                       Margin="24"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <ListBox Classes="workspaceList" ItemsSource="{Binding WebDavBackupHistory}" SelectedItem="{Binding SelectedWebDavBackupHistoryItem}" IsVisible="{Binding HasWebDavBackupHistory}" SelectionMode="Single" Margin="8,0,8,8">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:WebDavBackupHistoryItem">
+                        <Border Classes="workspaceListRow compact">
+                            <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="5">
+                                <Button Grid.RowSpan="2"
+                                        Classes="workspaceListRowButton"
+                                        Command="{Binding #SyncWorkspaceRoot.DataContext.ShowWebDavBackupDetailsCommand}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip.Tip="{Binding FileName}">
+                                    <Grid RowDefinitions="Auto,Auto" RowSpacing="5">
+                                        <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" />
+                                        <WrapPanel Grid.Row="1" Orientation="Horizontal">
+                                            <TextBlock Text="{Binding DateString}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,12,4" />
+                                            <TextBlock Text="{Binding SizeText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,12,4" />
+                                            <TextBlock Text="{Binding Path}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" MaxWidth="360" Margin="0,0,0,4" />
+                                        </WrapPanel>
+                                    </Grid>
+                                </Button>
+                                <WrapPanel Grid.Row="2" Orientation="Horizontal">
+                                    <Button Classes="workspaceCommand" Command="{Binding #SyncWorkspaceRoot.DataContext.RestoreWebDavBackupCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding #SyncWorkspaceRoot.DataContext.L.OperationRestore}" Margin="0,0,8,4">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <ic:FluentIcon Icon="ArrowDownload" FontSize="18" />
+                                            <TextBlock Text="{Binding #SyncWorkspaceRoot.DataContext.L.OperationRestore}" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Classes="workspaceCommand" Command="{Binding #SyncWorkspaceRoot.DataContext.DeleteWebDavBackupCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding #SyncWorkspaceRoot.DataContext.L.Delete}" Margin="0,0,0,4">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <ic:FluentIcon Icon="Delete" FontSize="18" />
+                                            <TextBlock Text="{Binding #SyncWorkspaceRoot.DataContext.L.Delete}" />
+                                        </StackPanel>
+                                    </Button>
+                                </WrapPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Grid>
+    </Grid>
+</Border>
+
+<fa:FASettingsExpander Header="{Binding L.CloudAndLocalVaults}" Description="{Binding L.CloudAndLocalVaultsDescription}" IsExpanded="True" IsVisible="{Binding IsSyncSourcesSelected}" MaxWidth="660" HorizontalAlignment="Left">
+    <fa:FASettingsExpander.IconSource>
+        <fa:FASymbolIconSource Symbol="Folder" />
+    </fa:FASettingsExpander.IconSource>
+    <fa:FASettingsExpander.Items>
+        <fa:FASettingsExpanderItem Content="{Binding L.EnableOneDrive}" Description="{Binding L.EnableOneDriveDescription}">
+            <fa:FASettingsExpanderItem.Footer>
+                <ToggleSwitch IsChecked="{Binding OneDriveEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+            </fa:FASettingsExpanderItem.Footer>
+        </fa:FASettingsExpanderItem>
+
+        <fa:FASettingsExpanderItem Content="{Binding L.MdbxLocalCache}" Description="{Binding L.MdbxLocalCacheDescription}">
+            <fa:FASettingsExpanderItem.Footer>
+                <ToggleSwitch IsChecked="{Binding MdbxLocalCacheEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+            </fa:FASettingsExpanderItem.Footer>
+        </fa:FASettingsExpanderItem>
+
+        <fa:FASettingsExpanderItem Content="{Binding L.CreateMdbxMetadata}" Description="{Binding L.CreateMdbxMetadataDescription}">
+            <fa:FASettingsExpanderItem.Footer>
+                <Button Command="{Binding SelectSectionCommand}" CommandParameter="Mdbx">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Database" FontSize="20" />
+                        <TextBlock Text="{Binding L.MdbxVaults}" />
+                    </StackPanel>
+                </Button>
+            </fa:FASettingsExpanderItem.Footer>
+        </fa:FASettingsExpanderItem>
+    </fa:FASettingsExpander.Items>
+</fa:FASettingsExpander>
+
+<fa:FASettingsExpander Header="{Binding L.ImportData}" Description="{Binding L.ImportDataDescription}" IsExpanded="True" IsVisible="{Binding IsSyncImportSelected}">
+    <fa:FASettingsExpander.IconSource>
+        <fa:FASymbolIconSource Symbol="Folder" />
+    </fa:FASettingsExpander.IconSource>
+    <StackPanel Spacing="16">
+        <StackPanel Spacing="8">
+            <TextBlock Text="{Binding L.ImportMonicaJson}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding L.ImportMonicaJsonDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <TextBox Text="{Binding ImportJsonText}" PlaceholderText="{Binding L.ImportJsonWatermark}" AcceptsReturn="True" MinHeight="120" TextWrapping="Wrap" />
+            <WrapPanel Orientation="Horizontal">
+                <Button Classes="workspaceCommand" Command="{Binding ImportMonicaJsonFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Folder" FontSize="20" />
+                        <TextBlock Text="{Binding L.ImportFromFile}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding ImportDataCommand}" Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="ArrowUpload" FontSize="20" />
+                        <TextBlock Text="{Binding L.Import}" />
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+        </StackPanel>
+
+        <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
+
+        <StackPanel Spacing="8">
+            <TextBlock Text="{Binding L.ImportAegisJson}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding L.ImportAegisJsonDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <TextBox Text="{Binding ImportAegisJsonText}" PlaceholderText="{Binding L.ImportAegisJsonWatermark}" AcceptsReturn="True" MinHeight="120" TextWrapping="Wrap" />
+            <WrapPanel Orientation="Horizontal">
+                <Button Classes="workspaceCommand" Command="{Binding ImportAegisJsonFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Folder" FontSize="20" />
+                        <TextBlock Text="{Binding L.ImportFromFile}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding ImportAegisJsonCommand}" Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="ArrowUpload" FontSize="20" />
+                        <TextBlock Text="{Binding L.ImportAegisJson}" />
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+        </StackPanel>
+
+        <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
+
+        <StackPanel Spacing="8">
+            <TextBlock Text="{Binding L.ImportTotpCsv}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding L.ImportTotpCsvDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <TextBox Text="{Binding ImportTotpCsvText}" PlaceholderText="{Binding L.ImportTotpCsvWatermark}" AcceptsReturn="True" MinHeight="120" TextWrapping="Wrap" />
+            <WrapPanel Orientation="Horizontal">
+                <Button Classes="workspaceCommand" Command="{Binding ImportTotpCsvFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Folder" FontSize="20" />
+                        <TextBlock Text="{Binding L.ImportFromFile}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding ImportTotpCsvCommand}" Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="ArrowUpload" FontSize="20" />
+                        <TextBlock Text="{Binding L.ImportTotpCsv}" />
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+        </StackPanel>
+
+        <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
+
+        <StackPanel Spacing="8">
+            <TextBlock Text="{Binding L.ImportNoteCsv}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding L.ImportNoteCsvDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <TextBox Text="{Binding ImportNoteCsvText}" PlaceholderText="{Binding L.ImportNoteCsvWatermark}" AcceptsReturn="True" MinHeight="120" TextWrapping="Wrap" />
+            <WrapPanel Orientation="Horizontal">
+                <Button Classes="workspaceCommand" Command="{Binding ImportNoteCsvFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Folder" FontSize="20" />
+                        <TextBlock Text="{Binding L.ImportFromFile}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding ImportNoteCsvCommand}" Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="ArrowUpload" FontSize="20" />
+                        <TextBlock Text="{Binding L.ImportNoteCsv}" />
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+        </StackPanel>
+
+        <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
+
+        <StackPanel Spacing="8">
+            <TextBlock Text="{Binding L.ImportPasswordCsv}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding L.ImportPasswordCsvDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <TextBox Text="{Binding ImportCsvText}" PlaceholderText="{Binding L.ImportCsvWatermark}" AcceptsReturn="True" MinHeight="120" TextWrapping="Wrap" />
+            <WrapPanel Orientation="Horizontal">
+                <Button Classes="workspaceCommand" Command="{Binding ImportPasswordCsvFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Folder" FontSize="20" />
+                        <TextBlock Text="{Binding L.ImportFromFile}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding ImportPasswordCsvCommand}" Margin="0,0,8,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="ArrowUpload" FontSize="20" />
+                        <TextBlock Text="{Binding L.ImportPasswordCsv}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding ExportPasswordCsvCommand}" Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="ArrowDownload" FontSize="20" />
+                        <TextBlock Text="{Binding L.ExportPasswordCsv}" />
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+        </StackPanel>
+    </StackPanel>
+</fa:FASettingsExpander>
+
+<fa:FASettingsExpander Header="{Binding L.ExportData}" Description="{Binding L.ExportDataDescription}" IsExpanded="True" IsVisible="{Binding IsSyncExportSelected}">
+    <fa:FASettingsExpander.IconSource>
+        <fa:FASymbolIconSource Symbol="ProtectedDocument" />
+    </fa:FASettingsExpander.IconSource>
+    <StackPanel Spacing="12">
+        <WrapPanel Orientation="Horizontal">
+            <Button Classes="workspaceCommand" Command="{Binding SaveMonicaJsonExportCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <ic:FluentIcon Icon="Save" FontSize="20" />
+                    <TextBlock Text="{Binding L.SaveJsonExport}" />
+                </StackPanel>
+            </Button>
+            <Button Classes="workspaceCommand" Command="{Binding SavePasswordCsvExportCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Save" FontSize="20" />
+                        <TextBlock Text="{Binding L.SaveCsvExport}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding SaveTotpCsvExportCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Save" FontSize="20" />
+                        <TextBlock Text="{Binding L.SaveTotpCsvExport}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding SaveNoteCsvExportCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Save" FontSize="20" />
+                        <TextBlock Text="{Binding L.SaveNoteCsvExport}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding SaveAegisJsonExportCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Save" FontSize="20" />
+                        <TextBlock Text="{Binding L.SaveAegisExport}" />
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+            <TextBlock Text="{Binding L.ExportPreview}" FontWeight="SemiBold" />
+            <TextBox Text="{Binding ExportPreview}" AcceptsReturn="True" MinHeight="160" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding L.ExportCsvPreview}" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <TextBox Text="{Binding ExportCsvPreview}" AcceptsReturn="True" MinHeight="160" TextWrapping="Wrap" />
+            <StackPanel Spacing="8" Margin="0,8,0,0">
+                <TextBlock Text="{Binding L.ExportTotpCsv}" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding L.ExportTotpCsvDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <Button Classes="workspaceCommand" Command="{Binding ExportTotpCsvCommand}" HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="ArrowDownload" FontSize="20" />
+                        <TextBlock Text="{Binding L.ExportTotpCsv}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+            <TextBlock Text="{Binding L.ExportTotpCsvPreview}" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <TextBox Text="{Binding ExportTotpCsvPreview}" AcceptsReturn="True" MinHeight="160" TextWrapping="Wrap" />
+            <StackPanel Spacing="8" Margin="0,8,0,0">
+                <TextBlock Text="{Binding L.ExportNoteCsv}" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding L.ExportNoteCsvDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <Button Classes="workspaceCommand" Command="{Binding ExportNoteCsvCommand}" HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="ArrowDownload" FontSize="20" />
+                        <TextBlock Text="{Binding L.ExportNoteCsv}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+            <TextBlock Text="{Binding L.ExportNoteCsvPreview}" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <TextBox Text="{Binding ExportNoteCsvPreview}" AcceptsReturn="True" MinHeight="160" TextWrapping="Wrap" />
+            <StackPanel Spacing="8" Margin="0,8,0,0">
+                <TextBlock Text="{Binding L.ExportAegisJson}" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding L.ExportAegisJsonDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <Button Classes="workspaceCommand" Command="{Binding ExportAegisJsonCommand}" HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="ArrowDownload" FontSize="20" />
+                        <TextBlock Text="{Binding L.ExportAegisJson}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+            <TextBlock Text="{Binding L.ExportAegisPreview}" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <TextBox Text="{Binding ExportAegisPreview}" AcceptsReturn="True" MinHeight="160" TextWrapping="Wrap" />
+        </StackPanel>
+    </fa:FASettingsExpander>
+        </StackPanel>
+    </ScrollViewer>
+</Grid>
+</Grid>
+</UserControl>
