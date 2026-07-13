@@ -332,13 +332,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsDatabaseSourceSelected))]
-    [NotifyPropertyChangedFor(nameof(IsDatabaseOverviewSelected))]
-    [NotifyPropertyChangedFor(nameof(IsDatabaseCloudSelected))]
-    [NotifyPropertyChangedFor(nameof(IsDatabaseCapabilitiesSelected))]
-    private string _selectedDatabaseManagementPage = "Source";
-
-    [ObservableProperty]
     private bool _compactPasswordList;
 
     [ObservableProperty]
@@ -524,12 +517,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public Thickness PasswordListContentMargin => CompactPasswordList ? new Thickness(10, 0, 0, 0) : new Thickness(14, 0, 0, 0);
     public bool ShowPasswordListDetails => !CompactPasswordList;
     public string NoteCountText => _localization.Format("NoteCountFormat", NoteItems.Count);
-    public string LocalDatabaseSummaryText => _localization.Format("DatabaseSummaryFormat", Passwords.Count, NoteItems.Count, TotpItems.Count, WalletItems.Count);
     public int SmokeVaultLoadDelayMilliseconds { get; set; }
-    public bool IsDatabaseSourceSelected => IsWorkspacePageSelected(SelectedDatabaseManagementPage, "Source");
-    public bool IsDatabaseOverviewSelected => IsWorkspacePageSelected(SelectedDatabaseManagementPage, "Overview");
-    public bool IsDatabaseCloudSelected => IsWorkspacePageSelected(SelectedDatabaseManagementPage, "Cloud");
-    public bool IsDatabaseCapabilitiesSelected => IsWorkspacePageSelected(SelectedDatabaseManagementPage, "Capabilities");
     public string NotePreviewMarkdown => NoteIsMarkdown ? BuildNotePreviewMarkdown(NoteContent) : "";
     public string NotePlainPreview => NoteContentCodec.ToPlainPreview(NoteContent, NoteIsMarkdown);
     public int SelectedPasswordCount => _selectedPasswordCount;
@@ -921,11 +909,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
 
 
-    [RelayCommand]
-    private void SelectDatabaseManagementPage(string? page)
-    {
-        SelectedDatabaseManagementPage = NormalizeDatabaseManagementPage(page);
-    }
 
 
     private static bool IsWorkspacePageSelected(string selectedPage, string expectedPage) =>
@@ -933,14 +916,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
 
 
-    private static string NormalizeDatabaseManagementPage(string? page) =>
-        page?.Trim().ToLowerInvariant() switch
-        {
-            "overview" or "local" => "Overview",
-            "cloud" or "vaults" or "sources" => "Cloud",
-            "capabilities" or "features" => "Capabilities",
-            _ => "Source"
-        };
 
 
 

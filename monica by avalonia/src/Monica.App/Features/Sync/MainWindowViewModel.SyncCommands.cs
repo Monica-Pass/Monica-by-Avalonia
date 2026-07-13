@@ -21,14 +21,6 @@ public sealed partial class MainWindowViewModel
             _ => "Configuration"
         };
 
-    [RelayCommand]
-    private void ShowVaultSourceDetails(VaultSourceDisplayItem? source)
-    {
-        if (source is not null)
-        {
-            SelectedVaultSource = source;
-        }
-    }
 
     [RelayCommand]
     private void ShowWebDavBackupDetails(WebDavBackupHistoryItem? item)

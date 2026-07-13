@@ -9,12 +9,10 @@ public sealed partial class MainWindowViewModel
 {
     private readonly IWebDavBackupService _webDavBackupService;
 
-    public ObservableCollection<VaultSourceDisplayItem> VaultSources { get; } = [];
     public ObservableCollection<SyncHealthDisplayItem> SyncHealthItems { get; } = [];
     public ObservableCollection<WebDavBackupHistoryItem> WebDavBackupHistory { get; } = [];
     public ObservableCollection<SettingsChoice> ConflictStrategyOptions { get; } = [];
 
-    public string VaultSourceCountText => _localization.Format("VaultSourceCountFormat", VaultSources.Count);
     public string WebDavConnectionStatusText => WebDavEnabled
         ? _localization.Format("WebDavConfiguredFormat", string.IsNullOrWhiteSpace(WebDavServerUrl) ? _localization.Get("NotConfigured") : WebDavServerUrl)
         : _localization.Get("WebDavDisabled");
@@ -65,13 +63,6 @@ public sealed partial class MainWindowViewModel
     public bool IsSyncSourcesSelected => IsWorkspacePageSelected(SelectedSyncPage, "Sources");
     public bool IsSyncImportSelected => IsWorkspacePageSelected(SelectedSyncPage, "Import");
     public bool IsSyncExportSelected => IsWorkspacePageSelected(SelectedSyncPage, "Export");
-    public bool HasSelectedVaultSource => SelectedVaultSource is not null;
-    public bool HasVaultSources => VaultSources.Count > 0;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasSelectedVaultSource))]
-    private VaultSourceDisplayItem? _selectedVaultSource;
-
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelectedWebDavBackupHistoryItem))]
     private WebDavBackupHistoryItem? _selectedWebDavBackupHistoryItem;
