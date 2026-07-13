@@ -939,11 +939,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         SelectedDatabaseManagementPage = NormalizeDatabaseManagementPage(page);
     }
 
-    [RelayCommand]
-    private void SelectMdbxWorkspacePage(string? page)
-    {
-        SelectedMdbxWorkspacePage = NormalizeMdbxWorkspacePage(page);
-    }
 
     private static bool IsWorkspacePageSelected(string selectedPage, string expectedPage) =>
         string.Equals(selectedPage, expectedPage, StringComparison.OrdinalIgnoreCase);
@@ -959,14 +954,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             _ => "Source"
         };
 
-    private static string NormalizeMdbxWorkspacePage(string? page) =>
-        page?.Trim().ToLowerInvariant() switch
-        {
-            "health" or "diagnostics" => "Health",
-            "sources" or "remote" => "Sources",
-            "runtime" or "android" => "Runtime",
-            _ => "Details"
-        };
 
 
     private bool CanOpenNoteReference(NoteReferenceItem? item) =>
@@ -1031,14 +1018,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
 
-    [RelayCommand]
-    private void ShowMdbxDatabaseDetails(MdbxDatabaseDisplayItem? item)
-    {
-        if (item is not null)
-        {
-            SelectedMdbxDatabaseItem = item;
-        }
-    }
 
 
     public async Task<long> AddPasswordAttachmentMetadataAsync(
@@ -1717,159 +1696,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
-    private async Task CreateMdbxVaultAsync()
-    {
-        var path = BuildMdbxWorkingCopyPath("local.mdbx");
-        var existing = MdbxDatabases.FirstOrDefault(item => string.Equals(item.FilePath, path, StringComparison.OrdinalIgnoreCase));
-        if (existing is not null)
-        {
-            existing.LastAccessedAt = DateTimeOffset.UtcNow;
-            await _repository.SaveMdbxDatabaseAsync(existing);
-            RefreshMdbxVaultState();
-            RefreshVaultSources();
-            StatusMessage = _localization.Format("MdbxMetadataAlreadyRegisteredFormat", existing.Name);
-            return;
-        }
 
-        var metadata = await _mdbxVaultService.CreateLocalMetadataAsync(_localization.Get("MdbxLocalVaultName"), path);
-        metadata.IsDefault = MdbxDatabases.Count == 0;
-        await _repository.SaveMdbxDatabaseAsync(metadata);
-        MdbxDatabases.Add(metadata);
-        RefreshMdbxVaultState();
-        RefreshVaultSources();
-        StatusMessage = _localization.Get("CreatedMdbxMetadata");
-    }
 
-    [RelayCommand]
-    private async Task CreateWebDavMdbxVaultAsync()
-    {
-        if (!WebDavEnabled)
-        {
-            StatusMessage = _localization.Get("EnableWebDavFirst");
-            return;
-        }
 
-        var remotePath = string.IsNullOrWhiteSpace(WebDavRemotePath) ? "/Monica/local.mdbx" : WebDavRemotePath.TrimEnd('/') + "/local.mdbx";
-        var existing = MdbxDatabases.FirstOrDefault(item =>
-            item.StorageLocation == MdbxStorageLocation.RemoteWebDav &&
-            string.Equals(item.FilePath, remotePath, StringComparison.OrdinalIgnoreCase));
-        if (existing is not null)
-        {
-            StatusMessage = _localization.Format("MdbxMetadataAlreadyRegisteredFormat", existing.Name);
-            return;
-        }
 
-        var metadata = await CreateRemoteMdbxMetadataAsync(
-            _localization.Get("MdbxWebDavVaultName"),
-            remotePath,
-            MdbxStorageLocation.RemoteWebDav,
-            "REMOTE_WEBDAV",
-            BuildMdbxWorkingCopyPath("webdav-local.mdbx"),
-            _localization.Get("MdbxWebDavMetadataDescription"));
-        metadata.IsDefault = MdbxDatabases.Count == 0;
-        await _repository.SaveMdbxDatabaseAsync(metadata);
-        MdbxDatabases.Add(metadata);
-        RefreshMdbxVaultState();
-        RefreshVaultSources();
-        StatusMessage = _localization.Get("CreatedMdbxWebDavMetadata");
-    }
 
-    [RelayCommand]
-    private async Task CreateOneDriveMdbxVaultAsync()
-    {
-        if (!OneDriveEnabled)
-        {
-            StatusMessage = _localization.Get("EnableOneDriveFirst");
-            return;
-        }
 
-        const string remotePath = "OneDrive:/Monica/local.mdbx";
-        var existing = MdbxDatabases.FirstOrDefault(item =>
-            item.StorageLocation == MdbxStorageLocation.RemoteOneDrive &&
-            string.Equals(item.FilePath, remotePath, StringComparison.OrdinalIgnoreCase));
-        if (existing is not null)
-        {
-            StatusMessage = _localization.Format("MdbxMetadataAlreadyRegisteredFormat", existing.Name);
-            return;
-        }
-
-        var metadata = await CreateRemoteMdbxMetadataAsync(
-            _localization.Get("MdbxOneDriveVaultName"),
-            remotePath,
-            MdbxStorageLocation.RemoteOneDrive,
-            "REMOTE_ONEDRIVE",
-            BuildMdbxWorkingCopyPath("onedrive-local.mdbx"),
-            _localization.Get("MdbxOneDriveMetadataDescription"));
-        metadata.IsDefault = MdbxDatabases.Count == 0;
-        await _repository.SaveMdbxDatabaseAsync(metadata);
-        MdbxDatabases.Add(metadata);
-        RefreshMdbxVaultState();
-        RefreshVaultSources();
-        StatusMessage = _localization.Get("CreatedMdbxOneDriveMetadata");
-    }
-
-    [RelayCommand]
-    private async Task RefreshMdbxVaultsAsync()
-    {
-        MdbxDatabases.Clear();
-        foreach (var database in await _repository.GetMdbxDatabasesAsync())
-        {
-            MdbxDatabases.Add(database);
-        }
-
-        RefreshMdbxVaultState();
-        RefreshVaultSources();
-        StatusMessage = _localization.Get("MdbxVaultsRefreshed");
-    }
-
-    [RelayCommand]
-    private async Task OpenMdbxDatabaseAsync(MdbxDatabaseDisplayItem? item)
-    {
-        if (item is null)
-        {
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(item.Database.WorkingCopyPath ?? item.Database.FilePath))
-        {
-            StatusMessage = _localization.Get("MdbxRemoteOpenPending");
-            return;
-        }
-
-        await using var stream = await _mdbxVaultService.OpenLocalStreamAsync(item.Database);
-        item.Database.LastAccessedAt = DateTimeOffset.UtcNow;
-        await _repository.SaveMdbxDatabaseAsync(item.Database);
-        RefreshMdbxVaultState();
-        RefreshVaultSources();
-        StatusMessage = _localization.Format("OpenedMdbxDatabaseFormat", item.Name, stream.Length);
-    }
-
-    [RelayCommand]
-    private async Task SetDefaultMdbxDatabaseAsync(MdbxDatabaseDisplayItem? item)
-    {
-        if (item is null)
-        {
-            return;
-        }
-
-        foreach (var database in MdbxDatabases)
-        {
-            database.IsDefault = database.Id == item.Database.Id;
-            await _repository.SaveMdbxDatabaseAsync(database);
-        }
-
-        RefreshMdbxVaultState();
-        RefreshVaultSources();
-        StatusMessage = _localization.Format("SelectedMdbxDefaultFormat", item.Name);
-    }
-
-    [RelayCommand]
-    private void ConfigureMdbxRemoteSources()
-    {
-        SelectedSection = "Sync";
-        StatusMessage = _localization.Get("ConfigureMdbxRemoteSourcesHint");
-    }
 
     [RelayCommand]
     private void TogglePasswordFolderExpansion(PasswordFolderFilterChoice? item)
@@ -2038,166 +1870,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RaiseWalletSelectionState();
     }
 
-    private void RefreshMdbxVaultState()
-    {
-        var selectedId = SelectedMdbxDatabaseItem?.Database.Id;
-        MdbxDatabaseItems.Clear();
-        foreach (var database in MdbxDatabases.OrderByDescending(item => item.IsDefault).ThenBy(item => item.SortOrder).ThenBy(item => item.Name))
-        {
-            MdbxDatabaseItems.Add(ToMdbxDisplayItem(database));
-        }
-
-        SelectedMdbxDatabaseItem =
-            MdbxDatabaseItems.FirstOrDefault(item => item.Database.Id == selectedId) ??
-            MdbxDatabaseItems.FirstOrDefault(item => item.IsDefault) ??
-            MdbxDatabaseItems.FirstOrDefault();
-        RaiseMdbxVaultState();
-    }
-
-    private void RaiseMdbxVaultState()
-    {
-        OnPropertyChanged(nameof(MdbxDatabaseCountText));
-        OnPropertyChanged(nameof(MdbxLocalCountText));
-        OnPropertyChanged(nameof(MdbxWebDavCountText));
-        OnPropertyChanged(nameof(MdbxOneDriveCountText));
-        OnPropertyChanged(nameof(MdbxLocalDatabaseCount));
-        OnPropertyChanged(nameof(MdbxWebDavDatabaseCount));
-        OnPropertyChanged(nameof(MdbxOneDriveDatabaseCount));
-        OnPropertyChanged(nameof(MdbxRemoteDatabaseCount));
-        OnPropertyChanged(nameof(MdbxWorkingCopyCount));
-        OnPropertyChanged(nameof(MdbxOfflineCopyCount));
-        OnPropertyChanged(nameof(MdbxPendingSyncCount));
-        OnPropertyChanged(nameof(MdbxSyncErrorCount));
-        OnPropertyChanged(nameof(HasMdbxDatabases));
-        OnPropertyChanged(nameof(HasMdbxSyncErrors));
-        OnPropertyChanged(nameof(MdbxDefaultVaultSummaryText));
-        OnPropertyChanged(nameof(MdbxWorkingCopySummaryText));
-        OnPropertyChanged(nameof(MdbxRemoteSummaryText));
-        OnPropertyChanged(nameof(MdbxSyncDiagnosticsSummaryText));
-        OnPropertyChanged(nameof(MdbxCachePolicyText));
-        OnPropertyChanged(nameof(MdbxLocalSourceStatusText));
-        OnPropertyChanged(nameof(MdbxWebDavSourceStatusText));
-        OnPropertyChanged(nameof(MdbxOneDriveSourceStatusText));
-        OnPropertyChanged(nameof(MdbxRuntimeSummaryText));
-        OnPropertyChanged(nameof(MdbxSecuritySummaryText));
-        RefreshMdbxHealthItems();
-        RefreshSyncHealthItems();
-    }
 
 
-    private void RefreshMdbxHealthItems()
-    {
-        MdbxHealthItems.Clear();
-        MdbxHealthItems.Add(new SyncHealthDisplayItem(
-            _localization.Get("MdbxDefaultVault"),
-            MdbxDefaultVaultSummaryText,
-            MdbxSecuritySummaryText));
-        MdbxHealthItems.Add(new SyncHealthDisplayItem(
-            _localization.Get("MdbxWorkingCopies"),
-            _localization.Format("MdbxWorkingCopyCountFormat", MdbxWorkingCopyCount),
-            MdbxWorkingCopySummaryText));
-        MdbxHealthItems.Add(new SyncHealthDisplayItem(
-            _localization.Get("MdbxRemoteSources"),
-            _localization.Format("MdbxRemoteSourceCountFormat", MdbxRemoteDatabaseCount),
-            MdbxRemoteSummaryText));
-        MdbxHealthItems.Add(new SyncHealthDisplayItem(
-            _localization.Get("MdbxDiagnostics"),
-            HasMdbxSyncErrors ? _localization.Get("NeedsAttention") : _localization.Get("Available"),
-            MdbxSyncDiagnosticsSummaryText));
-        OnPropertyChanged(nameof(MdbxHealthItems));
-    }
 
 
-    private MdbxDatabaseDisplayItem ToMdbxDisplayItem(LocalMdbxDatabase database)
-    {
-        var isLocal = IsLocalMdbxDatabase(database);
-        var source = database.StorageLocation switch
-        {
-            MdbxStorageLocation.Internal => _localization.Get("MdbxSourceLocal"),
-            MdbxStorageLocation.External => _localization.Get("MdbxSourceExternal"),
-            MdbxStorageLocation.RemoteWebDav => _localization.WebDav,
-            MdbxStorageLocation.RemoteOneDrive => _localization.OneDrive,
-            _ => database.StorageLocation.ToString()
-        };
-        var localPath = string.IsNullOrWhiteSpace(database.WorkingCopyPath)
-            ? database.FilePath
-            : database.WorkingCopyPath;
-        var remotePath = isLocal
-            ? _localization.Get("LocalOnly")
-            : string.IsNullOrWhiteSpace(database.FilePath) ? _localization.Get("NotConfigured") : database.FilePath;
-        var workingCopyStatus = HasMdbxWorkingCopy(database)
-            ? _localization.Get("MdbxWorkingCopyReady")
-            : _localization.Get("MdbxWorkingCopyMissing");
-        var remoteStatus = isLocal
-            ? _localization.Get("LocalOnly")
-            : _localization.Format("MdbxRemoteStatusFormat", source, remotePath);
-        var cachePath = string.IsNullOrWhiteSpace(database.CacheCopyPath)
-            ? _localization.Get("NotConfigured")
-            : database.CacheCopyPath;
-        var lastSyncError = string.IsNullOrWhiteSpace(database.LastSyncError)
-            ? _localization.Get("MdbxNoSyncErrors")
-            : database.LastSyncError!;
 
-        return new MdbxDatabaseDisplayItem(
-            database,
-            string.IsNullOrWhiteSpace(database.Name) ? "MDBX" : database.Name,
-            source,
-            string.IsNullOrWhiteSpace(localPath) ? _localization.Get("NotConfigured") : localPath,
-            remotePath,
-            database.TigaMode.ToString(),
-            database.UnlockMethod.ToString(),
-            FormatLocalDate(database.CreatedAt),
-            FormatLocalDate(database.LastAccessedAt),
-            database.LastSyncedAt is null ? _localization.Get("Never") : FormatLocalDate(database.LastSyncedAt.Value),
-            LocalizeSyncStatus(database.LastSyncStatus),
-            string.IsNullOrWhiteSpace(database.Description) ? _localization.Get("MdbxNoDescription") : database.Description,
-            workingCopyStatus,
-            remoteStatus,
-            cachePath,
-            lastSyncError,
-            !string.IsNullOrWhiteSpace(database.LastSyncError),
-            database.IsDefault,
-            isLocal,
-            !isLocal);
-    }
 
-    private static bool IsLocalMdbxDatabase(LocalMdbxDatabase database) =>
-        database.StorageLocation is MdbxStorageLocation.Internal or MdbxStorageLocation.External;
 
-    private static bool HasMdbxWorkingCopy(LocalMdbxDatabase database) =>
-        !string.IsNullOrWhiteSpace(database.WorkingCopyPath) ||
-        (database.StorageLocation is MdbxStorageLocation.Internal or MdbxStorageLocation.External &&
-            !string.IsNullOrWhiteSpace(database.FilePath));
 
-    private static bool HasPendingMdbxSync(LocalMdbxDatabase database) =>
-        database.LastSyncStatus is SyncStatus.Pending or SyncStatus.PendingUpload or SyncStatus.Syncing or SyncStatus.RemoteChanged;
 
-    private static bool HasMdbxSyncIssue(LocalMdbxDatabase database) =>
-        database.LastSyncStatus is SyncStatus.Failed or SyncStatus.Conflict ||
-        !string.IsNullOrWhiteSpace(database.LastSyncError);
 
-    private static string BuildMdbxWorkingCopyPath(string fileName)
-    {
-        return MonicaAppDataPaths.GetPath(Path.Combine("mdbx", fileName));
-    }
 
-    private async Task<LocalMdbxDatabase> CreateRemoteMdbxMetadataAsync(
-        string name,
-        string remotePath,
-        MdbxStorageLocation storageLocation,
-        string sourceType,
-        string workingCopyPath,
-        string description)
-    {
-        var metadata = await _mdbxVaultService.CreateLocalMetadataAsync(name, workingCopyPath, MdbxTigaMode.Multi);
-        metadata.FilePath = remotePath;
-        metadata.StorageLocation = storageLocation;
-        metadata.SourceType = sourceType;
-        metadata.LastSyncStatus = SyncStatus.PendingUpload;
-        metadata.IsOfflineAvailable = true;
-        metadata.Description = description;
-        return metadata;
-    }
 
     private string FormatLocalDate(DateTimeOffset value) =>
         value.ToLocalTime().ToString("yyyy/MM/dd HH:mm", _localization.Culture);
