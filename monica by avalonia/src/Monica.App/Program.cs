@@ -2,9 +2,11 @@ using Avalonia;
 using Monica.Core.Models;
 using Monica.Core.Services;
 using Monica.Data;
+using Monica.Data.Diagnostics;
 using Monica.Data.Repositories;
 using System;
 using System.IO;
+using System.Text.Json;
 
 namespace Monica.App;
 
@@ -43,6 +45,11 @@ class Program
             if (args.Length > 0 && string.Equals(args[0], "--init-empty-smoke-vault", StringComparison.Ordinal))
             {
                 return InitEmptySmokeVaultAsync(args).GetAwaiter().GetResult();
+            }
+
+            if (args.Length > 0 && string.Equals(args[0], "--benchmark-vault", StringComparison.Ordinal))
+            {
+                return RunVaultBenchmarkAsync(args).GetAwaiter().GetResult();
             }
 
             return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
@@ -103,6 +110,55 @@ class Program
             }
 
             Console.WriteLine("Vault smoke test passed.");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex);
+            return 1;
+        }
+    }
+
+    private static async Task<int> RunVaultBenchmarkAsync(string[] args)
+    {
+        try
+        {
+            if (args.Length < 2 || !int.TryParse(args[1], out var entryCount) || entryCount < 1)
+            {
+                Console.Error.WriteLine(
+                    "Usage: Monica.App --benchmark-vault <entryCount> [--benchmark-path <dbPath>] [--retain-benchmark-vault]");
+                return 2;
+            }
+
+            string? databasePath = null;
+            var retainDatabase = false;
+            for (var index = 2; index < args.Length; index++)
+            {
+                if (string.Equals(args[index], "--retain-benchmark-vault", StringComparison.Ordinal))
+                {
+                    retainDatabase = true;
+                    continue;
+                }
+
+                if (string.Equals(args[index], "--benchmark-path", StringComparison.Ordinal) && index + 1 < args.Length)
+                {
+                    databasePath = args[++index];
+                    continue;
+                }
+
+                Console.Error.WriteLine($"Unknown benchmark argument: {args[index]}");
+                return 2;
+            }
+
+            var result = await VaultBenchmarkRunner.RunAsync(new VaultBenchmarkOptions(
+                entryCount,
+                databasePath,
+                retainDatabase));
+            Console.WriteLine(JsonSerializer.Serialize(result, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true
+            }));
             return 0;
         }
         catch (Exception ex)

@@ -1,0 +1,33 @@
+{
+  "kind": "password",
+  "room_id": 42,
+  "website": "https://例子.example/登录",
+  "username": "测试用户@example.com",
+  "app_package_name": "com.example.portal",
+  "app_name": "示例门户",
+  "password_plain": "S3cret-密码-🔐",
+  "notes": "Synthetic Android compatibility fixture.",
+  "category_id": 7,
+  "mdbx_folder_id": "login:42",
+  "bound_note_room_id": 84,
+  "bound_note_entry_id": "note:84",
+  "login_type": "PASSWORD",
+  "authenticator_key": "otpauth://totp/Example:test?secret=JBSWY3DPEHPK3PXP&issuer=Example",
+  "passkey_bindings": "[{\"credentialId\":\"fixture-credential\"}]",
+  "custom_fields": [
+    {
+      "title": "Account number",
+      "value": "A-00042",
+      "is_protected": false,
+      "sort_order": 0
+    },
+    {
+      "title": "恢复代码",
+      "value": "fixture-recovery-code",
+      "is_protected": true,
+      "sort_order": 1
+    }
+  ],
+  "bitwarden_mode": false,
+  "keepass_mode": false
+}

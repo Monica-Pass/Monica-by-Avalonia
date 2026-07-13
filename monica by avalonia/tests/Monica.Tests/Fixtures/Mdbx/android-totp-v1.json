@@ -1,0 +1,12 @@
+{
+  "kind": "totp",
+  "room_id": 102,
+  "notes": "Synthetic TOTP fixture",
+  "item_data": "{\"secret\":\"JBSWY3DPEHPK3PXP\",\"issuer\":\"Example\",\"accountName\":\"fixture@example.com\",\"period\":30,\"digits\":6,\"boundPasswordId\":42}",
+  "image_paths": "[]",
+  "category_id": null,
+  "mdbx_folder_id": "totp:102",
+  "bound_password_entry_id": "login:42",
+  "bitwarden_mode": false,
+  "keepass_mode": false
+}

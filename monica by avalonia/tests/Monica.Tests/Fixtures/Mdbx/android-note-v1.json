@@ -1,0 +1,12 @@
+{
+  "kind": "note",
+  "room_id": 101,
+  "notes": "# Android note\n\nUnicode 内容 and a synthetic image reference.",
+  "item_data": "{\"content\":\"# Android note\\n\\nUnicode 内容 and a synthetic image reference.\",\"tags\":\"android,fixture\",\"isMarkdown\":true}",
+  "image_paths": "[\"monica-image://fixture-note-image\"]",
+  "category_id": 9,
+  "mdbx_folder_id": "note:101",
+  "bound_password_entry_id": null,
+  "bitwarden_mode": false,
+  "keepass_mode": false
+}

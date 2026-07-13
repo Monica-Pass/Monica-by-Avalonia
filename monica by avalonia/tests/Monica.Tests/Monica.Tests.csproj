@@ -25,4 +25,10 @@
     <ProjectReference Include="..\..\src\Monica.Platform\Monica.Platform.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Fixtures\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

@@ -15,6 +15,64 @@ public sealed class MdbxRepositoryTests
     };
 
     [Fact]
+    public async Task Repository_reads_android_flat_password_payload_from_mdbx_record()
+    {
+        var repository = CreateRepository(out var bridge);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        bridge.SeedEntry(
+            database.WorkingCopyPath!,
+            "Monica",
+            "login",
+            "Android 门户",
+            ReadMdbxFixture("android-login-v1.json"));
+
+        var entry = Assert.Single(await repository.GetPasswordsAsync());
+        var fields = await repository.GetCustomFieldsAsync(entry.Id);
+
+        Assert.Equal(42, entry.Id);
+        Assert.Equal("Android 门户", entry.Title);
+        Assert.Equal("S3cret-密码-🔐", entry.Password);
+        Assert.Equal("恢复代码", fields[1].Title);
+        Assert.True(fields[1].IsProtected);
+    }
+
+    [Fact]
+    public async Task Repository_keeps_read_compatibility_with_legacy_avalonia_wrapper_payload()
+    {
+        var repository = CreateRepository(out var bridge);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        bridge.SeedEntry(
+            database.WorkingCopyPath!,
+            "Monica",
+            "login",
+            "Legacy wrapper",
+            """
+            {
+              "kind": "password",
+              "schemaVersion": 1,
+              "data": {
+                "entry": {
+                  "id": 77,
+                  "title": "Legacy wrapper",
+                  "username": "legacy-user",
+                  "password": "legacy-secret"
+                },
+                "customFields": [
+                  { "entryId": 77, "title": "Legacy field", "value": "legacy-value", "sortOrder": 0 }
+                ]
+              }
+            }
+            """);
+
+        var entry = Assert.Single(await repository.GetPasswordsAsync());
+
+        Assert.Equal(77, entry.Id);
+        Assert.Equal("legacy-user", entry.Username);
+        Assert.Equal("legacy-secret", entry.Password);
+        Assert.Equal("Legacy field", Assert.Single(await repository.GetCustomFieldsAsync(entry.Id)).Title);
+    }
+
+    [Fact]
     public async Task Repository_roundtrips_passwords_through_mdbx_store_when_default_vault_exists()
     {
         var repository = CreateRepository(out var bridge);
@@ -81,14 +139,18 @@ public sealed class MdbxRepositoryTests
         await repository.SaveSecureItemAsync(note);
 
         using var passwordPayload = JsonDocument.Parse(bridge.GetEntryPayloadJson(database.WorkingCopyPath!, password.MdbxFolderId!)!);
-        var entry = passwordPayload.RootElement.GetProperty("data").GetProperty("entry");
+        var entry = passwordPayload.RootElement;
         AssertMissingOrNull(entry, "mdbxDatabaseId");
         AssertMissingOrNull(entry, "mdbxFolderId");
+        Assert.Equal(password.MdbxFolderId, entry.GetProperty("mdbx_folder_id").GetString());
+        Assert.False(entry.TryGetProperty("data", out _));
 
         using var secureItemPayload = JsonDocument.Parse(bridge.GetEntryPayloadJson(database.WorkingCopyPath!, note.MdbxFolderId!)!);
-        var item = secureItemPayload.RootElement.GetProperty("data").GetProperty("item");
+        var item = secureItemPayload.RootElement;
         AssertMissingOrNull(item, "mdbxDatabaseId");
         AssertMissingOrNull(item, "mdbxFolderId");
+        Assert.Equal(note.MdbxFolderId, item.GetProperty("mdbx_folder_id").GetString());
+        Assert.False(item.TryGetProperty("data", out _));
 
         Assert.NotNull(Assert.Single(await repository.GetPasswordsAsync()).MdbxDatabaseId);
         Assert.NotNull(Assert.Single(await repository.GetSecureItemsAsync(VaultItemType.Note)).MdbxDatabaseId);
@@ -701,10 +763,13 @@ public sealed class MdbxRepositoryTests
         var notePayloadJson = bridge.GetEntryPayloadJson(database.WorkingCopyPath!, note.MdbxFolderId!);
         using (var payload = JsonDocument.Parse(notePayloadJson!))
         {
-            Assert.Equal("secure-item", payload.RootElement.GetProperty("kind").GetString());
-            Assert.Equal(1, payload.RootElement.GetProperty("schemaVersion").GetInt32());
-            Assert.Equal("Recovery note", payload.RootElement.GetProperty("data").GetProperty("item").GetProperty("title").GetString());
-            Assert.True(payload.RootElement.GetProperty("data").TryGetProperty("attachments", out _));
+            Assert.Equal("note", payload.RootElement.GetProperty("kind").GetString());
+            Assert.Equal(note.Id, payload.RootElement.GetProperty("room_id").GetInt64());
+            Assert.Equal(note.ItemData, payload.RootElement.GetProperty("item_data").GetString());
+            Assert.True(payload.RootElement.TryGetProperty("attachments", out _));
+            Assert.False(payload.RootElement.TryGetProperty("schemaVersion", out _));
+            Assert.False(payload.RootElement.TryGetProperty("data", out _));
+            Assert.False(payload.RootElement.TryGetProperty("title", out _));
         }
 
         await repository.SoftDeleteSecureItemAsync(note.Id);
@@ -2181,6 +2246,9 @@ public sealed class MdbxRepositoryTests
         return path;
     }
 
+    private static string ReadMdbxFixture(string fileName) =>
+        File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "Mdbx", fileName));
+
     private static string GetTempRootPath()
     {
         var current = AppContext.BaseDirectory;
@@ -2265,6 +2333,17 @@ public sealed class MdbxRepositoryTests
 
         public string? GetEntryPayloadJson(string path, string entryId) =>
             _vaults.TryGetValue(path, out var vault) ? vault.GetEntryPayloadJson(entryId) : null;
+
+        public void SeedEntry(string path, string projectTitle, string entryType, string title, string payloadJson)
+        {
+            if (!_vaults.TryGetValue(path, out var vault))
+            {
+                vault = new FakeMdbxNativeVault("seed-device");
+                _vaults[path] = vault;
+            }
+
+            vault.SeedEntry(projectTitle, entryType, title, payloadJson);
+        }
     }
 
     private sealed class FakeAttachmentContentStore : IAttachmentContentStore
@@ -2481,6 +2560,24 @@ public sealed class MdbxRepositoryTests
 
         public string? GetEntryPayloadJson(string entryId) =>
             _entries.FirstOrDefault(entry => string.Equals(entry.EntryId, entryId, StringComparison.OrdinalIgnoreCase))?.PayloadJson;
+
+        public void SeedEntry(string projectTitle, string entryType, string title, string payloadJson)
+        {
+            var project = _projects.FirstOrDefault(project => string.Equals(project.Title, projectTitle, StringComparison.OrdinalIgnoreCase));
+            if (project is null)
+            {
+                project = new MdbxNativeProjectRecord($"project-{_nextProjectId++}", projectTitle, Deleted: false);
+                _projects.Add(project);
+            }
+
+            _entries.Add(new MdbxNativeEntryRecord(
+                $"entry-{_nextEntryId++}",
+                project.ProjectId,
+                entryType,
+                title,
+                payloadJson,
+                Deleted: false));
+        }
 
         private MdbxNativeEntryRecord SetDeleted(string projectId, string entryId, bool deleted)
         {

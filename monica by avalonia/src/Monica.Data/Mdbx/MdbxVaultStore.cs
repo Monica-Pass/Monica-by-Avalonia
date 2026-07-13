@@ -1,6 +1,8 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Monica.Core.Models;
+using Monica.Core.Services;
 
 namespace Monica.Data.Mdbx;
 
@@ -48,7 +50,7 @@ public sealed record MdbxPasswordReadSnapshot(
     IReadOnlyDictionary<long, IReadOnlyList<CustomField>> CustomFieldsByEntryId,
     IReadOnlyDictionary<long, IReadOnlyList<Attachment>> AttachmentsByEntryId);
 
-public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultStore
+public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge, ICryptoService? cryptoService = null) : IMdbxVaultStore
 {
     private const string DefaultProjectTitle = "Monica";
     private const string DeviceId = "monica-avalonia";
@@ -139,13 +141,30 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         using var _ = vault;
         var project = await ResolveProjectAsync(vault, entry.CategoryId, categories, cancellationToken);
         var entryType = ToMdbxEntryType(entry);
-        var payload = SerializePayload("password", new MdbxPasswordPayload
-        {
-            Entry = ClonePasswordEntryForPayload(entry),
-            CustomFields = NormalizeCustomFields(entry.Id, customFields).ToList(),
-            PasswordHistory = NormalizePasswordHistory(entry.Id, passwordHistory).ToList(),
-            Attachments = NormalizeAttachments(entry.Id, attachments).ToList()
-        });
+        var portableEntry = ClonePasswordEntryForPayload(entry);
+        portableEntry.Password = ToPortableSensitiveValue(portableEntry.Password);
+        portableEntry.AuthenticatorKey = ToPortableSensitiveValue(portableEntry.AuthenticatorKey);
+        var portableFields = NormalizeCustomFields(entry.Id, customFields)
+            .Select(field =>
+            {
+                field.Value = field.IsProtected ? ToPortableSensitiveValue(field.Value) : field.Value;
+                return field;
+            })
+            .ToList();
+        var portableHistory = NormalizePasswordHistory(entry.Id, passwordHistory)
+            .Select(history =>
+            {
+                history.Password = ToPortableSensitiveValue(history.Password);
+                return history;
+            })
+            .ToList();
+        var boundNoteEntryId = await ResolveSecureItemEntryIdAsync(vault, entry.BoundNoteId, "note", cancellationToken);
+        var payload = AndroidMdbxPayloadCodec.EncodePassword(
+            portableEntry,
+            portableFields,
+            boundNoteEntryId,
+            portableHistory,
+            NormalizeAttachments(entry.Id, attachments).ToList());
         var record = await SaveEntryAsync(vault, project.ProjectId, entry.MdbxFolderId, PasswordEntryTypes, entryType, entry.Title, payload, cancellationToken);
 
         entry.MdbxDatabaseId = database.Id;
@@ -173,7 +192,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         var categoryByProjectId = BuildCategoryByProjectId(categories, projects);
         var records = await ListPasswordRecordsAsync(vault, projects, includeDeleted: true, cancellationToken);
         var payloads = records
-            .Select(record => (Record: record, Payload: DeserializePasswordPayload(record.PayloadJson)))
+            .Select(record => (Record: record, Payload: DeserializePasswordPayload(record.PayloadJson, record.Title)))
             .Where(item => item.Payload is not null)
             .Select(item =>
             {
@@ -233,7 +252,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         var categoryByProjectId = BuildCategoryByProjectId(categories, projects);
         var records = await ListPasswordRecordsAsync(vault, projects, includeDeleted, cancellationToken);
         foreach (var item in records
-                     .Select(record => (Record: record, Payload: DeserializePasswordPayload(record.PayloadJson)))
+                     .Select(record => (Record: record, Payload: DeserializePasswordPayload(record.PayloadJson, record.Title)))
                      .Where(item => item.Payload?.Entry.Id == entryId)
                      .OrderBy(item => item.Record.Deleted))
         {
@@ -271,7 +290,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         var result = new Dictionary<long, IReadOnlyList<CustomField>>();
 
         foreach (var item in records
-                     .Select(record => (Record: record, Payload: DeserializePasswordPayload(record.PayloadJson)))
+                     .Select(record => (Record: record, Payload: DeserializePasswordPayload(record.PayloadJson, record.Title)))
                      .Where(item => item.Payload is not null)
                      .OrderBy(item => item.Record.Deleted))
         {
@@ -304,7 +323,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         var records = await ListPasswordRecordsAsync(vault, projects, includeDeleted: true, cancellationToken);
 
         return records
-            .Select(record => DeserializePasswordPayload(record.PayloadJson))
+            .Select(record => DeserializePasswordPayload(record.PayloadJson, record.Title))
             .Where(payload => payload?.CustomFields is not null)
             .Select(payload => payload!)
             .Where(payload => payload.CustomFields!.Any(field =>
@@ -333,7 +352,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         var records = await ListPasswordRecordsAsync(vault, projects, includeDeleted: true, cancellationToken);
 
         foreach (var item in records
-                     .Select(record => (Record: record, Payload: DeserializePasswordPayload(record.PayloadJson)))
+                     .Select(record => (Record: record, Payload: DeserializePasswordPayload(record.PayloadJson, record.Title)))
                      .Where(item => item.Payload is not null)
                      .OrderBy(item => item.Record.Deleted))
         {
@@ -367,7 +386,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         var records = await ListPasswordRecordsAsync(vault, projects, includeDeleted: true, cancellationToken);
 
         return records
-            .Select(record => DeserializePasswordPayload(record.PayloadJson))
+            .Select(record => DeserializePasswordPayload(record.PayloadJson, record.Title))
             .Where(payload => payload?.PasswordHistory is not null)
             .Select(payload => payload!)
             .FirstOrDefault(payload => payload.PasswordHistory!.Any(entry => entry.Id == historyId))
@@ -392,7 +411,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         var result = new Dictionary<long, IReadOnlyList<Attachment>>();
 
         foreach (var item in records
-                     .Select(record => (Record: record, Payload: DeserializePasswordPayload(record.PayloadJson)))
+                     .Select(record => (Record: record, Payload: DeserializePasswordPayload(record.PayloadJson, record.Title)))
                      .Where(item => item.Payload is not null)
                      .OrderBy(item => item.Record.Deleted))
         {
@@ -426,7 +445,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         var result = new Dictionary<long, IReadOnlyList<Attachment>>();
 
         foreach (var item in records
-                     .Select(record => (Record: record, Payload: DeserializeSecureItemPayloadSnapshot(record.PayloadJson)))
+                     .Select(record => (Record: record, Payload: DeserializeSecureItemPayloadSnapshot(record.PayloadJson, record.Title, record.EntryType)))
                      .Where(item => item.Payload is not null)
                      .OrderBy(item => item.Record.Deleted))
         {
@@ -513,11 +532,13 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         using var _ = vault;
         var project = await ResolveProjectAsync(vault, item.CategoryId, categories, cancellationToken);
         var entryType = ToMdbxEntryType(item.ItemType);
-        var payload = SerializePayload("secure-item", new MdbxSecureItemPayload
-        {
-            Item = CloneSecureItemForPayload(item),
-            Attachments = NormalizeSecureItemAttachments(item.Id, DecodeSecureItemImagePaths(item)).ToList()
-        });
+        var portableItem = CloneSecureItemForPayload(item);
+        portableItem.ItemData = ToPortableSensitiveValue(portableItem.ItemData);
+        var boundPasswordEntryId = await ResolvePasswordEntryIdAsync(vault, item.BoundPasswordId, cancellationToken);
+        var payload = AndroidMdbxPayloadCodec.EncodeSecureItem(
+            portableItem,
+            boundPasswordEntryId,
+            NormalizeSecureItemAttachments(item.Id, DecodeSecureItemImagePaths(item)).ToList());
         var record = await SaveEntryAsync(vault, project.ProjectId, item.MdbxFolderId, SecureEntryTypes, entryType, item.Title, payload, cancellationToken);
         await DeleteUnreferencedEntryAttachmentsAsync(vault, record.EntryId, DecodeSecureItemImagePaths(item), cancellationToken);
 
@@ -538,16 +559,26 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         var records = itemType is null
             ? await ListSecureRecordsAsync(vault, projects, includeDeleted, cancellationToken)
             : await ListSecureRecordsAsync(vault, projects, [ToMdbxEntryType(itemType.Value)], includeDeleted, cancellationToken);
+        var payloads = records
+            .Select(record => (Record: record, Payload: DeserializeSecureItemPayloadSnapshot(record.PayloadJson, record.Title, record.EntryType)))
+            .Where(item => item.Payload is not null)
+            .ToList();
+        IReadOnlyDictionary<string, long> passwordIdByEntryId = payloads.Any(item => item.Payload!.BoundPasswordEntryId is { Length: > 0 })
+            ? await BuildPasswordIdByEntryIdAsync(vault, projects, cancellationToken)
+            : new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
 
-        return records
-            .Select(record => (Record: record, Item: DeserializeSecureItemPayload(record.PayloadJson)))
-            .Where(item => item.Item is not null)
+        return payloads
             .Select(item =>
             {
                 var record = item.Record;
-                var secureItem = item.Item!;
+                var secureItem = item.Payload!.Item;
                 secureItem.MdbxDatabaseId = database.Id;
                 secureItem.MdbxFolderId = record.EntryId;
+                if (item.Payload.BoundPasswordEntryId is { Length: > 0 } boundEntryId &&
+                    passwordIdByEntryId.TryGetValue(boundEntryId, out var boundPasswordId))
+                {
+                    secureItem.BoundPasswordId = boundPasswordId;
+                }
                 if (categoryByProjectId.TryGetValue(record.ProjectId, out var categoryId))
                 {
                     secureItem.CategoryId = categoryId;
@@ -575,15 +606,25 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         var projects = await EnsureProjectsForReadAsync(vault, cancellationToken);
         var categoryByProjectId = BuildCategoryByProjectId(categories, projects);
         var records = await ListSecureRecordsAsync(vault, projects, includeDeleted, cancellationToken);
-        foreach (var item in records
-                     .Select(record => (Record: record, Item: DeserializeSecureItemPayload(record.PayloadJson)))
-                     .Where(item => item.Item?.Id == itemId)
-                     .OrderBy(item => item.Record.Deleted))
+        var matches = records
+            .Select(record => (Record: record, Payload: DeserializeSecureItemPayloadSnapshot(record.PayloadJson, record.Title, record.EntryType)))
+            .Where(item => item.Payload?.Item.Id == itemId)
+            .OrderBy(item => item.Record.Deleted)
+            .ToList();
+        IReadOnlyDictionary<string, long> passwordIdByEntryId = matches.Any(item => item.Payload!.BoundPasswordEntryId is { Length: > 0 })
+            ? await BuildPasswordIdByEntryIdAsync(vault, projects, cancellationToken)
+            : new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in matches)
         {
             var record = item.Record;
-            var secureItem = item.Item!;
+            var secureItem = item.Payload!.Item;
             secureItem.MdbxDatabaseId = database.Id;
             secureItem.MdbxFolderId = record.EntryId;
+            if (item.Payload.BoundPasswordEntryId is { Length: > 0 } boundEntryId &&
+                passwordIdByEntryId.TryGetValue(boundEntryId, out var boundPasswordId))
+            {
+                secureItem.BoundPasswordId = boundPasswordId;
+            }
             if (categoryByProjectId.TryGetValue(record.ProjectId, out var categoryId))
             {
                 secureItem.CategoryId = categoryId;
@@ -657,7 +698,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         var passwordRecords = await ListPasswordRecordsAsync(vault, [categoryProject], includeDeleted: true, cancellationToken);
         foreach (var record in passwordRecords)
         {
-            var payload = DeserializePasswordPayload(record.PayloadJson);
+            var payload = DeserializePasswordPayload(record.PayloadJson, record.Title);
             if (payload is null)
             {
                 continue;
@@ -667,13 +708,12 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
             payload.Entry.MdbxDatabaseId = database.Id;
             payload.Entry.MdbxFolderId = record.EntryId;
             var entryType = ToMdbxEntryType(payload.Entry);
-            var payloadJson = SerializePayload("password", new MdbxPasswordPayload
-            {
-                Entry = ClonePasswordEntryForPayload(payload.Entry),
-                CustomFields = payload.CustomFields,
-                PasswordHistory = payload.PasswordHistory,
-                Attachments = payload.Attachments
-            });
+            var payloadJson = AndroidMdbxPayloadCodec.EncodePassword(
+                ClonePasswordEntryForPayload(payload.Entry),
+                payload.CustomFields ?? [],
+                payload.BoundNoteEntryId,
+                payload.PasswordHistory,
+                payload.Attachments);
             if (!string.Equals(record.ProjectId, defaultProject.ProjectId, StringComparison.OrdinalIgnoreCase))
             {
                 await vault.MoveEntryAsync(record.ProjectId, record.EntryId, defaultProject.ProjectId, cancellationToken);
@@ -684,21 +724,21 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
 
         foreach (var record in await ListSecureRecordsAsync(vault, [categoryProject], includeDeleted: true, cancellationToken))
         {
-            var item = DeserializeSecureItemPayload(record.PayloadJson);
-            if (item is null)
+            var securePayload = DeserializeSecureItemPayloadSnapshot(record.PayloadJson, record.Title, record.EntryType);
+            if (securePayload is null)
             {
                 continue;
             }
 
+            var item = securePayload.Item;
             item.CategoryId = null;
             item.MdbxDatabaseId = database.Id;
             item.MdbxFolderId = record.EntryId;
             var entryType = ToMdbxEntryType(item.ItemType);
-            var payloadJson = SerializePayload("secure-item", new MdbxSecureItemPayload
-            {
-                Item = CloneSecureItemForPayload(item),
-                Attachments = NormalizeSecureItemAttachments(item.Id, DecodeSecureItemImagePaths(item)).ToList()
-            });
+            var payloadJson = AndroidMdbxPayloadCodec.EncodeSecureItem(
+                CloneSecureItemForPayload(item),
+                securePayload.BoundPasswordEntryId,
+                NormalizeSecureItemAttachments(item.Id, DecodeSecureItemImagePaths(item)).ToList());
             if (!string.Equals(record.ProjectId, defaultProject.ProjectId, StringComparison.OrdinalIgnoreCase))
             {
                 await vault.MoveEntryAsync(record.ProjectId, record.EntryId, defaultProject.ProjectId, cancellationToken);
@@ -1028,6 +1068,75 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         return records;
     }
 
+    private async Task<string?> ResolvePasswordEntryIdAsync(
+        IMdbxNativeVault vault,
+        long? passwordId,
+        CancellationToken cancellationToken)
+    {
+        if (passwordId is null or <= 0)
+        {
+            return null;
+        }
+
+        var projects = await EnsureProjectsForReadAsync(vault, cancellationToken);
+        return (await ListPasswordRecordsAsync(vault, projects, includeDeleted: true, cancellationToken))
+            .Select(record => (Record: record, Payload: DeserializePasswordPayload(record.PayloadJson, record.Title)))
+            .FirstOrDefault(item => item.Payload?.Entry.Id == passwordId.Value)
+            .Record?.EntryId;
+    }
+
+    private async Task<string?> ResolveSecureItemEntryIdAsync(
+        IMdbxNativeVault vault,
+        long? itemId,
+        string entryType,
+        CancellationToken cancellationToken)
+    {
+        if (itemId is null or <= 0)
+        {
+            return null;
+        }
+
+        var projects = await EnsureProjectsForReadAsync(vault, cancellationToken);
+        return (await ListSecureRecordsAsync(vault, projects, [entryType], includeDeleted: true, cancellationToken))
+            .Select(record => (Record: record, Payload: DeserializeSecureItemPayloadSnapshot(record.PayloadJson, record.Title, record.EntryType)))
+            .FirstOrDefault(item => item.Payload?.Item.Id == itemId.Value)
+            .Record?.EntryId;
+    }
+
+    private static async Task<IReadOnlyDictionary<string, long>> BuildPasswordIdByEntryIdAsync(
+        IMdbxNativeVault vault,
+        IReadOnlyList<MdbxNativeProjectRecord> projects,
+        CancellationToken cancellationToken)
+    {
+        return (await ListPasswordRecordsAsync(vault, projects, includeDeleted: true, cancellationToken))
+            .Select(record => (Record: record, Payload: DeserializePasswordPayload(record.PayloadJson, record.Title)))
+            .Where(item => item.Payload?.Entry.Id > 0)
+            .GroupBy(item => item.Record.EntryId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First().Payload!.Entry.Id, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private string ToPortableSensitiveValue(string value)
+    {
+        if (string.IsNullOrEmpty(value) || cryptoService is null)
+        {
+            return value;
+        }
+
+        if (!cryptoService.IsUnlocked)
+        {
+            throw new InvalidOperationException("Vault must be unlocked before sensitive values can be written to MDBX.");
+        }
+
+        try
+        {
+            return cryptoService.DecryptString(value);
+        }
+        catch (Exception ex) when (ex is FormatException or CryptographicException or ArgumentException)
+        {
+            return value;
+        }
+    }
+
     private static MdbxNativeProjectRecord? ResolveCategoryProject(Category category, IReadOnlyList<MdbxNativeProjectRecord> projects)
     {
         if (!string.IsNullOrWhiteSpace(category.MdbxFolderId))
@@ -1071,14 +1180,10 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         return categoryByProjectId;
     }
 
-    private static string SerializePayload<T>(string kind, T data) =>
-        JsonSerializer.Serialize(new MdbxPayload<T>(kind, 1, data), JsonOptions);
-
     private static PasswordEntry ClonePasswordEntryForPayload(PasswordEntry entry)
     {
         var clone = JsonSerializer.Deserialize<PasswordEntry>(JsonSerializer.Serialize(entry, JsonOptions), JsonOptions) ?? new PasswordEntry();
         clone.MdbxDatabaseId = null;
-        clone.MdbxFolderId = null;
         return clone;
     }
 
@@ -1086,7 +1191,6 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
     {
         var clone = JsonSerializer.Deserialize<SecureItem>(JsonSerializer.Serialize(item, JsonOptions), JsonOptions) ?? new SecureItem();
         clone.MdbxDatabaseId = null;
-        clone.MdbxFolderId = null;
         return clone;
     }
 
@@ -1096,14 +1200,14 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         return payload is null ? default : payload.Data;
     }
 
-    private static PasswordPayloadSnapshot? DeserializePasswordPayload(string payloadJson)
+    private static PasswordPayloadSnapshot? DeserializePasswordPayload(string payloadJson, string recordTitle = "")
     {
         try
         {
             var payload = JsonSerializer.Deserialize<MdbxPayload<MdbxPasswordPayload>>(payloadJson, JsonOptions);
-            if (payload?.Data.Entry is not null)
+            if (payload?.Data?.Entry is not null)
             {
-                return new PasswordPayloadSnapshot(payload.Data.Entry, payload.Data.CustomFields, payload.Data.PasswordHistory, payload.Data.Attachments);
+                return new PasswordPayloadSnapshot(payload.Data.Entry, payload.Data.CustomFields, payload.Data.PasswordHistory, payload.Data.Attachments, BoundNoteEntryId: null);
             }
         }
         catch (JsonException)
@@ -1113,25 +1217,37 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         try
         {
             var entry = DeserializePayload<PasswordEntry>(payloadJson);
-            return entry is null ? null : new PasswordPayloadSnapshot(entry, CustomFields: null, PasswordHistory: null, Attachments: null);
+            if (entry is not null)
+            {
+                return new PasswordPayloadSnapshot(entry, CustomFields: null, PasswordHistory: null, Attachments: null, BoundNoteEntryId: null);
+            }
         }
         catch (JsonException)
         {
-            return null;
         }
+
+        var androidPayload = AndroidMdbxPayloadCodec.DecodePassword(payloadJson, recordTitle);
+        return androidPayload is null
+            ? null
+            : new PasswordPayloadSnapshot(
+                androidPayload.Entry,
+                androidPayload.CustomFields.ToList(),
+                androidPayload.PasswordHistory,
+                androidPayload.Attachments,
+                androidPayload.BoundNoteEntryId);
     }
 
-    private static SecureItem? DeserializeSecureItemPayload(string payloadJson) =>
-        DeserializeSecureItemPayloadSnapshot(payloadJson)?.Item;
-
-    private static SecureItemPayloadSnapshot? DeserializeSecureItemPayloadSnapshot(string payloadJson)
+    private static SecureItemPayloadSnapshot? DeserializeSecureItemPayloadSnapshot(
+        string payloadJson,
+        string recordTitle = "",
+        string entryType = "")
     {
         try
         {
             var payload = JsonSerializer.Deserialize<MdbxPayload<MdbxSecureItemPayload>>(payloadJson, JsonOptions);
-            if (payload?.Data.Item is not null)
+            if (payload?.Data?.Item is not null)
             {
-                return new SecureItemPayloadSnapshot(payload.Data.Item, payload.Data.Attachments);
+                return new SecureItemPayloadSnapshot(payload.Data.Item, payload.Data.Attachments, BoundPasswordEntryId: null);
             }
         }
         catch (JsonException)
@@ -1141,12 +1257,22 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         try
         {
             var item = DeserializePayload<SecureItem>(payloadJson);
-            return item is null ? null : new SecureItemPayloadSnapshot(item, Attachments: null);
+            if (item is not null)
+            {
+                return new SecureItemPayloadSnapshot(item, Attachments: null, BoundPasswordEntryId: null);
+            }
         }
         catch (JsonException)
         {
-            return null;
         }
+
+        var androidPayload = AndroidMdbxPayloadCodec.DecodeSecureItem(payloadJson, recordTitle, entryType);
+        return androidPayload is null
+            ? null
+            : new SecureItemPayloadSnapshot(
+                androidPayload.Item,
+                androidPayload.Attachments,
+                androidPayload.BoundPasswordEntryId);
     }
 
     private static IReadOnlyList<CustomField> NormalizeCustomFields(long entryId, IReadOnlyList<CustomField> customFields) =>
@@ -1300,9 +1426,11 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge) : IMdbxVaultS
         PasswordEntry Entry,
         List<CustomField>? CustomFields,
         List<PasswordHistoryEntry>? PasswordHistory,
-        List<Attachment>? Attachments);
+        List<Attachment>? Attachments,
+        string? BoundNoteEntryId);
 
     private sealed record SecureItemPayloadSnapshot(
         SecureItem Item,
-        List<Attachment>? Attachments);
+        List<Attachment>? Attachments,
+        string? BoundPasswordEntryId);
 }

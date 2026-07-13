@@ -1,0 +1,12 @@
+{
+  "kind": "bank_card",
+  "room_id": 103,
+  "notes": "Synthetic payment card fixture",
+  "item_data": "{\"cardNumber\":\"4111111111111111\",\"cardholderName\":\"Fixture User\",\"expiryMonth\":\"12\",\"expiryYear\":\"2030\",\"cvv\":\"123\",\"bankName\":\"Fixture Bank\"}",
+  "image_paths": "[]",
+  "category_id": 10,
+  "mdbx_folder_id": "card:103",
+  "bound_password_entry_id": null,
+  "bitwarden_mode": false,
+  "keepass_mode": false
+}
