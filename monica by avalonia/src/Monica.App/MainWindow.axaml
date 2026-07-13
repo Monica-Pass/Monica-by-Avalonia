@@ -3662,25 +3662,7 @@
                             </Grid>
                         </Grid>
 
-                        <Grid Classes="notesWorkspace" IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsNotes}}" RowDefinitions="44,*" Background="{DynamicResource LayerFillColorDefaultBrush}">
-                            <notes:NoteTabStripView x:Name="NoteTabStripView"
-                                                    TabClosed="NoteTabStripView_OnTabClosed" />
-
-                            <Grid Grid.Row="1" SizeChanged="NoteWorkspaceGrid_OnSizeChanged">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="{Binding NoteTreeColumnWidth}" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="{Binding NoteInspectorColumnWidth}" />
-                                </Grid.ColumnDefinitions>
-                                <notes:NoteTreeView />
-
-                                <notes:NoteEditorView x:Name="NoteEditorView"
-                                                      Grid.Column="1"
-                                                      CloseRequested="NoteEditorView_OnCloseRequested" />
-                                <notes:NoteInspectorView Grid.Column="2"
-                                                         LineRequested="NoteInspectorView_OnLineRequested" />
-                            </Grid>
-                        </Grid>
+                        <notes:NoteWorkspaceView x:Name="NoteWorkspaceView" />
                     </Grid>
                 </Grid>
             </fa:FANavigationView>

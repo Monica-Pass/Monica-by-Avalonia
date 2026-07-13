@@ -376,7 +376,7 @@ public partial class MainWindow : Window
                     $"selected={viewModel.SelectedNoteTab?.Title}");
             }
 
-            await NoteEditorView.RunKeyboardSmokeChecksAsync(Check);
+            await NoteWorkspaceView.RunKeyboardSmokeChecksAsync(Check);
 
             viewModel.SelectSectionCommand.Execute("Generator");
             await Task.Delay(50);

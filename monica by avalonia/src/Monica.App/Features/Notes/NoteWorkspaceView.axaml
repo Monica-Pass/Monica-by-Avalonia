@@ -1,0 +1,24 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Monica.App"
+             xmlns:notes="using:Monica.App.Features.Notes"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Notes.NoteWorkspaceView"
+             x:DataType="vm:MainWindowViewModel">
+    <Grid Classes="notesWorkspace"
+          IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsNotes}}"
+          RowDefinitions="44,*"
+          Background="{DynamicResource LayerFillColorDefaultBrush}">
+        <notes:NoteTabStripView x:Name="TabStrip" TabClosed="TabStrip_OnTabClosed" />
+        <Grid Grid.Row="1" SizeChanged="WorkspaceGrid_OnSizeChanged">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="{Binding NoteTreeColumnWidth}" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="{Binding NoteInspectorColumnWidth}" />
+            </Grid.ColumnDefinitions>
+            <notes:NoteTreeView />
+            <notes:NoteEditorView x:Name="Editor" Grid.Column="1" CloseRequested="Editor_OnCloseRequested" />
+            <notes:NoteInspectorView Grid.Column="2" LineRequested="Inspector_OnLineRequested" />
+        </Grid>
+    </Grid>
+</UserControl>

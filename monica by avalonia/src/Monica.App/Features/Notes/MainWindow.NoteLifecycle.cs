@@ -16,7 +16,7 @@ public partial class MainWindow
 
     private async void HandleNoteWorkspaceShortcut(MainWindowViewModel viewModel, KeyEventArgs e)
     {
-        if (NoteEditorView.TryHandleWorkspaceShortcut(e))
+        if (NoteWorkspaceView.TryHandleShortcut(e))
         {
             return;
         }
@@ -51,7 +51,7 @@ public partial class MainWindow
         if (e.Key == Key.W && viewModel.SelectedNoteTab is not null)
         {
             e.Handled = true;
-            await NoteTabStripView.CloseTabWithPromptAsync(viewModel, viewModel.SelectedNoteTab);
+            await NoteWorkspaceView.CloseTabWithPromptAsync(viewModel, viewModel.SelectedNoteTab);
         }
     }
 
@@ -87,7 +87,7 @@ public partial class MainWindow
         _isHandlingUnsavedWindowClose = true;
         try
         {
-            var result = await NoteTabStripView.ShowUnsavedTabsDialogAsync(dirtyCount);
+            var result = await NoteWorkspaceView.ShowUnsavedTabsDialogAsync(dirtyCount);
             if (result == FAContentDialogResult.Primary)
             {
                 await viewModel.SaveAllNoteTabsCommand.ExecuteAsync(null);
@@ -124,7 +124,7 @@ public partial class MainWindow
             _observedViewModel.PropertyChanged += ViewModel_OnPropertyChanged;
         }
 
-        Dispatcher.UIThread.Post(NoteTabStripView.UpdateScrollButtons);
+        Dispatcher.UIThread.Post(NoteWorkspaceView.UpdateTabScroll);
     }
 
     private void ViewModel_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -133,18 +133,14 @@ public partial class MainWindow
         {
             Dispatcher.UIThread.Post(() =>
             {
-                NoteEditorView.RestoreSelectedTabSelection();
-                NoteEditorView.EnsureSelectedHistory();
-                NoteTabStripView.ScrollSelectedIntoView();
-                NoteTabStripView.UpdateScrollButtons();
+                NoteWorkspaceView.HandleSelectedTabChanged();
             });
         }
         else if (e.PropertyName == nameof(MainWindowViewModel.NoteTabWidth))
         {
             Dispatcher.UIThread.Post(() =>
             {
-                NoteTabStripView.ScrollSelectedIntoView();
-                NoteTabStripView.UpdateScrollButtons();
+                NoteWorkspaceView.HandleTabWidthChanged();
             });
         }
         else if (e.PropertyName == nameof(MainWindowViewModel.SelectedSection))
