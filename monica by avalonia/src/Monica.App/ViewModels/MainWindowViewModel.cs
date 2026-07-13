@@ -385,7 +385,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<PasswordEntry> Passwords { get; } = new ObservableRangeCollection<PasswordEntry>();
     public ObservableCollection<PasswordEntry> ArchivedPasswords { get; } = new ObservableRangeCollection<PasswordEntry>();
     public ObservableCollection<PasswordEntry> DeletedPasswords { get; } = new ObservableRangeCollection<PasswordEntry>();
-    public ObservableCollection<SecureItem> WalletItems { get; } = new ObservableRangeCollection<SecureItem>();
     public ObservableCollection<Category> Categories { get; } = new ObservableRangeCollection<Category>();
     public ObservableCollection<LocalizedPlatformIntegrationCapability> PlatformIntegrationCapabilities { get; } = [];
     public ObservableCollection<LocalizedPlatformCapability> Capabilities { get; } = [];
@@ -647,12 +646,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
         }
     }
-
-    [ObservableProperty]
-    private SecureItem? _selectedWalletItem;
-
-    [ObservableProperty]
-    private WalletItemDetailsViewModel? _selectedWalletDetails;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelectedTimelineEntry))]
@@ -1033,7 +1026,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public Thickness PasswordListContentMargin => CompactPasswordList ? new Thickness(10, 0, 0, 0) : new Thickness(14, 0, 0, 0);
     public bool ShowPasswordListDetails => !CompactPasswordList;
     public string NoteCountText => _localization.Format("NoteCountFormat", NoteItems.Count);
-    public string WalletCountText => _localization.Format("WalletCountFormat", WalletItems.Count);
     public string TimelineCountText => _localization.Format("TimelineCountFormat", TimelineEntries.Count);
     public string LocalDatabaseSummaryText => _localization.Format("DatabaseSummaryFormat", Passwords.Count, NoteItems.Count, TotpItems.Count, WalletItems.Count);
     public string MdbxDatabaseCountText => _localization.Format("MdbxDatabaseCountFormat", MdbxDatabases.Count);
@@ -1240,15 +1232,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public bool HasSelectedPasswordLoadingState =>
         SelectedPassword is not null &&
         IsLoadingSelectedPasswordDetails;
-    public int SelectedWalletCount => WalletItems.Count(item => item.IsSelected);
-    public string SelectedWalletCountText => _localization.Format("SelectedWalletCountFormat", SelectedWalletCount);
-    public bool HasSelectedWalletItems => SelectedWalletCount > 0;
-    public bool HasSelectedWalletItem => SelectedWalletItem is not null;
     public bool HasSelectedTimelineEntry => SelectedTimelineEntry is not null;
     public bool HasSelectedMdbxDatabaseItem => SelectedMdbxDatabaseItem is not null;
     public bool HasSelectedVaultSource => SelectedVaultSource is not null;
     public bool HasVaultSources => VaultSources.Count > 0;
-    public bool HasWalletItems => WalletItems.Count > 0;
     public bool HasRecoverableStatusMessage =>
         IsUnlocked &&
         !IsLoadingVault &&
@@ -1450,12 +1437,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedGeneratorTemplateOption));
         OnPropertyChanged(nameof(GeneratorStrategySummaryText));
         OnPropertyChanged(nameof(GeneratedPasswordStrengthText));
-    }
-
-    partial void OnSelectedWalletItemChanged(SecureItem? value)
-    {
-        SelectedWalletDetails = value is null ? null : new WalletItemDetailsViewModel(_localization, value);
-        OnPropertyChanged(nameof(HasSelectedWalletItem));
     }
 
     partial void OnSettingsLanguageChanged(string value)
