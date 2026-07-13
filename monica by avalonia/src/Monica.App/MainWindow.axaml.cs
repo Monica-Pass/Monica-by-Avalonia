@@ -7,16 +7,11 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FluentAvalonia.UI.Controls;
 using Monica.App.ViewModels;
-using System.ComponentModel;
 
 namespace Monica.App;
 
 public partial class MainWindow : Window
 {
-    private bool _isClosingAfterUnsavedNoteDecision;
-    private bool _isHandlingUnsavedWindowClose;
-    private MainWindowViewModel? _observedViewModel;
-
     private sealed record SmokePageLayoutCheck(
         string Section,
         string[] RequiredClasses,
@@ -204,70 +199,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void HandleNoteWorkspaceShortcut(MainWindowViewModel viewModel, KeyEventArgs e)
-    {
-        if (e.Key == Key.Escape && NoteFindPanel.IsVisible)
-        {
-            HideNoteFindPanel();
-            e.Handled = true;
-            return;
-        }
-
-        if (e.Key == Key.F3)
-        {
-            SelectNoteFindMatch(forward: !e.KeyModifiers.HasFlag(KeyModifiers.Shift), focusEditor: true);
-            e.Handled = true;
-            return;
-        }
-
-        if (!e.KeyModifiers.HasFlag(KeyModifiers.Control))
-        {
-            return;
-        }
-
-        if (e.Key == Key.F)
-        {
-            ShowNoteFindPanel(replaceMode: false);
-            e.Handled = true;
-            return;
-        }
-
-        if (e.Key == Key.H)
-        {
-            ShowNoteFindPanel(replaceMode: true);
-            e.Handled = true;
-            return;
-        }
-
-        if (e.Key == Key.S)
-        {
-            e.Handled = true;
-            if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
-            {
-                await viewModel.SaveAllNoteTabsCommand.ExecuteAsync(null);
-            }
-            else
-            {
-                await viewModel.SaveNoteCommand.ExecuteAsync(null);
-            }
-
-            return;
-        }
-
-        if (e.Key == Key.N)
-        {
-            viewModel.AddNoteCommand.Execute(null);
-            e.Handled = true;
-            return;
-        }
-
-        if (e.Key == Key.W && viewModel.SelectedNoteTab is not null)
-        {
-            e.Handled = true;
-            await CloseNoteTabWithPromptAsync(viewModel, viewModel.SelectedNoteTab);
-        }
-    }
-
     private void SelectAdjacentPassword(MainWindowViewModel viewModel, int delta)
     {
         var visiblePasswords = viewModel.VisiblePasswordNavigationEntries.ToList();
@@ -294,104 +225,6 @@ public partial class MainWindow : Window
         source is TextBox textBox && !PasswordVaultView.IsSearchBox(textBox);
 
     private static bool IsTextEditingSource(object? source) => source is TextBox;
-
-    private void OnClosed(object? sender, EventArgs e)
-    {
-        if (_observedViewModel is not null)
-        {
-            _observedViewModel.PropertyChanged -= ViewModel_OnPropertyChanged;
-            _observedViewModel = null;
-        }
-    }
-
-    private async void OnClosing(object? sender, WindowClosingEventArgs e)
-    {
-        if (_isClosingAfterUnsavedNoteDecision ||
-            DataContext is not MainWindowViewModel viewModel)
-        {
-            return;
-        }
-
-        var dirtyCount = viewModel.OpenNoteTabs.Count(tab => tab.IsDirty);
-        if (dirtyCount == 0)
-        {
-            return;
-        }
-
-        e.Cancel = true;
-        if (_isHandlingUnsavedWindowClose)
-        {
-            return;
-        }
-
-        _isHandlingUnsavedWindowClose = true;
-        try
-        {
-            var result = await ShowUnsavedNoteTabsDialogAsync(dirtyCount);
-            if (result == FAContentDialogResult.Primary)
-            {
-                await viewModel.SaveAllNoteTabsCommand.ExecuteAsync(null);
-                if (viewModel.OpenNoteTabs.Any(tab => tab.IsDirty))
-                {
-                    return;
-                }
-
-                _isClosingAfterUnsavedNoteDecision = true;
-                Close();
-            }
-            else if (result == FAContentDialogResult.Secondary)
-            {
-                _isClosingAfterUnsavedNoteDecision = true;
-                Close();
-            }
-        }
-        finally
-        {
-            _isHandlingUnsavedWindowClose = false;
-        }
-    }
-
-    private void OnDataContextChanged(object? sender, EventArgs e)
-    {
-        if (_observedViewModel is not null)
-        {
-            _observedViewModel.PropertyChanged -= ViewModel_OnPropertyChanged;
-        }
-
-        _observedViewModel = DataContext as MainWindowViewModel;
-        if (_observedViewModel is not null)
-        {
-            _observedViewModel.PropertyChanged += ViewModel_OnPropertyChanged;
-        }
-
-        Dispatcher.UIThread.Post(UpdateNoteTabScrollButtons);
-    }
-
-    private void ViewModel_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(MainWindowViewModel.SelectedNoteTab))
-        {
-            Dispatcher.UIThread.Post(() =>
-            {
-                RestoreSelectedNoteTabSelection();
-                EnsureSelectedNoteEditorHistory();
-                ScrollSelectedNoteTabIntoView();
-                UpdateNoteTabScrollButtons();
-            });
-        }
-        else if (e.PropertyName == nameof(MainWindowViewModel.NoteTabWidth))
-        {
-            Dispatcher.UIThread.Post(() =>
-            {
-                ScrollSelectedNoteTabIntoView();
-                UpdateNoteTabScrollButtons();
-            });
-        }
-        else if (e.PropertyName == nameof(MainWindowViewModel.SelectedSection))
-        {
-            QueueWorkspaceScrollResetForSelectedSection();
-        }
-    }
 
     private void QueueWorkspaceScrollResetForSelectedSection()
     {
