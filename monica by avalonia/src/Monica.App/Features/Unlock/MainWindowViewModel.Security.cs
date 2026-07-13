@@ -55,6 +55,7 @@ public sealed partial class MainWindowViewModel
         _cryptoService.Lock();
         IsUnlocked = false;
         ClearSensitiveSessionState();
+        await ClearSettingsSensitiveCacheAsync();
         await ClearOwnedClipboardAsync();
         StatusMessage = _localization.Get("VaultLocked");
         IsPrivacyScreenVisible = !_isWindowActive;
@@ -86,6 +87,18 @@ public sealed partial class MainWindowViewModel
         catch (Exception exception)
         {
             AppDiagnostics.Error("Clipboard clearing failed while locking", exception);
+        }
+    }
+
+    private async Task ClearSettingsSensitiveCacheAsync()
+    {
+        try
+        {
+            await _settingsService.ClearSensitiveCacheAsync();
+        }
+        catch (Exception exception)
+        {
+            AppDiagnostics.Error("Settings secret cache clearing failed while locking", exception);
         }
     }
 
@@ -206,6 +219,7 @@ public sealed partial class MainWindowViewModel
         _passwordQuickAccessRecords = new Dictionary<long, PasswordQuickAccessRecord>();
         _compromisedPasswordResults = new Dictionary<long, CompromisedPasswordResult>();
         _hasCompromisedPasswordCheckResults = false;
+        _hasAuthorizedExportPreview = false;
         SelectedSecurityIssue = null;
         VaultLoadStageText = "";
         _vaultLoadVersion++;

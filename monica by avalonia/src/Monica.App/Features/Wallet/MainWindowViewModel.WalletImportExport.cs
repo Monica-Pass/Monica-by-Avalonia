@@ -18,6 +18,11 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private async Task ExportWalletCsvAsync()
     {
+        if (!await AuthorizeSensitiveExportAsync())
+        {
+            return;
+        }
+
         ExportWalletCsvPreview = await BuildWalletCsvExportAsync();
         StatusMessage = _localization.Get("ExportedWalletCsv");
     }

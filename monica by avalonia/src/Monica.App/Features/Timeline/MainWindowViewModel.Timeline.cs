@@ -77,6 +77,11 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private async Task ExportTimelineAsync()
     {
+        if (!await AuthorizeSensitiveExportAsync())
+        {
+            return;
+        }
+
         if (TimelineEntries.Count == 0)
         {
             StatusMessage = _localization.Get("TimelineExportEmpty");

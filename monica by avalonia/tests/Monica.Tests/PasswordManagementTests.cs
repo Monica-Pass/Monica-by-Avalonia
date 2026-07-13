@@ -1944,7 +1944,7 @@ public sealed class PasswordManagementTests
     }
 
     [Fact]
-    public async Task ViewModel_creates_webdav_backup_with_selected_data_groups()
+    public async Task Security_baseline_view_model_rejects_plaintext_webdav_backup()
     {
         var webDav = new FakeWebDavBackupService();
         var harness = CreateHarness(webDavBackupService: webDav);
@@ -1974,17 +1974,13 @@ public sealed class PasswordManagementTests
         harness.ViewModel.WebDavBackupIncludeCards = false;
         harness.ViewModel.WebDavBackupIncludeDocuments = false;
         harness.ViewModel.WebDavBackupIncludeImages = false;
+        harness.ViewModel.WebDavBackupEncryptionEnabled = false;
 
         await harness.ViewModel.CreateWebDavBackupCommand.ExecuteAsync(null);
 
-        Assert.EndsWith(".monica.json", webDav.UploadedPath);
-        Assert.Contains("GitHub", webDav.UploadedContent);
-        Assert.Contains("plain-webdav-secret", webDav.UploadedContent);
-        Assert.Contains("Work", webDav.UploadedContent);
-        Assert.Contains("Recovery", webDav.UploadedContent);
-        Assert.DoesNotContain("inline.png", webDav.UploadedContent);
-        Assert.Single(harness.ViewModel.WebDavBackupHistory);
-        Assert.Equal(harness.ViewModel.L.Format("CreatedWebDavBackupFormat", harness.ViewModel.WebDavBackupHistory.Single().FileName), harness.ViewModel.StatusMessage);
+        Assert.Equal("", webDav.UploadedContent);
+        Assert.Empty(harness.ViewModel.WebDavBackupHistory);
+        Assert.Equal(harness.ViewModel.L.Get("WebDavEncryptionRequired"), harness.ViewModel.StatusMessage);
     }
 
     [Fact]
@@ -2012,11 +2008,14 @@ public sealed class PasswordManagementTests
         harness.ViewModel.WebDavBackupIncludeCards = false;
         harness.ViewModel.WebDavBackupIncludeDocuments = false;
         harness.ViewModel.WebDavBackupIncludeCategories = false;
+        harness.ViewModel.WebDavBackupEncryptionEnabled = true;
+        harness.ViewModel.WebDavBackupEncryptionPassword = "backup password";
 
         await harness.ViewModel.CreateWebDavBackupCommand.ExecuteAsync(null);
 
-        Assert.Contains("Fresh Portal", webDav.UploadedContent);
-        Assert.Contains("fresh-secret", webDav.UploadedContent);
+        Assert.EndsWith(".monica.enc.json", webDav.UploadedPath);
+        Assert.DoesNotContain("Fresh Portal", webDav.UploadedContent);
+        Assert.DoesNotContain("fresh-secret", webDav.UploadedContent);
         Assert.DoesNotContain("Cached Portal", webDav.UploadedContent);
         Assert.DoesNotContain("cached-secret", webDav.UploadedContent);
     }
@@ -2048,6 +2047,8 @@ public sealed class PasswordManagementTests
         await source.ViewModel.LoadAsync();
         source.ViewModel.WebDavEnabled = true;
         source.ViewModel.WebDavServerUrl = "https://dav.example.com/";
+        source.ViewModel.WebDavBackupEncryptionEnabled = true;
+        source.ViewModel.WebDavBackupEncryptionPassword = "backup password";
         await source.ViewModel.CreateWebDavBackupCommand.ExecuteAsync(null);
 
         var targetWebDav = new FakeWebDavBackupService
@@ -2058,7 +2059,8 @@ public sealed class PasswordManagementTests
         target.Crypto.InitializeSession("target password", new byte[16]);
         target.ViewModel.WebDavEnabled = true;
         target.ViewModel.WebDavServerUrl = "https://dav.example.com/";
-        var item = new WebDavBackupHistoryItem("monica_backup_20260601_120000.monica.json", "/Monica/monica_backup_20260601_120000.monica.json", "2026/06/01 12:00", "1 KB", null);
+        target.ViewModel.WebDavBackupEncryptionPassword = "backup password";
+        var item = new WebDavBackupHistoryItem("monica_backup_20260601_120000.monica.enc.json", "/Monica/monica_backup_20260601_120000.monica.enc.json", "2026/06/01 12:00", "1 KB", null);
 
         await target.ViewModel.RestoreWebDavBackupCommand.ExecuteAsync(item);
 
@@ -2777,6 +2779,7 @@ public sealed class PasswordManagementTests
     public async Task ViewModel_imports_monica_json_secure_item_images()
     {
         var source = CreateHarness();
+        source.Crypto.InitializeSession("source password", new byte[16]);
         var sourceImageContent = "document image bytes"u8.ToArray();
         source.Attachments.Put("secure_attachments/document-front.png", sourceImageContent);
         var document = new SecureItem
@@ -2809,6 +2812,7 @@ public sealed class PasswordManagementTests
     public async Task ViewModel_strips_local_mdbx_bindings_from_monica_json_export()
     {
         var harness = CreateHarness();
+        harness.Crypto.InitializeSession("source password", new byte[16]);
         var category = new Category
         {
             Name = "Work",

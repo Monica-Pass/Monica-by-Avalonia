@@ -495,6 +495,11 @@ public sealed partial class MainWindowViewModel
     [RelayCommand(CanExecute = nameof(CanUseFilePicker))]
     private async Task ExportCurrentNoteMarkdownAsync()
     {
+        if (!await AuthorizeSensitiveExportAsync(grantFileExport: false))
+        {
+            return;
+        }
+
         if (SelectedNoteTab is not null)
         {
             CaptureNoteEditorState(SelectedNoteTab, markDirty: SelectedNoteTab.IsDirty);

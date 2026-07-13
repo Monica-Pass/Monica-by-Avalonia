@@ -155,6 +155,11 @@ public partial class App : Application
         services.AddSingleton<IConfirmationDialogService>(_ => new ConfirmationDialogService(
             () => mainWindow,
             _.GetRequiredService<ILocalizationService>()));
+        services.AddSingleton<IExportAuthorizationService>(_ => new MasterPasswordExportAuthorizationService(
+            () => mainWindow,
+            _.GetRequiredService<IVaultCredentialStore>(),
+            _.GetRequiredService<ICryptoService>(),
+            _.GetRequiredService<ILocalizationService>()));
         services.AddSingleton<ITotpEditorDialogService>(_ => new TotpEditorDialogService(
             () => mainWindow,
             _.GetRequiredService<ILocalizationService>()));

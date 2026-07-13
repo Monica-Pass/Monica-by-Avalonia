@@ -22,6 +22,15 @@ public sealed class PlatformServiceTests
     }
 
     [Fact]
+    public void Security_baseline_webdav_rejects_insecure_transport()
+    {
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            WebDavEndpointPolicy.EnsureSecure(new Uri("http://dav.example.com/")));
+
+        Assert.Contains("HTTPS", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Mdbx_service_creates_metadata_and_stream()
     {
         var service = new MdbxVaultService(new MdbxTestVaultEngine());

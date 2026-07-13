@@ -58,6 +58,16 @@ public sealed partial class MainWindowViewModel
             return false;
         }
 
+        try
+        {
+            WebDavEndpointPolicy.EnsureSecure(baseUri);
+        }
+        catch (InvalidOperationException)
+        {
+            StatusMessage = _localization.Get("WebDavHttpsRequired");
+            return false;
+        }
+
         profile = new WebDavProfile
         {
             BaseUri = baseUri,

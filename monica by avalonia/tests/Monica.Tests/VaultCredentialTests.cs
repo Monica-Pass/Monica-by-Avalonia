@@ -17,7 +17,8 @@ public sealed class VaultCredentialTests
         var crypto = new CryptoService();
         crypto.InitializeSession("correct horse battery staple", crypto.CreateSalt());
         var clipboard = new RecordingClipboardService();
-        var viewModel = CreateViewModel(GetTempDatabasePath(), crypto, clipboard);
+        var settings = new AppSettingsService(GetTempSettingsPath());
+        var viewModel = CreateViewModel(GetTempDatabasePath(), crypto, clipboard, settingsService: settings);
         viewModel.IsUnlocked = true;
         viewModel.Passwords.Add(new PasswordEntry { Title = "Account", Password = "plain-secret" });
         viewModel.NoteItems.Add(new SecureItem { Title = "Recovery", ItemData = "backup-code" });
@@ -43,8 +44,26 @@ public sealed class VaultCredentialTests
         Assert.Equal("", viewModel.ExportPreview);
         Assert.Equal("", viewModel.GeneratedPassword);
         Assert.Equal("", viewModel.WebDavPassword);
+        Assert.Equal("", settings.Current.WebDavPassword);
         Assert.Equal("", viewModel.CurrentMasterPassword);
         Assert.True(clipboard.ClearOwnedContentCalled);
+    }
+
+    [Fact]
+    public async Task Security_baseline_export_requires_authorization()
+    {
+        var crypto = new CryptoService();
+        crypto.InitializeSession("correct horse battery staple", crypto.CreateSalt());
+        var viewModel = CreateViewModel(
+            GetTempDatabasePath(),
+            crypto,
+            exportAuthorizationService: new RejectingExportAuthorizationService());
+        viewModel.IsUnlocked = true;
+
+        await viewModel.ExportDataCommand.ExecuteAsync(null);
+
+        Assert.Equal("", viewModel.ExportPreview);
+        Assert.Equal(viewModel.L.Get("ExportAuthorizationFailed"), viewModel.StatusMessage);
     }
 
     [Fact]
@@ -296,7 +315,9 @@ public sealed class VaultCredentialTests
     private static MainWindowViewModel CreateViewModel(
         string databasePath,
         ICryptoService? cryptoService = null,
-        IClipboardService? clipboardService = null)
+        IClipboardService? clipboardService = null,
+        IAppSettingsService? settingsService = null,
+        IExportAuthorizationService? exportAuthorizationService = null)
     {
         var factory = new SqliteConnectionFactory(databasePath);
         var migrator = new DatabaseMigrator(factory);
@@ -318,8 +339,9 @@ public sealed class VaultCredentialTests
             new NoopPasswordDetailDialogService(),
             new NoopCategoryPickerDialogService(),
             new LegacyVaultDetector(factory),
-            new AppSettingsService(GetTempSettingsPath()),
-            new LocalizationService());
+            settingsService ?? new AppSettingsService(GetTempSettingsPath()),
+            new LocalizationService(),
+            exportAuthorizationService: exportAuthorizationService);
     }
 
     private static string GetTempDatabasePath()
@@ -385,6 +407,12 @@ public sealed class VaultCredentialTests
             ClearOwnedContentCalled = true;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class RejectingExportAuthorizationService : IExportAuthorizationService
+    {
+        public Task<bool> AuthorizeAsync(bool requireMasterPassword, CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
     }
 
     private sealed class NoopWebDavBackupService : IWebDavBackupService

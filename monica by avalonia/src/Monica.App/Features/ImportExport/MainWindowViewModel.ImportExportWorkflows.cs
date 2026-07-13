@@ -12,6 +12,11 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private async Task ExportDataAsync()
     {
+        if (!await AuthorizeSensitiveExportAsync())
+        {
+            return;
+        }
+
         ExportPreview = await BuildMonicaJsonExportAsync(
             includePasswords: true,
             includeTotp: true,
@@ -26,6 +31,11 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private async Task ExportPasswordCsvAsync()
     {
+        if (!await AuthorizeSensitiveExportAsync())
+        {
+            return;
+        }
+
         var exportPasswords = (await _repository.GetPasswordsAsync())
             .Select(item => ClonePasswordForExport(item))
             .ToArray();
@@ -36,6 +46,11 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private async Task ExportNoteCsvAsync()
     {
+        if (!await AuthorizeSensitiveExportAsync())
+        {
+            return;
+        }
+
         ExportNoteCsvPreview = await BuildNoteCsvExportAsync();
         StatusMessage = _localization.Get("ExportedNoteCsv");
     }
@@ -151,6 +166,11 @@ public sealed partial class MainWindowViewModel
         string content,
         IReadOnlyList<PlatformFilePickerFileType> fileTypes)
     {
+        if (!await AuthorizeFileExportAsync())
+        {
+            return;
+        }
+
         try
         {
             var fileName = await _fileSystemPickerService.SaveTextFileAsync(title, suggestedFileName, content, fileTypes);

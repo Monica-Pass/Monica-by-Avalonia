@@ -32,6 +32,11 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private async Task ExportTotpCsvAsync()
     {
+        if (!await AuthorizeSensitiveExportAsync())
+        {
+            return;
+        }
+
         ExportTotpCsvPreview = await BuildTotpCsvExportAsync();
         StatusMessage = _localization.Get("ExportedTotpCsv");
     }
@@ -39,6 +44,11 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private async Task ExportAegisJsonAsync()
     {
+        if (!await AuthorizeSensitiveExportAsync())
+        {
+            return;
+        }
+
         ExportAegisPreview = await BuildAegisJsonExportAsync();
         StatusMessage = _localization.Get("ExportedAegisJson");
     }

@@ -124,7 +124,7 @@ public sealed partial class MainWindowViewModel
     private bool _webDavBackupIncludeCategories = true;
 
     [ObservableProperty]
-    private bool _webDavBackupEncryptionEnabled;
+    private bool _webDavBackupEncryptionEnabled = true;
 
     [ObservableProperty]
     private string _webDavBackupEncryptionPassword = "";

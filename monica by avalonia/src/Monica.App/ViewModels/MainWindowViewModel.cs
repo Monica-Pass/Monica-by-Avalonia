@@ -50,6 +50,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly ILocalizationService _localization;
     private readonly IVaultSessionService _vaultSessionService;
     private readonly IWindowPrivacyService _windowPrivacyService;
+    private readonly IExportAuthorizationService _exportAuthorizationService;
     private int _vaultLoadVersion;
     public MainWindowViewModel(
         IMonicaRepository repository,
@@ -79,7 +80,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IExternalLinkService? externalLinkService = null,
         IFileSystemPickerService? fileSystemPickerService = null,
         IVaultSessionService? vaultSessionService = null,
-        IWindowPrivacyService? windowPrivacyService = null)
+        IWindowPrivacyService? windowPrivacyService = null,
+        IExportAuthorizationService? exportAuthorizationService = null)
     {
         _repository = repository;
         _cryptoService = cryptoService;
@@ -90,6 +92,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _clipboardService = clipboardService;
         _vaultSessionService = vaultSessionService ?? new VaultSessionService();
         _windowPrivacyService = windowPrivacyService ?? new DisabledWindowPrivacyService();
+        _exportAuthorizationService = exportAuthorizationService ?? new SessionExportAuthorizationService(_cryptoService);
         _webDavBackupService = webDavBackupService ?? new DisabledWebDavBackupService();
         _mdbxVaultService = mdbxVaultService;
         _passwordAttachmentFileService = passwordAttachmentFileService;

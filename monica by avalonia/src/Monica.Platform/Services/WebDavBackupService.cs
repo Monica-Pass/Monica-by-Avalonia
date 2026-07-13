@@ -5,6 +5,23 @@ using WebDav;
 
 namespace Monica.Platform.Services;
 
+public static class WebDavEndpointPolicy
+{
+    public static void EnsureSecure(Uri baseUri)
+    {
+        ArgumentNullException.ThrowIfNull(baseUri);
+        if (!string.Equals(baseUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("WebDAV endpoints must use HTTPS.");
+        }
+
+        if (!string.IsNullOrEmpty(baseUri.UserInfo))
+        {
+            throw new InvalidOperationException("WebDAV credentials must not be embedded in the endpoint URI.");
+        }
+    }
+}
+
 public sealed class WebDavBackupService(IHttpClientFactory httpClientFactory) : IWebDavBackupService
 {
     public string NormalizeRemotePath(string rootPath, string relativePath)
@@ -77,6 +94,7 @@ public sealed class WebDavBackupService(IHttpClientFactory httpClientFactory) : 
 
     private HttpClient CreateClient(WebDavProfile profile)
     {
+        WebDavEndpointPolicy.EnsureSecure(profile.BaseUri);
         var client = httpClientFactory.CreateClient("webdav");
         client.BaseAddress = profile.BaseUri;
         if (!string.IsNullOrEmpty(profile.Username))

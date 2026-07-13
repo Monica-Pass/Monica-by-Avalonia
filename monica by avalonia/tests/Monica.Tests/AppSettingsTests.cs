@@ -65,6 +65,18 @@ public sealed class AppSettingsTests
     }
 
     [Fact]
+    public async Task Security_baseline_app_settings_refuses_plaintext_secret_fallback()
+    {
+        var path = GetTempPath();
+        var settings = new AppSettingsService(path, new ThrowingSecretProtector());
+        settings.Current.WebDavPassword = "must-not-reach-disk";
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => settings.SaveAsync());
+
+        Assert.False(File.Exists(path));
+    }
+
+    [Fact]
     public async Task App_settings_allows_archive_startup_section()
     {
         var path = GetTempPath();
@@ -860,7 +872,8 @@ public sealed class AppSettingsTests
             new LocalizationService(),
             masterPasswordMaintenanceService: masterPasswordMaintenanceService,
             externalLinkService: externalLinkService,
-            fileSystemPickerService: fileSystemPickerService);
+            fileSystemPickerService: fileSystemPickerService,
+            exportAuthorizationService: new ApprovingExportAuthorizationService());
     }
 
     private static string GetTempPath()
@@ -948,6 +961,25 @@ public sealed class AppSettingsTests
             var reversed = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(protectedText));
             return Task.FromResult(new string(reversed.Reverse().ToArray()));
         }
+    }
+
+    private sealed class ApprovingExportAuthorizationService : IExportAuthorizationService
+    {
+        public Task<bool> AuthorizeAsync(bool requireMasterPassword, CancellationToken cancellationToken = default) =>
+            Task.FromResult(true);
+    }
+
+    private sealed class ThrowingSecretProtector : ISecretProtector
+    {
+        public PlatformIntegrationCapability Capability { get; } = PlatformIntegrationService.Unsupported(
+            PlatformFeatureKeys.SecretProtection,
+            "Protection unavailable.");
+
+        public Task<string> ProtectAsync(string plainText, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Protection unavailable.");
+
+        public Task<string> UnprotectAsync(string protectedText, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Protection unavailable.");
     }
 
     private sealed class CapturingFileSystemPickerService(

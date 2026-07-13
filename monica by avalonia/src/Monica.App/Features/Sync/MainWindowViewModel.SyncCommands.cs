@@ -105,9 +105,20 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        if (WebDavBackupEncryptionEnabled && string.IsNullOrWhiteSpace(WebDavBackupEncryptionPassword))
+        if (!WebDavBackupEncryptionEnabled)
+        {
+            StatusMessage = _localization.Get("WebDavEncryptionRequired");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(WebDavBackupEncryptionPassword))
         {
             StatusMessage = _localization.Get("WebDavEncryptionPasswordRequired");
+            return;
+        }
+
+        if (!await AuthorizeSensitiveExportAsync(grantFileExport: false))
+        {
             return;
         }
 
