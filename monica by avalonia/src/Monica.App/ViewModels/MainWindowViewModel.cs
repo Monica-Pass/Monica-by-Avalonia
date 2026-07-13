@@ -227,10 +227,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [
         new("Markdown", ["*.md", "*.markdown"])
     ];
-    private static readonly PlatformFilePickerFileType[] WalletCsvFileTypes =
-    [
-        new("Cards and Documents CSV", ["*.csv"])
-    ];
     private static readonly PlatformFilePickerFileType[] NoteImageFileTypes =
     [
         new("Images", ["*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp"])
@@ -545,9 +541,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private string _exportNoteCsvPreview = "";
-
-    [ObservableProperty]
-    private string _exportWalletCsvPreview = "";
 
     [ObservableProperty]
     private string _exportTimelinePreview = "";
@@ -2226,149 +2219,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
-    private async Task AddWalletItemAsync()
-    {
-        var editor = await _walletItemEditorDialogService.ShowAsync(null, WalletItems.Count % 2 == 0 ? VaultItemType.BankCard : VaultItemType.Document);
-        if (editor is null)
-        {
-            return;
-        }
-
-        var item = editor.ApplyTo();
-        await _repository.SaveSecureItemAsync(item);
-        await _repository.LogAsync(new OperationLog
-        {
-            ItemType = "WALLET",
-            ItemId = item.Id,
-            ItemTitle = item.Title,
-            OperationType = "CREATE",
-            DeviceName = Environment.MachineName
-        });
-        TrackWalletSelection(item);
-        WalletItems.Insert(0, item);
-        SelectedWalletItem = item;
-        RaiseCounts();
-        await LoadTimelineAsync();
-        StatusMessage = _localization.Format("SavedWalletItemFormat", item.Title);
-    }
-
-    [RelayCommand]
-    private async Task EditWalletItemAsync(SecureItem? item)
-    {
-        item ??= SelectedWalletItem;
-        if (item is null)
-        {
-            return;
-        }
-
-        var editor = await _walletItemEditorDialogService.ShowAsync(item);
-        if (editor is null)
-        {
-            return;
-        }
-
-        editor.ApplyTo(item);
-        await _repository.SaveSecureItemAsync(item);
-        await _repository.LogAsync(new OperationLog
-        {
-            ItemType = "WALLET",
-            ItemId = item.Id,
-            ItemTitle = item.Title,
-            OperationType = "UPDATE",
-            DeviceName = Environment.MachineName
-        });
-        SelectedWalletItem = item;
-        SelectedWalletDetails = new WalletItemDetailsViewModel(_localization, item);
-        await LoadTimelineAsync();
-        RaiseCounts();
-        StatusMessage = _localization.Format("SavedWalletItemFormat", item.Title);
-    }
-
-    [RelayCommand]
-    private void ShowWalletDetails(SecureItem? item)
-    {
-        if (item is not null)
-        {
-            SelectedWalletItem = item;
-        }
-    }
-
-    [RelayCommand]
-    private async Task CopyWalletFieldAsync(WalletFieldDisplayItem? field)
-    {
-        if (field is null || string.IsNullOrWhiteSpace(field.Value))
-        {
-            return;
-        }
-
-        await _clipboardService.SetTextAsync(field.Value);
-        StatusMessage = _localization.Format("CopiedWalletFieldFormat", field.Label);
-    }
-
-    [RelayCommand]
-    private async Task DeleteWalletItemAsync(SecureItem? item)
-    {
-        if (item is null)
-        {
-            return;
-        }
-
-        if (!await ConfirmMoveItemToRecycleBinAsync(item.Title))
-        {
-            return;
-        }
-
-        await DeleteWalletItemCoreAsync(item, updateStatus: true);
-    }
-
-    [RelayCommand]
-    private void ToggleWalletSelection(SecureItem? item)
-    {
-        if (item is null)
-        {
-            return;
-        }
-
-        item.IsSelected = !item.IsSelected;
-        RaiseWalletSelectionState();
-    }
-
-    [RelayCommand]
-    private void ClearWalletSelection()
-    {
-        foreach (var item in WalletItems.Where(item => item.IsSelected))
-        {
-            item.IsSelected = false;
-        }
-
-        RaiseWalletSelectionState();
-    }
-
-    [RelayCommand]
-    private async Task DeleteSelectedWalletItemsAsync()
-    {
-        var selected = WalletItems.Where(item => item.IsSelected).ToArray();
-        if (selected.Length == 0)
-        {
-            return;
-        }
-
-        if (!await ConfirmMoveSelectedItemsToRecycleBinAsync(selected.Length))
-        {
-            return;
-        }
-
-        foreach (var item in selected)
-        {
-            await DeleteWalletItemCoreAsync(item, updateStatus: false);
-        }
-
-        RaiseWalletSelectionState();
-        await LoadTimelineAsync();
-        StatusMessage = _localization.Format("MovedSelectedWalletItemsToRecycleBinFormat", selected.Length);
-    }
-
     public async Task<long> AddPasswordAttachmentMetadataAsync(
         PasswordEntry entry,
         string fileName,
@@ -2778,13 +2628,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         StatusMessage = _localization.Get("ExportedNoteCsv");
     }
 
-    [RelayCommand]
-    private async Task ExportWalletCsvAsync()
-    {
-        ExportWalletCsvPreview = await BuildWalletCsvExportAsync();
-        StatusMessage = _localization.Get("ExportedWalletCsv");
-    }
-
     [RelayCommand(CanExecute = nameof(CanUseFilePicker))]
     private async Task ImportMonicaJsonFileAsync()
     {
@@ -2888,21 +2731,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             $"monica_notes_{DateTimeOffset.Now:yyyyMMdd_HHmmss}.csv",
             ExportNoteCsvPreview,
             NoteCsvFileTypes);
-    }
-
-    [RelayCommand(CanExecute = nameof(CanUseFilePicker))]
-    private async Task SaveWalletCsvExportAsync()
-    {
-        if (string.IsNullOrWhiteSpace(ExportWalletCsvPreview))
-        {
-            await ExportWalletCsvAsync();
-        }
-
-        await SaveExportTextAsync(
-            _localization.Get("ExportWalletCsv"),
-            $"monica_cards_documents_{DateTimeOffset.Now:yyyyMMdd_HHmmss}.csv",
-            ExportWalletCsvPreview,
-            WalletCsvFileTypes);
     }
 
     private async Task SaveExportTextAsync(
@@ -3208,16 +3036,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             .ToArray();
 
         return _importExportService.ExportNoteCsv(exportNotes);
-    }
-
-    private async Task<string> BuildWalletCsvExportAsync()
-    {
-        var exportWalletItems = (await _repository.GetSecureItemsAsync())
-            .Where(item => item.ItemType is VaultItemType.BankCard or VaultItemType.Document)
-            .Select(item => CloneSecureItemForExport(item))
-            .ToArray();
-
-        return _importExportService.ExportWalletCsv(exportWalletItems);
     }
 
     private async Task<IReadOnlyDictionary<long, IReadOnlyList<PasswordHistoryEntry>>> GetPasswordHistoryForExportAsync(IReadOnlyList<long> passwordIds)
@@ -4362,29 +4180,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
 
-    private void RaiseWalletSelectionState()
-    {
-        OnPropertyChanged(nameof(SelectedWalletCount));
-        OnPropertyChanged(nameof(SelectedWalletCountText));
-        OnPropertyChanged(nameof(HasSelectedWalletItems));
-    }
 
 
-
-
-    private void TrackWalletSelection(SecureItem item)
-    {
-        item.PropertyChanged -= WalletItemPropertyChanged;
-        item.PropertyChanged += WalletItemPropertyChanged;
-    }
-
-    private void WalletItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(SecureItem.IsSelected))
-        {
-            RaiseWalletSelectionState();
-        }
-    }
 
 
     private static void ReplaceItems<T>(ObservableCollection<T> target, IEnumerable<T> items)
@@ -4745,37 +4542,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         };
     }
 
-
-    private async Task DeleteWalletItemCoreAsync(SecureItem item, bool updateStatus)
-    {
-        if (item.Id > 0)
-        {
-            await _repository.SoftDeleteSecureItemAsync(item.Id);
-        }
-
-        WalletItems.Remove(item);
-        item.IsSelected = false;
-        if (SelectedWalletItem?.Id == item.Id)
-        {
-            SelectedWalletItem = WalletItems.FirstOrDefault();
-        }
-
-        await _repository.LogAsync(new OperationLog
-        {
-            ItemType = "WALLET",
-            ItemId = item.Id,
-            ItemTitle = item.Title,
-            OperationType = "DELETE",
-            DeviceName = Environment.MachineName
-        });
-        RaiseCounts();
-        RaiseWalletSelectionState();
-        if (updateStatus)
-        {
-            await LoadTimelineAsync();
-            StatusMessage = _localization.Format("MovedToRecycleBinFormat", item.Title);
-        }
-    }
 
 
 
