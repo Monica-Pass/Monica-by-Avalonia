@@ -1,0 +1,129 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:local="using:Monica.App"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.SecurityAnalysis.SecurityAnalysisWorkspaceView"
+             x:Name="SecurityAnalysisRoot"
+             x:DataType="vm:MainWindowViewModel">
+<Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsSecurityAnalysis}}" RowDefinitions="Auto,*" MaxWidth="1120" Width="{Binding Bounds.Width, ElementName=SecurityAnalysisRoot}" HorizontalAlignment="Left" ClipToBounds="True">
+    <Border Classes="workspacePageHeader">
+        <StackPanel Spacing="8" MinWidth="0">
+            <TextBlock Classes="workspacePageTitle" Text="{Binding L.SecurityAnalysis}" />
+            <TextBlock Classes="workspacePageSubtitle" Text="{Binding L.SecurityAnalysisSubtitle}" MaxWidth="760" />
+            <WrapPanel Orientation="Horizontal">
+                <Button Classes="workspacePrimaryCommand" Command="{Binding CheckCompromisedPasswordsCommand}" IsEnabled="{Binding !IsCheckingCompromisedPasswords}" ToolTip.Tip="{Binding L.CheckCompromisedPasswords}" Margin="0,0,8,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Shield" FontSize="18" />
+                        <TextBlock Text="{Binding L.CheckCompromisedPasswords}" />
+                    </StackPanel>
+                </Button>
+                <TextBlock Text="{Binding CompromisedPasswordStatus}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,0,8" MaxWidth="620" />
+            </WrapPanel>
+            <ItemsControl ItemsSource="{Binding SecuritySummaryItems}" MaxWidth="{Binding Bounds.Width, ElementName=SecurityAnalysisRoot}" HorizontalAlignment="Left">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SecuritySummaryItem">
+                        <Border Width="138" MinHeight="80" Margin="0,0,8,8" Padding="10" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource LayerFillColorDefaultBrush}">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="{Binding Label}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" />
+                                <TextBlock Text="{Binding Value}" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" FontSize="12" MaxLines="2" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </Border>
+
+    <Grid Grid.Row="1" ColumnDefinitions="360,*" ColumnSpacing="16" MinWidth="0">
+        <Border Classes="workspaceSidebar" ClipToBounds="True">
+            <Grid RowDefinitions="Auto,*">
+                <StackPanel Margin="14,12,14,8" Spacing="3">
+                    <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.SecurityAnalysis}" />
+                    <TextBlock Text="{Binding SecurityIssueCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
+                </StackPanel>
+                <Grid Grid.Row="1">
+                    <StackPanel IsVisible="{Binding !HasSecurityIssues}" HorizontalAlignment="Left" VerticalAlignment="Top" Spacing="10" Margin="24" Width="240">
+                        <ic:FluentIcon Icon="Shield" FontSize="32" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
+                        <TextBlock Text="{Binding SecurityIssueCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ListBox Classes="workspaceList" ItemsSource="{Binding SecurityIssueItems}" SelectedItem="{Binding SelectedSecurityIssue}" IsVisible="{Binding HasSecurityIssues}" SelectionMode="Single" Margin="8,0,8,8">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SecurityIssueItem">
+                                <Border Classes="workspaceListRow">
+                                    <Button Classes="workspaceListRowButton"
+                                            Command="{Binding #SecurityAnalysisRoot.DataContext.ShowSecurityIssueDetailsCommand}"
+                                            CommandParameter="{Binding}"
+                                            ToolTip.Tip="{Binding Title}">
+                                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="3">
+                                            <ic:FluentIcon Grid.RowSpan="3" Icon="Key" FontSize="20" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,2,0,0" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Subtitle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" />
+                                            <WrapPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal">
+                                                <Border Classes="workspaceStatusChip" Margin="0,0,6,4">
+                                                    <TextBlock Text="{Binding Category}" FontSize="12" FontWeight="SemiBold" />
+                                                </Border>
+                                                <Border Classes="workspaceStatusChip" Margin="0,0,6,4">
+                                                    <TextBlock Text="{Binding Severity}" FontSize="12" />
+                                                </Border>
+                                            </WrapPanel>
+                                        </Grid>
+                                    </Button>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <Border Grid.Column="1" Classes="workspacePane" Padding="20" MinWidth="0">
+            <Grid>
+                <StackPanel IsVisible="{Binding HasSelectedSecurityIssue}" Spacing="18">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                        <Border Width="54" Height="54" CornerRadius="27" Background="{DynamicResource ControlFillColorDefaultBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                            <ic:FluentIcon Icon="Shield" FontSize="24" Foreground="{DynamicResource AccentFillColorDefaultBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" MinWidth="0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding SelectedSecurityIssue.Title}" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding SelectedSecurityIssue.Subtitle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                    <WrapPanel Orientation="Horizontal">
+                        <Border Classes="workspaceStatusChip" Margin="0,0,8,8">
+                            <TextBlock Text="{Binding SelectedSecurityIssue.Category}" FontSize="12" FontWeight="SemiBold" />
+                        </Border>
+                        <Border Classes="workspaceStatusChip" Margin="0,0,8,8">
+                            <TextBlock Text="{Binding SelectedSecurityIssue.Severity}" FontSize="12" />
+                        </Border>
+                    </WrapPanel>
+                    <WrapPanel Orientation="Horizontal" MaxWidth="280" HorizontalAlignment="Left">
+                        <Button Classes="workspacePrimaryCommand" Command="{Binding ShowPasswordDetailsCommand}" CommandParameter="{Binding SelectedSecurityIssue.Entry}" ToolTip.Tip="{Binding L.PasswordDetails}" Margin="0,0,8,8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="Info" FontSize="18" />
+                                <TextBlock Text="{Binding L.PasswordDetails}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="workspaceCommand" Command="{Binding EditPasswordCommand}" CommandParameter="{Binding SelectedSecurityIssue.Entry}" ToolTip.Tip="{Binding L.EditPassword}" Margin="0,0,0,8">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:FluentIcon Icon="Edit" FontSize="16" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding L.EditPassword}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </WrapPanel>
+                </StackPanel>
+                <StackPanel IsVisible="{Binding !HasSelectedSecurityIssue}" Spacing="10" Width="260" Margin="24" HorizontalAlignment="Left" VerticalAlignment="Top">
+                    <ic:FluentIcon Icon="Shield" FontSize="34" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding SecurityIssueCountText}" TextWrapping="Wrap" TextAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Grid>
+</UserControl>
