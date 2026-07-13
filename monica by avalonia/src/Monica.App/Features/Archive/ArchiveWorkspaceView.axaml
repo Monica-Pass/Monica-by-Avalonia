@@ -1,0 +1,132 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:local="using:Monica.App"
+             xmlns:models="using:Monica.Core.Models"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Archive.ArchiveWorkspaceView"
+             x:Name="ArchiveWorkspaceRoot"
+             x:DataType="vm:MainWindowViewModel">
+<Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsArchive}}" RowDefinitions="Auto,*" HorizontalAlignment="Stretch" ClipToBounds="True">
+    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
+        <Grid ColumnDefinitions="*,320,Auto" ColumnSpacing="12" MinHeight="56">
+            <StackPanel MinWidth="0" VerticalAlignment="Center">
+                <TextBlock Classes="workspacePageTitle" Text="{Binding L.Archive}" />
+                <TextBlock Text="{Binding ArchivedPasswordCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+            <TextBox Grid.Column="1" PlaceholderText="{Binding L.Search}" Text="{Binding SearchText}" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button Classes="workspacePrimaryCommand" Command="{Binding UnarchivePasswordCommand}" CommandParameter="{Binding SelectedArchivedPassword}" ToolTip.Tip="{Binding L.UnarchivePassword}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="ArrowUndo" FontSize="18" />
+                        <TextBlock Text="{Binding L.UnarchivePassword}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding SelectSectionCommand}" CommandParameter="Passwords" ToolTip.Tip="{Binding L.Passwords}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Key" FontSize="16" />
+                        <TextBlock Text="{Binding L.Passwords}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Border>
+
+    <Grid Grid.Row="1" ColumnDefinitions="300,*" ColumnSpacing="14" MinWidth="0">
+        <Border Classes="archiveFilterRail" ClipToBounds="True">
+            <Grid RowDefinitions="Auto,*">
+                <StackPanel Margin="14,12,14,8" Spacing="3">
+                    <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.Archive}" />
+                    <TextBlock Text="{Binding ArchivedPasswordCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
+                </StackPanel>
+                <Grid Grid.Row="1">
+                    <StackPanel IsVisible="{Binding !HasFilteredArchivedPasswords}" HorizontalAlignment="Left" VerticalAlignment="Top" Spacing="10" Margin="24" Width="240">
+                        <ic:FluentIcon Icon="Archive" FontSize="32" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
+                        <TextBlock Text="{Binding ArchivedPasswordCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding L.ArchiveEmptyHint}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap" />
+                        <Button Classes="workspaceCommand" Command="{Binding SelectSectionCommand}" CommandParameter="Passwords" ToolTip.Tip="{Binding L.Passwords}" HorizontalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="Key" FontSize="16" />
+                                <TextBlock Text="{Binding L.Passwords}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <ListBox Classes="archiveRecoveryList" ItemsSource="{Binding FilteredArchivedPasswords}" SelectedItem="{Binding SelectedArchivedPassword}" IsVisible="{Binding HasFilteredArchivedPasswords}" SelectionMode="Single" Margin="8,0,8,8">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="models:PasswordEntry">
+                                <Border Classes="archiveRecoveryRow">
+                                    <Button Classes="archiveRecoveryRowButton"
+                                            Command="{Binding #ArchiveWorkspaceRoot.DataContext.ShowArchivedPasswordDetailsCommand}"
+                                            CommandParameter="{Binding}"
+                                            ToolTip.Tip="{Binding Title}">
+                                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="2">
+                                            <Border Grid.RowSpan="3" Width="38" Height="38" CornerRadius="19" Background="#5B5FC7" VerticalAlignment="Top">
+                                                <TextBlock Text="{Binding AvatarText}" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <TextBlock Grid.Column="1" Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Username}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" />
+                                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Website}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" />
+                                        </Grid>
+                                    </Button>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <Border Grid.Column="1" Classes="archiveRecoveryPanel" Padding="24" MinWidth="0">
+            <Grid>
+                <StackPanel IsVisible="{Binding HasSelectedArchivedPassword}" Spacing="18">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                        <Border Width="54" Height="54" CornerRadius="27" Background="#5B5FC7">
+                            <TextBlock Text="{Binding SelectedArchivedPassword.AvatarText}" Foreground="White" FontWeight="SemiBold" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" MinWidth="0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding SelectedArchivedPassword.Title}" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding SelectedArchivedPassword.Website}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
+                        <Button Classes="workspacePrimaryCommand" Command="{Binding UnarchivePasswordCommand}" CommandParameter="{Binding SelectedArchivedPassword}" ToolTip.Tip="{Binding L.UnarchivePassword}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="ArrowUndo" FontSize="18" />
+                                <TextBlock Text="{Binding L.UnarchivePassword}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="workspaceCommand" Command="{Binding ShowPasswordDetailsCommand}" CommandParameter="{Binding SelectedArchivedPassword}" ToolTip.Tip="{Binding L.PasswordDetails}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:FluentIcon Icon="Info" FontSize="16" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding L.PasswordDetails}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="workspaceCommand" Command="{Binding DeletePasswordCommand}" CommandParameter="{Binding SelectedArchivedPassword}" ToolTip.Tip="{Binding L.MoveToRecycleBin}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:FluentIcon Icon="Delete" FontSize="16" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding L.MoveToRecycleBin}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="14">
+                        <TextBlock Classes="workspaceDetailLabel" Text="{Binding L.Username}" />
+                        <TextBlock Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedArchivedPassword.Username}" />
+                        <TextBlock Grid.Row="1" Classes="workspaceDetailLabel" Text="{Binding L.Website}" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedArchivedPassword.Website}" />
+                        <TextBlock Grid.Row="2" Classes="workspaceDetailLabel" Text="{Binding L.CreatedAt}" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedArchivedPassword.CreatedAt, StringFormat='{}{0:g}'}" />
+                        <TextBlock Grid.Row="3" Classes="workspaceDetailLabel" Text="{Binding L.UpdatedAt}" />
+                        <TextBlock Grid.Row="3" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedArchivedPassword.UpdatedAt, StringFormat='{}{0:g}'}" />
+                        <TextBlock Grid.Row="4" Classes="workspaceDetailLabel" Text="{Binding L.Archive}" />
+                        <TextBlock Grid.Row="4" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedArchivedPassword.ArchivedAt, StringFormat='{}{0:g}'}" />
+                    </Grid>
+                </StackPanel>
+                <StackPanel IsVisible="{Binding !HasSelectedArchivedPassword}" Spacing="10" Width="260" Margin="24" HorizontalAlignment="Left" VerticalAlignment="Top">
+                    <ic:FluentIcon Icon="Archive" FontSize="34" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding ArchivedPasswordCountText}" TextWrapping="Wrap" TextAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Grid>
+</UserControl>
