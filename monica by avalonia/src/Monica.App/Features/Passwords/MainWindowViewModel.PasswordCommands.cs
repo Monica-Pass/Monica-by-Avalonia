@@ -146,7 +146,7 @@ public sealed partial class MainWindowViewModel
             }
         }
 
-        await _clipboardService.SetTextAsync(text);
+        await _clipboardService.SetSensitiveTextAsync(text);
         StatusMessage = _localization.Format("CopiedPasswordFormat", entry.Title);
     }
 
@@ -158,7 +158,7 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        await _clipboardService.SetTextAsync(entry.Username);
+        await _clipboardService.SetSensitiveTextAsync(entry.Username);
         StatusMessage = _localization.Format("CopiedUsernameFormat", entry.Title);
     }
 
@@ -170,7 +170,7 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        await _clipboardService.SetTextAsync(entry.Website);
+        await _clipboardService.SetSensitiveTextAsync(entry.Website);
         StatusMessage = _localization.Format("CopiedWebsiteFormat", entry.Title);
     }
 
@@ -910,7 +910,7 @@ public sealed partial class MainWindowViewModel
         }
 
         RefreshPasswordTotpDisplay(entry);
-        await _clipboardService.SetTextAsync(entry.TotpCode);
+        await _clipboardService.SetSensitiveTextAsync(entry.TotpCode);
         StatusMessage = _localization.Format("CopiedTotpFormat", entry.Title);
     }
 

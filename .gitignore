@@ -55,3 +55,7 @@ nunit-*.xml
 
 # Local Codex task state
 .codex-tasks/
+
+# Local verification artifacts
+monica by avalonia/_screenshot.png
+monica by avalonia/publish/

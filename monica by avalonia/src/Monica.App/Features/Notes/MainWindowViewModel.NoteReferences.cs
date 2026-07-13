@@ -36,7 +36,7 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        await _clipboardService.SetTextAsync(item.Target);
+        await _clipboardService.SetSensitiveTextAsync(item.Target);
         StatusMessage = "已复制引用";
     }
 }

@@ -19,12 +19,14 @@ public partial class MainWindow : Window
         Closing += OnClosing;
         Closed += OnClosed;
         DataContextChanged += OnDataContextChanged;
+        InitializeSecurityLifecycle();
     }
 
     private async void OnOpened(object? sender, EventArgs e)
     {
         if (DataContext is MainWindowViewModel viewModel)
         {
+            viewModel.EnableWindowCaptureProtection();
             await viewModel.InitializeCommand.ExecuteAsync(null);
         }
     }
@@ -43,6 +45,11 @@ public partial class MainWindow : Window
 
     private void MainWindow_OnKeyDown(object? sender, KeyEventArgs e)
     {
+        if (DataContext is MainWindowViewModel activityViewModel)
+        {
+            activityViewModel.RecordUserActivity();
+        }
+
         if (DataContext is not MainWindowViewModel viewModel ||
             !viewModel.IsUnlocked)
         {

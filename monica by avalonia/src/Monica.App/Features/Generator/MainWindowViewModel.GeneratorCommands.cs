@@ -48,7 +48,7 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        await _clipboardService.SetTextAsync(item.Value);
+        await _clipboardService.SetSensitiveTextAsync(item.Value);
         StatusMessage = _localization.Get("CopiedGeneratedPassword");
     }
 
@@ -60,7 +60,7 @@ public sealed partial class MainWindowViewModel
             GeneratePassword();
         }
 
-        await _clipboardService.SetTextAsync(GeneratedPassword);
+        await _clipboardService.SetSensitiveTextAsync(GeneratedPassword);
         StatusMessage = _localization.Get("CopiedGeneratedPassword");
     }
 

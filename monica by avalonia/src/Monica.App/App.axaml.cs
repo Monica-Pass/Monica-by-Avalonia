@@ -105,6 +105,7 @@ public partial class App : Application
             provider.GetRequiredService<IAttachmentContentStore>()));
         services.AddSingleton<IMasterPasswordMaintenanceService, MasterPasswordMaintenanceService>();
         services.AddSingleton<ICryptoService, CryptoService>();
+        services.AddSingleton<IVaultSessionService, VaultSessionService>();
         services.AddSingleton<IVaultDataProtector, VaultDataProtector>();
         services.AddSingleton<ITotpService, TotpService>();
         services.AddSingleton<IPasswordGeneratorService, PasswordGeneratorService>();
@@ -129,7 +130,9 @@ public partial class App : Application
             nativeBridge: provider.GetRequiredService<IMdbxNativeBridge>()));
         services.AddSingleton<ICanonicalVaultPathProvider, CanonicalVaultPathProvider>();
         services.AddSingleton<ICanonicalVaultBootstrapService, CanonicalVaultBootstrapService>();
-        services.AddSingleton<IClipboardService>(_ => new AvaloniaClipboardService(() => mainWindow));
+        services.AddSingleton<IClipboardAdapter>(_ => new AvaloniaClipboardAdapter(() => mainWindow));
+        services.AddSingleton<IClipboardService, SecureClipboardService>();
+        services.AddSingleton<IWindowPrivacyService>(_ => new WindowPrivacyService(() => mainWindow));
         services.AddSingleton<PasswordAttachmentFileService>(_ => new PasswordAttachmentFileService(
             () => mainWindow,
             _.GetRequiredService<ILocalizationService>(),

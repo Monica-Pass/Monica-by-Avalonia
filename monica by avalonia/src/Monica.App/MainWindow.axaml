@@ -289,6 +289,12 @@
                             <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Button Classes="IconButton"
+                                    Command="{Binding LockCommand}"
+                                    ToolTip.Tip="{Binding LockVaultText}"
+                                    AutomationProperties.Name="{Binding LockVaultText}">
+                                <ic:FluentIcon Icon="LockClosed" FontSize="20" />
+                            </Button>
                             <Button Classes="IconButton" Command="{Binding LoadCommand}" ToolTip.Tip="{Binding L.Refresh}">
                                 <ic:FluentIcon Icon="ArrowClockwise" FontSize="20" />
                             </Button>
@@ -421,6 +427,30 @@
                            Foreground="#C8FFFFFF"
                            TextWrapping="Wrap"
                            TextAlignment="Center" />
+            </StackPanel>
+        </Border>
+
+        <Border Grid.RowSpan="2"
+                IsVisible="{Binding IsPrivacyScreenVisible}"
+                Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch">
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="14">
+                <Border Width="56"
+                        Height="56"
+                        CornerRadius="12"
+                        Background="{DynamicResource AccentFillColorDefaultBrush}">
+                    <ic:FluentIcon Icon="LockClosed"
+                                   FontSize="28"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Text="Monica"
+                           FontSize="24"
+                           FontWeight="SemiBold"
+                           HorizontalAlignment="Center" />
             </StackPanel>
         </Border>
     </Grid>

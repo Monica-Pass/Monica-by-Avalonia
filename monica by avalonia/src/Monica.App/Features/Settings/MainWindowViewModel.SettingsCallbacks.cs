@@ -23,8 +23,17 @@ public sealed partial class MainWindowViewModel
     partial void OnStartupSectionChanged(string value) => UpdateSettings(settings => settings.StartupSection = value);
     partial void OnAutoLockEnabledChanged(bool value) => UpdateSettings(settings => settings.AutoLockEnabled = value);
     partial void OnAutoLockMinutesChanged(int value) => UpdateSettings(settings => settings.AutoLockMinutes = value);
-    partial void OnClearClipboardEnabledChanged(bool value) => UpdateSettings(settings => settings.ClearClipboardEnabled = value);
-    partial void OnClipboardClearSecondsChanged(int value) => UpdateSettings(settings => settings.ClipboardClearSeconds = value);
+    partial void OnClearClipboardEnabledChanged(bool value)
+    {
+        ApplyClipboardPolicy();
+        UpdateSettings(settings => settings.ClearClipboardEnabled = value);
+    }
+
+    partial void OnClipboardClearSecondsChanged(int value)
+    {
+        ApplyClipboardPolicy();
+        UpdateSettings(settings => settings.ClipboardClearSeconds = value);
+    }
     partial void OnRequirePasswordBeforeExportChanged(bool value) => UpdateSettings(settings => settings.RequirePasswordBeforeExport = value);
 
     partial void OnSecurityRecoveryEnabledChanged(bool value)

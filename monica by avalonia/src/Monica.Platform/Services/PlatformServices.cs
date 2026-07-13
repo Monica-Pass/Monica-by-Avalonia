@@ -5,6 +5,28 @@ namespace Monica.Platform.Services;
 public interface IClipboardService
 {
     Task SetTextAsync(string text, CancellationToken cancellationToken = default);
+
+    Task SetSensitiveTextAsync(string text, CancellationToken cancellationToken = default) =>
+        SetTextAsync(text, cancellationToken);
+
+    void ConfigureSensitiveClear(TimeSpan? lifetime)
+    {
+    }
+
+    Task ClearOwnedContentAsync(CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+}
+
+public interface IClipboardAdapter
+{
+    Task<string?> GetTextAsync(CancellationToken cancellationToken = default);
+    Task SetTextAsync(string text, CancellationToken cancellationToken = default);
+    Task ClearAsync(CancellationToken cancellationToken = default);
+}
+
+public interface IClipboardExpiryScheduler
+{
+    Task DelayAsync(TimeSpan delay, CancellationToken cancellationToken);
 }
 
 public interface IPlatformCapabilityService

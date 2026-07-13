@@ -65,6 +65,18 @@ public sealed class CoreServicesTests
     }
 
     [Fact]
+    public void Security_baseline_crypto_lock_discards_session_key()
+    {
+        var service = new CryptoService();
+        service.InitializeSession("correct horse battery staple", service.CreateSalt());
+
+        service.Lock();
+
+        Assert.False(service.IsUnlocked);
+        Assert.Throws<InvalidOperationException>(() => service.EncryptString("secret"));
+    }
+
+    [Fact]
     public void Import_export_roundtrips_monica_json()
     {
         var service = new ImportExportService();

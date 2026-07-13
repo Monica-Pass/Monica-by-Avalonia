@@ -10,6 +10,7 @@ public interface ICryptoService
     MasterPasswordHash HashMasterPassword(string password, byte[]? salt = null);
     bool VerifyMasterPassword(string password, MasterPasswordHash storedHash);
     void InitializeSession(string password, byte[] salt);
+    void Lock();
     bool IsUnlocked { get; }
     string EncryptString(string plainText);
     string DecryptString(string protectedText);
@@ -51,7 +52,12 @@ public sealed class CryptoService : ICryptoService
         var verified = CryptographicOperations.FixedTimeEquals(candidate, expected);
         if (verified)
         {
+            ClearSessionKey();
             _sessionKey = candidate;
+        }
+        else
+        {
+            CryptographicOperations.ZeroMemory(candidate);
         }
 
         return verified;
@@ -59,8 +65,11 @@ public sealed class CryptoService : ICryptoService
 
     public void InitializeSession(string password, byte[] salt)
     {
+        ClearSessionKey();
         _sessionKey = DerivePbkdf2Key(password, salt, Pbkdf2Iterations);
     }
+
+    public void Lock() => ClearSessionKey();
 
     public string EncryptString(string plainText)
     {
@@ -116,6 +125,17 @@ public sealed class CryptoService : ICryptoService
         return storedHash.Kdf.Equals("argon2id", StringComparison.OrdinalIgnoreCase)
             ? DeriveArgon2Key(password, storedHash.Salt, storedHash.Iterations, storedHash.MemoryKiB, storedHash.Parallelism)
             : DerivePbkdf2Key(password, storedHash.Salt, storedHash.Iterations > 0 ? storedHash.Iterations : Pbkdf2Iterations);
+    }
+
+    private void ClearSessionKey()
+    {
+        if (_sessionKey is null)
+        {
+            return;
+        }
+
+        CryptographicOperations.ZeroMemory(_sessionKey);
+        _sessionKey = null;
     }
 
     private static byte[] DerivePbkdf2Key(string password, byte[] salt, int iterations)

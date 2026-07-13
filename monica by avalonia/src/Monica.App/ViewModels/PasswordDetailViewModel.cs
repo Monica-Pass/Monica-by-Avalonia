@@ -209,7 +209,7 @@ public sealed partial class PasswordDetailViewModel : ObservableObject
             return;
         }
 
-        await _clipboardService.SetTextAsync(field.CopyValue);
+        await _clipboardService.SetSensitiveTextAsync(field.CopyValue);
         StatusText = L.Format("CopiedFieldFormat", field.Label);
     }
 
@@ -244,7 +244,7 @@ public sealed partial class PasswordDetailViewModel : ObservableObject
             return;
         }
 
-        await _clipboardService.SetTextAsync(item.StoragePath);
+        await _clipboardService.SetSensitiveTextAsync(item.StoragePath);
         StatusText = L.Format("CopiedFieldFormat", item.FileName);
     }
 
@@ -285,7 +285,7 @@ public sealed partial class PasswordDetailViewModel : ObservableObject
             return;
         }
 
-        await _clipboardService.SetTextAsync(item.Password);
+        await _clipboardService.SetSensitiveTextAsync(item.Password);
         StatusText = L.Get("CopiedPasswordHistory");
     }
 

@@ -107,6 +107,7 @@ public sealed partial class MainWindowViewModel
                 return;
             case VaultUnlockStatus.WrongPassword:
                 IsVaultInitialized = result.IsVaultInitialized;
+                _cryptoService.Lock();
                 IsUnlocked = false;
                 StatusMessage = _localization.Get(result.MessageKey);
                 MasterPassword = "";
@@ -114,12 +115,14 @@ public sealed partial class MainWindowViewModel
                 return;
             case VaultUnlockStatus.Failed:
                 IsVaultInitialized = result.IsVaultInitialized || DefaultVaultDatabaseExists();
+                _cryptoService.Lock();
                 IsUnlocked = false;
                 StatusMessage = _localization.Format(result.MessageKey, result.Error?.Message ?? "");
                 return;
             case VaultUnlockStatus.CreatedAndUnlocked:
             case VaultUnlockStatus.Unlocked:
                 IsVaultInitialized = result.IsVaultInitialized;
+                await ReloadSettingsAfterUnlockAsync();
                 IsUnlocked = true;
                 HasPendingLegacyBusinessData = result.LegacyBusinessDataPending;
                 MasterPassword = "";
@@ -128,10 +131,17 @@ public sealed partial class MainWindowViewModel
                 _ = LoadAfterUnlockAsync();
                 return;
             default:
+                _cryptoService.Lock();
                 IsUnlocked = false;
                 StatusMessage = _localization.Format("UnlockFailedFormat", result.Status.ToString());
                 return;
         }
+    }
+
+    private async Task ReloadSettingsAfterUnlockAsync()
+    {
+        await _settingsService.LoadAsync();
+        ApplySettings(_settingsService.Current);
     }
 
     partial void OnIsVaultInitializedChanged(bool value)

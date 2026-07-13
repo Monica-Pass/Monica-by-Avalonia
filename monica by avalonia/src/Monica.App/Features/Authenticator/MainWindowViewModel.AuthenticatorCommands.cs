@@ -75,7 +75,7 @@ public sealed partial class MainWindowViewModel
         }
 
         RefreshTotpDisplay(item);
-        await _clipboardService.SetTextAsync(item.TotpCode);
+        await _clipboardService.SetSensitiveTextAsync(item.TotpCode);
         StatusMessage = _localization.Format("CopiedTotpFormat", item.Title);
     }
 

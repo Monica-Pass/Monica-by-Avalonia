@@ -48,12 +48,21 @@ public sealed partial class MainWindowViewModel
             OneDriveEnabled = settings.OneDriveEnabled;
             MdbxLocalCacheEnabled = settings.MdbxLocalCacheEnabled;
             ApplyTheme(settings.Theme);
+            ApplyClipboardPolicy();
             RefreshLocalizedProperties();
         }
         finally
         {
             _isApplyingSettings = false;
         }
+    }
+
+    private void ApplyClipboardPolicy()
+    {
+        var lifetime = ClearClipboardEnabled
+            ? TimeSpan.FromSeconds(ClipboardClearSeconds)
+            : (TimeSpan?)null;
+        _clipboardService.ConfigureSensitiveClear(lifetime);
     }
 
     private void ApplySecurityRecoverySettings(SecurityRecoverySettings settings)

@@ -83,7 +83,7 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        await _clipboardService.SetTextAsync(field.Value);
+        await _clipboardService.SetSensitiveTextAsync(field.Value);
         StatusMessage = _localization.Format("CopiedWalletFieldFormat", field.Label);
     }
 

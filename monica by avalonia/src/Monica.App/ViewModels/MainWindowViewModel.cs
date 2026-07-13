@@ -48,6 +48,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IClipboardService _clipboardService;
     private readonly IConfirmationDialogService _confirmationDialogService;
     private readonly ILocalizationService _localization;
+    private readonly IVaultSessionService _vaultSessionService;
+    private readonly IWindowPrivacyService _windowPrivacyService;
+    private int _vaultLoadVersion;
     public MainWindowViewModel(
         IMonicaRepository repository,
         IVaultCredentialStore credentialStore,
@@ -74,7 +77,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IMasterPasswordMaintenanceService? masterPasswordMaintenanceService = null,
         IVaultUnlockCoordinator? vaultUnlockCoordinator = null,
         IExternalLinkService? externalLinkService = null,
-        IFileSystemPickerService? fileSystemPickerService = null)
+        IFileSystemPickerService? fileSystemPickerService = null,
+        IVaultSessionService? vaultSessionService = null,
+        IWindowPrivacyService? windowPrivacyService = null)
     {
         _repository = repository;
         _cryptoService = cryptoService;
@@ -83,6 +88,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _pwnedPasswordService = pwnedPasswordService ?? new PwnedPasswordService();
         _importExportService = importExportService;
         _clipboardService = clipboardService;
+        _vaultSessionService = vaultSessionService ?? new VaultSessionService();
+        _windowPrivacyService = windowPrivacyService ?? new DisabledWindowPrivacyService();
         _webDavBackupService = webDavBackupService ?? new DisabledWebDavBackupService();
         _mdbxVaultService = mdbxVaultService;
         _passwordAttachmentFileService = passwordAttachmentFileService;
@@ -262,12 +269,22 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private async Task LoadCoreAsync(bool deferSecurityAnalysis)
     {
-        if (IsLoadingVault)
+        if (!IsUnlocked && _cryptoService.IsUnlocked)
         {
-            AppDiagnostics.Info("Vault load skipped because another load is running");
+            IsUnlocked = true;
+        }
+
+        if (IsLoadingVault ||
+            (_vaultSessionService.IsExplicitlyLocked && !_cryptoService.IsUnlocked))
+        {
+            AppDiagnostics.Info("Vault load skipped because the vault is locked or another load is running");
             return;
         }
 
+        var sessionCancellationToken = _vaultSessionService.IsUnlocked
+            ? _vaultSessionService.SessionCancellationToken
+            : CancellationToken.None;
+        var loadVersion = ++_vaultLoadVersion;
         IsLoadingVault = true;
         VaultLoadStageText = "准备加载保险库...";
         var loadStopwatch = Stopwatch.StartNew();
@@ -296,11 +313,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
             {
                 var delay = Math.Clamp(SmokeVaultLoadDelayMilliseconds, 0, 30000);
                 AppDiagnostics.Info($"Smoke UI vault load delay started. milliseconds={delay}");
-                await Task.Delay(delay);
+                await Task.Delay(delay, sessionCancellationToken);
                 AppDiagnostics.Info("Smoke UI vault load delay completed");
             }
 
-            var snapshot = await Task.Run(LoadVaultSnapshotAsync);
+            var snapshot = await Task.Run(LoadVaultSnapshotAsync, sessionCancellationToken);
+            sessionCancellationToken.ThrowIfCancellationRequested();
             VaultLoadStageText = "正在整理密码列表...";
             await YieldVaultLoadUiAsync();
             _passwordCustomFields = snapshot.PasswordCustomFields;
@@ -398,6 +416,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
             LastVaultLoadDurationMilliseconds = loadStopwatch.ElapsedMilliseconds;
             AppDiagnostics.Info($"Vault load completed in {LastVaultLoadDurationMilliseconds} ms. passwords={Passwords.Count}, archived={ArchivedPasswords.Count}, deleted={DeletedPasswords.Count}, notes={NoteItems.Count}, totp={TotpItems.Count}, wallet={WalletItems.Count}");
         }
+        catch (OperationCanceledException) when (sessionCancellationToken.IsCancellationRequested)
+        {
+            AppDiagnostics.Info("Vault load canceled because the session was locked");
+            VaultLoadStageText = "";
+        }
         catch (Exception ex)
         {
             LastVaultLoadDurationMilliseconds = loadStopwatch.ElapsedMilliseconds;
@@ -408,7 +431,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         finally
         {
-            IsLoadingVault = false;
+            if (loadVersion == _vaultLoadVersion)
+            {
+                IsLoadingVault = false;
+            }
         }
     }
 
@@ -561,6 +587,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(LoginTitle));
         OnPropertyChanged(nameof(LoginDescription));
         OnPropertyChanged(nameof(LoginButtonText));
+        OnPropertyChanged(nameof(LockVaultText));
         RefreshGeneratorLocalizedState();
         OnPropertyChanged(nameof(LegacyVaultImportPromptText));
         OnPropertyChanged(nameof(WebDavBackupOptionsSummaryText));

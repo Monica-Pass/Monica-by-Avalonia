@@ -12,6 +12,42 @@ namespace Monica.Tests;
 public sealed class VaultCredentialTests
 {
     [Fact]
+    public async Task Security_baseline_lock_clears_sensitive_view_state()
+    {
+        var crypto = new CryptoService();
+        crypto.InitializeSession("correct horse battery staple", crypto.CreateSalt());
+        var clipboard = new RecordingClipboardService();
+        var viewModel = CreateViewModel(GetTempDatabasePath(), crypto, clipboard);
+        viewModel.IsUnlocked = true;
+        viewModel.Passwords.Add(new PasswordEntry { Title = "Account", Password = "plain-secret" });
+        viewModel.NoteItems.Add(new SecureItem { Title = "Recovery", ItemData = "backup-code" });
+        viewModel.WalletItems.Add(new SecureItem { Title = "Card", ItemData = "4111111111111111" });
+        viewModel.TotpItems.Add(new SecureItem { Title = "TOTP", ItemData = "totp-seed" });
+        viewModel.NoteContent = "private note";
+        viewModel.ImportCsvText = "username,password";
+        viewModel.ExportPreview = "plain export";
+        viewModel.GeneratedPassword = "generated-secret";
+        viewModel.WebDavPassword = "webdav-secret";
+        viewModel.CurrentMasterPassword = "old-master-password";
+
+        await viewModel.LockCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsUnlocked);
+        Assert.False(crypto.IsUnlocked);
+        Assert.Empty(viewModel.Passwords);
+        Assert.Empty(viewModel.NoteItems);
+        Assert.Empty(viewModel.WalletItems);
+        Assert.Empty(viewModel.TotpItems);
+        Assert.Equal("", viewModel.NoteContent);
+        Assert.Equal("", viewModel.ImportCsvText);
+        Assert.Equal("", viewModel.ExportPreview);
+        Assert.Equal("", viewModel.GeneratedPassword);
+        Assert.Equal("", viewModel.WebDavPassword);
+        Assert.Equal("", viewModel.CurrentMasterPassword);
+        Assert.True(clipboard.ClearOwnedContentCalled);
+    }
+
+    [Fact]
     public void Default_database_path_uses_avalonia_specific_storage()
     {
         var factory = new SqliteConnectionFactory();
@@ -257,7 +293,10 @@ public sealed class VaultCredentialTests
         Assert.Contains("secret-log-change", Assert.Single(await repository.GetOperationLogsAsync()).ChangesJson);
     }
 
-    private static MainWindowViewModel CreateViewModel(string databasePath)
+    private static MainWindowViewModel CreateViewModel(
+        string databasePath,
+        ICryptoService? cryptoService = null,
+        IClipboardService? clipboardService = null)
     {
         var factory = new SqliteConnectionFactory(databasePath);
         var migrator = new DatabaseMigrator(factory);
@@ -265,13 +304,13 @@ public sealed class VaultCredentialTests
         return new MainWindowViewModel(
             repository,
             new VaultCredentialStore(factory, migrator),
-            new CryptoService(),
+            cryptoService ?? new CryptoService(),
             new TotpService(),
             new PasswordGeneratorService(),
             new ImportExportService(),
             new PlatformCapabilityService(),
             new PlatformIntegrationService(),
-            new NoopClipboardService(),
+            clipboardService ?? new NoopClipboardService(),
             new NoopWebDavBackupService(),
             new MdbxVaultService(),
             new NoopPasswordAttachmentFileService(),
@@ -333,6 +372,19 @@ public sealed class VaultCredentialTests
     private sealed class NoopClipboardService : IClipboardService
     {
         public Task SetTextAsync(string text, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class RecordingClipboardService : IClipboardService
+    {
+        public bool ClearOwnedContentCalled { get; private set; }
+
+        public Task SetTextAsync(string text, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task ClearOwnedContentAsync(CancellationToken cancellationToken = default)
+        {
+            ClearOwnedContentCalled = true;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class NoopWebDavBackupService : IWebDavBackupService
