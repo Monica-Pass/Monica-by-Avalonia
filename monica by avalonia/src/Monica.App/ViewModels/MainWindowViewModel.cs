@@ -29,74 +29,6 @@ using Monica.Platform.Services;
 namespace Monica.App.ViewModels;
 
 public sealed record SettingsChoice(object Value, string Label);
-public sealed record LocalizedPlatformIntegrationCapability(
-    string Key,
-    string Title,
-    string Description,
-    string Status,
-    string UnsupportedReason,
-    PlatformFeatureStatus StatusValue)
-{
-    public bool HasUnsupportedReason => !string.IsNullOrWhiteSpace(UnsupportedReason);
-    public bool IsUsable => StatusValue is PlatformFeatureStatus.Available or PlatformFeatureStatus.DesktopEquivalent;
-}
-
-public sealed class LocalizedPlatformCapability : ObservableObject
-{
-    private readonly Action<string, bool> _setFeatureEnabled;
-    private readonly string _enabledText;
-    private readonly string _disabledText;
-    private bool _isEnabled;
-
-    public LocalizedPlatformCapability(
-        string key,
-        string title,
-        string description,
-        string status,
-        bool isEnabled,
-        bool canToggle,
-        string enabledText,
-        string disabledText,
-        string unsupportedReason,
-        Action<string, bool> setFeatureEnabled)
-    {
-        Key = key;
-        Title = title;
-        Description = description;
-        Status = status;
-        CanToggle = canToggle;
-        UnsupportedReason = unsupportedReason;
-        _enabledText = enabledText;
-        _disabledText = disabledText;
-        _setFeatureEnabled = setFeatureEnabled;
-        _isEnabled = canToggle && isEnabled;
-    }
-
-    public string Key { get; }
-    public string Title { get; }
-    public string Description { get; }
-    public string Status { get; }
-    public bool CanToggle { get; }
-    public string UnsupportedReason { get; }
-    public bool HasUnsupportedReason => !string.IsNullOrWhiteSpace(UnsupportedReason);
-    public string ToggleStatus => IsEnabled ? _enabledText : _disabledText;
-
-    public bool IsEnabled
-    {
-        get => _isEnabled;
-        set
-        {
-            var normalizedValue = CanToggle && value;
-            if (!SetProperty(ref _isEnabled, normalizedValue))
-            {
-                return;
-            }
-
-            _setFeatureEnabled(Key, normalizedValue);
-            OnPropertyChanged(nameof(ToggleStatus));
-        }
-    }
-}
 public sealed record TimelineEntry(string Title, string Description, string TimestampText, string OperationType, string ItemType);
 public sealed record VaultSourceDisplayItem(string DisplayName, string Kind, string LocalPath, string RemoteUrl, string SyncStatus);
 public sealed record SyncHealthDisplayItem(string Label, string Value, string Detail);
@@ -266,10 +198,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IMasterPasswordMaintenanceService _masterPasswordMaintenanceService;
     private readonly IAppSettingsService _settingsService;
     private readonly ILocalizationService _localization;
-    private readonly IReadOnlyList<PlatformCapability> _sourceCapabilities;
-    private readonly IReadOnlyList<PlatformIntegrationCapability> _sourcePlatformIntegrationCapabilities;
-    private readonly IExternalLinkService _externalLinkService;
-    private readonly IFileSystemPickerService _fileSystemPickerService;
     private readonly SecurityQuestionService _securityQuestionService = new();
     private IReadOnlyDictionary<long, IReadOnlyList<CustomField>> _passwordCustomFields = new Dictionary<long, IReadOnlyList<CustomField>>();
     private IReadOnlyDictionary<long, IReadOnlyList<Attachment>> _passwordAttachments = new Dictionary<long, IReadOnlyList<Attachment>>();
@@ -360,8 +288,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ILocalizationService L => _localization;
     public ObservableCollection<PasswordEntry> Passwords { get; } = new ObservableRangeCollection<PasswordEntry>();
     public ObservableCollection<Category> Categories { get; } = new ObservableRangeCollection<Category>();
-    public ObservableCollection<LocalizedPlatformIntegrationCapability> PlatformIntegrationCapabilities { get; } = [];
-    public ObservableCollection<LocalizedPlatformCapability> Capabilities { get; } = [];
     public ObservableCollection<LocalMdbxDatabase> MdbxDatabases { get; } = new ObservableRangeCollection<LocalMdbxDatabase>();
     public ObservableCollection<MdbxDatabaseDisplayItem> MdbxDatabaseItems { get; } = [];
     public ObservableCollection<TimelineEntry> TimelineEntries { get; } = new ObservableRangeCollection<TimelineEntry>();
@@ -384,23 +310,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         PasswordFolderFilters.Where(item => !item.IsSystemNode);
     public bool HasRegularPasswordFolderFilters => PasswordFolderFilters.Any(item => !item.IsSystemNode);
 
-    public string PlatformName { get; }
-    public string PlatformIntegrationsTitle => _localization.Get("PlatformIntegrations");
-    public string PlatformIntegrationSummaryText => _localization.Format(
-        "PlatformIntegrationsDescriptionFormat",
-        PlatformName,
-        PlatformIntegrationCapabilities.Count(item => item.IsUsable),
-        PlatformIntegrationCapabilities.Count);
-    public bool CanUseTrayIntegration => IsPlatformIntegrationUsable(PlatformFeatureKeys.Tray);
-    public bool CanUseGlobalHotkeyIntegration => IsPlatformIntegrationUsable(PlatformFeatureKeys.GlobalHotkey);
-    public bool CanUseBrowserBridgeIntegration => IsPlatformIntegrationUsable(PlatformFeatureKeys.BrowserBridge);
-    public bool CanOpenExternalLinks => IsPlatformIntegrationUsable(PlatformFeatureKeys.ExternalLinks);
-    public bool CanUseFilePicker => IsPlatformIntegrationUsable(PlatformFeatureKeys.FilePicker);
-    public string TrayIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.Tray);
-    public string GlobalHotkeyIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.GlobalHotkey);
-    public string BrowserBridgeIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.BrowserBridge);
-    public string ExternalLinksIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.ExternalLinks);
-    public string FilePickerIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.FilePicker);
     public string AboutTitle => _localization.Get("About");
     public string AboutDescription => _localization.Get("AboutDescription");
     public string AppVersionLabel => _localization.Get("AppVersion");
@@ -671,21 +580,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isResettingMasterPassword;
-
-    [ObservableProperty]
-    private bool _minimizeToTray;
-
-    [ObservableProperty]
-    private bool _quickSearchEnabled = true;
-
-    [ObservableProperty]
-    private string _quickSearchHotkey = "Ctrl+Shift+Space";
-
-    [ObservableProperty]
-    private bool _browserIntegrationEnabled;
-
-    [ObservableProperty]
-    private int _browserIntegrationPort = 49152;
 
     [ObservableProperty]
     private bool _compactPasswordList;
@@ -1262,32 +1156,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(IsSecurityQuestion2Custom));
     }
 
-    partial void OnMinimizeToTrayChanged(bool value)
-    {
-        if (value && !CanUseTrayIntegration)
-        {
-            MinimizeToTray = false;
-            return;
-        }
-
-        UpdateSettings(settings => settings.MinimizeToTray = value);
-    }
-
-    partial void OnQuickSearchEnabledChanged(bool value) => UpdateSettings(settings => settings.QuickSearchEnabled = value);
-    partial void OnQuickSearchHotkeyChanged(string value) => UpdateSettings(settings => settings.QuickSearchHotkey = value);
-
-    partial void OnBrowserIntegrationEnabledChanged(bool value)
-    {
-        if (value && !CanUseBrowserBridgeIntegration)
-        {
-            BrowserIntegrationEnabled = false;
-            return;
-        }
-
-        UpdateSettings(settings => settings.BrowserIntegrationEnabled = value);
-    }
-
-    partial void OnBrowserIntegrationPortChanged(int value) => UpdateSettings(settings => settings.BrowserIntegrationPort = value);
     partial void OnCompactPasswordListChanged(bool value)
     {
         UpdateSettings(settings => settings.CompactPasswordList = value);
@@ -4328,55 +4196,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(PasswordSortButtonTip));
     }
 
-    private void RefreshPlatformIntegrationCapabilities()
-    {
-        PlatformIntegrationCapabilities.Clear();
-        foreach (var capability in _sourcePlatformIntegrationCapabilities)
-        {
-            var descriptionKey = $"Integration.{capability.Key}.Description";
-            var localizedDescription = _localization.Get(descriptionKey);
-            PlatformIntegrationCapabilities.Add(new LocalizedPlatformIntegrationCapability(
-                capability.Key,
-                _localization.Get($"Integration.{capability.Key}.Title"),
-                localizedDescription == descriptionKey ? capability.Description : localizedDescription,
-                LocalizeFeatureStatus(capability.Status),
-                capability.UnsupportedReason ?? "",
-                capability.Status));
-        }
-
-        RaisePlatformIntegrationState();
-    }
-
-    private void RaisePlatformIntegrationState()
-    {
-        OnPropertyChanged(nameof(PlatformIntegrationSummaryText));
-        OnPropertyChanged(nameof(CanUseTrayIntegration));
-        OnPropertyChanged(nameof(CanUseGlobalHotkeyIntegration));
-        OnPropertyChanged(nameof(CanUseBrowserBridgeIntegration));
-        OnPropertyChanged(nameof(CanOpenExternalLinks));
-        OnPropertyChanged(nameof(CanUseFilePicker));
-        OnPropertyChanged(nameof(TrayIntegrationStatusText));
-        OnPropertyChanged(nameof(GlobalHotkeyIntegrationStatusText));
-        OnPropertyChanged(nameof(BrowserBridgeIntegrationStatusText));
-        OnPropertyChanged(nameof(ExternalLinksIntegrationStatusText));
-        OnPropertyChanged(nameof(FilePickerIntegrationStatusText));
-        OpenGitHubRepositoryCommand.NotifyCanExecuteChanged();
-        OpenNoteReferenceCommand.NotifyCanExecuteChanged();
-        ImportMonicaJsonFileCommand.NotifyCanExecuteChanged();
-        ImportPasswordCsvFileCommand.NotifyCanExecuteChanged();
-        ImportTotpCsvFileCommand.NotifyCanExecuteChanged();
-        ImportNoteCsvFileCommand.NotifyCanExecuteChanged();
-        ImportAegisJsonFileCommand.NotifyCanExecuteChanged();
-        SaveMonicaJsonExportCommand.NotifyCanExecuteChanged();
-        SavePasswordCsvExportCommand.NotifyCanExecuteChanged();
-        SaveTotpCsvExportCommand.NotifyCanExecuteChanged();
-        SaveNoteCsvExportCommand.NotifyCanExecuteChanged();
-        SaveWalletCsvExportCommand.NotifyCanExecuteChanged();
-        SaveAegisJsonExportCommand.NotifyCanExecuteChanged();
-        ImportMarkdownNoteCommand.NotifyCanExecuteChanged();
-        ExportCurrentNoteMarkdownCommand.NotifyCanExecuteChanged();
-    }
-
     private void RaiseAboutText()
     {
         OnPropertyChanged(nameof(AboutTitle));
@@ -4430,50 +4249,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(CanRunResetMasterPassword));
     }
 
-    private void RefreshCapabilities()
-    {
-        Capabilities.Clear();
-        foreach (var capability in _sourceCapabilities)
-        {
-            var canToggle = capability.Status is not (PlatformFeatureStatus.Unsupported or PlatformFeatureStatus.Planned);
-            Capabilities.Add(new LocalizedPlatformCapability(
-                capability.Key,
-                _localization.Get($"Capability.{capability.Key}.Title"),
-                _localization.Get($"Capability.{capability.Key}.Description"),
-                LocalizeFeatureStatus(capability.Status),
-                _settingsService.IsFeatureEnabled(capability.Key),
-                canToggle,
-                _localization.FeatureEnabled,
-                _localization.FeatureDisabled,
-                capability.UnsupportedReason ?? "",
-                UpdateFeatureToggle));
-        }
-    }
-
-    private void UpdateFeatureToggle(string key, bool isEnabled)
-    {
-        if (_isApplyingSettings)
-        {
-            return;
-        }
-
-        _settingsService.SetFeatureEnabled(key, isEnabled);
-        QueueSaveSettings();
-    }
-
-    private string LocalizeFeatureStatus(PlatformFeatureStatus status)
-    {
-        return status switch
-        {
-            PlatformFeatureStatus.Available => _localization.Available,
-            PlatformFeatureStatus.DesktopEquivalent => _localization.DesktopEquivalent,
-            PlatformFeatureStatus.PlatformLimited => _localization.PlatformLimited,
-            PlatformFeatureStatus.Unsupported => _localization.Get("Unsupported"),
-            PlatformFeatureStatus.Planned => _localization.Planned,
-            _ => status.ToString()
-        };
-    }
-
     private string LocalizeVaultClearScope(VaultClearScope scope) => scope switch
     {
         VaultClearScope.Passwords => _localization.Get("ClearPasswordsOnly"),
@@ -4485,26 +4260,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         questionId == SecurityQuestionService.CustomQuestionId
             ? customText.Trim()
             : _securityQuestionService.GetQuestion(questionId).Text;
-
-    private bool IsPlatformIntegrationUsable(string key) => GetPlatformIntegration(key).IsUsable;
-
-    private string FormatPlatformIntegrationStatus(string key)
-    {
-        var capability = GetPlatformIntegration(key);
-        var status = LocalizeFeatureStatus(capability.Status);
-        return string.IsNullOrWhiteSpace(capability.UnsupportedReason)
-            ? status
-            : $"{status}: {capability.UnsupportedReason}";
-    }
-
-    private PlatformIntegrationCapability GetPlatformIntegration(string key) =>
-        _sourcePlatformIntegrationCapabilities.FirstOrDefault(
-            item => string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase))
-        ?? new PlatformIntegrationCapability(
-            key,
-            PlatformFeatureStatus.Unsupported,
-            "This platform adapter has not declared this feature.",
-            "This platform adapter has not declared this feature.");
 
     private static string GetAppVersionText()
     {
