@@ -20,12 +20,6 @@ public partial class MainWindow
         public int Index { get; set; } = -1;
     }
 
-    private void UndoNoteEditorButton_OnClick(object? sender, RoutedEventArgs e) =>
-        UndoNoteEditor();
-
-    private void RedoNoteEditorButton_OnClick(object? sender, RoutedEventArgs e) =>
-        RedoNoteEditor();
-
     private void NoteContentEditor_OnTextChanged(object? sender, TextChangedEventArgs e)
     {
         if (!_isRestoringNoteEditorHistory)

@@ -3848,35 +3848,8 @@
                                                  MaxLines="2" />
                                     </Grid>
 
-                                    <Border Grid.Row="1" Classes="noteToolbar" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,12">
-                                        <WrapPanel Orientation="Horizontal"
-                                                   MinWidth="0"
-                                                   MaxWidth="680"
-                                                   HorizontalAlignment="Left">
-                                                <Button Click="UndoNoteEditorButton_OnClick" ToolTip.Tip="撤销" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="ArrowUndo" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                                                <Button Click="RedoNoteEditorButton_OnClick" ToolTip.Tip="重做" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="ArrowRedo" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                                                <Border Width="1" Height="20" Background="{DynamicResource CardBorderBrush}" Margin="4,0,6,0" VerticalAlignment="Center" />
-                                                <Button Click="ShowNoteFindButton_OnClick" ToolTip.Tip="查找" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="Search" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                                                <Button Click="ShowNoteReplaceButton_OnClick" ToolTip.Tip="查找和替换" Width="32" Height="32" Padding="0"><TextBlock Text="↔" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                                                <Border Width="1" Height="20" Background="{DynamicResource CardBorderBrush}" Margin="4,0,6,0" VerticalAlignment="Center" />
-                                                <Button Tag="h1" Click="MarkdownToolbarButton_OnClick" ToolTip.Tip="一级标题" Width="32" Height="32" Padding="0"><TextBlock Text="H1" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                                                <Button Tag="h2" Click="MarkdownToolbarButton_OnClick" ToolTip.Tip="二级标题" Width="32" Height="32" Padding="0"><TextBlock Text="H2" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                                                <Button Tag="h3" Click="MarkdownToolbarButton_OnClick" ToolTip.Tip="三级标题" Width="32" Height="32" Padding="0"><TextBlock Text="H3" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                                                <Button Tag="bold" Click="MarkdownToolbarButton_OnClick" ToolTip.Tip="粗体" Width="32" Height="32" Padding="0"><TextBlock Text="B" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                                                <Button Tag="italic" Click="MarkdownToolbarButton_OnClick" ToolTip.Tip="斜体" Width="32" Height="32" Padding="0"><TextBlock Text="I" FontStyle="Italic" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                                                <Button Tag="strike" Click="MarkdownToolbarButton_OnClick" ToolTip.Tip="删除线" Width="32" Height="32" Padding="0"><TextBlock Text="S" TextDecorations="Strikethrough" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                                                <Button Tag="inlinecode" Click="MarkdownToolbarButton_OnClick" ToolTip.Tip="行内代码" Width="32" Height="32" Padding="0"><TextBlock Text="`" FontFamily="Consolas" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                                                <Button Tag="quote" Click="MarkdownToolbarButton_OnClick" ToolTip.Tip="引用" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="TextQuote" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                                                <Button Tag="code" Click="MarkdownToolbarButton_OnClick" ToolTip.Tip="代码块" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="Code" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                                                <Button Tag="ul" Click="MarkdownToolbarButton_OnClick" ToolTip.Tip="无序列表" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="TextBulletList" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                                                <Button Tag="ol" Click="MarkdownToolbarButton_OnClick" ToolTip.Tip="有序列表" Width="32" Height="32" Padding="0"><TextBlock Text="1." FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                                                <Button Tag="todo" Click="MarkdownToolbarButton_OnClick" ToolTip.Tip="任务列表" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="CheckboxChecked" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                                                <Button Tag="table" Click="MarkdownToolbarButton_OnClick" ToolTip.Tip="表格" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="Table" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                                                <Button Tag="link" Click="MarkdownToolbarButton_OnClick" ToolTip.Tip="链接" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="Link" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                                                <Button Tag="hr" Click="MarkdownToolbarButton_OnClick" ToolTip.Tip="分割线" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="Subtract" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                                                <Button Click="InsertNoteImageButton_OnClick" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="插入图片" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="Image" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                                        </WrapPanel>
-                                    </Border>
+                                    <notes:NoteEditorToolbarView Grid.Row="1"
+                                                                 ActionRequested="NoteEditorToolbarView_OnActionRequested" />
 
                                     <Border x:Name="NoteFindPanel" Grid.Row="2" IsVisible="False" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Background="{DynamicResource LayerFillColorSubtleBrush}" Padding="8" Margin="0,0,0,12" ClipToBounds="True">
                                         <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled" MinWidth="0" ClipToBounds="True">

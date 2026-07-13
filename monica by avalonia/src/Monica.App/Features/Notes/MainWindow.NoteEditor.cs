@@ -8,17 +8,34 @@ namespace Monica.App;
 
 public partial class MainWindow
 {
-    private void MarkdownToolbarButton_OnClick(object? sender, RoutedEventArgs e)
+    private async void NoteEditorToolbarView_OnActionRequested(object? sender, NoteEditorActionRequestedEventArgs e)
     {
-        if (sender is not Button { Tag: string action })
+        switch (e.Action)
         {
-            return;
+            case "undo":
+                UndoNoteEditor();
+                break;
+            case "redo":
+                RedoNoteEditor();
+                break;
+            case "find":
+                ShowNoteFindPanel(replaceMode: false);
+                break;
+            case "replace":
+                ShowNoteFindPanel(replaceMode: true);
+                break;
+            case "image":
+                await InsertNoteImageAsync();
+                break;
+            default:
+                ApplyMarkdownAction(e.Action);
+                break;
         }
 
-        ApplyMarkdownAction(action);
+        UpdateNoteEditorStatus();
     }
 
-    private async void InsertNoteImageButton_OnClick(object? sender, RoutedEventArgs e)
+    private async Task InsertNoteImageAsync()
     {
         if (DataContext is not MainWindowViewModel viewModel)
         {
@@ -31,12 +48,6 @@ public partial class MainWindow
             InsertMarkdownBlock(markdown);
         }
     }
-
-    private void ShowNoteFindButton_OnClick(object? sender, RoutedEventArgs e) =>
-        ShowNoteFindPanel(replaceMode: false);
-
-    private void ShowNoteReplaceButton_OnClick(object? sender, RoutedEventArgs e) =>
-        ShowNoteFindPanel(replaceMode: true);
 
     private void SetNoteEditModeMenuItem_OnClick(object? sender, RoutedEventArgs e)
     {
