@@ -100,10 +100,6 @@ public sealed class LocalizedPlatformCapability : ObservableObject
     }
 }
 public sealed record TimelineEntry(string Title, string Description, string TimestampText, string OperationType, string ItemType);
-public sealed record TotpFilterChoice(string Key, string Label, int Count, int Level, bool IsSelected)
-{
-    public Thickness Indent => new(Math.Max(0, Level) * 12, 0, 0, 0);
-}
 public sealed record VaultSourceDisplayItem(string DisplayName, string Kind, string LocalPath, string RemoteUrl, string SyncStatus);
 public sealed record SyncHealthDisplayItem(string Label, string Value, string Detail);
 internal sealed record VaultLoadSnapshot(
@@ -206,11 +202,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private const string GeneratorTemplatePin = "pin";
     private const string GeneratorTemplateUsername = "username";
     private const string SimilarGeneratorCharacters = "0OolI1|`";
-    private const string TotpFilterAll = "all";
-    private const string TotpFilterFavorites = "favorites";
-    private const string TotpFilterExpiringSoon = "expiring-soon";
-    private const string TotpFilterUnbound = "unbound";
-    private const string TotpFilterIssuerPrefix = "issuer:";
     private static readonly TimeSpan SelectedPasswordDetailsCoalesceDelay = TimeSpan.FromMilliseconds(60);
     private static readonly TimeSpan SelectedPasswordDetailsLoadingDelay = TimeSpan.FromMilliseconds(120);
     private static readonly string[] GeneratorPassphraseWords =
@@ -402,8 +393,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<PasswordEntry> Passwords { get; } = new ObservableRangeCollection<PasswordEntry>();
     public ObservableCollection<PasswordEntry> ArchivedPasswords { get; } = new ObservableRangeCollection<PasswordEntry>();
     public ObservableCollection<PasswordEntry> DeletedPasswords { get; } = new ObservableRangeCollection<PasswordEntry>();
-    public ObservableCollection<SecureItem> TotpItems { get; } = new ObservableRangeCollection<SecureItem>();
-    public ObservableCollection<TotpFilterChoice> TotpFilterChoices { get; } = [];
     public ObservableCollection<SecureItem> WalletItems { get; } = new ObservableRangeCollection<SecureItem>();
     public ObservableCollection<Category> Categories { get; } = new ObservableRangeCollection<Category>();
     public ObservableCollection<LocalizedPlatformIntegrationCapability> PlatformIntegrationCapabilities { get; } = [];
@@ -678,15 +667,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
         }
     }
-
-    [ObservableProperty]
-    private SecureItem? _selectedTotpItem;
-
-    [ObservableProperty]
-    private TotpItemDetailsViewModel? _selectedTotpDetails;
-
-    [ObservableProperty]
-    private string _selectedTotpFilterKey = TotpFilterAll;
 
     [ObservableProperty]
     private SecureItem? _selectedWalletItem;
@@ -1073,22 +1053,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public Thickness PasswordListContentMargin => CompactPasswordList ? new Thickness(10, 0, 0, 0) : new Thickness(14, 0, 0, 0);
     public bool ShowPasswordListDetails => !CompactPasswordList;
     public string NoteCountText => _localization.Format("NoteCountFormat", NoteItems.Count);
-    public string TotpCountText => _localization.Format("TotpCountFormat", TotpItems.Count);
-    public int TotpExpiringSoonCount => TotpItems.Count(IsTotpExpiringSoon);
-    public string TotpConsoleStatusText => _localization.Format("TotpConsoleStatusFormat", TotpItems.Count, TotpExpiringSoonCount);
-    public string TotpFilteredStatusText => _localization.Format("TotpFilteredStatusFormat", FilteredTotpItems.Count, TotpItems.Count);
-    public string TotpScanQrText => _localization.Get("TotpScanQr");
-    public string TotpManualAddText => _localization.Get("TotpManualAdd");
-    public string TotpMoreActionsText => _localization.Get("MoreActions");
-    public string TotpFilterTitleText => _localization.Get("TotpFilterTitle");
-    public string TotpIssuerGroupsText => _localization.Get("TotpIssuerGroups");
-    public string TotpNoFilteredResultsText => _localization.Get("TotpNoFilteredResults");
-    public string TotpEmptyStateText => HasTotpFilterOrSearch && HasTotpItems
-        ? _localization.Get("TotpNoFilteredResults")
-        : _localization.Get("TotpEmptyHint");
-    public string ClearTotpFiltersText => _localization.Get("ClearTotpFilters");
-    public string TotpShowHiddenText => _localization.Get("ShowHidden");
-    public string TotpHelpText => _localization.Get("Help");
     public string WalletCountText => _localization.Format("WalletCountFormat", WalletItems.Count);
     public string TimelineCountText => _localization.Format("TimelineCountFormat", TimelineEntries.Count);
     public string LocalDatabaseSummaryText => _localization.Format("DatabaseSummaryFormat", Passwords.Count, NoteItems.Count, TotpItems.Count, WalletItems.Count);
@@ -1296,11 +1260,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public bool HasSelectedPasswordLoadingState =>
         SelectedPassword is not null &&
         IsLoadingSelectedPasswordDetails;
-    public int SelectedTotpCount => TotpItems.Count(item => item.IsSelected);
-    public string SelectedTotpCountText => _localization.Format("SelectedTotpCountFormat", SelectedTotpCount);
-    public bool HasSelectedTotpItems => SelectedTotpCount > 0;
-    public bool HasSelectedTotpItem => SelectedTotpItem is not null;
-    public bool HasTotpItems => TotpItems.Count > 0;
     public int SelectedWalletCount => WalletItems.Count(item => item.IsSelected);
     public string SelectedWalletCountText => _localization.Format("SelectedWalletCountFormat", SelectedWalletCount);
     public bool HasSelectedWalletItems => SelectedWalletCount > 0;
@@ -1348,17 +1307,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
             .Where(row => row.IsPasswordEntryRow || row.IsStackHeader)
             .Select(row => row.Entry)
             .ToArray();
-    public IReadOnlyList<SecureItem> FilteredTotpItems => TotpItems.Where(MatchesTotpFilters).ToArray();
     public IEnumerable<PasswordEntry> FilteredArchivedPasswords =>
         ArchivedPasswords.Where(item => MatchesPasswordSearch(item, SearchText));
     public IEnumerable<PasswordEntry> FilteredDeletedPasswords =>
         DeletedPasswords.Where(item => MatchesPasswordSearch(item, SearchText));
     public bool HasFilteredArchivedPasswords => FilteredArchivedPasswords.Any();
     public bool HasFilteredDeletedPasswords => FilteredDeletedPasswords.Any();
-    public bool HasFilteredTotpItems => FilteredTotpItems.Count > 0;
-    public bool HasTotpFilterOrSearch =>
-        !string.Equals(SelectedTotpFilterKey, TotpFilterAll, StringComparison.OrdinalIgnoreCase) ||
-        !string.IsNullOrWhiteSpace(SearchText);
     public bool HasTimelineEntries => TimelineEntries.Count > 0;
 
     partial void OnSearchTextChanged(string value)
@@ -1517,19 +1471,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(GeneratorStrategySummaryText));
         OnPropertyChanged(nameof(GeneratedPasswordStrengthText));
     }
-
-    partial void OnSelectedTotpItemChanged(SecureItem? value)
-    {
-        if (value is not null)
-        {
-            RefreshTotpDisplay(value);
-        }
-
-        SelectedTotpDetails = value is null ? null : new TotpItemDetailsViewModel(_localization, value);
-        OnPropertyChanged(nameof(HasSelectedTotpItem));
-    }
-
-    partial void OnSelectedTotpFilterKeyChanged(string value) => RaiseTotpFilterState();
 
     partial void OnSelectedWalletItemChanged(SecureItem? value)
     {

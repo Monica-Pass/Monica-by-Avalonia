@@ -1,0 +1,66 @@
+using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using Monica.Core.Models;
+
+namespace Monica.App.ViewModels;
+
+public sealed partial class MainWindowViewModel
+{
+    private const string TotpFilterAll = "all";
+    private const string TotpFilterFavorites = "favorites";
+    private const string TotpFilterExpiringSoon = "expiring-soon";
+    private const string TotpFilterUnbound = "unbound";
+    private const string TotpFilterIssuerPrefix = "issuer:";
+
+    public ObservableCollection<SecureItem> TotpItems { get; } = new ObservableRangeCollection<SecureItem>();
+    public ObservableCollection<TotpFilterChoice> TotpFilterChoices { get; } = [];
+
+    [ObservableProperty]
+    private SecureItem? _selectedTotpItem;
+
+    [ObservableProperty]
+    private TotpItemDetailsViewModel? _selectedTotpDetails;
+
+    [ObservableProperty]
+    private string _selectedTotpFilterKey = TotpFilterAll;
+
+    public string TotpCountText => _localization.Format("TotpCountFormat", TotpItems.Count);
+    public int TotpExpiringSoonCount => TotpItems.Count(IsTotpExpiringSoon);
+    public string TotpConsoleStatusText => _localization.Format("TotpConsoleStatusFormat", TotpItems.Count, TotpExpiringSoonCount);
+    public string TotpFilteredStatusText => _localization.Format("TotpFilteredStatusFormat", FilteredTotpItems.Count, TotpItems.Count);
+    public string TotpScanQrText => _localization.Get("TotpScanQr");
+    public string TotpManualAddText => _localization.Get("TotpManualAdd");
+    public string TotpMoreActionsText => _localization.Get("MoreActions");
+    public string TotpFilterTitleText => _localization.Get("TotpFilterTitle");
+    public string TotpIssuerGroupsText => _localization.Get("TotpIssuerGroups");
+    public string TotpNoFilteredResultsText => _localization.Get("TotpNoFilteredResults");
+    public string TotpEmptyStateText => HasTotpFilterOrSearch && HasTotpItems
+        ? _localization.Get("TotpNoFilteredResults")
+        : _localization.Get("TotpEmptyHint");
+    public string ClearTotpFiltersText => _localization.Get("ClearTotpFilters");
+    public string TotpShowHiddenText => _localization.Get("ShowHidden");
+    public string TotpHelpText => _localization.Get("Help");
+    public int SelectedTotpCount => TotpItems.Count(item => item.IsSelected);
+    public string SelectedTotpCountText => _localization.Format("SelectedTotpCountFormat", SelectedTotpCount);
+    public bool HasSelectedTotpItems => SelectedTotpCount > 0;
+    public bool HasSelectedTotpItem => SelectedTotpItem is not null;
+    public bool HasTotpItems => TotpItems.Count > 0;
+    public IReadOnlyList<SecureItem> FilteredTotpItems => TotpItems.Where(MatchesTotpFilters).ToArray();
+    public bool HasFilteredTotpItems => FilteredTotpItems.Count > 0;
+    public bool HasTotpFilterOrSearch =>
+        !string.Equals(SelectedTotpFilterKey, TotpFilterAll, StringComparison.OrdinalIgnoreCase) ||
+        !string.IsNullOrWhiteSpace(SearchText);
+
+    partial void OnSelectedTotpItemChanged(SecureItem? value)
+    {
+        if (value is not null)
+        {
+            RefreshTotpDisplay(value);
+        }
+
+        SelectedTotpDetails = value is null ? null : new TotpItemDetailsViewModel(_localization, value);
+        OnPropertyChanged(nameof(HasSelectedTotpItem));
+    }
+
+    partial void OnSelectedTotpFilterKeyChanged(string value) => RaiseTotpFilterState();
+}
