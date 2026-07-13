@@ -41,7 +41,7 @@ public sealed partial class MainWindowViewModel
         var item = editor.ApplyTo();
         RefreshTotpDisplay(item);
         await _repository.SaveSecureItemAsync(item);
-        await _repository.LogAsync(new OperationLog
+        await LogOperationAsync(new OperationLog
         {
             ItemType = "TOTP",
             ItemId = item.Id,
@@ -55,7 +55,6 @@ public sealed partial class MainWindowViewModel
         RaiseCounts();
         RaiseTotpFilterState(reconcileSelection: false);
         RaiseTotpSelectionState();
-        await LoadTimelineAsync();
         StatusMessage = _localization.Format("SavedTotpFormat", item.Title);
     }
 
@@ -110,7 +109,7 @@ public sealed partial class MainWindowViewModel
             await _repository.SavePasswordAsync(password);
             await SynchronizeBoundTotpAsync(password);
             RefreshPasswordTotpDisplay(password);
-            await LoadTotpItemsAsync();
+            RefreshBoundTotpPresentation([password]);
         }
         else
         {
@@ -121,7 +120,7 @@ public sealed partial class MainWindowViewModel
             SelectedTotpDetails = new TotpItemDetailsViewModel(_localization, item);
         }
 
-        await _repository.LogAsync(new OperationLog
+        await LogOperationAsync(new OperationLog
         {
             ItemType = "TOTP",
             ItemId = item.Id,
@@ -130,7 +129,6 @@ public sealed partial class MainWindowViewModel
             DeviceName = Environment.MachineName
         });
         ClearTotpSelection();
-        await LoadTimelineAsync();
         StatusMessage = _localization.Format("SavedTotpFormat", editor.Title.Trim());
     }
 
@@ -150,7 +148,6 @@ public sealed partial class MainWindowViewModel
         }
 
         RaiseTotpFilterState();
-        await LoadTimelineAsync();
         StatusMessage = _localization.Format(next ? "FavoritedTotpFormat" : "UnfavoritedTotpFormat", item.Title);
     }
 
@@ -222,7 +219,6 @@ public sealed partial class MainWindowViewModel
 
         RaiseTotpFilterState();
         RaiseTotpSelectionState();
-        await LoadTimelineAsync();
         StatusMessage = _localization.Format("FavoritedTotpCountFormat", selected.Length);
     }
 
@@ -246,7 +242,6 @@ public sealed partial class MainWindowViewModel
         }
 
         RaiseTotpSelectionState();
-        await LoadTimelineAsync();
         StatusMessage = _localization.Format("MovedSelectedTotpToRecycleBinFormat", selected.Length);
     }
 }

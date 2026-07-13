@@ -15,8 +15,74 @@ using Microsoft.Data.Sqlite;
 
 namespace Monica.Tests;
 
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class PasswordManagementTestCollection
+{
+    public const string Name = "Password management";
+}
+
+[Collection(PasswordManagementTestCollection.Name)]
 public sealed class PasswordManagementTests
 {
+    [Fact]
+    public async Task Performance_budget_add_password_does_not_rebuild_all_derived_collections()
+    {
+        var harness = CreateHarness();
+        harness.Crypto.InitializeSession("performance password", new byte[16]);
+        await harness.Repository.GetPasswordsAsync();
+
+        for (var index = 0; index < 10_000; index++)
+        {
+            harness.ViewModel.Passwords.Add(new PasswordEntry
+            {
+                Id = index + 1,
+                Title = $"Existing {index}",
+                Website = $"https://account-{index}.example.local",
+                Username = $"user-{index}",
+                Password = harness.Crypto.EncryptString($"Unique strong password {index}!Aa9")
+            });
+        }
+
+        harness.Dialog.ConfigureNext(editor =>
+        {
+            editor.Title = "New account";
+            editor.WebsiteLines = "https://new.example.local";
+            editor.Username = "new-user";
+            editor.PasswordLines = "New strong password!Aa9";
+        });
+
+        var stopwatch = Stopwatch.StartNew();
+        await harness.ViewModel.AddPasswordCommand.ExecuteAsync(null);
+        stopwatch.Stop();
+
+        Assert.True(
+            stopwatch.ElapsedMilliseconds < 120,
+            $"Adding one password to a 10,000-entry vault took {stopwatch.ElapsedMilliseconds} ms.");
+        Assert.Contains(harness.ViewModel.TimelineEntries, item =>
+            item.OperationType == "CREATE" && item.Title == "New account");
+    }
+
+    [Fact]
+    public async Task ViewModel_refreshes_invalidated_security_analysis_when_page_is_opened()
+    {
+        var harness = CreateHarness();
+        await harness.ViewModel.LoadAsync();
+        harness.Dialog.ConfigureNext(editor =>
+        {
+            editor.Title = "Weak GitHub";
+            editor.WebsiteLines = "https://github.com";
+            editor.Username = "dev";
+            editor.PasswordLines = "abc";
+        });
+
+        await harness.ViewModel.AddPasswordCommand.ExecuteAsync(null);
+
+        Assert.Empty(harness.ViewModel.SecurityIssueItems);
+        harness.ViewModel.SelectedSection = "SecurityAnalysis";
+        Assert.Contains(harness.ViewModel.SecurityIssueItems, item =>
+            item.Title == "Weak GitHub" && item.Category == harness.ViewModel.L.WeakPasswords);
+    }
+
     [Fact]
     public async Task ViewModel_adds_password_from_editor_dialog()
     {

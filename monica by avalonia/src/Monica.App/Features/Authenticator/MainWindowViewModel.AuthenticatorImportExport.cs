@@ -206,7 +206,7 @@ public sealed partial class MainWindowViewModel
                 importedTotps++;
             }
 
-            await _repository.LogAsync(new OperationLog
+            await LogOperationAsync(new OperationLog
             {
                 ItemType = "TOTP",
                 ItemTitle = _localization.Get("AegisJson"),
@@ -254,7 +254,7 @@ public sealed partial class MainWindowViewModel
                 importedTotps++;
             }
 
-            await _repository.LogAsync(new OperationLog
+            await LogOperationAsync(new OperationLog
             {
                 ItemType = "TOTP",
                 ItemTitle = _localization.Get("TotpCsv"),

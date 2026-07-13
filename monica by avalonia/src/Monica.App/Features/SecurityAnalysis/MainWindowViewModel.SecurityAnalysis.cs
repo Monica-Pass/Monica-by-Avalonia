@@ -50,6 +50,7 @@ public sealed partial class MainWindowViewModel
     private IReadOnlyDictionary<long, CompromisedPasswordResult> _compromisedPasswordResults =
         new Dictionary<long, CompromisedPasswordResult>();
     private bool _hasCompromisedPasswordCheckResults;
+    private bool _isSecurityAnalysisDirty;
 
     public ObservableCollection<SecuritySummaryItem> SecuritySummaryItems { get; } = [];
     public ObservableCollection<SecurityIssueItem> SecurityIssueItems { get; } = [];
@@ -121,6 +122,7 @@ public sealed partial class MainWindowViewModel
     }
     public void RefreshSecurityAnalysis()
     {
+        _isSecurityAnalysisDirty = false;
         SecuritySummaryItems.Clear();
         SecurityIssueItems.Clear();
 
@@ -181,21 +183,18 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(HasSecurityIssues));
     }
 
-    private async Task RefreshSecurityAnalysisDeferredAsync()
+    private void InvalidateSecurityAnalysis()
     {
-        try
-        {
-            await Task.Delay(750);
-            if (!IsUnlocked)
-            {
-                return;
-            }
+        _isSecurityAnalysisDirty = true;
+        RefreshSecurityAnalysisIfNeeded();
+    }
 
-            AppDiagnostics.Measure("Refresh security analysis deferred", RefreshSecurityAnalysis);
-        }
-        catch (Exception ex)
+    private void RefreshSecurityAnalysisIfNeeded()
+    {
+        if (_isSecurityAnalysisDirty &&
+            string.Equals(SelectedSection, "SecurityAnalysis", StringComparison.Ordinal))
         {
-            AppDiagnostics.Error("Deferred security analysis failed", ex);
+            AppDiagnostics.Measure("Refresh visible security analysis", RefreshSecurityAnalysis);
         }
     }
 

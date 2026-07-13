@@ -166,7 +166,7 @@ public sealed partial class MainWindowViewModel
             await _repository.SaveSecureItemAsync(item);
         }
 
-        await _repository.LogAsync(new OperationLog
+        await LogOperationAsync(new OperationLog
         {
             ItemType = "TOTP",
             ItemId = item.Id,
@@ -203,7 +203,7 @@ public sealed partial class MainWindowViewModel
             SelectedTotpItem = TotpItems.FirstOrDefault();
         }
 
-        await _repository.LogAsync(new OperationLog
+        await LogOperationAsync(new OperationLog
         {
             ItemType = "TOTP",
             ItemId = item.Id,
@@ -216,7 +216,6 @@ public sealed partial class MainWindowViewModel
         RaiseTotpSelectionState();
         if (updateStatus)
         {
-            await LoadTimelineAsync();
             StatusMessage = _localization.Format("MovedToRecycleBinFormat", item.Title);
         }
     }

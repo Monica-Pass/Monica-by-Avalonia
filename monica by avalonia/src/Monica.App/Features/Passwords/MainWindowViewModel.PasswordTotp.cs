@@ -87,4 +87,52 @@ public sealed partial class MainWindowViewModel
             UpdatedAt = entry.UpdatedAt
         };
     }
+
+    private void RefreshBoundTotpPresentation(IEnumerable<PasswordEntry> changedPasswords)
+    {
+        var selectedBoundPasswordId = SelectedTotpItem?.BoundPasswordId;
+        var changedById = changedPasswords
+            .GroupBy(item => item.Id)
+            .ToDictionary(group => group.Key, group => group.Last());
+        if (changedById.Count == 0)
+        {
+            return;
+        }
+
+        for (var index = TotpItems.Count - 1; index >= 0; index--)
+        {
+            if (TotpItems[index].BoundPasswordId is { } boundPasswordId && changedById.ContainsKey(boundPasswordId))
+            {
+                TotpItems.RemoveAt(index);
+            }
+        }
+
+        var activePasswordIds = Passwords.Select(item => item.Id).ToHashSet();
+        foreach (var password in changedById.Values.Reverse())
+        {
+            if (!activePasswordIds.Contains(password.Id) || !password.HasAuthenticator)
+            {
+                continue;
+            }
+
+            var item = BuildVirtualTotpItem(password);
+            TrackTotpSelection(item);
+            RefreshTotpDisplay(item);
+            TotpItems.Insert(0, item);
+        }
+
+        if (selectedBoundPasswordId is { } passwordId)
+        {
+            SelectedTotpItem = TotpItems.FirstOrDefault(item => item.BoundPasswordId == passwordId)
+                ?? TotpItems.FirstOrDefault();
+        }
+        else if (SelectedTotpItem is not null && !TotpItems.Contains(SelectedTotpItem))
+        {
+            SelectedTotpItem = TotpItems.FirstOrDefault();
+        }
+
+        OnPropertyChanged(nameof(HasTotpItems));
+        RaiseTotpFilterState();
+        RaiseTotpSelectionState();
+    }
 }

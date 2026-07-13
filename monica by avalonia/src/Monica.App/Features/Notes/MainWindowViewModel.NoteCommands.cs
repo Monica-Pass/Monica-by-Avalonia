@@ -343,7 +343,6 @@ public sealed partial class MainWindowViewModel
 
             var savedNote = await SaveNoteTabAsync(SelectedNoteTab);
             SelectedNote = savedNote;
-            await LoadTimelineAsync();
             RaiseCounts();
             StatusMessage = _localization.Format("SavedNoteFormat", savedNote.Title);
             return;
@@ -378,7 +377,7 @@ public sealed partial class MainWindowViewModel
         item.SyncStatus = item.BitwardenVaultId is null ? SyncStatus.None : SyncStatus.Pending;
 
         await _repository.SaveSecureItemAsync(item);
-        await _repository.LogAsync(new OperationLog
+        await LogOperationAsync(new OperationLog
         {
             ItemType = "NOTE",
             ItemId = item.Id,
@@ -401,7 +400,6 @@ public sealed partial class MainWindowViewModel
         }
 
         SelectedNote = item;
-        await LoadTimelineAsync();
         RaiseCounts();
         StatusMessage = _localization.Format("SavedNoteFormat", item.Title);
     }
@@ -442,7 +440,6 @@ public sealed partial class MainWindowViewModel
 
         if (savedCount > 0)
         {
-            await LoadTimelineAsync();
             RaiseCounts();
         }
 
@@ -557,7 +554,7 @@ public sealed partial class MainWindowViewModel
         item.SyncStatus = item.BitwardenVaultId is null ? SyncStatus.None : SyncStatus.Pending;
 
         await _repository.SaveSecureItemAsync(item);
-        await _repository.LogAsync(new OperationLog
+        await LogOperationAsync(new OperationLog
         {
             ItemType = "NOTE",
             ItemId = item.Id,

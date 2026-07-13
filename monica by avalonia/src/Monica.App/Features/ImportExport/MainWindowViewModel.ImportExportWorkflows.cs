@@ -474,7 +474,7 @@ public sealed partial class MainWindowViewModel
             importedSecureItems++;
         }
 
-        await _repository.LogAsync(new OperationLog
+        await LogOperationAsync(new OperationLog
         {
             ItemType = "VAULT",
             ItemTitle = _localization.Get("MonicaJson"),
@@ -538,7 +538,7 @@ public sealed partial class MainWindowViewModel
                 importedPasswords++;
             }
 
-            await _repository.LogAsync(new OperationLog
+            await LogOperationAsync(new OperationLog
             {
                 ItemType = "PASSWORD",
                 ItemTitle = _localization.Get("PasswordCsv"),
@@ -586,7 +586,7 @@ public sealed partial class MainWindowViewModel
                 importedNotes++;
             }
 
-            await _repository.LogAsync(new OperationLog
+            await LogOperationAsync(new OperationLog
             {
                 ItemType = "NOTE",
                 ItemTitle = _localization.Get("NoteCsv"),

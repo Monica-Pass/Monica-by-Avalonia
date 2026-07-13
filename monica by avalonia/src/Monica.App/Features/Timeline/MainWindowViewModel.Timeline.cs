@@ -39,6 +39,22 @@ public sealed partial class MainWindowViewModel
         ApplyTimelineLogs(logs);
     }
 
+    private async Task LogOperationAsync(OperationLog log, CancellationToken cancellationToken = default)
+    {
+        await _repository.LogAsync(log, cancellationToken);
+
+        var entry = CreateTimelineEntry(log);
+        TimelineEntries.Insert(0, entry);
+        while (TimelineEntries.Count > 150)
+        {
+            TimelineEntries.RemoveAt(TimelineEntries.Count - 1);
+        }
+
+        SelectedTimelineEntry ??= entry;
+        OnPropertyChanged(nameof(TimelineCountText));
+        OnPropertyChanged(nameof(HasTimelineEntries));
+    }
+
     private async Task LoadTimelineDeferredAsync()
     {
         try
@@ -56,12 +72,7 @@ public sealed partial class MainWindowViewModel
         var selectedStamp = SelectedTimelineEntry?.TimestampText;
         var selectedTitle = SelectedTimelineEntry?.Title;
         var entries = logs
-            .Select(log => new TimelineEntry(
-                string.IsNullOrWhiteSpace(log.ItemTitle) ? _localization.Get("Untitled") : log.ItemTitle,
-                _localization.Format("TimelineEntryDescriptionFormat", LocalizeOperationType(log.OperationType), log.ItemType, log.DeviceName),
-                log.Timestamp.LocalDateTime.ToString("g", _localization.Culture),
-                log.OperationType,
-                log.ItemType))
+            .Select(CreateTimelineEntry)
             .ToArray();
         ReplaceItems(TimelineEntries, entries);
         SelectedTimelineEntry =
@@ -73,6 +84,18 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(TimelineCountText));
         OnPropertyChanged(nameof(HasTimelineEntries));
     }
+
+    private TimelineEntry CreateTimelineEntry(OperationLog log) =>
+        new(
+            string.IsNullOrWhiteSpace(log.ItemTitle) ? _localization.Get("Untitled") : log.ItemTitle,
+            _localization.Format(
+                "TimelineEntryDescriptionFormat",
+                LocalizeOperationType(log.OperationType),
+                log.ItemType,
+                log.DeviceName),
+            log.Timestamp.LocalDateTime.ToString("g", _localization.Culture),
+            log.OperationType,
+            log.ItemType);
 
     [RelayCommand]
     private async Task ExportTimelineAsync()

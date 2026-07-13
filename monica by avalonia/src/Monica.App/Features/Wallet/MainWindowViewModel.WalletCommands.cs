@@ -18,7 +18,7 @@ public sealed partial class MainWindowViewModel
 
         var item = editor.ApplyTo();
         await _repository.SaveSecureItemAsync(item);
-        await _repository.LogAsync(new OperationLog
+        await LogOperationAsync(new OperationLog
         {
             ItemType = "WALLET",
             ItemId = item.Id,
@@ -30,7 +30,6 @@ public sealed partial class MainWindowViewModel
         WalletItems.Insert(0, item);
         SelectedWalletItem = item;
         RaiseCounts();
-        await LoadTimelineAsync();
         StatusMessage = _localization.Format("SavedWalletItemFormat", item.Title);
     }
 
@@ -51,7 +50,7 @@ public sealed partial class MainWindowViewModel
 
         editor.ApplyTo(item);
         await _repository.SaveSecureItemAsync(item);
-        await _repository.LogAsync(new OperationLog
+        await LogOperationAsync(new OperationLog
         {
             ItemType = "WALLET",
             ItemId = item.Id,
@@ -61,7 +60,6 @@ public sealed partial class MainWindowViewModel
         });
         SelectedWalletItem = item;
         SelectedWalletDetails = new WalletItemDetailsViewModel(_localization, item);
-        await LoadTimelineAsync();
         RaiseCounts();
         StatusMessage = _localization.Format("SavedWalletItemFormat", item.Title);
     }
@@ -146,7 +144,6 @@ public sealed partial class MainWindowViewModel
         }
 
         RaiseWalletSelectionState();
-        await LoadTimelineAsync();
         StatusMessage = _localization.Format("MovedSelectedWalletItemsToRecycleBinFormat", selected.Length);
     }
 }

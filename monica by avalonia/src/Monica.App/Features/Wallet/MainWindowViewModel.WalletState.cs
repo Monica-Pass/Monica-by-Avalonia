@@ -43,7 +43,7 @@ public sealed partial class MainWindowViewModel
             SelectedWalletItem = WalletItems.FirstOrDefault();
         }
 
-        await _repository.LogAsync(new OperationLog
+        await LogOperationAsync(new OperationLog
         {
             ItemType = "WALLET",
             ItemId = item.Id,
@@ -55,7 +55,6 @@ public sealed partial class MainWindowViewModel
         RaiseWalletSelectionState();
         if (updateStatus)
         {
-            await LoadTimelineAsync();
             StatusMessage = _localization.Format("MovedToRecycleBinFormat", item.Title);
         }
     }

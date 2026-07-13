@@ -20,7 +20,7 @@ public sealed partial class MainWindowViewModel
             item.ArchivedAt = null;
             item.IsSelected = false;
             await _repository.SavePasswordAsync(item);
-            await _repository.LogAsync(new OperationLog
+            await LogOperationAsync(new OperationLog
             {
                 ItemType = "PASSWORD",
                 ItemId = item.Id,
@@ -40,11 +40,10 @@ public sealed partial class MainWindowViewModel
         }
 
         ReplacePasswordGroup([], siblings);
-        await LoadTotpItemsAsync();
-        await LoadTimelineAsync();
+        RefreshBoundTotpPresentation(siblings);
         RaiseCounts();
         RaiseFilteredPasswordsChanged();
-        RefreshSecurityAnalysis();
+        InvalidateSecurityAnalysis();
         StatusMessage = _localization.Format("UnarchivedPasswordFormat", entry.Title);
     }
 

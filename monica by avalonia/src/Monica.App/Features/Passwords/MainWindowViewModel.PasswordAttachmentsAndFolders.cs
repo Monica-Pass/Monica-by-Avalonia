@@ -45,7 +45,7 @@ public sealed partial class MainWindowViewModel
         SetPasswordAttachments(entry.Id, [.. GetPasswordAttachments(entry.Id), attachment]);
         RefreshPasswordAttachmentState(entry);
         RaiseFilteredPasswordsChanged();
-        await _repository.LogAsync(new OperationLog
+        await LogOperationAsync(new OperationLog
         {
             ItemType = "PASSWORD",
             ItemId = entry.Id,
@@ -53,7 +53,6 @@ public sealed partial class MainWindowViewModel
             OperationType = "ATTACHMENT",
             DeviceName = Environment.MachineName
         }, cancellationToken);
-        await LoadTimelineAsync();
         StatusMessage = _localization.Format("AddedAttachmentFormat", attachment.FileName, entry.Title);
         return id;
     }
@@ -184,7 +183,7 @@ public sealed partial class MainWindowViewModel
         await _repository.SaveCategoryAsync(category);
         RefreshPasswordFolderFilters(category.Id);
         NewFolderName = "";
-        await _repository.LogAsync(new OperationLog
+        await LogOperationAsync(new OperationLog
         {
             ItemType = "CATEGORY",
             ItemId = category.Id,
@@ -192,7 +191,6 @@ public sealed partial class MainWindowViewModel
             OperationType = "UPDATE",
             DeviceName = Environment.MachineName
         });
-        await LoadTimelineAsync();
         StatusMessage = _localization.Format("RenamedFolderFormat", oldName, category.Name);
     }
 
@@ -235,7 +233,7 @@ public sealed partial class MainWindowViewModel
             item.CategoryId = null;
         }
 
-        await _repository.LogAsync(new OperationLog
+        await LogOperationAsync(new OperationLog
         {
             ItemType = "CATEGORY",
             ItemId = category.Id,
@@ -244,7 +242,6 @@ public sealed partial class MainWindowViewModel
             DeviceName = Environment.MachineName
         });
         RefreshPasswordFolderFilters(-1);
-        await LoadTimelineAsync();
         StatusMessage = _localization.Format("DeletedFolderFormat", name, movedPasswords);
     }
 

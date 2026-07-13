@@ -31,7 +31,7 @@ public sealed partial class MainWindowViewModel
         foreach (var entry in entries)
         {
             await _repository.SavePasswordAsync(entry);
-            await _repository.LogAsync(new OperationLog
+            await LogOperationAsync(new OperationLog
             {
                 ItemType = "PASSWORD",
                 ItemId = entry.Id,
@@ -51,9 +51,8 @@ public sealed partial class MainWindowViewModel
 
         await SynchronizeBoundTotpAsync(entries[0]);
         ReplacePasswordGroup([], entries);
-        await LoadTotpItemsAsync();
-        await LoadTimelineAsync();
-        RefreshSecurityAnalysis();
+        RefreshBoundTotpPresentation(entries);
+        InvalidateSecurityAnalysis();
         RaiseCounts();
         RaiseFilteredPasswordsChanged();
         StatusMessage = _localization.Format("CreatedPasswordFormat", entries[0].Title);
@@ -91,7 +90,7 @@ public sealed partial class MainWindowViewModel
             var updated = editor.BuildEntryFrom(source, storedPasswords[index]);
             await _repository.SavePasswordAsync(updated);
             await SavePasswordHistorySnapshotIfChangedAsync(updated.Id, oldPlainPassword, passwordRows[index]);
-            await _repository.LogAsync(new OperationLog
+            await LogOperationAsync(new OperationLog
             {
                 ItemType = "PASSWORD",
                 ItemId = updated.Id,
@@ -117,9 +116,8 @@ public sealed partial class MainWindowViewModel
 
         await SynchronizeBoundTotpAsync(updatedEntries[0]);
         ReplacePasswordGroup(siblings, updatedEntries);
-        await LoadTotpItemsAsync();
-        await LoadTimelineAsync();
-        RefreshSecurityAnalysis();
+        RefreshBoundTotpPresentation(siblings.Concat(updatedEntries));
+        InvalidateSecurityAnalysis();
         RaiseCounts();
         RaiseFilteredPasswordsChanged();
         StatusMessage = _localization.Format("UpdatedPasswordFormat", updatedEntries[0].Title);
@@ -684,7 +682,7 @@ public sealed partial class MainWindowViewModel
             {
                 entry.IsFavorite = true;
                 await _repository.SavePasswordAsync(entry);
-                await _repository.LogAsync(new OperationLog
+                await LogOperationAsync(new OperationLog
                 {
                     ItemType = "PASSWORD",
                     ItemId = entry.Id,
@@ -704,8 +702,7 @@ public sealed partial class MainWindowViewModel
         });
 
         RaiseFilteredPasswordsChanged();
-        RefreshSecurityAnalysis();
-        await LoadTimelineAsync();
+        InvalidateSecurityAnalysis();
         StatusMessage = _localization.Format("FavoritedPasswordCountFormat", selected.Length);
     }
 
@@ -753,7 +750,6 @@ public sealed partial class MainWindowViewModel
         }
 
         RefreshPasswordSelectionStateFromPasswords();
-        await LoadTimelineAsync();
         StatusMessage = _localization.Format("MovedSelectedPasswordsToRecycleBinFormat", selected.Length);
     }
 
@@ -792,7 +788,6 @@ public sealed partial class MainWindowViewModel
         }
 
         RefreshPasswordSelectionStateFromPasswords();
-        await LoadTimelineAsync();
         StatusMessage = _localization.Format("ArchivedSelectedPasswordsFormat", selected.Length);
     }
 
@@ -832,7 +827,7 @@ public sealed partial class MainWindowViewModel
                 sibling.CategoryId = choice.Id;
                 await _repository.SavePasswordAsync(sibling);
                 await SynchronizeBoundTotpAsync(sibling);
-                await _repository.LogAsync(new OperationLog
+                await LogOperationAsync(new OperationLog
                 {
                     ItemType = "PASSWORD",
                     ItemId = sibling.Id,
@@ -851,10 +846,9 @@ public sealed partial class MainWindowViewModel
             }
         });
 
-        await LoadTotpItemsAsync();
+        RefreshBoundTotpPresentation(selected);
         RefreshPasswordFolderFilters(choice.Id);
         RaiseFilteredPasswordsChanged();
-        await LoadTimelineAsync();
         StatusMessage = _localization.Format("MovedSelectedPasswordsToFolderFormat", selected.Length, choice.Name);
     }
     [RelayCommand]
@@ -885,7 +879,7 @@ public sealed partial class MainWindowViewModel
         {
             entry.ReplicaGroupId = replicaGroupId;
             await _repository.SavePasswordAsync(entry);
-            await _repository.LogAsync(new OperationLog
+            await LogOperationAsync(new OperationLog
             {
                 ItemType = "PASSWORD",
                 ItemId = entry.Id,
@@ -896,8 +890,7 @@ public sealed partial class MainWindowViewModel
         }
 
         RaiseFilteredPasswordsChanged();
-        RefreshSecurityAnalysis();
-        await LoadTimelineAsync();
+        InvalidateSecurityAnalysis();
         StatusMessage = _localization.Format("StackedPasswordCountFormat", selected.Length);
     }
 
@@ -924,7 +917,7 @@ public sealed partial class MainWindowViewModel
 
         entry.IsFavorite = !entry.IsFavorite;
         await _repository.SavePasswordAsync(entry);
-        await _repository.LogAsync(new OperationLog
+        await LogOperationAsync(new OperationLog
         {
             ItemType = "PASSWORD",
             ItemId = entry.Id,
@@ -932,8 +925,7 @@ public sealed partial class MainWindowViewModel
             OperationType = "FAVORITE",
             DeviceName = Environment.MachineName
         });
-        await LoadTimelineAsync();
-        RefreshSecurityAnalysis();
+        InvalidateSecurityAnalysis();
         RaiseFilteredPasswordsChanged();
     }
 
@@ -1022,7 +1014,7 @@ public sealed partial class MainWindowViewModel
             item.ArchivedAt = DateTimeOffset.UtcNow;
             item.IsSelected = false;
             await _repository.SavePasswordAsync(item);
-            await _repository.LogAsync(new OperationLog
+            await LogOperationAsync(new OperationLog
             {
                 ItemType = "PASSWORD",
                 ItemId = item.Id,
@@ -1042,12 +1034,11 @@ public sealed partial class MainWindowViewModel
             ArchivedPasswords.Insert(0, item);
         }
 
-        await LoadTotpItemsAsync();
+        RefreshBoundTotpPresentation(siblings);
         RaiseCounts();
         RefreshPasswordSelectionStateFromPasswords();
         RaiseFilteredPasswordsChanged();
-        RefreshSecurityAnalysis();
-        await LoadTimelineAsync();
+        InvalidateSecurityAnalysis();
         if (updateStatus)
         {
             StatusMessage = _localization.Format("ArchivedPasswordFormat", entry.Title);
@@ -1059,7 +1050,7 @@ public sealed partial class MainWindowViewModel
         foreach (var item in siblings)
         {
             await _repository.SoftDeletePasswordAsync(item.Id);
-            await _repository.LogAsync(new OperationLog
+            await LogOperationAsync(new OperationLog
             {
                 ItemType = "PASSWORD",
                 ItemId = item.Id,
@@ -1092,12 +1083,11 @@ public sealed partial class MainWindowViewModel
             DeletedPasswords.Insert(0, item);
         }
 
-        await LoadTotpItemsAsync();
+        RefreshBoundTotpPresentation(siblings);
         RaiseCounts();
         RefreshPasswordSelectionStateFromPasswords();
         RaiseFilteredPasswordsChanged();
-        RefreshSecurityAnalysis();
-        await LoadTimelineAsync();
+        InvalidateSecurityAnalysis();
         if (updateStatus)
         {
             StatusMessage = _localization.Format("MovedToRecycleBinFormat", entry.Title);

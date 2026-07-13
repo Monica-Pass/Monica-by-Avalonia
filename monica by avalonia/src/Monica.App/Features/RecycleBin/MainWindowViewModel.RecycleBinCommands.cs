@@ -17,7 +17,7 @@ public sealed partial class MainWindowViewModel
         foreach (var item in siblings)
         {
             await _repository.RestorePasswordAsync(item.Id);
-            await _repository.LogAsync(new OperationLog
+            await LogOperationAsync(new OperationLog
             {
                 ItemType = "PASSWORD",
                 ItemId = item.Id,
@@ -38,11 +38,10 @@ public sealed partial class MainWindowViewModel
         }
 
         ReplacePasswordGroup([], siblings);
-        await LoadTotpItemsAsync();
-        await LoadTimelineAsync();
+        RefreshBoundTotpPresentation(siblings);
         RaiseCounts();
         RaiseFilteredPasswordsChanged();
-        RefreshSecurityAnalysis();
+        InvalidateSecurityAnalysis();
         StatusMessage = _localization.Format("RestoredPasswordFormat", entry.Title);
     }
 
@@ -63,7 +62,7 @@ public sealed partial class MainWindowViewModel
         foreach (var item in siblings)
         {
             await _repository.DeletePasswordPermanentlyAsync(item.Id);
-            await _repository.LogAsync(new OperationLog
+            await LogOperationAsync(new OperationLog
             {
                 ItemType = "PASSWORD",
                 ItemId = item.Id,
@@ -79,10 +78,9 @@ public sealed partial class MainWindowViewModel
             }
         }
 
-        await LoadTotpItemsAsync();
-        await LoadTimelineAsync();
+        RefreshBoundTotpPresentation(siblings);
         RaiseCounts();
-        RefreshSecurityAnalysis();
+        InvalidateSecurityAnalysis();
         StatusMessage = _localization.Format("DeletedPasswordPermanentlyFormat", entry.Title);
     }
 
@@ -103,7 +101,7 @@ public sealed partial class MainWindowViewModel
         foreach (var item in items)
         {
             await _repository.DeletePasswordPermanentlyAsync(item.Id);
-            await _repository.LogAsync(new OperationLog
+            await LogOperationAsync(new OperationLog
             {
                 ItemType = "PASSWORD",
                 ItemId = item.Id,
@@ -114,10 +112,9 @@ public sealed partial class MainWindowViewModel
         }
 
         DeletedPasswords.Clear();
-        await LoadTotpItemsAsync();
-        await LoadTimelineAsync();
+        RefreshBoundTotpPresentation(items);
         RaiseCounts();
-        RefreshSecurityAnalysis();
+        InvalidateSecurityAnalysis();
         StatusMessage = _localization.Format("EmptiedRecycleBinFormat", items.Length);
     }
 

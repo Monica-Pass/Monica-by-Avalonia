@@ -228,6 +228,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(SelectedSectionTitle));
         RaiseShellStatus();
+        RefreshSecurityAnalysisIfNeeded();
     }
 
     partial void OnStatusMessageChanged(string value) => RaiseShellStatus();
@@ -409,7 +410,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             _ = LoadTimelineDeferredAsync();
             if (deferSecurityAnalysis)
             {
-                _ = RefreshSecurityAnalysisDeferredAsync();
+                InvalidateSecurityAnalysis();
             }
             else
             {
