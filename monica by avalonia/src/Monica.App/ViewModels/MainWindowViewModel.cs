@@ -921,16 +921,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
 
 
-    [RelayCommand]
-    private void ShowSecurityIssueDetails(SecurityIssueItem? issue)
-    {
-        if (issue is not null)
-        {
-            SelectedSecurityIssue = issue;
-        }
-    }
-
-
 
 
     public async Task<long> AddPasswordAttachmentMetadataAsync(

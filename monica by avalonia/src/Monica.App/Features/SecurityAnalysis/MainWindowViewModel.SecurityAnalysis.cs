@@ -11,6 +11,15 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    [RelayCommand]
+    private void ShowSecurityIssueDetails(SecurityIssueItem? issue)
+    {
+        if (issue is not null)
+        {
+            SelectedSecurityIssue = issue;
+        }
+    }
+
     private static readonly string[] KnownTwoFactorDomains =
     [
         "google.com",
