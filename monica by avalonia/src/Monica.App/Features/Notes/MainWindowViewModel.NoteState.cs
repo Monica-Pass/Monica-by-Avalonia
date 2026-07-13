@@ -5,11 +5,21 @@ using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Monica.App.Services;
 using Monica.Core.Models;
+using Monica.Platform.Services;
 
 namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    private static readonly PlatformFilePickerFileType[] MarkdownFileTypes =
+    [
+        new("Markdown", ["*.md", "*.markdown"])
+    ];
+    private static readonly PlatformFilePickerFileType[] NoteImageFileTypes =
+    [
+        new("Images", ["*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp"])
+    ];
+
     private void LoadNoteIntoEditor(SecureItem? item)
     {
         if (item is null)
