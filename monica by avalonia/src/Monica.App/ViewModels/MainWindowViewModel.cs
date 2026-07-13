@@ -28,7 +28,6 @@ using Monica.Platform.Services;
 
 namespace Monica.App.ViewModels;
 
-public sealed record SettingsChoice(object Value, string Label);
 public sealed record TimelineEntry(string Title, string Description, string TimestampText, string OperationType, string ItemType);
 public sealed record VaultSourceDisplayItem(string DisplayName, string Kind, string LocalPath, string RemoteUrl, string SyncStatus);
 public sealed record SyncHealthDisplayItem(string Label, string Value, string Detail);
@@ -80,20 +79,6 @@ internal sealed class DisabledWalletItemEditorDialogService : IWalletItemEditorD
         Task.FromResult<WalletItemEditorViewModel?>(null);
 }
 
-internal sealed class DisabledMasterPasswordMaintenanceService : IMasterPasswordMaintenanceService
-{
-    public Task<MasterPasswordMaintenanceResult> ChangeMasterPasswordAsync(
-        string currentPassword,
-        string newPassword,
-        CancellationToken cancellationToken = default) =>
-        Task.FromResult(MasterPasswordMaintenanceResult.Failure("Master password maintenance is not available."));
-
-    public Task<MasterPasswordMaintenanceResult> ResetMasterPasswordFromUnlockedVaultAsync(
-        string newPassword,
-        CancellationToken cancellationToken = default) =>
-        Task.FromResult(MasterPasswordMaintenanceResult.Failure("Master password maintenance is not available."));
-}
-
 internal sealed class DisabledConfirmationDialogService : IConfirmationDialogService
 {
     public Task<bool> ConfirmAsync(
@@ -117,8 +102,6 @@ internal sealed class DisabledConfirmationDialogService : IConfirmationDialogSer
 
 public sealed partial class MainWindowViewModel : ObservableObject
 {
-    public const string GitHubRepositoryUrl = "https://github.com/JoyinJoester/Monica";
-
     private const int PasswordHistoryLimit = 10;
     private const int PasswordQuickAccessLimit = 6;
     private static readonly TimeSpan SelectedPasswordDetailsCoalesceDelay = TimeSpan.FromMilliseconds(60);
@@ -195,10 +178,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IConfirmationDialogService _confirmationDialogService;
     private readonly ITotpEditorDialogService _totpEditorDialogService;
     private readonly IWalletItemEditorDialogService _walletItemEditorDialogService;
-    private readonly IMasterPasswordMaintenanceService _masterPasswordMaintenanceService;
-    private readonly IAppSettingsService _settingsService;
     private readonly ILocalizationService _localization;
-    private readonly SecurityQuestionService _securityQuestionService = new();
     private IReadOnlyDictionary<long, IReadOnlyList<CustomField>> _passwordCustomFields = new Dictionary<long, IReadOnlyList<CustomField>>();
     private IReadOnlyDictionary<long, IReadOnlyList<Attachment>> _passwordAttachments = new Dictionary<long, IReadOnlyList<Attachment>>();
     private IReadOnlyDictionary<long, PasswordQuickAccessRecord> _passwordQuickAccessRecords = new Dictionary<long, PasswordQuickAccessRecord>();
@@ -209,16 +189,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private int _selectedPasswordCount;
     private bool _suppressPasswordSelectionStateNotifications;
     private bool _isSyncingSelectedPasswordListRow;
-    private bool _isApplyingSettings;
     private bool _isApplyingPasswordSearchImmediately;
     private CancellationTokenSource? _passwordSearchDebounceCts;
     private CancellationTokenSource? _selectedPasswordDetailsCts;
     private int _selectedPasswordDetailsVersion;
     private readonly HashSet<string> _collapsedPasswordFolderKeys = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _expandedPasswordStackKeys = new(StringComparer.OrdinalIgnoreCase);
-    private readonly object _settingsSaveSync = new();
-    private bool _isSavingSettings;
-    private bool _hasPendingSettingsSave;
 
     public MainWindowViewModel(
         IMonicaRepository repository,
@@ -295,14 +271,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<SyncHealthDisplayItem> MdbxHealthItems { get; } = [];
     public ObservableCollection<SyncHealthDisplayItem> SyncHealthItems { get; } = [];
     public ObservableCollection<WebDavBackupHistoryItem> WebDavBackupHistory { get; } = [];
-    public ObservableCollection<SettingsChoice> LanguageOptions { get; } = [];
-    public ObservableCollection<SettingsChoice> ThemeOptions { get; } = [];
-    public ObservableCollection<SettingsChoice> StartupSectionOptions { get; } = [];
-    public ObservableCollection<SettingsChoice> AutoLockMinuteOptions { get; } = [];
-    public ObservableCollection<SettingsChoice> ClipboardSecondOptions { get; } = [];
     public ObservableCollection<SettingsChoice> ConflictStrategyOptions { get; } = [];
     public ObservableCollection<SettingsChoice> PasswordSortOptions { get; } = [];
-    public ObservableCollection<SettingsChoice> SecurityQuestionOptions { get; } = [];
     public ObservableCollection<PasswordFolderFilterChoice> PasswordFolderFilters { get; } = [];
     public IEnumerable<PasswordFolderFilterChoice> SystemPasswordFolderFilters =>
         PasswordFolderFilters.Where(item => item.IsSystemNode);
@@ -310,63 +280,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         PasswordFolderFilters.Where(item => !item.IsSystemNode);
     public bool HasRegularPasswordFolderFilters => PasswordFolderFilters.Any(item => !item.IsSystemNode);
 
-    public string AboutTitle => _localization.Get("About");
-    public string AboutDescription => _localization.Get("AboutDescription");
-    public string AppVersionLabel => _localization.Get("AppVersion");
-    public string GitHubRepositoryLabel => _localization.Get("GitHubRepository");
-    public string OpenRepositoryText => _localization.Get("OpenRepository");
-    public string RepositoryUrlText => GitHubRepositoryUrl;
-    public string AppVersionText => GetAppVersionText();
-    public string DangerZoneTitle => _localization.Get("DangerZone");
-    public string DangerZoneDescription => _localization.Get("DangerZoneDescription");
-    public string ClearVaultDataTitle => _localization.Get("ClearVaultData");
-    public string ClearVaultDataDescription => _localization.Get("ClearVaultDataDescription");
-    public string ClearPasswordsOnlyText => _localization.Get("ClearPasswordsOnly");
-    public string ClearSecureItemsOnlyText => _localization.Get("ClearSecureItemsOnly");
-    public string ClearAllVaultDataText => _localization.Get("ClearAllVaultData");
-    public string ClearVaultConfirmationInstructionText =>
-        _localization.Format("ClearVaultConfirmationInstructionFormat", _localization.Get("ClearVaultConfirmationPhrase"));
-    public string ChangeMasterPasswordTitle => _localization.Get("ChangeMasterPassword");
-    public string ChangeMasterPasswordDescription => _localization.Get("ChangeMasterPasswordDescription");
-    public string CurrentMasterPasswordText => _localization.Get("CurrentMasterPassword");
-    public string NewMasterPasswordText => _localization.Get("NewMasterPassword");
-    public string ConfirmNewMasterPasswordText => _localization.Get("ConfirmNewMasterPassword");
-    public string ChangeMasterPasswordActionText => _localization.Get("ChangeMasterPasswordAction");
-    public string SecurityRecoveryTitle => _localization.Get("SecurityRecovery");
-    public string SecurityRecoveryDescription => _localization.Get("SecurityRecoveryDescription");
-    public string SecurityRecoveryStatusText => _settingsService.Current.SecurityRecovery.HasCompleteSetup
-        ? _localization.Get("SecurityQuestionsConfigured")
-        : _localization.Get("SecurityQuestionsNotConfigured");
-    public string SecurityRecoveryEnabledText => _localization.Get("SecurityRecoveryEnabled");
-    public string SecurityQuestion1Text => _localization.Get("SecurityQuestion1");
-    public string SecurityQuestion2Text => _localization.Get("SecurityQuestion2");
-    public string SecurityQuestionAnswerText => _localization.Get("SecurityQuestionAnswer");
-    public string CustomSecurityQuestionText => _localization.Get("CustomSecurityQuestion");
-    public string SaveSecurityQuestionsText => _localization.Get("SaveSecurityQuestions");
-    public string ResetMasterPasswordTitle => _localization.Get("ResetMasterPassword");
-    public string ResetMasterPasswordDescription => _localization.Get("ResetMasterPasswordDescription");
-    public string ResetMasterPasswordActionText => _localization.Get("ResetMasterPasswordAction");
-    public string SecurityRecoveryQuestion1PromptText => _settingsService.Current.SecurityRecovery.Question1Text;
-    public string SecurityRecoveryQuestion2PromptText => _settingsService.Current.SecurityRecovery.Question2Text;
-    public bool IsSecurityQuestion1Custom => SecurityQuestion1Id == SecurityQuestionService.CustomQuestionId;
-    public bool IsSecurityQuestion2Custom => SecurityQuestion2Id == SecurityQuestionService.CustomQuestionId;
-    public bool CanResetMasterPasswordWithSecurityQuestions => _settingsService.Current.SecurityRecovery.HasCompleteSetup;
-    public bool CanRunResetMasterPassword => CanResetMasterPasswordWithSecurityQuestions && !IsResettingMasterPassword;
-
     [ObservableProperty]
     private string _selectedSection = "Passwords";
-
-    [ObservableProperty]
-    private string _currentMasterPassword = "";
-
-    [ObservableProperty]
-    private string _newMasterPassword = "";
-
-    [ObservableProperty]
-    private string _confirmNewMasterPassword = "";
-
-    [ObservableProperty]
-    private bool _isChangingMasterPassword;
 
     [ObservableProperty]
     private string _searchText = "";
@@ -489,17 +404,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private WebDavBackupHistoryItem? _selectedWebDavBackupHistoryItem;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsSettingsGeneralSelected))]
-    [NotifyPropertyChangedFor(nameof(IsSettingsSecuritySelected))]
-    [NotifyPropertyChangedFor(nameof(IsSettingsSecurityRecoverySelected))]
-    [NotifyPropertyChangedFor(nameof(IsSettingsDataSelected))]
-    [NotifyPropertyChangedFor(nameof(IsSettingsDesktopSelected))]
-    [NotifyPropertyChangedFor(nameof(IsSettingsIntegrationsSelected))]
-    [NotifyPropertyChangedFor(nameof(IsSettingsAboutSelected))]
-    [NotifyPropertyChangedFor(nameof(IsSettingsDangerSelected))]
-    private string _selectedSettingsPage = "General";
-
-    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSyncConfigurationSelected))]
     [NotifyPropertyChangedFor(nameof(IsSyncBackupSelected))]
     [NotifyPropertyChangedFor(nameof(IsSyncSourcesSelected))]
@@ -522,70 +426,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _selectedMdbxWorkspacePage = "Details";
 
     [ObservableProperty]
-    private string _settingsLanguage = "system";
-
-    [ObservableProperty]
-    private string _settingsTheme = "system";
-
-    [ObservableProperty]
-    private string _startupSection = "Passwords";
-
-    [ObservableProperty]
-    private bool _autoLockEnabled = true;
-
-    [ObservableProperty]
-    private int _autoLockMinutes = 5;
-
-    [ObservableProperty]
-    private bool _clearClipboardEnabled = true;
-
-    [ObservableProperty]
-    private int _clipboardClearSeconds = 30;
-
-    [ObservableProperty]
-    private bool _requirePasswordBeforeExport = true;
-
-    [ObservableProperty]
-    private bool _securityRecoveryEnabled;
-
-    [ObservableProperty]
-    private int _securityQuestion1Id = 11;
-
-    [ObservableProperty]
-    private string _securityQuestion1CustomText = "";
-
-    [ObservableProperty]
-    private string _securityQuestion1Answer = "";
-
-    [ObservableProperty]
-    private int _securityQuestion2Id = 1;
-
-    [ObservableProperty]
-    private string _securityQuestion2CustomText = "";
-
-    [ObservableProperty]
-    private string _securityQuestion2Answer = "";
-
-    [ObservableProperty]
-    private string _securityRecoveryAnswer1 = "";
-
-    [ObservableProperty]
-    private string _securityRecoveryAnswer2 = "";
-
-    [ObservableProperty]
-    private string _recoveryNewMasterPassword = "";
-
-    [ObservableProperty]
-    private string _recoveryConfirmNewMasterPassword = "";
-
-    [ObservableProperty]
-    private bool _isResettingMasterPassword;
-
-    [ObservableProperty]
     private bool _compactPasswordList;
-
-    [ObservableProperty]
-    private string _dangerZoneConfirmationText = "";
 
     [ObservableProperty]
     private bool _webDavEnabled;
@@ -935,14 +776,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         "WebDavBackupOptionsSummaryFormat",
         CountSelectedWebDavBackupOptions(),
         WebDavBackupEncryptionEnabled ? _localization.Get("Encrypted") : _localization.Get("PlainJson"));
-    public bool IsSettingsGeneralSelected => IsWorkspacePageSelected(SelectedSettingsPage, "General");
-    public bool IsSettingsSecuritySelected => IsWorkspacePageSelected(SelectedSettingsPage, "Security");
-    public bool IsSettingsSecurityRecoverySelected => IsWorkspacePageSelected(SelectedSettingsPage, "SecurityRecovery");
-    public bool IsSettingsDataSelected => IsWorkspacePageSelected(SelectedSettingsPage, "Data");
-    public bool IsSettingsDesktopSelected => IsWorkspacePageSelected(SelectedSettingsPage, "Desktop");
-    public bool IsSettingsIntegrationsSelected => IsWorkspacePageSelected(SelectedSettingsPage, "Integrations");
-    public bool IsSettingsAboutSelected => IsWorkspacePageSelected(SelectedSettingsPage, "About");
-    public bool IsSettingsDangerSelected => IsWorkspacePageSelected(SelectedSettingsPage, "Danger");
     public bool IsSyncConfigurationSelected => IsWorkspacePageSelected(SelectedSyncPage, "Configuration");
     public bool IsSyncBackupSelected => IsWorkspacePageSelected(SelectedSyncPage, "Backup");
     public bool IsSyncSourcesSelected => IsWorkspacePageSelected(SelectedSyncPage, "Sources");
@@ -1100,60 +933,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             value.Contains("无法", StringComparison.Ordinal) ||
             value.Contains("失败", StringComparison.Ordinal) ||
             value.Contains("错误", StringComparison.Ordinal);
-    }
-
-    partial void OnSettingsLanguageChanged(string value)
-    {
-        if (_isApplyingSettings)
-        {
-            return;
-        }
-
-        _localization.SetLanguage(value);
-        _settingsService.Current.Language = value;
-        QueueSaveSettings();
-    }
-
-    partial void OnSettingsThemeChanged(string value)
-    {
-        ApplyTheme(value);
-        UpdateSettings(settings => settings.Theme = value);
-    }
-
-    partial void OnStartupSectionChanged(string value) => UpdateSettings(settings => settings.StartupSection = value);
-    partial void OnAutoLockEnabledChanged(bool value) => UpdateSettings(settings => settings.AutoLockEnabled = value);
-    partial void OnAutoLockMinutesChanged(int value) => UpdateSettings(settings => settings.AutoLockMinutes = value);
-    partial void OnClearClipboardEnabledChanged(bool value) => UpdateSettings(settings => settings.ClearClipboardEnabled = value);
-    partial void OnClipboardClearSecondsChanged(int value) => UpdateSettings(settings => settings.ClipboardClearSeconds = value);
-    partial void OnRequirePasswordBeforeExportChanged(bool value) => UpdateSettings(settings => settings.RequirePasswordBeforeExport = value);
-    partial void OnSecurityRecoveryEnabledChanged(bool value)
-    {
-        UpdateSettings(settings => settings.SecurityRecovery.IsEnabled = value);
-        OnPropertyChanged(nameof(SecurityRecoveryStatusText));
-        OnPropertyChanged(nameof(CanResetMasterPasswordWithSecurityQuestions));
-        OnPropertyChanged(nameof(CanRunResetMasterPassword));
-    }
-
-    partial void OnIsResettingMasterPasswordChanged(bool value) => OnPropertyChanged(nameof(CanRunResetMasterPassword));
-
-    partial void OnSecurityQuestion1IdChanged(int value)
-    {
-        if (!IsSecurityQuestion1Custom)
-        {
-            SecurityQuestion1CustomText = "";
-        }
-
-        OnPropertyChanged(nameof(IsSecurityQuestion1Custom));
-    }
-
-    partial void OnSecurityQuestion2IdChanged(int value)
-    {
-        if (!IsSecurityQuestion2Custom)
-        {
-            SecurityQuestion2CustomText = "";
-        }
-
-        OnPropertyChanged(nameof(IsSecurityQuestion2Custom));
     }
 
     partial void OnCompactPasswordListChanged(bool value)
