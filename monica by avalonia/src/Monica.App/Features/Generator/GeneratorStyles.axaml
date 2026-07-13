@@ -1,0 +1,23 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+<Style Selector="Border.generatorResultPanel">
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+</Style>
+<Style Selector="Border.generatorOptionsPanel">
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource LayerFillColorDefaultBrush}" />
+</Style>
+<Style Selector="TextBox.generatorPasswordBox">
+    <Setter Property="FontFamily" Value="Consolas" />
+    <Setter Property="FontSize" Value="22" />
+    <Setter Property="MinHeight" Value="170" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="AcceptsReturn" Value="True" />
+    <Setter Property="VerticalContentAlignment" Value="Top" />
+</Style>
+</Styles>
