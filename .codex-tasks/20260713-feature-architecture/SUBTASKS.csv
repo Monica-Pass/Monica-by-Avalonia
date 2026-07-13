@@ -1,7 +1,0 @@
-id,task,task_type,status,depends_on,task_dir,acceptance_criteria,validation_command,completed_at,retry_count,notes
-1,Extract unlock feature,single-full,IN_PROGRESS,,tasks/20260713-unlock,"Unlock UI and logic live under Features/Unlock; existing behavior passes","dotnet build Monica.slnx --no-restore && dotnet test Monica.slnx --no-restore --no-build",,0,
-2,Extract password vault feature,single-full,TODO,1,tasks/20260713-passwords,"Password view state and UI are isolated from the shell","dotnet build Monica.slnx --no-restore && dotnet test Monica.slnx --no-restore --no-build",,0,
-3,Extract secure notes feature,single-full,TODO,2,tasks/20260713-notes,"Note workspace state and UI are isolated from the shell","dotnet build Monica.slnx --no-restore && dotnet test Monica.slnx --no-restore --no-build",,0,
-4,Extract TOTP and wallet features,single-full,TODO,3,tasks/20260713-totp-wallet,"TOTP and wallet state and UI have feature locality","dotnet build Monica.slnx --no-restore && dotnet test Monica.slnx --no-restore --no-build",,0,
-5,Extract settings sync import and MDBX features,single-full,TODO,4,tasks/20260713-platform-features,"Remaining feature workflows no longer reside in the shell","dotnet build Monica.slnx --no-restore && dotnet test Monica.slnx --no-restore --no-build",,0,
-6,Consolidate shell and UI tests,single-full,TODO,5,tasks/20260713-shell-tests,"Main window is shell-only and critical UI paths have headless coverage","dotnet build Monica.slnx --no-restore && dotnet test Monica.slnx --no-restore --no-build",,0,

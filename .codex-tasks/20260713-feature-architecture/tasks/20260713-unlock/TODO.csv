@@ -1,5 +1,0 @@
-id,task,status,acceptance_criteria,validation_command,completed_at,retry_count,notes
-1,Map unlock dependencies,DONE,"Unlock state and call sites are identified","Select-String unlock references",2026-07-13,0,
-2,Extract unlock view,DONE,"Feature view compiles with existing behavior","dotnet build Monica.slnx --no-restore",2026-07-13,0,"Submitted as a small independently testable batch"
-3,Extract unlock ViewModel state and add focused coverage,IN_PROGRESS,"Unlock feature behavior is isolated and covered independently","dotnet test tests/Monica.Tests/Monica.Tests.csproj --no-restore --no-build",,0,
-4,Validate publish and handoff,TODO,"Full tests pass; commit is pushed; app runs","dotnet test Monica.slnx --no-restore --no-build",,0,
