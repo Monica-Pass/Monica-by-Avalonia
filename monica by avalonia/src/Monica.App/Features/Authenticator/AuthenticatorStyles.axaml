@@ -1,0 +1,72 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+<Style Selector="Button.totpAccountButton">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="VerticalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="VerticalContentAlignment" Value="Stretch" />
+</Style>
+<Style Selector="Button.totpAccountButton:pointerover">
+    <Setter Property="Background" Value="Transparent" />
+</Style>
+<Style Selector="Button.totpAccountButton:pressed">
+    <Setter Property="Background" Value="Transparent" />
+</Style>
+<Style Selector="ListBox.totpAccountList ListBoxItem">
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="MinHeight" Value="76" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="VerticalContentAlignment" Value="Stretch" />
+</Style>
+<Style Selector="ListBox.totpAccountList ListBoxItem:selected">
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+    <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
+</Style>
+<Style Selector="Border.totpAccountRow">
+    <Setter Property="Padding" Value="12,10" />
+    <Setter Property="MinHeight" Value="76" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="Background" Value="Transparent" />
+</Style>
+<Style Selector="Button.totpFilterButton">
+    <Setter Property="MinHeight" Value="34" />
+    <Setter Property="Padding" Value="8,6" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="6" />
+</Style>
+<Style Selector="Button.totpFilterButton:pointerover">
+    <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+</Style>
+<Style Selector="Button.totpFilterButton:selected">
+    <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
+</Style>
+<Style Selector="Border.totpCodeConsole">
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+</Style>
+<Style Selector="Border.totpInspector">
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource LayerFillColorDefaultBrush}" />
+</Style>
+<Style Selector="Border.totpRiskZone">
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource LayerFillColorSubtleBrush}" />
+</Style>
+</Styles>

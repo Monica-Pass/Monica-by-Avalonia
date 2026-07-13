@@ -1,0 +1,361 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:local="using:Monica.App"
+             xmlns:models="using:Monica.Core.Models"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Authenticator.AuthenticatorWorkspaceView"
+             x:Name="AuthenticatorWorkspaceRoot"
+             x:DataType="vm:MainWindowViewModel">
+<Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsTotp}}"
+      RowDefinitions="Auto,*"
+      HorizontalAlignment="Stretch"
+      ClipToBounds="True">
+    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
+        <Grid ColumnDefinitions="*,320,Auto" ColumnSpacing="12" MinHeight="56">
+            <StackPanel MinWidth="0" VerticalAlignment="Center">
+                <TextBlock Classes="workspacePageTitle" Text="{Binding L.TwoStepVerification}" />
+                <TextBlock Text="{Binding TotpConsoleStatusText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+            <TextBox Grid.Column="1"
+                     PlaceholderText="{Binding L.Search}"
+                     Text="{Binding SearchText}"
+                     VerticalAlignment="Center" />
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button Classes="workspacePrimaryCommand" Command="{Binding AddTotpCommand}" ToolTip.Tip="{Binding L.AddAuthenticator}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Add" FontSize="18" />
+                        <TextBlock Text="{Binding TotpManualAddText}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding ScanTotpQrCommand}" ToolTip.Tip="{Binding TotpScanQrText}" AutomationProperties.Name="{Binding TotpScanQrText}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:FluentIcon Icon="Document" FontSize="16" />
+                        <TextBlock Text="{Binding TotpScanQrText}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding LoadCommand}" ToolTip.Tip="{Binding L.Refresh}" AutomationProperties.Name="{Binding L.Refresh}" Width="36" Height="36" Padding="0">
+                    <ic:FluentIcon Icon="ArrowClockwise" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Button>
+                <Button Classes="workspaceCommand" ToolTip.Tip="{Binding TotpMoreActionsText}" AutomationProperties.Name="{Binding TotpMoreActionsText}" Width="36" Height="36" Padding="0">
+                    <ic:FluentIcon Icon="MoreHorizontal" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Button.Flyout>
+                        <MenuFlyout>
+                            <MenuItem Header="{Binding L.ImportTotpCsv}" Command="{Binding ImportTotpCsvFileCommand}" IsEnabled="{Binding CanUseFilePicker}">
+                                <MenuItem.Icon>
+                                    <ic:FluentIcon Icon="ArrowUpload" FontSize="16" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="{Binding L.ImportAegisJson}" Command="{Binding ImportAegisJsonFileCommand}" IsEnabled="{Binding CanUseFilePicker}">
+                                <MenuItem.Icon>
+                                    <ic:FluentIcon Icon="ArrowUpload" FontSize="16" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator />
+                            <MenuItem Header="{Binding L.SaveTotpCsvExport}" Command="{Binding SaveTotpCsvExportCommand}" IsEnabled="{Binding CanUseFilePicker}">
+                                <MenuItem.Icon>
+                                    <ic:FluentIcon Icon="ArrowDownload" FontSize="16" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="{Binding L.SaveAegisExport}" Command="{Binding SaveAegisJsonExportCommand}" IsEnabled="{Binding CanUseFilePicker}">
+                                <MenuItem.Icon>
+                                    <ic:FluentIcon Icon="ArrowDownload" FontSize="16" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator />
+                            <MenuItem Header="{Binding TotpShowHiddenText}" IsEnabled="False">
+                                <MenuItem.Icon>
+                                    <ic:FluentIcon Icon="Info" FontSize="16" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="{Binding SortTitleText}" IsEnabled="False">
+                                <MenuItem.Icon>
+                                    <ic:FluentIcon Icon="TextBulletList" FontSize="16" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="{Binding TotpHelpText}" IsEnabled="False">
+                                <MenuItem.Icon>
+                                    <ic:FluentIcon Icon="Info" FontSize="16" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Border>
+
+    <Grid Grid.Row="1" ColumnSpacing="14" MinWidth="0">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="{Binding TotpAccountColumnWidth}" />
+            <ColumnDefinition Width="{Binding TotpCodeColumnWidth}" />
+            <ColumnDefinition Width="{Binding TotpInspectorColumnWidth}" />
+        </Grid.ColumnDefinitions>
+        <Border Classes="workspaceSidebar" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,Auto,*,Auto">
+            <Grid Margin="14,12,14,8" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <StackPanel Spacing="3">
+                    <TextBlock Classes="workspaceSectionLabel" Text="{Binding TotpFilterTitleText}" />
+                    <TextBlock Text="{Binding TotpFilteredStatusText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" TextWrapping="Wrap" MaxLines="2" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="workspaceCommand" Command="{Binding AddTotpCommand}" ToolTip.Tip="{Binding L.AddAuthenticator}" AutomationProperties.Name="{Binding L.AddAuthenticator}" Width="34" Height="34" Padding="0">
+                    <ic:FluentIcon Icon="Add" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Button>
+            </Grid>
+            <ScrollViewer Grid.Row="1"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto"
+                          MaxHeight="176"
+                          Margin="8,0,8,8">
+                <StackPanel Spacing="2">
+                    <ItemsControl ItemsSource="{Binding TotpFilterChoices}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TotpFilterChoice">
+                                <Button Classes="totpFilterButton"
+                                        Command="{Binding #AuthenticatorWorkspaceRoot.DataContext.SelectTotpFilterCommand}"
+                                        CommandParameter="{Binding Key}"
+                                        ToolTip.Tip="{Binding Label}">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" MinWidth="0" Margin="{Binding Indent}">
+                                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                        <Border Grid.Column="1" Classes="workspaceStatusChip">
+                                            <TextBlock Text="{Binding Count}" FontSize="12" />
+                                        </Border>
+                                    </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+            <Grid Grid.Row="2">
+            <ListBox Classes="totpAccountList"
+                     ItemsSource="{Binding FilteredTotpItems}"
+                     SelectedItem="{Binding SelectedTotpItem}"
+                     SelectionMode="Single"
+                     IsVisible="{Binding HasFilteredTotpItems}"
+                     Margin="8,0,8,8">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="models:SecureItem">
+                        <Border Classes="totpAccountRow">
+                            <Border.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="{Binding #AuthenticatorWorkspaceRoot.DataContext.L.Copy}" Command="{Binding #AuthenticatorWorkspaceRoot.DataContext.CopyTotpCommand}" CommandParameter="{Binding}">
+                                        <MenuItem.Icon>
+                                            <ic:FluentIcon Icon="Copy" FontSize="16" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem Header="{Binding #AuthenticatorWorkspaceRoot.DataContext.L.Edit}" Command="{Binding #AuthenticatorWorkspaceRoot.DataContext.EditTotpCommand}" CommandParameter="{Binding}">
+                                        <MenuItem.Icon>
+                                            <ic:FluentIcon Icon="Edit" FontSize="16" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem Header="{Binding #AuthenticatorWorkspaceRoot.DataContext.L.Favorite}" Command="{Binding #AuthenticatorWorkspaceRoot.DataContext.ToggleTotpFavoriteCommand}" CommandParameter="{Binding}">
+                                        <MenuItem.Icon>
+                                            <ic:FluentIcon Icon="Star" FontSize="16" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem Header="{Binding #AuthenticatorWorkspaceRoot.DataContext.L.Select}" Command="{Binding #AuthenticatorWorkspaceRoot.DataContext.ToggleTotpSelectionCommand}" CommandParameter="{Binding}">
+                                        <MenuItem.Icon>
+                                            <ic:FluentIcon Icon="CheckmarkCircle" FontSize="16" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <Separator />
+                                    <MenuItem Header="{Binding #AuthenticatorWorkspaceRoot.DataContext.L.Delete}" Command="{Binding #AuthenticatorWorkspaceRoot.DataContext.DeleteTotpCommand}" CommandParameter="{Binding}">
+                                        <MenuItem.Icon>
+                                            <ic:FluentIcon Icon="Delete" FontSize="16" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                </ContextMenu>
+                            </Border.ContextMenu>
+                            <Button Classes="totpAccountButton"
+                                        Command="{Binding #AuthenticatorWorkspaceRoot.DataContext.ShowTotpDetailsCommand}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip.Tip="{Binding Title}">
+                                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="4" MinWidth="0">
+                                    <Border Grid.RowSpan="3" Width="38" Height="38" CornerRadius="19" Background="{DynamicResource ControlFillColorDefaultBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="1" VerticalAlignment="Top">
+                                        <ic:FluentIcon Icon="Key" FontSize="17" Foreground="{DynamicResource AccentFillColorDefaultBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <Grid Grid.Column="1" ColumnDefinitions="*,Auto" MinWidth="0">
+                                        <StackPanel Orientation="Horizontal" Spacing="6" MinWidth="0">
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <ic:FluentIcon Icon="Star" FontSize="14" Foreground="{DynamicResource SystemFillColorCautionBrush}" IsVisible="{Binding IsFavorite}" />
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Classes="workspaceStatusChip" Margin="8,0,0,0">
+                                            <TextBlock Text="{Binding TotpTimeRemaining}" FontSize="12" />
+                                        </Border>
+                                    </Grid>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Notes}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                    <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*" MinWidth="0">
+                                        <ProgressBar Maximum="100" Value="{Binding TotpProgress}" Height="4" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Grid>
+                            </Button>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <StackPanel IsVisible="{Binding !HasFilteredTotpItems}" HorizontalAlignment="Left" VerticalAlignment="Top" Spacing="10" Margin="24" Width="240">
+                <ic:FluentIcon Icon="Key" FontSize="34" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
+                <TextBlock Text="{Binding TotpEmptyStateText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" />
+                <Button Classes="workspacePrimaryCommand" Command="{Binding AddTotpCommand}" ToolTip.Tip="{Binding L.AddAuthenticator}" HorizontalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Add" FontSize="18" />
+                        <TextBlock Text="{Binding TotpManualAddText}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding ScanTotpQrCommand}" ToolTip.Tip="{Binding TotpScanQrText}" HorizontalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Document" FontSize="16" />
+                        <TextBlock Text="{Binding TotpScanQrText}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding ClearTotpFiltersCommand}" IsVisible="{Binding HasTotpFilterOrSearch}" ToolTip.Tip="{Binding ClearTotpFiltersText}" HorizontalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Dismiss" FontSize="12" />
+                        <TextBlock Text="{Binding ClearTotpFiltersText}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            </Grid>
+
+            <Border Grid.Row="3"
+                    Padding="12"
+                    CornerRadius="12"
+                    BorderBrush="{DynamicResource CardBorderBrush}"
+                    BorderThickness="1,1,0,0"
+                    Background="{DynamicResource LayerFillColorSubtleBrush}"
+                    IsVisible="{Binding HasSelectedTotpItems}">
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <ic:FluentIcon Icon="CheckmarkCircle" FontSize="16" Foreground="{DynamicResource AccentFillColorDefaultBrush}" />
+                        <TextBlock Text="{Binding SelectedTotpCountText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Classes="workspaceCommand" Command="{Binding FavoriteSelectedTotpCommand}" ToolTip.Tip="{Binding L.BatchFavorite}" AutomationProperties.Name="{Binding L.BatchFavorite}" Width="34" Height="34" Padding="0">
+                        <ic:FluentIcon Icon="Star" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
+                    <Button Grid.Column="2" Classes="workspaceCommand" Command="{Binding DeleteSelectedTotpCommand}" ToolTip.Tip="{Binding L.BatchDelete}" AutomationProperties.Name="{Binding L.BatchDelete}" Width="34" Height="34" Padding="0">
+                        <ic:FluentIcon Icon="Delete" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
+                    <Button Grid.Column="3" Classes="workspaceCommand" Command="{Binding ClearTotpSelectionCommand}" ToolTip.Tip="{Binding L.Cancel}" AutomationProperties.Name="{Binding L.Cancel}" Width="34" Height="34" Padding="0">
+                        <ic:FluentIcon Icon="Dismiss" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
+                </Grid>
+            </Border>
+        </Grid>
+        </Border>
+
+        <Border Grid.Column="1" Classes="totpCodeConsole" Padding="{Binding TotpCodeConsolePadding}" MinWidth="0" ClipToBounds="True">
+            <Grid>
+            <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" IsVisible="{Binding HasSelectedTotpItem}">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                    <Border Width="50" Height="50" CornerRadius="25" Background="{DynamicResource ControlFillColorDefaultBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                        <ic:FluentIcon Icon="Key" FontSize="22" Foreground="{DynamicResource AccentFillColorDefaultBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel Grid.Column="1" MinWidth="0" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="{Binding SelectedTotpDetails.Title}" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <ic:FluentIcon Icon="Star" FontSize="16" Foreground="{DynamicResource SystemFillColorCautionBrush}" IsVisible="{Binding SelectedTotpItem.IsFavorite}" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding SelectedTotpDetails.Account}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="2" Text="{Binding SelectedTotpItem.TotpTimeRemaining}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                </Grid>
+
+                <StackPanel Grid.Row="1" Margin="0,28,0,0" Spacing="14" HorizontalAlignment="Center" MaxWidth="520">
+                    <TextBlock Text="{Binding L.TotpCode}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding SelectedTotpItem.TotpCode}" FontFamily="Consolas" FontSize="{Binding TotpCodeFontSize}" FontWeight="Bold" Foreground="{DynamicResource AccentFillColorDefaultBrush}" HorizontalAlignment="Center" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" MaxWidth="360" HorizontalAlignment="Stretch">
+                        <ProgressBar Maximum="100" Value="{Binding SelectedTotpItem.TotpProgress}" Height="6" VerticalAlignment="Center" />
+                        <Border Grid.Column="1" Classes="workspaceStatusChip">
+                            <TextBlock Text="{Binding SelectedTotpItem.TotpTimeRemaining}" FontSize="12" FontWeight="SemiBold" />
+                        </Border>
+                    </Grid>
+                </StackPanel>
+
+                <WrapPanel Grid.Row="2" Orientation="Horizontal" Margin="0,18,0,8" HorizontalAlignment="Center">
+                    <Button Classes="workspacePrimaryCommand" Command="{Binding CopyTotpCommand}" CommandParameter="{Binding SelectedTotpItem}" ToolTip.Tip="{Binding L.CopyCode}" Margin="0,0,8,8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="Copy" FontSize="18" />
+                            <TextBlock Text="{Binding L.CopyCode}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="workspaceCommand" Command="{Binding EditTotpCommand}" CommandParameter="{Binding SelectedTotpItem}" ToolTip.Tip="{Binding L.Edit}" Margin="0,0,8,8">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:FluentIcon Icon="Edit" FontSize="16" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding L.Edit}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="workspaceCommand" Command="{Binding ToggleTotpFavoriteCommand}" CommandParameter="{Binding SelectedTotpItem}" ToolTip.Tip="{Binding L.Favorite}" AutomationProperties.Name="{Binding L.Favorite}" Width="36" Height="36" Padding="0" Margin="0,0,0,8">
+                        <ic:FluentIcon Icon="Star" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
+                </WrapPanel>
+
+                <Border Grid.Row="3" Margin="0,12,0,0" Padding="14" CornerRadius="8" Background="{DynamicResource LayerFillColorSubtleBrush}" VerticalAlignment="Top">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                        <ic:FluentIcon Icon="Clock" FontSize="18" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Top" />
+                        <TextBlock Grid.Column="1" Text="{Binding L.TotpPageDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                    </Grid>
+                </Border>
+            </Grid>
+
+                <StackPanel IsVisible="{Binding !HasSelectedTotpItem}" Spacing="10" Width="260" Margin="24" HorizontalAlignment="Left" VerticalAlignment="Top">
+                    <ic:FluentIcon Icon="Key" FontSize="34" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding L.TotpPageDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border Grid.Column="2" Classes="totpInspector" Padding="16" ClipToBounds="True">
+            <Grid>
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasSelectedTotpItem}">
+                    <StackPanel Spacing="16">
+                        <StackPanel Spacing="4">
+                            <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.Details}" />
+                            <TextBlock Text="{Binding SelectedTotpDetails.Issuer}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <ItemsControl ItemsSource="{Binding SelectedTotpDetails.Fields}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:WalletFieldDisplayItem">
+                                    <Grid RowDefinitions="Auto,Auto" Margin="0,0,0,10">
+                                        <TextBlock Text="{Binding Label}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Row="1" Text="{Binding Value}" TextWrapping="Wrap" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <StackPanel Spacing="4" IsVisible="{Binding SelectedTotpDetails.HasNotes}">
+                            <TextBlock Text="{Binding L.Notes}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding SelectedTotpDetails.Notes}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+
+                        <Border Classes="totpRiskZone" Padding="14">
+                            <StackPanel Spacing="10">
+                                <StackPanel Spacing="3">
+                                    <TextBlock Text="{Binding L.Delete}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding L.TotpPageDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" FontSize="12" />
+                                </StackPanel>
+                                <Button Classes="workspaceCommand" Command="{Binding DeleteTotpCommand}" CommandParameter="{Binding SelectedTotpItem}" ToolTip.Tip="{Binding L.Delete}" HorizontalAlignment="Left">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <ic:FluentIcon Icon="Delete" FontSize="16" />
+                                        <TextBlock Text="{Binding L.Delete}" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <StackPanel IsVisible="{Binding !HasSelectedTotpItem}" Spacing="10" HorizontalAlignment="Left" VerticalAlignment="Top">
+                    <ic:FluentIcon Icon="Info" FontSize="28" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                    <TextBlock Text="{Binding L.Details}" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding L.TotpPageDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Grid>
+</UserControl>
