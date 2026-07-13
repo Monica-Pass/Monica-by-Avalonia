@@ -179,14 +179,6 @@ public sealed partial class MainWindowViewModel
             .OrderBy(item => item.Id == 0 ? long.MaxValue : item.Id);
     }
 
-    private IEnumerable<PasswordEntry> GetArchivedPasswordSiblings(PasswordEntry entry)
-    {
-        var key = BuildSiblingGroupKey(entry);
-        return ArchivedPasswords
-            .Where(item => BuildSiblingGroupKey(item) == key)
-            .OrderBy(item => item.Id == 0 ? long.MaxValue : item.Id);
-    }
-
     private static string BuildSiblingGroupKey(PasswordEntry entry)
     {
         if (!string.IsNullOrWhiteSpace(entry.ReplicaGroupId))

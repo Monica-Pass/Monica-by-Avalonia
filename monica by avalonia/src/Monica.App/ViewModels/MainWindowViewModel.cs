@@ -1133,13 +1133,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     partial void OnSearchTextChanged(string value)
     {
         RaiseFilteredPasswordsChanged();
-        OnPropertyChanged(nameof(FilteredArchivedPasswords));
+        RefreshArchiveSearchState();
         OnPropertyChanged(nameof(FilteredDeletedPasswords));
-        OnPropertyChanged(nameof(HasFilteredArchivedPasswords));
         OnPropertyChanged(nameof(HasFilteredDeletedPasswords));
-        SelectedArchivedPassword =
-            FilteredArchivedPasswords.FirstOrDefault(item => item.Id == SelectedArchivedPassword?.Id) ??
-            FilteredArchivedPasswords.FirstOrDefault();
         SelectedDeletedPassword =
             FilteredDeletedPasswords.FirstOrDefault(item => item.Id == SelectedDeletedPassword?.Id) ??
             FilteredDeletedPasswords.FirstOrDefault();
@@ -3258,20 +3254,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void RaiseCounts()
     {
-        SelectedArchivedPassword =
-            ArchivedPasswords.FirstOrDefault(item => item.Id == SelectedArchivedPassword?.Id) ??
-            ArchivedPasswords.FirstOrDefault();
+        RefreshArchiveCountState();
         SelectedDeletedPassword =
             DeletedPasswords.FirstOrDefault(item => item.Id == SelectedDeletedPassword?.Id) ??
             DeletedPasswords.FirstOrDefault();
 
         OnPropertyChanged(nameof(PasswordCountText));
-        OnPropertyChanged(nameof(ArchivedPasswordCountText));
         OnPropertyChanged(nameof(DeletedPasswordCountText));
         OnPropertyChanged(nameof(HasDeletedPasswords));
-        OnPropertyChanged(nameof(FilteredArchivedPasswords));
         OnPropertyChanged(nameof(FilteredDeletedPasswords));
-        OnPropertyChanged(nameof(HasFilteredArchivedPasswords));
         OnPropertyChanged(nameof(HasFilteredDeletedPasswords));
         OnPropertyChanged(nameof(NoteCountText));
         OnPropertyChanged(nameof(TotpCountText));

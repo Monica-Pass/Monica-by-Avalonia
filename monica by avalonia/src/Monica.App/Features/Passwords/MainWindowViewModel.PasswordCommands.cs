@@ -1086,49 +1086,6 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    [RelayCommand]
-    private async Task UnarchivePasswordAsync(PasswordEntry? entry)
-    {
-        if (entry is null)
-        {
-            return;
-        }
-
-        var siblings = GetArchivedPasswordSiblings(entry).ToList();
-        foreach (var item in siblings)
-        {
-            item.IsArchived = false;
-            item.ArchivedAt = null;
-            item.IsSelected = false;
-            await _repository.SavePasswordAsync(item);
-            await _repository.LogAsync(new OperationLog
-            {
-                ItemType = "PASSWORD",
-                ItemId = item.Id,
-                ItemTitle = item.Title,
-                OperationType = "UNARCHIVE",
-                DeviceName = Environment.MachineName
-            });
-            ArchivedPasswords.Remove(item);
-            var current = ArchivedPasswords.FirstOrDefault(password => password.Id == item.Id);
-            if (current is not null)
-            {
-                ArchivedPasswords.Remove(current);
-            }
-
-            RefreshPasswordTotpDisplay(item);
-            RefreshPasswordAttachmentState(item);
-        }
-
-        ReplacePasswordGroup([], siblings);
-        await LoadTotpItemsAsync();
-        await LoadTimelineAsync();
-        RaiseCounts();
-        RaiseFilteredPasswordsChanged();
-        RefreshSecurityAnalysis();
-        StatusMessage = _localization.Format("UnarchivedPasswordFormat", entry.Title);
-    }
-
     private async Task DeletePasswordGroupAsync(PasswordEntry entry, IReadOnlyList<PasswordEntry> siblings, bool updateStatus)
     {
         foreach (var item in siblings)
@@ -1293,15 +1250,6 @@ public sealed partial class MainWindowViewModel
         RaiseCounts();
         RefreshSecurityAnalysis();
         StatusMessage = _localization.Format("EmptiedRecycleBinFormat", items.Length);
-    }
-
-    [RelayCommand]
-    private void ShowArchivedPasswordDetails(PasswordEntry? entry)
-    {
-        if (entry is not null)
-        {
-            SelectedArchivedPassword = entry;
-        }
     }
 
     [RelayCommand]
