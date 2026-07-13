@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using FluentAvalonia.UI.Controls;
+using Monica.App.Features.Wallet;
 using Monica.App.ViewModels;
 using Monica.Core.Models;
 

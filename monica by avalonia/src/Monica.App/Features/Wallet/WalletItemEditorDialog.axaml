@@ -3,7 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Monica.App.ViewModels"
-             x:Class="Monica.App.WalletItemEditorDialog"
+             x:Class="Monica.App.Features.Wallet.WalletItemEditorDialog"
              x:DataType="vm:WalletItemEditorViewModel"
              mc:Ignorable="d"
              d:DesignWidth="560"

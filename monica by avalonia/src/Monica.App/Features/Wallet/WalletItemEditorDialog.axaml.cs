@@ -1,6 +1,6 @@
 using Avalonia.Controls;
 
-namespace Monica.App;
+namespace Monica.App.Features.Wallet;
 
 public partial class WalletItemEditorDialog : UserControl
 {
