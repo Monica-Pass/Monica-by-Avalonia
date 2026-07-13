@@ -183,6 +183,9 @@ public sealed partial class MainWindowViewModel
     {
         MasterPassword = "";
         ConfirmMasterPassword = "";
+        IsMasterPasswordVisible = false;
+        IsConfirmMasterPasswordVisible = false;
+        HasUnlockError = false;
         CurrentMasterPassword = "";
         NewMasterPassword = "";
         ConfirmNewMasterPassword = "";

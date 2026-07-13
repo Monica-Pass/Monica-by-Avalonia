@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:vm="using:Monica.App.ViewModels"
              x:Class="Monica.App.Features.Unlock.UnlockView"
              x:DataType="vm:MainWindowViewModel">
@@ -12,6 +13,10 @@
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="TextAlignment" Value="Center" />
             <Setter Property="LineHeight" Value="20" />
+        </Style>
+        <Style Selector="TextBlock.unlockFieldLabel">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
         <Style Selector="TextBox.unlockInput">
             <Setter Property="MinHeight" Value="42" />
@@ -28,6 +33,15 @@
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
         </Style>
+        <Style Selector="Button.unlockRevealCommand">
+            <Setter Property="Width" Value="42" />
+            <Setter Property="Height" Value="42" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
         <Style Selector="Button.unlockPrimaryCommand">
             <Setter Property="MinHeight" Value="42" />
             <Setter Property="Padding" Value="14,8" />
@@ -43,14 +57,23 @@
         <Style Selector="Button.unlockPrimaryCommand:disabled">
             <Setter Property="Opacity" Value="0.72" />
         </Style>
+        <Style Selector="Border.unlockFeedback">
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Background" Value="{DynamicResource LayerFillColorSubtleBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Border.unlockFeedback.error">
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+        </Style>
     </UserControl.Styles>
 
     <Grid Classes="unlockSurface"
           Background="{DynamicResource LayerFillColorDefaultBrush}"
           ClipToBounds="True">
-        <StackPanel Width="420"
-                    MaxWidth="420"
-                    Margin="24"
+        <StackPanel MaxWidth="440"
+                    Margin="32,24"
                     Spacing="16"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center">
@@ -78,23 +101,84 @@
                                TextAlignment="Left" />
                 </StackPanel>
             </Border>
-            <TextBox Classes="unlockInput"
-                     PasswordChar="*"
-                     PlaceholderText="{Binding L.MasterPasswordWatermark}"
-                     Text="{Binding MasterPassword}" />
-            <TextBox Classes="unlockInput"
-                     IsVisible="{Binding !IsVaultInitialized}"
-                     PasswordChar="*"
-                     PlaceholderText="{Binding L.ConfirmMasterPasswordWatermark}"
-                     Text="{Binding ConfirmMasterPassword}" />
-            <Button Classes="unlockPrimaryCommand"
+            <StackPanel Spacing="6">
+                <TextBlock x:Name="MasterPasswordLabel"
+                           Classes="unlockFieldLabel"
+                           Text="{Binding L.MasterPasswordWatermark}" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <TextBox x:Name="MasterPasswordInput"
+                             Classes="unlockInput"
+                             PasswordChar="{Binding MasterPasswordMaskChar}"
+                             PlaceholderText="{Binding L.MasterPasswordWatermark}"
+                             Text="{Binding MasterPassword, Mode=TwoWay}"
+                             IsEnabled="{Binding !IsUnlocking}"
+                             AutomationProperties.Name="{Binding L.MasterPasswordWatermark}"
+                             AutomationProperties.HelpText="{Binding MasterPasswordPrivacyNotice}" />
+                    <Button x:Name="ToggleMasterPasswordVisibilityButton"
+                            Grid.Column="1"
+                            Classes="unlockRevealCommand"
+                            Command="{Binding ToggleMasterPasswordVisibilityCommand}"
+                            IsEnabled="{Binding !IsUnlocking}"
+                            ToolTip.Tip="{Binding ToggleMasterPasswordVisibilityLabel}"
+                            AutomationProperties.Name="{Binding ToggleMasterPasswordVisibilityLabel}">
+                        <ic:FluentIcon Icon="Eye" FontSize="18" />
+                    </Button>
+                </Grid>
+            </StackPanel>
+            <StackPanel IsVisible="{Binding !IsVaultInitialized}" Spacing="6">
+                <TextBlock x:Name="ConfirmMasterPasswordLabel"
+                           Classes="unlockFieldLabel"
+                           Text="{Binding L.ConfirmMasterPasswordWatermark}" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <TextBox x:Name="ConfirmMasterPasswordInput"
+                             Classes="unlockInput"
+                             PasswordChar="{Binding ConfirmMasterPasswordMaskChar}"
+                             PlaceholderText="{Binding L.ConfirmMasterPasswordWatermark}"
+                             Text="{Binding ConfirmMasterPassword, Mode=TwoWay}"
+                             IsEnabled="{Binding !IsUnlocking}"
+                             AutomationProperties.Name="{Binding L.ConfirmMasterPasswordWatermark}" />
+                    <Button x:Name="ToggleConfirmMasterPasswordVisibilityButton"
+                            Grid.Column="1"
+                            Classes="unlockRevealCommand"
+                            Command="{Binding ToggleConfirmMasterPasswordVisibilityCommand}"
+                            IsEnabled="{Binding !IsUnlocking}"
+                            ToolTip.Tip="{Binding ToggleConfirmMasterPasswordVisibilityLabel}"
+                            AutomationProperties.Name="{Binding ToggleConfirmMasterPasswordVisibilityLabel}">
+                        <ic:FluentIcon Icon="Eye" FontSize="18" />
+                    </Button>
+                </Grid>
+            </StackPanel>
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                <ic:FluentIcon Icon="LockClosed"
+                               FontSize="16"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Margin="0,2,0,0" />
+                <TextBlock Grid.Column="1"
+                           Classes="unlockDescription"
+                           Text="{Binding MasterPasswordPrivacyNotice}"
+                           TextAlignment="Left" />
+            </Grid>
+            <Button x:Name="UnlockButton"
+                    Classes="unlockPrimaryCommand"
                     Command="{Binding UnlockCommand}"
+                    IsDefault="True"
                     HorizontalAlignment="Stretch"
-                    HorizontalContentAlignment="Center">
+                    HorizontalContentAlignment="Center"
+                    AutomationProperties.Name="{Binding LoginButtonText}">
                 <TextBlock Text="{Binding LoginButtonText}"
                            Foreground="{DynamicResource LayerFillColorAltBrush}" />
             </Button>
-            <TextBlock Classes="unlockDescription" Text="{Binding StatusMessage}" />
+            <ProgressBar x:Name="UnlockProgress"
+                         IsVisible="{Binding IsUnlocking}"
+                         IsIndeterminate="True"
+                         Height="4" />
+            <Border Classes="unlockFeedback"
+                    Classes.error="{Binding HasUnlockError}"
+                    IsVisible="{Binding HasUnlockStatusMessage}">
+                <TextBlock Classes="unlockDescription"
+                           Text="{Binding StatusMessage}"
+                           TextAlignment="Left" />
+            </Border>
         </StackPanel>
     </Grid>
 </UserControl>

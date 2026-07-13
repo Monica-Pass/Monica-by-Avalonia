@@ -30,6 +30,8 @@ public sealed class VaultCredentialTests
         viewModel.GeneratedPassword = "generated-secret";
         viewModel.WebDavPassword = "webdav-secret";
         viewModel.CurrentMasterPassword = "old-master-password";
+        viewModel.ToggleMasterPasswordVisibilityCommand.Execute(null);
+        viewModel.ToggleConfirmMasterPasswordVisibilityCommand.Execute(null);
 
         await viewModel.LockCommand.ExecuteAsync(null);
 
@@ -46,6 +48,8 @@ public sealed class VaultCredentialTests
         Assert.Equal("", viewModel.WebDavPassword);
         Assert.Equal("", settings.Current.WebDavPassword);
         Assert.Equal("", viewModel.CurrentMasterPassword);
+        Assert.False(viewModel.IsMasterPasswordVisible);
+        Assert.False(viewModel.IsConfirmMasterPasswordVisible);
         Assert.True(clipboard.ClearOwnedContentCalled);
     }
 
@@ -188,6 +192,69 @@ public sealed class VaultCredentialTests
 
         Assert.False(viewModel.IsUnlocked);
         Assert.Equal(viewModel.L.Get("ConfirmationMismatch"), viewModel.StatusMessage);
+        Assert.True(viewModel.HasUnlockError);
+
+        viewModel.ConfirmMasterPassword = "password-one";
+
+        Assert.False(viewModel.HasUnlockError);
+        Assert.Equal("", viewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task Vault_access_sanitizes_secret_input_and_exposes_reveal_commands()
+    {
+        var viewModel = CreateViewModel(GetTempDatabasePath());
+        await viewModel.InitializeAsync();
+
+        Assert.False(viewModel.UnlockCommand.CanExecute(null));
+
+        viewModel.MasterPassword = "pass\u0001word";
+        Assert.Equal("password", viewModel.MasterPassword);
+        Assert.False(viewModel.UnlockCommand.CanExecute(null));
+
+        viewModel.ConfirmMasterPassword = "password";
+        Assert.True(viewModel.UnlockCommand.CanExecute(null));
+        Assert.Equal('*', viewModel.MasterPasswordMaskChar);
+        Assert.Equal('*', viewModel.ConfirmMasterPasswordMaskChar);
+
+        viewModel.ToggleMasterPasswordVisibilityCommand.Execute(null);
+        viewModel.ToggleConfirmMasterPasswordVisibilityCommand.Execute(null);
+
+        Assert.Equal('\0', viewModel.MasterPasswordMaskChar);
+        Assert.Equal('\0', viewModel.ConfirmMasterPasswordMaskChar);
+        Assert.Equal(viewModel.L.HidePassword, viewModel.ToggleMasterPasswordVisibilityLabel);
+        Assert.Equal(viewModel.L.HidePassword, viewModel.ToggleConfirmMasterPasswordVisibilityLabel);
+    }
+
+    [Fact]
+    public async Task Vault_access_disables_duplicate_submission_while_unlocking()
+    {
+        var coordinator = new BlockingVaultUnlockCoordinator();
+        var viewModel = CreateViewModel(
+            GetTempDatabasePath(),
+            vaultUnlockCoordinator: coordinator);
+        await viewModel.InitializeAsync();
+        viewModel.MasterPassword = "correct password";
+        viewModel.ToggleMasterPasswordVisibilityCommand.Execute(null);
+
+        var operation = viewModel.UnlockCommand.ExecuteAsync(null);
+        await coordinator.Entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.True(viewModel.IsUnlocking);
+        Assert.False(viewModel.UnlockCommand.CanExecute(null));
+        viewModel.UnlockCommand.Execute(null);
+        Assert.Equal(1, coordinator.UnlockCallCount);
+
+        coordinator.Complete(new VaultUnlockResult(
+            VaultUnlockStatus.WrongPassword,
+            true,
+            "WrongMasterPassword"));
+        await operation;
+
+        Assert.False(viewModel.IsUnlocking);
+        Assert.True(viewModel.HasUnlockError);
+        Assert.False(viewModel.IsMasterPasswordVisible);
+        Assert.Equal(1, coordinator.UnlockCallCount);
     }
 
     [Fact]
@@ -317,7 +384,8 @@ public sealed class VaultCredentialTests
         ICryptoService? cryptoService = null,
         IClipboardService? clipboardService = null,
         IAppSettingsService? settingsService = null,
-        IExportAuthorizationService? exportAuthorizationService = null)
+        IExportAuthorizationService? exportAuthorizationService = null,
+        IVaultUnlockCoordinator? vaultUnlockCoordinator = null)
     {
         var factory = new SqliteConnectionFactory(databasePath);
         var migrator = new DatabaseMigrator(factory);
@@ -341,7 +409,35 @@ public sealed class VaultCredentialTests
             new LegacyVaultDetector(factory),
             settingsService ?? new AppSettingsService(GetTempSettingsPath()),
             new LocalizationService(),
+            vaultUnlockCoordinator: vaultUnlockCoordinator,
             exportAuthorizationService: exportAuthorizationService);
+    }
+
+    private sealed class BlockingVaultUnlockCoordinator : IVaultUnlockCoordinator
+    {
+        private readonly TaskCompletionSource<VaultUnlockResult> _completion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource<object?> Entered { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int UnlockCallCount { get; private set; }
+
+        public Task<VaultInitializationState> InitializeAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new VaultInitializationState(LegacyVaultDetection.Empty, true));
+
+        public Task<VaultUnlockResult> UnlockOrCreateAsync(
+            string masterPassword,
+            string confirmMasterPassword,
+            LegacyVaultDetection legacyVaultDetection,
+            CancellationToken cancellationToken = default)
+        {
+            UnlockCallCount++;
+            Entered.TrySetResult(null);
+            return _completion.Task.WaitAsync(cancellationToken);
+        }
+
+        public void Complete(VaultUnlockResult result) => _completion.TrySetResult(result);
     }
 
     private static string GetTempDatabasePath()

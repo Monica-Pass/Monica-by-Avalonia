@@ -231,7 +231,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RefreshSecurityAnalysisIfNeeded();
     }
 
-    partial void OnStatusMessageChanged(string value) => RaiseShellStatus();
+    partial void OnStatusMessageChanged(string value)
+    {
+        RaiseShellStatus();
+        OnPropertyChanged(nameof(HasUnlockStatusMessage));
+    }
 
     private static bool IsRecoverableStatusMessage(string? value)
     {
@@ -591,6 +595,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(LoginTitle));
         OnPropertyChanged(nameof(LoginDescription));
         OnPropertyChanged(nameof(LoginButtonText));
+        OnPropertyChanged(nameof(MasterPasswordPrivacyNotice));
+        OnPropertyChanged(nameof(ToggleMasterPasswordVisibilityLabel));
+        OnPropertyChanged(nameof(ToggleConfirmMasterPasswordVisibilityLabel));
         OnPropertyChanged(nameof(LockVaultText));
         RefreshGeneratorLocalizedState();
         OnPropertyChanged(nameof(LegacyVaultImportPromptText));
