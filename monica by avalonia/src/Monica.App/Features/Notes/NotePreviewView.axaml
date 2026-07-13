@@ -1,0 +1,81 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:md="clr-namespace:Markdown.Avalonia;assembly=Markdown.Avalonia"
+             xmlns:ctxt="clr-namespace:ColorTextBlock.Avalonia;assembly=ColorTextBlock.Avalonia"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Notes.NotePreviewView"
+             x:DataType="vm:MainWindowViewModel">
+    <Border IsVisible="{Binding IsNotePreviewPaneVisible}"
+            Padding="{Binding NotePreviewContentPadding}"
+            Background="Transparent">
+        <Grid RowDefinitions="*,Auto">
+            <md:MarkdownScrollViewer IsVisible="{Binding NoteIsMarkdown}"
+                                     Markdown="{Binding NotePreviewMarkdown}"
+                                     MarkdownStyleName="Standard">
+                <md:MarkdownScrollViewer.Styles>
+                    <Style Selector=".Markdown_Avalonia_MarkdownViewer ctxt|CTextBlock">
+                        <Setter Property="FontSize" Value="14" />
+                        <Setter Property="Margin" Value="0,4" />
+                        <Setter Property="TextWrapping" Value="Wrap" />
+                    </Style>
+                    <Style Selector=".Markdown_Avalonia_MarkdownViewer ctxt|CTextBlock.Heading1">
+                        <Setter Property="FontSize" Value="28" />
+                        <Setter Property="FontWeight" Value="SemiBold" />
+                        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                        <Setter Property="TextWrapping" Value="Wrap" />
+                    </Style>
+                    <Style Selector=".Markdown_Avalonia_MarkdownViewer ctxt|CTextBlock.Heading2">
+                        <Setter Property="FontSize" Value="24" />
+                        <Setter Property="FontWeight" Value="SemiBold" />
+                        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                        <Setter Property="TextWrapping" Value="Wrap" />
+                    </Style>
+                    <Style Selector=".Markdown_Avalonia_MarkdownViewer ctxt|CTextBlock.Heading3">
+                        <Setter Property="FontSize" Value="19" />
+                        <Setter Property="FontWeight" Value="SemiBold" />
+                        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                        <Setter Property="TextWrapping" Value="Wrap" />
+                    </Style>
+                    <Style Selector=".Markdown_Avalonia_MarkdownViewer Grid.List">
+                        <Setter Property="Margin" Value="22,0,0,0" />
+                    </Style>
+                    <Style Selector=".Markdown_Avalonia_MarkdownViewer ctxt|CTextBlock.ListMarker">
+                        <Setter Property="Margin" Value="0,4,6,4" />
+                    </Style>
+                </md:MarkdownScrollViewer.Styles>
+            </md:MarkdownScrollViewer>
+            <ScrollViewer IsVisible="{Binding !NoteIsMarkdown}">
+                <TextBlock Text="{Binding NotePlainPreview}" TextWrapping="Wrap" FontSize="16" LineHeight="24" />
+            </ScrollViewer>
+            <Border Grid.Row="1"
+                    IsVisible="{Binding HasNoteImagePreviewItems}"
+                    BorderBrush="{DynamicResource CardBorderBrush}"
+                    BorderThickness="0,1,0,0"
+                    Margin="0,12,0,0"
+                    Padding="0,10,0,0">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" MaxHeight="190">
+                    <ItemsControl ItemsSource="{Binding NoteImagePreviewItems}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:NoteImagePreviewItem">
+                                <Border Width="172" Height="158" Margin="0,0,10,0" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Background="{DynamicResource CardBackgroundBrush}">
+                                    <Grid RowDefinitions="*,Auto" Margin="8">
+                                        <Image Source="{Binding Image}" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Row="1" Spacing="1" Margin="0,6,0,0">
+                                            <TextBlock Text="{Binding DisplayName}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding SizeText}" FontSize="10" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Border>
+</UserControl>
