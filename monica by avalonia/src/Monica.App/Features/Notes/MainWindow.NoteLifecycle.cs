@@ -143,10 +143,6 @@ public partial class MainWindow
                 NoteWorkspaceView.HandleTabWidthChanged();
             });
         }
-        else if (e.PropertyName == nameof(MainWindowViewModel.SelectedSection))
-        {
-            QueueWorkspaceScrollResetForSelectedSection();
-        }
     }
 
 }

@@ -226,34 +226,6 @@ public partial class MainWindow : Window
 
     private static bool IsTextEditingSource(object? source) => source is TextBox;
 
-    private void QueueWorkspaceScrollResetForSelectedSection()
-    {
-        ResetWorkspaceScrollForSelectedSection();
-        Dispatcher.UIThread.Post(ResetWorkspaceScrollForSelectedSection);
-        _ = ResetWorkspaceScrollForSelectedSectionDeferredAsync();
-    }
-
-    private async Task ResetWorkspaceScrollForSelectedSectionDeferredAsync()
-    {
-        await Task.Delay(120);
-        await Dispatcher.UIThread.InvokeAsync(ResetWorkspaceScrollForSelectedSection);
-        await Task.Delay(480);
-        await Dispatcher.UIThread.InvokeAsync(ResetWorkspaceScrollForSelectedSection);
-    }
-
-    private void ResetWorkspaceScrollForSelectedSection()
-    {
-        if (DataContext is not MainWindowViewModel viewModel)
-        {
-            return;
-        }
-
-        if (string.Equals(viewModel.SelectedSection, "DatabaseManagement", StringComparison.OrdinalIgnoreCase))
-        {
-            DatabaseManagementScrollViewer.Offset = new Vector(0, 0);
-        }
-    }
-
     private void WorkspaceHost_OnSizeChanged(object? sender, SizeChangedEventArgs e)
     {
         if (DataContext is MainWindowViewModel viewModel)
