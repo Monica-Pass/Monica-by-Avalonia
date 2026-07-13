@@ -1,0 +1,100 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Unlock.UnlockView"
+             x:DataType="vm:MainWindowViewModel">
+    <UserControl.Styles>
+        <Style Selector="Grid.unlockSurface TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        </Style>
+        <Style Selector="TextBlock.unlockDescription">
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="LineHeight" Value="20" />
+        </Style>
+        <Style Selector="TextBox.unlockInput">
+            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="PlaceholderForeground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="TextBox.unlockInput:pointerover, TextBox.unlockInput:focus">
+            <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
+        </Style>
+        <Style Selector="Button.unlockPrimaryCommand">
+            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource LayerFillColorAltBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="Button.unlockPrimaryCommand:pointerover, Button.unlockPrimaryCommand:pressed">
+            <Setter Property="Background" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource LayerFillColorAltBrush}" />
+        </Style>
+        <Style Selector="Button.unlockPrimaryCommand:disabled">
+            <Setter Property="Opacity" Value="0.72" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid Classes="unlockSurface"
+          Background="{DynamicResource LayerFillColorDefaultBrush}"
+          ClipToBounds="True">
+        <StackPanel Width="420"
+                    MaxWidth="420"
+                    Margin="24"
+                    Spacing="16"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+            <Image Source="/Assets/Logo.png"
+                   Width="56"
+                   Height="56"
+                   HorizontalAlignment="Center" />
+            <TextBlock Text="{Binding LoginTitle}"
+                       FontSize="24"
+                       FontWeight="SemiBold"
+                       HorizontalAlignment="Center"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap" />
+            <TextBlock Classes="unlockDescription" Text="{Binding LoginDescription}" />
+            <Border IsVisible="{Binding HasLegacyVaultImportPrompt}"
+                    Padding="12"
+                    CornerRadius="8"
+                    BorderBrush="{DynamicResource CardBorderBrush}"
+                    BorderThickness="1"
+                    Background="{DynamicResource LayerFillColorSubtleBrush}">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="{Binding L.LegacyVaultDetected}" FontWeight="SemiBold" />
+                    <TextBlock Classes="unlockDescription"
+                               Text="{Binding LegacyVaultImportPromptText}"
+                               TextAlignment="Left" />
+                </StackPanel>
+            </Border>
+            <TextBox Classes="unlockInput"
+                     PasswordChar="*"
+                     PlaceholderText="{Binding L.MasterPasswordWatermark}"
+                     Text="{Binding MasterPassword}" />
+            <TextBox Classes="unlockInput"
+                     IsVisible="{Binding !IsVaultInitialized}"
+                     PasswordChar="*"
+                     PlaceholderText="{Binding L.ConfirmMasterPasswordWatermark}"
+                     Text="{Binding ConfirmMasterPassword}" />
+            <Button Classes="unlockPrimaryCommand"
+                    Command="{Binding UnlockCommand}"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center">
+                <TextBlock Text="{Binding LoginButtonText}"
+                           Foreground="{DynamicResource LayerFillColorAltBrush}" />
+            </Button>
+            <TextBlock Classes="unlockDescription" Text="{Binding StatusMessage}" />
+        </StackPanel>
+    </Grid>
+</UserControl>
