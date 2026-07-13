@@ -11,6 +11,7 @@
         xmlns:vm="using:Monica.App.ViewModels"
         xmlns:unlock="using:Monica.App.Features.Unlock"
         xmlns:passwords="using:Monica.App.Features.Passwords"
+        xmlns:notes="using:Monica.App.Features.Notes"
         x:DataType="vm:MainWindowViewModel"
         mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="760"
         x:Class="Monica.App.MainWindow"
@@ -3876,37 +3877,8 @@
                                                     <ItemsControl ItemsSource="{Binding FavoriteNoteItems}" HorizontalAlignment="Stretch">
                                                         <ItemsControl.ItemTemplate>
                                                             <DataTemplate x:DataType="models:SecureItem">
-                                                                <Border Margin="8,0,0,4" Padding="0" CornerRadius="6" MinHeight="48" HorizontalAlignment="Stretch" Background="Transparent">
-                                                                    <Grid ColumnDefinitions="*,Auto" MinHeight="48" HorizontalAlignment="Stretch">
-                                                                        <Button Classes="noteTreeItemButton"
-                                                                                Grid.ColumnSpan="2"
-                                                                                Command="{Binding #Root.DataContext.OpenNoteCommand}"
-                                                                                CommandParameter="{Binding}"
-                                                                                MinHeight="48" />
-                                                                        <Grid Margin="10,7" ColumnDefinitions="Auto,*" ColumnSpacing="8" HorizontalAlignment="Stretch" IsHitTestVisible="False">
-                                                                            <ic:FluentIcon Icon="Document" FontSize="15" VerticalAlignment="Top" Margin="0,2,0,0" />
-                                                                            <StackPanel Grid.Column="1" Spacing="2" MinWidth="0">
-                                                                                <StackPanel Orientation="Horizontal" Spacing="5" MinWidth="0">
-                                                                                    <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MinWidth="0" />
-                                                                                    <TextBlock Text=".md" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                                                    <ic:FluentIcon Icon="Star" FontSize="12" IsVisible="{Binding IsFavorite}" />
-                                                                                </StackPanel>
-                                                                                <TextBlock Text="{Binding Notes}" FontSize="12" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                                            </StackPanel>
-                                                                        </Grid>
-                                                                        <Button Grid.Column="1"
-                                                                                Command="{Binding #Root.DataContext.DeleteNoteCommand}"
-                                                                                CommandParameter="{Binding}"
-                                                                                ToolTip.Tip="{Binding #Root.DataContext.L.MoveToRecycleBin}"
-                                                                                Width="28"
-                                                                                Height="28"
-                                                                                Padding="0"
-                                                                                Margin="6,4,6,0"
-                                                                                VerticalAlignment="Top">
-                                                                            <ic:FluentIcon Icon="Delete" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                                        </Button>
-                                                                    </Grid>
-                                                                </Border>
+                                                                <notes:NoteTreeItemView Margin="8,0,0,4"
+                                                                                        ViewModel="{Binding #Root.DataContext}" />
                                                             </DataTemplate>
                                                         </ItemsControl.ItemTemplate>
                                                     </ItemsControl>
@@ -3937,37 +3909,8 @@
                                                                     <ItemsControl ItemsSource="{Binding Items}" HorizontalAlignment="Stretch">
                                                                         <ItemsControl.ItemTemplate>
                                                                             <DataTemplate x:DataType="models:SecureItem">
-                                                                                <Border Margin="12,0,0,4" Padding="0" CornerRadius="6" MinHeight="48" HorizontalAlignment="Stretch" Background="Transparent">
-                                                                                    <Grid ColumnDefinitions="*,Auto" MinHeight="48" HorizontalAlignment="Stretch">
-                                                                                        <Button Classes="noteTreeItemButton"
-                                                                                                Grid.ColumnSpan="2"
-                                                                                                Command="{Binding #Root.DataContext.OpenNoteCommand}"
-                                                                                                CommandParameter="{Binding}"
-                                                                                                MinHeight="48" />
-                                                                                        <Grid Margin="10,7" ColumnDefinitions="Auto,*" ColumnSpacing="8" HorizontalAlignment="Stretch" IsHitTestVisible="False">
-                                                                                            <ic:FluentIcon Icon="Document" FontSize="15" VerticalAlignment="Top" Margin="0,2,0,0" />
-                                                                                            <StackPanel Grid.Column="1" Spacing="2" MinWidth="0">
-                                                                                                <StackPanel Orientation="Horizontal" Spacing="5" MinWidth="0">
-                                                                                                    <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MinWidth="0" />
-                                                                                                    <TextBlock Text=".md" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                                                                    <ic:FluentIcon Icon="Star" FontSize="12" IsVisible="{Binding IsFavorite}" />
-                                                                                                </StackPanel>
-                                                                                                <TextBlock Text="{Binding Notes}" FontSize="12" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                                                            </StackPanel>
-                                                                                        </Grid>
-                                                                                        <Button Grid.Column="1"
-                                                                                                Command="{Binding #Root.DataContext.DeleteNoteCommand}"
-                                                                                                CommandParameter="{Binding}"
-                                                                                                ToolTip.Tip="{Binding #Root.DataContext.L.MoveToRecycleBin}"
-                                                                                                Width="28"
-                                                                                                Height="28"
-                                                                                                Padding="0"
-                                                                                                Margin="6,4,6,0"
-                                                                                                VerticalAlignment="Top">
-                                                                                            <ic:FluentIcon Icon="Delete" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                                                        </Button>
-                                                                                    </Grid>
-                                                                                </Border>
+                                                                                <notes:NoteTreeItemView Margin="12,0,0,4"
+                                                                                                        ViewModel="{Binding #Root.DataContext}" />
                                                                             </DataTemplate>
                                                                         </ItemsControl.ItemTemplate>
                                                                     </ItemsControl>

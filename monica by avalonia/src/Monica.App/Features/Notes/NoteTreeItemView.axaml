@@ -1,0 +1,53 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:models="using:Monica.Core.Models"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Notes.NoteTreeItemView"
+             x:Name="Root"
+             x:DataType="models:SecureItem">
+    <Border Padding="0"
+            CornerRadius="6"
+            MinHeight="48"
+            HorizontalAlignment="Stretch"
+            Background="Transparent">
+        <Grid ColumnDefinitions="*,Auto" MinHeight="48" HorizontalAlignment="Stretch">
+            <Button Classes="noteTreeItemButton"
+                    Grid.ColumnSpan="2"
+                    Command="{Binding #Root.ViewModel.OpenNoteCommand}"
+                    CommandParameter="{Binding}"
+                    MinHeight="48" />
+            <Grid Margin="10,7"
+                  ColumnDefinitions="Auto,*"
+                  ColumnSpacing="8"
+                  HorizontalAlignment="Stretch"
+                  IsHitTestVisible="False">
+                <ic:FluentIcon Icon="Document" FontSize="15" VerticalAlignment="Top" Margin="0,2,0,0" />
+                <StackPanel Grid.Column="1" Spacing="2" MinWidth="0">
+                    <StackPanel Orientation="Horizontal" Spacing="5" MinWidth="0">
+                        <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MinWidth="0" />
+                        <TextBlock Text=".md" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <ic:FluentIcon Icon="Star" FontSize="12" IsVisible="{Binding IsFavorite}" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding Notes}"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               TextTrimming="CharacterEllipsis"
+                               MaxLines="2"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+            </Grid>
+            <Button Grid.Column="1"
+                    Command="{Binding #Root.ViewModel.DeleteNoteCommand}"
+                    CommandParameter="{Binding}"
+                    ToolTip.Tip="{Binding #Root.ViewModel.L.MoveToRecycleBin}"
+                    Width="28"
+                    Height="28"
+                    Padding="0"
+                    Margin="6,4,6,0"
+                    VerticalAlignment="Top">
+                <ic:FluentIcon Icon="Delete" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Button>
+        </Grid>
+    </Border>
+</UserControl>
