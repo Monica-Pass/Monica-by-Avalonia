@@ -1123,11 +1123,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         RaiseFilteredPasswordsChanged();
         RefreshArchiveSearchState();
-        OnPropertyChanged(nameof(FilteredDeletedPasswords));
-        OnPropertyChanged(nameof(HasFilteredDeletedPasswords));
-        SelectedDeletedPassword =
-            FilteredDeletedPasswords.FirstOrDefault(item => item.Id == SelectedDeletedPassword?.Id) ??
-            FilteredDeletedPasswords.FirstOrDefault();
+        RefreshRecycleBinSearchState();
         RaisePasswordSelectionState();
         ReconcileSelectedPasswordDetails();
         RaiseTotpFilterState();
@@ -3244,15 +3240,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void RaiseCounts()
     {
         RefreshArchiveCountState();
-        SelectedDeletedPassword =
-            DeletedPasswords.FirstOrDefault(item => item.Id == SelectedDeletedPassword?.Id) ??
-            DeletedPasswords.FirstOrDefault();
+        RefreshRecycleBinCountState();
 
         OnPropertyChanged(nameof(PasswordCountText));
-        OnPropertyChanged(nameof(DeletedPasswordCountText));
-        OnPropertyChanged(nameof(HasDeletedPasswords));
-        OnPropertyChanged(nameof(FilteredDeletedPasswords));
-        OnPropertyChanged(nameof(HasFilteredDeletedPasswords));
         OnPropertyChanged(nameof(NoteCountText));
         OnPropertyChanged(nameof(TotpCountText));
         OnPropertyChanged(nameof(HasTotpItems));

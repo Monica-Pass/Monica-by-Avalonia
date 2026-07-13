@@ -171,14 +171,6 @@ public sealed partial class MainWindowViewModel
             .OrderBy(item => item.Id == 0 ? long.MaxValue : item.Id);
     }
 
-    private IEnumerable<PasswordEntry> GetDeletedPasswordSiblings(PasswordEntry entry)
-    {
-        var key = BuildSiblingGroupKey(entry);
-        return DeletedPasswords
-            .Where(item => BuildSiblingGroupKey(item) == key)
-            .OrderBy(item => item.Id == 0 ? long.MaxValue : item.Id);
-    }
-
     private static string BuildSiblingGroupKey(PasswordEntry entry)
     {
         if (!string.IsNullOrWhiteSpace(entry.ReplicaGroupId))
