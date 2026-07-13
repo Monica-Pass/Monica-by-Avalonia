@@ -1,0 +1,107 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:local="using:Monica.App"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Timeline.TimelineWorkspaceView"
+             x:Name="TimelineWorkspaceRoot"
+             x:DataType="vm:MainWindowViewModel">
+<Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsTimeline}}" RowDefinitions="Auto,*" HorizontalAlignment="Stretch" ClipToBounds="True">
+    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
+        <Grid ColumnDefinitions="*,320,Auto" ColumnSpacing="12" MinHeight="56">
+            <StackPanel MinWidth="0" VerticalAlignment="Center">
+                <TextBlock Classes="workspacePageTitle" Text="{Binding L.Timeline}" />
+                <TextBlock Text="{Binding TimelineCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+            <TextBox Grid.Column="1" PlaceholderText="{Binding L.Search}" Text="{Binding SearchText}" VerticalAlignment="Center" />
+            <WrapPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Classes="workspaceCommand" Command="{Binding ExportTimelineCommand}" ToolTip.Tip="{Binding L.Export}" Margin="0,0,8,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="ArrowDownload" FontSize="18" />
+                        <TextBlock Text="{Binding L.Export}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding LoadCommand}" ToolTip.Tip="{Binding L.Refresh}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="ArrowClockwise" FontSize="18" />
+                        <TextBlock Text="{Binding L.Refresh}" />
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+        </Grid>
+    </Border>
+
+    <Grid Grid.Row="1" ColumnDefinitions="420,*" ColumnSpacing="14" MinWidth="0">
+        <Border Classes="timelineFilterRail" ClipToBounds="True">
+            <Grid RowDefinitions="Auto,*">
+                <StackPanel Margin="14,12,14,8" Spacing="3">
+                    <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.Timeline}" />
+                    <TextBlock Text="{Binding TimelineCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
+                </StackPanel>
+                <Grid Grid.Row="1">
+                    <StackPanel IsVisible="{Binding !HasTimelineEntries}" HorizontalAlignment="Left" VerticalAlignment="Top" Spacing="10" Margin="24" Width="240">
+                        <ic:FluentIcon Icon="Clock" FontSize="32" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
+                        <TextBlock Text="{Binding TimelineCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding L.TimelineEmptyHint}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap" />
+                        <Button Classes="workspaceCommand" Command="{Binding LoadCommand}" ToolTip.Tip="{Binding L.Refresh}" HorizontalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="ArrowClockwise" FontSize="16" />
+                                <TextBlock Text="{Binding L.Refresh}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <ListBox Classes="timelineEventStream" ItemsSource="{Binding TimelineEntries}" SelectedItem="{Binding SelectedTimelineEntry}" IsVisible="{Binding HasTimelineEntries}" SelectionMode="Single" Margin="8,0,8,8">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TimelineEntry">
+                                <Border Classes="timelineEventRow">
+                                    <Button Classes="timelineEventButton"
+                                            Command="{Binding #TimelineWorkspaceRoot.DataContext.ShowTimelineEntryDetailsCommand}"
+                                            CommandParameter="{Binding}"
+                                            ToolTip.Tip="{Binding Title}">
+                                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="2">
+                                            <ic:FluentIcon Grid.RowSpan="3" Icon="Clock" FontSize="20" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,2,0,0" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Description}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" />
+                                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding TimestampText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                        </Grid>
+                                    </Button>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <Border Grid.Column="1" Classes="timelineInspector" Padding="24" MinWidth="0">
+            <Grid>
+                <StackPanel IsVisible="{Binding HasSelectedTimelineEntry}" Spacing="18">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                        <Border Width="54" Height="54" CornerRadius="27" Background="{DynamicResource ControlFillColorDefaultBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                            <ic:FluentIcon Icon="Clock" FontSize="24" Foreground="{DynamicResource AccentFillColorDefaultBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" MinWidth="0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding SelectedTimelineEntry.Title}" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding SelectedTimelineEntry.TimestampText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Text="{Binding SelectedTimelineEntry.Description}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <WrapPanel Orientation="Horizontal">
+                        <Border Classes="workspaceStatusChip" Margin="0,0,8,8">
+                            <TextBlock Text="{Binding SelectedTimelineEntry.OperationType}" FontSize="12" FontWeight="SemiBold" />
+                        </Border>
+                        <Border Classes="workspaceStatusChip" Margin="0,0,8,8">
+                            <TextBlock Text="{Binding SelectedTimelineEntry.ItemType}" FontSize="12" />
+                        </Border>
+                    </WrapPanel>
+                </StackPanel>
+                <StackPanel IsVisible="{Binding !HasSelectedTimelineEntry}" Spacing="10" Width="260" Margin="24" HorizontalAlignment="Left" VerticalAlignment="Top">
+                    <ic:FluentIcon Icon="Clock" FontSize="34" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding L.TimelineEmptySelectionHint}" TextWrapping="Wrap" TextAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Grid>
+
+</UserControl>
