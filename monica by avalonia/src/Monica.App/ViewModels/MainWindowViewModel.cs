@@ -460,9 +460,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly ITotpEditorDialogService _totpEditorDialogService;
     private readonly IWalletItemEditorDialogService _walletItemEditorDialogService;
     private readonly IMasterPasswordMaintenanceService _masterPasswordMaintenanceService;
-    private readonly IVaultCredentialStore _credentialStore;
-    private readonly ILegacyVaultDetector _legacyVaultDetector;
-    private readonly IVaultUnlockCoordinator _vaultUnlockCoordinator;
     private readonly IAppSettingsService _settingsService;
     private readonly ILocalizationService _localization;
     private readonly IReadOnlyList<PlatformCapability> _sourceCapabilities;
@@ -489,7 +486,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private int _selectedPasswordDetailsVersion;
     private bool _isLoadingNoteEditor;
     private int _noteImagePreviewVersion;
-    private LegacyVaultDetection _legacyVaultDetection = LegacyVaultDetection.Empty;
     private readonly HashSet<string> _collapsedPasswordFolderKeys = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _expandedPasswordStackKeys = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _settingsSaveSync = new();
@@ -525,7 +521,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IFileSystemPickerService? fileSystemPickerService = null)
     {
         _repository = repository;
-        _credentialStore = credentialStore;
         _cryptoService = cryptoService;
         _totpService = totpService;
         _passwordGenerator = passwordGenerator;
@@ -542,8 +537,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _totpEditorDialogService = totpEditorDialogService ?? new DisabledTotpEditorDialogService();
         _walletItemEditorDialogService = walletItemEditorDialogService ?? new DisabledWalletItemEditorDialogService();
         _masterPasswordMaintenanceService = masterPasswordMaintenanceService ?? new DisabledMasterPasswordMaintenanceService();
-        _legacyVaultDetector = legacyVaultDetector ?? new NoLegacyVaultDetector();
-        _vaultUnlockCoordinator = vaultUnlockCoordinator ?? new VaultUnlockCoordinator(_credentialStore, _cryptoService, _legacyVaultDetector);
+        _vaultUnlockCoordinator = vaultUnlockCoordinator ?? new VaultUnlockCoordinator(
+            credentialStore,
+            _cryptoService,
+            legacyVaultDetector ?? new NoLegacyVaultDetector());
         _settingsService = settingsService;
         _localization = localization;
         _localization.PropertyChanged += (_, _) => RefreshLocalizedProperties();
@@ -599,13 +596,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public IEnumerable<PasswordFolderFilterChoice> RegularPasswordFolderFilters =>
         PasswordFolderFilters.Where(item => !item.IsSystemNode);
     public bool HasRegularPasswordFolderFilters => PasswordFolderFilters.Any(item => !item.IsSystemNode);
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasRecoverableStatusMessage))]
-    private bool _isUnlocked;
-
-    [ObservableProperty]
-    private bool _isVaultInitialized;
 
     public string PlatformName { get; }
     public string PlatformIntegrationsTitle => _localization.Get("PlatformIntegrations");
@@ -669,12 +659,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private string _selectedSection = "Passwords";
-
-    [ObservableProperty]
-    private string _masterPassword = "";
-
-    [ObservableProperty]
-    private string _confirmMasterPassword = "";
 
     [ObservableProperty]
     private string _currentMasterPassword = "";
@@ -1315,12 +1299,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OperatingSystem.IsMacOS() ? "macOS" :
         OperatingSystem.IsLinux() ? "Linux" :
         "Desktop";
-    public string LoginTitle => IsVaultInitialized ? _localization.UnlockMonica : _localization.CreateMonicaVault;
-    public string LoginDescription => IsVaultInitialized
-        ? _localization.UnlockDescription
-        : _localization.CreateVaultDescription;
-    public string LoginButtonText => IsVaultInitialized ? _localization.Unlock : _localization.CreateVault;
-
     public string PasswordCountText => _localization.Format("PasswordCountFormat", Passwords.Count);
     public string ArchivedPasswordCountText => _localization.Format("ArchivedPasswordCountFormat", ArchivedPasswords.Count);
     public string DeletedPasswordCountText => _localization.Format("DeletedPasswordCountFormat", DeletedPasswords.Count);
@@ -1577,10 +1555,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public bool IsMdbxHealthSelected => IsWorkspacePageSelected(SelectedMdbxWorkspacePage, "Health");
     public bool IsMdbxSourcesSelected => IsWorkspacePageSelected(SelectedMdbxWorkspacePage, "Sources");
     public bool IsMdbxRuntimeSelected => IsWorkspacePageSelected(SelectedMdbxWorkspacePage, "Runtime");
-    public bool HasLegacyVaultImportPrompt => _legacyVaultDetection.RequiresImport;
-    public string LegacyVaultImportPromptText => _legacyVaultDetection.RequiresImport
-        ? _localization.Format("LegacyVaultImportPromptFormat", _legacyVaultDetection.DatabasePath)
-        : "";
     public string GeneratorLengthText => _localization.Format("GeneratorLengthFormat", GeneratorLength);
     public string GeneratorWordCountText => _localization.Format("GeneratorWordCountFormat", GeneratorWordCount);
     public int GeneratorLengthMinimum => GeneratorMode == GeneratorModePin ? 4 : 8;
@@ -1996,13 +1970,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(HasSelectedWalletItem));
     }
 
-    partial void OnIsVaultInitializedChanged(bool value)
-    {
-        OnPropertyChanged(nameof(LoginTitle));
-        OnPropertyChanged(nameof(LoginDescription));
-        OnPropertyChanged(nameof(LoginButtonText));
-    }
-
     partial void OnSettingsLanguageChanged(string value)
     {
         if (_isApplyingSettings)
@@ -2182,101 +2149,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ShellSyncText));
         OnPropertyChanged(nameof(ShellPageText));
         OnPropertyChanged(nameof(ShellPlatformText));
-    }
-
-    private static bool DefaultVaultDatabaseExists()
-    {
-        try
-        {
-            return File.Exists(MonicaAppDataPaths.GetDatabasePath());
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    [RelayCommand]
-    public async Task InitializeAsync()
-    {
-        try
-        {
-            AppDiagnostics.Info("Initialize started");
-            await _settingsService.LoadAsync();
-            ApplySettings(_settingsService.Current);
-            var initialization = await AppDiagnostics.MeasureAsync(
-                "Vault metadata initialize",
-                () => _vaultUnlockCoordinator.InitializeAsync());
-            _legacyVaultDetection = initialization.LegacyVaultDetection;
-            RaiseLegacyVaultImportPrompt();
-            if (_legacyVaultDetection.RequiresImport)
-            {
-                IsVaultInitialized = false;
-                StatusMessage = _localization.Get("LegacyVaultImportRequired");
-                return;
-            }
-
-            IsVaultInitialized = initialization.IsVaultInitialized;
-            StatusMessage = IsVaultInitialized
-                ? _localization.Get("VaultLocked")
-                : _localization.Get("FirstRunCreateMasterPassword");
-            AppDiagnostics.Info($"Initialize completed. initialized={IsVaultInitialized}, legacyImportRequired={_legacyVaultDetection.RequiresImport}");
-        }
-        catch (Exception ex)
-        {
-            AppDiagnostics.Error("Initialize failed", ex);
-            IsVaultInitialized = DefaultVaultDatabaseExists();
-            StatusMessage = _localization.Format("VaultMetadataLoadFailedFormat", ex.Message);
-        }
-    }
-
-    [RelayCommand]
-    private async Task UnlockAsync()
-    {
-        AppDiagnostics.Info($"Unlock requested. initialized={IsVaultInitialized}, legacyImportRequired={_legacyVaultDetection.RequiresImport}");
-        var result = await AppDiagnostics.MeasureAsync(
-            "Unlock credential verification",
-            () => _vaultUnlockCoordinator.UnlockOrCreateAsync(
-                MasterPassword,
-                ConfirmMasterPassword,
-                _legacyVaultDetection));
-        AppDiagnostics.Info($"Unlock result={result.Status}");
-
-        switch (result.Status)
-        {
-            case VaultUnlockStatus.MissingPassword:
-            case VaultUnlockStatus.LegacyImportRequired:
-            case VaultUnlockStatus.PasswordTooShort:
-            case VaultUnlockStatus.ConfirmationMismatch:
-                IsVaultInitialized = result.IsVaultInitialized;
-                StatusMessage = _localization.Get(result.MessageKey);
-                return;
-            case VaultUnlockStatus.WrongPassword:
-                IsVaultInitialized = result.IsVaultInitialized;
-                IsUnlocked = false;
-                StatusMessage = _localization.Get(result.MessageKey);
-                MasterPassword = "";
-                ConfirmMasterPassword = "";
-                return;
-            case VaultUnlockStatus.Failed:
-                IsVaultInitialized = result.IsVaultInitialized || DefaultVaultDatabaseExists();
-                IsUnlocked = false;
-                StatusMessage = _localization.Format(result.MessageKey, result.Error?.Message ?? "");
-                return;
-            case VaultUnlockStatus.CreatedAndUnlocked:
-            case VaultUnlockStatus.Unlocked:
-                IsVaultInitialized = result.IsVaultInitialized;
-                IsUnlocked = true;
-                MasterPassword = "";
-                ConfirmMasterPassword = "";
-                StatusMessage = $"{_localization.Get(result.MessageKey)}，正在加载保险库数据...";
-                _ = LoadAfterUnlockAsync();
-                return;
-            default:
-                IsUnlocked = false;
-                StatusMessage = _localization.Format("UnlockFailedFormat", result.Status.ToString());
-                return;
-        }
     }
 
     private async Task LoadAfterUnlockAsync()
@@ -9918,12 +9790,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             CompromisedPasswordStatus = _localization.Get("CompromisedPasswordNotChecked");
         }
-    }
-
-    private void RaiseLegacyVaultImportPrompt()
-    {
-        OnPropertyChanged(nameof(HasLegacyVaultImportPrompt));
-        OnPropertyChanged(nameof(LegacyVaultImportPromptText));
     }
 
     private void RefreshChoiceLabels()

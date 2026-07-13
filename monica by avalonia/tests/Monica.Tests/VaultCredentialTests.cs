@@ -70,6 +70,56 @@ public sealed class VaultCredentialTests
     }
 
     [Fact]
+    public async Task Unlock_coordinator_creates_and_initializes_a_new_vault()
+    {
+        var path = GetTempDatabasePath();
+        var factory = new SqliteConnectionFactory(path);
+        var migrator = new DatabaseMigrator(factory);
+        var coordinator = new VaultUnlockCoordinator(
+            new VaultCredentialStore(factory, migrator),
+            new CryptoService(),
+            new LegacyVaultDetector(factory));
+
+        var initialState = await coordinator.InitializeAsync();
+        var missingPassword = await coordinator.UnlockOrCreateAsync("", "", LegacyVaultDetection.Empty);
+        var mismatchedConfirmation = await coordinator.UnlockOrCreateAsync(
+            "correct password",
+            "different password",
+            LegacyVaultDetection.Empty);
+        var created = await coordinator.UnlockOrCreateAsync(
+            "correct password",
+            "correct password",
+            LegacyVaultDetection.Empty);
+        var initializedState = await coordinator.InitializeAsync();
+
+        Assert.False(initialState.IsVaultInitialized);
+        Assert.Equal(VaultUnlockStatus.MissingPassword, missingPassword.Status);
+        Assert.Equal(VaultUnlockStatus.ConfirmationMismatch, mismatchedConfirmation.Status);
+        Assert.Equal(VaultUnlockStatus.CreatedAndUnlocked, created.Status);
+        Assert.True(initializedState.IsVaultInitialized);
+    }
+
+    [Fact]
+    public async Task Unlock_coordinator_rejects_wrong_password_and_accepts_existing_password()
+    {
+        var path = GetTempDatabasePath();
+        var factory = new SqliteConnectionFactory(path);
+        var migrator = new DatabaseMigrator(factory);
+        var store = new VaultCredentialStore(factory, migrator);
+        await store.SaveAsync(new CryptoService().HashMasterPassword("correct password"));
+        var coordinator = new VaultUnlockCoordinator(
+            store,
+            new CryptoService(),
+            new LegacyVaultDetector(factory));
+
+        var wrong = await coordinator.UnlockOrCreateAsync("wrong password", "", LegacyVaultDetection.Empty);
+        var unlocked = await coordinator.UnlockOrCreateAsync("correct password", "", LegacyVaultDetection.Empty);
+
+        Assert.Equal(VaultUnlockStatus.WrongPassword, wrong.Status);
+        Assert.Equal(VaultUnlockStatus.Unlocked, unlocked.Status);
+    }
+
+    [Fact]
     public async Task ViewModel_requires_first_run_password_confirmation()
     {
         var viewModel = CreateViewModel(GetTempDatabasePath());
