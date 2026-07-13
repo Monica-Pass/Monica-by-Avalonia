@@ -974,16 +974,6 @@ public sealed partial class MainWindowViewModel
             _localization.Get("MoveToRecycleBin"),
             _localization.Cancel);
 
-    private Task<bool> ConfirmDeleteWebDavBackupAsync(string fileName) =>
-        _confirmationDialogService.ConfirmTypedAsync(
-            _localization.Get("DeleteWebDavBackupConfirmationTitle"),
-            _localization.Format("DeleteWebDavBackupConfirmationMessageFormat", fileName),
-            _localization.Get("DeleteWebDavBackupConfirmationPhrase"),
-            _localization.Format(
-                "DeleteWebDavBackupConfirmationInstructionFormat",
-                _localization.Get("DeleteWebDavBackupConfirmationPhrase")),
-            _localization.Get("Delete"),
-            _localization.Cancel);
     private Task<bool> ConfirmDeleteFolderAsync(string name, int affectedPasswordCount) =>
         _confirmationDialogService.ConfirmAsync(
             _localization.Get("DeleteFolderConfirmationTitle"),

@@ -1036,11 +1036,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
 
-    [RelayCommand]
-    private void SelectSyncPage(string? page)
-    {
-        SelectedSyncPage = NormalizeSyncPage(page);
-    }
 
     [RelayCommand]
     private void SelectDatabaseManagementPage(string? page)
@@ -1058,15 +1053,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         string.Equals(selectedPage, expectedPage, StringComparison.OrdinalIgnoreCase);
 
 
-    private static string NormalizeSyncPage(string? page) =>
-        page?.Trim().ToLowerInvariant() switch
-        {
-            "backup" or "backups" or "history" => "Backup",
-            "sources" or "vaults" or "database" => "Sources",
-            "import" => "Import",
-            "export" => "Export",
-            _ => "Configuration"
-        };
 
     private static string NormalizeDatabaseManagementPage(string? page) =>
         page?.Trim().ToLowerInvariant() switch
@@ -1148,14 +1134,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
-    private void ShowVaultSourceDetails(VaultSourceDisplayItem? source)
-    {
-        if (source is not null)
-        {
-            SelectedVaultSource = source;
-        }
-    }
 
     [RelayCommand]
     private void ShowMdbxDatabaseDetails(MdbxDatabaseDisplayItem? item)
@@ -1166,14 +1144,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
-    private void ShowWebDavBackupDetails(WebDavBackupHistoryItem? item)
-    {
-        if (item is not null)
-        {
-            SelectedWebDavBackupHistoryItem = item;
-        }
-    }
 
     public async Task<long> AddPasswordAttachmentMetadataAsync(
         PasswordEntry entry,
@@ -1453,207 +1423,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
-    private async Task LoadWebDavBackupsAsync()
-    {
-        if (!TryCreateWebDavProfile(out var profile))
-        {
-            return;
-        }
-
-        try
-        {
-            IsLoadingWebDavBackups = true;
-            var entries = await _webDavBackupService.ListAsync(profile, "");
-            WebDavBackupHistory.Clear();
-            foreach (var item in entries
-                .Where(item => !item.IsDirectory)
-                .OrderByDescending(item => item.LastModified ?? DateTimeOffset.MinValue)
-                .ThenBy(item => item.Path, StringComparer.OrdinalIgnoreCase))
-            {
-                WebDavBackupHistory.Add(ToWebDavBackupHistoryItem(item));
-            }
-
-            SelectedWebDavBackupHistoryItem = WebDavBackupHistory.FirstOrDefault();
-            RaiseWebDavBackupHistoryState();
-            StatusMessage = _localization.Format("LoadedWebDavBackupsFormat", WebDavBackupHistory.Count);
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = _localization.Format("WebDavBackupHistoryFailedFormat", ex.Message);
-        }
-        finally
-        {
-            IsLoadingWebDavBackups = false;
-        }
-    }
-
-    [RelayCommand]
-    private async Task TestWebDavConnectionAsync()
-    {
-        if (!TryCreateWebDavProfile(out var profile))
-        {
-            return;
-        }
-
-        try
-        {
-            IsLoadingWebDavBackups = true;
-            var entries = await _webDavBackupService.ListAsync(profile, "");
-            StatusMessage = _localization.Format("WebDavConnectionTestSucceededFormat", entries.Count);
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = _localization.Format("WebDavConnectionTestFailedFormat", ex.Message);
-        }
-        finally
-        {
-            IsLoadingWebDavBackups = false;
-            RaiseSyncPageState();
-        }
-    }
-
-    [RelayCommand]
-    private async Task CreateWebDavBackupAsync()
-    {
-        if (!TryCreateWebDavProfile(out var profile))
-        {
-            return;
-        }
-
-        if (!HasSelectedWebDavBackupOptions())
-        {
-            StatusMessage = _localization.Get("SelectWebDavBackupContent");
-            return;
-        }
-
-        if (WebDavBackupEncryptionEnabled && string.IsNullOrWhiteSpace(WebDavBackupEncryptionPassword))
-        {
-            StatusMessage = _localization.Get("WebDavEncryptionPasswordRequired");
-            return;
-        }
-
-        try
-        {
-            IsRunningWebDavBackup = true;
-            var json = await BuildMonicaJsonExportAsync(
-                WebDavBackupIncludePasswords,
-                WebDavBackupIncludeTotp,
-                WebDavBackupIncludeNotes,
-                WebDavBackupIncludeCards,
-                WebDavBackupIncludeDocuments,
-                WebDavBackupIncludeImages,
-                WebDavBackupIncludeCategories);
-            var extension = WebDavBackupEncryptionEnabled ? "monica.enc.json" : "monica.json";
-            var fileName = $"monica_backup_{DateTimeOffset.UtcNow:yyyyMMdd_HHmmss}.{extension}";
-            var content = WebDavBackupEncryptionEnabled
-                ? EncryptWebDavBackupPayload(json, WebDavBackupEncryptionPassword)
-                : json;
-
-            await _webDavBackupService.UploadTextAsync(profile, fileName, content);
-            var path = _webDavBackupService.NormalizeRemotePath(profile.RootPath, fileName);
-            var existing = WebDavBackupHistory.FirstOrDefault(item => string.Equals(item.Path, path, StringComparison.OrdinalIgnoreCase));
-            if (existing is not null)
-            {
-                WebDavBackupHistory.Remove(existing);
-            }
-
-            var backupItem = new WebDavBackupHistoryItem(
-                fileName,
-                path,
-                DateTimeOffset.UtcNow.ToLocalTime().ToString("yyyy/MM/dd HH:mm", _localization.Culture),
-                FormatByteSize(Encoding.UTF8.GetByteCount(content)),
-                DateTimeOffset.UtcNow);
-            WebDavBackupHistory.Insert(0, backupItem);
-            SelectedWebDavBackupHistoryItem = backupItem;
-            RaiseWebDavBackupHistoryState();
-            StatusMessage = _localization.Format("CreatedWebDavBackupFormat", fileName);
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = _localization.Format("CreateWebDavBackupFailedFormat", ex.Message);
-        }
-        finally
-        {
-            IsRunningWebDavBackup = false;
-        }
-    }
-
-    [RelayCommand]
-    private async Task RestoreWebDavBackupAsync(WebDavBackupHistoryItem? item)
-    {
-        if (item is null || !TryCreateWebDavProfile(out var profile))
-        {
-            return;
-        }
-
-        if (IsEncryptedWebDavBackup(item.FileName) && string.IsNullOrWhiteSpace(WebDavBackupEncryptionPassword))
-        {
-            StatusMessage = _localization.Get("WebDavEncryptionPasswordRequired");
-            return;
-        }
-
-        try
-        {
-            IsRunningWebDavBackup = true;
-            var content = await _webDavBackupService.DownloadTextAsync(profile, item.FileName);
-            var json = IsEncryptedWebDavBackup(item.FileName)
-                ? DecryptWebDavBackupPayload(content, WebDavBackupEncryptionPassword)
-                : content;
-            var result = await ImportMonicaJsonAsync(json);
-            StatusMessage = _localization.Format("RestoredWebDavBackupFormat", item.FileName, result.Passwords, result.SecureItems, result.Categories);
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = _localization.Format("RestoreWebDavBackupFailedFormat", ex.Message);
-        }
-        finally
-        {
-            IsRunningWebDavBackup = false;
-        }
-    }
-
-    [RelayCommand]
-    private async Task RestoreLatestWebDavBackupAsync()
-    {
-        if (!WebDavBackupHistory.Any())
-        {
-            await LoadWebDavBackupsAsync();
-        }
-
-        await RestoreWebDavBackupAsync(WebDavBackupHistory.FirstOrDefault());
-    }
-
-    [RelayCommand]
-    private async Task DeleteWebDavBackupAsync(WebDavBackupHistoryItem? item)
-    {
-        if (item is null || !TryCreateWebDavProfile(out var profile))
-        {
-            return;
-        }
-
-        if (!await ConfirmDeleteWebDavBackupAsync(item.FileName))
-        {
-            return;
-        }
-
-        try
-        {
-            await _webDavBackupService.DeleteAsync(profile, item.FileName);
-            WebDavBackupHistory.Remove(item);
-            if (SelectedWebDavBackupHistoryItem == item)
-            {
-                SelectedWebDavBackupHistoryItem = WebDavBackupHistory.FirstOrDefault();
-            }
-
-            RaiseWebDavBackupHistoryState();
-            StatusMessage = _localization.Format("DeletedWebDavBackupFormat", item.FileName);
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = _localization.Format("DeleteWebDavBackupFailedFormat", ex.Message);
-        }
-    }
 
     private async Task<string> BuildMonicaJsonExportAsync(
         bool includePasswords,
@@ -1965,75 +1734,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             : _localization.Format("ImportedMonicaJsonFormat", result.Passwords, result.SecureItems);
     }
 
-    private bool HasSelectedWebDavBackupOptions() =>
-        WebDavBackupIncludePasswords ||
-        WebDavBackupIncludeTotp ||
-        WebDavBackupIncludeNotes ||
-        WebDavBackupIncludeCards ||
-        WebDavBackupIncludeDocuments ||
-        WebDavBackupIncludeImages ||
-        WebDavBackupIncludeCategories;
-
-    private int CountSelectedWebDavBackupOptions() =>
-        (WebDavBackupIncludePasswords ? 1 : 0) +
-        (WebDavBackupIncludeTotp ? 1 : 0) +
-        (WebDavBackupIncludeNotes ? 1 : 0) +
-        (WebDavBackupIncludeCards ? 1 : 0) +
-        (WebDavBackupIncludeDocuments ? 1 : 0) +
-        (WebDavBackupIncludeImages ? 1 : 0) +
-        (WebDavBackupIncludeCategories ? 1 : 0);
-
-    private static bool IsEncryptedWebDavBackup(string fileName) =>
-        fileName.EndsWith(".enc.json", StringComparison.OrdinalIgnoreCase);
-
-    private static string EncryptWebDavBackupPayload(string json, string password)
-    {
-        const int saltSize = 16;
-        const int nonceSize = 12;
-        const int tagSize = 16;
-        const int iterations = 300_000;
-
-        var salt = RandomNumberGenerator.GetBytes(saltSize);
-        var nonce = RandomNumberGenerator.GetBytes(nonceSize);
-        var plainBytes = Encoding.UTF8.GetBytes(json);
-        var cipherBytes = new byte[plainBytes.Length];
-        var tag = new byte[tagSize];
-        var key = Rfc2898DeriveBytes.Pbkdf2(Encoding.UTF8.GetBytes(password), salt, iterations, HashAlgorithmName.SHA256, 32);
-
-        using var aes = new AesGcm(key, tagSize);
-        aes.Encrypt(nonce, plainBytes, cipherBytes, tag);
-
-        return JsonSerializer.Serialize(new WebDavEncryptedBackupPackage(
-            1,
-            "pbkdf2-sha256",
-            iterations,
-            Convert.ToBase64String(salt),
-            Convert.ToBase64String(nonce),
-            Convert.ToBase64String(tag),
-            Convert.ToBase64String(cipherBytes)));
-    }
-
-    private static string DecryptWebDavBackupPayload(string content, string password)
-    {
-        const int tagSize = 16;
-        var package = JsonSerializer.Deserialize<WebDavEncryptedBackupPackage>(content)
-            ?? throw new InvalidOperationException("Invalid encrypted Monica backup payload.");
-        if (!string.Equals(package.Kdf, "pbkdf2-sha256", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("Unsupported Monica backup encryption KDF.");
-        }
-
-        var salt = Convert.FromBase64String(package.Salt);
-        var nonce = Convert.FromBase64String(package.Nonce);
-        var tag = Convert.FromBase64String(package.Tag);
-        var cipherBytes = Convert.FromBase64String(package.CipherText);
-        var plainBytes = new byte[cipherBytes.Length];
-        var key = Rfc2898DeriveBytes.Pbkdf2(Encoding.UTF8.GetBytes(password), salt, package.Iterations, HashAlgorithmName.SHA256, 32);
-
-        using var aes = new AesGcm(key, tagSize);
-        aes.Decrypt(nonce, cipherBytes, tag, plainBytes);
-        return Encoding.UTF8.GetString(plainBytes);
-    }
 
     [RelayCommand]
     private async Task ImportPasswordCsvAsync()
@@ -2488,15 +2188,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RefreshSyncHealthItems();
     }
 
-    private void RaiseSyncPageState()
-    {
-        OnPropertyChanged(nameof(WebDavConnectionStatusText));
-        OnPropertyChanged(nameof(SyncStatusSummaryText));
-        OnPropertyChanged(nameof(SyncConfigurationSummaryText));
-        OnPropertyChanged(nameof(SyncRecoverySummaryText));
-        OnPropertyChanged(nameof(OneDriveConnectionStatusText));
-        RefreshSyncHealthItems();
-    }
 
     private void RefreshMdbxHealthItems()
     {
@@ -2520,31 +2211,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(MdbxHealthItems));
     }
 
-    private void RefreshSyncHealthItems()
-    {
-        SyncHealthItems.Clear();
-        SyncHealthItems.Add(new SyncHealthDisplayItem(
-            _localization.WebDav,
-            WebDavEnabled ? BuildWebDavSourceStatus() : _localization.Get("Disabled"),
-            WebDavConnectionStatusText));
-        SyncHealthItems.Add(new SyncHealthDisplayItem(
-            _localization.Get("RemoteSync"),
-            WebDavEnabled ? _localization.Get("Enabled") : _localization.Get("LocalOnly"),
-            SyncConfigurationSummaryText));
-        SyncHealthItems.Add(new SyncHealthDisplayItem(
-            _localization.Get("BackupHistory"),
-            WebDavBackupHistoryCountText,
-            SyncRecoverySummaryText));
-        SyncHealthItems.Add(new SyncHealthDisplayItem(
-            _localization.OneDrive,
-            OneDriveConnectionStatusText,
-            _localization.Get("OneDriveBoundaryDescription")));
-        SyncHealthItems.Add(new SyncHealthDisplayItem(
-            _localization.MdbxVaults,
-            MdbxDatabaseCountText,
-            MdbxSyncDiagnosticsSummaryText));
-        OnPropertyChanged(nameof(SyncHealthItems));
-    }
 
     private MdbxDatabaseDisplayItem ToMdbxDisplayItem(LocalMdbxDatabase database)
     {
@@ -2640,195 +2306,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string FormatLocalDate(DateTimeOffset value) =>
         value.ToLocalTime().ToString("yyyy/MM/dd HH:mm", _localization.Culture);
 
-    private void RefreshVaultSources()
-    {
-        var selectedName = SelectedVaultSource?.DisplayName;
-        var selectedKind = SelectedVaultSource?.Kind;
-        VaultSources.Clear();
-        VaultSources.Add(new VaultSourceDisplayItem(
-            _localization.LocalDatabase,
-            "SQLite",
-            _localization.Get("CanonicalVault"),
-            _localization.Get("LocalOnly"),
-            _localization.Get("Available")));
-
-        if (WebDavEnabled)
-        {
-            VaultSources.Add(new VaultSourceDisplayItem(
-                _localization.WebDav,
-                "WebDAV",
-                string.IsNullOrWhiteSpace(WebDavRemotePath) ? "/" : WebDavRemotePath,
-                string.IsNullOrWhiteSpace(WebDavServerUrl) ? _localization.Get("NotConfigured") : WebDavServerUrl,
-                BuildWebDavSourceStatus()));
-        }
-
-        foreach (var database in MdbxDatabases)
-        {
-            var isLocalMdbx = IsLocalMdbxDatabase(database);
-            var localPath = string.IsNullOrWhiteSpace(database.WorkingCopyPath)
-                ? database.FilePath
-                : database.WorkingCopyPath;
-            var remotePath = isLocalMdbx
-                ? _localization.Get("LocalOnly")
-                : string.IsNullOrWhiteSpace(database.FilePath) ? _localization.Get("NotConfigured") : database.FilePath;
-            VaultSources.Add(new VaultSourceDisplayItem(
-                string.IsNullOrWhiteSpace(database.Name) ? "MDBX" : database.Name,
-                "MDBX",
-                string.IsNullOrWhiteSpace(localPath) ? _localization.Get("NotConfigured") : localPath,
-                remotePath,
-                LocalizeSyncStatus(database.LastSyncStatus)));
-        }
-
-        var keePassGroups = Passwords
-            .Concat(ArchivedPasswords)
-            .Concat(DeletedPasswords)
-            .Where(item => item.KeepassDatabaseId is not null)
-            .GroupBy(item => item.KeepassDatabaseId!.Value)
-            .OrderBy(group => group.Key);
-
-        foreach (var group in keePassGroups)
-        {
-            var sample = group.First();
-            VaultSources.Add(new VaultSourceDisplayItem(
-                _localization.Format("KeePassSourceNameFormat", group.Key),
-                "KDBX",
-                sample.KeepassGroupPath ?? _localization.Get("NotConfigured"),
-                _localization.Format("EntryCountFormat", group.Count()),
-                _localization.Get("DesktopEquivalent")));
-        }
-
-        var bitwardenGroups = Passwords
-            .Concat(ArchivedPasswords)
-            .Concat(DeletedPasswords)
-            .Where(item => item.BitwardenVaultId is not null)
-            .GroupBy(item => item.BitwardenVaultId!.Value)
-            .OrderBy(group => group.Key);
-
-        foreach (var group in bitwardenGroups)
-        {
-            var pendingCount = group.Count(item => item.BitwardenLocalModified);
-            VaultSources.Add(new VaultSourceDisplayItem(
-                _localization.Format("BitwardenSourceNameFormat", group.Key),
-                "Bitwarden",
-                _localization.Format("EntryCountFormat", group.Count()),
-                pendingCount > 0 ? _localization.Format("PendingSyncCountFormat", pendingCount) : _localization.Get("NoPendingChanges"),
-                pendingCount > 0 ? _localization.Get("Pending") : _localization.Get("Available")));
-        }
-
-        SelectedVaultSource =
-            VaultSources.FirstOrDefault(item =>
-                string.Equals(item.DisplayName, selectedName, StringComparison.Ordinal) &&
-                string.Equals(item.Kind, selectedKind, StringComparison.Ordinal)) ??
-            VaultSources.FirstOrDefault();
-
-        OnPropertyChanged(nameof(VaultSourceCountText));
-        OnPropertyChanged(nameof(HasVaultSources));
-    }
-
-    private bool TryCreateWebDavProfile(out WebDavProfile profile)
-    {
-        profile = new WebDavProfile();
-        if (!WebDavEnabled)
-        {
-            StatusMessage = _localization.Get("EnableWebDavFirst");
-            return false;
-        }
-
-        if (!Uri.TryCreate(WebDavServerUrl, UriKind.Absolute, out var baseUri))
-        {
-            StatusMessage = _localization.Get("WebDavServerUrlRequired");
-            return false;
-        }
-
-        profile = new WebDavProfile
-        {
-            BaseUri = baseUri,
-            Username = WebDavUsername.Trim(),
-            Password = WebDavPassword,
-            RootPath = string.IsNullOrWhiteSpace(WebDavRemotePath) ? "/" : WebDavRemotePath
-        };
-        return true;
-    }
-
-    private WebDavBackupHistoryItem ToWebDavBackupHistoryItem(RemoteFileEntry item)
-    {
-        var fileName = ExtractWebDavFileName(item.Path);
-        var dateString = item.LastModified is null
-            ? _localization.Get("UnknownDate")
-            : item.LastModified.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm", _localization.Culture);
-        return new WebDavBackupHistoryItem(
-            fileName,
-            item.Path,
-            dateString,
-            FormatByteSize(item.Length),
-            item.LastModified);
-    }
-
-    private void RaiseWebDavBackupHistoryState()
-    {
-        if (SelectedWebDavBackupHistoryItem is not null &&
-            !WebDavBackupHistory.Contains(SelectedWebDavBackupHistoryItem))
-        {
-            SelectedWebDavBackupHistoryItem = WebDavBackupHistory.FirstOrDefault();
-        }
-
-        OnPropertyChanged(nameof(WebDavBackupHistoryCountText));
-        OnPropertyChanged(nameof(HasWebDavBackupHistory));
-        OnPropertyChanged(nameof(HasSelectedWebDavBackupHistoryItem));
-        RaiseSyncPageState();
-    }
-
-    private static string ExtractWebDavFileName(string path)
-    {
-        var normalized = Uri.TryCreate(path, UriKind.Absolute, out var uri) ? uri.AbsolutePath : path;
-        normalized = normalized.TrimEnd('/');
-        var index = normalized.LastIndexOf('/');
-        return Uri.UnescapeDataString(index >= 0 ? normalized[(index + 1)..] : normalized);
-    }
-
-    private string FormatByteSize(long? length)
-    {
-        if (length is null)
-        {
-            return _localization.Get("UnknownSize");
-        }
-
-        var value = (double)length.Value;
-        string[] units = ["B", "KB", "MB", "GB"];
-        var unitIndex = 0;
-        while (value >= 1024 && unitIndex < units.Length - 1)
-        {
-            value /= 1024;
-            unitIndex++;
-        }
-
-        return string.Format(_localization.Culture, "{0:0.#} {1}", value, units[unitIndex]);
-    }
-
-    private string BuildWebDavSourceStatus()
-    {
-        if (string.IsNullOrWhiteSpace(WebDavServerUrl))
-        {
-            return _localization.Get("NotConfigured");
-        }
-
-        if (WebDavSyncOnStartup && WebDavSyncAfterChanges)
-        {
-            return _localization.Get("AutomaticSync");
-        }
-
-        if (WebDavSyncOnStartup)
-        {
-            return _localization.Get("StartupSync");
-        }
-
-        if (WebDavSyncAfterChanges)
-        {
-            return _localization.Get("ChangeSync");
-        }
-
-        return _localization.Get("ManualSync");
-    }
 
     private string LocalizeSyncStatus(SyncStatus status)
     {
@@ -3216,22 +2693,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
 
 
-    private sealed record WebDavEncryptedBackupPackage(
-        int Version,
-        string Kdf,
-        int Iterations,
-        string Salt,
-        string Nonce,
-        string Tag,
-        string CipherText);
 
 
-    private void UpdateWebDavBackupOption(Action<DesktopAppSettings> update)
-    {
-        UpdateSettings(update);
-        OnPropertyChanged(nameof(WebDavBackupOptionsSummaryText));
-        RaiseSyncPageState();
-    }
 
 
     private void RefreshLocalizedProperties()
