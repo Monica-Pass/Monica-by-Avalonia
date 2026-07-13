@@ -115,14 +115,14 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (e.Key is Key.Up or Key.Down && !IsNonSearchPasswordTextEditingSource(e.Source))
+        if (e.Key is Key.Up or Key.Down && !PasswordVaultView.IsNonSearchTextEditingSource(e.Source))
         {
-            SelectAdjacentPassword(viewModel, e.Key == Key.Down ? 1 : -1);
+            PasswordVaultView.SelectAdjacentPassword(viewModel, e.Key == Key.Down ? 1 : -1);
             e.Handled = true;
             return;
         }
 
-        if (e.Key == Key.Enter && viewModel.HasCurrentSelectedPasswordDetails && !IsNonSearchPasswordTextEditingSource(e.Source))
+        if (e.Key == Key.Enter && viewModel.HasCurrentSelectedPasswordDetails && !PasswordVaultView.IsNonSearchTextEditingSource(e.Source))
         {
             PasswordVaultView.FocusDetails();
             e.Handled = true;
@@ -193,31 +193,6 @@ public partial class MainWindow : Window
                 return false;
         }
     }
-
-    private void SelectAdjacentPassword(MainWindowViewModel viewModel, int delta)
-    {
-        var visiblePasswords = viewModel.VisiblePasswordNavigationEntries.ToList();
-        if (visiblePasswords.Count == 0)
-        {
-            return;
-        }
-
-        var currentIndex = viewModel.SelectedPassword is null
-            ? -1
-            : visiblePasswords.FindIndex(item => item.Id == viewModel.SelectedPassword.Id);
-        var nextIndex = currentIndex < 0
-            ? (delta > 0 ? 0 : visiblePasswords.Count - 1)
-            : Math.Clamp(currentIndex + delta, 0, visiblePasswords.Count - 1);
-
-        viewModel.SelectedPassword = visiblePasswords[nextIndex];
-        if (viewModel.SelectedPasswordListRow is { } row)
-        {
-            Dispatcher.UIThread.Post(() => PasswordVaultView.ScrollIntoView(row));
-        }
-    }
-
-    private bool IsNonSearchPasswordTextEditingSource(object? source) =>
-        source is TextBox textBox && !PasswordVaultView.IsSearchBox(textBox);
 
     private static bool IsTextEditingSource(object? source) => source is TextBox;
 

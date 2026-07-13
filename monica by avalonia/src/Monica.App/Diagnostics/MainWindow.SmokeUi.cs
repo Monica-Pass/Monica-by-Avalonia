@@ -71,7 +71,7 @@ public partial class MainWindow
             if (visiblePasswords.Length >= 2)
             {
                 viewModel.SelectedPassword = visiblePasswords[0];
-                SelectAdjacentPassword(viewModel, 1);
+                PasswordVaultView.SelectAdjacentPassword(viewModel, 1);
                 await Task.Delay(50);
                 Check(
                     "password-arrow-select-next",
