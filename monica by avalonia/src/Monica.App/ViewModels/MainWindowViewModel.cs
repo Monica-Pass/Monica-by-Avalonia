@@ -29,8 +29,6 @@ using Monica.Platform.Services;
 namespace Monica.App.ViewModels;
 
 public sealed record TimelineEntry(string Title, string Description, string TimestampText, string OperationType, string ItemType);
-public sealed record VaultSourceDisplayItem(string DisplayName, string Kind, string LocalPath, string RemoteUrl, string SyncStatus);
-public sealed record SyncHealthDisplayItem(string Label, string Value, string Detail);
 internal sealed record VaultLoadSnapshot(
     IReadOnlyList<PasswordEntry> ActivePasswords,
     IReadOnlyList<PasswordEntry> ArchivedPasswords,
@@ -64,7 +62,6 @@ public sealed record MdbxDatabaseDisplayItem(
     bool IsDefault,
     bool IsLocal,
     bool IsRemote);
-public sealed record WebDavBackupHistoryItem(string FileName, string Path, string DateString, string SizeText, DateTimeOffset? LastModified);
 public sealed record MonicaJsonImportResult(int Passwords, int SecureItems, int Categories);
 
 internal sealed class DisabledTotpEditorDialogService : ITotpEditorDialogService
@@ -144,24 +141,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         public List<PasswordFolderTreeNode> Children { get; } = [];
     }
 
-    private sealed class DisabledWebDavBackupService : IWebDavBackupService
-    {
-        public string NormalizeRemotePath(string rootPath, string relativePath) => relativePath;
-
-        public Task<IReadOnlyList<RemoteFileEntry>> ListAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<RemoteFileEntry>>([]);
-
-        public Task UploadTextAsync(WebDavProfile profile, string relativePath, string content, CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
-
-        public Task<string> DownloadTextAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) =>
-            Task.FromResult("");
-
-        public Task DeleteAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
-    }
-
-
     private readonly IMonicaRepository _repository;
     private readonly ICryptoService _cryptoService;
     private readonly ITotpService _totpService;
@@ -169,7 +148,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IPwnedPasswordService _pwnedPasswordService;
     private readonly IImportExportService _importExportService;
     private readonly IClipboardService _clipboardService;
-    private readonly IWebDavBackupService _webDavBackupService;
     private readonly IMdbxVaultService _mdbxVaultService;
     private readonly IPasswordAttachmentFileService _passwordAttachmentFileService;
     private readonly IPasswordEditorDialogService _passwordEditorDialogService;
@@ -267,11 +245,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<LocalMdbxDatabase> MdbxDatabases { get; } = new ObservableRangeCollection<LocalMdbxDatabase>();
     public ObservableCollection<MdbxDatabaseDisplayItem> MdbxDatabaseItems { get; } = [];
     public ObservableCollection<TimelineEntry> TimelineEntries { get; } = new ObservableRangeCollection<TimelineEntry>();
-    public ObservableCollection<VaultSourceDisplayItem> VaultSources { get; } = [];
     public ObservableCollection<SyncHealthDisplayItem> MdbxHealthItems { get; } = [];
-    public ObservableCollection<SyncHealthDisplayItem> SyncHealthItems { get; } = [];
-    public ObservableCollection<WebDavBackupHistoryItem> WebDavBackupHistory { get; } = [];
-    public ObservableCollection<SettingsChoice> ConflictStrategyOptions { get; } = [];
     public ObservableCollection<SettingsChoice> PasswordSortOptions { get; } = [];
     public ObservableCollection<PasswordFolderFilterChoice> PasswordFolderFilters { get; } = [];
     public IEnumerable<PasswordFolderFilterChoice> SystemPasswordFolderFilters =>
@@ -396,22 +370,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private MdbxDatabaseDisplayItem? _selectedMdbxDatabaseItem;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasSelectedVaultSource))]
-    private VaultSourceDisplayItem? _selectedVaultSource;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasSelectedWebDavBackupHistoryItem))]
-    private WebDavBackupHistoryItem? _selectedWebDavBackupHistoryItem;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsSyncConfigurationSelected))]
-    [NotifyPropertyChangedFor(nameof(IsSyncBackupSelected))]
-    [NotifyPropertyChangedFor(nameof(IsSyncSourcesSelected))]
-    [NotifyPropertyChangedFor(nameof(IsSyncImportSelected))]
-    [NotifyPropertyChangedFor(nameof(IsSyncExportSelected))]
-    private string _selectedSyncPage = "Configuration";
-
-    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsDatabaseSourceSelected))]
     [NotifyPropertyChangedFor(nameof(IsDatabaseOverviewSelected))]
     [NotifyPropertyChangedFor(nameof(IsDatabaseCloudSelected))]
@@ -427,66 +385,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _compactPasswordList;
-
-    [ObservableProperty]
-    private bool _webDavEnabled;
-
-    [ObservableProperty]
-    private string _webDavServerUrl = "";
-
-    [ObservableProperty]
-    private string _webDavUsername = "";
-
-    [ObservableProperty]
-    private string _webDavPassword = "";
-
-    [ObservableProperty]
-    private string _webDavRemotePath = "/Monica";
-
-    [ObservableProperty]
-    private bool _webDavSyncOnStartup;
-
-    [ObservableProperty]
-    private bool _webDavSyncAfterChanges;
-
-    [ObservableProperty]
-    private bool _isLoadingWebDavBackups;
-
-    [ObservableProperty]
-    private bool _isRunningWebDavBackup;
-
-    [ObservableProperty]
-    private bool _webDavBackupIncludePasswords = true;
-
-    [ObservableProperty]
-    private bool _webDavBackupIncludeTotp = true;
-
-    [ObservableProperty]
-    private bool _webDavBackupIncludeNotes = true;
-
-    [ObservableProperty]
-    private bool _webDavBackupIncludeCards = true;
-
-    [ObservableProperty]
-    private bool _webDavBackupIncludeDocuments = true;
-
-    [ObservableProperty]
-    private bool _webDavBackupIncludeImages = true;
-
-    [ObservableProperty]
-    private bool _webDavBackupIncludeCategories = true;
-
-    [ObservableProperty]
-    private bool _webDavBackupEncryptionEnabled;
-
-    [ObservableProperty]
-    private string _webDavBackupEncryptionPassword = "";
-
-    [ObservableProperty]
-    private string _syncConflictStrategy = "ask";
-
-    [ObservableProperty]
-    private bool _oneDriveEnabled;
 
     [ObservableProperty]
     private bool _mdbxLocalCacheEnabled = true;
@@ -729,58 +627,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             : _localization.Get("MdbxOneDriveSourceEmpty");
     public string MdbxRuntimeSummaryText => _localization.Get("MdbxRuntimeSummary");
     public string MdbxSecuritySummaryText => _localization.Get("MdbxSecuritySummary");
-    public string VaultSourceCountText => _localization.Format("VaultSourceCountFormat", VaultSources.Count);
-    public string WebDavConnectionStatusText => WebDavEnabled
-        ? _localization.Format("WebDavConfiguredFormat", string.IsNullOrWhiteSpace(WebDavServerUrl) ? _localization.Get("NotConfigured") : WebDavServerUrl)
-        : _localization.Get("WebDavDisabled");
-    public string SyncStatusSummaryText => WebDavEnabled
-        ? _localization.Format("SyncStatusSummaryFormat", BuildWebDavSourceStatus(), WebDavBackupHistory.Count)
-        : _localization.Get("SyncStatusLocalOnly");
-    public string SyncConfigurationSummaryText
-    {
-        get
-        {
-            if (!WebDavEnabled)
-            {
-                return _localization.Get("SyncConfigurationDisabled");
-            }
-
-            return Uri.TryCreate(WebDavServerUrl, UriKind.Absolute, out _)
-                ? _localization.Format("SyncConfigurationReadyFormat", string.IsNullOrWhiteSpace(WebDavRemotePath) ? "/" : WebDavRemotePath)
-                : _localization.Get("SyncConfigurationIncomplete");
-        }
-    }
-    public string SyncRecoverySummaryText
-    {
-        get
-        {
-            if (!WebDavEnabled)
-            {
-                return _localization.Get("SyncRecoveryLocalOnly");
-            }
-
-            return HasWebDavBackupHistory
-                ? _localization.Format("SyncRecoveryBackupReadyFormat", WebDavBackupHistory.Count)
-                : _localization.Get("SyncRecoveryNoBackupsLoaded");
-        }
-    }
-    public string OneDriveConnectionStatusText => OneDriveEnabled
-        ? _localization.Get("OneDriveBoundaryEnabled")
-        : _localization.Get("FeatureDisabled");
     public int SmokeVaultLoadDelayMilliseconds { get; set; }
-    public string WebDavBackupHistoryCountText => _localization.Format("WebDavBackupHistoryCountFormat", WebDavBackupHistory.Count);
-    public bool HasWebDavBackupHistory => WebDavBackupHistory.Count > 0;
-    public bool HasSelectedWebDavBackupHistoryItem => SelectedWebDavBackupHistoryItem is not null;
-    public bool IsWebDavBusy => IsLoadingWebDavBackups || IsRunningWebDavBackup;
-    public string WebDavBackupOptionsSummaryText => _localization.Format(
-        "WebDavBackupOptionsSummaryFormat",
-        CountSelectedWebDavBackupOptions(),
-        WebDavBackupEncryptionEnabled ? _localization.Get("Encrypted") : _localization.Get("PlainJson"));
-    public bool IsSyncConfigurationSelected => IsWorkspacePageSelected(SelectedSyncPage, "Configuration");
-    public bool IsSyncBackupSelected => IsWorkspacePageSelected(SelectedSyncPage, "Backup");
-    public bool IsSyncSourcesSelected => IsWorkspacePageSelected(SelectedSyncPage, "Sources");
-    public bool IsSyncImportSelected => IsWorkspacePageSelected(SelectedSyncPage, "Import");
-    public bool IsSyncExportSelected => IsWorkspacePageSelected(SelectedSyncPage, "Export");
     public bool IsDatabaseSourceSelected => IsWorkspacePageSelected(SelectedDatabaseManagementPage, "Source");
     public bool IsDatabaseOverviewSelected => IsWorkspacePageSelected(SelectedDatabaseManagementPage, "Overview");
     public bool IsDatabaseCloudSelected => IsWorkspacePageSelected(SelectedDatabaseManagementPage, "Cloud");
@@ -804,8 +651,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IsLoadingSelectedPasswordDetails;
     public bool HasSelectedTimelineEntry => SelectedTimelineEntry is not null;
     public bool HasSelectedMdbxDatabaseItem => SelectedMdbxDatabaseItem is not null;
-    public bool HasSelectedVaultSource => SelectedVaultSource is not null;
-    public bool HasVaultSources => VaultSources.Count > 0;
     public bool HasRecoverableStatusMessage =>
         IsUnlocked &&
         !IsLoadingVault &&
@@ -946,81 +791,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(PasswordListContentMargin));
         OnPropertyChanged(nameof(ShowPasswordListDetails));
     }
-    partial void OnWebDavEnabledChanged(bool value)
-    {
-        UpdateSettings(settings => settings.WebDavEnabled = value);
-        RaiseSyncPageState();
-        RefreshVaultSources();
-        RefreshMdbxVaultState();
-        RaiseShellStatus();
-    }
-    partial void OnWebDavServerUrlChanged(string value)
-    {
-        UpdateSettings(settings => settings.WebDavServerUrl = value);
-        RaiseSyncPageState();
-        RefreshVaultSources();
-    }
-    partial void OnWebDavUsernameChanged(string value)
-    {
-        UpdateSettings(settings => settings.WebDavUsername = value);
-        RaiseSyncPageState();
-        RefreshVaultSources();
-    }
-    partial void OnWebDavPasswordChanged(string value)
-    {
-        UpdateSettings(settings => settings.WebDavPassword = value);
-        RaiseSyncPageState();
-    }
-    partial void OnWebDavRemotePathChanged(string value)
-    {
-        UpdateSettings(settings => settings.WebDavRemotePath = value);
-        RaiseSyncPageState();
-        RefreshVaultSources();
-    }
-    partial void OnWebDavSyncOnStartupChanged(bool value)
-    {
-        UpdateSettings(settings => settings.WebDavSyncOnStartup = value);
-        RaiseSyncPageState();
-        RefreshVaultSources();
-    }
-    partial void OnWebDavSyncAfterChangesChanged(bool value)
-    {
-        UpdateSettings(settings => settings.WebDavSyncAfterChanges = value);
-        RaiseSyncPageState();
-        RefreshVaultSources();
-    }
-    partial void OnIsLoadingWebDavBackupsChanged(bool value)
-    {
-        OnPropertyChanged(nameof(IsWebDavBusy));
-        RaiseSyncPageState();
-    }
-    partial void OnIsRunningWebDavBackupChanged(bool value)
-    {
-        OnPropertyChanged(nameof(IsWebDavBusy));
-        RaiseSyncPageState();
-    }
-    partial void OnWebDavBackupIncludePasswordsChanged(bool value) => UpdateWebDavBackupOption(settings => settings.WebDavBackupIncludePasswords = value);
-    partial void OnWebDavBackupIncludeTotpChanged(bool value) => UpdateWebDavBackupOption(settings => settings.WebDavBackupIncludeTotp = value);
-    partial void OnWebDavBackupIncludeNotesChanged(bool value) => UpdateWebDavBackupOption(settings => settings.WebDavBackupIncludeNotes = value);
-    partial void OnWebDavBackupIncludeCardsChanged(bool value) => UpdateWebDavBackupOption(settings => settings.WebDavBackupIncludeCards = value);
-    partial void OnWebDavBackupIncludeDocumentsChanged(bool value) => UpdateWebDavBackupOption(settings => settings.WebDavBackupIncludeDocuments = value);
-    partial void OnWebDavBackupIncludeImagesChanged(bool value) => UpdateWebDavBackupOption(settings => settings.WebDavBackupIncludeImages = value);
-    partial void OnWebDavBackupIncludeCategoriesChanged(bool value) => UpdateWebDavBackupOption(settings => settings.WebDavBackupIncludeCategories = value);
-    partial void OnWebDavBackupEncryptionEnabledChanged(bool value) => UpdateWebDavBackupOption(settings => settings.WebDavBackupEncryptionEnabled = value);
-    partial void OnWebDavBackupEncryptionPasswordChanged(string value) => UpdateSettings(settings => settings.WebDavBackupEncryptionPassword = value);
-    partial void OnSyncConflictStrategyChanged(string value)
-    {
-        UpdateSettings(settings => settings.SyncConflictStrategy = value);
-        RaiseSyncPageState();
-        RefreshVaultSources();
-    }
-    partial void OnOneDriveEnabledChanged(bool value)
-    {
-        UpdateSettings(settings => settings.OneDriveEnabled = value);
-        RaiseSyncPageState();
-        RefreshMdbxVaultState();
-    }
-
     partial void OnMdbxLocalCacheEnabledChanged(bool value)
     {
         UpdateSettings(settings => settings.MdbxLocalCacheEnabled = value);
