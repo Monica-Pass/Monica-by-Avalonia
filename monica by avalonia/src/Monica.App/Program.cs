@@ -30,7 +30,7 @@ class Program
 
         try
         {
-            File.WriteAllText(LogPath, $"[Start] {DateTime.Now}\n");
+            AppDiagnostics.Info($"Process started at {DateTimeOffset.Now:O}");
 
             if (args.Length > 0 && string.Equals(args[0], "--smoke-vault", StringComparison.Ordinal))
             {

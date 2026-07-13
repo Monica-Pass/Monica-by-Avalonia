@@ -124,7 +124,13 @@ public partial class MainWindow
             _observedViewModel.PropertyChanged += ViewModel_OnPropertyChanged;
         }
 
-        Dispatcher.UIThread.Post(NoteWorkspaceView.UpdateTabScroll);
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (WorkspaceHost.TryGet<NoteWorkspaceView>("Notes", out var noteWorkspace))
+            {
+                noteWorkspace.UpdateTabScroll();
+            }
+        });
     }
 
     private void ViewModel_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -133,14 +139,20 @@ public partial class MainWindow
         {
             Dispatcher.UIThread.Post(() =>
             {
-                NoteWorkspaceView.HandleSelectedTabChanged();
+                if (WorkspaceHost.TryGet<NoteWorkspaceView>("Notes", out var noteWorkspace))
+                {
+                    noteWorkspace.HandleSelectedTabChanged();
+                }
             });
         }
         else if (e.PropertyName == nameof(MainWindowViewModel.NoteTabWidth))
         {
             Dispatcher.UIThread.Post(() =>
             {
-                NoteWorkspaceView.HandleTabWidthChanged();
+                if (WorkspaceHost.TryGet<NoteWorkspaceView>("Notes", out var noteWorkspace))
+                {
+                    noteWorkspace.HandleTabWidthChanged();
+                }
             });
         }
     }

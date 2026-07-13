@@ -7,20 +7,8 @@
         xmlns:local="using:Monica.App"
         xmlns:models="using:Monica.Core.Models"
         xmlns:vm="using:Monica.App.ViewModels"
+        xmlns:controls="using:Monica.App.Controls"
         xmlns:unlock="using:Monica.App.Features.Unlock"
-        xmlns:passwords="using:Monica.App.Features.Passwords"
-        xmlns:notes="using:Monica.App.Features.Notes"
-        xmlns:authenticator="using:Monica.App.Features.Authenticator"
-        xmlns:wallet="using:Monica.App.Features.Wallet"
-        xmlns:generator="using:Monica.App.Features.Generator"
-        xmlns:archive="using:Monica.App.Features.Archive"
-        xmlns:recycleBin="using:Monica.App.Features.RecycleBin"
-        xmlns:settings="using:Monica.App.Features.Settings"
-        xmlns:sync="using:Monica.App.Features.Sync"
-        xmlns:mdbx="using:Monica.App.Features.Mdbx"
-        xmlns:timeline="using:Monica.App.Features.Timeline"
-        xmlns:databaseManagement="using:Monica.App.Features.DatabaseManagement"
-        xmlns:securityAnalysis="using:Monica.App.Features.SecurityAnalysis"
         x:DataType="vm:MainWindowViewModel"
         mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="760"
         x:Class="Monica.App.MainWindow"
@@ -317,38 +305,11 @@
                         </Grid>
                     </Border>
 
-                    <Grid x:Name="WorkspaceHost" Grid.Row="2" SizeChanged="WorkspaceHost_OnSizeChanged">
-                        <passwords:PasswordVaultView x:Name="PasswordVaultView"
-                                                     IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsPasswords}}" />
-
-                        <archive:ArchiveWorkspaceView />
-
-                        <recycleBin:RecycleBinWorkspaceView />
-
-
-                        <timeline:TimelineWorkspaceView />
-
-                        <securityAnalysis:SecurityAnalysisWorkspaceView />
-
-
-                        <authenticator:AuthenticatorWorkspaceView />
-
-                        <wallet:WalletWorkspaceView />
-
-                        <settings:SettingsWorkspaceView />
-
-
-
-                        <databaseManagement:DatabaseManagementWorkspaceView />
-
-                        <mdbx:MdbxWorkspaceView />
-
-                        <sync:SyncWorkspaceView />
-
-                        <generator:GeneratorWorkspaceView />
-
-                        <notes:NoteWorkspaceView x:Name="NoteWorkspaceView" />
-                    </Grid>
+                    <controls:WorkspaceHostView x:Name="WorkspaceHost"
+                                                Grid.Row="2"
+                                                Section="{Binding SelectedSection}"
+                                                IsActive="{Binding IsUnlocked}"
+                                                SizeChanged="WorkspaceHost_OnSizeChanged" />
                 </Grid>
             </fa:FANavigationView>
 

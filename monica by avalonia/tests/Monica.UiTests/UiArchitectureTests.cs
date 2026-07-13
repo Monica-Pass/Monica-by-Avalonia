@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
+using Monica.App.Controls;
 using Monica.App.Features.Archive;
 using Monica.App.Features.Authenticator;
 using Monica.App.Features.DatabaseManagement;
@@ -40,6 +41,7 @@ public static class TestAppBuilder
     }
 }
 
+[Collection(AvaloniaUiTestCollection.Name)]
 public sealed class UiArchitectureTests
 {
     public UiArchitectureTests()
@@ -75,8 +77,9 @@ public sealed class UiArchitectureTests
     public void Main_window_is_composed_from_feature_hosts()
     {
         var window = new Monica.App.MainWindow();
+        var host = window.FindControl<WorkspaceHostView>("WorkspaceHost");
 
-        Assert.NotNull(window.FindControl<PasswordVaultView>("PasswordVaultView"));
-        Assert.NotNull(window.FindControl<NoteWorkspaceView>("NoteWorkspaceView"));
+        Assert.NotNull(host);
+        Assert.Empty(host.CreatedSections);
     }
 }

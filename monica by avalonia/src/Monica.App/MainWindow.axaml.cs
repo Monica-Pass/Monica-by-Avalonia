@@ -6,12 +6,20 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FluentAvalonia.UI.Controls;
+using Monica.App.Features.Notes;
+using Monica.App.Features.Passwords;
 using Monica.App.ViewModels;
 
 namespace Monica.App;
 
 public partial class MainWindow : Window
 {
+    private PasswordVaultView PasswordVaultView =>
+        WorkspaceHost.GetOrCreate<PasswordVaultView>("Passwords");
+
+    private NoteWorkspaceView NoteWorkspaceView =>
+        WorkspaceHost.GetOrCreate<NoteWorkspaceView>("Notes");
+
     public MainWindow()
     {
         InitializeComponent();
