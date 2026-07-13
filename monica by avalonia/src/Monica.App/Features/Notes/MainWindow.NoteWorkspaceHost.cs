@@ -16,17 +16,11 @@ public partial class MainWindow
     }
 
     private async void NoteEditorView_OnCloseRequested(object? sender, NoteEditorCloseRequestedEventArgs e) =>
-        await CloseNoteTabWithPromptAsync((MainWindowViewModel)DataContext!, e.Tab);
+        await NoteTabStripView.CloseTabWithPromptAsync((MainWindowViewModel)DataContext!, e.Tab);
 
     private void NoteInspectorView_OnLineRequested(object? sender, NoteLineRequestedEventArgs e) =>
         NoteEditorView.JumpToLine(e.LineNumber);
 
-    private void SetNoteEditModeMenuItem_OnClick(object? sender, RoutedEventArgs e) =>
-        NoteEditorView.SetMode("edit");
-
-    private void SetNotePreviewModeMenuItem_OnClick(object? sender, RoutedEventArgs e) =>
-        NoteEditorView.SetMode("preview");
-
-    private void SetNoteSplitModeMenuItem_OnClick(object? sender, RoutedEventArgs e) =>
-        NoteEditorView.SetMode("split");
+    private void NoteTabStripView_OnTabClosed(object? sender, NoteTabClosedEventArgs e) =>
+        NoteEditorView.RemoveHistory(e.Tab);
 }

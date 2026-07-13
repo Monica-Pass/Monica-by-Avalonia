@@ -51,7 +51,7 @@ public partial class MainWindow
         if (e.Key == Key.W && viewModel.SelectedNoteTab is not null)
         {
             e.Handled = true;
-            await CloseNoteTabWithPromptAsync(viewModel, viewModel.SelectedNoteTab);
+            await NoteTabStripView.CloseTabWithPromptAsync(viewModel, viewModel.SelectedNoteTab);
         }
     }
 
@@ -87,7 +87,7 @@ public partial class MainWindow
         _isHandlingUnsavedWindowClose = true;
         try
         {
-            var result = await ShowUnsavedNoteTabsDialogAsync(dirtyCount);
+            var result = await NoteTabStripView.ShowUnsavedTabsDialogAsync(dirtyCount);
             if (result == FAContentDialogResult.Primary)
             {
                 await viewModel.SaveAllNoteTabsCommand.ExecuteAsync(null);
@@ -124,7 +124,7 @@ public partial class MainWindow
             _observedViewModel.PropertyChanged += ViewModel_OnPropertyChanged;
         }
 
-        Dispatcher.UIThread.Post(UpdateNoteTabScrollButtons);
+        Dispatcher.UIThread.Post(NoteTabStripView.UpdateScrollButtons);
     }
 
     private void ViewModel_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -135,16 +135,16 @@ public partial class MainWindow
             {
                 NoteEditorView.RestoreSelectedTabSelection();
                 NoteEditorView.EnsureSelectedHistory();
-                ScrollSelectedNoteTabIntoView();
-                UpdateNoteTabScrollButtons();
+                NoteTabStripView.ScrollSelectedIntoView();
+                NoteTabStripView.UpdateScrollButtons();
             });
         }
         else if (e.PropertyName == nameof(MainWindowViewModel.NoteTabWidth))
         {
             Dispatcher.UIThread.Post(() =>
             {
-                ScrollSelectedNoteTabIntoView();
-                UpdateNoteTabScrollButtons();
+                NoteTabStripView.ScrollSelectedIntoView();
+                NoteTabStripView.UpdateScrollButtons();
             });
         }
         else if (e.PropertyName == nameof(MainWindowViewModel.SelectedSection))

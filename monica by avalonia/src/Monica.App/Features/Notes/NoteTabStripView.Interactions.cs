@@ -5,9 +5,9 @@ using Avalonia.Threading;
 using FluentAvalonia.UI.Controls;
 using Monica.App.ViewModels;
 
-namespace Monica.App;
+namespace Monica.App.Features.Notes;
 
-public partial class MainWindow
+public partial class NoteTabStripView
 {
     private void PreviousNoteTabButton_OnClick(object? sender, RoutedEventArgs e) =>
         ScrollNoteTabsBy(-GetNoteTabPageScrollAmount());
@@ -22,12 +22,12 @@ public partial class MainWindow
             viewModel.NoteTabRailViewportWidth = e.NewSize.Width;
         }
 
-        Dispatcher.UIThread.Post(ScrollSelectedNoteTabIntoView);
-        Dispatcher.UIThread.Post(UpdateNoteTabScrollButtons);
+        Dispatcher.UIThread.Post(ScrollSelectedIntoView);
+        Dispatcher.UIThread.Post(UpdateScrollButtons);
     }
 
     private void NoteTabsScrollViewer_OnScrollChanged(object? sender, ScrollChangedEventArgs e) =>
-        UpdateNoteTabScrollButtons();
+        UpdateScrollButtons();
 
     private double GetNoteTabPageScrollAmount()
     {
@@ -40,7 +40,7 @@ public partial class MainWindow
     private void ScrollNoteTabsBy(double delta) =>
         SetNoteTabsOffset(NoteTabsScrollViewer.Offset.X + delta);
 
-    private void ScrollSelectedNoteTabIntoView()
+    public void ScrollSelectedIntoView()
     {
         if (DataContext is not MainWindowViewModel viewModel || viewModel.SelectedNoteTab is null)
         {
@@ -89,10 +89,10 @@ public partial class MainWindow
         var maxOffset = Math.Max(0, extentWidth - viewportWidth);
         var x = Math.Clamp(targetOffset, 0, maxOffset);
         NoteTabsScrollViewer.Offset = new Vector(x, 0);
-        UpdateNoteTabScrollButtons();
+        UpdateScrollButtons();
     }
 
-    private void UpdateNoteTabScrollButtons()
+    public void UpdateScrollButtons()
     {
         var viewportWidth = NoteTabsScrollViewer.Viewport.Width;
         var extentWidth = NoteTabsScrollViewer.Extent.Width;
@@ -121,10 +121,10 @@ public partial class MainWindow
             return;
         }
 
-        await CloseNoteTabWithPromptAsync(viewModel, tab);
+        await CloseTabWithPromptAsync(viewModel, tab);
     }
 
-    private async Task CloseNoteTabWithPromptAsync(MainWindowViewModel viewModel, NoteEditorTab tab)
+    public async Task CloseTabWithPromptAsync(MainWindowViewModel viewModel, NoteEditorTab tab)
     {
         if (!tab.IsDirty)
         {
@@ -154,7 +154,7 @@ public partial class MainWindow
     private void CloseNoteTab(MainWindowViewModel viewModel, NoteEditorTab tab)
     {
         viewModel.CloseNoteTabCommand.Execute(tab);
-        NoteEditorView.RemoveHistory(tab);
+        NotifyTabClosed(tab);
     }
 
     private async Task<FAContentDialogResult> ShowUnsavedNoteTabDialogAsync(NoteEditorTab tab)
@@ -175,10 +175,10 @@ public partial class MainWindow
             DefaultButton = FAContentDialogButton.Primary
         };
 
-        return await dialog.ShowAsync(this);
+        return await dialog.ShowAsync((Window)TopLevel.GetTopLevel(this)!);
     }
 
-    private async Task<FAContentDialogResult> ShowUnsavedNoteTabsDialogAsync(int dirtyCount)
+    public async Task<FAContentDialogResult> ShowUnsavedTabsDialogAsync(int dirtyCount)
     {
         var dialog = new FAContentDialog
         {
@@ -195,6 +195,6 @@ public partial class MainWindow
             DefaultButton = FAContentDialogButton.Primary
         };
 
-        return await dialog.ShowAsync(this);
+        return await dialog.ShowAsync((Window)TopLevel.GetTopLevel(this)!);
     }
 }

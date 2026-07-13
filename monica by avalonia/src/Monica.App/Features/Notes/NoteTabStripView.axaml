@@ -1,0 +1,72 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Notes.NoteTabStripView"
+             x:Name="Root"
+             x:DataType="vm:MainWindowViewModel">
+    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Background="{DynamicResource LayerFillColorDefaultBrush}">
+        <Grid Height="44" ColumnDefinitions="0,*">
+            <Border IsVisible="{Binding IsNoteTreePaneVisible}" Padding="14,0" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,1,0">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                    <ic:FluentIcon Icon="Folder" FontSize="17" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{Binding L.SecureNotes}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="{Binding NoteCountText}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
+            <Grid Grid.Column="1" HorizontalAlignment="Left" Width="{Binding NoteTabStripWidth}" MaxWidth="680" ColumnDefinitions="Auto,*" Background="{DynamicResource LayerFillColorSubtleBrush}">
+                <Button x:Name="PreviousNoteTabButton" Click="PreviousNoteTabButton_OnClick" IsEnabled="False" ToolTip.Tip="向左滚动标签" Width="30" Height="34" Padding="0" Margin="8,5,2,0" VerticalAlignment="Top">
+                    <ic:FluentIcon Icon="ChevronLeft" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Button>
+                <ScrollViewer x:Name="NoteTabsScrollViewer" Grid.Column="1" Height="44" MaxHeight="44" MinWidth="0" Margin="0,0,158,0" ClipToBounds="True" SizeChanged="NoteTabsScrollViewer_OnSizeChanged" ScrollChanged="NoteTabsScrollViewer_OnScrollChanged" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden">
+                    <ItemsControl ItemsSource="{Binding OpenNoteTabs}" Height="40" Margin="4,4,4,0" HorizontalAlignment="Left">
+                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:NoteEditorTab">
+                                <Border Classes="noteTab" Classes.active="{Binding IsSelected}" Width="{Binding #Root.DataContext.NoteTabWidth}" MinWidth="76" MaxWidth="156" Height="34" Margin="0,4,4,0" BorderThickness="1,1,1,0" CornerRadius="4,4,0,0">
+                                    <Grid RowDefinitions="3,*">
+                                        <Border IsVisible="{Binding IsSelected}" Background="{DynamicResource AccentFillColorDefaultBrush}" CornerRadius="4,4,0,0" />
+                                        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" MinWidth="0">
+                                            <Button Classes="noteTabButton" Grid.ColumnSpan="2" Command="{Binding #Root.DataContext.SelectNoteTabCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding Title}">
+                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="5" Margin="10,0,30,0" MinWidth="0">
+                                                    <TextBlock Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="1" Text="*" IsVisible="{Binding IsDirty}" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </Button>
+                                            <Button Grid.Column="1" Click="CloseNoteTabButton_OnClick" IsVisible="{Binding IsSelected}" ToolTip.Tip="关闭标签" Width="24" Height="24" Padding="0" Margin="0,2,5,0" VerticalAlignment="Top">
+                                                <ic:FluentIcon Icon="Dismiss" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Button>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <StackPanel Grid.Column="1" Panel.ZIndex="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Background="{DynamicResource LayerFillColorSubtleBrush}">
+                    <Button x:Name="NextNoteTabButton" Click="NextNoteTabButton_OnClick" IsEnabled="False" ToolTip.Tip="向右滚动标签" Width="30" Height="34" Padding="0" Margin="2,5,4,0" VerticalAlignment="Top"><ic:FluentIcon Icon="ChevronRight" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
+                    <Button Command="{Binding AddNoteCommand}" ToolTip.Tip="{Binding L.NewSecureNote}" Width="34" Height="34" Padding="0" Margin="0,5,4,0" VerticalAlignment="Top"><ic:FluentIcon Icon="Add" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
+                    <Button Command="{Binding SaveNoteCommand}" ToolTip.Tip="{Binding L.SaveNote}" Width="34" Height="34" Padding="0" Margin="0,5,4,0" VerticalAlignment="Top"><ic:FluentIcon Icon="Save" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
+                    <Button ToolTip.Tip="{Binding L.MoreOptions}" Width="34" Height="34" Padding="0" Margin="0,5,8,0" VerticalAlignment="Top">
+                        <ic:FluentIcon Icon="MoreHorizontal" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Button.Flyout>
+                            <MenuFlyout>
+                                <MenuItem Header="保存全部" Command="{Binding SaveAllNoteTabsCommand}" />
+                                <MenuItem Header="导入 Markdown" Command="{Binding ImportMarkdownNoteCommand}" IsEnabled="{Binding CanUseFilePicker}" />
+                                <MenuItem Header="导出 Markdown" Command="{Binding ExportCurrentNoteMarkdownCommand}" IsEnabled="{Binding CanUseFilePicker}" />
+                                <MenuItem Header="插入图片" Command="{Binding InsertNoteImageCommand}" IsEnabled="{Binding CanUseFilePicker}" />
+                                <MenuItem Header="{Binding L.Favorite}" Command="{Binding ToggleNoteFavoriteCommand}" />
+                                <Separator />
+                                <MenuItem Header="编辑模式" Click="SetNoteEditModeMenuItem_OnClick" />
+                                <MenuItem Header="预览模式" Click="SetNotePreviewModeMenuItem_OnClick" />
+                                <MenuItem Header="分屏模式" Click="SetNoteSplitModeMenuItem_OnClick" />
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>
