@@ -1,0 +1,107 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:local="using:Monica.App"
+             xmlns:models="using:Monica.Core.Models"
+             xmlns:notes="using:Monica.App.Features.Notes"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Notes.NoteTreeView"
+             x:Name="Root"
+             x:DataType="vm:MainWindowViewModel">
+    <Border IsVisible="{Binding IsNoteTreePaneVisible}"
+            BorderBrush="{DynamicResource CardBorderBrush}"
+            BorderThickness="0,0,1,0"
+            Background="{DynamicResource LayerFillColorDefaultBrush}">
+        <Grid RowDefinitions="Auto,Auto,Auto,*" Margin="12">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6" Margin="0,0,0,10">
+                <TextBlock Text="保险库" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Command="{Binding AddNoteCommand}" ToolTip.Tip="{Binding L.NewSecureNote}" Width="32" Height="32" Padding="0">
+                    <ic:FluentIcon Icon="Add" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Button>
+                <Button Grid.Column="2" Command="{Binding LoadCommand}" ToolTip.Tip="{Binding L.Refresh}" Width="32" Height="32" Padding="0">
+                    <ic:FluentIcon Icon="ArrowSync" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Button>
+            </Grid>
+
+            <TextBox Grid.Row="1"
+                     Text="{Binding NoteSearchText}"
+                     PlaceholderText="搜索笔记、标签、正文"
+                     Height="32"
+                     Margin="0,0,0,10" />
+
+            <Border Grid.Row="2" Padding="10,8" CornerRadius="6" Background="{DynamicResource LayerFillColorSubtleBrush}" Margin="0,0,0,10">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                    <ic:FluentIcon Icon="Home" FontSize="16" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="主页" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding NoteTreeStatusText}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Spacing="10">
+                    <StackPanel IsVisible="{Binding HasFavoriteNoteItems}">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6" Margin="2,0,0,6">
+                            <ic:FluentIcon Icon="ChevronDown" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="7">
+                                <ic:FluentIcon Icon="Star" FontSize="14" VerticalAlignment="Center" />
+                                <TextBlock Text="收藏" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="2" Text="{Binding FavoriteNoteCount}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <ItemsControl ItemsSource="{Binding FavoriteNoteItems}" HorizontalAlignment="Stretch">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="models:SecureItem">
+                                    <notes:NoteTreeItemView Margin="8,0,0,4" ViewModel="{Binding #Root.DataContext}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <StackPanel>
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6" Margin="2,0,0,6">
+                            <ic:FluentIcon Icon="ChevronDown" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="7">
+                                <ic:FluentIcon Icon="FolderOpen" FontSize="14" VerticalAlignment="Center" />
+                                <TextBlock Text="标签文件树" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="2" Text="{Binding FilteredNoteItems.Count}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <ItemsControl ItemsSource="{Binding NoteTreeGroups}" HorizontalAlignment="Stretch">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:NoteTreeGroup">
+                                    <StackPanel Margin="8,0,0,8" Spacing="4">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="7" MinHeight="28">
+                                            <ic:FluentIcon Icon="FolderOpen" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                            <Border Grid.Column="2" Padding="7,2" CornerRadius="9" Background="{DynamicResource LayerFillColorSubtleBrush}" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Count}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            </Border>
+                                        </Grid>
+
+                                        <ItemsControl ItemsSource="{Binding Items}" HorizontalAlignment="Stretch">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="models:SecureItem">
+                                                    <notes:NoteTreeItemView Margin="12,0,0,4" ViewModel="{Binding #Root.DataContext}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock IsVisible="{Binding HasNoteTreeGroups, Converter={x:Static local:BoolConverters.Not}}"
+                                   Text="没有匹配的笔记"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Margin="22,8,0,0" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</UserControl>
