@@ -8,6 +8,49 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    private const int PasswordHistoryLimit = 10;
+    private const int PasswordQuickAccessLimit = 6;
+    private static readonly TimeSpan SelectedPasswordDetailsCoalesceDelay = TimeSpan.FromMilliseconds(60);
+    private static readonly TimeSpan SelectedPasswordDetailsLoadingDelay = TimeSpan.FromMilliseconds(120);
+
+    private enum QuickAccessSort
+    {
+        Recent,
+        Frequent
+    }
+
+    private sealed class PasswordFolderTreeNode(string key, string displayName, int level)
+    {
+        public string Key { get; } = key;
+        public string DisplayName { get; } = displayName;
+        public int Level { get; } = level;
+        public Category? Category { get; set; }
+        public int ExactCount { get; set; }
+        public int DescendantCount { get; set; }
+        public List<PasswordFolderTreeNode> Children { get; } = [];
+    }
+
+    private readonly IPasswordAttachmentFileService _passwordAttachmentFileService;
+    private readonly IPasswordEditorDialogService _passwordEditorDialogService;
+    private readonly IPasswordDetailDialogService _passwordDetailDialogService;
+    private readonly ICategoryPickerDialogService _categoryPickerDialogService;
+    private IReadOnlyDictionary<long, IReadOnlyList<CustomField>> _passwordCustomFields = new Dictionary<long, IReadOnlyList<CustomField>>();
+    private IReadOnlyDictionary<long, IReadOnlyList<Attachment>> _passwordAttachments = new Dictionary<long, IReadOnlyList<Attachment>>();
+    private IReadOnlyDictionary<long, PasswordQuickAccessRecord> _passwordQuickAccessRecords = new Dictionary<long, PasswordQuickAccessRecord>();
+    private IReadOnlyList<PasswordEntry> _filteredPasswords = [];
+    private IReadOnlyList<PasswordListRow> _filteredPasswordRows = [];
+    private bool _filteredPasswordsDirty = true;
+    private bool _filteredPasswordRowsDirty = true;
+    private int _selectedPasswordCount;
+    private bool _suppressPasswordSelectionStateNotifications;
+    private bool _isSyncingSelectedPasswordListRow;
+    private bool _isApplyingPasswordSearchImmediately;
+    private CancellationTokenSource? _passwordSearchDebounceCts;
+    private CancellationTokenSource? _selectedPasswordDetailsCts;
+    private int _selectedPasswordDetailsVersion;
+    private readonly HashSet<string> _collapsedPasswordFolderKeys = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _expandedPasswordStackKeys = new(StringComparer.OrdinalIgnoreCase);
+
     [ObservableProperty]
     private string _passwordSearchText = "";
 
@@ -313,5 +356,16 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(PasswordListAvatarCornerRadius));
         OnPropertyChanged(nameof(PasswordListContentMargin));
         OnPropertyChanged(nameof(ShowPasswordListDetails));
+    }
+
+    private void RaisePasswordSortText()
+    {
+        OnPropertyChanged(nameof(SortUpdatedText));
+        OnPropertyChanged(nameof(SortTitleText));
+        OnPropertyChanged(nameof(SortWebsiteText));
+        OnPropertyChanged(nameof(SortUsernameText));
+        OnPropertyChanged(nameof(SortCreatedText));
+        OnPropertyChanged(nameof(SortFavoritesText));
+        OnPropertyChanged(nameof(PasswordSortButtonTip));
     }
 }

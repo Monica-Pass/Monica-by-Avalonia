@@ -40,93 +40,14 @@ internal sealed record VaultLoadSnapshot(
     IReadOnlyDictionary<long, PasswordQuickAccessRecord> PasswordQuickAccessRecords,
     IReadOnlyList<LocalMdbxDatabase> MdbxDatabases);
 
-internal sealed class DisabledTotpEditorDialogService : ITotpEditorDialogService
-{
-    public Task<TotpEditorViewModel?> ShowAsync(SecureItem? item, CancellationToken cancellationToken = default) =>
-        Task.FromResult<TotpEditorViewModel?>(null);
-}
-
-internal sealed class DisabledWalletItemEditorDialogService : IWalletItemEditorDialogService
-{
-    public Task<WalletItemEditorViewModel?> ShowAsync(SecureItem? item, VaultItemType? newItemType = null, CancellationToken cancellationToken = default) =>
-        Task.FromResult<WalletItemEditorViewModel?>(null);
-}
-
-internal sealed class DisabledConfirmationDialogService : IConfirmationDialogService
-{
-    public Task<bool> ConfirmAsync(
-        string title,
-        string message,
-        string primaryButtonText,
-        string? closeButtonText = null,
-        CancellationToken cancellationToken = default) =>
-        Task.FromResult(true);
-
-    public Task<bool> ConfirmTypedAsync(
-        string title,
-        string message,
-        string requiredPhrase,
-        string instruction,
-        string primaryButtonText,
-        string? closeButtonText = null,
-        CancellationToken cancellationToken = default) =>
-        Task.FromResult(true);
-}
-
 public sealed partial class MainWindowViewModel : ObservableObject
 {
-    private const int PasswordHistoryLimit = 10;
-    private const int PasswordQuickAccessLimit = 6;
-    private static readonly TimeSpan SelectedPasswordDetailsCoalesceDelay = TimeSpan.FromMilliseconds(60);
-    private static readonly TimeSpan SelectedPasswordDetailsLoadingDelay = TimeSpan.FromMilliseconds(120);
-    private enum QuickAccessSort
-    {
-        Recent,
-        Frequent
-    }
-
-    private sealed class PasswordFolderTreeNode(string key, string displayName, int level)
-    {
-        public string Key { get; } = key;
-        public string DisplayName { get; } = displayName;
-        public int Level { get; } = level;
-        public Category? Category { get; set; }
-        public int ExactCount { get; set; }
-        public int DescendantCount { get; set; }
-        public List<PasswordFolderTreeNode> Children { get; } = [];
-    }
-
     private readonly IMonicaRepository _repository;
     private readonly ICryptoService _cryptoService;
-    private readonly ITotpService _totpService;
     private readonly IPasswordGeneratorService _passwordGenerator;
-    private readonly IPwnedPasswordService _pwnedPasswordService;
     private readonly IClipboardService _clipboardService;
-    private readonly IPasswordAttachmentFileService _passwordAttachmentFileService;
-    private readonly IPasswordEditorDialogService _passwordEditorDialogService;
-    private readonly IPasswordDetailDialogService _passwordDetailDialogService;
-    private readonly ICategoryPickerDialogService _categoryPickerDialogService;
     private readonly IConfirmationDialogService _confirmationDialogService;
-    private readonly ITotpEditorDialogService _totpEditorDialogService;
-    private readonly IWalletItemEditorDialogService _walletItemEditorDialogService;
     private readonly ILocalizationService _localization;
-    private IReadOnlyDictionary<long, IReadOnlyList<CustomField>> _passwordCustomFields = new Dictionary<long, IReadOnlyList<CustomField>>();
-    private IReadOnlyDictionary<long, IReadOnlyList<Attachment>> _passwordAttachments = new Dictionary<long, IReadOnlyList<Attachment>>();
-    private IReadOnlyDictionary<long, PasswordQuickAccessRecord> _passwordQuickAccessRecords = new Dictionary<long, PasswordQuickAccessRecord>();
-    private IReadOnlyList<PasswordEntry> _filteredPasswords = [];
-    private IReadOnlyList<PasswordListRow> _filteredPasswordRows = [];
-    private bool _filteredPasswordsDirty = true;
-    private bool _filteredPasswordRowsDirty = true;
-    private int _selectedPasswordCount;
-    private bool _suppressPasswordSelectionStateNotifications;
-    private bool _isSyncingSelectedPasswordListRow;
-    private bool _isApplyingPasswordSearchImmediately;
-    private CancellationTokenSource? _passwordSearchDebounceCts;
-    private CancellationTokenSource? _selectedPasswordDetailsCts;
-    private int _selectedPasswordDetailsVersion;
-    private readonly HashSet<string> _collapsedPasswordFolderKeys = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> _expandedPasswordStackKeys = new(StringComparer.OrdinalIgnoreCase);
-
     public MainWindowViewModel(
         IMonicaRepository repository,
         IVaultCredentialStore credentialStore,
@@ -282,10 +203,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OperatingSystem.IsMacOS() ? "macOS" :
         OperatingSystem.IsLinux() ? "Linux" :
         "Desktop";
-    public string NoteCountText => _localization.Format("NoteCountFormat", NoteItems.Count);
-    public int SmokeVaultLoadDelayMilliseconds { get; set; }
-    public string NotePreviewMarkdown => NoteIsMarkdown ? BuildNotePreviewMarkdown(NoteContent) : "";
-    public string NotePlainPreview => NoteContentCodec.ToPlainPreview(NoteContent, NoteIsMarkdown);
 
     partial void OnSearchTextChanged(string value)
     {
@@ -570,41 +487,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
 
 
-    private bool CanOpenNoteReference(NoteReferenceItem? item) =>
-        CanOpenExternalLinks && TryCreateExternalReferenceUri(item?.Target, out _);
-
-    [RelayCommand(CanExecute = nameof(CanOpenNoteReference))]
-    private async Task OpenNoteReferenceAsync(NoteReferenceItem? item)
-    {
-        if (!TryCreateExternalReferenceUri(item?.Target, out var uri))
-        {
-            StatusMessage = "无法打开此引用";
-            return;
-        }
-
-        try
-        {
-            await _externalLinkService.OpenAsync(uri);
-            StatusMessage = $"已打开 {uri.Host}";
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"打开引用失败：{ex.Message}";
-        }
-    }
-
-    [RelayCommand]
-    private async Task CopyNoteReferenceAsync(NoteReferenceItem? item)
-    {
-        if (item is null || string.IsNullOrWhiteSpace(item.Target))
-        {
-            return;
-        }
-
-        await _clipboardService.SetTextAsync(item.Target);
-        StatusMessage = "已复制引用";
-    }
-
 
 
 
@@ -653,136 +535,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
 
 
-    private string FormatLocalDate(DateTimeOffset value) =>
-        value.ToLocalTime().ToString("yyyy/MM/dd HH:mm", _localization.Culture);
-
-
-    private string LocalizeSyncStatus(SyncStatus status)
-    {
-        return status switch
-        {
-            SyncStatus.Synced => _localization.Get("Synced"),
-            SyncStatus.Syncing => _localization.Get("Syncing"),
-            SyncStatus.Pending => _localization.Get("Pending"),
-            SyncStatus.PendingUpload => _localization.Get("PendingUpload"),
-            SyncStatus.InSync => _localization.Get("Synced"),
-            SyncStatus.RemoteChanged => _localization.Get("RemoteChanged"),
-            SyncStatus.LocalOnly => _localization.Get("LocalOnly"),
-            SyncStatus.Conflict => _localization.Get("Conflict"),
-            SyncStatus.Failed => _localization.Get("Failed"),
-            _ => _localization.Get("None")
-        };
-    }
 
 
 
 
 
 
-    private static void ReplaceItems<T>(ObservableCollection<T> target, IEnumerable<T> items)
-    {
-        if (target is ObservableRangeCollection<T> range)
-        {
-            range.ReplaceRange(items);
-            return;
-        }
-
-        target.Clear();
-        foreach (var item in items)
-        {
-            target.Add(item);
-        }
-    }
-
-
-
-    private static IReadOnlyList<string> DecodeSecureItemImagePaths(SecureItem item) => item.ItemType switch
-    {
-        VaultItemType.Document => WalletItemDataCodec.DecodeDocument(item).ImagePaths,
-        VaultItemType.BankCard => WalletItemDataCodec.DecodeBankCard(item).ImagePaths,
-        VaultItemType.Note => NoteContentCodec.DecodeImagePaths(item.ImagePaths),
-        _ => WalletItemDataCodec.DecodeImagePaths(item.ImagePaths)
-    };
-
-    private static Attachment CreateSecureItemImageAttachmentForExport(SecureItem item, string imagePath, int index)
-    {
-        return new Attachment
-        {
-            Id = 0,
-            OwnerType = "SECURE_ITEM",
-            OwnerId = item.Id,
-            FileName = ResolveSecureItemImageFileName(item, imagePath, index),
-            ContentType = InferAttachmentContentType(imagePath),
-            StoragePath = imagePath,
-            SizeBytes = 0,
-            CreatedAt = item.UpdatedAt == default ? DateTimeOffset.UtcNow : item.UpdatedAt
-        };
-    }
-
-    private static string ResolveSecureItemImageFileName(SecureItem item, string imagePath, int index)
-    {
-        var fileName = Path.GetFileName(imagePath.Replace('\\', Path.DirectorySeparatorChar));
-        if (!string.IsNullOrWhiteSpace(fileName) && !imagePath.StartsWith("mdbx:", StringComparison.OrdinalIgnoreCase))
-        {
-            return fileName;
-        }
-
-        var prefix = item.ItemType switch
-        {
-            VaultItemType.BankCard => "card-image",
-            VaultItemType.Document => "document-image",
-            VaultItemType.Note => "note-image",
-            _ => "secure-item-image"
-        };
-        return $"{prefix}-{index + 1}";
-    }
-
-    private static string InferAttachmentContentType(string path)
-    {
-        var extension = Path.GetExtension(path).ToLowerInvariant();
-        return extension switch
-        {
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".png" => "image/png",
-            ".gif" => "image/gif",
-            ".webp" => "image/webp",
-            ".bmp" => "image/bmp",
-            ".svg" => "image/svg+xml",
-            ".pdf" => "application/pdf",
-            _ => ""
-        };
-    }
-
-    private static void ApplySecureItemImagePaths(SecureItem item, IReadOnlyList<string> imagePaths)
-    {
-        item.ImagePaths = WalletItemDataCodec.EncodeImagePaths(imagePaths);
-        if (item.ItemType == VaultItemType.Note)
-        {
-            var note = NoteContentCodec.DecodeFromItem(item);
-            item.ItemData = NoteContentCodec.BuildSavePayload(
-                item.Title,
-                note.Content,
-                string.Join(",", note.Tags),
-                note.IsMarkdown,
-                imagePaths).ItemData;
-            return;
-        }
-
-        if (item.ItemType == VaultItemType.Document)
-        {
-            var data = WalletItemDataCodec.DecodeDocument(item);
-            data.ImagePaths = imagePaths.ToList();
-            item.ItemData = WalletItemDataCodec.EncodeDocument(data);
-            return;
-        }
-
-        if (item.ItemType == VaultItemType.BankCard)
-        {
-            var data = WalletItemDataCodec.DecodeBankCard(item);
-            data.ImagePaths = imagePaths.ToList();
-            item.ItemData = WalletItemDataCodec.EncodeBankCard(data);
-        }
-    }
 
 
     private void RefreshLocalizedProperties()
@@ -829,18 +587,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             CompromisedPasswordStatus = _localization.Get("CompromisedPasswordNotChecked");
         }
-    }
-
-
-    private void RaisePasswordSortText()
-    {
-        OnPropertyChanged(nameof(SortUpdatedText));
-        OnPropertyChanged(nameof(SortTitleText));
-        OnPropertyChanged(nameof(SortWebsiteText));
-        OnPropertyChanged(nameof(SortUsernameText));
-        OnPropertyChanged(nameof(SortCreatedText));
-        OnPropertyChanged(nameof(SortFavoritesText));
-        OnPropertyChanged(nameof(PasswordSortButtonTip));
     }
 
 

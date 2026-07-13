@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Monica.App;
+using Monica.App.Services;
 using Monica.Core.Models;
 using Monica.Core.Services;
 
@@ -7,6 +8,9 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    private readonly ITotpService _totpService;
+    private readonly ITotpEditorDialogService _totpEditorDialogService;
+
     public void RefreshTotpDisplay(SecureItem item)
     {
         var data = TotpDataResolver.ParseStoredItemData(item.ItemData, item.Title, item.Notes);

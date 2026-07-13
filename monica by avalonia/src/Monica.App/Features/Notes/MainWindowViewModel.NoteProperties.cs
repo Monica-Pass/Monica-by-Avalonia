@@ -8,6 +8,10 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    public string NoteCountText => _localization.Format("NoteCountFormat", NoteItems.Count);
+    public string NotePreviewMarkdown => NoteIsMarkdown ? BuildNotePreviewMarkdown(NoteContent) : "";
+    public string NotePlainPreview => NoteContentCodec.ToPlainPreview(NoteContent, NoteIsMarkdown);
+
     private bool _isLoadingNoteEditor;
     private int _noteImagePreviewVersion;
 

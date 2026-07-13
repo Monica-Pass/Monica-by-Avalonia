@@ -6,11 +6,14 @@ using CommunityToolkit.Mvvm.Input;
 using Monica.App;
 using Monica.App.Services;
 using Monica.Core.Models;
+using Monica.Core.Services;
 
 namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    private readonly IPwnedPasswordService _pwnedPasswordService;
+
     [RelayCommand]
     private void ShowSecurityIssueDetails(SecurityIssueItem? issue)
     {

@@ -1,10 +1,13 @@
 using System.ComponentModel;
+using Monica.App.Services;
 using Monica.Core.Models;
 
 namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    private readonly IWalletItemEditorDialogService _walletItemEditorDialogService;
+
     private void RaiseWalletSelectionState()
     {
         OnPropertyChanged(nameof(SelectedWalletCount));
