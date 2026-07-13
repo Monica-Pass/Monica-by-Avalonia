@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Monica.App.Features.Notes;
 using Monica.App.ViewModels;
 
 namespace Monica.App;
@@ -262,15 +263,8 @@ public partial class MainWindow
         }
     }
 
-    private void NoteOutlineItem_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not Control { DataContext: NoteOutlineItem item })
-        {
-            return;
-        }
-
-        JumpToNoteLine(item.LineNumber);
-    }
+    private void NoteInspectorView_OnLineRequested(object? sender, NoteLineRequestedEventArgs e) =>
+        JumpToNoteLine(e.LineNumber);
 
     private void ApplyMarkdownAction(string action)
     {
