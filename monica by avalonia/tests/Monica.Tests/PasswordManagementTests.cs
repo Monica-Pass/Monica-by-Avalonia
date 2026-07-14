@@ -1330,6 +1330,36 @@ public sealed class PasswordManagementTests
         });
     }
 
+    [Fact]
+    public void ViewModel_password_detail_clears_replaced_decrypted_model()
+    {
+        RunOnStaThread(() =>
+        {
+            var harness = CreateHarness();
+            harness.Crypto.InitializeSession("correct password", new byte[16]);
+            var entry = new PasswordEntry
+            {
+                Title = "Disposable details",
+                Password = harness.Crypto.EncryptString("temporary-plain-secret")
+            };
+            harness.Repository.SavePasswordAsync(entry).GetAwaiter().GetResult();
+            harness.ViewModel.LoadAsync().GetAwaiter().GetResult();
+
+            harness.ViewModel.SelectedPassword = harness.ViewModel.Passwords.Single();
+            WaitForCondition(() => harness.ViewModel.SelectedPasswordDetails?.Entry.Id == entry.Id);
+            var oldDetails = harness.ViewModel.SelectedPasswordDetails!;
+            Assert.Contains(
+                oldDetails.Groups.SelectMany(group => group.Fields),
+                field => field.CopyValue == "temporary-plain-secret");
+
+            harness.ViewModel.SelectedPassword = null;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(oldDetails.IsSensitiveStateCleared);
+            Assert.Empty(oldDetails.Groups);
+        });
+    }
+
     private static void ViewModelEmbeddedPasswordDetailsKeepsLatestSelectionWhenSwitchingQuicklyCore()
     {
         var harness = CreateHarness();
@@ -3013,6 +3043,33 @@ public sealed class PasswordManagementTests
         await details.CopyAttachmentPathCommand.ExecuteAsync(attachment);
 
         Assert.Equal("", clipboard.Text);
+    }
+
+    [Fact]
+    public async Task Password_details_fail_closed_when_current_and_history_ciphertext_are_unreadable()
+    {
+        var harness = CreateHarness();
+        harness.Crypto.InitializeSession("master-password", Enumerable.Repeat((byte)5, 16).ToArray());
+        var entry = new PasswordEntry { Title = "Unreadable", Password = "not-valid-current-ciphertext" };
+        await harness.Repository.SavePasswordAsync(entry);
+        await harness.Repository.SavePasswordHistoryAsync(new PasswordHistoryEntry
+        {
+            EntryId = entry.Id,
+            Password = "not-valid-history-ciphertext",
+            LastUsedAt = DateTimeOffset.UtcNow
+        });
+        await harness.ViewModel.LoadAsync();
+
+        await harness.ViewModel.ShowPasswordDetailsCommand.ExecuteAsync(harness.ViewModel.Passwords.Single());
+
+        var details = Assert.IsType<PasswordDetailViewModel>(harness.DetailDialog.LastDetails);
+        var currentPassword = Assert.Single(details.Groups.SelectMany(group => group.Fields), field => field.IsSensitive);
+        var historyPassword = Assert.Single(details.PasswordHistory);
+        Assert.False(currentPassword.CanCopy);
+        Assert.Empty(currentPassword.CopyValue);
+        Assert.DoesNotContain("not-valid-current-ciphertext", currentPassword.DisplayText, StringComparison.Ordinal);
+        Assert.False(historyPassword.CanCopy);
+        Assert.DoesNotContain("not-valid-history-ciphertext", historyPassword.DisplayPassword, StringComparison.Ordinal);
     }
 
     [Fact]

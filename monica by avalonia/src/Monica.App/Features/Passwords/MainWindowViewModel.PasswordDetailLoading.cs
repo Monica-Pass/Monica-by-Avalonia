@@ -116,23 +116,35 @@ public sealed partial class MainWindowViewModel
                         return CreatePasswordDetailViewModel(snapshot);
                     },
                     cancellationToken));
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            var ownershipTransferred = false;
+            try
             {
-                if (cancellationToken.IsCancellationRequested ||
-                    !IsCurrentSelectedPasswordDetailsRequest(version) ||
-                    SelectedPassword?.Id != entry.Id)
+                await Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    return;
-                }
+                    if (cancellationToken.IsCancellationRequested ||
+                        !IsCurrentSelectedPasswordDetailsRequest(version) ||
+                        SelectedPassword?.Id != entry.Id)
+                    {
+                        return;
+                    }
 
-                SelectedPasswordDetails = details;
-                IsLoadingSelectedPasswordDetails = false;
-                AppDiagnostics.Info($"Password selection fast details applied in {stopwatch.ElapsedMilliseconds} ms. id={entry.Id}, version={version}");
-                Dispatcher.UIThread.Post(
-                    () => AppDiagnostics.Info($"Password selection details UI idle after {stopwatch.ElapsedMilliseconds} ms. id={entry.Id}, version={version}"),
-                    DispatcherPriority.ApplicationIdle);
-                _ = LoadSelectedPasswordHistoryDeferredAsync(entry.Id, version, details);
-            }, DispatcherPriority.Background);
+                    SelectedPasswordDetails = details;
+                    ownershipTransferred = true;
+                    IsLoadingSelectedPasswordDetails = false;
+                    AppDiagnostics.Info($"Password selection fast details applied in {stopwatch.ElapsedMilliseconds} ms. id={entry.Id}, version={version}");
+                    Dispatcher.UIThread.Post(
+                        () => AppDiagnostics.Info($"Password selection details UI idle after {stopwatch.ElapsedMilliseconds} ms. id={entry.Id}, version={version}"),
+                        DispatcherPriority.ApplicationIdle);
+                    _ = LoadSelectedPasswordHistoryDeferredAsync(entry.Id, version, details);
+                }, DispatcherPriority.Background);
+            }
+            finally
+            {
+                if (!ownershipTransferred)
+                {
+                    details.Dispose();
+                }
+            }
         }
         catch (OperationCanceledException)
         {

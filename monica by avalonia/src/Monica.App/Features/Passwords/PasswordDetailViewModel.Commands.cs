@@ -1,0 +1,132 @@
+using CommunityToolkit.Mvvm.Input;
+
+namespace Monica.App.ViewModels;
+
+public sealed partial class PasswordDetailViewModel
+{
+    [RelayCommand]
+    private async Task CopyFieldAsync(PasswordDetailField? field)
+    {
+        if (IsSensitiveStateCleared || field is null || !field.CanCopy || string.IsNullOrWhiteSpace(field.CopyValue))
+        {
+            return;
+        }
+
+        await _clipboardService.SetSensitiveTextAsync(field.CopyValue);
+        StatusText = L.Format("CopiedFieldFormat", field.Label);
+    }
+
+    [RelayCommand]
+    private void ToggleFieldVisibility(PasswordDetailField? field)
+    {
+        if (IsSensitiveStateCleared || field is null || !field.CanToggleVisibility)
+        {
+            return;
+        }
+
+        field.IsVisible = !field.IsVisible;
+    }
+
+    [RelayCommand]
+    private async Task AddAttachmentAsync()
+    {
+        if (IsSensitiveStateCleared || _addAttachment is null)
+        {
+            return;
+        }
+
+        await _addAttachment(Entry);
+        StatusText = L.Get("AttachmentAddedRefreshDetails");
+    }
+
+    [RelayCommand]
+    private async Task CopyAttachmentPathAsync(PasswordAttachmentItem? item)
+    {
+        if (IsSensitiveStateCleared || item is null || !item.CanCopy)
+        {
+            return;
+        }
+
+        await _clipboardService.SetSensitiveTextAsync(item.StoragePath);
+        StatusText = L.Format("CopiedFieldFormat", item.FileName);
+    }
+
+    [RelayCommand]
+    private async Task DeleteAttachmentAsync(PasswordAttachmentItem? item)
+    {
+        if (IsSensitiveStateCleared || item is null || _deleteAttachment is null)
+        {
+            return;
+        }
+
+        if (!await _deleteAttachment(item.Attachment))
+        {
+            return;
+        }
+
+        var fileName = item.FileName;
+        Attachments.Remove(item);
+        item.ClearSensitiveState();
+        OnPropertyChanged(nameof(HasAttachments));
+        StatusText = L.Format("DeletedAttachmentFormat", fileName);
+    }
+
+    [RelayCommand]
+    private void ToggleHistoryPassword(PasswordHistoryItemViewModel? item)
+    {
+        if (IsSensitiveStateCleared || item is null || !item.CanCopy)
+        {
+            return;
+        }
+
+        item.IsVisible = !item.IsVisible;
+    }
+
+    [RelayCommand]
+    private async Task CopyHistoryPasswordAsync(PasswordHistoryItemViewModel? item)
+    {
+        if (IsSensitiveStateCleared || item is null || !item.CanCopy || string.IsNullOrWhiteSpace(item.Password))
+        {
+            return;
+        }
+
+        await _clipboardService.SetSensitiveTextAsync(item.Password);
+        StatusText = L.Get("CopiedPasswordHistory");
+    }
+
+    [RelayCommand]
+    private async Task DeleteHistoryPasswordAsync(PasswordHistoryItemViewModel? item)
+    {
+        if (IsSensitiveStateCleared || item is null || _deletePasswordHistory is null)
+        {
+            return;
+        }
+
+        if (!await _deletePasswordHistory(item.Entry))
+        {
+            return;
+        }
+
+        PasswordHistory.Remove(item);
+        item.ClearSensitiveState();
+        OnPropertyChanged(nameof(HasPasswordHistory));
+        StatusText = L.Get("DeletedPasswordHistoryEntry");
+    }
+
+    [RelayCommand]
+    private async Task ClearPasswordHistoryAsync()
+    {
+        if (IsSensitiveStateCleared || _clearPasswordHistory is null || PasswordHistory.Count == 0)
+        {
+            return;
+        }
+
+        if (!await _clearPasswordHistory(Entry.Id))
+        {
+            return;
+        }
+
+        ClearPasswordHistoryPresentation();
+        StatusText = L.Get("ClearedPasswordHistory");
+    }
+}

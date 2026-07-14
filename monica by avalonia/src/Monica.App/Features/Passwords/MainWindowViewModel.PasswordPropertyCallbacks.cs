@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using Avalonia;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Monica.App.Services;
 using Monica.Core.Models;
@@ -52,6 +53,16 @@ public sealed partial class MainWindowViewModel
     {
         SyncSelectedPasswordListRow(value);
         QueueSelectedPasswordDetailsRefresh(value);
+    }
+
+    partial void OnSelectedPasswordDetailsChanged(
+        PasswordDetailViewModel? oldValue,
+        PasswordDetailViewModel? newValue)
+    {
+        if (!ReferenceEquals(oldValue, newValue))
+        {
+            Dispatcher.UIThread.Post(() => oldValue?.Dispose(), DispatcherPriority.Background);
+        }
     }
 
     partial void OnSelectedPasswordListRowChanged(PasswordListRow? value)

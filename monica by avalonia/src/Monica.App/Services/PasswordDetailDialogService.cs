@@ -63,14 +63,28 @@ public sealed class PasswordDetailDialogService(
             deletePasswordHistory,
             clearPasswordHistory);
 
-        var dialog = new FAContentDialog
+        PasswordDetailDialog? detailView = null;
+        try
         {
-            Title = details.DialogTitle,
-            Content = new PasswordDetailDialog { DataContext = details },
-            CloseButtonText = localization.Get("Close"),
-            DefaultButton = FAContentDialogButton.Close
-        };
+            detailView = new PasswordDetailDialog { DataContext = details };
+            var dialog = new FAContentDialog
+            {
+                Title = details.DialogTitle,
+                Content = detailView,
+                CloseButtonText = localization.Get("Close"),
+                DefaultButton = FAContentDialogButton.Close
+            };
 
-        await dialog.ShowAsync(ownerProvider());
+            await dialog.ShowAsync(ownerProvider());
+        }
+        finally
+        {
+            if (detailView is not null)
+            {
+                detailView.DataContext = null;
+            }
+
+            details.Dispose();
+        }
     }
 }

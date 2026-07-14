@@ -96,7 +96,7 @@ public sealed partial class MainWindowViewModel
         }
         catch
         {
-            return (storedPassword, true);
+            return (_localization.Get("PasswordHistoryUnavailable"), false);
         }
     }
 
