@@ -28,6 +28,7 @@
         <StyleInclude Source="/Features/Generator/GeneratorStyles.axaml" />
         <StyleInclude Source="/Features/Archive/ArchiveStyles.axaml" />
         <StyleInclude Source="/Features/RecycleBin/RecycleBinStyles.axaml" />
+        <StyleInclude Source="/Features/Passwords/PasswordVaultStyles.axaml" />
         <StyleInclude Source="/Features/Settings/SettingsStyles.axaml" />
         <StyleInclude Source="/Features/Sync/SyncStyles.axaml" />
         <StyleInclude Source="/Features/Mdbx/MdbxStyles.axaml" />

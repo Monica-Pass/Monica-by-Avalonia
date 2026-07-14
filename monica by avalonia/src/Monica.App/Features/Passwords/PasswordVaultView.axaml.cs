@@ -21,10 +21,10 @@ public partial class PasswordVaultView : UserControl
 
     public bool IsNarrowLayout { get; private set; }
 
-    public bool IsSearchBox(object? source) => ReferenceEquals(source, PasswordSearchBox);
+    public bool IsSearchBox(object? source) => PasswordVaultToolbar.IsSearchBox(source);
 
     public bool IsNonSearchTextEditingSource(object? source) =>
-        source is TextBox textBox && !IsSearchBox(textBox);
+        PasswordVaultToolbar.IsNonSearchTextEditingSource(source);
 
     public void SelectAdjacentPassword(MainWindowViewModel viewModel, int delta)
     {
@@ -48,21 +48,17 @@ public partial class PasswordVaultView : UserControl
         }
     }
 
-    public void FocusSearch()
-    {
-        PasswordSearchBox.Focus();
-        PasswordSearchBox.SelectAll();
-    }
+    public void FocusSearch() => PasswordVaultToolbar.FocusSearch();
 
-    public bool IsSearchFocused => PasswordSearchBox.IsFocused;
+    public bool IsSearchFocused => PasswordVaultToolbar.IsSearchFocused;
 
-    public void ScrollIntoView(PasswordListRow row) => PasswordListBox.ScrollIntoView(row);
+    public void ScrollIntoView(PasswordListRow row) => PasswordListPane.ScrollIntoView(row);
 
     public void FocusDetails() => PasswordDetailRegion.Focus();
 
     public bool IsDetailFocused => PasswordDetailRegion.IsFocused;
 
-    public void FocusPasswordList() => Dispatcher.UIThread.Post(() => PasswordListBox.Focus());
+    public void FocusPasswordList() => Dispatcher.UIThread.Post(PasswordListPane.FocusList);
 
     public void UpdateResponsiveLayoutForWidth(double width)
     {
@@ -126,7 +122,7 @@ public partial class PasswordVaultView : UserControl
             PasswordListRegion.IsVisible = !hasSelection;
             PasswordDetailRegion.IsVisible = hasSelection;
             PasswordDetailRegion.Margin = new Thickness(0);
-            BackToPasswordListButton.IsVisible = hasSelection;
+            PasswordDetailPane.ShowBackButton = hasSelection;
             if (!hasSelection)
             {
                 FocusPasswordList();
@@ -140,6 +136,6 @@ public partial class PasswordVaultView : UserControl
         PasswordListRegion.IsVisible = true;
         PasswordDetailRegion.IsVisible = true;
         PasswordDetailRegion.Margin = new Thickness(12, 0, 0, 0);
-        BackToPasswordListButton.IsVisible = false;
+        PasswordDetailPane.ShowBackButton = false;
     }
 }
