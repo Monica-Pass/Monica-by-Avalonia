@@ -46,6 +46,32 @@ function Assert-NoTrackedGeneratedArtifacts {
     }
 }
 
+function Assert-FocusedFeatureFileSizes {
+    $featurePaths = @(
+        'src/Monica.App/Features/Passwords',
+        'src/Monica.App/Features/Notes'
+    )
+    $maximumLines = 300
+    $oversizedFiles = @()
+    foreach ($featurePath in $featurePaths) {
+        $sourceFiles = Get-ChildItem -LiteralPath $featurePath -File |
+            Where-Object { $_.Extension -in @('.cs', '.axaml') }
+        foreach ($sourceFile in $sourceFiles) {
+            $lineCount = (Get-Content -LiteralPath $sourceFile.FullName).Count
+            if ($lineCount -gt $maximumLines) {
+                $relativePath = [IO.Path]::GetRelativePath($projectRoot, $sourceFile.FullName)
+                $oversizedFiles += "$relativePath ($lineCount lines)"
+            }
+        }
+    }
+
+    if ($oversizedFiles.Count -gt 0) {
+        throw "Focused feature files exceed $maximumLines lines:`n$($oversizedFiles -join "`n")"
+    }
+
+    Write-Host "Focused Password Vault and Secure Notes files are within $maximumLines lines."
+}
+
 function Get-VulnerabilityCount {
     param([object] $Value)
 
@@ -101,6 +127,7 @@ try {
     }
 
     Assert-NoTrackedGeneratedArtifacts
+    Assert-FocusedFeatureFileSizes
 
     if (-not $SkipRestore) {
         Invoke-CheckedCommand dotnet @('restore', $Solution)
