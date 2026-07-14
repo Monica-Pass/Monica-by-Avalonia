@@ -808,7 +808,7 @@ public sealed class AppSettingsTests
         viewModel.SecurityQuestion2Id = SecurityQuestionService.CustomQuestionId;
         viewModel.SecurityQuestion2CustomText = "Favorite shell?";
         viewModel.SecurityQuestion2Answer = "PowerShell";
-        viewModel.SaveSecurityQuestionsCommand.Execute(null);
+        await viewModel.SaveSecurityQuestionsCommand.ExecuteAsync(null);
         await Task.Delay(250);
 
         var reloaded = new AppSettingsService(settingsPath);
@@ -866,7 +866,7 @@ public sealed class AppSettingsTests
         viewModel.SecurityQuestion2Id = SecurityQuestionService.CustomQuestionId;
         viewModel.SecurityQuestion2CustomText = "Favorite shell?";
         viewModel.SecurityQuestion2Answer = "PowerShell";
-        viewModel.SaveSecurityQuestionsCommand.Execute(null);
+        await viewModel.SaveSecurityQuestionsCommand.ExecuteAsync(null);
 
         viewModel.SecurityRecoveryAnswer1 = "tiga";
         viewModel.SecurityRecoveryAnswer2 = "powershell";
@@ -882,6 +882,90 @@ public sealed class AppSettingsTests
         Assert.Equal("", viewModel.RecoveryConfirmNewMasterPassword);
         Assert.Equal(viewModel.L.Format("ResetMasterPasswordChangedFormat", 4), viewModel.StatusMessage);
         Assert.False(viewModel.IsResettingMasterPassword);
+    }
+
+    [Fact]
+    public async Task ViewModel_blocks_security_question_reset_when_recovery_is_disabled()
+    {
+        var maintenance = new CapturingMasterPasswordMaintenanceService(
+            new MasterPasswordMaintenanceResult(true, "ok", PasswordsReencrypted: 1));
+        var viewModel = CreateViewModel(GetTempPath(), masterPasswordMaintenanceService: maintenance);
+        await viewModel.InitializeAsync();
+        viewModel.IsUnlocked = true;
+        viewModel.SecurityRecoveryEnabled = true;
+        viewModel.SecurityQuestion1Id = 11;
+        viewModel.SecurityQuestion1Answer = "Tiga";
+        viewModel.SecurityQuestion2Id = 1;
+        viewModel.SecurityQuestion2Answer = "Monica";
+        await viewModel.SaveSecurityQuestionsCommand.ExecuteAsync(null);
+
+        viewModel.SecurityRecoveryEnabled = false;
+        viewModel.SecurityRecoveryAnswer1 = "tiga";
+        viewModel.SecurityRecoveryAnswer2 = "monica";
+        viewModel.RecoveryNewMasterPassword = "new password";
+        viewModel.RecoveryConfirmNewMasterPassword = "new password";
+        await viewModel.ResetMasterPasswordWithSecurityQuestionsCommand.ExecuteAsync(null);
+
+        Assert.False(maintenance.WasReset);
+        Assert.False(viewModel.CanResetMasterPasswordWithSecurityQuestions);
+        Assert.Equal(viewModel.L.Get("SecurityRecoveryDisabled"), viewModel.StatusMessage);
+    }
+
+    [Fact]
+    public void ViewModel_clears_transient_security_inputs_when_leaving_settings_pages()
+    {
+        var viewModel = CreateViewModel(GetTempPath());
+        viewModel.SelectedSettingsPage = "Security";
+        viewModel.CurrentMasterPassword = "old";
+        viewModel.NewMasterPassword = "new password";
+        viewModel.ConfirmNewMasterPassword = "new password";
+
+        viewModel.SelectedSettingsPage = "SecurityRecovery";
+
+        Assert.Empty(viewModel.CurrentMasterPassword);
+        Assert.Empty(viewModel.NewMasterPassword);
+        Assert.Empty(viewModel.ConfirmNewMasterPassword);
+
+        viewModel.SecurityQuestion1Answer = "one";
+        viewModel.SecurityQuestion2Answer = "two";
+        viewModel.SecurityRecoveryAnswer1 = "one";
+        viewModel.SecurityRecoveryAnswer2 = "two";
+        viewModel.RecoveryNewMasterPassword = "new password";
+        viewModel.RecoveryConfirmNewMasterPassword = "new password";
+
+        viewModel.SelectedSettingsPage = "General";
+
+        Assert.Empty(viewModel.SecurityQuestion1Answer);
+        Assert.Empty(viewModel.SecurityQuestion2Answer);
+        Assert.Empty(viewModel.SecurityRecoveryAnswer1);
+        Assert.Empty(viewModel.SecurityRecoveryAnswer2);
+        Assert.Empty(viewModel.RecoveryNewMasterPassword);
+        Assert.Empty(viewModel.RecoveryConfirmNewMasterPassword);
+
+        viewModel.SelectedSection = "Settings";
+        viewModel.SelectedSettingsPage = "Security";
+        viewModel.CurrentMasterPassword = "old";
+        viewModel.NewMasterPassword = "new password";
+        viewModel.ConfirmNewMasterPassword = "new password";
+        viewModel.SelectedSettingsPage = "SecurityRecovery";
+        viewModel.SecurityQuestion1Answer = "one";
+        viewModel.SecurityQuestion2Answer = "two";
+        viewModel.SecurityRecoveryAnswer1 = "one";
+        viewModel.SecurityRecoveryAnswer2 = "two";
+        viewModel.RecoveryNewMasterPassword = "new password";
+        viewModel.RecoveryConfirmNewMasterPassword = "new password";
+
+        viewModel.SelectedSection = "Passwords";
+
+        Assert.Empty(viewModel.CurrentMasterPassword);
+        Assert.Empty(viewModel.NewMasterPassword);
+        Assert.Empty(viewModel.ConfirmNewMasterPassword);
+        Assert.Empty(viewModel.SecurityQuestion1Answer);
+        Assert.Empty(viewModel.SecurityQuestion2Answer);
+        Assert.Empty(viewModel.SecurityRecoveryAnswer1);
+        Assert.Empty(viewModel.SecurityRecoveryAnswer2);
+        Assert.Empty(viewModel.RecoveryNewMasterPassword);
+        Assert.Empty(viewModel.RecoveryConfirmNewMasterPassword);
     }
 
     private static MainWindowViewModel CreateViewModel(

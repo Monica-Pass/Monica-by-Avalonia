@@ -65,8 +65,13 @@ public sealed partial class MainWindowViewModel
     public string SecurityRecoveryQuestion2PromptText => _settingsService.Current.SecurityRecovery.Question2Text;
     public bool IsSecurityQuestion1Custom => SecurityQuestion1Id == SecurityQuestionService.CustomQuestionId;
     public bool IsSecurityQuestion2Custom => SecurityQuestion2Id == SecurityQuestionService.CustomQuestionId;
-    public bool CanResetMasterPasswordWithSecurityQuestions => _settingsService.Current.SecurityRecovery.HasCompleteSetup;
-    public bool CanRunResetMasterPassword => CanResetMasterPasswordWithSecurityQuestions && !IsResettingMasterPassword;
+    public bool CanResetMasterPasswordWithSecurityQuestions =>
+        _settingsService.Current.SecurityRecovery is { IsEnabled: true, HasCompleteSetup: true };
+    public bool IsSecurityMaintenanceBusy =>
+        IsChangingMasterPassword || IsResettingMasterPassword || IsSavingSecurityQuestions || IsClearingVaultData;
+    public bool CanRunResetMasterPassword => CanResetMasterPasswordWithSecurityQuestions && !IsSecurityMaintenanceBusy;
+    public bool CanChangeMasterPassword => IsUnlocked && !IsSecurityMaintenanceBusy;
+    public bool CanClearVaultData => IsUnlocked && !IsSecurityMaintenanceBusy;
 
     public bool IsSettingsGeneralSelected => IsWorkspacePageSelected(SelectedSettingsPage, "General");
     public bool IsSettingsSecuritySelected => IsWorkspacePageSelected(SelectedSettingsPage, "Security");
@@ -88,6 +93,12 @@ public sealed partial class MainWindowViewModel
 
     [ObservableProperty]
     private bool _isChangingMasterPassword;
+
+    [ObservableProperty]
+    private bool _isSavingSecurityQuestions;
+
+    [ObservableProperty]
+    private bool _isClearingVaultData;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSettingsGeneralSelected))]

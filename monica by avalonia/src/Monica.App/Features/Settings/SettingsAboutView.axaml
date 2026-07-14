@@ -1,0 +1,30 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsAboutView" x:DataType="vm:MainWindowViewModel">
+    <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsAboutSelected}">
+        <StackPanel>
+            <fa:FASettingsExpanderItem Content="Monica" Description="{Binding AppVersionText}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                        <Image Source="/Assets/Logo.png" Width="44" Height="44" />
+                        <StackPanel Grid.Column="1" Spacing="2">
+                            <TextBlock Text="{Binding AppVersionLabel}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding AppVersionText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                    </Grid>
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding GitHubRepositoryLabel}" Description="{Binding RepositoryUrlText}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <StackPanel Spacing="6" MaxWidth="380">
+                        <TextBlock Text="{Binding ExternalLinksIntegrationStatusText}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <Button Command="{Binding OpenGitHubRepositoryCommand}" IsEnabled="{Binding CanOpenExternalLinks}" ToolTip.Tip="{Binding ExternalLinksIntegrationStatusText}" HorizontalAlignment="Left">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="Link" FontSize="18" />
+                                <TextBlock Text="{Binding OpenRepositoryText}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+        </StackPanel>
+    </Border>
+</UserControl>

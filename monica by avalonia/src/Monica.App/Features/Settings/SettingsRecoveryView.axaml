@@ -1,0 +1,70 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsRecoveryView" x:DataType="vm:MainWindowViewModel">
+    <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsSecurityRecoverySelected}">
+        <StackPanel>
+            <fa:FASettingsExpanderItem Content="{Binding SecurityRecoveryEnabledText}" Description="{Binding SecurityRecoveryStatusText}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <ToggleSwitch IsChecked="{Binding SecurityRecoveryEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding SecurityQuestion1Text}" Description="{Binding SecurityRecoveryDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <StackPanel Spacing="8" Margin="16,0,0,0" MinWidth="260" MaxWidth="440">
+                        <ComboBox ItemsSource="{Binding SecurityQuestionOptions}" SelectedValue="{Binding SecurityQuestion1Id}" SelectedValueBinding="{Binding Value}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SettingsChoice">
+                                    <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBox IsVisible="{Binding IsSecurityQuestion1Custom}" PlaceholderText="{Binding CustomSecurityQuestionText}" Text="{Binding SecurityQuestion1CustomText}" />
+                        <TextBox PasswordChar="*" PlaceholderText="{Binding SecurityQuestionAnswerText}" Text="{Binding SecurityQuestion1Answer}" AutomationProperties.Name="{Binding SecurityQuestionAnswerText}" />
+                    </StackPanel>
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding SecurityQuestion2Text}" Description="{Binding SecurityRecoveryDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <StackPanel Spacing="8" Margin="16,0,0,0" MinWidth="260" MaxWidth="440">
+                        <ComboBox ItemsSource="{Binding SecurityQuestionOptions}" SelectedValue="{Binding SecurityQuestion2Id}" SelectedValueBinding="{Binding Value}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SettingsChoice">
+                                    <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBox IsVisible="{Binding IsSecurityQuestion2Custom}" PlaceholderText="{Binding CustomSecurityQuestionText}" Text="{Binding SecurityQuestion2CustomText}" />
+                        <TextBox PasswordChar="*" PlaceholderText="{Binding SecurityQuestionAnswerText}" Text="{Binding SecurityQuestion2Answer}" AutomationProperties.Name="{Binding SecurityQuestionAnswerText}" />
+                    </StackPanel>
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding SaveSecurityQuestionsText}" Description="{Binding SecurityRecoveryStatusText}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <StackPanel Spacing="8">
+                        <Button Command="{Binding SaveSecurityQuestionsCommand}" IsEnabled="{Binding !IsSecurityMaintenanceBusy}">
+                            <TextBlock Text="{Binding SaveSecurityQuestionsText}" />
+                        </Button>
+                        <ProgressBar IsVisible="{Binding IsSavingSecurityQuestions}" IsIndeterminate="True" />
+                    </StackPanel>
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding ResetMasterPasswordTitle}" Description="{Binding ResetMasterPasswordDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <StackPanel Spacing="8" Margin="16,0,0,0" MinWidth="260" MaxWidth="460">
+                        <TextBlock Text="{Binding SecurityRecoveryQuestion1PromptText}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                        <TextBox x:Name="RecoveryAnswer1Box" PasswordChar="*" PlaceholderText="{Binding SecurityQuestionAnswerText}" Text="{Binding SecurityRecoveryAnswer1}" IsEnabled="{Binding CanRunResetMasterPassword}" />
+                        <TextBlock Text="{Binding SecurityRecoveryQuestion2PromptText}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                        <TextBox PasswordChar="*" PlaceholderText="{Binding SecurityQuestionAnswerText}" Text="{Binding SecurityRecoveryAnswer2}" IsEnabled="{Binding CanRunResetMasterPassword}" />
+                        <TextBox PasswordChar="*" PlaceholderText="{Binding NewMasterPasswordText}" Text="{Binding RecoveryNewMasterPassword}" IsEnabled="{Binding CanRunResetMasterPassword}" />
+                        <TextBox PasswordChar="*" PlaceholderText="{Binding ConfirmNewMasterPasswordText}" Text="{Binding RecoveryConfirmNewMasterPassword}" IsEnabled="{Binding CanRunResetMasterPassword}" />
+                        <Button Command="{Binding ResetMasterPasswordWithSecurityQuestionsCommand}" IsEnabled="{Binding CanRunResetMasterPassword}" HorizontalAlignment="Right">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="Key" FontSize="18" />
+                                <TextBlock Text="{Binding ResetMasterPasswordActionText}" />
+                            </StackPanel>
+                        </Button>
+                        <ProgressBar IsVisible="{Binding IsResettingMasterPassword}" IsIndeterminate="True" />
+                    </StackPanel>
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+        </StackPanel>
+    </Border>
+</UserControl>

@@ -1,0 +1,45 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsDesktopView" x:DataType="vm:MainWindowViewModel">
+    <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsDesktopSelected}">
+        <StackPanel>
+            <fa:FASettingsExpanderItem Content="{Binding L.MinimizeToTray}" Description="{Binding L.MinimizeToTrayDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <StackPanel Spacing="4" MaxWidth="340">
+                        <TextBlock Text="{Binding TrayIntegrationStatusText}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <ToggleSwitch IsChecked="{Binding MinimizeToTray}" IsEnabled="{Binding CanUseTrayIntegration}" ToolTip.Tip="{Binding TrayIntegrationStatusText}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+                    </StackPanel>
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding L.QuickSearch}" Description="{Binding L.QuickSearchDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <ToggleSwitch IsChecked="{Binding QuickSearchEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding L.QuickSearchHotkey}" Description="{Binding L.QuickSearchHotkeyDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <StackPanel Spacing="4" MaxWidth="340">
+                        <TextBlock Text="{Binding GlobalHotkeyIntegrationStatusText}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBox MinWidth="200" Text="{Binding QuickSearchHotkey}" IsEnabled="{Binding CanUseGlobalHotkeyIntegration}" ToolTip.Tip="{Binding GlobalHotkeyIntegrationStatusText}" AutomationProperties.Name="{Binding L.QuickSearchHotkey}" />
+                    </StackPanel>
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding L.BrowserIntegration}" Description="{Binding L.BrowserIntegrationDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <StackPanel Spacing="4" MaxWidth="340">
+                        <TextBlock Text="{Binding BrowserBridgeIntegrationStatusText}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <ToggleSwitch IsChecked="{Binding BrowserIntegrationEnabled}" IsEnabled="{Binding CanUseBrowserBridgeIntegration}" ToolTip.Tip="{Binding BrowserBridgeIntegrationStatusText}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+                    </StackPanel>
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding L.BrowserIntegrationPort}" Description="{Binding L.BrowserIntegrationPortDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <NumericUpDown MinWidth="180" Minimum="1024" Maximum="65535" Increment="1" Value="{Binding BrowserIntegrationPort}" IsEnabled="{Binding CanUseBrowserBridgeIntegration}" ToolTip.Tip="{Binding BrowserBridgeIntegrationStatusText}" AutomationProperties.Name="{Binding L.BrowserIntegrationPort}" />
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding L.CompactPasswordList}" Description="{Binding L.CompactPasswordListDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <ToggleSwitch IsChecked="{Binding CompactPasswordList}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+        </StackPanel>
+    </Border>
+</UserControl>

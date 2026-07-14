@@ -1,479 +1,79 @@
-<UserControl xmlns="https://github.com/avaloniaui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:fa="using:FluentAvalonia.UI.Controls"
-             xmlns:ic="using:FluentIcons.Avalonia"
-             xmlns:local="using:Monica.App"
-             xmlns:vm="using:Monica.App.ViewModels"
-             x:Class="Monica.App.Features.Settings.SettingsWorkspaceView"
-             x:Name="SettingsWorkspaceRoot"
-             x:DataType="vm:MainWindowViewModel">
-<Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsSettings}}"
-      RowDefinitions="Auto,*"
-      MaxWidth="1080"
-      Width="{Binding Bounds.Width, ElementName=SettingsWorkspaceRoot}"
-      HorizontalAlignment="Left"
-      ClipToBounds="True">
-    <Border Classes="workspacePageHeader">
-        <StackPanel MinWidth="0" Spacing="3">
-            <TextBlock Classes="workspacePageTitle" Text="{Binding L.Settings}" />
-            <TextBlock Classes="workspacePageSubtitle" Text="{Binding L.SettingsSubtitle}" />
-        </StackPanel>
-    </Border>
-
-    <Grid Grid.Row="1" ColumnDefinitions="260,*" ColumnSpacing="16" MinWidth="0">
-        <Border Classes="workspaceSidebar" Padding="14" ClipToBounds="True">
-            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Spacing="8">
-                    <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.Settings}" Margin="2,0,0,4" />
-                    <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsGeneralSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="General">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <ic:FluentIcon Icon="Settings" FontSize="17" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding L.General}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsSecuritySelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Security">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <ic:FluentIcon Icon="Shield" FontSize="17" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding L.Security}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsSecurityRecoverySelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="SecurityRecovery">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <ic:FluentIcon Icon="Key" FontSize="17" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding SecurityRecoveryTitle}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsDataSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Data">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <ic:FluentIcon Icon="Save" FontSize="17" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding L.DataManagement}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsDesktopSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Desktop">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <ic:FluentIcon Icon="Desktop" FontSize="17" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding L.Desktop}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsIntegrationsSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Integrations">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <ic:FluentIcon Icon="Link" FontSize="17" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding PlatformIntegrationsTitle}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsAboutSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="About">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <ic:FluentIcon Icon="Info" FontSize="17" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding AboutTitle}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsDangerSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Danger">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <ic:FluentIcon Icon="Delete" FontSize="17" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding DangerZoneTitle}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ic="using:FluentIcons.Avalonia" xmlns:local="using:Monica.App" xmlns:settings="using:Monica.App.Features.Settings" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsWorkspaceView" x:DataType="vm:MainWindowViewModel">
+    <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsSettings}}" RowDefinitions="Auto,*" MaxWidth="1080" HorizontalAlignment="Stretch" ClipToBounds="True">
+        <Border Classes="workspacePageHeader">
+            <StackPanel Spacing="3">
+                <TextBlock Classes="workspacePageTitle" Text="{Binding L.Settings}" />
+                <TextBlock Classes="workspacePageSubtitle" Text="{Binding L.SettingsSubtitle}" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+        <Grid x:Name="SettingsWorkspaceLayoutGrid" Grid.Row="1" ColumnDefinitions="260,*" RowDefinitions="*" ColumnSpacing="16" RowSpacing="12" MinWidth="0">
+            <Border x:Name="SettingsSidebarRegion" Classes="workspaceSidebar" Padding="14" ClipToBounds="True">
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="8">
+                        <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.Settings}" Margin="2,0,0,4" />
+                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsGeneralSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="General">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <ic:FluentIcon Icon="Settings" FontSize="17" />
+                                <TextBlock Text="{Binding L.General}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsSecuritySelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Security">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <ic:FluentIcon Icon="Shield" FontSize="17" />
+                                <TextBlock Text="{Binding L.Security}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsSecurityRecoverySelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="SecurityRecovery">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <ic:FluentIcon Icon="Key" FontSize="17" />
+                                <TextBlock Text="{Binding SecurityRecoveryTitle}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsDataSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Data">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <ic:FluentIcon Icon="Save" FontSize="17" />
+                                <TextBlock Text="{Binding L.DataManagement}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsDesktopSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Desktop">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <ic:FluentIcon Icon="Desktop" FontSize="17" />
+                                <TextBlock Text="{Binding L.Desktop}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsIntegrationsSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Integrations">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <ic:FluentIcon Icon="Link" FontSize="17" />
+                                <TextBlock Text="{Binding PlatformIntegrationsTitle}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsAboutSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="About">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <ic:FluentIcon Icon="Info" FontSize="17" />
+                                <TextBlock Text="{Binding AboutTitle}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsDangerSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Danger">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <ic:FluentIcon Icon="Delete" FontSize="17" />
+                                <TextBlock Text="{Binding DangerZoneTitle}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+            <ScrollViewer x:Name="SettingsContentRegion" Grid.Column="1" HorizontalScrollBarVisibility="Disabled" ClipToBounds="True">
+                <StackPanel Spacing="14" MaxWidth="760" HorizontalAlignment="Stretch">
+                    <settings:SettingsGeneralView />
+                    <settings:SettingsSecurityView />
+                    <settings:SettingsRecoveryView />
+                    <settings:SettingsDataView />
+                    <settings:SettingsDesktopView />
+                    <settings:SettingsIntegrationsView />
+                    <settings:SettingsAboutView />
+                    <settings:SettingsDangerView />
                 </StackPanel>
             </ScrollViewer>
-        </Border>
-
-        <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Disabled" ClipToBounds="True">
-            <StackPanel Spacing="14" MaxWidth="760" HorizontalAlignment="Stretch">
-
-        <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsGeneralSelected}">
-            <StackPanel>
-                <fa:FASettingsExpanderItem Content="{Binding L.Language}" Description="{Binding L.LanguageDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <ComboBox Width="220" ItemsSource="{Binding LanguageOptions}" SelectedValue="{Binding SettingsLanguage}" SelectedValueBinding="{Binding Value}">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:SettingsChoice">
-                                    <TextBlock Text="{Binding Label}" />
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                <fa:FASettingsExpanderItem Content="{Binding L.Theme}" Description="{Binding L.ThemeDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <ComboBox Width="220" ItemsSource="{Binding ThemeOptions}" SelectedValue="{Binding SettingsTheme}" SelectedValueBinding="{Binding Value}">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:SettingsChoice">
-                                    <TextBlock Text="{Binding Label}" />
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                <fa:FASettingsExpanderItem Content="{Binding L.StartupView}" Description="{Binding L.StartupViewDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <ComboBox Width="220" ItemsSource="{Binding StartupSectionOptions}" SelectedValue="{Binding StartupSection}" SelectedValueBinding="{Binding Value}">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:SettingsChoice">
-                                    <TextBlock Text="{Binding Label}" />
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                                            </StackPanel>
-        </Border>
-
-        <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsSecuritySelected}">
-            <StackPanel>
-                <fa:FASettingsExpanderItem Content="{Binding L.AutoLock}" Description="{Binding L.AutoLockDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <ToggleSwitch IsChecked="{Binding AutoLockEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                <fa:FASettingsExpanderItem Content="{Binding L.AutoLockAfter}" Description="{Binding L.AutoLockAfterDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <ComboBox Width="180" ItemsSource="{Binding AutoLockMinuteOptions}" SelectedValue="{Binding AutoLockMinutes}" SelectedValueBinding="{Binding Value}">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:SettingsChoice">
-                                    <TextBlock Text="{Binding Label}" />
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                <fa:FASettingsExpanderItem Content="{Binding L.ClearClipboard}" Description="{Binding L.ClearClipboardDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <ToggleSwitch IsChecked="{Binding ClearClipboardEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                <fa:FASettingsExpanderItem Content="{Binding L.ClearClipboardAfter}" Description="{Binding L.ClearClipboardAfterDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <ComboBox Width="180" ItemsSource="{Binding ClipboardSecondOptions}" SelectedValue="{Binding ClipboardClearSeconds}" SelectedValueBinding="{Binding Value}">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:SettingsChoice">
-                                    <TextBlock Text="{Binding Label}" />
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                <fa:FASettingsExpanderItem Content="{Binding L.RequirePasswordBeforeExport}" Description="{Binding L.RequirePasswordBeforeExportDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <ToggleSwitch IsChecked="{Binding RequirePasswordBeforeExport}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                <fa:FASettingsExpanderItem Content="{Binding ChangeMasterPasswordTitle}" Description="{Binding ChangeMasterPasswordDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <StackPanel Spacing="8" Margin="16,0,0,0" MaxWidth="420">
-                            <TextBox PasswordChar="*" PlaceholderText="{Binding CurrentMasterPasswordText}" Text="{Binding CurrentMasterPassword}" IsEnabled="{Binding !IsChangingMasterPassword}" />
-                            <TextBox PasswordChar="*" PlaceholderText="{Binding NewMasterPasswordText}" Text="{Binding NewMasterPassword}" IsEnabled="{Binding !IsChangingMasterPassword}" />
-                            <TextBox PasswordChar="*" PlaceholderText="{Binding ConfirmNewMasterPasswordText}" Text="{Binding ConfirmNewMasterPassword}" IsEnabled="{Binding !IsChangingMasterPassword}" />
-                            <Button Command="{Binding ChangeMasterPasswordCommand}" IsEnabled="{Binding !IsChangingMasterPassword}" HorizontalAlignment="Right">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <ic:FluentIcon Icon="Key" FontSize="18" />
-                                    <TextBlock Text="{Binding ChangeMasterPasswordActionText}" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                                            </StackPanel>
-        </Border>
-
-        <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsSecurityRecoverySelected}">
-            <StackPanel>
-                <fa:FASettingsExpanderItem Content="{Binding SecurityRecoveryEnabledText}" Description="{Binding SecurityRecoveryStatusText}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <ToggleSwitch IsChecked="{Binding SecurityRecoveryEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                <fa:FASettingsExpanderItem Content="{Binding SecurityQuestion1Text}" Description="{Binding SecurityRecoveryDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <StackPanel Spacing="8" Margin="16,0,0,0" MaxWidth="420">
-                            <ComboBox Width="360" ItemsSource="{Binding SecurityQuestionOptions}" SelectedValue="{Binding SecurityQuestion1Id}" SelectedValueBinding="{Binding Value}">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:SettingsChoice">
-                                        <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
-                            <TextBox IsVisible="{Binding IsSecurityQuestion1Custom}" PlaceholderText="{Binding CustomSecurityQuestionText}" Text="{Binding SecurityQuestion1CustomText}" />
-                            <TextBox PasswordChar="*" PlaceholderText="{Binding SecurityQuestionAnswerText}" Text="{Binding SecurityQuestion1Answer}" />
-                        </StackPanel>
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                <fa:FASettingsExpanderItem Content="{Binding SecurityQuestion2Text}" Description="{Binding SecurityRecoveryDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <StackPanel Spacing="8" Margin="16,0,0,0" MaxWidth="420">
-                            <ComboBox Width="360" ItemsSource="{Binding SecurityQuestionOptions}" SelectedValue="{Binding SecurityQuestion2Id}" SelectedValueBinding="{Binding Value}">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:SettingsChoice">
-                                        <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
-                            <TextBox IsVisible="{Binding IsSecurityQuestion2Custom}" PlaceholderText="{Binding CustomSecurityQuestionText}" Text="{Binding SecurityQuestion2CustomText}" />
-                            <TextBox PasswordChar="*" PlaceholderText="{Binding SecurityQuestionAnswerText}" Text="{Binding SecurityQuestion2Answer}" />
-                        </StackPanel>
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                <fa:FASettingsExpanderItem Content="{Binding SaveSecurityQuestionsText}" Description="{Binding SecurityRecoveryStatusText}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <Button Command="{Binding SaveSecurityQuestionsCommand}">
-                            <TextBlock Text="{Binding SaveSecurityQuestionsText}" />
-                        </Button>
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                <fa:FASettingsExpanderItem Content="{Binding ResetMasterPasswordTitle}" Description="{Binding ResetMasterPasswordDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <StackPanel Spacing="8" Margin="16,0,0,0" MaxWidth="460">
-                            <TextBlock Text="{Binding SecurityRecoveryQuestion1PromptText}" TextWrapping="Wrap" FontWeight="SemiBold" />
-                            <TextBox PasswordChar="*" PlaceholderText="{Binding SecurityQuestionAnswerText}" Text="{Binding SecurityRecoveryAnswer1}" IsEnabled="{Binding CanRunResetMasterPassword}" />
-                            <TextBlock Text="{Binding SecurityRecoveryQuestion2PromptText}" TextWrapping="Wrap" FontWeight="SemiBold" />
-                            <TextBox PasswordChar="*" PlaceholderText="{Binding SecurityQuestionAnswerText}" Text="{Binding SecurityRecoveryAnswer2}" IsEnabled="{Binding CanRunResetMasterPassword}" />
-                            <TextBox PasswordChar="*" PlaceholderText="{Binding NewMasterPasswordText}" Text="{Binding RecoveryNewMasterPassword}" IsEnabled="{Binding CanRunResetMasterPassword}" />
-                            <TextBox PasswordChar="*" PlaceholderText="{Binding ConfirmNewMasterPasswordText}" Text="{Binding RecoveryConfirmNewMasterPassword}" IsEnabled="{Binding CanRunResetMasterPassword}" />
-                            <Button Command="{Binding ResetMasterPasswordWithSecurityQuestionsCommand}" IsEnabled="{Binding CanRunResetMasterPassword}" HorizontalAlignment="Right">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <ic:FluentIcon Icon="Key" FontSize="18" />
-                                    <TextBlock Text="{Binding ResetMasterPasswordActionText}" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                                            </StackPanel>
-        </Border>
-
-        <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsDataSelected}">
-            <StackPanel>
-                <fa:FASettingsExpanderItem Content="{Binding L.ImportData}" Description="{Binding L.ImportDataDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <StackPanel Orientation="Horizontal" Spacing="12" Margin="16,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding FilePickerIntegrationStatusText}" FontSize="12" TextWrapping="Wrap" MaxWidth="240" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                            <Button Command="{Binding ImportMonicaJsonFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <ic:FluentIcon Icon="Folder" FontSize="18" />
-                                    <TextBlock Text="{Binding L.ImportMonicaJson}" />
-                                </StackPanel>
-                            </Button>
-                            <Button Command="{Binding ImportPasswordCsvFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <ic:FluentIcon Icon="Folder" FontSize="18" />
-                                    <TextBlock Text="{Binding L.ImportPasswordCsv}" />
-                                </StackPanel>
-                            </Button>
-                            <Button Command="{Binding ImportAegisJsonFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <ic:FluentIcon Icon="Folder" FontSize="18" />
-                                    <TextBlock Text="{Binding L.ImportAegisJson}" />
-                                </StackPanel>
-                            </Button>
-                            <Button Command="{Binding ImportTotpCsvFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <ic:FluentIcon Icon="Folder" FontSize="18" />
-                                    <TextBlock Text="{Binding L.ImportTotpCsv}" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                <fa:FASettingsExpanderItem Content="{Binding L.ExportData}" Description="{Binding L.ExportDataDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <StackPanel Orientation="Horizontal" Spacing="12" Margin="16,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding FilePickerIntegrationStatusText}" FontSize="12" TextWrapping="Wrap" MaxWidth="240" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                            <Button Command="{Binding SaveMonicaJsonExportCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <ic:FluentIcon Icon="Save" FontSize="18" />
-                                    <TextBlock Text="{Binding L.SaveJsonExport}" />
-                                </StackPanel>
-                            </Button>
-                            <Button Command="{Binding SavePasswordCsvExportCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <ic:FluentIcon Icon="Save" FontSize="18" />
-                                    <TextBlock Text="{Binding L.SaveCsvExport}" />
-                                </StackPanel>
-                            </Button>
-                            <Button Command="{Binding SaveTotpCsvExportCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <ic:FluentIcon Icon="Save" FontSize="18" />
-                                    <TextBlock Text="{Binding L.SaveTotpCsvExport}" />
-                                </StackPanel>
-                            </Button>
-                            <Button Command="{Binding SaveAegisJsonExportCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <ic:FluentIcon Icon="Save" FontSize="18" />
-                                    <TextBlock Text="{Binding L.SaveAegisExport}" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                <fa:FASettingsExpanderItem Content="{Binding L.WebDav}" Description="{Binding L.RemoteSyncDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <Button Command="{Binding SelectSectionCommand}" CommandParameter="Sync" Margin="16,0,0,0">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <ic:FluentIcon Icon="ArrowClockwise" FontSize="18" />
-                                <TextBlock Text="{Binding L.SyncAndBackup}" />
-                            </StackPanel>
-                        </Button>
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                                            </StackPanel>
-        </Border>
-
-        <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsDesktopSelected}">
-            <StackPanel>
-                <fa:FASettingsExpanderItem Content="{Binding L.MinimizeToTray}" Description="{Binding L.MinimizeToTrayDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <StackPanel Orientation="Horizontal" Spacing="12" Margin="16,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding TrayIntegrationStatusText}" FontSize="12" TextWrapping="Wrap" MaxWidth="260" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                            <ToggleSwitch IsChecked="{Binding MinimizeToTray}" IsEnabled="{Binding CanUseTrayIntegration}" ToolTip.Tip="{Binding TrayIntegrationStatusText}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
-                        </StackPanel>
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                <fa:FASettingsExpanderItem Content="{Binding L.QuickSearch}" Description="{Binding L.QuickSearchDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <ToggleSwitch IsChecked="{Binding QuickSearchEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                <fa:FASettingsExpanderItem Content="{Binding L.QuickSearchHotkey}" Description="{Binding L.QuickSearchHotkeyDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <StackPanel Orientation="Horizontal" Spacing="12" Margin="16,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding GlobalHotkeyIntegrationStatusText}" FontSize="12" TextWrapping="Wrap" MaxWidth="260" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                            <TextBox Width="220" Text="{Binding QuickSearchHotkey}" IsEnabled="{Binding CanUseGlobalHotkeyIntegration}" ToolTip.Tip="{Binding GlobalHotkeyIntegrationStatusText}" />
-                        </StackPanel>
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                <fa:FASettingsExpanderItem Content="{Binding L.BrowserIntegration}" Description="{Binding L.BrowserIntegrationDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <StackPanel Orientation="Horizontal" Spacing="12" Margin="16,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding BrowserBridgeIntegrationStatusText}" FontSize="12" TextWrapping="Wrap" MaxWidth="260" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                            <ToggleSwitch IsChecked="{Binding BrowserIntegrationEnabled}" IsEnabled="{Binding CanUseBrowserBridgeIntegration}" ToolTip.Tip="{Binding BrowserBridgeIntegrationStatusText}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
-                        </StackPanel>
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                <fa:FASettingsExpanderItem Content="{Binding L.BrowserIntegrationPort}" Description="{Binding L.BrowserIntegrationPortDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <NumericUpDown Width="180" Minimum="1024" Maximum="65535" Increment="1" Value="{Binding BrowserIntegrationPort}" IsEnabled="{Binding CanUseBrowserBridgeIntegration}" ToolTip.Tip="{Binding BrowserBridgeIntegrationStatusText}" />
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                <fa:FASettingsExpanderItem Content="{Binding L.CompactPasswordList}" Description="{Binding L.CompactPasswordListDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <ToggleSwitch IsChecked="{Binding CompactPasswordList}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                                            </StackPanel>
-        </Border>
-
-        <ItemsControl Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsIntegrationsSelected}" ItemsSource="{Binding PlatformIntegrationCapabilities}">                                    <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:LocalizedPlatformIntegrationCapability">
-                    <fa:FASettingsExpanderItem Content="{Binding Title}" Description="{Binding Description}">
-                        <fa:FASettingsExpanderItem.Footer>
-                            <StackPanel Spacing="2" Margin="16,0,0,0" MinWidth="160" MaxWidth="360">
-                                <TextBlock Text="{Binding Status}" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding UnsupportedReason}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding HasUnsupportedReason}" />
-                            </StackPanel>
-                        </fa:FASettingsExpanderItem.Footer>
-                    </fa:FASettingsExpanderItem>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-
-        <fa:FAInfoBar IsOpen="True" IsVisible="{Binding IsSettingsIntegrationsSelected}" Severity="Informational" Title="{Binding L.DesktopEquivalents}" Message="{Binding L.DesktopEquivalentsMessage}" />
-        <ItemsControl Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsIntegrationsSelected}" ItemsSource="{Binding Capabilities}">                                    <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:LocalizedPlatformCapability">
-                    <fa:FASettingsExpanderItem Content="{Binding Title}" Description="{Binding Description}">
-                        <fa:FASettingsExpanderItem.Footer>
-                            <StackPanel Orientation="Horizontal" Spacing="12" Margin="16,0,0,0" VerticalAlignment="Center">
-                                <StackPanel MinWidth="132" Spacing="2">
-                                    <TextBlock Text="{Binding Status}" FontWeight="SemiBold" />
-                                    <TextBlock Text="{Binding ToggleStatus}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                    <TextBlock Text="{Binding UnsupportedReason}" FontSize="12" TextWrapping="Wrap" MaxWidth="280" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding HasUnsupportedReason}" />
-                                </StackPanel>
-                                <ToggleSwitch IsChecked="{Binding IsEnabled, Mode=TwoWay}" IsEnabled="{Binding CanToggle}" ToolTip.Tip="{Binding ToggleStatus}" />
-                            </StackPanel>
-                        </fa:FASettingsExpanderItem.Footer>
-                    </fa:FASettingsExpanderItem>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-
-        <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsAboutSelected}">
-            <StackPanel>
-                <fa:FASettingsExpanderItem Content="Monica" Description="{Binding AppVersionText}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <StackPanel Orientation="Horizontal" Spacing="12" Margin="16,0,0,0" VerticalAlignment="Center">
-                            <Image Source="/Assets/Logo.png" Width="44" Height="44" />
-                            <StackPanel Spacing="2" MaxWidth="320">
-                                <TextBlock Text="{Binding AppVersionLabel}" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding AppVersionText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                            </StackPanel>
-                        </StackPanel>
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                <fa:FASettingsExpanderItem Content="{Binding GitHubRepositoryLabel}" Description="{Binding RepositoryUrlText}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <StackPanel Orientation="Horizontal" Spacing="12" Margin="16,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding ExternalLinksIntegrationStatusText}" FontSize="12" TextWrapping="Wrap" MaxWidth="260" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                            <Button Command="{Binding OpenGitHubRepositoryCommand}" IsEnabled="{Binding CanOpenExternalLinks}" ToolTip.Tip="{Binding ExternalLinksIntegrationStatusText}">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <ic:FluentIcon Icon="Link" FontSize="18" />
-                                    <TextBlock Text="{Binding OpenRepositoryText}" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                                            </StackPanel>
-        </Border>
-
-        <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsDangerSelected}">
-            <StackPanel>
-                <fa:FASettingsExpanderItem Content="{Binding ClearVaultDataTitle}" Description="{Binding ClearVaultDataDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <StackPanel Spacing="8" Margin="16,0,0,0" MaxWidth="520">
-                            <TextBlock Text="{Binding ClearVaultConfirmationInstructionText}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
-                            <TextBox PlaceholderText="{Binding ClearVaultConfirmationInstructionText}" Text="{Binding DangerZoneConfirmationText}" />
-                            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                                <Button Command="{Binding ClearVaultDataCommand}" CommandParameter="Passwords">
-                                    <TextBlock Text="{Binding ClearPasswordsOnlyText}" />
-                                </Button>
-                                <Button Command="{Binding ClearVaultDataCommand}" CommandParameter="SecureItems">
-                                    <TextBlock Text="{Binding ClearSecureItemsOnlyText}" />
-                                </Button>
-                                <Button Background="{DynamicResource SystemFillColorCriticalBrush}" Command="{Binding ClearVaultDataCommand}" CommandParameter="All">
-                                    <TextBlock Text="{Binding ClearAllVaultDataText}" />
-                                </Button>
-                            </StackPanel>
-                        </StackPanel>
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-
-                                            </StackPanel>
-        </Border>
-            </StackPanel>
-        </ScrollViewer>
+        </Grid>
     </Grid>
-</Grid>
 </UserControl>

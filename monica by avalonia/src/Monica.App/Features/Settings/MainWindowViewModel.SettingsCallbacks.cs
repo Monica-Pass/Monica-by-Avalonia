@@ -2,6 +2,45 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    partial void OnSelectedSettingsPageChanged(string value)
+    {
+        if (!IsWorkspacePageSelected(value, "Security"))
+        {
+            CurrentMasterPassword = "";
+            NewMasterPassword = "";
+            ConfirmNewMasterPassword = "";
+        }
+
+        if (!IsWorkspacePageSelected(value, "SecurityRecovery"))
+        {
+            SecurityQuestion1Answer = "";
+            SecurityQuestion2Answer = "";
+            SecurityRecoveryAnswer1 = "";
+            SecurityRecoveryAnswer2 = "";
+            RecoveryNewMasterPassword = "";
+            RecoveryConfirmNewMasterPassword = "";
+        }
+
+        if (!IsWorkspacePageSelected(value, "Danger"))
+        {
+            DangerZoneConfirmationText = "";
+        }
+    }
+
+    private void ClearTransientSettingsSecurityInputs()
+    {
+        CurrentMasterPassword = "";
+        NewMasterPassword = "";
+        ConfirmNewMasterPassword = "";
+        SecurityQuestion1Answer = "";
+        SecurityQuestion2Answer = "";
+        SecurityRecoveryAnswer1 = "";
+        SecurityRecoveryAnswer2 = "";
+        RecoveryNewMasterPassword = "";
+        RecoveryConfirmNewMasterPassword = "";
+        DangerZoneConfirmationText = "";
+    }
+
     partial void OnSettingsLanguageChanged(string value)
     {
         if (_isApplyingSettings)
@@ -44,7 +83,10 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(CanRunResetMasterPassword));
     }
 
-    partial void OnIsResettingMasterPasswordChanged(bool value) => OnPropertyChanged(nameof(CanRunResetMasterPassword));
+    partial void OnIsChangingMasterPasswordChanged(bool value) => RaiseSecurityMaintenanceState();
+    partial void OnIsResettingMasterPasswordChanged(bool value) => RaiseSecurityMaintenanceState();
+    partial void OnIsSavingSecurityQuestionsChanged(bool value) => RaiseSecurityMaintenanceState();
+    partial void OnIsClearingVaultDataChanged(bool value) => RaiseSecurityMaintenanceState();
 
     partial void OnSecurityQuestion1IdChanged(int value)
     {

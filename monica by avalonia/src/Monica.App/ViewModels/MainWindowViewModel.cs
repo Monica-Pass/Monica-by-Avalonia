@@ -217,6 +217,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedSectionTitle));
         RaiseShellStatus();
         RefreshSecurityAnalysisIfNeeded();
+        if (!string.Equals(value, "Settings", StringComparison.OrdinalIgnoreCase))
+        {
+            ClearTransientSettingsSecurityInputs();
+        }
+
         if (string.Equals(value, "Generator", StringComparison.OrdinalIgnoreCase))
         {
             EnsureGeneratedPassword();

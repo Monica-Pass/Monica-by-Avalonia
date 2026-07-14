@@ -48,10 +48,8 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var requiredPhrase = _localization.Get("ClearVaultConfirmationPhrase");
-        if (!string.Equals(DangerZoneConfirmationText.Trim(), requiredPhrase, StringComparison.Ordinal))
+        if (!TryBeginSecurityMaintenance(() => IsClearingVaultData = true))
         {
-            StatusMessage = _localization.Format("ClearVaultConfirmationFailedFormat", requiredPhrase);
             return;
         }
 
@@ -62,10 +60,35 @@ public sealed partial class MainWindowViewModel
             _ => VaultClearScope.All
         };
 
-        await _repository.ClearVaultDataAsync(clearScope);
-        DangerZoneConfirmationText = "";
-        await LoadAsync();
-        StatusMessage = _localization.Format("ClearedVaultDataFormat", LocalizeVaultClearScope(clearScope));
+        try
+        {
+            var requiredPhrase = _localization.Get("ClearVaultConfirmationPhrase");
+            var confirmed = await _confirmationDialogService.ConfirmTypedAsync(
+                _localization.Get("ClearVaultTypedConfirmationTitle"),
+                _localization.Format("ClearVaultTypedConfirmationMessageFormat", LocalizeVaultClearScope(clearScope)),
+                requiredPhrase,
+                _localization.Format("ClearVaultConfirmationInstructionFormat", requiredPhrase),
+                _localization.Get("Delete"),
+                _localization.Cancel);
+            if (!confirmed)
+            {
+                StatusMessage = _localization.Get("ClearVaultCancelled");
+                return;
+            }
+
+            await _repository.ClearVaultDataAsync(clearScope);
+            DangerZoneConfirmationText = "";
+            await LoadAsync();
+            StatusMessage = _localization.Format("ClearedVaultDataFormat", LocalizeVaultClearScope(clearScope));
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = _localization.Format("ClearVaultDataFailedFormat", ex.Message);
+        }
+        finally
+        {
+            EndSecurityMaintenance(() => IsClearingVaultData = false);
+        }
     }
 
     [RelayCommand]
@@ -101,13 +124,20 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        IsChangingMasterPassword = true;
+        var currentPassword = CurrentMasterPassword;
+        var newPassword = NewMasterPassword;
+
+        if (!TryBeginSecurityMaintenance(() => IsChangingMasterPassword = true))
+        {
+            return;
+        }
+
         StatusMessage = _localization.Get("ChangeMasterPasswordInProgress");
         try
         {
             var result = await _masterPasswordMaintenanceService.ChangeMasterPasswordAsync(
-                CurrentMasterPassword,
-                NewMasterPassword);
+                currentPassword,
+                newPassword);
             if (!result.Success)
             {
                 var message = result.Message.Contains("incorrect", StringComparison.OrdinalIgnoreCase)
@@ -130,120 +160,8 @@ public sealed partial class MainWindowViewModel
         }
         finally
         {
-            IsChangingMasterPassword = false;
+            EndSecurityMaintenance(() => IsChangingMasterPassword = false);
         }
     }
 
-    [RelayCommand]
-    private async Task ResetMasterPasswordWithSecurityQuestionsAsync()
-    {
-        if (!IsUnlocked)
-        {
-            StatusMessage = _localization.Get("VaultLocked");
-            return;
-        }
-
-        var recovery = _settingsService.Current.SecurityRecovery;
-        if (!recovery.HasCompleteSetup)
-        {
-            StatusMessage = _localization.Get("SecurityQuestionsNotConfigured");
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(SecurityRecoveryAnswer1) || string.IsNullOrWhiteSpace(SecurityRecoveryAnswer2))
-        {
-            StatusMessage = _localization.Get("SecurityQuestionAnswersRequired");
-            return;
-        }
-
-        if (!_securityQuestionService.VerifyAnswer(SecurityRecoveryAnswer1, recovery.Question1AnswerHash, recovery.Question1AnswerSalt) ||
-            !_securityQuestionService.VerifyAnswer(SecurityRecoveryAnswer2, recovery.Question2AnswerHash, recovery.Question2AnswerSalt))
-        {
-            StatusMessage = _localization.Get("SecurityQuestionAnswersIncorrect");
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(RecoveryNewMasterPassword))
-        {
-            StatusMessage = _localization.Get("EnterNewMasterPassword");
-            return;
-        }
-
-        if (RecoveryNewMasterPassword.Length < 8)
-        {
-            StatusMessage = _localization.Get("MasterPasswordMinLength");
-            return;
-        }
-
-        if (!string.Equals(RecoveryNewMasterPassword, RecoveryConfirmNewMasterPassword, StringComparison.Ordinal))
-        {
-            StatusMessage = _localization.Get("ConfirmationMismatch");
-            return;
-        }
-
-        IsResettingMasterPassword = true;
-        StatusMessage = _localization.Get("ResetMasterPasswordInProgress");
-        try
-        {
-            var result = await _masterPasswordMaintenanceService.ResetMasterPasswordFromUnlockedVaultAsync(RecoveryNewMasterPassword);
-            if (!result.Success)
-            {
-                StatusMessage = _localization.Format("ResetMasterPasswordFailedFormat", result.Message);
-                return;
-            }
-
-            SecurityRecoveryAnswer1 = "";
-            SecurityRecoveryAnswer2 = "";
-            RecoveryNewMasterPassword = "";
-            RecoveryConfirmNewMasterPassword = "";
-            MasterPassword = "";
-            ConfirmMasterPassword = "";
-            StatusMessage = _localization.Format("ResetMasterPasswordChangedFormat", result.TotalSecretsReencrypted);
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = _localization.Format("ResetMasterPasswordFailedFormat", ex.Message);
-        }
-        finally
-        {
-            IsResettingMasterPassword = false;
-        }
-    }
-
-    [RelayCommand]
-    private void SaveSecurityQuestions()
-    {
-        if (!SecurityRecoveryEnabled)
-        {
-            _settingsService.Current.SecurityRecovery.IsEnabled = false;
-            QueueSaveSettings();
-            OnPropertyChanged(nameof(SecurityRecoveryStatusText));
-            OnPropertyChanged(nameof(CanResetMasterPasswordWithSecurityQuestions));
-            OnPropertyChanged(nameof(CanRunResetMasterPassword));
-            StatusMessage = _localization.Get("SecurityQuestionsDisabled");
-            return;
-        }
-
-        try
-        {
-            var setup = _securityQuestionService.CreateSetup(
-                new SecurityQuestionDraft(SecurityQuestion1Id, GetSecurityQuestionText(SecurityQuestion1Id, SecurityQuestion1CustomText), SecurityQuestion1Answer),
-                new SecurityQuestionDraft(SecurityQuestion2Id, GetSecurityQuestionText(SecurityQuestion2Id, SecurityQuestion2CustomText), SecurityQuestion2Answer));
-            _settingsService.Current.SecurityRecovery = setup;
-            ApplySecurityRecoverySettings(setup);
-            SecurityQuestion1Answer = "";
-            SecurityQuestion2Answer = "";
-            QueueSaveSettings();
-            OnPropertyChanged(nameof(SecurityRecoveryStatusText));
-            OnPropertyChanged(nameof(SecurityRecoveryQuestion1PromptText));
-            OnPropertyChanged(nameof(SecurityRecoveryQuestion2PromptText));
-            OnPropertyChanged(nameof(CanResetMasterPasswordWithSecurityQuestions));
-            OnPropertyChanged(nameof(CanRunResetMasterPassword));
-            StatusMessage = _localization.Get("SecurityQuestionsSaved");
-        }
-        catch (ArgumentException ex)
-        {
-            StatusMessage = _localization.Format("SecurityQuestionsSaveFailedFormat", ex.Message);
-        }
-    }
 }

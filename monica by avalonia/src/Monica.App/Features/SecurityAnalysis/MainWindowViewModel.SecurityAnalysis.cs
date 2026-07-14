@@ -1,6 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Security.Cryptography;
-using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Monica.App;
@@ -20,43 +18,33 @@ public sealed partial class MainWindowViewModel
         if (issue is not null)
         {
             SelectedSecurityIssue = issue;
+            SecurityAnalysisNarrowShowsList = false;
         }
     }
-
-    private static readonly string[] KnownTwoFactorDomains =
-    [
-        "google.com",
-        "gmail.com",
-        "github.com",
-        "microsoft.com",
-        "apple.com",
-        "amazon.com",
-        "paypal.com",
-        "dropbox.com",
-        "facebook.com",
-        "instagram.com",
-        "linkedin.com",
-        "reddit.com",
-        "slack.com",
-        "discord.com",
-        "x.com",
-        "twitter.com",
-        "icloud.com",
-        "outlook.com",
-        "twitch.tv",
-        "steam.com"
-    ];
 
     private IReadOnlyDictionary<long, CompromisedPasswordResult> _compromisedPasswordResults =
         new Dictionary<long, CompromisedPasswordResult>();
     private bool _hasCompromisedPasswordCheckResults;
     private bool _isSecurityAnalysisDirty;
 
-    public ObservableCollection<SecuritySummaryItem> SecuritySummaryItems { get; } = [];
-    public ObservableCollection<SecurityIssueItem> SecurityIssueItems { get; } = [];
+    public ObservableCollection<SecuritySummaryItem> SecuritySummaryItems { get; } =
+        new ObservableRangeCollection<SecuritySummaryItem>();
+    public ObservableCollection<SecurityIssueItem> SecurityIssueItems { get; } =
+        new ObservableRangeCollection<SecurityIssueItem>();
+    public ObservableCollection<SecurityIssueItem> FilteredSecurityIssueItems { get; } =
+        new ObservableRangeCollection<SecurityIssueItem>();
 
     [ObservableProperty]
     private bool _isCheckingCompromisedPasswords;
+
+    [ObservableProperty]
+    private bool _isRefreshingSecurityAnalysis;
+
+    [ObservableProperty]
+    private string _securityIssueSearchText = "";
+
+    [ObservableProperty]
+    private bool _securityAnalysisNarrowShowsList = true;
 
     [ObservableProperty]
     private string _compromisedPasswordStatus = "";
@@ -71,45 +59,44 @@ public sealed partial class MainWindowViewModel
     public bool HasSelectedSecurityIssue => SelectedSecurityIssue is not null;
     public bool HasSecurityIssues => SecurityIssueItems.Count > 0;
 
-    [RelayCommand]
-    private async Task CheckCompromisedPasswordsAsync()
+    [RelayCommand(IncludeCancelCommand = true)]
+    private async Task CheckCompromisedPasswordsAsync(CancellationToken cancellationToken)
     {
-        if (IsCheckingCompromisedPasswords)
+        if (!TryBeginSecurityAnalysisOperation(compromisedCheck: true))
         {
             return;
         }
 
-        var snapshots = BuildSecurityPasswordSnapshots();
-        var plainPasswords = snapshots
-            .Select(item => item.PlainPassword)
-            .Where(item => !string.IsNullOrWhiteSpace(item))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-
-        IsCheckingCompromisedPasswords = true;
-        CompromisedPasswordStatus = _localization.Format("CompromisedPasswordCheckingFormat", plainPasswords.Length);
-
         try
         {
-            var countsByPassword = await _pwnedPasswordService.CheckPasswordsAsync(plainPasswords);
-            var next = new Dictionary<long, CompromisedPasswordResult>();
-            foreach (var snapshot in snapshots.Where(item => !string.IsNullOrWhiteSpace(item.PlainPassword)))
-            {
-                if (!countsByPassword.TryGetValue(snapshot.PlainPassword, out var count) || count <= 0)
-                {
-                    continue;
-                }
+            var entries = Passwords.ToArray();
+            var checkInput = await Task.Run(
+                () => BuildCompromisedPasswordCheckInput(entries, cancellationToken),
+                cancellationToken);
+            CompromisedPasswordStatus = _localization.Format(
+                "CompromisedPasswordCheckingFormat",
+                checkInput.PlainPasswords.Length);
 
-                next[snapshot.Entry.Id] = new CompromisedPasswordResult(HashPasswordForSecurityCache(snapshot.PlainPassword), count);
-            }
+            var countsByPassword = await _pwnedPasswordService.CheckPasswordsAsync(
+                checkInput.PlainPasswords,
+                cancellationToken);
+            var next = await Task.Run(
+                () => BuildCompromisedPasswordResults(checkInput.Snapshots, countsByPassword, cancellationToken),
+                cancellationToken);
 
             _compromisedPasswordResults = next;
             _hasCompromisedPasswordCheckResults = true;
             CompromisedPasswordStatus = _localization.Format(
                 "CompromisedPasswordCheckCompleteFormat",
-                plainPasswords.Length,
+                checkInput.PlainPasswords.Length,
                 next.Count);
-            RefreshSecurityAnalysis();
+            var currentEntries = Passwords.ToArray();
+            var result = await BuildSecurityAnalysisAsync(currentEntries, cancellationToken);
+            ApplySecurityAnalysisResult(result);
+        }
+        catch (OperationCanceledException)
+        {
+            CompromisedPasswordStatus = _localization.Get("CompromisedPasswordCheckCancelled");
         }
         catch (Exception ex)
         {
@@ -117,70 +104,79 @@ public sealed partial class MainWindowViewModel
         }
         finally
         {
-            IsCheckingCompromisedPasswords = false;
+            EndSecurityAnalysisOperation(compromisedCheck: true);
         }
     }
+
+    [RelayCommand(IncludeCancelCommand = true)]
+    private async Task RefreshSecurityAnalysisAsync(CancellationToken cancellationToken)
+    {
+        if (!TryBeginSecurityAnalysisOperation(compromisedCheck: false))
+        {
+            return;
+        }
+        try
+        {
+            var entries = Passwords.ToArray();
+            var result = await BuildSecurityAnalysisAsync(entries, cancellationToken);
+            ApplySecurityAnalysisResult(result);
+            CompromisedPasswordStatus = _localization.Get("SecurityAnalysisRefreshed");
+        }
+        catch (OperationCanceledException)
+        {
+            CompromisedPasswordStatus = _localization.Get("SecurityAnalysisRefreshCancelled");
+        }
+        catch (Exception ex)
+        {
+            CompromisedPasswordStatus = _localization.Format("SecurityAnalysisRefreshFailedFormat", ex.Message);
+        }
+        finally
+        {
+            EndSecurityAnalysisOperation(compromisedCheck: false);
+        }
+    }
+
     public void RefreshSecurityAnalysis()
     {
-        _isSecurityAnalysisDirty = false;
-        SecuritySummaryItems.Clear();
-        SecurityIssueItems.Clear();
+        var snapshots = BuildSecurityPasswordSnapshots(Passwords.ToArray(), CancellationToken.None);
+        ApplySecurityAnalysisResult(BuildSecurityAnalysisResult(
+            snapshots,
+            _compromisedPasswordResults,
+            _hasCompromisedPasswordCheckResults,
+            CancellationToken.None));
+    }
 
-        var analyzed = BuildSecurityPasswordSnapshots();
-
-        var compromisedCount = AddCompromisedPasswordIssues(analyzed);
-        var weakCount = AddWeakPasswordIssues(analyzed);
-        var duplicatePasswordCount = AddDuplicatePasswordIssues(analyzed);
-        var duplicateWebsiteCount = AddDuplicateWebsiteIssues(analyzed);
-        var missingTwoFactorCount = AddMissingTwoFactorIssues(analyzed);
-        var staleCount = AddStalePasswordIssues(analyzed);
-
-        var totalPenalty =
-            compromisedCount * 10 +
-            weakCount * 4 +
-            duplicatePasswordCount * 6 +
-            duplicateWebsiteCount * 2 +
-            missingTwoFactorCount * 2 +
-            staleCount;
-        var score = Math.Clamp(100 - totalPenalty, 0, 100);
-
-        SecuritySummaryItems.Add(new SecuritySummaryItem(
-            _localization.SecurityScore,
-            _localization.Format("SecurityScoreFormat", score),
-            _localization.Format("SecurityAnalyzedPasswordCountFormat", analyzed.Length)));
-        SecuritySummaryItems.Add(new SecuritySummaryItem(
-            _localization.CompromisedPasswords,
-            _hasCompromisedPasswordCheckResults ? compromisedCount.ToString(_localization.Culture) : "-",
-            _localization.Get("CompromisedPasswordsSummary")));
-        SecuritySummaryItems.Add(new SecuritySummaryItem(
-            _localization.WeakPasswords,
-            weakCount.ToString(_localization.Culture),
-            _localization.Get("WeakPasswordsSummary")));
-        SecuritySummaryItems.Add(new SecuritySummaryItem(
-            _localization.DuplicatePasswords,
-            duplicatePasswordCount.ToString(_localization.Culture),
-            _localization.Get("DuplicatePasswordsSummary")));
-        SecuritySummaryItems.Add(new SecuritySummaryItem(
-            _localization.MissingTwoFactor,
-            missingTwoFactorCount.ToString(_localization.Culture),
-            _localization.Get("MissingTwoFactorSummary")));
-
-        var orderedIssues = SecurityIssueItems
-            .OrderByDescending(item => item.SeverityWeight)
-            .ThenBy(item => item.Title, StringComparer.CurrentCultureIgnoreCase)
-            .ToArray();
-        SecurityIssueItems.Clear();
-        foreach (var issue in orderedIssues)
+    private Task<SecurityAnalysisResult> BuildSecurityAnalysisAsync(
+        PasswordEntry[] entries,
+        CancellationToken cancellationToken)
+    {
+        var compromisedResults = _compromisedPasswordResults;
+        var hasCompromisedResults = _hasCompromisedPasswordCheckResults;
+        return Task.Run(() =>
         {
-            SecurityIssueItems.Add(issue);
-        }
+            var snapshots = BuildSecurityPasswordSnapshots(entries, cancellationToken);
+            return BuildSecurityAnalysisResult(
+                snapshots,
+                compromisedResults,
+                hasCompromisedResults,
+                cancellationToken);
+        }, cancellationToken);
+    }
+
+    private void ApplySecurityAnalysisResult(SecurityAnalysisResult result)
+    {
+        var selectedPasswordId = SelectedSecurityIssue?.PasswordId;
+        _isSecurityAnalysisDirty = false;
+        ReplaceItems(SecuritySummaryItems, result.Summaries);
+        ReplaceItems(SecurityIssueItems, result.Issues);
 
         SelectedSecurityIssue =
-            SecurityIssueItems.FirstOrDefault(item => item.PasswordId == SelectedSecurityIssue?.PasswordId) ??
+            SecurityIssueItems.FirstOrDefault(item => item.PasswordId == selectedPasswordId) ??
             SecurityIssueItems.FirstOrDefault();
 
         OnPropertyChanged(nameof(SecurityIssueCountText));
         OnPropertyChanged(nameof(HasSecurityIssues));
+        RefreshSecurityIssueFilter();
     }
 
     private void InvalidateSecurityAnalysis()
@@ -194,205 +190,74 @@ public sealed partial class MainWindowViewModel
         if (_isSecurityAnalysisDirty &&
             string.Equals(SelectedSection, "SecurityAnalysis", StringComparison.Ordinal))
         {
-            AppDiagnostics.Measure("Refresh visible security analysis", RefreshSecurityAnalysis);
+            if (Passwords.Count >= 500)
+            {
+                _ = RefreshSecurityAnalysisAsync(CancellationToken.None);
+            }
+            else
+            {
+                AppDiagnostics.Measure("Refresh visible security analysis", RefreshSecurityAnalysis);
+            }
         }
     }
 
-    private SecurityPasswordSnapshot[] BuildSecurityPasswordSnapshots()
+    private SecurityPasswordSnapshot[] BuildSecurityPasswordSnapshots(
+        IReadOnlyList<PasswordEntry> entries,
+        CancellationToken cancellationToken)
     {
-        return Passwords
-            .Where(item => !item.IsDeleted && !item.IsArchived)
-            .Select(item => new SecurityPasswordSnapshot(
+        var snapshots = new List<SecurityPasswordSnapshot>(entries.Count);
+        foreach (var item in entries)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (item.IsDeleted || item.IsArchived)
+            {
+                continue;
+            }
+
+            snapshots.Add(new SecurityPasswordSnapshot(
                 item,
                 UnprotectPassword(item.Password).Trim(),
-                SplitAndNormalizeWebsites(item.Website).ToArray()))
+                SplitAndNormalizeWebsites(item.Website).ToArray()));
+        }
+
+        return snapshots.ToArray();
+    }
+
+    private CompromisedPasswordCheckInput BuildCompromisedPasswordCheckInput(
+        IReadOnlyList<PasswordEntry> entries,
+        CancellationToken cancellationToken)
+    {
+        var snapshots = BuildSecurityPasswordSnapshots(entries, cancellationToken);
+        var plainPasswords = snapshots
+            .Select(item => item.PlainPassword)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.Ordinal)
             .ToArray();
+        return new CompromisedPasswordCheckInput(snapshots, plainPasswords);
     }
 
-    private int AddCompromisedPasswordIssues(IReadOnlyList<SecurityPasswordSnapshot> snapshots)
+    private static IReadOnlyDictionary<long, CompromisedPasswordResult> BuildCompromisedPasswordResults(
+        IReadOnlyList<SecurityPasswordSnapshot> snapshots,
+        IReadOnlyDictionary<string, int> countsByPassword,
+        CancellationToken cancellationToken)
     {
-        if (!_hasCompromisedPasswordCheckResults || _compromisedPasswordResults.Count == 0)
-        {
-            return 0;
-        }
-
-        var count = 0;
-        foreach (var snapshot in snapshots.Where(item => !string.IsNullOrWhiteSpace(item.PlainPassword)))
-        {
-            if (!_compromisedPasswordResults.TryGetValue(snapshot.Entry.Id, out var result) ||
-                !string.Equals(result.PasswordHash, HashPasswordForSecurityCache(snapshot.PlainPassword), StringComparison.Ordinal) ||
-                result.ExposureCount <= 0)
-            {
-                continue;
-            }
-
-            count++;
-            SecurityIssueItems.Add(new SecurityIssueItem(
-                snapshot.Entry.Title,
-                _localization.Format("CompromisedPasswordIssueFormat", result.ExposureCount),
-                _localization.CompromisedPasswords,
-                _localization.Get("HighSeverity"),
-                snapshot.Entry.Id,
-                snapshot.Entry,
-                40));
-        }
-
-        return count;
-    }
-
-    private int AddWeakPasswordIssues(IReadOnlyList<SecurityPasswordSnapshot> snapshots)
-    {
-        var count = 0;
+        var results = new Dictionary<long, CompromisedPasswordResult>();
         foreach (var snapshot in snapshots)
         {
-            if (string.IsNullOrWhiteSpace(snapshot.PlainPassword))
+            cancellationToken.ThrowIfCancellationRequested();
+            if (string.IsNullOrWhiteSpace(snapshot.PlainPassword) ||
+                !countsByPassword.TryGetValue(snapshot.PlainPassword, out var count) ||
+                count <= 0)
             {
                 continue;
             }
 
-            var strength = _passwordGenerator.Analyze(snapshot.PlainPassword);
-            if (strength.Score > 2)
-            {
-                continue;
-            }
-
-            count++;
-            SecurityIssueItems.Add(new SecurityIssueItem(
-                snapshot.Entry.Title,
-                _localization.Format(
-                    "WeakPasswordIssueFormat",
-                    PasswordStrengthLocalization.Label(_localization, strength.Label)),
-                _localization.WeakPasswords,
-                _localization.Get("HighSeverity"),
-                snapshot.Entry.Id,
-                snapshot.Entry,
-                30));
+            results[snapshot.Entry.Id] = new CompromisedPasswordResult(
+                HashPasswordForSecurityCache(snapshot.PlainPassword),
+                count);
         }
 
-        return count;
+        return results;
     }
 
-    private int AddDuplicatePasswordIssues(IReadOnlyList<SecurityPasswordSnapshot> snapshots)
-    {
-        var count = 0;
-        foreach (var group in snapshots
-            .Where(item => !string.IsNullOrWhiteSpace(item.PlainPassword))
-            .GroupBy(item => item.PlainPassword, StringComparer.Ordinal)
-            .Where(group => group.Count() > 1))
-        {
-            var titles = string.Join(", ", group.Select(item => item.Entry.Title).Distinct().Take(3));
-            foreach (var snapshot in group)
-            {
-                count++;
-                SecurityIssueItems.Add(new SecurityIssueItem(
-                    snapshot.Entry.Title,
-                    _localization.Format("DuplicatePasswordIssueFormat", group.Count(), titles),
-                    _localization.DuplicatePasswords,
-                    _localization.Get("HighSeverity"),
-                    snapshot.Entry.Id,
-                    snapshot.Entry,
-                    28));
-            }
-        }
-
-        return count;
-    }
-
-    private int AddDuplicateWebsiteIssues(IReadOnlyList<SecurityPasswordSnapshot> snapshots)
-    {
-        var websites = snapshots
-            .SelectMany(snapshot => snapshot.NormalizedWebsites.Select(website => new WebsiteSnapshot(snapshot.Entry, website)))
-            .GroupBy(item => item.Website, StringComparer.OrdinalIgnoreCase)
-            .Where(group => group.Select(item => item.Entry.Id).Distinct().Count() > 1);
-
-        var count = 0;
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var group in websites)
-        {
-            var entries = group
-                .GroupBy(item => item.Entry.Id)
-                .Select(item => item.First().Entry)
-                .ToArray();
-            foreach (var entry in entries)
-            {
-                if (!seen.Add($"{entry.Id}:{group.Key}"))
-                {
-                    continue;
-                }
-
-                count++;
-                SecurityIssueItems.Add(new SecurityIssueItem(
-                    entry.Title,
-                    _localization.Format("DuplicateWebsiteIssueFormat", group.Key, entries.Length),
-                    _localization.DuplicateWebsites,
-                    _localization.Get("MediumSeverity"),
-                    entry.Id,
-                    entry,
-                    18));
-            }
-        }
-
-        return count;
-    }
-
-    private int AddMissingTwoFactorIssues(IReadOnlyList<SecurityPasswordSnapshot> snapshots)
-    {
-        var count = 0;
-        foreach (var snapshot in snapshots)
-        {
-            if (snapshot.Entry.HasAuthenticator ||
-                !string.IsNullOrWhiteSpace(snapshot.Entry.PasskeyBindings) ||
-                snapshot.Entry.LoginType is not PasswordLoginType.Password ||
-                snapshot.NormalizedWebsites.Length == 0)
-            {
-                continue;
-            }
-
-            var domain = snapshot.NormalizedWebsites.First();
-            if (!KnownTwoFactorDomains.Any(known => domain.Equals(known, StringComparison.OrdinalIgnoreCase) || domain.EndsWith($".{known}", StringComparison.OrdinalIgnoreCase)))
-            {
-                continue;
-            }
-
-            count++;
-            SecurityIssueItems.Add(new SecurityIssueItem(
-                snapshot.Entry.Title,
-                _localization.Format("MissingTwoFactorIssueFormat", domain),
-                _localization.MissingTwoFactor,
-                _localization.Get("MediumSeverity"),
-                snapshot.Entry.Id,
-                snapshot.Entry,
-                16));
-        }
-
-        return count;
-    }
-    private int AddStalePasswordIssues(IReadOnlyList<SecurityPasswordSnapshot> snapshots)
-    {
-        var threshold = DateTimeOffset.UtcNow.AddDays(-365);
-        var count = 0;
-        foreach (var snapshot in snapshots.Where(item => item.Entry.UpdatedAt < threshold))
-        {
-            count++;
-            SecurityIssueItems.Add(new SecurityIssueItem(
-                snapshot.Entry.Title,
-                _localization.Format("StalePasswordIssueFormat", snapshot.Entry.UpdatedAt.LocalDateTime.ToString("d", _localization.Culture)),
-                _localization.StalePasswords,
-                _localization.Get("LowSeverity"),
-                snapshot.Entry.Id,
-                snapshot.Entry,
-                8));
-        }
-
-        return count;
-    }
-
-    private static string HashPasswordForSecurityCache(string value)
-    {
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
-    }
-
-    private sealed record SecurityPasswordSnapshot(PasswordEntry Entry, string PlainPassword, string[] NormalizedWebsites);
-    private sealed record WebsiteSnapshot(PasswordEntry Entry, string Website);
-    private sealed record CompromisedPasswordResult(string PasswordHash, int ExposureCount);
 }

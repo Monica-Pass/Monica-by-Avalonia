@@ -63,6 +63,7 @@ public sealed partial class MainWindowViewModel
 
     partial void OnIsUnlockedChanged(bool value)
     {
+        RaiseSecurityMaintenanceState();
         if (value)
         {
             _vaultSessionService.MarkUnlocked();

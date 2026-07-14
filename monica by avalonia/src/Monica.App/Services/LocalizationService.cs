@@ -1907,6 +1907,21 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxOperationRefresh"] = "refresh",
         ["MdbxOperationOpen"] = "open",
         ["MdbxOperationSetDefault"] = "set default",
+        ["SecurityMaintenanceInProgress"] = "Another security maintenance operation is already in progress.",
+        ["ClearVaultTypedConfirmationTitle"] = "Clear vault data?",
+        ["ClearVaultTypedConfirmationMessageFormat"] = "Permanently clear {0}? This cannot be undone.",
+        ["ClearVaultCancelled"] = "Vault data clearing was cancelled.",
+        ["ClearVaultDataFailedFormat"] = "Clear vault data failed: {0}",
+        ["SecurityRecoveryDisabled"] = "Security-question recovery is disabled.",
+        ["CompromisedPasswordCheckCancelled"] = "Compromised-password check cancelled.",
+        ["SecurityAnalysisRefreshed"] = "Security analysis refreshed.",
+        ["SecurityAnalysisRefreshCancelled"] = "Security analysis refresh cancelled.",
+        ["SecurityAnalysisRefreshFailedFormat"] = "Security analysis refresh failed: {0}",
+        ["SecurityIssueSearchResultFormat"] = "{0} of {1} security issues",
+        ["SecurityIssueSearchPlaceholder"] = "Search security issues",
+        ["RefreshSecurityAnalysis"] = "Refresh analysis",
+        ["CancelSecurityCheck"] = "Cancel check",
+        ["BackToSecurityIssues"] = "Back to security issues",
         ["CreatedMdbxMetadata"] = "Created a real MDBX-1 vault and registered its local metadata"
     };
 
@@ -2807,6 +2822,21 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxOperationRefresh"] = "刷新",
         ["MdbxOperationOpen"] = "打开",
         ["MdbxOperationSetDefault"] = "设为默认",
+        ["SecurityMaintenanceInProgress"] = "已有另一个安全维护操作正在进行。",
+        ["ClearVaultTypedConfirmationTitle"] = "清空保险库数据？",
+        ["ClearVaultTypedConfirmationMessageFormat"] = "要永久清空{0}吗？此操作无法撤销。",
+        ["ClearVaultCancelled"] = "已取消清空保险库数据。",
+        ["ClearVaultDataFailedFormat"] = "清空保险库数据失败：{0}",
+        ["SecurityRecoveryDisabled"] = "安全问题恢复已关闭。",
+        ["CompromisedPasswordCheckCancelled"] = "已取消泄露密码检查。",
+        ["SecurityAnalysisRefreshed"] = "安全分析已刷新。",
+        ["SecurityAnalysisRefreshCancelled"] = "已取消刷新安全分析。",
+        ["SecurityAnalysisRefreshFailedFormat"] = "刷新安全分析失败：{0}",
+        ["SecurityIssueSearchResultFormat"] = "显示 {0}/{1} 个安全问题",
+        ["SecurityIssueSearchPlaceholder"] = "搜索安全问题",
+        ["RefreshSecurityAnalysis"] = "刷新分析",
+        ["CancelSecurityCheck"] = "取消检查",
+        ["BackToSecurityIssues"] = "返回安全问题列表",
         ["CreatedMdbxMetadata"] = "已创建真实 MDBX-1 保险库并登记本地元数据"
     };
 }

@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsDataView" x:DataType="vm:MainWindowViewModel">
+    <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsDataSelected}">
+        <StackPanel>
+            <fa:FASettingsExpanderItem Content="{Binding L.ImportData}" Description="{Binding L.ImportDataDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <Button Command="{Binding OpenSyncWorkspacePageCommand}" CommandParameter="Import">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
+                            <TextBlock Text="{Binding L.ImportData}" />
+                        </StackPanel>
+                    </Button>
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding L.ExportData}" Description="{Binding L.ExportDataDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <Button Command="{Binding OpenSyncWorkspacePageCommand}" CommandParameter="Export">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="ArrowDownload" FontSize="18" />
+                            <TextBlock Text="{Binding L.ExportData}" />
+                        </StackPanel>
+                    </Button>
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding L.WebDav}" Description="{Binding L.RemoteSyncDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <Button Command="{Binding OpenSyncWorkspacePageCommand}" CommandParameter="Configuration">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="ArrowSync" FontSize="18" />
+                            <TextBlock Text="{Binding L.SyncAndBackup}" />
+                        </StackPanel>
+                    </Button>
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+        </StackPanel>
+    </Border>
+</UserControl>

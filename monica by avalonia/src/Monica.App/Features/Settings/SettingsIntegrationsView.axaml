@@ -1,0 +1,37 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsIntegrationsView" x:DataType="vm:MainWindowViewModel" IsVisible="{Binding IsSettingsIntegrationsSelected}">
+    <StackPanel Spacing="14">
+        <ItemsControl Classes="settingsFlatGroup" ItemsSource="{Binding PlatformIntegrationCapabilities}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:LocalizedPlatformIntegrationCapability">
+                    <fa:FASettingsExpanderItem Content="{Binding Title}" Description="{Binding Description}">
+                        <fa:FASettingsExpanderItem.Footer>
+                            <StackPanel Spacing="2" MinWidth="160" MaxWidth="360">
+                                <TextBlock Text="{Binding Status}" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding UnsupportedReason}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding HasUnsupportedReason}" />
+                            </StackPanel>
+                        </fa:FASettingsExpanderItem.Footer>
+                    </fa:FASettingsExpanderItem>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <fa:FAInfoBar IsOpen="True" Severity="Informational" Title="{Binding L.DesktopEquivalents}" Message="{Binding L.DesktopEquivalentsMessage}" />
+        <ItemsControl Classes="settingsFlatGroup" ItemsSource="{Binding Capabilities}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:LocalizedPlatformCapability">
+                    <fa:FASettingsExpanderItem Content="{Binding Title}" Description="{Binding Description}">
+                        <fa:FASettingsExpanderItem.Footer>
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" MaxWidth="440">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="{Binding Status}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding ToggleStatus}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="{Binding UnsupportedReason}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding HasUnsupportedReason}" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsEnabled, Mode=TwoWay}" IsEnabled="{Binding CanToggle}" ToolTip.Tip="{Binding ToggleStatus}" AutomationProperties.Name="{Binding Title}" />
+                            </Grid>
+                        </fa:FASettingsExpanderItem.Footer>
+                    </fa:FASettingsExpanderItem>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </StackPanel>
+</UserControl>

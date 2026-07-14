@@ -6,6 +6,8 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    private static readonly TimeSpan SettingsSaveDebounce = TimeSpan.FromMilliseconds(150);
+
     private void ApplySettings(DesktopAppSettings settings)
     {
         _isApplyingSettings = true;
@@ -129,6 +131,7 @@ public sealed partial class MainWindowViewModel
         {
             while (true)
             {
+                await Task.Delay(SettingsSaveDebounce);
                 lock (_settingsSaveSync)
                 {
                     if (!_hasPendingSettingsSave)

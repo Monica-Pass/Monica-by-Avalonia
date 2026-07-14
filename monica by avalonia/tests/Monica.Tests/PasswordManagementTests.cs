@@ -3112,6 +3112,139 @@ public sealed class PasswordManagementTests
     }
 
     [Fact]
+    public async Task ViewModel_cancels_compromised_password_check_and_recovers_busy_state()
+    {
+        var service = new BlockingPwnedPasswordService();
+        var harness = CreateHarness(service);
+        harness.Crypto.InitializeSession("target password", new byte[16]);
+        harness.ViewModel.Passwords.Add(new PasswordEntry
+        {
+            Id = 1,
+            Title = "Account",
+            Password = harness.Crypto.EncryptString("secret")
+        });
+
+        var check = harness.ViewModel.CheckCompromisedPasswordsCommand.ExecuteAsync(null);
+        await service.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(harness.ViewModel.IsCheckingCompromisedPasswords);
+
+        harness.ViewModel.CheckCompromisedPasswordsCancelCommand.Execute(null);
+        await check;
+
+        Assert.True(service.WasCancelled);
+        Assert.False(harness.ViewModel.IsCheckingCompromisedPasswords);
+        Assert.Equal(harness.ViewModel.L.Get("CompromisedPasswordCheckCancelled"), harness.ViewModel.CompromisedPasswordStatus);
+    }
+
+    [Fact]
+    public void ViewModel_filters_security_issues_without_searching_password_payloads()
+    {
+        var harness = CreateHarness();
+        harness.Crypto.InitializeSession("target password", new byte[16]);
+        harness.ViewModel.Passwords.Add(new PasswordEntry { Id = 1, Title = "Alpha account", Password = harness.Crypto.EncryptString("weak-secret") });
+        harness.ViewModel.Passwords.Add(new PasswordEntry { Id = 2, Title = "Beta account", Password = harness.Crypto.EncryptString("another-weak-secret") });
+        harness.ViewModel.RefreshSecurityAnalysis();
+
+        harness.ViewModel.SecurityIssueSearchText = "Alpha";
+
+        Assert.NotEmpty(harness.ViewModel.FilteredSecurityIssueItems);
+        Assert.All(harness.ViewModel.FilteredSecurityIssueItems, issue => Assert.Equal("Alpha account", issue.Title));
+
+        harness.ViewModel.SecurityIssueSearchText = "another-weak-secret";
+
+        Assert.Empty(harness.ViewModel.FilteredSecurityIssueItems);
+    }
+
+    [Fact]
+    public async Task ViewModel_dispatches_large_security_analysis_without_blocking_the_caller()
+    {
+        var harness = CreateHarness();
+        harness.Crypto.InitializeSession("target password", new byte[16]);
+        for (var index = 0; index < 600; index++)
+        {
+            harness.ViewModel.Passwords.Add(new PasswordEntry
+            {
+                Id = index + 1,
+                Title = $"Account {index}",
+                Website = $"https://account-{index}.example.com",
+                Password = harness.Crypto.EncryptString($"Unique strong password {index}!Aa9")
+            });
+        }
+
+        var stopwatch = Stopwatch.StartNew();
+        var refresh = harness.ViewModel.RefreshSecurityAnalysisCommand.ExecuteAsync(null);
+        stopwatch.Stop();
+
+        Assert.True(stopwatch.ElapsedMilliseconds < 100, $"Dispatch blocked for {stopwatch.ElapsedMilliseconds} ms.");
+        await refresh;
+        Assert.False(harness.ViewModel.IsRefreshingSecurityAnalysis);
+        Assert.Contains(harness.ViewModel.SecuritySummaryItems, item => item.Label == harness.ViewModel.L.SecurityScore);
+    }
+
+    [Fact]
+    public async Task ViewModel_cancels_local_security_analysis_and_recovers_busy_state()
+    {
+        var generator = new BlockingPasswordGeneratorService();
+        var harness = CreateHarness(passwordGeneratorService: generator);
+        harness.Crypto.InitializeSession("target password", new byte[16]);
+        harness.ViewModel.Passwords.Add(new PasswordEntry
+        {
+            Id = 1,
+            Title = "Slow account",
+            Password = harness.Crypto.EncryptString("weak password")
+        });
+        harness.ViewModel.Passwords.Add(new PasswordEntry
+        {
+            Id = 2,
+            Title = "Second account",
+            Password = harness.Crypto.EncryptString("another weak password")
+        });
+
+        var callerThreadId = Environment.CurrentManagedThreadId;
+        var refresh = harness.ViewModel.RefreshSecurityAnalysisCommand.ExecuteAsync(null);
+        await generator.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(harness.ViewModel.IsRefreshingSecurityAnalysis);
+        Assert.NotEqual(callerThreadId, generator.AnalyzeThreadId);
+
+        harness.ViewModel.RefreshSecurityAnalysisCancelCommand.Execute(null);
+        generator.Release();
+        await refresh;
+
+        Assert.False(harness.ViewModel.IsRefreshingSecurityAnalysis);
+        Assert.Equal(
+            harness.ViewModel.L.Get("SecurityAnalysisRefreshCancelled"),
+            harness.ViewModel.CompromisedPasswordStatus);
+    }
+
+    [Fact]
+    public void ViewModel_applies_large_security_analysis_with_batched_collection_updates()
+    {
+        var harness = CreateHarness();
+        harness.Crypto.InitializeSession("target password", new byte[16]);
+        for (var index = 0; index < 600; index++)
+        {
+            harness.ViewModel.Passwords.Add(new PasswordEntry
+            {
+                Id = index + 1,
+                Title = $"Weak account {index}",
+                Website = $"https://account-{index}.example.com",
+                Password = harness.Crypto.EncryptString($"weak-{index}")
+            });
+        }
+
+        var summaryChanges = 0;
+        var issueChanges = 0;
+        harness.ViewModel.SecuritySummaryItems.CollectionChanged += (_, _) => summaryChanges++;
+        harness.ViewModel.SecurityIssueItems.CollectionChanged += (_, _) => issueChanges++;
+
+        harness.ViewModel.RefreshSecurityAnalysis();
+
+        Assert.NotEmpty(harness.ViewModel.SecurityIssueItems);
+        Assert.Equal(1, summaryChanges);
+        Assert.Equal(1, issueChanges);
+    }
+
+    [Fact]
     public async Task ViewModel_does_not_save_when_editor_is_cancelled()
     {
         var harness = CreateHarness();
@@ -3405,7 +3538,8 @@ public sealed class PasswordManagementTests
     [Fact]
     public async Task ViewModel_clears_vault_data_only_after_danger_confirmation()
     {
-        var harness = CreateHarness();
+        var confirmation = new FakeConfirmationDialogService(result: false);
+        var harness = CreateHarness(confirmationDialogService: confirmation);
         harness.ViewModel.IsUnlocked = true;
         var password = new PasswordEntry { Title = "Portal", Password = "one" };
         await harness.Repository.SavePasswordAsync(password);
@@ -3415,17 +3549,15 @@ public sealed class PasswordManagementTests
         await harness.ViewModel.ClearVaultDataCommand.ExecuteAsync("Passwords");
 
         Assert.Single(harness.ViewModel.Passwords);
-        Assert.Equal(
-            harness.ViewModel.L.Format("ClearVaultConfirmationFailedFormat", harness.ViewModel.L.Get("ClearVaultConfirmationPhrase")),
-            harness.ViewModel.StatusMessage);
+        Assert.Single(confirmation.TypedRequests);
 
-        harness.ViewModel.DangerZoneConfirmationText = harness.ViewModel.L.Get("ClearVaultConfirmationPhrase");
+        confirmation.Result = true;
         await harness.ViewModel.ClearVaultDataCommand.ExecuteAsync("Passwords");
 
         Assert.Empty(harness.ViewModel.Passwords);
         Assert.Single(harness.ViewModel.NoteItems);
         Assert.Empty(await harness.Repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
-        Assert.Equal("", harness.ViewModel.DangerZoneConfirmationText);
+        Assert.False(harness.ViewModel.IsClearingVaultData);
     }
 
     [Fact]
@@ -3488,7 +3620,8 @@ public sealed class PasswordManagementTests
         IWebDavBackupService? webDavBackupService = null,
         IConfirmationDialogService? confirmationDialogService = null,
         IFileSystemPickerService? fileSystemPickerService = null,
-        IExportAuthorizationService? exportAuthorizationService = null)
+        IExportAuthorizationService? exportAuthorizationService = null,
+        IPasswordGeneratorService? passwordGeneratorService = null)
     {
         var databasePath = GetTempDatabasePath();
         var factory = new SqliteConnectionFactory(databasePath);
@@ -3497,7 +3630,7 @@ public sealed class PasswordManagementTests
         var repository = new MonicaRepository(factory, migrator, attachmentContentStore: attachmentFileService);
         var crypto = new CryptoService();
         var localization = new LocalizationService();
-        var generator = new PasswordGeneratorService();
+        var generator = passwordGeneratorService ?? new PasswordGeneratorService();
         var dialog = new FakePasswordEditorDialogService(localization, generator);
         var clipboard = new CapturingClipboardService();
         var detailDialog = new FakePasswordDetailDialogService(localization, clipboard, crypto, new TotpService());
@@ -3774,6 +3907,29 @@ public sealed class PasswordManagementTests
         }
     }
 
+    private sealed class BlockingPwnedPasswordService : IPwnedPasswordService
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public bool WasCancelled { get; private set; }
+
+        public async Task<IReadOnlyDictionary<string, int>> CheckPasswordsAsync(IEnumerable<string> plaintextPasswords, CancellationToken cancellationToken = default)
+        {
+            _ = plaintextPasswords.ToArray();
+            Started.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                WasCancelled = true;
+                throw;
+            }
+
+            return new Dictionary<string, int>();
+        }
+    }
+
     private sealed class FakeFileSystemPickerService : IFileSystemPickerService
     {
         public PlatformIntegrationCapability Capability { get; } = new(
@@ -3839,6 +3995,36 @@ public sealed class PasswordManagementTests
             TypedRequests.Add((title, requiredPhrase));
             return Task.FromResult(Result);
         }
+    }
+
+    private sealed class BlockingPasswordGeneratorService : IPasswordGeneratorService
+    {
+        private readonly PasswordGeneratorService _inner = new();
+        private readonly ManualResetEventSlim _release = new(false);
+
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int AnalyzeThreadId { get; private set; }
+
+        public string GeneratePassword(int length = 20, bool includeSymbols = true) =>
+            _inner.GeneratePassword(length, includeSymbols);
+
+        public string GeneratePassword(
+            int length,
+            bool includeUppercase,
+            bool includeLowercase,
+            bool includeNumbers,
+            bool includeSymbols) =>
+            _inner.GeneratePassword(length, includeUppercase, includeLowercase, includeNumbers, includeSymbols);
+
+        public PasswordStrengthResult Analyze(string password)
+        {
+            AnalyzeThreadId = Environment.CurrentManagedThreadId;
+            Started.TrySetResult();
+            _release.Wait(TimeSpan.FromSeconds(5));
+            return _inner.Analyze(password);
+        }
+
+        public void Release() => _release.Set();
     }
 
     private sealed class FakePasswordEditorDialogService(
