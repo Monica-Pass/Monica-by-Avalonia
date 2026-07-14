@@ -161,6 +161,7 @@ public sealed class PasswordManagementTests
     public async Task ViewModel_refreshes_invalidated_security_analysis_when_page_is_opened()
     {
         var harness = CreateHarness();
+        harness.Crypto.InitializeSession("correct password", new byte[16]);
         await harness.ViewModel.LoadAsync();
         harness.Dialog.ConfigureNext(editor =>
         {
@@ -568,6 +569,31 @@ public sealed class PasswordManagementTests
     }
 
     [Fact]
+    public async Task ViewModel_refuses_to_edit_unreadable_password_without_overwriting_it()
+    {
+        var harness = CreateHarness();
+        harness.Crypto.InitializeSession("correct password", new byte[16]);
+        var unreadablePayload = Convert.ToBase64String(new byte[29]);
+        var entry = new PasswordEntry
+        {
+            Title = "Unreadable",
+            Username = "dev",
+            Password = unreadablePayload
+        };
+        await harness.Repository.SavePasswordAsync(entry);
+        await harness.ViewModel.LoadAsync();
+        var dialogOpened = false;
+        harness.Dialog.ConfigureNext(_ => dialogOpened = true);
+
+        await harness.ViewModel.EditPasswordCommand.ExecuteAsync(harness.ViewModel.Passwords.Single());
+
+        Assert.False(dialogOpened);
+        Assert.Equal(unreadablePayload, Assert.Single(await harness.Repository.GetPasswordsAsync()).Password);
+        Assert.Empty(await harness.Repository.GetPasswordHistoryAsync(entry.Id));
+        Assert.Equal(harness.ViewModel.L.Get("PasswordSecretUnavailable"), harness.ViewModel.StatusMessage);
+    }
+
+    [Fact]
     public async Task ViewModel_keeps_password_history_deduplicated_and_limited()
     {
         var harness = CreateHarness();
@@ -617,6 +643,7 @@ public sealed class PasswordManagementTests
     public async Task ViewModel_edit_updates_existing_bound_totp_and_removes_it_when_authenticator_is_cleared()
     {
         var harness = CreateHarness();
+        harness.Crypto.InitializeSession("correct password", new byte[16]);
         var entry = new PasswordEntry
         {
             Title = "Old",
@@ -1806,6 +1833,25 @@ public sealed class PasswordManagementTests
     }
 
     [Fact]
+    public async Task ViewModel_does_not_copy_unreadable_password_payload()
+    {
+        var harness = CreateHarness();
+        harness.Crypto.InitializeSession("correct password", new byte[16]);
+        var unreadablePayload = Convert.ToBase64String(new byte[29]);
+        await harness.Repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "Unreadable",
+            Password = unreadablePayload
+        });
+        await harness.ViewModel.LoadAsync();
+
+        await harness.ViewModel.CopyPasswordCommand.ExecuteAsync(harness.ViewModel.Passwords.Single());
+
+        Assert.Empty(harness.Clipboard.Text);
+        Assert.Equal(harness.ViewModel.L.Get("PasswordSecretUnavailable"), harness.ViewModel.StatusMessage);
+    }
+
+    [Fact]
     public async Task ViewModel_adds_edits_favorites_and_deletes_totp_items()
     {
         var harness = CreateHarness();
@@ -2771,6 +2817,7 @@ public sealed class PasswordManagementTests
     public async Task ViewModel_stacks_selected_passwords_as_manual_sibling_group()
     {
         var harness = CreateHarness();
+        harness.Crypto.InitializeSession("correct password", new byte[16]);
         var first = new PasswordEntry
         {
             Title = "GitHub",
@@ -3050,12 +3097,14 @@ public sealed class PasswordManagementTests
     {
         var harness = CreateHarness();
         harness.Crypto.InitializeSession("master-password", Enumerable.Repeat((byte)5, 16).ToArray());
-        var entry = new PasswordEntry { Title = "Unreadable", Password = "not-valid-current-ciphertext" };
+        var unreadableCurrent = Convert.ToBase64String(new byte[29]);
+        var unreadableHistory = Convert.ToBase64String(Enumerable.Repeat((byte)1, 29).ToArray());
+        var entry = new PasswordEntry { Title = "Unreadable", Password = unreadableCurrent };
         await harness.Repository.SavePasswordAsync(entry);
         await harness.Repository.SavePasswordHistoryAsync(new PasswordHistoryEntry
         {
             EntryId = entry.Id,
-            Password = "not-valid-history-ciphertext",
+            Password = unreadableHistory,
             LastUsedAt = DateTimeOffset.UtcNow
         });
         await harness.ViewModel.LoadAsync();
@@ -3067,15 +3116,16 @@ public sealed class PasswordManagementTests
         var historyPassword = Assert.Single(details.PasswordHistory);
         Assert.False(currentPassword.CanCopy);
         Assert.Empty(currentPassword.CopyValue);
-        Assert.DoesNotContain("not-valid-current-ciphertext", currentPassword.DisplayText, StringComparison.Ordinal);
+        Assert.DoesNotContain(unreadableCurrent, currentPassword.DisplayText, StringComparison.Ordinal);
         Assert.False(historyPassword.CanCopy);
-        Assert.DoesNotContain("not-valid-history-ciphertext", historyPassword.DisplayPassword, StringComparison.Ordinal);
+        Assert.DoesNotContain(unreadableHistory, historyPassword.DisplayPassword, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task ViewModel_analyzes_active_password_security_issues()
     {
         var harness = CreateHarness();
+        harness.Crypto.InitializeSession("correct password", new byte[16]);
         var oldPasswordDate = DateTimeOffset.UtcNow.AddDays(-370);
         var weak = new PasswordEntry
         {
@@ -3191,6 +3241,34 @@ public sealed class PasswordManagementTests
         Assert.Contains(harness.ViewModel.SecuritySummaryItems, item => item.Label == harness.ViewModel.L.CompromisedPasswords && item.Value == "1");
         Assert.Equal(["leaked-secret", "safe-secret"], pwnedPasswords.CheckedPasswords.Order(StringComparer.Ordinal).ToArray());
         Assert.Equal(harness.ViewModel.L.Format("CompromisedPasswordCheckCompleteFormat", 2, 1), harness.ViewModel.CompromisedPasswordStatus);
+    }
+
+    [Fact]
+    public async Task ViewModel_excludes_unreadable_payloads_from_compromised_password_checks()
+    {
+        var pwnedPasswords = new FakePwnedPasswordService(new Dictionary<string, int>());
+        var harness = CreateHarness(pwnedPasswords);
+        harness.Crypto.InitializeSession("target password", new byte[16]);
+        var unreadablePayload = Convert.ToBase64String(new byte[29]);
+        await harness.Repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "Compatible plaintext",
+            Password = "legacy-secret"
+        });
+        await harness.Repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "Unreadable",
+            Password = unreadablePayload
+        });
+        await harness.ViewModel.LoadAsync();
+
+        await harness.ViewModel.CheckCompromisedPasswordsCommand.ExecuteAsync(null);
+
+        Assert.Equal(["legacy-secret"], pwnedPasswords.CheckedPasswords);
+        Assert.DoesNotContain(unreadablePayload, pwnedPasswords.CheckedPasswords);
+        Assert.Equal(
+            harness.ViewModel.L.Format("CompromisedPasswordCheckCompleteFormat", 1, 0),
+            harness.ViewModel.CompromisedPasswordStatus);
     }
 
     [Fact]
@@ -3618,6 +3696,27 @@ public sealed class PasswordManagementTests
     }
 
     [Fact]
+    public async Task ViewModel_rejects_unreadable_json_passwords_before_mutating_vault()
+    {
+        var harness = CreateHarness();
+        harness.Crypto.InitializeSession("target password", new byte[16]);
+        var unreadablePayload = Convert.ToBase64String(new byte[29]);
+        harness.ViewModel.ImportJsonText = new ImportExportService().ExportJson(
+            [new PasswordEntry { Id = 7, Title = "Unreadable", Password = unreadablePayload }],
+            [],
+            [new Category { Id = 3, Name = "Must not be imported" }]);
+
+        await harness.ViewModel.ImportDataCommand.ExecuteAsync(null);
+
+        Assert.Empty(await harness.Repository.GetPasswordsAsync());
+        Assert.Empty(await harness.Repository.GetCategoriesAsync());
+        Assert.NotEmpty(harness.ViewModel.ImportJsonText);
+        Assert.Equal(
+            harness.ViewModel.L.Format("ImportFailedFormat", harness.ViewModel.L.Get("PasswordSecretUnavailable")),
+            harness.ViewModel.StatusMessage);
+    }
+
+    [Fact]
     public async Task ViewModel_clears_vault_data_only_after_danger_confirmation()
     {
         var confirmation = new FakeConfirmationDialogService(result: false);
@@ -3662,6 +3761,25 @@ public sealed class PasswordManagementTests
         Assert.Contains("plain-export-secret", harness.ViewModel.ExportCsvPreview);
         Assert.Contains("JBSWY3DPEHPK3PXP", harness.ViewModel.ExportCsvPreview);
         Assert.Equal(harness.ViewModel.L.Get("ExportedPasswordCsv"), harness.ViewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task ViewModel_refuses_to_export_unreadable_password_payload()
+    {
+        var harness = CreateHarness();
+        harness.Crypto.InitializeSession("source password", new byte[16]);
+        var unreadablePayload = Convert.ToBase64String(new byte[29]);
+        await harness.Repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "Unreadable",
+            Password = unreadablePayload
+        });
+        await harness.ViewModel.LoadAsync();
+
+        await harness.ViewModel.ExportPasswordCsvCommand.ExecuteAsync(null);
+
+        Assert.Empty(harness.ViewModel.ExportCsvPreview);
+        Assert.Equal(harness.ViewModel.L.Get("PasswordSecretUnavailable"), harness.ViewModel.StatusMessage);
     }
 
     [Fact]

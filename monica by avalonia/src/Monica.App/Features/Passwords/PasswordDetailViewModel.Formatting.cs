@@ -46,25 +46,18 @@ public sealed partial class PasswordDetailViewModel
         string storedPassword,
         ICryptoService cryptoService)
     {
-        if (string.IsNullOrWhiteSpace(storedPassword))
+        var result = PasswordSecretResolver.Read(storedPassword, cryptoService);
+        if (result.State == PasswordSecretState.Empty)
         {
             return ("", "", false);
         }
 
-        if (!cryptoService.IsUnlocked)
+        if (!result.IsReadable)
         {
             return ("********", "", false);
         }
 
-        try
-        {
-            var plainText = cryptoService.DecryptString(storedPassword);
-            return (plainText, plainText, true);
-        }
-        catch
-        {
-            return ("********", "", false);
-        }
+        return (result.Value, result.Value, true);
     }
 
     private static string LocalizeLoginType(ILocalizationService localization, PasswordLoginType loginType)

@@ -24,21 +24,21 @@ public sealed partial class MainWindowViewModel
         return passwords.Select(ProtectPassword).ToArray();
     }
 
-    private string UnprotectPassword(string storedPassword)
+    private PasswordSecretReadResult ReadPasswordSecret(string storedPassword) =>
+        PasswordSecretResolver.Read(storedPassword, _cryptoService);
+
+    private string ReadPasswordSecretOrThrow(string storedPassword)
     {
-        if (!_cryptoService.IsUnlocked)
+        var result = ReadPasswordSecret(storedPassword);
+        if (result.IsReadable)
         {
-            return storedPassword;
+            return result.Value;
         }
 
-        try
-        {
-            return _cryptoService.DecryptString(storedPassword);
-        }
-        catch
-        {
-            return storedPassword;
-        }
+        var messageKey = result.State == PasswordSecretState.Locked
+            ? "VaultLocked"
+            : "PasswordSecretUnavailable";
+        throw new PasswordSecretUnavailableException(_localization.Get(messageKey));
     }
 
     private async Task SavePasswordHistorySnapshotIfChangedAsync(long entryId, string oldPlainPassword, string newPlainPassword)
@@ -51,8 +51,11 @@ public sealed partial class MainWindowViewModel
         }
 
         var latestHistory = (await _repository.GetPasswordHistoryAsync(entryId)).FirstOrDefault();
-        if (latestHistory is not null &&
-            string.Equals(UnprotectPassword(latestHistory.Password), oldPlainPassword, StringComparison.Ordinal))
+        var latestPassword = latestHistory is null
+            ? default
+            : ReadPasswordSecret(latestHistory.Password);
+        if (latestPassword.IsReadable &&
+            string.Equals(latestPassword.Value, oldPlainPassword, StringComparison.Ordinal))
         {
             return;
         }
@@ -80,24 +83,23 @@ public sealed partial class MainWindowViewModel
 
     private (string DisplayValue, bool CanCopy) TryUnprotectHistoryPassword(string storedPassword)
     {
-        if (string.IsNullOrWhiteSpace(storedPassword))
+        var result = ReadPasswordSecret(storedPassword);
+        if (result.State == PasswordSecretState.Empty)
         {
             return (_localization.Get("PasswordHistoryUnavailable"), false);
         }
 
-        if (!_cryptoService.IsUnlocked)
+        if (result.State == PasswordSecretState.Locked)
         {
             return ("********", false);
         }
 
-        try
+        if (result.IsReadable)
         {
-            return (_cryptoService.DecryptString(storedPassword), true);
+            return (result.Value, true);
         }
-        catch
-        {
-            return (_localization.Get("PasswordHistoryUnavailable"), false);
-        }
+
+        return (_localization.Get("PasswordHistoryUnavailable"), false);
     }
 
     private async Task<bool> DeletePasswordHistoryAsync(PasswordHistoryEntry entry)

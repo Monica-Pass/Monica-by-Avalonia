@@ -69,12 +69,25 @@ public sealed partial class MainWindowViewModel
         }
 
         var siblings = GetPasswordSiblings(entry).ToList();
+        var entryPassword = ReadPasswordSecret(entry.Password);
+        var siblingPasswords = siblings.Select(item => ReadPasswordSecret(item.Password)).ToArray();
+        if (!entryPassword.IsReadable || siblingPasswords.Any(item => !item.IsReadable))
+        {
+            var unavailable = !entryPassword.IsReadable
+                ? entryPassword
+                : siblingPasswords.First(item => !item.IsReadable);
+            StatusMessage = _localization.Get(unavailable.State == PasswordSecretState.Locked
+                ? "VaultLocked"
+                : "PasswordSecretUnavailable");
+            return;
+        }
+
         var customFields = await GetGroupCustomFieldsAsync(entry, siblings);
         var editor = await _passwordEditorDialogService.ShowAsync(
             entry,
             Categories.ToList(),
-            UnprotectPassword(entry.Password),
-            siblings.Select(item => UnprotectPassword(item.Password)).ToArray(),
+            entryPassword.Value,
+            siblingPasswords.Select(item => item.Value).ToArray(),
             NoteItems.ToList(),
             customFields);
         if (editor is null)
@@ -90,7 +103,7 @@ public sealed partial class MainWindowViewModel
         for (var index = 0; index < storedPasswords.Count; index++)
         {
             var source = index < siblings.Count ? siblings[index] : null;
-            var oldPlainPassword = source is null ? "" : UnprotectPassword(source.Password);
+            var oldPlainPassword = source is null ? "" : siblingPasswords[index].Value;
             var updated = editor.BuildEntryFrom(source, storedPasswords[index]);
             await _repository.SavePasswordAsync(updated);
             await SavePasswordHistorySnapshotIfChangedAsync(updated.Id, oldPlainPassword, passwordRows[index]);

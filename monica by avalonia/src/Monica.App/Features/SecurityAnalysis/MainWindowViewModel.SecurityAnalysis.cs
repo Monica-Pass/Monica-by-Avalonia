@@ -214,9 +214,15 @@ public sealed partial class MainWindowViewModel
                 continue;
             }
 
+            var password = ReadPasswordSecret(item.Password);
+            if (!password.IsReadable)
+            {
+                continue;
+            }
+
             snapshots.Add(new SecurityPasswordSnapshot(
                 item,
-                UnprotectPassword(item.Password).Trim(),
+                password.Value.Trim(),
                 SplitAndNormalizeWebsites(item.Website).ToArray()));
         }
 

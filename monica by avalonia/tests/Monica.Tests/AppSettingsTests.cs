@@ -981,11 +981,13 @@ public sealed class AppSettingsTests
         Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
         var factory = new SqliteConnectionFactory(databasePath);
         var migrator = new DatabaseMigrator(factory);
+        var crypto = new CryptoService();
+        crypto.InitializeSession("test password", new byte[16]);
         platformIntegrationService ??= new PlatformIntegrationService();
         return new MainWindowViewModel(
             new MonicaRepository(factory, migrator),
             new VaultCredentialStore(factory, migrator),
-            new CryptoService(),
+            crypto,
             new TotpService(),
             new PasswordGeneratorService(),
             new ImportExportService(),

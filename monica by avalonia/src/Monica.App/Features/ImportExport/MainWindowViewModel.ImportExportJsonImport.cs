@@ -33,6 +33,7 @@ public sealed partial class MainWindowViewModel
     private async Task<MonicaJsonImportResult> ImportMonicaJsonAsync(string json)
     {
         var package = await Task.Run(() => _importExportService.ImportJson(json));
+        ValidatePasswordSecretsForImport(package);
         var categoryIdMap = new Dictionary<long, long>();
         var importedCategories = await ImportCategoriesAsync(package.Categories, categoryIdMap);
         var passwordIdMap = new Dictionary<long, long>();
@@ -50,6 +51,19 @@ public sealed partial class MainWindowViewModel
         });
         await LoadAsync();
         return new MonicaJsonImportResult(importedPasswords, importedSecureItems, importedCategories);
+    }
+
+    private void ValidatePasswordSecretsForImport(MonicaExportPackage package)
+    {
+        foreach (var password in package.Passwords)
+        {
+            _ = ReadPasswordSecretOrThrow(password.Password);
+        }
+
+        foreach (var historyEntry in package.PasswordHistory.SelectMany(group => group.Entries))
+        {
+            _ = ReadPasswordSecretOrThrow(historyEntry.Password);
+        }
     }
 
     private async Task<int> ImportCategoriesAsync(

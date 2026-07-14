@@ -15,10 +15,11 @@ public sealed partial class MainWindowViewModel
         try
         {
             var entries = await Task.Run(() => _importExportService.ImportPasswordCsv(csv));
+            var importedEntries = entries.Select(item => ClonePasswordForImport(item)).ToArray();
             var importedPasswords = 0;
-            foreach (var source in entries)
+            foreach (var imported in importedEntries)
             {
-                await _repository.SavePasswordAsync(ClonePasswordForImport(source));
+                await _repository.SavePasswordAsync(imported);
                 importedPasswords++;
             }
 

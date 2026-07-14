@@ -19,20 +19,16 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var text = entry.Password;
-        if (_cryptoService.IsUnlocked)
+        var password = ReadPasswordSecret(entry.Password);
+        if (!password.IsReadable)
         {
-            try
-            {
-                text = _cryptoService.DecryptString(entry.Password);
-            }
-            catch
-            {
-                text = entry.Password;
-            }
+            StatusMessage = _localization.Get(password.State == PasswordSecretState.Locked
+                ? "VaultLocked"
+                : "PasswordSecretUnavailable");
+            return;
         }
 
-        await _clipboardService.SetSensitiveTextAsync(text);
+        await _clipboardService.SetSensitiveTextAsync(password.Value);
         StatusMessage = _localization.Format("CopiedPasswordFormat", entry.Title);
     }
 

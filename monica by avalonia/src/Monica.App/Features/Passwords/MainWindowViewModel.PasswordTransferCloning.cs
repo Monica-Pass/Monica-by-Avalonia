@@ -12,7 +12,7 @@ public sealed partial class MainWindowViewModel
     private PasswordEntry ClonePasswordForExport(PasswordEntry source, bool includeCategory = true)
     {
         var clone = ClonePassword(source);
-        clone.Password = UnprotectPassword(source.Password);
+        clone.Password = ReadPasswordSecretOrThrow(source.Password);
         if (!includeCategory)
         {
             clone.CategoryId = null;
@@ -27,7 +27,7 @@ public sealed partial class MainWindowViewModel
     {
         var clone = ClonePassword(source);
         clone.Id = 0;
-        clone.Password = ProtectPassword(UnprotectPassword(source.Password));
+        clone.Password = ProtectPassword(ReadPasswordSecretOrThrow(source.Password));
         clone.MdbxDatabaseId = null;
         clone.MdbxFolderId = null;
         if (clone.CategoryId is { } categoryId)
@@ -123,7 +123,7 @@ public sealed partial class MainWindowViewModel
         {
             Id = source.Id,
             EntryId = source.EntryId,
-            Password = UnprotectPassword(source.Password),
+            Password = ReadPasswordSecretOrThrow(source.Password),
             LastUsedAt = source.LastUsedAt
         };
     }
@@ -134,7 +134,7 @@ public sealed partial class MainWindowViewModel
         {
             Id = 0,
             EntryId = importedPasswordId,
-            Password = ProtectPassword(UnprotectPassword(source.Password)),
+            Password = ProtectPassword(ReadPasswordSecretOrThrow(source.Password)),
             LastUsedAt = source.LastUsedAt
         };
     }

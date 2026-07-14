@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.Input;
+using Monica.Core.Models;
 using Monica.Platform.Services;
 
 namespace Monica.App.ViewModels;
@@ -69,14 +70,24 @@ public sealed partial class MainWindowViewModel
             return false;
         }
 
-        ExportPreview = await BuildMonicaJsonExportAsync(
-            includePasswords: true,
-            includeTotp: true,
-            includeNotes: true,
-            includeCards: true,
-            includeDocuments: true,
-            includeImages: true,
-            includeCategories: true);
+        try
+        {
+            ExportPreview = await BuildMonicaJsonExportAsync(
+                includePasswords: true,
+                includeTotp: true,
+                includeNotes: true,
+                includeCards: true,
+                includeDocuments: true,
+                includeImages: true,
+                includeCategories: true);
+        }
+        catch (PasswordSecretUnavailableException ex)
+        {
+            ExportPreview = "";
+            StatusMessage = ex.Message;
+            return false;
+        }
+
         StatusMessage = _localization.Get("ExportPrepared");
         return true;
     }
@@ -88,9 +99,20 @@ public sealed partial class MainWindowViewModel
             return false;
         }
 
-        var exportPasswords = (await _repository.GetPasswordsAsync())
-            .Select(item => ClonePasswordForExport(item))
-            .ToArray();
+        PasswordEntry[] exportPasswords;
+        try
+        {
+            exportPasswords = (await _repository.GetPasswordsAsync())
+                .Select(item => ClonePasswordForExport(item))
+                .ToArray();
+        }
+        catch (PasswordSecretUnavailableException ex)
+        {
+            ExportCsvPreview = "";
+            StatusMessage = ex.Message;
+            return false;
+        }
+
         ExportCsvPreview = await Task.Run(() => _importExportService.ExportPasswordCsv(exportPasswords));
         StatusMessage = _localization.Get("ExportedPasswordCsv");
         return true;
