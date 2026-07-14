@@ -4,6 +4,11 @@
             <fa:FASymbolIconSource Symbol="Folder" />
         </fa:FASettingsExpander.IconSource>
         <StackPanel Spacing="16">
+            <ProgressBar x:Name="ImportBusyIndicator"
+                         IsIndeterminate="True"
+                         IsVisible="{Binding IsImportExportBusy}"
+                         AutomationProperties.Name="{Binding StatusMessage}" />
+            <StackPanel x:Name="ImportOperationContent" Spacing="16" IsEnabled="{Binding IsImportExportIdle}">
             <StackPanel Spacing="8">
                 <TextBlock Text="{Binding L.ImportMonicaJson}" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding L.ImportMonicaJsonDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
@@ -102,6 +107,7 @@
                         </StackPanel>
                     </Button>
                 </WrapPanel>
+            </StackPanel>
             </StackPanel>
         </StackPanel>
     </fa:FASettingsExpander>

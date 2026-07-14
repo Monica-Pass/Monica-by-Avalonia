@@ -72,6 +72,12 @@ public sealed class StorageWorkflowUiTests
         Assert.Equal('*', configuration.FindControl<TextBox>("WebDavPasswordBox")!.PasswordChar);
         Assert.Equal('*', backup.FindControl<TextBox>("WebDavBackupPasswordBox")!.PasswordChar);
         Assert.True(export.FindControl<TextBox>("JsonExportPreviewBox")!.IsReadOnly);
+        Assert.True(export.FindControl<ProgressBar>("ExportBusyIndicator")!.IsIndeterminate);
+        Assert.NotNull(export.FindControl<StackPanel>("ExportOperationContent"));
+
+        var import = new SyncImportView();
+        Assert.True(import.FindControl<ProgressBar>("ImportBusyIndicator")!.IsIndeterminate);
+        Assert.NotNull(import.FindControl<StackPanel>("ImportOperationContent"));
 
         var restore = backup.FindControl<Button>("RestoreSelectedBackupButton");
         var delete = backup.FindControl<Button>("DeleteSelectedBackupButton");

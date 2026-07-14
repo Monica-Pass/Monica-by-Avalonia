@@ -4,6 +4,11 @@
             <fa:FASymbolIconSource Symbol="ProtectedDocument" />
         </fa:FASettingsExpander.IconSource>
         <StackPanel Spacing="14">
+            <ProgressBar x:Name="ExportBusyIndicator"
+                         IsIndeterminate="True"
+                         IsVisible="{Binding IsImportExportBusy}"
+                         AutomationProperties.Name="{Binding StatusMessage}" />
+            <StackPanel x:Name="ExportOperationContent" Spacing="14" IsEnabled="{Binding IsImportExportIdle}">
             <TextBlock Text="{Binding L.ExportPreview}" FontWeight="SemiBold" />
             <WrapPanel>
                 <Button Classes="workspaceCommand" Command="{Binding ExportDataCommand}" Margin="0,0,8,8">
@@ -88,6 +93,7 @@
                 </Button>
             </WrapPanel>
             <TextBox Text="{Binding ExportAegisPreview, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" MinHeight="150" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ExportAegisPreview}" />
+            </StackPanel>
         </StackPanel>
     </fa:FASettingsExpander>
 </UserControl>

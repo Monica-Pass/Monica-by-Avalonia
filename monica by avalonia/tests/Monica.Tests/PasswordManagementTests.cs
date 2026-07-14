@@ -3615,13 +3615,52 @@ public sealed class PasswordManagementTests
         Assert.DoesNotContain("cached-export-secret", harness.ViewModel.ExportCsvPreview);
     }
 
+    [Fact]
+    public async Task Import_export_busy_state_covers_background_payload_conversion()
+    {
+        var service = new BlockingImportExportService();
+        var harness = CreateHarness(importExportService: service);
+        harness.ViewModel.ImportJsonText = service.ExportJson([], []);
+
+        var operation = harness.ViewModel.ImportDataCommand.ExecuteAsync(null);
+        await service.ImportStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(harness.ViewModel.IsImportExportBusy);
+        Assert.False(harness.ViewModel.IsImportExportIdle);
+
+        service.ReleaseImport();
+        await operation;
+
+        Assert.False(harness.ViewModel.IsImportExportBusy);
+        Assert.True(harness.ViewModel.IsImportExportIdle);
+    }
+
+    [Fact]
+    public async Task Import_export_file_import_bypasses_the_editor_bound_payload_buffer()
+    {
+        var picker = new FakeFileSystemPickerService
+        {
+            TextFileToOpen = new PickedTextFile(
+                "monica.json",
+                new ImportExportService().ExportJson([], []))
+        };
+        var harness = CreateHarness(fileSystemPickerService: picker);
+        harness.ViewModel.ImportJsonText = "preserved manual draft";
+
+        await harness.ViewModel.ImportMonicaJsonFileCommand.ExecuteAsync(null);
+
+        Assert.Equal("preserved manual draft", harness.ViewModel.ImportJsonText);
+        Assert.Contains("0", harness.ViewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
     private static PasswordHarness CreateHarness(
         IPwnedPasswordService? pwnedPasswordService = null,
         IWebDavBackupService? webDavBackupService = null,
         IConfirmationDialogService? confirmationDialogService = null,
         IFileSystemPickerService? fileSystemPickerService = null,
         IExportAuthorizationService? exportAuthorizationService = null,
-        IPasswordGeneratorService? passwordGeneratorService = null)
+        IPasswordGeneratorService? passwordGeneratorService = null,
+        IImportExportService? importExportService = null)
     {
         var databasePath = GetTempDatabasePath();
         var factory = new SqliteConnectionFactory(databasePath);
@@ -3643,7 +3682,7 @@ public sealed class PasswordManagementTests
             crypto,
             new TotpService(),
             generator,
-            new ImportExportService(),
+            importExportService ?? new ImportExportService(),
             new PlatformCapabilityService(),
             new PlatformIntegrationService(),
             clipboard,
@@ -3938,9 +3977,10 @@ public sealed class PasswordManagementTests
             "Test file picker");
         public string SuggestedFileName { get; private set; } = "";
         public string SavedContent { get; private set; } = "";
+        public PickedTextFile? TextFileToOpen { get; init; }
 
         public Task<PickedTextFile?> OpenTextFileAsync(string title, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
-            Task.FromResult<PickedTextFile?>(null);
+            Task.FromResult(TextFileToOpen);
 
         public Task<PickedBinaryFile?> OpenBinaryFileAsync(string title, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
             Task.FromResult<PickedBinaryFile?>(null);
@@ -3951,6 +3991,50 @@ public sealed class PasswordManagementTests
             SavedContent = content;
             return Task.FromResult<string?>(suggestedFileName);
         }
+    }
+
+    private sealed class BlockingImportExportService : IImportExportService
+    {
+        private readonly ImportExportService _inner = new();
+        private readonly ManualResetEventSlim _releaseImport = new(false);
+
+        public TaskCompletionSource ImportStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void ReleaseImport() => _releaseImport.Set();
+
+        public string ExportJson(
+            IEnumerable<PasswordEntry> passwords,
+            IEnumerable<SecureItem> secureItems,
+            IEnumerable<Category>? categories = null,
+            IReadOnlyDictionary<long, IReadOnlyList<CustomField>>? passwordCustomFields = null,
+            IReadOnlyDictionary<long, IReadOnlyList<PasswordHistoryEntry>>? passwordHistory = null,
+            IReadOnlyDictionary<long, IReadOnlyList<PasswordAttachmentExport>>? passwordAttachments = null,
+            IReadOnlyDictionary<long, IReadOnlyList<SecureItemAttachmentExport>>? secureItemAttachments = null) =>
+            _inner.ExportJson(
+                passwords,
+                secureItems,
+                categories,
+                passwordCustomFields,
+                passwordHistory,
+                passwordAttachments,
+                secureItemAttachments);
+
+        public MonicaExportPackage ImportJson(string json)
+        {
+            ImportStarted.TrySetResult();
+            Assert.True(_releaseImport.Wait(TimeSpan.FromSeconds(5)), "Timed out waiting to release the import parser.");
+            return _inner.ImportJson(json);
+        }
+
+        public string ExportPasswordCsv(IEnumerable<PasswordEntry> passwords) => _inner.ExportPasswordCsv(passwords);
+        public string ExportTotpCsv(IEnumerable<SecureItem> secureItems) => _inner.ExportTotpCsv(secureItems);
+        public string ExportNoteCsv(IEnumerable<SecureItem> secureItems) => _inner.ExportNoteCsv(secureItems);
+        public string ExportWalletCsv(IEnumerable<SecureItem> secureItems) => _inner.ExportWalletCsv(secureItems);
+        public string ExportAegisJson(IEnumerable<SecureItem> secureItems) => _inner.ExportAegisJson(secureItems);
+        public IReadOnlyList<SecureItem> ImportTotpCsv(string csv) => _inner.ImportTotpCsv(csv);
+        public IReadOnlyList<SecureItem> ImportNoteCsv(string csv) => _inner.ImportNoteCsv(csv);
+        public IReadOnlyList<SecureItem> ImportAegisJson(string json) => _inner.ImportAegisJson(json);
+        public IReadOnlyList<PasswordEntry> ImportPasswordCsv(string csv) => _inner.ImportPasswordCsv(csv);
     }
 
     private sealed class CountingExportAuthorizationService : IExportAuthorizationService

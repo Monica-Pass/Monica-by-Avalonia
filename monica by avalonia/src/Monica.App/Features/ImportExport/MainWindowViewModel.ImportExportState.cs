@@ -22,6 +22,13 @@ public sealed partial class MainWindowViewModel
     ];
 
     private readonly IImportExportService _importExportService;
+    private int _importExportOperationActive;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsImportExportIdle))]
+    private bool _isImportExportBusy;
+
+    public bool IsImportExportIdle => !IsImportExportBusy;
 
     [ObservableProperty]
     private string _exportPreview = "";
@@ -40,4 +47,23 @@ public sealed partial class MainWindowViewModel
 
     [ObservableProperty]
     private string _importCsvText = "";
+
+    private async Task RunImportExportOperationAsync(Func<Task> operation)
+    {
+        if (Interlocked.CompareExchange(ref _importExportOperationActive, 1, 0) != 0)
+        {
+            return;
+        }
+
+        IsImportExportBusy = true;
+        try
+        {
+            await operation();
+        }
+        finally
+        {
+            IsImportExportBusy = false;
+            Interlocked.Exchange(ref _importExportOperationActive, 0);
+        }
+    }
 }
