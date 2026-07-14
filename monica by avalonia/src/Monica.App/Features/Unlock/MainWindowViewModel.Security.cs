@@ -161,6 +161,8 @@ public sealed partial class MainWindowViewModel
         SearchText = "";
         TotpSearchText = "";
         TotpNarrowShowsList = true;
+        WalletSearchText = "";
+        WalletNarrowShowsList = true;
         GeneratedPassword = "";
         ClearTransferBuffers();
     }

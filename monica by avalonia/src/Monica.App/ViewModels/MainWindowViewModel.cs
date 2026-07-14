@@ -541,6 +541,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RaiseTotpFilterState(reconcileSelection: false);
         OnPropertyChanged(nameof(WalletCountText));
         OnPropertyChanged(nameof(HasWalletItems));
+        RaiseWalletFilterState();
         OnPropertyChanged(nameof(TimelineCountText));
         OnPropertyChanged(nameof(HasTimelineEntries));
         OnPropertyChanged(nameof(SecurityIssueCountText));
@@ -622,6 +623,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (SelectedTotpItem is not null)
         {
             SelectedTotpDetails = new TotpItemDetailsViewModel(_localization, SelectedTotpItem);
+        }
+        OnPropertyChanged(nameof(WalletFilteredStatusText));
+        OnPropertyChanged(nameof(WalletEmptyStateText));
+        if (SelectedWalletItem is not null)
+        {
+            SelectedWalletDetails = new WalletItemDetailsViewModel(_localization, SelectedWalletItem);
         }
         RaiseCounts();
         OnPropertyChanged(nameof(SecurityIssueCountText));

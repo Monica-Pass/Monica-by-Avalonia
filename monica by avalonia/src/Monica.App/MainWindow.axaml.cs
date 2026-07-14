@@ -82,6 +82,15 @@ public partial class MainWindow : Window
             }
         }
 
+        if (string.Equals(viewModel.SelectedSection, "Cards", StringComparison.OrdinalIgnoreCase))
+        {
+            HandleWalletWorkspaceShortcut(viewModel, e);
+            if (e.Handled)
+            {
+                return;
+            }
+        }
+
         if (e.Key == Key.F5 && !IsTextEditingSource(e.Source))
         {
             if (viewModel.LoadCommand.CanExecute(null))

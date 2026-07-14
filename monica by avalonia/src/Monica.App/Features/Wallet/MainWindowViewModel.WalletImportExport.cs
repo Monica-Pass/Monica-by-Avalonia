@@ -30,11 +30,12 @@ public sealed partial class MainWindowViewModel
     [RelayCommand(CanExecute = nameof(CanUseFilePicker))]
     private async Task SaveWalletCsvExportAsync()
     {
-        if (string.IsNullOrWhiteSpace(ExportWalletCsvPreview))
+        if (!await AuthorizeSensitiveExportAsync())
         {
-            await ExportWalletCsvAsync();
+            return;
         }
 
+        ExportWalletCsvPreview = await BuildWalletCsvExportAsync();
         await SaveExportTextAsync(
             _localization.Get("ExportWalletCsv"),
             $"monica_cards_documents_{DateTimeOffset.Now:yyyyMMdd_HHmmss}.csv",

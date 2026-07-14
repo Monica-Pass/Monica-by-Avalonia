@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:vm="using:Monica.App.ViewModels"
              x:Class="Monica.App.Features.Wallet.WalletItemEditorDialog"
              x:DataType="vm:WalletItemEditorViewModel"
@@ -34,7 +35,24 @@
                     </ComboBox.ItemTemplate>
                 </ComboBox>
                 <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="10">
-                    <TextBox Text="{Binding DocumentNumber}" PlaceholderText="{Binding L.DocumentNumber}" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                        <TextBox x:Name="DocumentNumberInput"
+                                 Text="{Binding DocumentNumber}"
+                                 PasswordChar="{Binding DocumentNumberMaskChar}"
+                                 PlaceholderText="{Binding L.DocumentNumber}"
+                                 AutomationProperties.Name="{Binding L.DocumentNumber}" />
+                        <Button x:Name="ToggleDocumentNumberVisibilityButton"
+                                Grid.Column="1"
+                                Classes="workspaceCommand"
+                                Command="{Binding ToggleDocumentNumberVisibilityCommand}"
+                                ToolTip.Tip="{Binding DocumentNumberVisibilityLabel}"
+                                AutomationProperties.Name="{Binding DocumentNumberVisibilityLabel}"
+                                Width="36"
+                                Height="36"
+                                Padding="0">
+                            <ic:FluentIcon Icon="Eye" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Button>
+                    </Grid>
                     <TextBox Grid.Column="1" Text="{Binding FullName}" PlaceholderText="{Binding L.FullName}" />
                     <TextBox Grid.Row="1" Text="{Binding IssuedDate}" PlaceholderText="{Binding L.IssuedDate}" />
                     <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ExpiryDate}" PlaceholderText="{Binding L.ExpiryDate}" />
@@ -54,13 +72,47 @@
                         </DataTemplate>
                     </ComboBox.ItemTemplate>
                 </ComboBox>
-                <TextBox Text="{Binding CardNumber}" PlaceholderText="{Binding L.CardNumber}" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                    <TextBox x:Name="CardNumberInput"
+                             Text="{Binding CardNumber}"
+                             PasswordChar="{Binding CardNumberMaskChar}"
+                             PlaceholderText="{Binding L.CardNumber}"
+                             AutomationProperties.Name="{Binding L.CardNumber}" />
+                    <Button x:Name="ToggleCardNumberVisibilityButton"
+                            Grid.Column="1"
+                            Classes="workspaceCommand"
+                            Command="{Binding ToggleCardNumberVisibilityCommand}"
+                            ToolTip.Tip="{Binding CardNumberVisibilityLabel}"
+                            AutomationProperties.Name="{Binding CardNumberVisibilityLabel}"
+                            Width="36"
+                            Height="36"
+                            Padding="0">
+                        <ic:FluentIcon Icon="Eye" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
+                </Grid>
                 <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="10">
                     <TextBox Text="{Binding CardholderName}" PlaceholderText="{Binding L.CardholderName}" />
                     <TextBox Grid.Column="1" Text="{Binding BankName}" PlaceholderText="{Binding L.BankName}" />
                     <TextBox Grid.Row="1" Text="{Binding ExpiryMonth}" PlaceholderText="{Binding L.ExpiryMonth}" />
                     <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ExpiryYear}" PlaceholderText="{Binding L.ExpiryYear}" />
-                    <TextBox Grid.Row="2" Text="{Binding Cvv}" PlaceholderText="CVV" />
+                    <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                        <TextBox x:Name="CardCvvInput"
+                                 Text="{Binding Cvv}"
+                                 PasswordChar="{Binding CvvMaskChar}"
+                                 PlaceholderText="{Binding L.CreditCardCvv}"
+                                 AutomationProperties.Name="{Binding L.CreditCardCvv}" />
+                        <Button x:Name="ToggleCardCvvVisibilityButton"
+                                Grid.Column="1"
+                                Classes="workspaceCommand"
+                                Command="{Binding ToggleCvvVisibilityCommand}"
+                                ToolTip.Tip="{Binding CvvVisibilityLabel}"
+                                AutomationProperties.Name="{Binding CvvVisibilityLabel}"
+                                Width="36"
+                                Height="36"
+                                Padding="0">
+                            <ic:FluentIcon Icon="Eye" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Button>
+                    </Grid>
                     <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Brand}" PlaceholderText="{Binding L.CardBrand}" />
                 </Grid>
                 <TextBox Text="{Binding BillingAddress}" PlaceholderText="{Binding L.BillingAddress}" AcceptsReturn="True" MinHeight="64" TextWrapping="Wrap" />

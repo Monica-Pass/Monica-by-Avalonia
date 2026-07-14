@@ -15,8 +15,14 @@ public sealed class UiPerformanceTests
     }
 
     [Fact]
-    public void Performance_budget_locked_shell_defers_vault_workspaces()
+    public void Performance_budget_warm_locked_shell_defers_vault_workspaces()
     {
+        var warmupWindow = new Monica.App.MainWindow();
+        var warmupHost = warmupWindow.FindControl<WorkspaceHostView>("WorkspaceHost");
+
+        Assert.NotNull(warmupHost);
+        Assert.Empty(warmupHost.CreatedSections);
+
         var stopwatch = Stopwatch.StartNew();
         var window = new Monica.App.MainWindow();
         stopwatch.Stop();

@@ -1909,6 +1909,10 @@ public sealed class PasswordManagementTests
         Assert.Contains("4111111111111111", document.ItemData);
         Assert.Equal("**** **** **** 1111", harness.ViewModel.SelectedWalletDetails?.PrimaryText);
 
+        await harness.ViewModel.CopySelectedWalletPrimaryFieldCommand.ExecuteAsync(null);
+
+        Assert.Equal("4111 1111 1111 1111", harness.Clipboard.Text);
+
         document.IsSelected = true;
         await harness.ViewModel.DeleteSelectedWalletItemsCommand.ExecuteAsync(null);
 
@@ -1916,6 +1920,117 @@ public sealed class PasswordManagementTests
         Assert.Empty(await harness.Repository.GetSecureItemsAsync(VaultItemType.BankCard));
         Assert.Single(await harness.Repository.GetSecureItemsAsync(VaultItemType.BankCard, includeDeleted: true));
         Assert.Equal(harness.ViewModel.L.Format("MovedSelectedWalletItemsToRecycleBinFormat", 1), harness.ViewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task ViewModel_filters_wallet_items_without_sharing_other_page_search_state()
+    {
+        var harness = CreateHarness();
+        await harness.Repository.SaveSecureItemAsync(new SecureItem
+        {
+            ItemType = VaultItemType.BankCard,
+            Title = "Work card",
+            Notes = "travel",
+            ItemData = WalletItemDataCodec.EncodeBankCard(new BankCardWalletData
+            {
+                CardNumber = "4111111111111111",
+                CardholderName = "Ada Lovelace",
+                Cvv = "731",
+                BankName = "Monica Bank"
+            })
+        });
+        await harness.Repository.SaveSecureItemAsync(new SecureItem
+        {
+            ItemType = VaultItemType.Document,
+            Title = "Passport",
+            ItemData = WalletItemDataCodec.EncodeDocument(new DocumentWalletData
+            {
+                DocumentNumber = "P12345678",
+                FullName = "Grace Hopper",
+                IssuedBy = "Passport Office"
+            })
+        });
+        await harness.ViewModel.LoadAsync();
+        harness.ViewModel.SearchText = "archive search";
+
+        harness.ViewModel.WalletSearchText = "Lovelace";
+
+        Assert.Equal("Work card", Assert.Single(harness.ViewModel.FilteredWalletItems).Title);
+
+        harness.ViewModel.WalletSearchText = "P12345678";
+
+        Assert.Equal("Passport", Assert.Single(harness.ViewModel.FilteredWalletItems).Title);
+
+        harness.ViewModel.WalletSearchText = "731";
+
+        Assert.Empty(harness.ViewModel.FilteredWalletItems);
+        Assert.True(harness.ViewModel.HasWalletSearchText);
+
+        harness.ViewModel.ClearWalletSearchCommand.Execute(null);
+
+        Assert.Equal("", harness.ViewModel.WalletSearchText);
+        Assert.Equal("archive search", harness.ViewModel.SearchText);
+        Assert.Equal(2, harness.ViewModel.FilteredWalletItems.Count);
+    }
+
+    [Fact]
+    public void Wallet_sensitive_fields_are_masked_until_explicitly_revealed()
+    {
+        var details = new WalletItemDetailsViewModel(
+            new LocalizationService(),
+            new SecureItem
+            {
+                ItemType = VaultItemType.BankCard,
+                Title = "Work card",
+                ItemData = WalletItemDataCodec.EncodeBankCard(new BankCardWalletData
+                {
+                    CardNumber = "4111111111111111",
+                    Cvv = "731"
+                })
+            });
+        var sensitiveFields = details.Fields.Where(field => field.IsSensitive).ToArray();
+
+        Assert.Equal(2, sensitiveFields.Length);
+        Assert.All(sensitiveFields, field => Assert.NotEqual(field.Value, field.DisplayValue));
+        Assert.DoesNotContain(sensitiveFields, field => field.DisplayValue.Contains("731", StringComparison.Ordinal));
+
+        var cardNumber = sensitiveFields.Single(field => field.Value.Contains("4111", StringComparison.Ordinal));
+        cardNumber.ToggleVisibilityCommand.Execute(null);
+
+        Assert.True(cardNumber.IsRevealed);
+        Assert.Equal(cardNumber.Value, cardNumber.DisplayValue);
+
+        var shortDocumentNumber = new WalletFieldDisplayItem("Document", "AB1234", isSensitive: true);
+
+        Assert.NotEqual(shortDocumentNumber.Value, shortDocumentNumber.DisplayValue);
+        Assert.DoesNotContain("AB1234", shortDocumentNumber.DisplayValue, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Wallet_editor_masks_android_sensitive_inputs_by_default()
+    {
+        var editor = new WalletItemEditorViewModel(
+            new LocalizationService(),
+            source: null,
+            newItemType: VaultItemType.BankCard);
+
+        Assert.Equal('*', editor.CardNumberMaskChar);
+        Assert.Equal('*', editor.CvvMaskChar);
+        Assert.Equal('*', editor.DocumentNumberMaskChar);
+
+        editor.CardNumber = "4111-abcd 22";
+        editor.Cvv = "7a3129";
+
+        Assert.Equal("4111 22", editor.CardNumber);
+        Assert.Equal("7312", editor.Cvv);
+
+        editor.ToggleCardNumberVisibilityCommand.Execute(null);
+        editor.ToggleCvvVisibilityCommand.Execute(null);
+        editor.ToggleDocumentNumberVisibilityCommand.Execute(null);
+
+        Assert.Equal('\0', editor.CardNumberMaskChar);
+        Assert.Equal('\0', editor.CvvMaskChar);
+        Assert.Equal('\0', editor.DocumentNumberMaskChar);
     }
 
     [Fact]

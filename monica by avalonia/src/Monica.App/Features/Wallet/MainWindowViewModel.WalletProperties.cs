@@ -14,16 +14,35 @@ public sealed partial class MainWindowViewModel
     [ObservableProperty]
     private WalletItemDetailsViewModel? _selectedWalletDetails;
 
+    [ObservableProperty]
+    private string _walletSearchText = "";
+
+    [ObservableProperty]
+    private bool _walletNarrowShowsList = true;
+
     public string WalletCountText => _localization.Format("WalletCountFormat", WalletItems.Count);
     public int SelectedWalletCount => WalletItems.Count(item => item.IsSelected);
     public string SelectedWalletCountText => _localization.Format("SelectedWalletCountFormat", SelectedWalletCount);
     public bool HasSelectedWalletItems => SelectedWalletCount > 0;
     public bool HasSelectedWalletItem => SelectedWalletItem is not null;
     public bool HasWalletItems => WalletItems.Count > 0;
+    public bool HasWalletSearchText => !string.IsNullOrWhiteSpace(WalletSearchText);
+    public IReadOnlyList<SecureItem> FilteredWalletItems =>
+        WalletItems.Where(item => MatchesWalletSearch(item, WalletSearchText)).ToArray();
+    public bool HasFilteredWalletItems => FilteredWalletItems.Count > 0;
+    public string WalletFilteredStatusText => _localization.Format(
+        "WalletFilteredStatusFormat",
+        FilteredWalletItems.Count,
+        WalletItems.Count);
+    public string WalletEmptyStateText => HasWalletSearchText && HasWalletItems
+        ? _localization.Get("WalletNoResults")
+        : _localization.Get("WalletEmptyHint");
 
     partial void OnSelectedWalletItemChanged(SecureItem? value)
     {
         SelectedWalletDetails = value is null ? null : new WalletItemDetailsViewModel(_localization, value);
         OnPropertyChanged(nameof(HasSelectedWalletItem));
     }
+
+    partial void OnWalletSearchTextChanged(string value) => RaiseWalletFilterState();
 }

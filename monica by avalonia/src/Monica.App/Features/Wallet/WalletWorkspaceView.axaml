@@ -3,6 +3,7 @@
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:local="using:Monica.App"
              xmlns:models="using:Monica.Core.Models"
+             xmlns:views="using:Monica.App.Features.Wallet"
              xmlns:vm="using:Monica.App.ViewModels"
              x:Class="Monica.App.Features.Wallet.WalletWorkspaceView"
              x:Name="WalletWorkspaceRoot"
@@ -12,41 +13,74 @@
       HorizontalAlignment="Stretch"
       ClipToBounds="True">
     <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
-        <Grid ColumnDefinitions="*,320,Auto" ColumnSpacing="12" MinHeight="56">
-            <StackPanel MinWidth="0" VerticalAlignment="Center">
+        <Grid x:Name="WalletHeaderGrid" ColumnDefinitions="*,320,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" MinHeight="56">
+            <StackPanel x:Name="WalletHeaderTitle" MinWidth="0" VerticalAlignment="Center">
                 <TextBlock Classes="workspacePageTitle" Text="{Binding L.Wallet}" />
                 <TextBlock Text="{Binding WalletCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
             </StackPanel>
-            <TextBox Grid.Column="1"
-                     PlaceholderText="{Binding L.Search}"
-                     Text="{Binding SearchText}"
-                     VerticalAlignment="Center" />
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <Button Classes="workspacePrimaryCommand" Command="{Binding AddWalletItemCommand}" ToolTip.Tip="{Binding L.AddItem}">
+            <Grid x:Name="WalletSearchRegion" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="6" VerticalAlignment="Center">
+                <TextBox x:Name="WalletSearchBox"
+                         PlaceholderText="{Binding L.Search}"
+                         AutomationProperties.Name="{Binding L.Search}"
+                         Text="{Binding WalletSearchText}" />
+                <Button x:Name="WalletSearchClearButton"
+                        Grid.Column="1"
+                        Classes="workspaceCommand"
+                        Command="{Binding ClearWalletSearchCommand}"
+                        IsVisible="{Binding HasWalletSearchText}"
+                        ToolTip.Tip="{Binding L[Clear]}"
+                        AutomationProperties.Name="{Binding L[Clear]}"
+                        Width="36"
+                        Height="36"
+                        Padding="0">
+                    <ic:FluentIcon Icon="Dismiss" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Button>
+            </Grid>
+            <StackPanel x:Name="WalletHeaderCommands" Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button Classes="workspacePrimaryCommand" Command="{Binding AddWalletItemCommand}" ToolTip.Tip="{Binding L.AddItem}" AutomationProperties.Name="{Binding L.AddItem}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <ic:FluentIcon Icon="Add" FontSize="18" />
                         <TextBlock Text="{Binding L.AddItem}" />
                     </StackPanel>
                 </Button>
+                <Button x:Name="WalletMoreActionsButton" Classes="workspaceCommand" ToolTip.Tip="{Binding L[MoreActions]}" AutomationProperties.Name="{Binding L[MoreActions]}" Width="36" Height="36" Padding="0">
+                    <ic:FluentIcon Icon="MoreHorizontal" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Button.Flyout>
+                        <MenuFlyout>
+                            <MenuItem Header="{Binding L[ExportWalletCsv]}" Command="{Binding SaveWalletCsvExportCommand}" IsEnabled="{Binding CanUseFilePicker}">
+                                <MenuItem.Icon>
+                                    <ic:FluentIcon Icon="ArrowDownload" FontSize="16" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
             </StackPanel>
         </Grid>
     </Border>
 
-    <Grid Grid.Row="1" ColumnDefinitions="300,*,300" ColumnSpacing="14" MinWidth="0">
-        <Border Classes="workspaceSidebar" ClipToBounds="True">
+    <Grid x:Name="WalletMasterDetailGrid" Grid.Row="1" ColumnSpacing="14" MinWidth="0">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="300" />
+        </Grid.ColumnDefinitions>
+        <Border x:Name="WalletListRegion" Classes="workspaceSidebar" ClipToBounds="True">
         <Grid RowDefinitions="Auto,*,Auto">
             <Grid Margin="14,12,14,8" ColumnDefinitions="*,Auto" ColumnSpacing="8">
                 <StackPanel Spacing="3">
                     <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.Wallet}" />
-                    <TextBlock Text="{Binding L.WalletPageDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" TextWrapping="Wrap" MaxLines="2" />
+                    <TextBlock Text="{Binding WalletFilteredStatusText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" TextWrapping="Wrap" MaxLines="2" />
                 </StackPanel>
                 <Button Grid.Column="1" Classes="workspaceCommand" Command="{Binding AddWalletItemCommand}" ToolTip.Tip="{Binding L.AddItem}" AutomationProperties.Name="{Binding L.AddItem}" Width="34" Height="34" Padding="0">
                     <ic:FluentIcon Icon="Add" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
             </Grid>
             <Grid Grid.Row="1">
-            <ListBox Classes="walletItemList"
-                     ItemsSource="{Binding WalletItems}"
+            <ListBox x:Name="WalletItemList"
+                     Classes="walletItemList"
+                     AutomationProperties.Name="{Binding L.Wallet}"
+                     ItemsSource="{Binding FilteredWalletItems}"
                      SelectedItem="{Binding SelectedWalletItem}"
                      SelectionMode="Single"
                      IsVisible="{Binding HasWalletItems}"
@@ -79,35 +113,63 @@
                                     </MenuItem>
                                 </ContextMenu>
                             </Border.ContextMenu>
-                            <Button Classes="walletItemButton"
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                                <CheckBox IsChecked="{Binding IsSelected}"
+                                          AutomationProperties.Name="{Binding Title}"
+                                          AutomationProperties.HelpText="{Binding #WalletWorkspaceRoot.DataContext.L.Select}"
+                                          ToolTip.Tip="{Binding #WalletWorkspaceRoot.DataContext.L.Select}"
+                                          VerticalAlignment="Top"
+                                          Margin="2,14,0,0" />
+                            <Button Grid.Column="1"
+                                        Classes="walletItemButton"
                                         Command="{Binding #WalletWorkspaceRoot.DataContext.ShowWalletDetailsCommand}"
                                         CommandParameter="{Binding}"
+                                        AutomationProperties.Name="{Binding Title}"
                                         ToolTip.Tip="{Binding Title}">
                                 <Grid ColumnDefinitions="Auto,*" MinHeight="62" ColumnSpacing="10">
                                     <Border Width="44" Height="44" CornerRadius="8" Background="{DynamicResource AccentFillColorDefaultBrush}" VerticalAlignment="Top">
-                                            <ic:FluentIcon Icon="WalletCreditCard" FontSize="18" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        </Border>
+                                        <Grid>
+                                            <ic:FluentIcon Icon="WalletCreditCard" FontSize="18" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsBankCard}}" />
+                                            <ic:FluentIcon Icon="Document" FontSize="18" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsDocument}}" />
+                                        </Grid>
+                                    </Border>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center" MinWidth="0" Spacing="3">
                                         <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                         <TextBlock Text="{Binding Notes}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
                                         <Border Classes="workspaceStatusChip" HorizontalAlignment="Left">
-                                            <TextBlock Text="{Binding ItemType}" FontSize="12" />
+                                            <Grid>
+                                                <TextBlock Text="{Binding #WalletWorkspaceRoot.DataContext.L.BankCard}" FontSize="12" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsBankCard}}" />
+                                                <TextBlock Text="{Binding #WalletWorkspaceRoot.DataContext.L.Document}" FontSize="12" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsDocument}}" />
+                                            </Grid>
                                         </Border>
                                     </StackPanel>
                                 </Grid>
                             </Button>
+                            </Grid>
                         </Border>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
 
-            <StackPanel IsVisible="{Binding !HasWalletItems}" HorizontalAlignment="Left" VerticalAlignment="Top" Spacing="10" Margin="24" Width="240">
+            <StackPanel x:Name="WalletEmptyState" IsVisible="{Binding !HasFilteredWalletItems}" HorizontalAlignment="Left" VerticalAlignment="Top" Spacing="10" Margin="24" Width="240">
                 <ic:FluentIcon Icon="WalletCreditCard" FontSize="34" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
-                <TextBlock Text="{Binding L.WalletPageDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" />
-                <Button Classes="workspacePrimaryCommand" Command="{Binding AddWalletItemCommand}" ToolTip.Tip="{Binding L.AddItem}" HorizontalAlignment="Center">
+                <TextBlock Text="{Binding WalletEmptyStateText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" />
+                <Button x:Name="EmptyWalletAddButton" Classes="workspacePrimaryCommand" Command="{Binding AddWalletItemCommand}" ToolTip.Tip="{Binding L.AddItem}" AutomationProperties.Name="{Binding L.AddItem}" HorizontalAlignment="Center">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <ic:FluentIcon Icon="Add" FontSize="18" />
                         <TextBlock Text="{Binding L.AddItem}" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="EmptyWalletClearSearchButton"
+                        Classes="workspaceCommand"
+                        Command="{Binding ClearWalletSearchCommand}"
+                        IsVisible="{Binding HasWalletSearchText}"
+                        ToolTip.Tip="{Binding L[Clear]}"
+                        AutomationProperties.Name="{Binding L[Clear]}"
+                        HorizontalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Dismiss" FontSize="12" />
+                        <TextBlock Text="{Binding L[Clear]}" />
                     </StackPanel>
                 </Button>
             </StackPanel>
@@ -137,123 +199,12 @@
         </Grid>
         </Border>
 
-        <Border Grid.Column="1" Classes="walletWorkbench" Padding="24" MinWidth="0" ClipToBounds="True">
-            <Grid>
-            <Grid RowDefinitions="Auto,Auto,*" IsVisible="{Binding HasSelectedWalletItem}">
-                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
-                    <Border Width="56" Height="56" CornerRadius="10" Background="{DynamicResource AccentFillColorDefaultBrush}">
-                        <ic:FluentIcon Icon="WalletCreditCard" FontSize="26" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" MinWidth="0">
-                        <TextBlock Text="{Binding SelectedWalletDetails.Title}" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Text="{Binding SelectedWalletDetails.KindText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                    </StackPanel>
-                </Grid>
-
-                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,14,0,0" Spacing="8" HorizontalAlignment="Left">
-                    <Button Classes="workspaceCommand" Command="{Binding EditWalletItemCommand}" CommandParameter="{Binding SelectedWalletItem}" ToolTip.Tip="{Binding L.Edit}">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <ic:FluentIcon Icon="Edit" FontSize="16" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding L.Edit}" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
-
-                <ScrollViewer Grid.Row="2" Margin="0,18,0,0" HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel Spacing="16">
-                        <Border Padding="20" CornerRadius="12" Background="#172F7DFF" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" MaxWidth="420" HorizontalAlignment="Left">
-                            <Grid RowDefinitions="Auto,*,Auto" MinHeight="170">
-                                <TextBlock Text="{Binding SelectedWalletDetails.KindText}" FontWeight="SemiBold" />
-                                <StackPanel Grid.Row="1" VerticalAlignment="Center" Spacing="4">
-                                    <TextBlock Text="{Binding SelectedWalletDetails.PrimaryText}" FontSize="24" FontFamily="Consolas" FontWeight="Bold" />
-                                    <TextBlock Text="{Binding SelectedWalletDetails.SecondaryText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                </StackPanel>
-                                <TextBlock Grid.Row="2" Text="{Binding SelectedWalletDetails.ExpiryText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                            </Grid>
-                        </Border>
-
-                        <ItemsControl ItemsSource="{Binding SelectedWalletDetails.Fields}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:WalletFieldDisplayItem">
-                                    <Grid ColumnDefinitions="130,*,Auto" Margin="0,0,0,8" ColumnSpacing="8">
-                                        <TextBlock Text="{Binding Label}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                        <TextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" />
-                                        <Button Grid.Column="2" Classes="workspaceCommand" Command="{Binding #WalletWorkspaceRoot.DataContext.CopyWalletFieldCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding #WalletWorkspaceRoot.DataContext.L.Copy}" Width="32" Height="32" Padding="0" VerticalAlignment="Top">
-                                            <ic:FluentIcon Icon="Copy" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        </Button>
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-
-                    </StackPanel>
-                </ScrollViewer>
-            </Grid>
-
-                <StackPanel IsVisible="{Binding !HasSelectedWalletItem}" Spacing="10" Width="260" Margin="24" HorizontalAlignment="Left" VerticalAlignment="Top">
-                    <ic:FluentIcon Icon="WalletCreditCard" FontSize="34" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
-                    <TextBlock Text="{Binding L.WalletPageDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" />
-                    <Button Classes="workspacePrimaryCommand" Command="{Binding AddWalletItemCommand}" ToolTip.Tip="{Binding L.AddItem}" HorizontalAlignment="Center">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="Add" FontSize="18" />
-                            <TextBlock Text="{Binding L.AddItem}" />
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
-            </Grid>
+        <Border x:Name="WalletWorkbenchRegion" Grid.Column="1" Classes="walletWorkbench" Padding="24" MinWidth="0" ClipToBounds="True" Focusable="True">
+            <views:WalletWorkbenchView x:Name="WalletWorkbench" />
         </Border>
 
-        <Border Grid.Column="2" Classes="walletInspector" Padding="16" ClipToBounds="True">
-            <Grid>
-                <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasSelectedWalletItem}">
-                    <StackPanel Spacing="16">
-                        <StackPanel Spacing="4">
-                            <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.Details}" />
-                            <TextBlock Text="{Binding SelectedWalletDetails.KindText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                        </StackPanel>
-
-                        <StackPanel Spacing="8">
-                            <TextBlock Text="{Binding L.DocumentPhotos}" FontWeight="SemiBold" />
-                            <ItemsControl ItemsSource="{Binding SelectedWalletDetails.ImagePaths}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Padding="10" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Margin="0,0,0,8">
-                                            <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <TextBlock Text="{Binding L.NoDocumentPhotos}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding !SelectedWalletDetails.HasImages}" />
-                        </StackPanel>
-
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="{Binding L.Notes}" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding SelectedWalletDetails.Notes}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                        </StackPanel>
-
-                        <Border Classes="walletRiskZone" Padding="14">
-                            <StackPanel Spacing="10">
-                                <StackPanel Spacing="3">
-                                    <TextBlock Text="{Binding L.Delete}" FontWeight="SemiBold" />
-                                    <TextBlock Text="{Binding L.WalletPageDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" FontSize="12" />
-                                </StackPanel>
-                                <Button Classes="workspaceCommand" Command="{Binding DeleteWalletItemCommand}" CommandParameter="{Binding SelectedWalletItem}" ToolTip.Tip="{Binding L.Delete}" HorizontalAlignment="Left">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <ic:FluentIcon Icon="Delete" FontSize="16" />
-                                        <TextBlock Text="{Binding L.Delete}" />
-                                    </StackPanel>
-                                </Button>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-                </ScrollViewer>
-
-                <StackPanel IsVisible="{Binding !HasSelectedWalletItem}" Spacing="10" HorizontalAlignment="Left" VerticalAlignment="Top">
-                    <ic:FluentIcon Icon="Info" FontSize="28" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                    <TextBlock Text="{Binding L.Details}" FontWeight="SemiBold" />
-                    <TextBlock Text="{Binding L.WalletPageDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                </StackPanel>
-            </Grid>
+        <Border x:Name="WalletInspectorRegion" Grid.Column="2" Classes="walletInspector" Padding="16" ClipToBounds="True">
+            <views:WalletInspectorView />
         </Border>
         </Grid>
     </Grid>

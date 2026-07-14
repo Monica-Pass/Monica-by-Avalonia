@@ -10,7 +10,7 @@ public sealed partial class MainWindowViewModel
     {
         var editor = await _walletItemEditorDialogService.ShowAsync(
             null,
-            WalletItems.Count % 2 == 0 ? VaultItemType.BankCard : VaultItemType.Document);
+            VaultItemType.BankCard);
         if (editor is null)
         {
             return;
@@ -29,6 +29,7 @@ public sealed partial class MainWindowViewModel
         TrackWalletSelection(item);
         WalletItems.Insert(0, item);
         SelectedWalletItem = item;
+        WalletNarrowShowsList = false;
         RaiseCounts();
         StatusMessage = _localization.Format("SavedWalletItemFormat", item.Title);
     }
@@ -70,7 +71,23 @@ public sealed partial class MainWindowViewModel
         if (item is not null)
         {
             SelectedWalletItem = item;
+            WalletNarrowShowsList = false;
         }
+    }
+
+    [RelayCommand]
+    private void ShowWalletList() => WalletNarrowShowsList = true;
+
+    [RelayCommand]
+    private void ClearWalletSearch()
+    {
+        if (!HasWalletSearchText)
+        {
+            return;
+        }
+
+        WalletSearchText = "";
+        StatusMessage = _localization.Get("ClearedWalletSearch");
     }
 
     [RelayCommand]
@@ -83,6 +100,14 @@ public sealed partial class MainWindowViewModel
 
         await _clipboardService.SetSensitiveTextAsync(field.Value);
         StatusMessage = _localization.Format("CopiedWalletFieldFormat", field.Label);
+    }
+
+    [RelayCommand]
+    private async Task CopySelectedWalletPrimaryFieldAsync()
+    {
+        var field = SelectedWalletDetails?.Fields.FirstOrDefault(item => item.IsSensitive)
+            ?? SelectedWalletDetails?.Fields.FirstOrDefault();
+        await CopyWalletFieldAsync(field);
     }
 
     [RelayCommand]

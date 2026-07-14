@@ -1,0 +1,52 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Wallet.WalletInspectorView"
+             x:DataType="vm:MainWindowViewModel">
+    <Grid>
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasSelectedWalletItem}">
+            <StackPanel Spacing="16">
+                <StackPanel Spacing="4">
+                    <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.Details}" />
+                    <TextBlock Text="{Binding SelectedWalletDetails.KindText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <TextBlock Text="{Binding L.DocumentPhotos}" FontWeight="SemiBold" />
+                    <ItemsControl ItemsSource="{Binding SelectedWalletDetails.ImagePaths}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="{Binding L.NoDocumentPhotos}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding !SelectedWalletDetails.HasImages}" />
+                </StackPanel>
+
+                <StackPanel Spacing="4" IsVisible="{Binding SelectedWalletDetails.HasNotes}">
+                    <TextBlock Text="{Binding L.Notes}" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding SelectedWalletDetails.Notes}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+
+                <Border Classes="walletRiskZone" Padding="14">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="{Binding L.Delete}" FontWeight="SemiBold" />
+                        <Button Classes="workspaceCommand" Command="{Binding DeleteWalletItemCommand}" CommandParameter="{Binding SelectedWalletItem}" ToolTip.Tip="{Binding L.Delete}" AutomationProperties.Name="{Binding L.Delete}" HorizontalAlignment="Left">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:FluentIcon Icon="Delete" FontSize="16" />
+                                <TextBlock Text="{Binding L.Delete}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel IsVisible="{Binding !HasSelectedWalletItem}" Spacing="10" HorizontalAlignment="Left" VerticalAlignment="Top">
+            <ic:FluentIcon Icon="Info" FontSize="28" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+            <TextBlock Text="{Binding L.Details}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding L.WalletPageDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+        </StackPanel>
+    </Grid>
+</UserControl>
