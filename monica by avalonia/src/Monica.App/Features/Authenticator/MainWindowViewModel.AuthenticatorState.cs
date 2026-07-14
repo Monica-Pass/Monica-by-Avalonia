@@ -40,6 +40,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(FilteredTotpItems));
         OnPropertyChanged(nameof(HasFilteredTotpItems));
         OnPropertyChanged(nameof(HasTotpFilterOrSearch));
+        OnPropertyChanged(nameof(HasTotpSearchText));
         OnPropertyChanged(nameof(TotpExpiringSoonCount));
         OnPropertyChanged(nameof(TotpConsoleStatusText));
         OnPropertyChanged(nameof(TotpFilteredStatusText));
@@ -242,7 +243,7 @@ public sealed partial class MainWindowViewModel
             }
         }
 
-        return MatchesTotpSearch(item, SearchText);
+        return MatchesTotpSearch(item, TotpSearchText);
     }
 
     private static bool MatchesTotpSearch(SecureItem item, string query)
@@ -258,7 +259,6 @@ public sealed partial class MainWindowViewModel
             term,
             item.Title,
             item.Notes,
-            item.TotpCode,
             data?.Issuer ?? "",
             data?.AccountName ?? "",
             data?.OtpType ?? "");

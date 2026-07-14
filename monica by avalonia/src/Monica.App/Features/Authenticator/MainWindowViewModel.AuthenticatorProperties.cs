@@ -24,6 +24,12 @@ public sealed partial class MainWindowViewModel
     [ObservableProperty]
     private string _selectedTotpFilterKey = TotpFilterAll;
 
+    [ObservableProperty]
+    private string _totpSearchText = "";
+
+    [ObservableProperty]
+    private bool _totpNarrowShowsList = true;
+
     public string TotpCountText => _localization.Format("TotpCountFormat", TotpItems.Count);
     public int TotpExpiringSoonCount => TotpItems.Count(IsTotpExpiringSoon);
     public string TotpConsoleStatusText => _localization.Format("TotpConsoleStatusFormat", TotpItems.Count, TotpExpiringSoonCount);
@@ -49,7 +55,8 @@ public sealed partial class MainWindowViewModel
     public bool HasFilteredTotpItems => FilteredTotpItems.Count > 0;
     public bool HasTotpFilterOrSearch =>
         !string.Equals(SelectedTotpFilterKey, TotpFilterAll, StringComparison.OrdinalIgnoreCase) ||
-        !string.IsNullOrWhiteSpace(SearchText);
+        !string.IsNullOrWhiteSpace(TotpSearchText);
+    public bool HasTotpSearchText => !string.IsNullOrWhiteSpace(TotpSearchText);
 
     partial void OnSelectedTotpItemChanged(SecureItem? value)
     {
@@ -63,4 +70,6 @@ public sealed partial class MainWindowViewModel
     }
 
     partial void OnSelectedTotpFilterKeyChanged(string value) => RaiseTotpFilterState();
+
+    partial void OnTotpSearchTextChanged(string value) => RaiseTotpFilterState();
 }

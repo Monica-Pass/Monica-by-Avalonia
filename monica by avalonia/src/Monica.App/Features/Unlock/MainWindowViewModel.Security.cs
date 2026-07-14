@@ -159,6 +159,8 @@ public sealed partial class MainWindowViewModel
         NoteTagsText = "";
         PasswordSearchText = "";
         SearchText = "";
+        TotpSearchText = "";
+        TotpNarrowShowsList = true;
         GeneratedPassword = "";
         ClearTransferBuffers();
     }

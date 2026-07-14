@@ -132,9 +132,6 @@ public sealed partial class MainWindowViewModel
     private void RaiseOtherWorkspaceLayoutState()
     {
         OnPropertyChanged(nameof(IsOtherWorkspaceCompact));
-        OnPropertyChanged(nameof(TotpAccountColumnWidth));
-        OnPropertyChanged(nameof(TotpCodeColumnWidth));
-        OnPropertyChanged(nameof(TotpInspectorColumnWidth));
         OnPropertyChanged(nameof(TotpCodeConsolePadding));
         OnPropertyChanged(nameof(TotpCodeFontSize));
         OnPropertyChanged(nameof(GeneratorOptionsColumnWidth));

@@ -28,10 +28,10 @@ public sealed class TotpItemDetailsViewModel
         [
             new(localization.Issuer, Issuer),
             new(localization.Account, Account),
-            new("OTP", OtpType),
-            new("Period", PeriodText),
-            new("Digits", DigitsText),
-            new("Algorithm", Algorithm),
+            new(localization.Get("TotpType"), OtpType),
+            new(localization.Get("TotpPeriod"), PeriodText),
+            new(localization.Get("TotpDigits"), DigitsText),
+            new(localization.Get("TotpAlgorithm"), Algorithm),
             new(localization.CreatedAt, CreatedAtText),
             new(localization.UpdatedAt, UpdatedAtText)
         ];

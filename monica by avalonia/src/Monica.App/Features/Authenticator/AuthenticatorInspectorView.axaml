@@ -1,0 +1,54 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Authenticator.AuthenticatorInspectorView"
+             x:DataType="vm:MainWindowViewModel">
+    <Grid>
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasSelectedTotpItem}">
+            <StackPanel Spacing="16">
+                <StackPanel Spacing="4">
+                    <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.Details}" />
+                    <TextBlock Text="{Binding SelectedTotpDetails.Issuer}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <ItemsControl ItemsSource="{Binding SelectedTotpDetails.Fields}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:WalletFieldDisplayItem">
+                            <Grid RowDefinitions="Auto,Auto" Margin="0,0,0,10">
+                                <TextBlock Text="{Binding Label}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Grid.Row="1" Text="{Binding Value}" TextWrapping="Wrap" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <StackPanel Spacing="4" IsVisible="{Binding SelectedTotpDetails.HasNotes}">
+                    <TextBlock Text="{Binding L.Notes}" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding SelectedTotpDetails.Notes}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+
+                <Border Classes="totpRiskZone" Padding="14">
+                    <StackPanel Spacing="10">
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="{Binding L.Delete}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding L.TotpPageDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" FontSize="12" />
+                        </StackPanel>
+                        <Button Classes="workspaceCommand" Command="{Binding DeleteTotpCommand}" CommandParameter="{Binding SelectedTotpItem}" ToolTip.Tip="{Binding L.Delete}" AutomationProperties.Name="{Binding L.Delete}" HorizontalAlignment="Left">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:FluentIcon Icon="Delete" FontSize="16" />
+                                <TextBlock Text="{Binding L.Delete}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel IsVisible="{Binding !HasSelectedTotpItem}" Spacing="10" HorizontalAlignment="Left" VerticalAlignment="Top">
+            <ic:FluentIcon Icon="Info" FontSize="28" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+            <TextBlock Text="{Binding L.Details}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding L.TotpPageDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+        </StackPanel>
+    </Grid>
+</UserControl>

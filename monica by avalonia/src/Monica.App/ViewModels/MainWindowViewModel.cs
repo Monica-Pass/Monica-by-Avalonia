@@ -148,15 +148,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public bool IsOtherWorkspaceCompact =>
         OtherWorkspaceViewportWidth > 0 &&
         (OtherWorkspaceViewportWidth < 980 || OtherWorkspaceViewportHeight < 460);
-    public GridLength TotpAccountColumnWidth => IsOtherWorkspaceCompact
-        ? new GridLength(1.15, GridUnitType.Star)
-        : new GridLength(300);
-    public GridLength TotpCodeColumnWidth => IsOtherWorkspaceCompact
-        ? new GridLength(1, GridUnitType.Star)
-        : new GridLength(1, GridUnitType.Star);
-    public GridLength TotpInspectorColumnWidth => IsOtherWorkspaceCompact
-        ? new GridLength(1.05, GridUnitType.Star)
-        : new GridLength(300);
     public Thickness TotpCodeConsolePadding => IsOtherWorkspaceCompact
         ? new Thickness(16)
         : new Thickness(24);
@@ -221,7 +212,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RefreshRecycleBinSearchState();
         RaisePasswordSelectionState();
         ReconcileSelectedPasswordDetails();
-        RaiseTotpFilterState();
     }
 
     partial void OnSelectedSectionChanged(string value)
@@ -629,6 +619,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(TotpShowHiddenText));
         OnPropertyChanged(nameof(TotpHelpText));
         RaiseTotpFilterState(reconcileSelection: false);
+        if (SelectedTotpItem is not null)
+        {
+            SelectedTotpDetails = new TotpItemDetailsViewModel(_localization, SelectedTotpItem);
+        }
         RaiseCounts();
         OnPropertyChanged(nameof(SecurityIssueCountText));
         OnPropertyChanged(nameof(NotePreviewMarkdown));

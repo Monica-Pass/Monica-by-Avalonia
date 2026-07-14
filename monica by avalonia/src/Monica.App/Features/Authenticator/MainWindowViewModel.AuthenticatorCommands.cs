@@ -11,8 +11,12 @@ public sealed partial class MainWindowViewModel
         if (item is not null)
         {
             SelectedTotpItem = item;
+            TotpNarrowShowsList = false;
         }
     }
+
+    [RelayCommand]
+    private void ShowTotpList() => TotpNarrowShowsList = true;
 
     [RelayCommand]
     private void SelectTotpFilter(string? key)
@@ -23,11 +27,14 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private void ClearTotpFilters()
     {
-        SearchText = "";
+        TotpSearchText = "";
         SelectedTotpFilterKey = TotpFilterAll;
         RaiseTotpFilterState();
         StatusMessage = _localization.Get("ClearedTotpFilters");
     }
+
+    [RelayCommand]
+    private void ClearTotpSearch() => TotpSearchText = "";
 
     [RelayCommand]
     private async Task AddTotpAsync()
@@ -52,6 +59,7 @@ public sealed partial class MainWindowViewModel
         TrackTotpSelection(item);
         TotpItems.Insert(0, item);
         SelectedTotpItem = item;
+        TotpNarrowShowsList = false;
         RaiseCounts();
         RaiseTotpFilterState(reconcileSelection: false);
         RaiseTotpSelectionState();

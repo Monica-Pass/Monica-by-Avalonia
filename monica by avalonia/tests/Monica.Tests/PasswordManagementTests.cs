@@ -1679,6 +1679,11 @@ public sealed class PasswordManagementTests
         Assert.True(item.Id > 0);
         Assert.Single(await harness.Repository.GetSecureItemsAsync(VaultItemType.Totp));
 
+        await harness.ViewModel.CopyTotpCommand.ExecuteAsync(item);
+
+        Assert.Equal(item.TotpCode, harness.Clipboard.Text);
+        Assert.Matches("^[0-9]{6}$", harness.Clipboard.Text);
+
         harness.TotpDialog.ConfigureNext(editor =>
         {
             editor.Title = "GitHub prod";
@@ -1769,21 +1774,46 @@ public sealed class PasswordManagementTests
         Assert.All(harness.ViewModel.FilteredTotpItems, item => Assert.Contains("GitHub", item.Title));
 
         harness.ViewModel.SelectTotpFilterCommand.Execute("all");
-        harness.ViewModel.SearchText = "azure";
+        harness.ViewModel.SearchText = "password page search";
+        harness.ViewModel.TotpSearchText = "azure";
 
         var searched = Assert.Single(harness.ViewModel.FilteredTotpItems);
         Assert.Equal("Azure admin", searched.Title);
 
-        harness.ViewModel.SearchText = "missing authenticator";
+        harness.ViewModel.TotpSearchText = "missing authenticator";
 
         Assert.False(harness.ViewModel.HasFilteredTotpItems);
         Assert.True(harness.ViewModel.HasTotpFilterOrSearch);
 
+        var transientCode = harness.ViewModel.TotpItems[0].TotpCode;
+        harness.ViewModel.TotpSearchText = transientCode;
+
+        Assert.False(harness.ViewModel.HasFilteredTotpItems);
+
         harness.ViewModel.ClearTotpFiltersCommand.Execute(null);
 
-        Assert.Equal("", harness.ViewModel.SearchText);
+        Assert.Equal("", harness.ViewModel.TotpSearchText);
+        Assert.Equal("password page search", harness.ViewModel.SearchText);
         Assert.Equal(3, harness.ViewModel.FilteredTotpItems.Count);
         Assert.Contains(harness.ViewModel.TotpFilterChoices, item => item.Key == "all" && item.IsSelected);
+    }
+
+    [Fact]
+    public void Totp_details_never_expose_the_stored_secret()
+    {
+        const string secret = "JBSWY3DPEHPK3PXP";
+        var localization = new LocalizationService();
+        var item = new SecureItem
+        {
+            ItemType = VaultItemType.Totp,
+            Title = "GitHub",
+            ItemData = TotpDataResolver.ToItemData(new TotpData(secret, "GitHub", "dev@example.com"))
+        };
+
+        var details = new TotpItemDetailsViewModel(localization, item);
+
+        Assert.DoesNotContain(details.Fields, field => field.Value.Contains(secret, StringComparison.Ordinal));
+        Assert.DoesNotContain(secret, details.Notes, StringComparison.Ordinal);
     }
 
     [Fact]
