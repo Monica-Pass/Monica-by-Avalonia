@@ -82,7 +82,7 @@ public partial class App : Application
     }
 
 
-    private static ServiceProvider ConfigureServices(MainWindow mainWindow)
+    internal static ServiceProvider ConfigureServices(MainWindow mainWindow)
     {
         var services = new ServiceCollection();
         services.AddLogging();

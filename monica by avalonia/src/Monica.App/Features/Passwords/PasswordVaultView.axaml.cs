@@ -17,6 +17,7 @@ public partial class PasswordVaultView : UserControl
         InitializeComponent();
         SizeChanged += (_, e) => UpdateResponsiveLayoutForWidth(e.NewSize.Width);
         DataContextChanged += OnDataContextChanged;
+        Dispatcher.UIThread.Post(PasswordEditorDialogWarmup.EnsureWarmed, DispatcherPriority.Background);
     }
 
     public bool IsNarrowLayout { get; private set; }

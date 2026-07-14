@@ -265,6 +265,28 @@ public sealed class VaultCredentialTests
     }
 
     [Fact]
+    public async Task Startup_initialization_begins_settings_and_vault_metadata_reads_together()
+    {
+        var release = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var settings = new BlockingStartupSettingsService(release.Task);
+        var coordinator = new BlockingStartupVaultCoordinator(release.Task);
+        var viewModel = CreateViewModel(
+            GetTempDatabasePath(),
+            settingsService: settings,
+            vaultUnlockCoordinator: coordinator);
+
+        var initialization = viewModel.InitializeAsync();
+        var bothEntered = Task.WhenAll(settings.LoadEntered.Task, coordinator.InitializeEntered.Task);
+        var observed = await Task.WhenAny(bothEntered, Task.Delay(250));
+
+        release.TrySetResult(null);
+        await initialization;
+
+        Assert.Same(bothEntered, observed);
+        Assert.True(viewModel.IsVaultInitialized);
+    }
+
+    [Fact]
     public async Task ViewModel_creates_vault_then_rejects_wrong_password()
     {
         var path = GetTempDatabasePath();
@@ -445,6 +467,45 @@ public sealed class VaultCredentialTests
         }
 
         public void Complete(VaultUnlockResult result) => _completion.TrySetResult(result);
+    }
+
+    private sealed class BlockingStartupSettingsService(Task release) : IAppSettingsService
+    {
+        public DesktopAppSettings Current { get; } = new();
+        public TaskCompletionSource<object?> LoadEntered { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task LoadAsync(CancellationToken cancellationToken = default)
+        {
+            LoadEntered.TrySetResult(null);
+            await release.WaitAsync(cancellationToken);
+        }
+
+        public Task SaveAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task ClearSensitiveCacheAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public IReadOnlyDictionary<string, bool> GetFeatureToggles() => Current.FeatureToggles;
+        public bool IsFeatureEnabled(string featureKey) => Current.FeatureToggles.GetValueOrDefault(featureKey);
+        public void SetFeatureEnabled(string featureKey, bool isEnabled) => Current.FeatureToggles[featureKey] = isEnabled;
+    }
+
+    private sealed class BlockingStartupVaultCoordinator(Task release) : IVaultUnlockCoordinator
+    {
+        public TaskCompletionSource<object?> InitializeEntered { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task<VaultInitializationState> InitializeAsync(CancellationToken cancellationToken = default)
+        {
+            InitializeEntered.TrySetResult(null);
+            await release.WaitAsync(cancellationToken);
+            return new VaultInitializationState(LegacyVaultDetection.Empty, true);
+        }
+
+        public Task<VaultUnlockResult> UnlockOrCreateAsync(
+            string masterPassword,
+            string confirmMasterPassword,
+            LegacyVaultDetection legacyVaultDetection,
+            CancellationToken cancellationToken = default) =>
+            Task.FromException<VaultUnlockResult>(new NotSupportedException());
     }
 
     private static string GetTempDatabasePath()

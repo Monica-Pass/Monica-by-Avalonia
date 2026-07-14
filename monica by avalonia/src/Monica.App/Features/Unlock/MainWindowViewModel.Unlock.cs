@@ -81,11 +81,13 @@ public sealed partial class MainWindowViewModel
         try
         {
             AppDiagnostics.Info("Initialize started");
-            await _settingsService.LoadAsync();
-            ApplySettings(_settingsService.Current);
-            var initialization = await AppDiagnostics.MeasureAsync(
+            var settingsLoad = _settingsService.LoadAsync();
+            var vaultInitialization = AppDiagnostics.MeasureAsync(
                 "Vault metadata initialize",
                 () => _vaultUnlockCoordinator.InitializeAsync());
+            await Task.WhenAll(settingsLoad, vaultInitialization);
+            ApplySettings(_settingsService.Current);
+            var initialization = await vaultInitialization;
             _legacyVaultDetection = initialization.LegacyVaultDetection;
             RaiseLegacyVaultImportPrompt();
             if (_legacyVaultDetection.RequiresImport)
