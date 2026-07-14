@@ -120,6 +120,48 @@ public sealed class PasswordManagementTests
     }
 
     [Fact]
+    public async Task Password_list_status_reports_visible_and_total_counts_only_while_filtered()
+    {
+        var harness = CreateHarness();
+        await harness.Repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "Favorite",
+            Username = "favorite",
+            Password = "one",
+            IsFavorite = true
+        });
+        await harness.Repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "Work",
+            Username = "work",
+            Password = "two"
+        });
+        await harness.Repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "Personal",
+            Username = "personal",
+            Password = "three"
+        });
+        await harness.ViewModel.LoadAsync();
+
+        Assert.Equal(
+            harness.ViewModel.L.Format("PasswordCountFormat", 3),
+            harness.ViewModel.PasswordListStatusText);
+
+        harness.ViewModel.QuickFilterFavorite = true;
+
+        Assert.Equal(
+            harness.ViewModel.L.Format("PasswordFilteredStatusFormat", 1, 3),
+            harness.ViewModel.PasswordListStatusText);
+
+        harness.ViewModel.ClearPasswordFiltersCommand.Execute(null);
+
+        Assert.Equal(
+            harness.ViewModel.L.Format("PasswordCountFormat", 3),
+            harness.ViewModel.PasswordListStatusText);
+    }
+
+    [Fact]
     public async Task Performance_budget_add_password_does_not_rebuild_all_derived_collections()
     {
         var harness = CreateHarness();

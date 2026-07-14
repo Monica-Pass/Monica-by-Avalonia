@@ -9,6 +9,9 @@ namespace Monica.App.ViewModels;
 public sealed partial class MainWindowViewModel
 {
     public string PasswordCountText => _localization.Format("PasswordCountFormat", Passwords.Count);
+    public string PasswordListStatusText => HasPasswordFilters
+        ? _localization.Format("PasswordFilteredStatusFormat", FilteredPasswords.Count, Passwords.Count)
+        : PasswordCountText;
     public bool HasFilteredPasswordRows => FilteredPasswordRows.Count > 0;
     public bool HasPasswordSearchText => !string.IsNullOrEmpty(PasswordSearchText);
     public bool ShowAddPasswordInEmptyState => Passwords.Count == 0;

@@ -47,6 +47,7 @@ public sealed partial class MainWindowViewModel
     private void RaisePasswordFilterState()
     {
         OnPropertyChanged(nameof(HasPasswordFilters));
+        OnPropertyChanged(nameof(PasswordListStatusText));
         OnPropertyChanged(nameof(PasswordFilterSummaryText));
         OnPropertyChanged(nameof(PasswordEmptyStateText));
         OnPropertyChanged(nameof(ShowClearPasswordFiltersInEmptyState));
@@ -152,6 +153,7 @@ public sealed partial class MainWindowViewModel
         _filteredPasswordRowsDirty = true;
         OnPropertyChanged(nameof(FilteredPasswords));
         OnPropertyChanged(nameof(FilteredPasswordRows));
+        OnPropertyChanged(nameof(PasswordListStatusText));
         OnPropertyChanged(nameof(VisiblePasswordNavigationEntries));
         OnPropertyChanged(nameof(HasFilteredPasswordRows));
         OnPropertyChanged(nameof(PasswordEmptyStateText));

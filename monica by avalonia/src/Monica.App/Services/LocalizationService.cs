@@ -95,6 +95,7 @@ public interface ILocalizationService : INotifyPropertyChanged
     string QuickFilterUncategorized { get; }
     string QuickFilterLocalOnly { get; }
     string QuickFilterAttachments { get; }
+    string PasswordFilters { get; }
     string QuickAccessRecent { get; }
     string QuickAccessFrequent { get; }
     string SortPasswords { get; }
@@ -551,6 +552,7 @@ public sealed class LocalizationService : ILocalizationService
     public string QuickFilterUncategorized => Text();
     public string QuickFilterLocalOnly => Text();
     public string QuickFilterAttachments => Text();
+    public string PasswordFilters => Text();
     public string QuickAccessRecent => Text();
     public string QuickAccessFrequent => Text();
     public string SortPasswords => Text();
@@ -1059,6 +1061,7 @@ public sealed class LocalizationService : ILocalizationService
         ["QuickFilterUncategorized"] = "Uncategorized",
         ["QuickFilterLocalOnly"] = "Local only",
         ["QuickFilterAttachments"] = "Attachments",
+        ["PasswordFilters"] = "Filters",
         ["ClearPasswordFilters"] = "Clear filters",
         ["ClearedPasswordFilters"] = "Cleared password filters",
         ["QuickAccessRecent"] = "Recently opened",
@@ -1677,6 +1680,7 @@ public sealed class LocalizationService : ILocalizationService
         ["MinuteFormat"] = "{0} min",
         ["SecondFormat"] = "{0} sec",
         ["PasswordCountFormat"] = "{0} items",
+        ["PasswordFilteredStatusFormat"] = "{0} visible · {1} total",
         ["DatabaseSummaryFormat"] = "{0} passwords, {1} notes, {2} authenticators, {3} wallet items",
         ["MdbxDatabaseCountFormat"] = "{0} MDBX metadata record(s)",
         ["MdbxSourceCountFormat"] = "{0} vault(s)",
@@ -2039,6 +2043,7 @@ public sealed class LocalizationService : ILocalizationService
         ["QuickFilterUncategorized"] = "未分类",
         ["QuickFilterLocalOnly"] = "仅本地",
         ["QuickFilterAttachments"] = "附件",
+        ["PasswordFilters"] = "筛选",
         ["MoreOptions"] = "更多操作",
         ["MoveToRecycleBin"] = "移到回收站",
         ["BatchFavorite"] = "收藏所选",
@@ -2664,6 +2669,7 @@ public sealed class LocalizationService : ILocalizationService
         ["MinuteFormat"] = "{0} 分钟",
         ["SecondFormat"] = "{0} 秒",
         ["PasswordCountFormat"] = "{0} 项",
+        ["PasswordFilteredStatusFormat"] = "显示 {0} 项，共 {1} 项",
         ["ArchivedPasswordCountFormat"] = "{0} 个已归档密码",
         ["DeletedPasswordCountFormat"] = "{0} 个已删除密码",
         ["TimelineCountFormat"] = "{0} 条事件",
