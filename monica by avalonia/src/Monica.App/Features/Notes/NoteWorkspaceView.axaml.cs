@@ -12,7 +12,7 @@ public partial class NoteWorkspaceView : UserControl
         InitializeComponent();
     }
 
-    public bool TryHandleShortcut(KeyEventArgs e) => Editor.TryHandleWorkspaceShortcut(e);
+    public bool TryHandleShortcut(KeyEventArgs e) => NoteEditorRegion.TryHandleWorkspaceShortcut(e);
 
     public Task CloseTabWithPromptAsync(MainWindowViewModel viewModel, NoteEditorTab tab) =>
         TabStrip.CloseTabWithPromptAsync(viewModel, tab);
@@ -24,8 +24,8 @@ public partial class NoteWorkspaceView : UserControl
 
     public void HandleSelectedTabChanged()
     {
-        Editor.RestoreSelectedTabSelection();
-        Editor.EnsureSelectedHistory();
+        NoteEditorRegion.RestoreSelectedTabSelection();
+        NoteEditorRegion.EnsureSelectedHistory();
         TabStrip.ScrollSelectedIntoView();
         TabStrip.UpdateScrollButtons();
     }
@@ -36,9 +36,11 @@ public partial class NoteWorkspaceView : UserControl
         TabStrip.UpdateScrollButtons();
     }
 
-    public Task<bool> RunSmokeChecksAsync(MainWindowViewModel viewModel) => Editor.RunSmokeChecksAsync(viewModel);
+    public void FocusNoteTree() => NoteTreeRegion.FocusSearch();
 
-    public Task RunKeyboardSmokeChecksAsync(Action<string, bool, string> check) => Editor.RunKeyboardSmokeChecksAsync(check);
+    public Task<bool> RunSmokeChecksAsync(MainWindowViewModel viewModel) => NoteEditorRegion.RunSmokeChecksAsync(viewModel);
+
+    public Task RunKeyboardSmokeChecksAsync(Action<string, bool, string> check) => NoteEditorRegion.RunKeyboardSmokeChecksAsync(check);
 
     private void WorkspaceGrid_OnSizeChanged(object? sender, SizeChangedEventArgs e)
     {
@@ -56,7 +58,7 @@ public partial class NoteWorkspaceView : UserControl
         }
     }
 
-    private void Inspector_OnLineRequested(object? sender, NoteLineRequestedEventArgs e) => Editor.JumpToLine(e.LineNumber);
+    private void Inspector_OnLineRequested(object? sender, NoteLineRequestedEventArgs e) => NoteEditorRegion.JumpToLine(e.LineNumber);
 
-    private void TabStrip_OnTabClosed(object? sender, NoteTabClosedEventArgs e) => Editor.RemoveHistory(e.Tab);
+    private void TabStrip_OnTabClosed(object? sender, NoteTabClosedEventArgs e) => NoteEditorRegion.RemoveHistory(e.Tab);
 }

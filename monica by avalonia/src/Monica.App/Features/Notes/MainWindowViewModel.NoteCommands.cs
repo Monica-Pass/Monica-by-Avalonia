@@ -25,6 +25,7 @@ public sealed partial class MainWindowViewModel
         OpenNoteTabs.Add(tab);
         NotifyNoteTabsChanged();
         SelectedNoteTab = tab;
+        NoteNarrowShowsTree = false;
         StatusMessage = _localization.Get("EditingNewSecureNote");
     }
 
@@ -34,6 +35,7 @@ public sealed partial class MainWindowViewModel
         if (item is not null)
         {
             OpenNoteTab(item);
+            NoteNarrowShowsTree = false;
         }
     }
 
@@ -116,8 +118,12 @@ public sealed partial class MainWindowViewModel
 
     private void RaiseNoteWorkspaceLayoutState()
     {
+        OnPropertyChanged(nameof(IsNoteWorkspaceNarrow));
         OnPropertyChanged(nameof(IsNoteTreePaneVisible));
+        OnPropertyChanged(nameof(IsNoteEditorWorkspaceVisible));
+        OnPropertyChanged(nameof(ShowBackToNoteList));
         OnPropertyChanged(nameof(NoteTreeColumnWidth));
+        OnPropertyChanged(nameof(NoteWorkspaceEditorColumnWidth));
         OnPropertyChanged(nameof(NoteTabStripWidth));
         OnPropertyChanged(nameof(IsNoteInspectorPaneVisible));
         OnPropertyChanged(nameof(NoteInspectorColumnWidth));
@@ -150,7 +156,23 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(HasFavoriteNoteItems));
         OnPropertyChanged(nameof(HasFilteredNoteItems));
         OnPropertyChanged(nameof(HasNoteTreeGroups));
+        OnPropertyChanged(nameof(HasNoteSearchText));
+        OnPropertyChanged(nameof(ShowAddNoteInEmptyTree));
+        OnPropertyChanged(nameof(ShowClearNoteSearchInEmptyTree));
+        OnPropertyChanged(nameof(NoteTreeEmptyText));
         OnPropertyChanged(nameof(NoteTreeStatusText));
+    }
+
+    [RelayCommand]
+    private void ClearNoteSearch() => NoteSearchText = "";
+
+    [RelayCommand]
+    private void ShowNoteTree()
+    {
+        if (IsNoteWorkspaceNarrow)
+        {
+            NoteNarrowShowsTree = true;
+        }
     }
 
     private void RefreshNoteTabState()
@@ -175,7 +197,7 @@ public sealed partial class MainWindowViewModel
             .ToArray();
     }
 
-    private static IReadOnlyList<NoteTreeGroup> BuildNoteTreeGroups(IReadOnlyList<SecureItem> notes)
+    private IReadOnlyList<NoteTreeGroup> BuildNoteTreeGroups(IReadOnlyList<SecureItem> notes)
     {
         var taggedGroups = new SortedDictionary<string, List<SecureItem>>(StringComparer.OrdinalIgnoreCase);
         var untagged = new List<SecureItem>();
@@ -207,7 +229,7 @@ public sealed partial class MainWindowViewModel
 
         if (untagged.Count > 0)
         {
-            groups.Add(new NoteTreeGroup("未分类", untagged.Count, untagged, IsUntagged: true));
+            groups.Add(new NoteTreeGroup(_localization.Get("NoteUntagged"), untagged.Count, untagged, IsUntagged: true));
         }
 
         return groups;
@@ -309,7 +331,7 @@ public sealed partial class MainWindowViewModel
     {
         try
         {
-            var file = await _fileSystemPickerService.OpenBinaryFileAsync("插入图片", NoteImageFileTypes);
+            var file = await _fileSystemPickerService.OpenBinaryFileAsync(_localization.Get("InsertImage"), NoteImageFileTypes);
             if (file is null)
             {
                 return null;
@@ -319,12 +341,12 @@ public sealed partial class MainWindowViewModel
                 file.FileName,
                 file.Content,
                 InferImageContentType(file.FileName));
-            StatusMessage = $"已插入图片 {draft.FileName}";
+            StatusMessage = _localization.Format("InsertedNoteImageFormat", draft.FileName);
             return NoteContentCodec.BuildInlineImageMarkdown(draft.StoragePath);
         }
         catch (Exception ex)
         {
-            StatusMessage = $"插入图片失败：{ex.Message}";
+            StatusMessage = _localization.Format("InsertNoteImageFailedFormat", ex.Message);
             return null;
         }
     }
@@ -415,7 +437,7 @@ public sealed partial class MainWindowViewModel
         var dirtyTabs = OpenNoteTabs.Where(tab => tab.IsDirty).ToArray();
         if (dirtyTabs.Length == 0)
         {
-            StatusMessage = "没有需要保存的笔记";
+            StatusMessage = _localization.Get("NoNotesToSave");
             return;
         }
 
@@ -444,8 +466,8 @@ public sealed partial class MainWindowViewModel
         }
 
         StatusMessage = skippedCount == 0
-            ? $"已保存 {savedCount} 个笔记"
-            : $"已保存 {savedCount} 个笔记，{skippedCount} 个空笔记未保存";
+            ? _localization.Format("SavedNotesFormat", savedCount)
+            : _localization.Format("SavedNotesWithSkippedFormat", savedCount, skippedCount);
     }
 
     [RelayCommand(CanExecute = nameof(CanUseFilePicker))]
@@ -453,7 +475,7 @@ public sealed partial class MainWindowViewModel
     {
         try
         {
-            var file = await _fileSystemPickerService.OpenTextFileAsync("导入 Markdown", MarkdownFileTypes);
+            var file = await _fileSystemPickerService.OpenTextFileAsync(_localization.Get("ImportMarkdown"), MarkdownFileTypes);
             if (file is null)
             {
                 return;
@@ -481,11 +503,11 @@ public sealed partial class MainWindowViewModel
             OpenNoteTabs.Add(tab);
             NotifyNoteTabsChanged();
             SelectedNoteTab = tab;
-            StatusMessage = $"已导入 Markdown 草稿 {file.FileName}";
+            StatusMessage = _localization.Format("ImportedMarkdownDraftFormat", file.FileName);
         }
         catch (Exception ex)
         {
-            StatusMessage = $"导入 Markdown 失败：{ex.Message}";
+            StatusMessage = _localization.Format("ImportMarkdownFailedFormat", ex.Message);
         }
     }
 
@@ -509,7 +531,7 @@ public sealed partial class MainWindowViewModel
         var content = NoteIsMarkdown
             ? NoteContent
             : NoteContentCodec.ToPlainPreview(NoteContent, NoteIsMarkdown);
-        await SaveExportTextAsync("导出 Markdown", suggestedFileName, content, MarkdownFileTypes);
+        await SaveExportTextAsync(_localization.Get("ExportMarkdown"), suggestedFileName, content, MarkdownFileTypes);
     }
 
     private static bool CanSaveNoteTab(NoteEditorTab tab) =>
@@ -613,9 +635,17 @@ public sealed partial class MainWindowViewModel
 
         await _repository.SoftDeleteSecureItemAsync(item.Id);
         NoteItems.Remove(item);
-        if (ReferenceEquals(SelectedNote, item) || SelectedNote?.Id == item.Id)
+        var deletedTabs = OpenNoteTabs
+            .Where(tab => tab.Source?.Id == item.Id)
+            .ToArray();
+        foreach (var tab in deletedTabs)
         {
-            AddNote();
+            CloseNoteTab(tab);
+        }
+
+        if (deletedTabs.Length == 0 && SelectedNote?.Id == item.Id)
+        {
+            SelectedNote = null;
         }
 
         RaiseCounts();

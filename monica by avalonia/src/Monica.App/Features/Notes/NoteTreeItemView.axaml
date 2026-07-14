@@ -16,6 +16,7 @@
                     Grid.ColumnSpan="2"
                     Command="{Binding #Root.ViewModel.OpenNoteCommand}"
                     CommandParameter="{Binding}"
+                    AutomationProperties.Name="{Binding Title}"
                     MinHeight="48" />
             <Grid Margin="10,7"
                   ColumnDefinitions="Auto,*"
@@ -41,6 +42,7 @@
                     Command="{Binding #Root.ViewModel.DeleteNoteCommand}"
                     CommandParameter="{Binding}"
                     ToolTip.Tip="{Binding #Root.ViewModel.L.MoveToRecycleBin}"
+                    AutomationProperties.Name="{Binding #Root.ViewModel.L.MoveToRecycleBin}"
                     Width="28"
                     Height="28"
                     Padding="0"

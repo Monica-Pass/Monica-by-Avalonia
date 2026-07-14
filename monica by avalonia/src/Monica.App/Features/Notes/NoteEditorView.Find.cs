@@ -252,7 +252,7 @@ public partial class NoteEditorView
         NoteContentEditor.SelectionEnd = 0;
         CaptureNoteEditorHistorySnapshot();
         UpdateNoteFindStatus();
-        NoteFindStatusText.Text = $"已替换 {count} 处";
+        NoteFindStatusText.Text = FormatLocalizedText("NoteReplacedMatchesFormat", count);
         NoteContentEditor.Focus();
     }
 
@@ -310,7 +310,7 @@ public partial class NoteEditorView
 
         if (matches.Count == 0)
         {
-            NoteFindStatusText.Text = "无匹配";
+            NoteFindStatusText.Text = GetLocalizedText("NoteNoMatches");
             return;
         }
 

@@ -25,6 +25,61 @@ public sealed class PasswordManagementTestCollection
 public sealed class PasswordManagementTests
 {
     [Fact]
+    public void ViewModel_note_workspace_uses_single_pane_navigation_when_narrow()
+    {
+        var harness = CreateHarness();
+        harness.ViewModel.NoteWorkspaceViewportWidth = 680;
+
+        Assert.True(harness.ViewModel.IsNoteWorkspaceNarrow);
+        Assert.True(harness.ViewModel.IsNoteTreePaneVisible);
+        Assert.False(harness.ViewModel.IsNoteEditorWorkspaceVisible);
+
+        harness.ViewModel.AddNoteCommand.Execute(null);
+
+        Assert.False(harness.ViewModel.NoteNarrowShowsTree);
+        Assert.False(harness.ViewModel.IsNoteTreePaneVisible);
+        Assert.True(harness.ViewModel.IsNoteEditorWorkspaceVisible);
+
+        harness.ViewModel.ShowNoteTreeCommand.Execute(null);
+
+        Assert.True(harness.ViewModel.NoteNarrowShowsTree);
+        Assert.True(harness.ViewModel.IsNoteTreePaneVisible);
+        Assert.False(harness.ViewModel.IsNoteEditorWorkspaceVisible);
+
+        harness.ViewModel.NoteSearchText = "missing";
+        harness.ViewModel.ClearNoteSearchCommand.Execute(null);
+        Assert.Equal("", harness.ViewModel.NoteSearchText);
+    }
+
+    [Fact]
+    public async Task ViewModel_deleting_open_note_closes_its_tab_without_creating_phantom_draft()
+    {
+        var confirmation = new FakeConfirmationDialogService();
+        var harness = CreateHarness(confirmationDialogService: confirmation);
+        var payload = NoteContentCodec.BuildSavePayload("Delete note", "body", "", true);
+        var note = new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = payload.Title,
+            Notes = payload.NotesCache,
+            ItemData = payload.ItemData
+        };
+        await harness.Repository.SaveSecureItemAsync(note);
+        await harness.ViewModel.LoadAsync();
+
+        var displayed = Assert.Single(harness.ViewModel.NoteItems);
+        harness.ViewModel.OpenNoteCommand.Execute(displayed);
+        Assert.Single(harness.ViewModel.OpenNoteTabs);
+
+        await harness.ViewModel.DeleteNoteCommand.ExecuteAsync(displayed);
+
+        Assert.Empty(harness.ViewModel.NoteItems);
+        Assert.Empty(harness.ViewModel.OpenNoteTabs);
+        Assert.Null(harness.ViewModel.SelectedNoteTab);
+        Assert.False(harness.ViewModel.HasOpenNoteTabs);
+    }
+
+    [Fact]
     public async Task Password_workflow_distinguishes_empty_vault_from_empty_search_results()
     {
         var harness = CreateHarness();

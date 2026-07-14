@@ -6,7 +6,11 @@
              x:Name="Root"
              x:DataType="vm:MainWindowViewModel">
     <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Background="{DynamicResource LayerFillColorDefaultBrush}">
-        <Grid Height="44" ColumnDefinitions="0,*">
+        <Grid Height="44">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="{Binding NoteTreeColumnWidth}" />
+                <ColumnDefinition Width="{Binding NoteWorkspaceEditorColumnWidth}" />
+            </Grid.ColumnDefinitions>
             <Border IsVisible="{Binding IsNoteTreePaneVisible}" Padding="14,0" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,1,0">
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
                     <ic:FluentIcon Icon="Folder" FontSize="17" VerticalAlignment="Center" />
@@ -15,8 +19,8 @@
                 </Grid>
             </Border>
 
-            <Grid Grid.Column="1" HorizontalAlignment="Left" Width="{Binding NoteTabStripWidth}" MaxWidth="680" ColumnDefinitions="Auto,*" Background="{DynamicResource LayerFillColorSubtleBrush}">
-                <Button x:Name="PreviousNoteTabButton" Click="PreviousNoteTabButton_OnClick" IsEnabled="False" ToolTip.Tip="向左滚动标签" Width="30" Height="34" Padding="0" Margin="8,5,2,0" VerticalAlignment="Top">
+            <Grid Grid.Column="1" IsVisible="{Binding IsNoteEditorWorkspaceVisible}" HorizontalAlignment="Left" Width="{Binding NoteTabStripWidth}" MaxWidth="680" ColumnDefinitions="Auto,*" Background="{DynamicResource LayerFillColorSubtleBrush}">
+                <Button x:Name="PreviousNoteTabButton" Click="PreviousNoteTabButton_OnClick" IsEnabled="False" ToolTip.Tip="{Binding L[PreviousNoteTabs]}" AutomationProperties.Name="{Binding L[PreviousNoteTabs]}" Width="30" Height="34" Padding="0" Margin="8,5,2,0" VerticalAlignment="Top">
                     <ic:FluentIcon Icon="ChevronLeft" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
                 <ScrollViewer x:Name="NoteTabsScrollViewer" Grid.Column="1" Height="44" MaxHeight="44" MinWidth="0" Margin="0,0,158,0" ClipToBounds="True" SizeChanged="NoteTabsScrollViewer_OnSizeChanged" ScrollChanged="NoteTabsScrollViewer_OnScrollChanged" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden">
@@ -34,7 +38,7 @@
                                                     <TextBlock Grid.Column="1" Text="*" IsVisible="{Binding IsDirty}" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
                                                 </Grid>
                                             </Button>
-                                            <Button Grid.Column="1" Click="CloseNoteTabButton_OnClick" IsVisible="{Binding IsSelected}" ToolTip.Tip="关闭标签" Width="24" Height="24" Padding="0" Margin="0,2,5,0" VerticalAlignment="Top">
+                                            <Button Grid.Column="1" Click="CloseNoteTabButton_OnClick" IsVisible="{Binding IsSelected}" ToolTip.Tip="{Binding #Root.DataContext.L[CloseNoteTab]}" AutomationProperties.Name="{Binding #Root.DataContext.L[CloseNoteTab]}" Width="24" Height="24" Padding="0" Margin="0,2,5,0" VerticalAlignment="Top">
                                                 <ic:FluentIcon Icon="Dismiss" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                             </Button>
                                         </Grid>
@@ -46,22 +50,22 @@
                 </ScrollViewer>
 
                 <StackPanel Grid.Column="1" Panel.ZIndex="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Background="{DynamicResource LayerFillColorSubtleBrush}">
-                    <Button x:Name="NextNoteTabButton" Click="NextNoteTabButton_OnClick" IsEnabled="False" ToolTip.Tip="向右滚动标签" Width="30" Height="34" Padding="0" Margin="2,5,4,0" VerticalAlignment="Top"><ic:FluentIcon Icon="ChevronRight" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                    <Button Command="{Binding AddNoteCommand}" ToolTip.Tip="{Binding L.NewSecureNote}" Width="34" Height="34" Padding="0" Margin="0,5,4,0" VerticalAlignment="Top"><ic:FluentIcon Icon="Add" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                    <Button Command="{Binding SaveNoteCommand}" ToolTip.Tip="{Binding L.SaveNote}" Width="34" Height="34" Padding="0" Margin="0,5,4,0" VerticalAlignment="Top"><ic:FluentIcon Icon="Save" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                    <Button ToolTip.Tip="{Binding L.MoreOptions}" Width="34" Height="34" Padding="0" Margin="0,5,8,0" VerticalAlignment="Top">
+                    <Button x:Name="NextNoteTabButton" Click="NextNoteTabButton_OnClick" IsEnabled="False" ToolTip.Tip="{Binding L[NextNoteTabs]}" AutomationProperties.Name="{Binding L[NextNoteTabs]}" Width="30" Height="34" Padding="0" Margin="2,5,4,0" VerticalAlignment="Top"><ic:FluentIcon Icon="ChevronRight" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
+                    <Button Command="{Binding AddNoteCommand}" ToolTip.Tip="{Binding L.NewSecureNote}" AutomationProperties.Name="{Binding L.NewSecureNote}" Width="34" Height="34" Padding="0" Margin="0,5,4,0" VerticalAlignment="Top"><ic:FluentIcon Icon="Add" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
+                    <Button Command="{Binding SaveNoteCommand}" IsEnabled="{Binding HasOpenNoteTabs}" ToolTip.Tip="{Binding L.SaveNote}" AutomationProperties.Name="{Binding L.SaveNote}" Width="34" Height="34" Padding="0" Margin="0,5,4,0" VerticalAlignment="Top"><ic:FluentIcon Icon="Save" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
+                    <Button ToolTip.Tip="{Binding L.MoreOptions}" AutomationProperties.Name="{Binding L.MoreOptions}" Width="34" Height="34" Padding="0" Margin="0,5,8,0" VerticalAlignment="Top">
                         <ic:FluentIcon Icon="MoreHorizontal" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         <Button.Flyout>
                             <MenuFlyout>
-                                <MenuItem Header="保存全部" Command="{Binding SaveAllNoteTabsCommand}" />
-                                <MenuItem Header="导入 Markdown" Command="{Binding ImportMarkdownNoteCommand}" IsEnabled="{Binding CanUseFilePicker}" />
-                                <MenuItem Header="导出 Markdown" Command="{Binding ExportCurrentNoteMarkdownCommand}" IsEnabled="{Binding CanUseFilePicker}" />
-                                <MenuItem Header="插入图片" Command="{Binding InsertNoteImageCommand}" IsEnabled="{Binding CanUseFilePicker}" />
-                                <MenuItem Header="{Binding L.Favorite}" Command="{Binding ToggleNoteFavoriteCommand}" />
+                                <MenuItem Header="{Binding L[SaveAllNotes]}" Command="{Binding SaveAllNoteTabsCommand}" />
+                                <MenuItem Header="{Binding L[ImportMarkdown]}" Command="{Binding ImportMarkdownNoteCommand}" IsEnabled="{Binding CanUseFilePicker}" />
+                                <MenuItem Header="{Binding L[ExportMarkdown]}" Command="{Binding ExportCurrentNoteMarkdownCommand}" IsEnabled="{Binding HasOpenNoteTabs}" />
+                                <MenuItem Header="{Binding L[InsertImage]}" Command="{Binding InsertNoteImageCommand}" IsEnabled="{Binding HasOpenNoteTabs}" />
+                                <MenuItem Header="{Binding L.Favorite}" Command="{Binding ToggleNoteFavoriteCommand}" IsEnabled="{Binding HasOpenNoteTabs}" />
                                 <Separator />
-                                <MenuItem Header="编辑模式" Click="SetNoteEditModeMenuItem_OnClick" />
-                                <MenuItem Header="预览模式" Click="SetNotePreviewModeMenuItem_OnClick" />
-                                <MenuItem Header="分屏模式" Click="SetNoteSplitModeMenuItem_OnClick" />
+                                <MenuItem Header="{Binding L[NoteEditMode]}" Click="SetNoteEditModeMenuItem_OnClick" IsEnabled="{Binding HasOpenNoteTabs}" />
+                                <MenuItem Header="{Binding L[NotePreviewMode]}" Click="SetNotePreviewModeMenuItem_OnClick" IsEnabled="{Binding HasOpenNoteTabs}" />
+                                <MenuItem Header="{Binding L[NoteSplitMode]}" Click="SetNoteSplitModeMenuItem_OnClick" IsEnabled="{Binding HasOpenNoteTabs}" />
                             </MenuFlyout>
                         </Button.Flyout>
                     </Button>

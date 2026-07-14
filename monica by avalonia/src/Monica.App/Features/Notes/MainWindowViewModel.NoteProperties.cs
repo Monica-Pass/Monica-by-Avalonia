@@ -49,6 +49,9 @@ public sealed partial class MainWindowViewModel
     [ObservableProperty]
     private bool _noteIsFavorite;
 
+    [ObservableProperty]
+    private bool _noteNarrowShowsTree = true;
+
     public string NoteLineNumbersText => BuildLineNumbersText(NoteContent);
     public int NoteLineCount => CountNoteLines(NoteContent);
     public int NoteWordCount => CountNoteWords(NoteContent);
@@ -61,7 +64,7 @@ public sealed partial class MainWindowViewModel
     public bool HasNoteReferenceItems => NoteReferenceCount > 0;
     public int NoteImagePreviewCount => NoteImagePreviewItems.Count;
     public bool HasNoteImagePreviewItems => NoteImagePreviewCount > 0;
-    public string NoteFormatText => NoteIsMarkdown ? "Markdown" : "Plain text";
+    public string NoteFormatText => NoteIsMarkdown ? "Markdown" : _localization.PlainText;
     public IReadOnlyList<SecureItem> FavoriteNoteItems => BuildFilteredNoteItems(favoritesOnly: true);
     public IReadOnlyList<SecureItem> FilteredNoteItems => BuildFilteredNoteItems(favoritesOnly: false);
     public IReadOnlyList<NoteTreeGroup> NoteTreeGroups => BuildNoteTreeGroups(FilteredNoteItems);
@@ -69,6 +72,12 @@ public sealed partial class MainWindowViewModel
     public bool HasFavoriteNoteItems => FavoriteNoteItems.Count > 0;
     public bool HasFilteredNoteItems => FilteredNoteItems.Count > 0;
     public bool HasNoteTreeGroups => NoteTreeGroups.Count > 0;
+    public bool HasNoteSearchText => !string.IsNullOrWhiteSpace(NoteSearchText);
+    public bool ShowAddNoteInEmptyTree => NoteItems.Count == 0;
+    public bool ShowClearNoteSearchInEmptyTree => NoteItems.Count > 0 && HasNoteSearchText && !HasNoteTreeGroups;
+    public string NoteTreeEmptyText => ShowClearNoteSearchInEmptyTree
+        ? _localization.Get("NoteNoMatchingItems")
+        : _localization.Get("NoteEmptyDescription");
     public string NoteTreeStatusText => string.IsNullOrWhiteSpace(NoteSearchText)
         ? NoteCountText
         : $"{FilteredNoteItems.Count}/{NoteItems.Count}";
@@ -86,9 +95,24 @@ public sealed partial class MainWindowViewModel
     public Thickness NotePreviewContentPadding => NoteSplitPreviewMode
         ? new Thickness(0)
         : new Thickness(32, 0, 0, 0);
-    public bool IsNoteTreePaneVisible => !NoteSplitPreviewMode;
+    public bool IsNoteWorkspaceNarrow =>
+        NoteWorkspaceViewportWidth > 0 &&
+        NoteWorkspaceViewportWidth < 760;
+    public bool IsNoteTreePaneVisible =>
+        !NoteSplitPreviewMode &&
+        (!IsNoteWorkspaceNarrow || NoteNarrowShowsTree);
+    public bool IsNoteEditorWorkspaceVisible =>
+        !IsNoteWorkspaceNarrow || !NoteNarrowShowsTree;
+    public bool ShowBackToNoteList =>
+        IsNoteWorkspaceNarrow &&
+        !NoteNarrowShowsTree;
     public GridLength NoteTreeColumnWidth => IsNoteTreePaneVisible
-        ? new GridLength(280)
+        ? IsNoteWorkspaceNarrow
+            ? new GridLength(1, GridUnitType.Star)
+            : new GridLength(280)
+        : new GridLength(0);
+    public GridLength NoteWorkspaceEditorColumnWidth => IsNoteEditorWorkspaceVisible
+        ? new GridLength(1, GridUnitType.Star)
         : new GridLength(0);
     public bool IsNoteInspectorPaneVisible =>
         NoteWorkspaceViewportWidth <= 0 || NoteWorkspaceViewportWidth >= 780;
@@ -97,8 +121,21 @@ public sealed partial class MainWindowViewModel
         : new GridLength(0);
     public string NoteEditorStatusText =>
         NoteSelectedCharacterCount > 0
-            ? $"行 {NoteCaretLine}, 列 {NoteCaretColumn} · 已选 {NoteSelectedCharacterCount} · {NoteLineCount} 行 · {NoteWordCount} 词 · {NoteCharacterCount} 字符"
-            : $"行 {NoteCaretLine}, 列 {NoteCaretColumn} · {NoteLineCount} 行 · {NoteWordCount} 词 · {NoteCharacterCount} 字符";
+            ? _localization.Format(
+                "NoteEditorSelectionStatusFormat",
+                NoteCaretLine,
+                NoteCaretColumn,
+                NoteSelectedCharacterCount,
+                NoteLineCount,
+                NoteWordCount,
+                NoteCharacterCount)
+            : _localization.Format(
+                "NoteEditorStatusFormat",
+                NoteCaretLine,
+                NoteCaretColumn,
+                NoteLineCount,
+                NoteWordCount,
+                NoteCharacterCount);
     public bool HasOpenNoteTabs => OpenNoteTabs.Count > 0;
     public double NoteTabWidth => CalculateNoteTabWidth(OpenNoteTabs.Count, NoteTabRailViewportWidth);
     public double NoteTabStripWidth
@@ -141,6 +178,11 @@ public sealed partial class MainWindowViewModel
         {
             if (SetProperty(ref _noteWorkspaceViewportWidth, Math.Max(0, value)))
             {
+                if (IsNoteWorkspaceNarrow)
+                {
+                    NoteNarrowShowsTree = SelectedNoteTab is null;
+                }
+
                 RaiseNoteWorkspaceLayoutState();
             }
         }
@@ -240,6 +282,8 @@ public sealed partial class MainWindowViewModel
 
     partial void OnNoteSearchTextChanged(string value) => RaiseNoteTreeState();
 
+    partial void OnNoteNarrowShowsTreeChanged(bool value) => RaiseNoteWorkspaceLayoutState();
+
     partial void OnSelectedNoteChanged(SecureItem? value)
     {
         if (_isLoadingNoteEditor)
@@ -265,6 +309,11 @@ public sealed partial class MainWindowViewModel
         }
 
         LoadNoteTab(newValue);
+        if (IsNoteWorkspaceNarrow)
+        {
+            NoteNarrowShowsTree = newValue is null;
+        }
+
         RefreshNoteTabState();
     }
 }

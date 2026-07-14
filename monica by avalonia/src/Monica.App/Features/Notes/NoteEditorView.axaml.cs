@@ -174,4 +174,14 @@ public partial class NoteEditorView : UserControl
 
     private void RequestClose(NoteEditorTab tab) =>
         CloseRequested?.Invoke(this, new NoteEditorCloseRequestedEventArgs(tab));
+
+    private string GetLocalizedText(string key) =>
+        DataContext is MainWindowViewModel viewModel
+            ? viewModel.L.Get(key)
+            : key;
+
+    private string FormatLocalizedText(string key, params object[] arguments) =>
+        DataContext is MainWindowViewModel viewModel
+            ? viewModel.L.Format(key, arguments)
+            : string.Format(System.Globalization.CultureInfo.InvariantCulture, key, arguments);
 }

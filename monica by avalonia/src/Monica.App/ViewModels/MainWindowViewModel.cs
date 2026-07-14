@@ -633,6 +633,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(SecurityIssueCountText));
         OnPropertyChanged(nameof(NotePreviewMarkdown));
         OnPropertyChanged(nameof(NotePlainPreview));
+        OnPropertyChanged(nameof(NoteFormatText));
+        OnPropertyChanged(nameof(NoteEditorStatusText));
+        OnPropertyChanged(nameof(NoteReferenceItems));
         if (!_hasCompromisedPasswordCheckResults)
         {
             CompromisedPasswordStatus = _localization.Get("CompromisedPasswordNotChecked");

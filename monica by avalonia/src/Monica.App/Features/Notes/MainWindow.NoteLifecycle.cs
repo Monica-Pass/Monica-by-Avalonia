@@ -21,6 +21,15 @@ public partial class MainWindow
             return;
         }
 
+        if (viewModel.IsNoteWorkspaceNarrow &&
+            !viewModel.NoteNarrowShowsTree &&
+            (e.Key == Key.Escape || (e.Key == Key.Left && e.KeyModifiers == KeyModifiers.Alt)))
+        {
+            viewModel.ShowNoteTreeCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+
         if (!e.KeyModifiers.HasFlag(KeyModifiers.Control))
         {
             return;
@@ -152,6 +161,17 @@ public partial class MainWindow
                 if (WorkspaceHost.TryGet<NoteWorkspaceView>("Notes", out var noteWorkspace))
                 {
                     noteWorkspace.HandleTabWidthChanged();
+                }
+            });
+        }
+        else if (e.PropertyName == nameof(MainWindowViewModel.NoteNarrowShowsTree) &&
+                 _observedViewModel?.NoteNarrowShowsTree == true)
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (WorkspaceHost.TryGet<NoteWorkspaceView>("Notes", out var noteWorkspace))
+                {
+                    noteWorkspace.FocusNoteTree();
                 }
             });
         }

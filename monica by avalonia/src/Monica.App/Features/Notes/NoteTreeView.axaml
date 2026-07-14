@@ -14,39 +14,52 @@
             Background="{DynamicResource LayerFillColorDefaultBrush}">
         <Grid RowDefinitions="Auto,Auto,Auto,*" Margin="12">
             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6" Margin="0,0,0,10">
-                <TextBlock Text="保险库" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
-                <Button Grid.Column="1" Command="{Binding AddNoteCommand}" ToolTip.Tip="{Binding L.NewSecureNote}" Width="32" Height="32" Padding="0">
+                <TextBlock Text="{Binding L[NoteVault]}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Command="{Binding AddNoteCommand}" ToolTip.Tip="{Binding L.NewSecureNote}" AutomationProperties.Name="{Binding L.NewSecureNote}" Width="32" Height="32" Padding="0">
                     <ic:FluentIcon Icon="Add" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
-                <Button Grid.Column="2" Command="{Binding LoadCommand}" ToolTip.Tip="{Binding L.Refresh}" Width="32" Height="32" Padding="0">
+                <Button Grid.Column="2" Command="{Binding LoadCommand}" ToolTip.Tip="{Binding L.Refresh}" AutomationProperties.Name="{Binding L.Refresh}" Width="32" Height="32" Padding="0">
                     <ic:FluentIcon Icon="ArrowSync" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
             </Grid>
 
-            <TextBox Grid.Row="1"
-                     Text="{Binding NoteSearchText}"
-                     PlaceholderText="搜索笔记、标签、正文"
-                     Height="32"
-                     Margin="0,0,0,10" />
+            <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="4" Margin="0,0,0,10">
+                <TextBox x:Name="NoteSearchBox"
+                         Text="{Binding NoteSearchText}"
+                         PlaceholderText="{Binding L[NoteSearchWatermark]}"
+                         AutomationProperties.Name="{Binding L.Search}"
+                         Height="32" />
+                <Button x:Name="ClearNoteSearchButton"
+                        Grid.Column="1"
+                        IsVisible="{Binding HasNoteSearchText}"
+                        Command="{Binding ClearNoteSearchCommand}"
+                        ToolTip.Tip="{Binding L[ClearNoteSearch]}"
+                        AutomationProperties.Name="{Binding L[ClearNoteSearch]}"
+                        Width="32"
+                        Height="32"
+                        Padding="0">
+                    <ic:FluentIcon Icon="Dismiss" FontSize="14" />
+                </Button>
+            </Grid>
 
             <Border Grid.Row="2" Padding="10,8" CornerRadius="6" Background="{DynamicResource LayerFillColorSubtleBrush}" Margin="0,0,0,10">
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
                     <ic:FluentIcon Icon="Home" FontSize="16" VerticalAlignment="Center" />
                     <StackPanel Grid.Column="1">
-                        <TextBlock Text="主页" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding L[NoteHome]}" FontWeight="SemiBold" />
                         <TextBlock Text="{Binding NoteTreeStatusText}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ScrollViewer Grid.Row="3" IsVisible="{Binding HasNoteTreeGroups}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Spacing="10">
                     <StackPanel IsVisible="{Binding HasFavoriteNoteItems}">
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6" Margin="2,0,0,6">
                             <ic:FluentIcon Icon="ChevronDown" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="7">
                                 <ic:FluentIcon Icon="Star" FontSize="14" VerticalAlignment="Center" />
-                                <TextBlock Text="收藏" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding L.Favorite}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
                             </StackPanel>
                             <TextBlock Grid.Column="2" Text="{Binding FavoriteNoteCount}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
                         </Grid>
@@ -65,7 +78,7 @@
                             <ic:FluentIcon Icon="ChevronDown" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="7">
                                 <ic:FluentIcon Icon="FolderOpen" FontSize="14" VerticalAlignment="Center" />
-                                <TextBlock Text="标签文件树" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding L[NoteTagTree]}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
                             </StackPanel>
                             <TextBlock Grid.Column="2" Text="{Binding FilteredNoteItems.Count}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
                         </Grid>
@@ -94,14 +107,35 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <TextBlock IsVisible="{Binding HasNoteTreeGroups, Converter={x:Static local:BoolConverters.Not}}"
-                                   Text="没有匹配的笔记"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                   Margin="22,8,0,0" />
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>
+
+            <StackPanel x:Name="NoteTreeEmptyState"
+                        Grid.Row="3"
+                        IsVisible="{Binding HasNoteTreeGroups, Converter={x:Static local:BoolConverters.Not}}"
+                        Spacing="10"
+                        Margin="20"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+                <ic:FluentIcon Icon="Note" FontSize="32" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
+                <TextBlock Text="{Binding NoteTreeEmptyText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="220" />
+                <Button x:Name="EmptyNoteTreeAddButton"
+                        IsVisible="{Binding ShowAddNoteInEmptyTree}"
+                        Command="{Binding AddNoteCommand}"
+                        AutomationProperties.Name="{Binding L.NewSecureNote}"
+                        HorizontalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Add" FontSize="16" />
+                        <TextBlock Text="{Binding L.NewSecureNote}" />
+                    </StackPanel>
+                </Button>
+                <Button IsVisible="{Binding ShowClearNoteSearchInEmptyTree}"
+                        Command="{Binding ClearNoteSearchCommand}"
+                        AutomationProperties.Name="{Binding L[ClearNoteSearch]}"
+                        Content="{Binding L[ClearNoteSearch]}"
+                        HorizontalAlignment="Center" />
+            </StackPanel>
         </Grid>
     </Border>
 </UserControl>

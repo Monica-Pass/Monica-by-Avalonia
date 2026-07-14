@@ -281,12 +281,14 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(HasNoteImagePreviewItems));
     }
 
-    private static string BuildNoteImagePreviewName(string imagePath, int fallbackIndex)
+    private string BuildNoteImagePreviewName(string imagePath, int fallbackIndex)
     {
         var normalized = imagePath.Trim();
         if (normalized.StartsWith("mdbx:", StringComparison.OrdinalIgnoreCase))
         {
-            return fallbackIndex > 0 ? $"MDBX image {fallbackIndex}" : "MDBX image";
+            return fallbackIndex > 0
+                ? $"MDBX {_localization.Format("NoteImageNumberFormat", fallbackIndex)}"
+                : $"MDBX {_localization.Get("NoteImage")}";
         }
 
         var fileName = Path.GetFileName(normalized.Replace('\\', '/'));
@@ -295,7 +297,9 @@ public sealed partial class MainWindowViewModel
             return fileName;
         }
 
-        return fallbackIndex > 0 ? $"Image {fallbackIndex}" : "Image";
+        return fallbackIndex > 0
+            ? _localization.Format("NoteImageNumberFormat", fallbackIndex)
+            : _localization.Get("NoteImage");
     }
 
     private static string BuildLineNumbersText(string content)
@@ -339,7 +343,7 @@ public sealed partial class MainWindowViewModel
     private static bool IsCjkCharacter(char character) =>
         character is >= '\u3400' and <= '\u9fff' or >= '\uf900' and <= '\ufaff';
 
-    private static string BuildNotePreviewMarkdown(string content)
+    private string BuildNotePreviewMarkdown(string content)
     {
         if (string.IsNullOrWhiteSpace(content))
         {
@@ -372,8 +376,8 @@ public sealed partial class MainWindowViewModel
                     }
 
                     return string.IsNullOrWhiteSpace(label)
-                        ? "[图片附件]"
-                        : $"[图片附件: {label}]";
+                        ? $"[{_localization.Get("NoteImageAttachment")}]"
+                        : $"[{_localization.Format("NoteImageAttachmentFormat", label)}]";
                 });
             AppendPreviewMarkdownLine(builder, previewLine, index < lines.Length - 1);
         }
@@ -436,7 +440,7 @@ public sealed partial class MainWindowViewModel
         return items;
     }
 
-    private static IReadOnlyList<NoteReferenceItem> BuildNoteReferenceItems(string content)
+    private IReadOnlyList<NoteReferenceItem> BuildNoteReferenceItems(string content)
     {
         if (string.IsNullOrWhiteSpace(content))
         {
@@ -473,7 +477,7 @@ public sealed partial class MainWindowViewModel
 
                 markdownLinkRanges.Add((match.Index, match.Index + match.Length));
                 items.Add(new NoteReferenceItem(
-                    string.IsNullOrWhiteSpace(label) ? (isImage ? "Image" : target) : label,
+                    string.IsNullOrWhiteSpace(label) ? (isImage ? _localization.Get("NoteImage") : target) : label,
                     target,
                     index + 1,
                     isImage));

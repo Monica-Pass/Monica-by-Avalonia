@@ -31,4 +31,14 @@ public partial class NoteTabStripView : UserControl
     }
 
     private void NotifyTabClosed(NoteEditorTab tab) => TabClosed?.Invoke(this, new NoteTabClosedEventArgs(tab));
+
+    private string GetLocalizedText(string key) =>
+        DataContext is MainWindowViewModel viewModel
+            ? viewModel.L.Get(key)
+            : key;
+
+    private string FormatLocalizedText(string key, params object[] arguments) =>
+        DataContext is MainWindowViewModel viewModel
+            ? viewModel.L.Format(key, arguments)
+            : key;
 }

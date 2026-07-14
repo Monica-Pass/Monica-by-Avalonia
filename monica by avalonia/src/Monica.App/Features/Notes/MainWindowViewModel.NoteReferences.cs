@@ -13,18 +13,18 @@ public sealed partial class MainWindowViewModel
     {
         if (!TryCreateExternalReferenceUri(item?.Target, out var uri))
         {
-            StatusMessage = "无法打开此引用";
+            StatusMessage = _localization.Get("ReferenceCannotOpen");
             return;
         }
 
         try
         {
             await _externalLinkService.OpenAsync(uri);
-            StatusMessage = $"已打开 {uri.Host}";
+            StatusMessage = _localization.Format("OpenedReferenceFormat", uri.Host);
         }
         catch (Exception ex)
         {
-            StatusMessage = $"打开引用失败：{ex.Message}";
+            StatusMessage = _localization.Format("OpenReferenceFailedFormat", ex.Message);
         }
     }
 
@@ -37,6 +37,6 @@ public sealed partial class MainWindowViewModel
         }
 
         await _clipboardService.SetSensitiveTextAsync(item.Target);
-        StatusMessage = "已复制引用";
+        StatusMessage = _localization.Get("CopiedReference");
     }
 }

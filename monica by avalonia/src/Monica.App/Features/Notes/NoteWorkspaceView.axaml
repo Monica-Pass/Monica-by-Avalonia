@@ -10,14 +10,14 @@
           RowDefinitions="44,*"
           Background="{DynamicResource LayerFillColorDefaultBrush}">
         <notes:NoteTabStripView x:Name="TabStrip" TabClosed="TabStrip_OnTabClosed" />
-        <Grid Grid.Row="1" SizeChanged="WorkspaceGrid_OnSizeChanged">
+        <Grid x:Name="NoteWorkspaceGrid" Grid.Row="1" SizeChanged="WorkspaceGrid_OnSizeChanged">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="{Binding NoteTreeColumnWidth}" />
-                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="{Binding NoteWorkspaceEditorColumnWidth}" />
                 <ColumnDefinition Width="{Binding NoteInspectorColumnWidth}" />
             </Grid.ColumnDefinitions>
-            <notes:NoteTreeView />
-            <notes:NoteEditorView x:Name="Editor" Grid.Column="1" CloseRequested="Editor_OnCloseRequested" />
+            <notes:NoteTreeView x:Name="NoteTreeRegion" />
+            <notes:NoteEditorView x:Name="NoteEditorRegion" Grid.Column="1" IsVisible="{Binding IsNoteEditorWorkspaceVisible}" CloseRequested="Editor_OnCloseRequested" />
             <notes:NoteInspectorView Grid.Column="2" LineRequested="Inspector_OnLineRequested" />
         </Grid>
     </Grid>

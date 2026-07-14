@@ -37,7 +37,7 @@ public sealed class SecureNoteTests
         viewModel.NoteIsMarkdown = true;
         viewModel.NoteContent = "# Inline image\n\n![inline](monica-image://img-1)\n\n![web](https://example.com/a.png)";
 
-        Assert.Contains("[图片附件: inline]", viewModel.NotePreviewMarkdown);
+        Assert.Contains($"[{viewModel.L.Format("NoteImageAttachmentFormat", "inline")}]", viewModel.NotePreviewMarkdown);
         Assert.DoesNotContain("monica-image://", viewModel.NotePreviewMarkdown);
         Assert.Contains("![web](https://example.com/a.png)", viewModel.NotePreviewMarkdown);
     }
@@ -74,7 +74,7 @@ public sealed class SecureNoteTests
         Assert.Single(viewModel.NoteItems);
         Assert.Equal("Recovery", viewModel.SelectedNote?.Title);
         Assert.Contains("\"tags\":[\"account\",\"emergency\"]", viewModel.SelectedNote?.ItemData);
-        Assert.Equal("1 notes", viewModel.NoteCountText);
+        Assert.Equal(viewModel.L.Format("NoteCountFormat", 1), viewModel.NoteCountText);
 
         await viewModel.ToggleNoteFavoriteCommand.ExecuteAsync(null);
         Assert.True(viewModel.SelectedNote?.IsFavorite);
@@ -111,10 +111,11 @@ public sealed class SecureNoteTests
         await viewModel.SaveNoteCommand.ExecuteAsync(null);
 
         var groups = viewModel.NoteTreeGroups;
-        Assert.Equal(["ops", "private", "未分类"], groups.Select(group => group.Name));
+        var untagged = viewModel.L.Get("NoteUntagged");
+        Assert.Equal(["ops", "private", untagged], groups.Select(group => group.Name));
         Assert.Single(groups.Single(group => group.Name == "ops").Items);
         Assert.Equal(2, groups.Single(group => group.Name == "private").Items.Count);
-        Assert.True(groups.Single(group => group.Name == "未分类").IsUntagged);
+        Assert.True(groups.Single(group => group.Name == untagged).IsUntagged);
 
         viewModel.NoteSearchText = "operations";
         groups = viewModel.NoteTreeGroups;

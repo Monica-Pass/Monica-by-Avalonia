@@ -159,19 +159,19 @@ public partial class NoteTabStripView
 
     private async Task<FAContentDialogResult> ShowUnsavedNoteTabDialogAsync(NoteEditorTab tab)
     {
-        var title = string.IsNullOrWhiteSpace(tab.Title) ? "未命名笔记" : tab.Title.Trim();
+        var title = string.IsNullOrWhiteSpace(tab.Title) ? GetLocalizedText("Untitled") : tab.Title.Trim();
         var dialog = new FAContentDialog
         {
-            Title = "保存对此笔记的更改？",
+            Title = GetLocalizedText("SaveNoteChangesTitle"),
             Content = new TextBlock
             {
-                Text = $"“{title}”有未保存的更改。关闭前要保存吗？",
+                Text = FormatLocalizedText("UnsavedNoteMessageFormat", title),
                 TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                 MaxWidth = 420
             },
-            PrimaryButtonText = "保存",
-            SecondaryButtonText = "放弃",
-            CloseButtonText = "取消",
+            PrimaryButtonText = GetLocalizedText("Save"),
+            SecondaryButtonText = GetLocalizedText("Discard"),
+            CloseButtonText = GetLocalizedText("Cancel"),
             DefaultButton = FAContentDialogButton.Primary
         };
 
@@ -182,16 +182,16 @@ public partial class NoteTabStripView
     {
         var dialog = new FAContentDialog
         {
-            Title = "保存未保存的笔记？",
+            Title = GetLocalizedText("SaveUnsavedNotesTitle"),
             Content = new TextBlock
             {
-                Text = $"还有 {dirtyCount} 个笔记标签包含未保存的更改。关闭 Monica 前要保存全部吗？",
+                Text = FormatLocalizedText("UnsavedNotesMessageFormat", dirtyCount),
                 TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                 MaxWidth = 440
             },
-            PrimaryButtonText = "保存全部",
-            SecondaryButtonText = "放弃",
-            CloseButtonText = "取消",
+            PrimaryButtonText = GetLocalizedText("SaveAllNotes"),
+            SecondaryButtonText = GetLocalizedText("Discard"),
+            CloseButtonText = GetLocalizedText("Cancel"),
             DefaultButton = FAContentDialogButton.Primary
         };
 

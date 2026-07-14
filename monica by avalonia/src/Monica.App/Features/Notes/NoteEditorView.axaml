@@ -1,20 +1,37 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:local="using:Monica.App"
              xmlns:notes="using:Monica.App.Features.Notes"
              xmlns:vm="using:Monica.App.ViewModels"
              x:Class="Monica.App.Features.Notes.NoteEditorView"
              x:DataType="vm:MainWindowViewModel">
-    <Grid RowDefinitions="Auto,Auto,Auto,*"
-          Margin="36,24,36,20"
-          MaxWidth="920"
-          MinWidth="0"
-          ClipToBounds="True"
-          HorizontalAlignment="Stretch">
-        <Grid Margin="0,0,0,16">
-            <TextBox Text="{Binding NoteTitle}"
+    <Grid>
+        <Grid x:Name="NoteEditorContent"
+              IsVisible="{Binding HasOpenNoteTabs}"
+              RowDefinitions="Auto,Auto,Auto,*"
+              Margin="36,24,36,20"
+              MaxWidth="920"
+              MinWidth="0"
+              ClipToBounds="True"
+              HorizontalAlignment="Stretch">
+        <Grid Margin="0,0,0,16" ColumnDefinitions="Auto,*" ColumnSpacing="10">
+            <Button x:Name="BackToNoteListButton"
+                    IsVisible="{Binding ShowBackToNoteList}"
+                    Command="{Binding ShowNoteTreeCommand}"
+                    ToolTip.Tip="{Binding L[BackToNoteList]}"
+                    AutomationProperties.Name="{Binding L[BackToNoteList]}"
+                    Width="34"
+                    Height="34"
+                    Padding="0"
+                    VerticalAlignment="Center">
+                <ic:FluentIcon Icon="ArrowLeft" FontSize="18" />
+            </Button>
+            <TextBox Grid.Column="1"
+                     Text="{Binding NoteTitle}"
                      Classes="noteChromeLessTextBox"
                      PlaceholderText="{Binding L.NoteTitleWatermark}"
+                     AutomationProperties.Name="{Binding L.NoteTitleWatermark}"
                      FontSize="32"
                      FontWeight="SemiBold"
                      BorderThickness="0"
@@ -29,15 +46,15 @@
         <Border x:Name="NoteFindPanel" Grid.Row="2" IsVisible="False" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Background="{DynamicResource LayerFillColorSubtleBrush}" Padding="8" Margin="0,0,0,12" ClipToBounds="True">
             <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled" MinWidth="0" ClipToBounds="True">
                 <WrapPanel Orientation="Horizontal" ItemHeight="32" MinWidth="0">
-                    <TextBox x:Name="NoteFindTextBox" PlaceholderText="查找" Width="180" MinWidth="140" Height="32" Margin="0,0,6,6" KeyDown="NoteFindTextBox_OnKeyDown" TextChanged="NoteFindTextBox_OnTextChanged" />
-                    <TextBox x:Name="NoteReplaceTextBox" PlaceholderText="替换为" Width="180" MinWidth="140" Height="32" Margin="0,0,6,6" KeyDown="NoteReplaceTextBox_OnKeyDown" />
-                    <Button Click="FindPreviousNoteMatchButton_OnClick" ToolTip.Tip="上一个" Width="32" Height="32" Margin="0,0,6,6" Padding="0"><ic:FluentIcon Icon="ChevronLeft" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                    <Button Click="FindNextNoteMatchButton_OnClick" ToolTip.Tip="下一个" Width="32" Height="32" Margin="0,0,6,6" Padding="0"><ic:FluentIcon Icon="ChevronRight" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                    <Button Click="ReplaceCurrentNoteMatchButton_OnClick" ToolTip.Tip="替换当前匹配" MinWidth="54" Height="32" Margin="0,0,6,6" Padding="10,0"><TextBlock Text="替换" VerticalAlignment="Center" /></Button>
-                    <Button Click="ReplaceAllNoteMatchesButton_OnClick" ToolTip.Tip="替换全部匹配" MinWidth="70" Height="32" Margin="0,0,6,6" Padding="10,0"><TextBlock Text="全部替换" VerticalAlignment="Center" /></Button>
-                    <CheckBox x:Name="NoteFindMatchCaseCheckBox" Content="Aa" ToolTip.Tip="区分大小写" Height="32" Margin="0,0,6,6" VerticalAlignment="Center" Click="NoteFindOptions_OnChanged" />
+                    <TextBox x:Name="NoteFindTextBox" PlaceholderText="{Binding L[NoteFind]}" AutomationProperties.Name="{Binding L[NoteFind]}" Width="180" MinWidth="140" Height="32" Margin="0,0,6,6" KeyDown="NoteFindTextBox_OnKeyDown" TextChanged="NoteFindTextBox_OnTextChanged" />
+                    <TextBox x:Name="NoteReplaceTextBox" PlaceholderText="{Binding L[NoteReplaceWith]}" AutomationProperties.Name="{Binding L[NoteReplaceWith]}" Width="180" MinWidth="140" Height="32" Margin="0,0,6,6" KeyDown="NoteReplaceTextBox_OnKeyDown" />
+                    <Button Click="FindPreviousNoteMatchButton_OnClick" ToolTip.Tip="{Binding L[NotePreviousMatch]}" AutomationProperties.Name="{Binding L[NotePreviousMatch]}" Width="32" Height="32" Margin="0,0,6,6" Padding="0"><ic:FluentIcon Icon="ChevronLeft" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
+                    <Button Click="FindNextNoteMatchButton_OnClick" ToolTip.Tip="{Binding L[NoteNextMatch]}" AutomationProperties.Name="{Binding L[NoteNextMatch]}" Width="32" Height="32" Margin="0,0,6,6" Padding="0"><ic:FluentIcon Icon="ChevronRight" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
+                    <Button Click="ReplaceCurrentNoteMatchButton_OnClick" ToolTip.Tip="{Binding L[NoteReplaceCurrentMatch]}" AutomationProperties.Name="{Binding L[NoteReplaceCurrentMatch]}" MinWidth="54" Height="32" Margin="0,0,6,6" Padding="10,0"><TextBlock Text="{Binding L[NoteReplace]}" VerticalAlignment="Center" /></Button>
+                    <Button Click="ReplaceAllNoteMatchesButton_OnClick" ToolTip.Tip="{Binding L[NoteReplaceAllMatches]}" AutomationProperties.Name="{Binding L[NoteReplaceAllMatches]}" MinWidth="70" Height="32" Margin="0,0,6,6" Padding="10,0"><TextBlock Text="{Binding L[NoteReplaceAll]}" VerticalAlignment="Center" /></Button>
+                    <CheckBox x:Name="NoteFindMatchCaseCheckBox" Content="Aa" ToolTip.Tip="{Binding L[NoteMatchCase]}" AutomationProperties.Name="{Binding L[NoteMatchCase]}" Height="32" Margin="0,0,6,6" VerticalAlignment="Center" Click="NoteFindOptions_OnChanged" />
                     <TextBlock x:Name="NoteFindStatusText" Text="0/0" MinWidth="44" Height="32" Margin="0,0,6,6" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" TextAlignment="Center" />
-                    <Button Click="CloseNoteFindPanelButton_OnClick" ToolTip.Tip="关闭查找" Width="32" Height="32" Margin="0,0,0,6" Padding="0"><ic:FluentIcon Icon="Dismiss" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
+                    <Button Click="CloseNoteFindPanelButton_OnClick" ToolTip.Tip="{Binding L[NoteCloseFind]}" AutomationProperties.Name="{Binding L[NoteCloseFind]}" Width="32" Height="32" Margin="0,0,0,6" Padding="0"><ic:FluentIcon Icon="Dismiss" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
                 </WrapPanel>
             </ScrollViewer>
         </Border>
@@ -58,6 +75,7 @@
                          Grid.Column="1"
                          Text="{Binding NoteContent}"
                          PlaceholderText="{Binding L.NoteContentWatermark}"
+                         AutomationProperties.Name="{Binding L.NoteContentWatermark}"
                          AcceptsReturn="True"
                          TextWrapping="Wrap"
                          VerticalAlignment="Stretch"
@@ -95,5 +113,25 @@
             <Border Grid.Column="1" IsVisible="{Binding NoteSplitPreviewMode}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1,0,0,0" Margin="8,0,8,0" />
             <notes:NotePreviewView Grid.Column="2" />
         </Grid>
+        </Grid>
+
+        <StackPanel x:Name="NoteEditorEmptyState"
+                    IsVisible="{Binding HasOpenNoteTabs, Converter={x:Static local:BoolConverters.Not}}"
+                    Width="320"
+                    Spacing="12"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+            <ic:FluentIcon Icon="Note" FontSize="38" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
+            <TextBlock Text="{Binding L[NoteEmptyTitle]}" FontSize="20" FontWeight="SemiBold" TextAlignment="Center" />
+            <TextBlock Text="{Binding L[NoteEmptyDescription]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" />
+            <Button Command="{Binding AddNoteCommand}"
+                    AutomationProperties.Name="{Binding L.NewSecureNote}"
+                    HorizontalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <ic:FluentIcon Icon="Add" FontSize="17" />
+                    <TextBlock Text="{Binding L.NewSecureNote}" />
+                </StackPanel>
+            </Button>
+        </StackPanel>
     </Grid>
 </UserControl>

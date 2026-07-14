@@ -8,4 +8,10 @@ public partial class NoteTreeView : UserControl
     {
         InitializeComponent();
     }
+
+    public void FocusSearch()
+    {
+        NoteSearchBox.Focus();
+        NoteSearchBox.SelectAll();
+    }
 }
