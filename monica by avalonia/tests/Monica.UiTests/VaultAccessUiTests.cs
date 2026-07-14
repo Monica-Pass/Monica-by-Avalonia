@@ -17,6 +17,8 @@ public sealed class VaultAccessUiTests
     {
         var view = new UnlockView();
 
+        Assert.NotNull(view.FindControl<StackPanel>("VaultAccessInitializingPanel"));
+        Assert.NotNull(view.FindControl<StackPanel>("VaultAccessForm"));
         Assert.NotNull(view.FindControl<TextBlock>("MasterPasswordLabel"));
         Assert.NotNull(view.FindControl<TextBox>("MasterPasswordInput"));
         Assert.NotNull(view.FindControl<Button>("ToggleMasterPasswordVisibilityButton"));

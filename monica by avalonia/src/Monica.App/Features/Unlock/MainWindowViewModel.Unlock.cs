@@ -40,19 +40,25 @@ public sealed partial class MainWindowViewModel
     [NotifyPropertyChangedFor(nameof(HasRecoverableStatusMessage))]
     private bool _hasPendingLegacyBusinessData;
 
-    public string LoginTitle => IsVaultInitialized
-        ? _localization.UnlockMonica
-        : _localization.CreateMonicaVault;
-
-    public string LoginDescription => IsVaultInitialized
-        ? _localization.UnlockDescription
-        : _localization.CreateVaultDescription;
-
-    public string LoginButtonText => IsUnlocking
-        ? _localization.Get(IsVaultInitialized ? "UnlockingVault" : "CreatingVault")
+    public string LoginTitle => IsVaultAccessInitializing
+        ? _localization.Get("PreparingVaultAccess")
         : IsVaultInitialized
-            ? _localization.Unlock
-            : _localization.CreateVault;
+            ? _localization.UnlockMonica
+            : _localization.CreateMonicaVault;
+
+    public string LoginDescription => IsVaultAccessInitializing
+        ? _localization.Get("PreparingVaultAccessDescription")
+        : IsVaultInitialized
+            ? _localization.UnlockDescription
+            : _localization.CreateVaultDescription;
+
+    public string LoginButtonText => IsVaultAccessInitializing
+        ? _localization.Get("PreparingVaultAccess")
+        : IsUnlocking
+            ? _localization.Get(IsVaultInitialized ? "UnlockingVault" : "CreatingVault")
+            : IsVaultInitialized
+                ? _localization.Unlock
+                : _localization.CreateVault;
 
     public char MasterPasswordMaskChar => IsMasterPasswordVisible ? '\0' : '*';
 
@@ -73,45 +79,6 @@ public sealed partial class MainWindowViewModel
     public string LegacyVaultImportPromptText => _legacyVaultDetection.RequiresImport
         ? _localization.Format("LegacyVaultImportPromptFormat", _legacyVaultDetection.DatabasePath)
         : "";
-
-    [RelayCommand]
-    public async Task InitializeAsync()
-    {
-        HasUnlockError = false;
-        try
-        {
-            AppDiagnostics.Info("Initialize started");
-            var settingsLoad = _settingsService.LoadAsync();
-            var vaultInitialization = AppDiagnostics.MeasureAsync(
-                "Vault metadata initialize",
-                () => _vaultUnlockCoordinator.InitializeAsync());
-            await Task.WhenAll(settingsLoad, vaultInitialization);
-            ApplySettings(_settingsService.Current);
-            var initialization = await vaultInitialization;
-            _legacyVaultDetection = initialization.LegacyVaultDetection;
-            RaiseLegacyVaultImportPrompt();
-            if (_legacyVaultDetection.RequiresImport)
-            {
-                IsVaultInitialized = false;
-                SetUnlockError(_localization.Get("LegacyVaultImportRequired"));
-                return;
-            }
-
-            IsVaultInitialized = initialization.IsVaultInitialized;
-            StatusMessage = IsVaultInitialized
-                ? _localization.Get("VaultLocked")
-                : _localization.Get("FirstRunCreateMasterPassword");
-            AppDiagnostics.Info(
-                $"Initialize completed. initialized={IsVaultInitialized}, " +
-                $"legacyImportRequired={_legacyVaultDetection.RequiresImport}");
-        }
-        catch (Exception ex)
-        {
-            AppDiagnostics.Error("Initialize failed", ex);
-            IsVaultInitialized = DefaultVaultDatabaseExists();
-            SetUnlockError(_localization.Format("VaultMetadataLoadFailedFormat", ex.Message));
-        }
-    }
 
     [RelayCommand(CanExecute = nameof(CanUnlockVault))]
     private async Task UnlockAsync()
@@ -204,6 +171,7 @@ public sealed partial class MainWindowViewModel
     }
 
     private bool CanUnlockVault() =>
+        IsVaultAccessReady &&
         !IsUnlocking &&
         !_legacyVaultDetection.RequiresImport &&
         !string.IsNullOrEmpty(MasterPassword) &&

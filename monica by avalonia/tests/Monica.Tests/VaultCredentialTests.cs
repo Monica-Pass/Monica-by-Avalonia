@@ -274,16 +274,46 @@ public sealed class VaultCredentialTests
             GetTempDatabasePath(),
             settingsService: settings,
             vaultUnlockCoordinator: coordinator);
+        viewModel.MasterPassword = "correct password";
+        viewModel.ConfirmMasterPassword = "correct password";
+
+        Assert.True(viewModel.IsVaultAccessInitializing);
+        Assert.False(viewModel.IsVaultAccessReady);
+        Assert.False(viewModel.UnlockCommand.CanExecute(null));
+        Assert.Equal(viewModel.L.Get("PreparingVaultAccess"), viewModel.LoginTitle);
 
         var initialization = viewModel.InitializeAsync();
         var bothEntered = Task.WhenAll(settings.LoadEntered.Task, coordinator.InitializeEntered.Task);
         var observed = await Task.WhenAny(bothEntered, Task.Delay(250));
 
+        Assert.True(viewModel.IsVaultAccessInitializing);
+        Assert.False(viewModel.UnlockCommand.CanExecute(null));
+
         release.TrySetResult(null);
         await initialization;
 
         Assert.Same(bothEntered, observed);
+        Assert.False(viewModel.IsVaultAccessInitializing);
+        Assert.True(viewModel.IsVaultAccessReady);
         Assert.True(viewModel.IsVaultInitialized);
+        Assert.True(viewModel.UnlockCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task Startup_initialization_failure_releases_preparation_state_and_surfaces_error()
+    {
+        var viewModel = CreateViewModel(
+            GetTempDatabasePath(),
+            vaultUnlockCoordinator: new FailingStartupVaultCoordinator());
+
+        Assert.True(viewModel.IsVaultAccessInitializing);
+
+        await viewModel.InitializeAsync();
+
+        Assert.False(viewModel.IsVaultAccessInitializing);
+        Assert.True(viewModel.IsVaultAccessReady);
+        Assert.True(viewModel.HasUnlockError);
+        Assert.Contains("metadata unavailable", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -499,6 +529,19 @@ public sealed class VaultCredentialTests
             await release.WaitAsync(cancellationToken);
             return new VaultInitializationState(LegacyVaultDetection.Empty, true);
         }
+
+        public Task<VaultUnlockResult> UnlockOrCreateAsync(
+            string masterPassword,
+            string confirmMasterPassword,
+            LegacyVaultDetection legacyVaultDetection,
+            CancellationToken cancellationToken = default) =>
+            Task.FromException<VaultUnlockResult>(new NotSupportedException());
+    }
+
+    private sealed class FailingStartupVaultCoordinator : IVaultUnlockCoordinator
+    {
+        public Task<VaultInitializationState> InitializeAsync(CancellationToken cancellationToken = default) =>
+            Task.FromException<VaultInitializationState>(new InvalidOperationException("Metadata unavailable"));
 
         public Task<VaultUnlockResult> UnlockOrCreateAsync(
             string masterPassword,
