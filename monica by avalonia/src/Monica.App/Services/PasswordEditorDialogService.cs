@@ -36,10 +36,11 @@ public sealed class PasswordEditorDialogService(
         cancellationToken.ThrowIfCancellationRequested();
 
         var editor = new PasswordEditorViewModel(localization, passwordGenerator, entry, categories, plainPassword, siblingPasswords, notes, customFields);
+        var editorView = new PasswordEditorDialog { DataContext = editor };
         var dialog = new FAContentDialog
         {
             Title = editor.DialogTitle,
-            Content = new PasswordEditorDialog { DataContext = editor },
+            Content = editorView,
             PrimaryButtonText = localization.Save,
             CloseButtonText = localization.Cancel,
             DefaultButton = FAContentDialogButton.Primary
@@ -50,10 +51,23 @@ public sealed class PasswordEditorDialogService(
             if (!editor.Validate())
             {
                 args.Cancel = true;
+                editorView.FocusValidationTarget();
             }
         };
 
-        var result = await dialog.ShowAsync(ownerProvider());
-        return result == FAContentDialogResult.Primary ? editor : null;
+        var retainEditor = false;
+        try
+        {
+            var result = await dialog.ShowAsync(ownerProvider());
+            retainEditor = result == FAContentDialogResult.Primary;
+            return retainEditor ? editor : null;
+        }
+        finally
+        {
+            if (!retainEditor)
+            {
+                editor.ClearSensitiveState();
+            }
+        }
     }
 }

@@ -25,6 +25,8 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        using var editorLifetime = editor;
+
         var entries = editor
             .BuildEntries(ProtectPasswords(editor.GetPasswordRows()))
             .ToList();
@@ -79,6 +81,8 @@ public sealed partial class MainWindowViewModel
         {
             return;
         }
+
+        using var editorLifetime = editor;
 
         var passwordRows = editor.GetPasswordRows();
         var storedPasswords = ProtectPasswords(passwordRows);

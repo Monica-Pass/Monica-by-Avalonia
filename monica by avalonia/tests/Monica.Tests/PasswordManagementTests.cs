@@ -377,6 +377,31 @@ public sealed class PasswordManagementTests
     }
 
     [Fact]
+    public async Task Password_editor_sensitive_state_is_cleared_after_create_command()
+    {
+        var harness = CreateHarness();
+        await harness.ViewModel.LoadAsync();
+        harness.Dialog.ConfigureNext(editor =>
+        {
+            editor.Title = "Private account";
+            editor.Username = "private-user";
+            editor.PasswordLines = "plain-secret";
+            editor.AuthenticatorKey = "otpauth://totp/private";
+            editor.CreditCardCvv = "123";
+            editor.CustomFieldsText = "!Recovery=private-value";
+        });
+
+        await harness.ViewModel.AddPasswordCommand.ExecuteAsync(null);
+
+        var editor = Assert.IsType<PasswordEditorViewModel>(harness.Dialog.LastEditor);
+        Assert.True(editor.IsSensitiveStateCleared);
+        Assert.Empty(editor.PasswordLines);
+        Assert.Empty(editor.AuthenticatorKey);
+        Assert.Empty(editor.CreditCardCvv);
+        Assert.Empty(editor.CustomFieldsText);
+    }
+
+    [Fact]
     public async Task ViewModel_saves_password_authenticator_as_bound_totp_and_searches_rich_fields()
     {
         var harness = CreateHarness();
@@ -4118,6 +4143,8 @@ public sealed class PasswordManagementTests
         private Action<PasswordEditorViewModel>? _configureNext;
         private bool _cancelNext;
 
+        public PasswordEditorViewModel? LastEditor { get; private set; }
+
         public void ConfigureNext(Action<PasswordEditorViewModel> configure)
         {
             _cancelNext = false;
@@ -4146,6 +4173,7 @@ public sealed class PasswordManagementTests
             }
 
             var editor = new PasswordEditorViewModel(localization, passwordGenerator, entry, categories, plainPassword, siblingPasswords, notes, customFields);
+            LastEditor = editor;
             _configureNext?.Invoke(editor);
             _configureNext = null;
             return Task.FromResult<PasswordEditorViewModel?>(editor.Validate() ? editor : null);
