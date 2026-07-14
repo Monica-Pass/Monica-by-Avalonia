@@ -3046,6 +3046,69 @@ public sealed class PasswordManagementTests
     }
 
     [Fact]
+    public void ViewModel_generator_rejects_an_empty_random_character_set()
+    {
+        var harness = CreateHarness();
+        harness.ViewModel.GeneratePasswordCommand.Execute(null);
+
+        harness.ViewModel.GeneratorIncludeUppercase = false;
+        harness.ViewModel.GeneratorIncludeLowercase = false;
+        harness.ViewModel.GeneratorIncludeNumbers = false;
+        harness.ViewModel.GeneratorIncludeSymbols = false;
+
+        Assert.False(harness.ViewModel.CanGeneratePassword);
+        Assert.True(harness.ViewModel.HasGeneratorValidationError);
+        Assert.Empty(harness.ViewModel.GeneratedPassword);
+        Assert.False(harness.ViewModel.GeneratePasswordCommand.CanExecute(null));
+        Assert.False(harness.ViewModel.CopyGeneratedPasswordCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void ViewModel_generator_refreshes_an_existing_result_when_options_change()
+    {
+        var harness = CreateHarness();
+        harness.ViewModel.GeneratePasswordCommand.Execute(null);
+
+        harness.ViewModel.GeneratorLength = 31;
+
+        Assert.Equal(31, harness.ViewModel.GeneratedPassword.Length);
+        Assert.Single(harness.ViewModel.GeneratedPasswordHistory);
+    }
+
+    [Fact]
+    public void ViewModel_generator_uses_android_compatible_length_ranges()
+    {
+        var harness = CreateHarness();
+        harness.ViewModel.GeneratorMode = "random";
+        harness.ViewModel.GeneratorLength = 1;
+        Assert.Equal(4, harness.ViewModel.GeneratorLength);
+
+        harness.ViewModel.GeneratorMode = "pin";
+        harness.ViewModel.GeneratorLength = 20;
+        Assert.Equal(9, harness.ViewModel.GeneratorLength);
+
+        harness.ViewModel.GeneratorMode = "passphrase";
+        harness.ViewModel.GeneratorWordCount = 30;
+        Assert.Equal(20, harness.ViewModel.GeneratorWordCount);
+    }
+
+    [Fact]
+    public void ViewModel_generator_creates_initial_result_on_first_navigation_and_clears_history()
+    {
+        var harness = CreateHarness();
+
+        harness.ViewModel.SelectSectionCommand.Execute("Generator");
+
+        Assert.NotEmpty(harness.ViewModel.GeneratedPassword);
+        Assert.False(harness.ViewModel.HasGeneratedPasswordHistory);
+        harness.ViewModel.GeneratePasswordCommand.Execute(null);
+        Assert.True(harness.ViewModel.HasGeneratedPasswordHistory);
+        harness.ViewModel.ClearGeneratedPasswordHistoryCommand.Execute(null);
+        Assert.Empty(harness.ViewModel.GeneratedPasswordHistory);
+        Assert.False(harness.ViewModel.HasGeneratedPasswordHistory);
+    }
+
+    [Fact]
     public async Task ViewModel_imports_monica_json_and_rebinds_totp_to_new_password_ids()
     {
         var source = CreateHarness();

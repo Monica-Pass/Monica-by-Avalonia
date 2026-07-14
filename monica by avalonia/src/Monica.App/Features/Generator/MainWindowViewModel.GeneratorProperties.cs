@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using Avalonia;
-using Avalonia.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Monica.App.Services;
 
@@ -19,6 +18,8 @@ public sealed partial class MainWindowViewModel
     private const string GeneratorTemplatePin = "pin";
     private const string GeneratorTemplateUsername = "username";
     private const string SimilarGeneratorCharacters = "0OolI1|`";
+
+    private bool _isApplyingGeneratorTemplate;
 
     private static readonly string[] GeneratorPassphraseWords =
     [
@@ -62,9 +63,6 @@ public sealed partial class MainWindowViewModel
     [ObservableProperty]
     private int _generatorWordCount = 4;
 
-    public GridLength GeneratorOptionsColumnWidth => IsOtherWorkspaceCompact
-        ? new GridLength(300)
-        : new GridLength(340);
     public Thickness GeneratorResultPanelPadding => IsOtherWorkspaceCompact
         ? new Thickness(18)
         : new Thickness(24);
@@ -79,13 +77,21 @@ public sealed partial class MainWindowViewModel
 
     public string GeneratorLengthText => _localization.Format("GeneratorLengthFormat", GeneratorLength);
     public string GeneratorWordCountText => _localization.Format("GeneratorWordCountFormat", GeneratorWordCount);
-    public int GeneratorLengthMinimum => GeneratorMode == GeneratorModePin ? 4 : 8;
-    public int GeneratorLengthMaximum => GeneratorMode == GeneratorModePin ? 32 : 128;
+    public int GeneratorLengthMinimum => GeneratorMode == GeneratorModePin ? 3 : 4;
+    public int GeneratorLengthMaximum => GeneratorMode == GeneratorModePin ? 9 : 128;
     public bool IsGeneratorPassphraseMode => GeneratorMode == GeneratorModePassphrase;
-    public bool ShowGeneratorCharacterOptions => GeneratorMode is GeneratorModeRandom or GeneratorModeUsername;
+    public bool ShowGeneratorCharacterOptions => GeneratorMode == GeneratorModeRandom;
+    public bool ShowGeneratorUsernameOptions => GeneratorMode == GeneratorModeUsername;
     public bool ShowGeneratorLengthOptions => GeneratorMode is not GeneratorModePassphrase;
     public bool ShowGeneratorWordCountOptions => GeneratorMode == GeneratorModePassphrase;
     public bool HasGeneratedPasswordHistory => GeneratedPasswordHistory.Count > 0;
+    public bool CanGeneratePassword => GeneratorMode != GeneratorModeRandom ||
+        GeneratorIncludeUppercase || GeneratorIncludeLowercase || GeneratorIncludeNumbers || GeneratorIncludeSymbols;
+    public bool CanCopyGeneratedPassword => CanGeneratePassword && !string.IsNullOrEmpty(GeneratedPassword);
+    public bool HasGeneratorValidationError => !CanGeneratePassword;
+    public string GeneratorValidationMessage => HasGeneratorValidationError
+        ? _localization.Get("GeneratorSelectCharacterType")
+        : _localization.Get("GeneratorReady");
     public string SelectedGeneratorModeLabel => FindChoiceLabel(GeneratorModeOptions, GeneratorMode);
     public string SelectedGeneratorTemplateLabel => FindChoiceLabel(GeneratorTemplateOptions, GeneratorTemplate);
 
@@ -117,15 +123,15 @@ public sealed partial class MainWindowViewModel
     {
         GeneratorModePassphrase => _localization.Format(
             "GeneratorStrategyPassphraseFormat",
-            SelectedGeneratorTemplateLabel,
+            SelectedGeneratorModeLabel,
             GeneratorWordCount),
         GeneratorModePin => _localization.Format(
             "GeneratorStrategyLengthFormat",
-            SelectedGeneratorTemplateLabel,
+            SelectedGeneratorModeLabel,
             GeneratorLength),
         _ => _localization.Format(
             "GeneratorStrategyLengthFormat",
-            SelectedGeneratorTemplateLabel,
+            SelectedGeneratorModeLabel,
             GeneratorLength)
     };
 
@@ -147,18 +153,23 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    partial void OnGeneratedPasswordChanged(string value) => OnPropertyChanged(nameof(GeneratedPasswordStrengthText));
+    partial void OnGeneratedPasswordChanged(string value)
+    {
+        OnPropertyChanged(nameof(GeneratedPasswordStrengthText));
+        OnPropertyChanged(nameof(CanCopyGeneratedPassword));
+        CopyGeneratedPasswordCommand.NotifyCanExecuteChanged();
+    }
 
     partial void OnGeneratorLengthChanged(int value)
     {
         GeneratorLength = Math.Clamp(value, GeneratorLengthMinimum, GeneratorLengthMaximum);
-        RaiseGeneratorState();
+        HandleGeneratorOptionsChanged();
     }
 
     partial void OnGeneratorWordCountChanged(int value)
     {
-        GeneratorWordCount = Math.Clamp(value, 2, 8);
-        RaiseGeneratorState();
+        GeneratorWordCount = Math.Clamp(value, 1, 20);
+        HandleGeneratorOptionsChanged();
     }
 
     partial void OnGeneratorModeChanged(string value)
@@ -169,21 +180,52 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        GeneratorLength = Math.Clamp(GeneratorLength, GeneratorLengthMinimum, GeneratorLengthMaximum);
-        RaiseGeneratorState();
+        if (_isApplyingGeneratorTemplate)
+        {
+            GeneratorLength = Math.Clamp(GeneratorLength, GeneratorLengthMinimum, GeneratorLengthMaximum);
+            return;
+        }
+
+        _isApplyingGeneratorTemplate = true;
+        try
+        {
+            GeneratorLength = Math.Clamp(GeneratorLength, GeneratorLengthMinimum, GeneratorLengthMaximum);
+        }
+        finally
+        {
+            _isApplyingGeneratorTemplate = false;
+        }
+
+        HandleGeneratorOptionsChanged();
     }
 
     partial void OnGeneratorTemplateChanged(string value)
     {
         ApplyGeneratorTemplate(value);
-        RaiseGeneratorState();
     }
 
-    partial void OnGeneratorIncludeUppercaseChanged(bool value) => RaiseGeneratorState();
-    partial void OnGeneratorIncludeLowercaseChanged(bool value) => RaiseGeneratorState();
-    partial void OnGeneratorIncludeNumbersChanged(bool value) => RaiseGeneratorState();
-    partial void OnGeneratorIncludeSymbolsChanged(bool value) => RaiseGeneratorState();
-    partial void OnGeneratorExcludeSimilarCharactersChanged(bool value) => RaiseGeneratorState();
+    partial void OnGeneratorIncludeUppercaseChanged(bool value) => HandleGeneratorOptionsChanged();
+    partial void OnGeneratorIncludeLowercaseChanged(bool value) => HandleGeneratorOptionsChanged();
+    partial void OnGeneratorIncludeNumbersChanged(bool value) => HandleGeneratorOptionsChanged();
+    partial void OnGeneratorIncludeSymbolsChanged(bool value) => HandleGeneratorOptionsChanged();
+    partial void OnGeneratorExcludeSimilarCharactersChanged(bool value) => HandleGeneratorOptionsChanged();
+
+    private void HandleGeneratorOptionsChanged()
+    {
+        if (_isApplyingGeneratorTemplate)
+        {
+            return;
+        }
+
+        RaiseGeneratorState();
+        if (!CanGeneratePassword)
+        {
+            GeneratedPassword = "";
+            return;
+        }
+
+        RefreshGeneratedPasswordFromOptions();
+    }
 
     private void RaiseGeneratorState()
     {
@@ -193,6 +235,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(GeneratorLengthMaximum));
         OnPropertyChanged(nameof(IsGeneratorPassphraseMode));
         OnPropertyChanged(nameof(ShowGeneratorCharacterOptions));
+        OnPropertyChanged(nameof(ShowGeneratorUsernameOptions));
         OnPropertyChanged(nameof(ShowGeneratorLengthOptions));
         OnPropertyChanged(nameof(ShowGeneratorWordCountOptions));
         OnPropertyChanged(nameof(SelectedGeneratorModeLabel));
@@ -201,5 +244,11 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SelectedGeneratorTemplateOption));
         OnPropertyChanged(nameof(GeneratorStrategySummaryText));
         OnPropertyChanged(nameof(GeneratedPasswordStrengthText));
+        OnPropertyChanged(nameof(CanGeneratePassword));
+        OnPropertyChanged(nameof(CanCopyGeneratedPassword));
+        OnPropertyChanged(nameof(HasGeneratorValidationError));
+        OnPropertyChanged(nameof(GeneratorValidationMessage));
+        GeneratePasswordCommand.NotifyCanExecuteChanged();
+        CopyGeneratedPasswordCommand.NotifyCanExecuteChanged();
     }
 }

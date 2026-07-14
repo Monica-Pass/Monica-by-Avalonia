@@ -134,7 +134,6 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(IsOtherWorkspaceCompact));
         OnPropertyChanged(nameof(TotpCodeConsolePadding));
         OnPropertyChanged(nameof(TotpCodeFontSize));
-        OnPropertyChanged(nameof(GeneratorOptionsColumnWidth));
         OnPropertyChanged(nameof(GeneratorResultPanelPadding));
         OnPropertyChanged(nameof(GeneratorOptionsPanelPadding));
         OnPropertyChanged(nameof(GeneratorOptionsSpacing));

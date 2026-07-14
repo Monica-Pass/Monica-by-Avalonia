@@ -11,19 +11,19 @@
       HorizontalAlignment="Stretch"
       ClipToBounds="True">
     <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
-        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" MinHeight="56">
-            <StackPanel MinWidth="0" VerticalAlignment="Center">
+        <Grid x:Name="GeneratorHeaderGrid" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" MinHeight="56">
+            <StackPanel x:Name="GeneratorHeaderTitle" MinWidth="0" VerticalAlignment="Center">
                 <TextBlock Classes="workspacePageTitle" Text="{Binding L.PasswordGenerator}" />
                 <TextBlock Text="{Binding GeneratedPasswordStrengthText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
             </StackPanel>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <Button Classes="workspacePrimaryCommand" Command="{Binding GeneratePasswordCommand}" ToolTip.Tip="{Binding L.Generate}">
+            <StackPanel x:Name="GeneratorHeaderCommands" Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button x:Name="HeaderGeneratePasswordButton" Classes="workspacePrimaryCommand" Command="{Binding GeneratePasswordCommand}" ToolTip.Tip="{Binding L.Generate}" AutomationProperties.Name="{Binding L.Generate}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <ic:FluentIcon Icon="Sparkle" FontSize="18" />
                         <TextBlock Text="{Binding L.Generate}" />
                     </StackPanel>
                 </Button>
-                <Button Classes="workspaceCommand" Command="{Binding CopyGeneratedPasswordCommand}" ToolTip.Tip="{Binding L.CopyPassword}">
+                <Button x:Name="HeaderCopyGeneratedPasswordButton" Classes="workspaceCommand" Command="{Binding CopyGeneratedPasswordCommand}" ToolTip.Tip="{Binding L.CopyPassword}" AutomationProperties.Name="{Binding L.CopyPassword}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <ic:FluentIcon Icon="Copy" FontSize="16" />
                         <TextBlock Text="{Binding L.CopyPassword}" />
@@ -33,7 +33,7 @@
                     <ic:FluentIcon Icon="MoreHorizontal" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     <Button.Flyout>
                         <MenuFlyout>
-                            <MenuItem Header="{Binding L.SaveAsLogin}" Command="{Binding AddPasswordCommand}">
+                            <MenuItem Header="{Binding L.SaveAsLogin}" Command="{Binding AddPasswordCommand}" IsEnabled="{Binding CanCopyGeneratedPassword}">
                                 <MenuItem.Icon>
                                     <ic:FluentIcon Icon="Key" FontSize="16" />
                                 </MenuItem.Icon>
@@ -50,36 +50,52 @@
         </Grid>
     </Border>
 
-    <Grid Grid.Row="1" ColumnSpacing="14" MinWidth="0">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="{Binding GeneratorOptionsColumnWidth}" />
-        </Grid.ColumnDefinitions>
-        <Border Classes="generatorResultPanel" Padding="{Binding GeneratorResultPanelPadding}" MinWidth="0">
+    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+    <Grid x:Name="GeneratorContentGrid" ColumnDefinitions="*,340" RowDefinitions="Auto" ColumnSpacing="14" RowSpacing="14" MinWidth="0">
+        <Border x:Name="GeneratorResultRegion" Classes="generatorResultPanel" Padding="{Binding GeneratorResultPanelPadding}" MinWidth="0">
             <Grid RowDefinitions="Auto,*,Auto,Auto" RowSpacing="14">
                 <StackPanel Spacing="4">
                     <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.GeneratedPasswordLabel}" />
                     <TextBlock Text="{Binding GeneratorStrategySummaryText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                    <TextBlock x:Name="GeneratorValidationMessage"
+                               Text="{Binding GeneratorValidationMessage}"
+                               Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                               AutomationProperties.LiveSetting="Assertive"
+                               IsVisible="{Binding HasGeneratorValidationError}"
+                               TextWrapping="Wrap" />
                 </StackPanel>
-                <TextBox Grid.Row="1"
+                <TextBox x:Name="GeneratedPasswordBox"
+                         Grid.Row="1"
                          Classes="generatorPasswordBox"
                          MinHeight="{Binding GeneratorPasswordBoxMinHeight}"
                          Text="{Binding GeneratedPassword}"
-                         PlaceholderText="{Binding L.GeneratedPasswordPlaceholder}" />
+                         IsReadOnly="True"
+                         AutomationProperties.Name="{Binding L.GeneratedPasswordLabel}"
+                         PlaceholderText="{Binding L.GeneratedPasswordPlaceholder}">
+                    <TextBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="{Binding L.CopyPassword}" Command="{Binding CopyGeneratedPasswordCommand}">
+                                <MenuItem.Icon>
+                                    <ic:FluentIcon Icon="Copy" FontSize="16" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </TextBox.ContextMenu>
+                </TextBox>
                 <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="8">
-                    <Button Classes="workspacePrimaryCommand" Command="{Binding CopyGeneratedPasswordCommand}" ToolTip.Tip="{Binding L.CopyPassword}">
+                    <Button x:Name="CopyGeneratedPasswordButton" Classes="workspacePrimaryCommand" Command="{Binding CopyGeneratedPasswordCommand}" ToolTip.Tip="{Binding L.CopyPassword}" AutomationProperties.Name="{Binding L.CopyPassword}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <ic:FluentIcon Icon="Copy" FontSize="18" />
                             <TextBlock Text="{Binding L.CopyPassword}" />
                         </StackPanel>
                     </Button>
-                    <Button Grid.Column="1" Classes="workspaceCommand" Command="{Binding GeneratePasswordCommand}" ToolTip.Tip="{Binding L.Generate}">
+                    <Button x:Name="GeneratePasswordButton" Grid.Column="1" Classes="workspaceCommand" Command="{Binding GeneratePasswordCommand}" ToolTip.Tip="{Binding L.Generate}" AutomationProperties.Name="{Binding L.Generate}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <ic:FluentIcon Icon="Sparkle" FontSize="16" />
                             <TextBlock Text="{Binding L.Generate}" />
                         </StackPanel>
                     </Button>
-                    <Button Grid.Column="2" Classes="workspaceCommand" Command="{Binding AddPasswordCommand}" ToolTip.Tip="{Binding L.SaveAsLogin}">
+                    <Button x:Name="SaveGeneratedPasswordButton" Grid.Column="2" Classes="workspaceCommand" Command="{Binding AddPasswordCommand}" IsEnabled="{Binding CanCopyGeneratedPassword}" ToolTip.Tip="{Binding L.SaveAsLogin}" AutomationProperties.Name="{Binding L.SaveAsLogin}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <ic:FluentIcon Icon="Key" FontSize="16" />
                             <TextBlock Text="{Binding L.SaveAsLogin}" />
@@ -88,7 +104,19 @@
                 </Grid>
                 <Border Grid.Row="3" Padding="12" CornerRadius="8" Background="{DynamicResource LayerFillColorSubtleBrush}">
                     <Grid RowDefinitions="Auto,Auto">
-                        <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.RecentGeneratedPasswords}" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.RecentGeneratedPasswords}" VerticalAlignment="Center" />
+                            <Button x:Name="ClearGeneratorHistoryButton"
+                                    Grid.Column="1"
+                                    Classes="workspaceCommand"
+                                    Command="{Binding ClearGeneratedPasswordHistoryCommand}"
+                                    IsVisible="{Binding HasGeneratedPasswordHistory}"
+                                    ToolTip.Tip="{Binding L[ClearGeneratedPasswordHistory]}"
+                                    AutomationProperties.Name="{Binding L[ClearGeneratedPasswordHistory]}"
+                                    Width="32" Height="32" Padding="0">
+                                <ic:FluentIcon Icon="Delete" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Button>
+                        </Grid>
                         <TextBlock Grid.Row="1"
                                    Text="{Binding L.NoGeneratedPasswordHistory}"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
@@ -112,6 +140,7 @@
                                                     Command="{Binding #GeneratorWorkspaceRoot.DataContext.UseGeneratedPasswordHistoryItemCommand}"
                                                     CommandParameter="{Binding}"
                                                     ToolTip.Tip="{Binding #GeneratorWorkspaceRoot.DataContext.L.UsePassword}"
+                                                    AutomationProperties.Name="{Binding #GeneratorWorkspaceRoot.DataContext.L.UsePassword}"
                                                     Width="32"
                                                     Height="32"
                                                     Padding="0">
@@ -123,6 +152,7 @@
                                                     Command="{Binding #GeneratorWorkspaceRoot.DataContext.CopyGeneratedPasswordHistoryItemCommand}"
                                                     CommandParameter="{Binding}"
                                                     ToolTip.Tip="{Binding #GeneratorWorkspaceRoot.DataContext.L.CopyPassword}"
+                                                    AutomationProperties.Name="{Binding #GeneratorWorkspaceRoot.DataContext.L.CopyPassword}"
                                                     Width="32"
                                                     Height="32"
                                                     Padding="0">
@@ -138,13 +168,13 @@
             </Grid>
         </Border>
 
-        <Border Grid.Column="1" Classes="generatorOptionsPanel" Padding="{Binding GeneratorOptionsPanelPadding}" MinWidth="0">
-            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <Border x:Name="GeneratorOptionsRegion" Grid.Column="1" Classes="generatorOptionsPanel" Padding="{Binding GeneratorOptionsPanelPadding}" MinWidth="0">
                 <StackPanel Spacing="{Binding GeneratorOptionsSpacing}">
                     <StackPanel Spacing="4">
                         <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.GeneratorTemplate}" />
                         <ComboBox ItemsSource="{Binding GeneratorTemplateOptions}"
                                   SelectedItem="{Binding SelectedGeneratorTemplateOption}"
+                                  AutomationProperties.Name="{Binding L.GeneratorTemplate}"
                                   HorizontalAlignment="Stretch">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate x:DataType="vm:SettingsChoice">
@@ -157,6 +187,7 @@
                         <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.GeneratorMode}" />
                         <ComboBox ItemsSource="{Binding GeneratorModeOptions}"
                                   SelectedItem="{Binding SelectedGeneratorModeOption}"
+                                  AutomationProperties.Name="{Binding L.GeneratorMode}"
                                   HorizontalAlignment="Stretch">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate x:DataType="vm:SettingsChoice">
@@ -168,28 +199,32 @@
                     <StackPanel Spacing="4" IsVisible="{Binding ShowGeneratorLengthOptions}">
                         <TextBlock Text="{Binding GeneratorLengthText}" FontWeight="SemiBold" />
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                            <Slider Minimum="{Binding GeneratorLengthMinimum}" Maximum="{Binding GeneratorLengthMaximum}" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding GeneratorLength}" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Column="1" Width="104" Height="36" Minimum="{Binding GeneratorLengthMinimum}" Maximum="{Binding GeneratorLengthMaximum}" Value="{Binding GeneratorLength}" />
+                            <Slider Minimum="{Binding GeneratorLengthMinimum}" Maximum="{Binding GeneratorLengthMaximum}" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding GeneratorLength}" AutomationProperties.Name="{Binding GeneratorLengthText}" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Column="1" Width="104" Height="36" Minimum="{Binding GeneratorLengthMinimum}" Maximum="{Binding GeneratorLengthMaximum}" Value="{Binding GeneratorLength}" AutomationProperties.Name="{Binding GeneratorLengthText}" />
                         </Grid>
                     </StackPanel>
                     <StackPanel Spacing="4" IsVisible="{Binding ShowGeneratorWordCountOptions}">
                         <TextBlock Text="{Binding GeneratorWordCountText}" FontWeight="SemiBold" />
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                            <Slider Minimum="2" Maximum="8" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding GeneratorWordCount}" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Column="1" Width="104" Height="36" Minimum="2" Maximum="8" Value="{Binding GeneratorWordCount}" />
+                            <Slider Minimum="1" Maximum="20" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding GeneratorWordCount}" AutomationProperties.Name="{Binding GeneratorWordCountText}" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Column="1" Width="104" Height="36" Minimum="1" Maximum="20" Value="{Binding GeneratorWordCount}" AutomationProperties.Name="{Binding GeneratorWordCountText}" />
                         </Grid>
                     </StackPanel>
                     <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
                     <StackPanel Spacing="{Binding GeneratorCheckboxSpacing}" IsVisible="{Binding ShowGeneratorCharacterOptions}">
-                        <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.PasswordStrength}" />
+                        <TextBlock Classes="workspaceSectionLabel" Text="{Binding L[GeneratorCharacterTypes]}" />
                         <CheckBox Content="{Binding L.IncludeUppercase}" IsChecked="{Binding GeneratorIncludeUppercase}" />
                         <CheckBox Content="{Binding L.IncludeLowercase}" IsChecked="{Binding GeneratorIncludeLowercase}" />
                         <CheckBox Content="{Binding L.IncludeNumbers}" IsChecked="{Binding GeneratorIncludeNumbers}" />
                         <CheckBox Content="{Binding L.IncludeSymbols}" IsChecked="{Binding GeneratorIncludeSymbols}" />
                         <CheckBox Content="{Binding L.ExcludeSimilarCharacters}" IsChecked="{Binding GeneratorExcludeSimilarCharacters}" />
                     </StackPanel>
+                    <StackPanel Spacing="{Binding GeneratorCheckboxSpacing}" IsVisible="{Binding ShowGeneratorUsernameOptions}">
+                        <TextBlock Classes="workspaceSectionLabel" Text="{Binding L[GeneratorUsernameOptions]}" />
+                        <CheckBox Content="{Binding L.IncludeNumbers}" IsChecked="{Binding GeneratorIncludeNumbers}" />
+                    </StackPanel>
                     <StackPanel Spacing="{Binding GeneratorCheckboxSpacing}" IsVisible="{Binding IsGeneratorPassphraseMode}">
-                        <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.PasswordStrength}" />
+                        <TextBlock Classes="workspaceSectionLabel" Text="{Binding L[GeneratorPassphraseOptions]}" />
                         <CheckBox Content="{Binding L.IncludeNumbers}" IsChecked="{Binding GeneratorIncludeNumbers}" />
                         <CheckBox Content="{Binding L.IncludeSymbols}" IsChecked="{Binding GeneratorIncludeSymbols}" />
                     </StackPanel>
@@ -198,8 +233,8 @@
                         <TextBlock Text="{Binding GeneratedPasswordStrengthText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                     </Border>
                 </StackPanel>
-            </ScrollViewer>
         </Border>
     </Grid>
+    </ScrollViewer>
 </Grid>
 </UserControl>

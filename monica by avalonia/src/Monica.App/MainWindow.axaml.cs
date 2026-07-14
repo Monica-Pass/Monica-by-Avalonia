@@ -8,6 +8,7 @@ using Avalonia.VisualTree;
 using FluentAvalonia.UI.Controls;
 using Monica.App.Features.Notes;
 using Monica.App.Features.Passwords;
+using Monica.App.Features.Generator;
 using Monica.App.ViewModels;
 
 namespace Monica.App;
@@ -19,6 +20,9 @@ public partial class MainWindow : Window
 
     private NoteWorkspaceView NoteWorkspaceView =>
         WorkspaceHost.GetOrCreate<NoteWorkspaceView>("Notes");
+
+    private GeneratorWorkspaceView GeneratorWorkspaceView =>
+        WorkspaceHost.GetOrCreate<GeneratorWorkspaceView>("Generator");
 
     public MainWindow()
     {
@@ -85,6 +89,15 @@ public partial class MainWindow : Window
         if (string.Equals(viewModel.SelectedSection, "Cards", StringComparison.OrdinalIgnoreCase))
         {
             HandleWalletWorkspaceShortcut(viewModel, e);
+            if (e.Handled)
+            {
+                return;
+            }
+        }
+
+        if (string.Equals(viewModel.SelectedSection, "Generator", StringComparison.OrdinalIgnoreCase))
+        {
+            HandleGeneratorWorkspaceShortcut(viewModel, e);
             if (e.Handled)
             {
                 return;
