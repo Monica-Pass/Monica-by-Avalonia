@@ -1130,6 +1130,33 @@ public sealed class PasswordManagementTests
         RunOnStaThread(ViewModelEmbeddedPasswordDetailsKeepsLatestSelectionWhenSwitchingQuicklyCore);
     }
 
+    [Fact]
+    public void ViewModel_password_detail_recovery_can_retry_and_return_to_list()
+    {
+        RunOnStaThread(() =>
+        {
+            var harness = CreateHarness();
+            var selected = new PasswordEntry
+            {
+                Id = 101,
+                Title = "Recovery test",
+                Username = "recovery@example.com",
+                Password = "secret"
+            };
+            harness.ViewModel.Passwords.Add(selected);
+            harness.ViewModel.SelectedPassword = selected;
+            harness.ViewModel.SelectedPasswordDetailsError = "Details failed";
+
+            Assert.True(harness.ViewModel.HasSelectedPasswordDetailsError);
+            harness.ViewModel.RetrySelectedPasswordDetailsCommand.Execute(null);
+            Assert.Null(harness.ViewModel.SelectedPasswordDetailsError);
+
+            harness.ViewModel.CloseSelectedPasswordDetailsCommand.Execute(null);
+            Assert.Null(harness.ViewModel.SelectedPassword);
+            Assert.Null(harness.ViewModel.SelectedPasswordDetailsError);
+        });
+    }
+
     private static void ViewModelEmbeddedPasswordDetailsKeepsLatestSelectionWhenSwitchingQuicklyCore()
     {
         var harness = CreateHarness();

@@ -211,6 +211,7 @@ public sealed partial class MainWindowViewModel
         var version = Interlocked.Increment(ref _selectedPasswordDetailsVersion);
         CancelSelectedPasswordDetailsRefresh();
         IsLoadingSelectedPasswordDetails = false;
+        SelectedPasswordDetailsError = null;
         OnPropertyChanged(nameof(HasCurrentSelectedPasswordDetails));
 
         if (entry is null)
@@ -305,7 +306,8 @@ public sealed partial class MainWindowViewModel
                 if (IsCurrentSelectedPasswordDetailsRequest(version))
                 {
                     IsLoadingSelectedPasswordDetails = false;
-                    StatusMessage = _localization.Format("PasswordDetailsLoadFailedFormat", ex.Message);
+                    SelectedPasswordDetailsError = _localization.Format("PasswordDetailsLoadFailedFormat", ex.Message);
+                    StatusMessage = SelectedPasswordDetailsError;
                 }
             }, DispatcherPriority.Background);
             AppDiagnostics.Error($"Password selection details failed after {stopwatch.ElapsedMilliseconds} ms. id={entry.Id}, version={version}", ex);
@@ -331,7 +333,7 @@ public sealed partial class MainWindowViewModel
                 if (cancellationToken.IsCancellationRequested ||
                     !IsCurrentSelectedPasswordDetailsRequest(version) ||
                     SelectedPassword?.Id != entryId ||
-                    SelectedPasswordDetails is not null)
+                    SelectedPasswordDetails?.Entry.Id == entryId)
                 {
                     return;
                 }
@@ -383,6 +385,26 @@ public sealed partial class MainWindowViewModel
 
         _selectedPasswordDetailsCts = null;
         cts.Cancel();
+    }
+
+    [RelayCommand]
+    private void RetrySelectedPasswordDetails()
+    {
+        var entry = SelectedPassword;
+        if (entry is null)
+        {
+            return;
+        }
+
+        SelectedPasswordDetails = null;
+        QueueSelectedPasswordDetailsRefresh(entry);
+    }
+
+    [RelayCommand]
+    private void CloseSelectedPasswordDetails()
+    {
+        SelectedPassword = null;
+        SelectedPasswordDetailsError = null;
     }
 
     private async Task<PasswordDetailViewModel> BuildPasswordDetailViewModelAsync(

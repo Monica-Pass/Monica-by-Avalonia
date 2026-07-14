@@ -615,6 +615,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(PasswordEmptyStateText));
         OnPropertyChanged(nameof(SelectPasswordItemsText));
         OnPropertyChanged(nameof(SelectAllVisiblePasswordsText));
+        OnPropertyChanged(nameof(BackToPasswordListText));
+        OnPropertyChanged(nameof(RetryPasswordDetailsText));
         RaisePasswordSortText();
         OnPropertyChanged(nameof(TotpScanQrText));
         OnPropertyChanged(nameof(TotpManualAddText));

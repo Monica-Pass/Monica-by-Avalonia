@@ -131,6 +131,10 @@ public sealed partial class MainWindowViewModel
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelectedPasswordLoadingState))]
     private bool _isLoadingSelectedPasswordDetails;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedPasswordDetailsError))]
+    private string? _selectedPasswordDetailsError;
     public string PasswordCountText => _localization.Format("PasswordCountFormat", Passwords.Count);
     public bool HasFilteredPasswordRows => FilteredPasswordRows.Count > 0;
     public bool HasPasswordSearchText => !string.IsNullOrEmpty(PasswordSearchText);
@@ -142,6 +146,8 @@ public sealed partial class MainWindowViewModel
     public string SelectPasswordItemsText => _localization.Get("SelectPasswordItems");
     public string SelectAllVisiblePasswordsText => _localization.Get("SelectAllVisiblePasswords");
     public string SelectedPasswordCountText => _localization.Format("SelectedPasswordCountFormat", SelectedPasswordCount);
+    public string BackToPasswordListText => _localization.Get("BackToPasswordList");
+    public string RetryPasswordDetailsText => _localization.Get("RetryPasswordDetails");
     public string SelectedPasswordTitle => SelectedPassword?.Title ?? _localization.Get("PasswordDetails");
     public string SelectedPasswordSubtitle => SelectedPassword is null
         ? PasswordCountText
@@ -262,6 +268,9 @@ public sealed partial class MainWindowViewModel
     public bool HasSelectedPasswordLoadingState =>
         SelectedPassword is not null &&
         IsLoadingSelectedPasswordDetails;
+    public bool HasSelectedPasswordDetailsError =>
+        SelectedPassword is not null &&
+        !string.IsNullOrWhiteSpace(SelectedPasswordDetailsError);
     public bool HasRecoverableStatusMessage =>
         IsUnlocked &&
         !IsLoadingVault &&

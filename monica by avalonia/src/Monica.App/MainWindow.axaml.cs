@@ -98,6 +98,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (e.Key == Key.Left && e.KeyModifiers == KeyModifiers.Alt && viewModel.SelectedPassword is not null)
+        {
+            ClosePasswordDetails(viewModel);
+            e.Handled = true;
+            return;
+        }
+
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.F)
         {
             PasswordVaultView.FocusSearch();
@@ -116,6 +123,15 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (e.Key == Key.Escape &&
+            viewModel.SelectedPassword is not null &&
+            (PasswordVaultView.IsNarrowLayout || PasswordVaultView.IsDetailFocused))
+        {
+            ClosePasswordDetails(viewModel);
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == Key.Escape && viewModel.HasPasswordFilters)
         {
             if (viewModel.ClearPasswordFiltersCommand.CanExecute(null))
@@ -123,10 +139,41 @@ public partial class MainWindow : Window
                 viewModel.ClearPasswordFiltersCommand.Execute(null);
                 e.Handled = true;
             }
+
+            return;
+        }
+
+        if (e.Key == Key.C &&
+            !IsTextEditingSource(e.Source) &&
+            viewModel.SelectedPassword is not null &&
+            e.KeyModifiers is KeyModifiers.Control or (KeyModifiers.Control | KeyModifiers.Shift))
+        {
+            var command = e.KeyModifiers.HasFlag(KeyModifiers.Shift)
+                ? viewModel.CopyPasswordCommand
+                : viewModel.CopyUsernameCommand;
+            if (command.CanExecute(viewModel.SelectedPassword))
+            {
+                command.Execute(viewModel.SelectedPassword);
+                e.Handled = true;
+            }
+
+            return;
         }
 
         if (e.KeyModifiers != KeyModifiers.None)
         {
+            return;
+        }
+
+        if (e.Key == Key.F2 && !IsTextEditingSource(e.Source))
+        {
+            if (viewModel.SelectedPassword is not null &&
+                viewModel.EditPasswordCommand.CanExecute(viewModel.SelectedPassword))
+            {
+                viewModel.EditPasswordCommand.Execute(viewModel.SelectedPassword);
+                e.Handled = true;
+            }
+
             return;
         }
 
@@ -152,6 +199,15 @@ public partial class MainWindow : Window
                 viewModel.DeletePasswordCommand.Execute(viewModel.SelectedPassword);
                 e.Handled = true;
             }
+        }
+    }
+
+    private void ClosePasswordDetails(MainWindowViewModel viewModel)
+    {
+        if (viewModel.CloseSelectedPasswordDetailsCommand.CanExecute(null))
+        {
+            viewModel.CloseSelectedPasswordDetailsCommand.Execute(null);
+            PasswordVaultView.FocusPasswordList();
         }
     }
 
