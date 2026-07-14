@@ -16,8 +16,6 @@ env:
   DOTNET_VERSION: 10.0.x
   PROJECT_DIR: monica by avalonia
   APP_PROJECT: src/Monica.App/Monica.App.csproj
-  ANDROID_PROJECT: src/Monica.Android/Monica.Android.csproj
-  IOS_PROJECT: src/Monica.iOS/Monica.iOS.csproj
 
 jobs:
   desktop:
@@ -104,106 +102,4 @@ jobs:
         with:
           name: Monica-${{ steps.version.outputs.version }}-${{ matrix.rid }}-${{ matrix.mode }}
           path: ${{ env.PROJECT_DIR }}/${{ steps.pack.outputs.package_path }}
-          if-no-files-found: error
-
-  android:
-    name: Android APK ${{ matrix.mode }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        mode:
-          - jit
-          - aot
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      - name: Install Android workload
-        run: dotnet workload install android
-
-      - name: Resolve CI version
-        id: version
-        shell: pwsh
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: ./eng/ci/resolve-version.ps1 -Mode ci
-
-      - name: Publish APK
-        shell: pwsh
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: >
-          ./eng/ci/publish-android.ps1
-          -Project "${{ env.ANDROID_PROJECT }}"
-          -Mode "${{ matrix.mode }}"
-          -Version "${{ steps.version.outputs.version }}"
-          -VersionPrefix "${{ steps.version.outputs.version_prefix }}"
-          -PackageVersion "${{ steps.version.outputs.package_version }}"
-          -AssemblyVersion "${{ steps.version.outputs.assembly_version }}"
-          -FileVersion "${{ steps.version.outputs.file_version }}"
-          -InformationalVersion "${{ steps.version.outputs.informational_version }}"
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Monica-${{ steps.version.outputs.version }}-android-${{ matrix.mode }}-apk
-          path: ${{ env.PROJECT_DIR }}/artifacts/mobile/android/${{ matrix.mode }}/*.apk
-          if-no-files-found: error
-
-  ios:
-    name: iOS IPA ${{ matrix.mode }}
-    runs-on: macos-14
-    strategy:
-      fail-fast: false
-      matrix:
-        mode:
-          - jit
-          - aot
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      - name: Install iOS workload
-        run: dotnet workload install ios
-
-      - name: Resolve CI version
-        id: version
-        shell: pwsh
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: ./eng/ci/resolve-version.ps1 -Mode ci
-
-      - name: Publish IPA
-        shell: pwsh
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: >
-          ./eng/ci/publish-ios.ps1
-          -Project "${{ env.IOS_PROJECT }}"
-          -Mode "${{ matrix.mode }}"
-          -Version "${{ steps.version.outputs.version }}"
-          -VersionPrefix "${{ steps.version.outputs.version_prefix }}"
-          -PackageVersion "${{ steps.version.outputs.package_version }}"
-          -AssemblyVersion "${{ steps.version.outputs.assembly_version }}"
-          -FileVersion "${{ steps.version.outputs.file_version }}"
-          -InformationalVersion "${{ steps.version.outputs.informational_version }}"
-
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: Monica-${{ steps.version.outputs.version }}-ios-${{ matrix.mode }}-ipa
-          path: ${{ env.PROJECT_DIR }}/artifacts/mobile/ios/${{ matrix.mode }}/*.ipa
           if-no-files-found: error

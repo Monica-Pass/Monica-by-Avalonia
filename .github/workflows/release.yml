@@ -16,11 +16,6 @@ on:
           - both
           - jit
           - aot
-      include_mobile:
-        description: Build mobile packages too, Android APK and iOS IPA
-        required: true
-        default: false
-        type: boolean
       draft:
         description: Create the GitHub release as a draft
         required: true
@@ -33,14 +28,12 @@ on:
         type: boolean
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   DOTNET_VERSION: 10.0.x
   PROJECT_DIR: monica by avalonia
   APP_PROJECT: src/Monica.App/Monica.App.csproj
-  ANDROID_PROJECT: src/Monica.Android/Monica.Android.csproj
-  IOS_PROJECT: src/Monica.iOS/Monica.iOS.csproj
 
 jobs:
   version:
@@ -67,7 +60,9 @@ jobs:
         id: version
         shell: pwsh
         working-directory: ${{ env.PROJECT_DIR }}
-        run: ./eng/ci/resolve-version.ps1 -Mode release -ReleaseVersion "${{ inputs.version }}"
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: ./eng/ci/resolve-version.ps1 -Mode release -ReleaseVersion $env:RELEASE_VERSION
 
       - name: Resolve selected modes
         id: modes
@@ -90,9 +85,47 @@ jobs:
           "modes_json=$modesJson" >> $env:GITHUB_OUTPUT
           "macos_matrix_json=$macosMatrixJson" >> $env:GITHUB_OUTPUT
 
+  quality:
+    name: Verify commercial release gates
+    needs: version
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Verify
+        shell: pwsh
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: >
+          ./eng/ci/verify-commercial-release.ps1
+          -Version "${{ needs.version.outputs.version }}"
+          -VersionPrefix "${{ needs.version.outputs.version_prefix }}"
+          -PackageVersion "${{ needs.version.outputs.package_version }}"
+          -AssemblyVersion "${{ needs.version.outputs.assembly_version }}"
+          -FileVersion "${{ needs.version.outputs.file_version }}"
+          -InformationalVersion "${{ needs.version.outputs.informational_version }}"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-gate-test-results
+          path: ${{ env.PROJECT_DIR }}/TestResults/**/*.trx
+          if-no-files-found: ignore
+
   windows:
     name: Windows Inno Setup ${{ matrix.mode }}
-    needs: version
+    needs:
+      - version
+      - quality
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -148,7 +181,9 @@ jobs:
 
   linux:
     name: Linux deb ${{ matrix.rid }} ${{ matrix.mode }}
-    needs: version
+    needs:
+      - version
+      - quality
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -210,7 +245,9 @@ jobs:
 
   macos:
     name: macOS DMG ${{ matrix.rid }} ${{ matrix.mode }}
-    needs: version
+    needs:
+      - version
+      - quality
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -261,107 +298,18 @@ jobs:
           path: ${{ env.PROJECT_DIR }}/artifacts/release/macos/*.dmg
           if-no-files-found: error
 
-  android:
-    name: Android APK ${{ matrix.mode }}
-    needs: version
-    if: ${{ inputs.include_mobile }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        mode: ${{ fromJson(needs.version.outputs.modes_json) }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      - name: Install Android workload
-        run: dotnet workload install android
-
-      - name: Publish APK
-        shell: pwsh
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: >
-          ./eng/ci/publish-android.ps1
-          -Project "${{ env.ANDROID_PROJECT }}"
-          -Mode "${{ matrix.mode }}"
-          -Version "${{ needs.version.outputs.version }}"
-          -VersionPrefix "${{ needs.version.outputs.version_prefix }}"
-          -PackageVersion "${{ needs.version.outputs.package_version }}"
-          -AssemblyVersion "${{ needs.version.outputs.assembly_version }}"
-          -FileVersion "${{ needs.version.outputs.file_version }}"
-          -InformationalVersion "${{ needs.version.outputs.informational_version }}"
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Monica-${{ needs.version.outputs.version }}-android-${{ matrix.mode }}-apk
-          path: ${{ env.PROJECT_DIR }}/artifacts/mobile/android/${{ matrix.mode }}/*.apk
-          if-no-files-found: error
-
-  ios:
-    name: iOS IPA ${{ matrix.mode }}
-    needs: version
-    if: ${{ inputs.include_mobile }}
-    runs-on: macos-14
-    strategy:
-      fail-fast: false
-      matrix:
-        mode: ${{ fromJson(needs.version.outputs.modes_json) }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      - name: Install iOS workload
-        run: dotnet workload install ios
-
-      - name: Publish IPA
-        shell: pwsh
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: >
-          ./eng/ci/publish-ios.ps1
-          -Project "${{ env.IOS_PROJECT }}"
-          -Mode "${{ matrix.mode }}"
-          -Version "${{ needs.version.outputs.version }}"
-          -VersionPrefix "${{ needs.version.outputs.version_prefix }}"
-          -PackageVersion "${{ needs.version.outputs.package_version }}"
-          -AssemblyVersion "${{ needs.version.outputs.assembly_version }}"
-          -FileVersion "${{ needs.version.outputs.file_version }}"
-          -InformationalVersion "${{ needs.version.outputs.informational_version }}"
-
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: Monica-${{ needs.version.outputs.version }}-ios-${{ matrix.mode }}-ipa
-          path: ${{ env.PROJECT_DIR }}/artifacts/mobile/ios/${{ matrix.mode }}/*.ipa
-          if-no-files-found: error
-
   publish:
     name: Publish GitHub release
     needs:
       - version
+      - quality
       - windows
       - linux
       - macos
-      - android
-      - ios
     runs-on: ubuntu-latest
-    if: ${{ always() && needs.version.result == 'success' && needs.windows.result == 'success' && needs.linux.result == 'success' && needs.macos.result == 'success' && (inputs.include_mobile == false || (needs.android.result == 'success' && needs.ios.result == 'success')) }}
+    if: ${{ always() && needs.version.result == 'success' && needs.quality.result == 'success' && needs.windows.result == 'success' && needs.linux.result == 'success' && needs.macos.result == 'success' }}
+    permissions:
+      contents: write
 
     steps:
       - name: Download release artifacts

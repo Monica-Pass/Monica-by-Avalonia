@@ -39,36 +39,18 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         run: ./eng/ci/resolve-version.ps1 -Mode ci
 
-      - name: Restore
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: dotnet restore "${{ env.SOLUTION_FILE }}"
-
-      - name: Verify formatting
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: dotnet format "${{ env.SOLUTION_FILE }}" --verify-no-changes --no-restore
-
-      - name: Build
+      - name: Verify commercial release gates
+        shell: pwsh
         working-directory: ${{ env.PROJECT_DIR }}
         run: >
-          dotnet build "${{ env.SOLUTION_FILE }}"
-          --configuration Release
-          --no-restore
-          /p:ContinuousIntegrationBuild=true
-          /p:Version=${{ steps.version.outputs.version }}
-          /p:VersionPrefix=${{ steps.version.outputs.version_prefix }}
-          /p:PackageVersion=${{ steps.version.outputs.package_version }}
-          /p:AssemblyVersion=${{ steps.version.outputs.assembly_version }}
-          /p:FileVersion=${{ steps.version.outputs.file_version }}
-          /p:InformationalVersion=${{ steps.version.outputs.informational_version }}
-
-      - name: Test
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: >
-          dotnet test "${{ env.SOLUTION_FILE }}"
-          --configuration Release
-          --no-build
-          --logger trx
-          --results-directory TestResults
+          ./eng/ci/verify-commercial-release.ps1
+          -Solution "${{ env.SOLUTION_FILE }}"
+          -Version "${{ steps.version.outputs.version }}"
+          -VersionPrefix "${{ steps.version.outputs.version_prefix }}"
+          -PackageVersion "${{ steps.version.outputs.package_version }}"
+          -AssemblyVersion "${{ steps.version.outputs.assembly_version }}"
+          -FileVersion "${{ steps.version.outputs.file_version }}"
+          -InformationalVersion "${{ steps.version.outputs.informational_version }}"
 
       - name: Upload test results
         if: always()

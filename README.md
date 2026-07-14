@@ -164,6 +164,16 @@ dotnet run --project "src\Monica.App\Monica.App.csproj"
 dotnet test Monica.slnx
 ```
 
+### 商业发布门槛
+
+提交发布前请运行统一验证脚本。它会检查禁止跟踪的本地产物、代码格式、NuGet 直接与传递依赖漏洞、Release 零警告构建、普通测试和 Avalonia Headless UI 测试，全程不会打开可见应用窗口。
+
+```powershell
+.\eng\ci\verify-commercial-release.ps1
+```
+
+GitHub 的 `Check` 与 `Release` 工作流调用同一脚本；Windows、macOS 和 Linux 安装包只有在全部门槛通过后才会构建。Android 主应用由 Monica Android 仓库独立发布，本仓库不生成 Android 或 iOS 移动包。
+
 ### 发布示例
 
 ```powershell
@@ -222,7 +232,7 @@ cargo run -p mdbx-cli -- --help
 仍建议在正式发布前补充：
 
 - 桌面端真实截图与安装包说明
-- 各平台发布流水线
+- Windows 代码签名与 macOS 签名、公证配置
 - MDBX 冲突、快照、诊断页面的端到端测试
 - macOS / Linux 平台集成能力实测矩阵
 
