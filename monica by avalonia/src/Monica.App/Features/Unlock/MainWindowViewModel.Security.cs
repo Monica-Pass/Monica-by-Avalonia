@@ -158,8 +158,7 @@ public sealed partial class MainWindowViewModel
         NoteTitle = "";
         NoteContent = "";
         NoteTagsText = "";
-        PasswordSearchText = "";
-        SearchText = "";
+        SetPasswordSearchImmediately("");
         TotpSearchText = "";
         TotpNarrowShowsList = true;
         WalletSearchText = "";

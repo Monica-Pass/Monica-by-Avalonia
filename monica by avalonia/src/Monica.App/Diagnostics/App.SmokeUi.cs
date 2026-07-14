@@ -474,7 +474,7 @@ public partial class App
         {
             var vaultReady = await WaitForSmokeVaultReadyAsync(viewModel, TimeSpan.FromSeconds(10));
             Check("vault-ready", vaultReady, $"passwords={viewModel.Passwords.Count}");
-            viewModel.SearchText = "";
+            viewModel.ClearPasswordSearchCommand.Execute(null);
 
             viewModel.SelectSectionCommand.Execute("Totp");
             await Task.Delay(50);
@@ -536,7 +536,7 @@ public partial class App
             }
 
             viewModel.SelectSectionCommand.Execute("Archive");
-            viewModel.SearchText = "Smoke";
+            viewModel.ArchiveSearchText = "Smoke";
             await Task.Delay(50);
             var archived = viewModel.FilteredArchivedPasswords.ToArray();
             Check(
@@ -545,13 +545,15 @@ public partial class App
                 $"count={archived.Length}");
 
             viewModel.SelectSectionCommand.Execute("RecycleBin");
+            viewModel.RecycleBinSearchText = "Smoke";
             await Task.Delay(50);
             var deleted = viewModel.FilteredDeletedPasswords.ToArray();
             Check(
                 "recycle-filtered-row-present",
                 deleted.Any(item => string.Equals(item.Title, "Smoke Deleted Account", StringComparison.Ordinal)),
                 $"count={deleted.Length}");
-            viewModel.SearchText = "";
+            viewModel.ClearArchiveSearchCommand.Execute(null);
+            viewModel.ClearRecycleBinSearchCommand.Execute(null);
 
             viewModel.SelectSectionCommand.Execute("Timeline");
             var timelineReady = await WaitForSmokeConditionAsync(

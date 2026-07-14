@@ -78,11 +78,8 @@ public sealed partial class MainWindowViewModel
             return false;
         }
 
-        return MatchesPasswordSearch(item, GetEffectivePasswordSearchQuery());
+        return MatchesPasswordSearch(item, PasswordSearchQuery);
     }
-
-    private string GetEffectivePasswordSearchQuery() =>
-        string.IsNullOrWhiteSpace(PasswordSearchQuery) ? SearchText : PasswordSearchQuery;
 
     private bool PasswordMatchesFolderPath(PasswordEntry item, string pathPrefix)
     {

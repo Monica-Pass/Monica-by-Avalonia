@@ -129,9 +129,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _selectedSection = "Passwords";
 
     [ObservableProperty]
-    private string _searchText = "";
-
-    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasRecoverableStatusMessage))]
     private string _statusMessage = "Locked";
 
@@ -204,13 +201,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OperatingSystem.IsMacOS() ? "macOS" :
         OperatingSystem.IsLinux() ? "Linux" :
         "Desktop";
-
-    partial void OnSearchTextChanged(string value)
-    {
-        RaiseFilteredPasswordsChanged();
-        RaisePasswordSelectionState();
-        ReconcileSelectedPasswordDetails();
-    }
 
     partial void OnSelectedSectionChanged(string value)
     {

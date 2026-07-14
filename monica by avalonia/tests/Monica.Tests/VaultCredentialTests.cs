@@ -35,6 +35,8 @@ public sealed class VaultCredentialTests
         viewModel.ImportCsvText = "username,password";
         viewModel.ExportPreview = "plain export";
         viewModel.GeneratedPassword = "generated-secret";
+        viewModel.PasswordSearchText = "private account query";
+        viewModel.PasswordSearchQuery = "private account query";
         viewModel.WebDavPassword = "webdav-secret";
         viewModel.CurrentMasterPassword = "old-master-password";
         viewModel.ToggleMasterPasswordVisibilityCommand.Execute(null);
@@ -52,6 +54,8 @@ public sealed class VaultCredentialTests
         Assert.Equal("", viewModel.ImportCsvText);
         Assert.Equal("", viewModel.ExportPreview);
         Assert.Equal("", viewModel.GeneratedPassword);
+        Assert.Equal("", viewModel.PasswordSearchText);
+        Assert.Equal("", viewModel.PasswordSearchQuery);
         Assert.Equal("", viewModel.WebDavPassword);
         Assert.Equal("", settings.Current.WebDavPassword);
         Assert.Equal("", viewModel.CurrentMasterPassword);

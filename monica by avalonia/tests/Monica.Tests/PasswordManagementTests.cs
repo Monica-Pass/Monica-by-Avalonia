@@ -162,6 +162,35 @@ public sealed class PasswordManagementTests
     }
 
     [Fact]
+    public async Task Password_search_state_is_exclusive_to_the_password_workspace()
+    {
+        var harness = CreateHarness();
+        await harness.Repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "Alpha",
+            Username = "alpha",
+            Password = "one"
+        });
+        await harness.Repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "Beta",
+            Username = "beta",
+            Password = "two"
+        });
+        await harness.ViewModel.LoadAsync();
+
+        Assert.Empty(harness.ViewModel.PasswordSearchText);
+        Assert.Empty(harness.ViewModel.PasswordSearchQuery);
+        Assert.False(harness.ViewModel.HasPasswordFilters);
+
+        var obsoleteGlobalSearch = typeof(MainWindowViewModel).GetProperty("SearchText");
+        obsoleteGlobalSearch?.SetValue(harness.ViewModel, "Alpha");
+
+        Assert.Equal(2, harness.ViewModel.FilteredPasswords.Count);
+        Assert.Null(obsoleteGlobalSearch);
+    }
+
+    [Fact]
     public async Task Performance_budget_add_password_does_not_rebuild_all_derived_collections()
     {
         var harness = CreateHarness();
@@ -475,11 +504,11 @@ public sealed class PasswordManagementTests
         Assert.Contains("JBSWY3DPEHPK3PXP", boundTotp.ItemData, StringComparison.Ordinal);
         Assert.Single(harness.ViewModel.TotpItems, item => item.BoundPasswordId == saved.Id);
 
-        harness.ViewModel.SearchText = "blue";
+        SetPasswordSearch(harness.ViewModel, "blue");
         Assert.Equal([saved.Id], harness.ViewModel.FilteredPasswords.Select(item => item.Id).ToArray());
-        harness.ViewModel.SearchText = "GitHub Desktop";
+        SetPasswordSearch(harness.ViewModel, "GitHub Desktop");
         Assert.Equal([saved.Id], harness.ViewModel.FilteredPasswords.Select(item => item.Id).ToArray());
-        harness.ViewModel.SearchText = "github.com";
+        SetPasswordSearch(harness.ViewModel, "github.com");
         Assert.Equal([saved.Id], harness.ViewModel.FilteredPasswords.Select(item => item.Id).ToArray());
     }
 
@@ -837,7 +866,7 @@ public sealed class PasswordManagementTests
     public void Lifecycle_workspaces_keep_search_state_independent_and_recover_empty_results()
     {
         var harness = CreateHarness();
-        harness.ViewModel.SearchText = "main vault";
+        SetPasswordSearch(harness.ViewModel, "main vault");
         harness.ViewModel.ArchivedPasswords.Add(new PasswordEntry
         {
             Id = 1,
@@ -855,7 +884,8 @@ public sealed class PasswordManagementTests
         harness.ViewModel.ArchiveSearchText = "github";
         harness.ViewModel.RecycleBinSearchText = "missing";
 
-        Assert.Equal("main vault", harness.ViewModel.SearchText);
+        Assert.Equal("main vault", harness.ViewModel.PasswordSearchText);
+        Assert.Equal("main vault", harness.ViewModel.PasswordSearchQuery);
         Assert.Same(harness.ViewModel.FilteredArchivedPasswords, harness.ViewModel.FilteredArchivedPasswords);
         Assert.Same(harness.ViewModel.FilteredDeletedPasswords, harness.ViewModel.FilteredDeletedPasswords);
         Assert.Single(harness.ViewModel.FilteredArchivedPasswords);
@@ -2010,7 +2040,7 @@ public sealed class PasswordManagementTests
         Assert.All(harness.ViewModel.FilteredTotpItems, item => Assert.Contains("GitHub", item.Title));
 
         harness.ViewModel.SelectTotpFilterCommand.Execute("all");
-        harness.ViewModel.SearchText = "password page search";
+        SetPasswordSearch(harness.ViewModel, "password page search");
         harness.ViewModel.TotpSearchText = "azure";
 
         var searched = Assert.Single(harness.ViewModel.FilteredTotpItems);
@@ -2029,7 +2059,8 @@ public sealed class PasswordManagementTests
         harness.ViewModel.ClearTotpFiltersCommand.Execute(null);
 
         Assert.Equal("", harness.ViewModel.TotpSearchText);
-        Assert.Equal("password page search", harness.ViewModel.SearchText);
+        Assert.Equal("password page search", harness.ViewModel.PasswordSearchText);
+        Assert.Equal("password page search", harness.ViewModel.PasswordSearchQuery);
         Assert.Equal(3, harness.ViewModel.FilteredTotpItems.Count);
         Assert.Contains(harness.ViewModel.TotpFilterChoices, item => item.Key == "all" && item.IsSelected);
     }
@@ -2187,7 +2218,7 @@ public sealed class PasswordManagementTests
             })
         });
         await harness.ViewModel.LoadAsync();
-        harness.ViewModel.SearchText = "archive search";
+        SetPasswordSearch(harness.ViewModel, "password page search");
 
         harness.ViewModel.WalletSearchText = "Lovelace";
 
@@ -2205,7 +2236,8 @@ public sealed class PasswordManagementTests
         harness.ViewModel.ClearWalletSearchCommand.Execute(null);
 
         Assert.Equal("", harness.ViewModel.WalletSearchText);
-        Assert.Equal("archive search", harness.ViewModel.SearchText);
+        Assert.Equal("password page search", harness.ViewModel.PasswordSearchText);
+        Assert.Equal("password page search", harness.ViewModel.PasswordSearchQuery);
         Assert.Equal(2, harness.ViewModel.FilteredWalletItems.Count);
     }
 
@@ -2980,7 +3012,7 @@ public sealed class PasswordManagementTests
         harness.ViewModel.QuickFilterLocalOnly = true;
         Assert.Equal(["Local No Folder"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
 
-        harness.ViewModel.SearchText = "missing";
+        SetPasswordSearch(harness.ViewModel, "missing");
         Assert.Empty(harness.ViewModel.FilteredPasswords);
     }
 
@@ -3021,7 +3053,7 @@ public sealed class PasswordManagementTests
         Assert.Equal(["Passport"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
 
         harness.ViewModel.QuickFilterAttachments = false;
-        harness.ViewModel.SearchText = "passport-scan";
+        SetPasswordSearch(harness.ViewModel, "passport-scan");
         Assert.Equal(["Passport"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
 
         await harness.ViewModel.ShowPasswordDetailsCommand.ExecuteAsync(displayed);
@@ -3893,6 +3925,12 @@ public sealed class PasswordManagementTests
 
         Assert.Equal("preserved manual draft", harness.ViewModel.ImportJsonText);
         Assert.Contains("0", harness.ViewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    private static void SetPasswordSearch(MainWindowViewModel viewModel, string value)
+    {
+        viewModel.PasswordSearchText = value;
+        viewModel.PasswordSearchQuery = value;
     }
 
     private static PasswordHarness CreateHarness(
