@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Sync.SyncSourcesView" x:DataType="vm:MainWindowViewModel">
+    <fa:FASettingsExpander Header="{Binding L.CloudAndLocalVaults}" Description="{Binding L.CloudAndLocalVaultsDescription}" IsExpanded="True" IsVisible="{Binding IsSyncSourcesSelected}">
+        <fa:FASettingsExpander.IconSource>
+            <fa:FASymbolIconSource Symbol="Folder" />
+        </fa:FASettingsExpander.IconSource>
+        <fa:FASettingsExpander.Items>
+            <fa:FASettingsExpanderItem Content="{Binding L.EnableOneDrive}" Description="{Binding L.EnableOneDriveDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <ToggleSwitch IsChecked="{Binding OneDriveEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding L.MdbxLocalCache}" Description="{Binding L.MdbxLocalCacheDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <ToggleSwitch IsChecked="{Binding MdbxLocalCacheEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding L.CreateMdbxMetadata}" Description="{Binding L.CreateMdbxMetadataDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <Button Command="{Binding SelectSectionCommand}" CommandParameter="Mdbx">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="Database" FontSize="18" />
+                            <TextBlock Text="{Binding L.MdbxVaults}" />
+                        </StackPanel>
+                    </Button>
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+        </fa:FASettingsExpander.Items>
+    </fa:FASettingsExpander>
+</UserControl>

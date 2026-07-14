@@ -1,0 +1,93 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Sync.SyncExportView" x:DataType="vm:MainWindowViewModel">
+    <fa:FASettingsExpander Header="{Binding L.ExportData}" Description="{Binding L.ExportDataDescription}" IsExpanded="True" IsVisible="{Binding IsSyncExportSelected}">
+        <fa:FASettingsExpander.IconSource>
+            <fa:FASymbolIconSource Symbol="ProtectedDocument" />
+        </fa:FASettingsExpander.IconSource>
+        <StackPanel Spacing="14">
+            <TextBlock Text="{Binding L.ExportPreview}" FontWeight="SemiBold" />
+            <WrapPanel>
+                <Button Classes="workspaceCommand" Command="{Binding ExportDataCommand}" Margin="0,0,8,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Eye" FontSize="18" />
+                        <TextBlock Text="{Binding L.ExportPreview}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding SaveMonicaJsonExportCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Save" FontSize="18" />
+                        <TextBlock Text="{Binding L.SaveJsonExport}" />
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+            <TextBox x:Name="JsonExportPreviewBox" Text="{Binding ExportPreview, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" MinHeight="150" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ExportPreview}" />
+            <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
+            <TextBlock Text="{Binding L.ExportCsvPreview}" FontWeight="SemiBold" />
+            <WrapPanel>
+                <Button Classes="workspaceCommand" Command="{Binding ExportPasswordCsvCommand}" Margin="0,0,8,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Eye" FontSize="18" />
+                        <TextBlock Text="{Binding L.ExportPasswordCsv}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding SavePasswordCsvExportCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Save" FontSize="18" />
+                        <TextBlock Text="{Binding L.SaveCsvExport}" />
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+            <TextBox Text="{Binding ExportCsvPreview, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" MinHeight="150" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ExportCsvPreview}" />
+            <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
+            <TextBlock Text="{Binding L.ExportTotpCsvPreview}" FontWeight="SemiBold" />
+            <WrapPanel>
+                <Button Classes="workspaceCommand" Command="{Binding ExportTotpCsvCommand}" Margin="0,0,8,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Eye" FontSize="18" />
+                        <TextBlock Text="{Binding L.ExportTotpCsv}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding SaveTotpCsvExportCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Save" FontSize="18" />
+                        <TextBlock Text="{Binding L.SaveTotpCsvExport}" />
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+            <TextBox Text="{Binding ExportTotpCsvPreview, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" MinHeight="150" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ExportTotpCsvPreview}" />
+            <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
+            <TextBlock Text="{Binding L.ExportNoteCsvPreview}" FontWeight="SemiBold" />
+            <WrapPanel>
+                <Button Classes="workspaceCommand" Command="{Binding ExportNoteCsvCommand}" Margin="0,0,8,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Eye" FontSize="18" />
+                        <TextBlock Text="{Binding L.ExportNoteCsv}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding SaveNoteCsvExportCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Save" FontSize="18" />
+                        <TextBlock Text="{Binding L.SaveNoteCsvExport}" />
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+            <TextBox Text="{Binding ExportNoteCsvPreview, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" MinHeight="150" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ExportNoteCsvPreview}" />
+            <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
+            <TextBlock Text="{Binding L.ExportAegisPreview}" FontWeight="SemiBold" />
+            <WrapPanel>
+                <Button Classes="workspaceCommand" Command="{Binding ExportAegisJsonCommand}" Margin="0,0,8,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Eye" FontSize="18" />
+                        <TextBlock Text="{Binding L.ExportAegisJson}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding SaveAegisJsonExportCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Save" FontSize="18" />
+                        <TextBlock Text="{Binding L.SaveAegisExport}" />
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+            <TextBox Text="{Binding ExportAegisPreview, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" MinHeight="150" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ExportAegisPreview}" />
+        </StackPanel>
+    </fa:FASettingsExpander>
+</UserControl>

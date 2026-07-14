@@ -393,6 +393,52 @@ public sealed class AppSettingsTests
     }
 
     [Fact]
+    public async Task ViewModel_serializes_webdav_operations_across_commands()
+    {
+        var webDav = new BlockingWebDavBackupService();
+        var viewModel = CreateViewModel(GetTempPath(), webDavBackupService: webDav);
+        viewModel.WebDavEnabled = true;
+        viewModel.WebDavServerUrl = "https://dav.example.com";
+
+        var first = viewModel.LoadWebDavBackupsCommand.ExecuteAsync(null);
+        await webDav.ListStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(viewModel.IsWebDavBusy);
+
+        var second = viewModel.TestWebDavConnectionCommand.ExecuteAsync(null);
+        await Task.Delay(50);
+
+        Assert.Equal(1, webDav.ListCallCount);
+        Assert.Equal(viewModel.L.Get("WebDavOperationInProgress"), viewModel.StatusMessage);
+
+        webDav.ReleaseList.TrySetResult();
+        await Task.WhenAll(first, second);
+        Assert.False(viewModel.IsWebDavBusy);
+    }
+
+    [Fact]
+    public async Task ViewModel_contains_mdbx_failures_and_recovers_busy_state()
+    {
+        var viewModel = CreateViewModel(GetTempPath(), mdbxVaultService: new FailingMdbxVaultService());
+
+        await viewModel.CreateMdbxVaultCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsMdbxBusy);
+        Assert.Empty(viewModel.MdbxDatabases);
+        Assert.Equal(viewModel.L.Format("MdbxOperationFailedFormat", viewModel.L.Get("MdbxOperationCreate"), "fixture failure"), viewModel.StatusMessage);
+    }
+
+    [Fact]
+    public void ViewModel_opens_database_import_and_export_in_sync_workspace()
+    {
+        var viewModel = CreateViewModel(GetTempPath());
+
+        viewModel.OpenSyncWorkspacePageCommand.Execute("Export");
+
+        Assert.Equal("Sync", viewModel.SelectedSection);
+        Assert.Equal("Export", viewModel.SelectedSyncPage);
+    }
+
+    [Fact]
     public async Task ViewModel_surfaces_platform_integration_statuses()
     {
         var integration = new PlatformIntegrationService("TestOS",
@@ -844,7 +890,8 @@ public sealed class AppSettingsTests
         IPlatformIntegrationService? platformIntegrationService = null,
         IMasterPasswordMaintenanceService? masterPasswordMaintenanceService = null,
         IExternalLinkService? externalLinkService = null,
-        IFileSystemPickerService? fileSystemPickerService = null)
+        IFileSystemPickerService? fileSystemPickerService = null,
+        IMdbxVaultService? mdbxVaultService = null)
     {
         var databasePath = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
         Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
@@ -862,7 +909,7 @@ public sealed class AppSettingsTests
             platformIntegrationService,
             new NoopClipboardService(),
             webDavBackupService ?? new NoopWebDavBackupService(),
-            new MdbxVaultService(new MdbxTestVaultEngine()),
+            mdbxVaultService ?? new MdbxVaultService(new MdbxTestVaultEngine()),
             new NoopPasswordAttachmentFileService(),
             new NoopPasswordEditorDialogService(),
             new NoopPasswordDetailDialogService(),
@@ -961,6 +1008,36 @@ public sealed class AppSettingsTests
             var reversed = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(protectedText));
             return Task.FromResult(new string(reversed.Reverse().ToArray()));
         }
+    }
+
+    private sealed class BlockingWebDavBackupService : IWebDavBackupService
+    {
+        public TaskCompletionSource ListStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource ReleaseList { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int ListCallCount { get; private set; }
+
+        public string NormalizeRemotePath(string rootPath, string relativePath) => relativePath;
+
+        public async Task<IReadOnlyList<RemoteFileEntry>> ListAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default)
+        {
+            ListCallCount++;
+            ListStarted.TrySetResult();
+            await ReleaseList.Task.WaitAsync(cancellationToken);
+            return [];
+        }
+
+        public Task UploadTextAsync(WebDavProfile profile, string relativePath, string content, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<string> DownloadTextAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) => Task.FromResult("");
+        public Task DeleteAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class FailingMdbxVaultService : IMdbxVaultService
+    {
+        public Task<LocalMdbxDatabase> CreateLocalMetadataAsync(string name, string filePath, MdbxTigaMode mode = MdbxTigaMode.Multi, CancellationToken cancellationToken = default) =>
+            Task.FromException<LocalMdbxDatabase>(new InvalidOperationException("fixture failure"));
+
+        public Task<Stream> OpenLocalStreamAsync(LocalMdbxDatabase database, CancellationToken cancellationToken = default) =>
+            Task.FromException<Stream>(new InvalidOperationException("fixture failure"));
     }
 
     private sealed class ApprovingExportAuthorizationService : IExportAuthorizationService

@@ -1,0 +1,55 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Sync.SyncConfigurationView" x:DataType="vm:MainWindowViewModel">
+    <fa:FASettingsExpander Header="{Binding L.SyncConfiguration}" Description="{Binding SyncConfigurationSummaryText}" IsExpanded="True" IsVisible="{Binding IsSyncConfigurationSelected}">
+        <fa:FASettingsExpander.IconSource>
+            <fa:FASymbolIconSource Symbol="Sync" />
+        </fa:FASettingsExpander.IconSource>
+        <fa:FASettingsExpander.Items>
+            <fa:FASettingsExpanderItem Content="{Binding L.EnableWebDav}" Description="{Binding L.EnableWebDavDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <ToggleSwitch IsChecked="{Binding WebDavEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding L.WebDavServerUrl}" Description="{Binding L.WebDavServerUrlDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <TextBox MinWidth="220" MaxWidth="340" Text="{Binding WebDavServerUrl}" PlaceholderText="https://dav.example.com" AutomationProperties.Name="{Binding L.WebDavServerUrl}" />
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding L.WebDavUsername}" Description="{Binding L.WebDavUsernameDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <TextBox MinWidth="220" MaxWidth="340" Text="{Binding WebDavUsername}" AutomationProperties.Name="{Binding L.WebDavUsername}" />
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding L.WebDavPassword}" Description="{Binding L.WebDavPasswordDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <TextBox x:Name="WebDavPasswordBox" MinWidth="220" MaxWidth="340" PasswordChar="*" Text="{Binding WebDavPassword}" AutomationProperties.Name="{Binding L.WebDavPassword}" />
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding L.WebDavRemotePath}" Description="{Binding L.WebDavRemotePathDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <TextBox MinWidth="220" MaxWidth="340" Text="{Binding WebDavRemotePath}" AutomationProperties.Name="{Binding L.WebDavRemotePath}" />
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding L.SyncOnStartup}" Description="{Binding L.SyncOnStartupDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <ToggleSwitch IsChecked="{Binding WebDavSyncOnStartup}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding L.SyncAfterChanges}" Description="{Binding L.SyncAfterChangesDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <ToggleSwitch IsChecked="{Binding WebDavSyncAfterChanges}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding L.ConflictStrategy}" Description="{Binding L.ConflictStrategyDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <ComboBox MinWidth="220" MaxWidth="340" ItemsSource="{Binding ConflictStrategyOptions}" SelectedValue="{Binding SyncConflictStrategy}" SelectedValueBinding="{Binding Value}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SettingsChoice">
+                                <TextBlock Text="{Binding Label}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+        </fa:FASettingsExpander.Items>
+    </fa:FASettingsExpander>
+</UserControl>

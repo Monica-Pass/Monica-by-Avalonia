@@ -1,0 +1,158 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.DatabaseManagement.DatabaseWorkbenchView" x:DataType="vm:MainWindowViewModel">
+    <StackPanel Spacing="14">
+        <Border Classes="databaseWorkbench" Padding="20" IsVisible="{Binding IsDatabaseSourceSelected}">
+            <Grid>
+                <StackPanel IsVisible="{Binding HasSelectedVaultSource}" Spacing="18">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                        <Border Width="54" Height="54" CornerRadius="27" Background="{DynamicResource ControlFillColorDefaultBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                            <ic:FluentIcon Icon="Database" FontSize="24" Foreground="{DynamicResource AccentFillColorDefaultBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding SelectedVaultSource.DisplayName}" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding SelectedVaultSource.Kind}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                    </Grid>
+                    <Grid ColumnDefinitions="100,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="12">
+                        <TextBlock Classes="workspaceDetailLabel" Text="{Binding L.LocalPath}" />
+                        <TextBlock Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedVaultSource.LocalPath}" MaxLines="2" />
+                        <TextBlock Grid.Row="1" Classes="workspaceDetailLabel" Text="{Binding L.MdbxRemotePath}" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedVaultSource.RemoteUrl}" MaxLines="2" />
+                        <TextBlock Grid.Row="2" Classes="workspaceDetailLabel" Text="{Binding L.SyncOverview}" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedVaultSource.SyncStatus}" />
+                    </Grid>
+                    <WrapPanel>
+                        <Button Classes="workspacePrimaryCommand" Command="{Binding SelectSectionCommand}" CommandParameter="Mdbx" Margin="0,0,8,8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="Database" FontSize="18" />
+                                <TextBlock Text="{Binding L.MdbxVaults}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="workspaceCommand" Command="{Binding SelectSectionCommand}" CommandParameter="Sync" Margin="0,0,0,8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="ArrowSync" FontSize="18" />
+                                <TextBlock Text="{Binding L.SyncAndBackup}" />
+                            </StackPanel>
+                        </Button>
+                    </WrapPanel>
+                </StackPanel>
+                <TextBlock IsVisible="{Binding !HasSelectedVaultSource}" Text="{Binding VaultSourceCountText}" Margin="24" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </Grid>
+        </Border>
+        <Border Classes="databaseWorkbench" Padding="20" IsVisible="{Binding IsDatabaseOverviewSelected}">
+            <StackPanel Spacing="12">
+                <TextBlock Text="{Binding L.LocalDatabase}" FontSize="20" FontWeight="SemiBold" />
+                <Border Padding="16" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource LayerFillColorDefaultBrush}">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="{Binding LocalDatabaseSummaryText}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding L.LocalDatabaseDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <WrapPanel>
+                            <Button Classes="workspaceCommand" Command="{Binding LoadCommand}" Margin="0,0,8,8">
+                                <TextBlock Text="{Binding L.Refresh}" />
+                            </Button>
+                            <Button Classes="workspaceCommand" Command="{Binding SelectSectionCommand}" CommandParameter="Passwords" Margin="0,0,0,8">
+                                <TextBlock Text="{Binding L.Passwords}" />
+                            </Button>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+                <Border Padding="16" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource LayerFillColorDefaultBrush}">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="{Binding L.ExternalDatabases}" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding L.ExternalDatabasesDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <WrapPanel>
+                            <Button Classes="workspaceCommand" Command="{Binding SelectSectionCommand}" CommandParameter="Sync" Margin="0,0,8,8">
+                                <TextBlock Text="KDBX" />
+                            </Button>
+                            <Button Classes="workspaceCommand" Command="{Binding SelectSectionCommand}" CommandParameter="Mdbx" Margin="0,0,8,8">
+                                <TextBlock Text="MDBX" />
+                            </Button>
+                            <Button Classes="workspaceCommand" Command="{Binding SelectSectionCommand}" CommandParameter="Sync" Margin="0,0,0,8">
+                                <TextBlock Text="Bitwarden" />
+                            </Button>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+        <Border Classes="databaseWorkbench" Padding="20" IsVisible="{Binding IsDatabaseCloudSelected}">
+            <StackPanel Spacing="14">
+                <TextBlock Text="{Binding L.CloudAndLocalVaults}" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding L.CloudAndLocalVaultsDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <Border Padding="16" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource LayerFillColorDefaultBrush}">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="{Binding L.MdbxDatabaseCount}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding MdbxDatabaseCountText}" FontSize="22" FontWeight="SemiBold" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="workspacePrimaryCommand" Command="{Binding SelectSectionCommand}" CommandParameter="Mdbx">
+                            <TextBlock Text="{Binding L.MdbxVaults}" />
+                        </Button>
+                    </Grid>
+                </Border>
+                <Border Padding="16" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource LayerFillColorDefaultBrush}">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="{Binding L.MdbxLocalCache}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding L.MdbxLocalCacheDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding MdbxLocalCacheEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+                    </Grid>
+                </Border>
+                <Border Padding="16" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource LayerFillColorDefaultBrush}">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="{Binding L.EnableOneDrive}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding L.EnableOneDriveDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding OneDriveEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </Border>
+        <Border Classes="databaseWorkbench" Padding="20" IsVisible="{Binding IsDatabaseCapabilitiesSelected}">
+            <StackPanel Spacing="14">
+                <TextBlock Text="{Binding L.FeatureParityMap}" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding L.FeatureParityMapDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <ItemsControl ItemsSource="{Binding Capabilities}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LocalizedPlatformCapability">
+                            <Border Margin="0,0,0,10" Padding="14" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource LayerFillColorDefaultBrush}">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding Description}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Text="{Binding Status}" FontSize="12" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding UnsupportedReason}" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding HasUnsupportedReason}" />
+                                    </StackPanel>
+                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsEnabled, Mode=TwoWay}" IsEnabled="{Binding CanToggle}" ToolTip.Tip="{Binding ToggleStatus}" AutomationProperties.Name="{Binding Title}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+        <Border Classes="databaseWorkbench" Padding="16">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{Binding L.ImportData}" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding L.ImportDataDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+                <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+                    <Button Classes="workspaceCommand" Command="{Binding OpenSyncWorkspacePageCommand}" CommandParameter="Import" Margin="0,0,8,8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
+                            <TextBlock Text="{Binding L.ImportData}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="workspaceCommand" Command="{Binding OpenSyncWorkspacePageCommand}" CommandParameter="Export" Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="ArrowDownload" FontSize="18" />
+                            <TextBlock Text="{Binding L.ExportData}" />
+                        </StackPanel>
+                    </Button>
+                </WrapPanel>
+            </Grid>
+        </Border>
+    </StackPanel>
+</UserControl>

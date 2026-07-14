@@ -5,6 +5,35 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    private int _mdbxOperationActive;
+
+    private async Task RunMdbxOperationAsync(string operationKey, Func<Task> action)
+    {
+        if (Interlocked.CompareExchange(ref _mdbxOperationActive, 1, 0) != 0)
+        {
+            StatusMessage = _localization.Get("MdbxOperationInProgress");
+            return;
+        }
+
+        IsMdbxBusy = true;
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = _localization.Format(
+                "MdbxOperationFailedFormat",
+                _localization.Get(operationKey),
+                ex.Message);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _mdbxOperationActive, 0);
+            IsMdbxBusy = false;
+        }
+    }
+
     private void RefreshMdbxVaultState()
     {
         var selectedId = SelectedMdbxDatabaseItem?.Database.Id;

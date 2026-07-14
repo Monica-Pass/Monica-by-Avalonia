@@ -226,7 +226,7 @@ public sealed partial class MainWindowViewModel
         _passwordQuickAccessRecords = new Dictionary<long, PasswordQuickAccessRecord>();
         _compromisedPasswordResults = new Dictionary<long, CompromisedPasswordResult>();
         _hasCompromisedPasswordCheckResults = false;
-        _hasAuthorizedExportPreview = false;
+        _exportPreviewAuthorizationExpiresAt = null;
         SelectedSecurityIssue = null;
         VaultLoadStageText = "";
         _vaultLoadVersion++;

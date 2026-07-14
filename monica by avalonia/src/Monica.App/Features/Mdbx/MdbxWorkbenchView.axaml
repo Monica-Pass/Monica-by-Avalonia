@@ -1,0 +1,151 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Mdbx.MdbxWorkbenchView" x:DataType="vm:MainWindowViewModel">
+    <StackPanel Spacing="14">
+        <Border Classes="mdbxWorkbench" Padding="20" IsVisible="{Binding IsMdbxDetailsSelected}">
+            <Grid>
+                <StackPanel IsVisible="{Binding HasSelectedMdbxDatabaseItem}" Spacing="18">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                        <Border Width="54" Height="54" CornerRadius="27" Background="{DynamicResource ControlFillColorDefaultBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                            <ic:FluentIcon Icon="Database" FontSize="24" Foreground="{DynamicResource AccentFillColorDefaultBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" MinWidth="0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding SelectedMdbxDatabaseItem.Name}" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding SelectedMdbxDatabaseItem.Description}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                    <WrapPanel>
+                        <Border Classes="workspaceStatusChip" Margin="0,0,8,8">
+                            <TextBlock Text="{Binding SelectedMdbxDatabaseItem.Source}" FontSize="12" />
+                        </Border>
+                        <Border Classes="workspaceStatusChip" Margin="0,0,8,8">
+                            <TextBlock Text="{Binding SelectedMdbxDatabaseItem.WorkingCopyStatus}" FontSize="12" />
+                        </Border>
+                        <Border Classes="workspaceStatusChip" Margin="0,0,8,8">
+                            <TextBlock Text="{Binding SelectedMdbxDatabaseItem.SyncStatus}" FontSize="12" />
+                        </Border>
+                    </WrapPanel>
+                    <Grid ColumnDefinitions="100,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="12">
+                        <TextBlock Classes="workspaceDetailLabel" Text="{Binding L.LocalPath}" />
+                        <TextBlock Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedMdbxDatabaseItem.LocalPath}" MaxLines="2" />
+                        <TextBlock Grid.Row="1" Classes="workspaceDetailLabel" Text="{Binding L.MdbxRemotePath}" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedMdbxDatabaseItem.RemotePath}" MaxLines="2" />
+                        <TextBlock Grid.Row="2" Classes="workspaceDetailLabel" Text="{Binding L.MdbxLastSynced}" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedMdbxDatabaseItem.LastSyncedText}" />
+                        <TextBlock Grid.Row="3" Classes="workspaceDetailLabel" Text="{Binding L.MdbxDiagnostics}" />
+                        <TextBlock Grid.Row="3" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedMdbxDatabaseItem.LastSyncErrorText}" MaxLines="2" />
+                    </Grid>
+                    <WrapPanel>
+                        <Button Classes="workspacePrimaryCommand" Command="{Binding OpenMdbxDatabaseCommand}" CommandParameter="{Binding SelectedMdbxDatabaseItem}" IsEnabled="{Binding !IsMdbxBusy}" Margin="0,0,8,8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="FolderOpen" FontSize="18" />
+                                <TextBlock Text="{Binding L.Open}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="workspaceCommand" Command="{Binding SetDefaultMdbxDatabaseCommand}" CommandParameter="{Binding SelectedMdbxDatabaseItem}" IsEnabled="{Binding !IsMdbxBusy}" Margin="0,0,0,8">
+                            <TextBlock Text="{Binding L.SetDefault}" />
+                        </Button>
+                    </WrapPanel>
+                </StackPanel>
+                <StackPanel IsVisible="{Binding !HasSelectedMdbxDatabaseItem}" Spacing="10" Margin="24" Width="260" HorizontalAlignment="Left">
+                    <ic:FluentIcon Icon="Database" FontSize="34" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding L.NoMdbxVaults}" TextAlignment="Center" TextWrapping="Wrap" />
+                </StackPanel>
+            </Grid>
+        </Border>
+        <Border Classes="mdbxWorkbench" Padding="20" IsVisible="{Binding IsMdbxHealthSelected}">
+            <StackPanel Spacing="14">
+                <TextBlock Text="{Binding L.MdbxHealthSection}" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding MdbxSyncDiagnosticsSummaryText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <ItemsControl ItemsSource="{Binding MdbxHealthItems}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:SyncHealthDisplayItem">
+                            <Border Classes="mdbxDiagnosticTile" Width="260" MinHeight="112" Margin="0,0,10,10" Padding="14">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="{Binding Label}" FontSize="12" />
+                                    <TextBlock Text="{Binding Value}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Detail}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+        <Border Classes="mdbxWorkbench" Padding="20" IsVisible="{Binding IsMdbxSourcesSelected}">
+            <StackPanel Spacing="12">
+                <TextBlock Text="{Binding L.MdbxSourcesSection}" FontSize="20" FontWeight="SemiBold" />
+                <Border Classes="mdbxDiagnosticTile" Padding="16">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="{Binding L.MdbxLocalSource}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding MdbxLocalSourceStatusText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="workspacePrimaryCommand" Command="{Binding CreateMdbxVaultCommand}" IsEnabled="{Binding !IsMdbxBusy}" AutomationProperties.Name="{Binding L.CreateLocalMdbxVault}">
+                            <ic:FluentIcon Icon="Add" FontSize="18" />
+                        </Button>
+                    </Grid>
+                </Border>
+                <Border Classes="mdbxDiagnosticTile" Padding="16">
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="{Binding L.MdbxWebDavSource}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding MdbxWebDavSourceStatusText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="workspaceCommand" Command="{Binding CreateWebDavMdbxVaultCommand}" IsEnabled="{Binding !IsMdbxBusy}" ToolTip.Tip="{Binding L.CreateMdbxMetadata}" AutomationProperties.Name="{Binding L.CreateMdbxMetadata}">
+                            <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
+                        </Button>
+                        <Button Grid.Column="2" Classes="workspaceCommand" Command="{Binding ConfigureMdbxRemoteSourcesCommand}" ToolTip.Tip="{Binding L.Configure}" AutomationProperties.Name="{Binding L.Configure}">
+                            <ic:FluentIcon Icon="Settings" FontSize="18" />
+                        </Button>
+                    </Grid>
+                </Border>
+                <Border Classes="mdbxDiagnosticTile" Padding="16">
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="{Binding L.MdbxOneDriveSource}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding MdbxOneDriveSourceStatusText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="workspaceCommand" Command="{Binding CreateOneDriveMdbxVaultCommand}" IsEnabled="{Binding !IsMdbxBusy}" ToolTip.Tip="{Binding L.CreateMdbxMetadata}" AutomationProperties.Name="{Binding L.CreateMdbxMetadata}">
+                            <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
+                        </Button>
+                        <Button Grid.Column="2" Classes="workspaceCommand" Command="{Binding ConfigureMdbxRemoteSourcesCommand}" ToolTip.Tip="{Binding L.Configure}" AutomationProperties.Name="{Binding L.Configure}">
+                            <ic:FluentIcon Icon="Settings" FontSize="18" />
+                        </Button>
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </Border>
+        <Border Classes="mdbxWorkbench" Padding="20" IsVisible="{Binding IsMdbxRuntimeSelected}">
+            <StackPanel Spacing="14">
+                <TextBlock Text="{Binding L.MdbxRuntime}" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding MdbxRuntimeSummaryText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <Border Classes="mdbxDiagnosticTile" Padding="16">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="{Binding L.MdbxLocalCache}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding MdbxCachePolicyText}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding MdbxLocalCacheEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+                    </Grid>
+                </Border>
+                <Border Classes="mdbxDiagnosticTile" Padding="16">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding L.MdbxSecurity}" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding MdbxSecuritySummaryText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="mdbxDiagnosticTile" Padding="16">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding L.MdbxAndroidParity}" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding L.MdbxAndroidParityLocal}" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding L.MdbxAndroidParityRemote}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

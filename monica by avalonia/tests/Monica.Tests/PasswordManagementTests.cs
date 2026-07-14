@@ -2447,6 +2447,29 @@ public sealed class PasswordManagementTests
     }
 
     [Fact]
+    public async Task ViewModel_clears_sensitive_export_previews_when_leaving_export_page()
+    {
+        var harness = CreateHarness();
+        harness.Crypto.InitializeSession("source password", new byte[16]);
+        await harness.Repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "Exported account",
+            Password = harness.Crypto.EncryptString("preview-secret")
+        });
+        harness.ViewModel.SelectedSyncPage = "Export";
+
+        await harness.ViewModel.ExportDataCommand.ExecuteAsync(null);
+        await harness.ViewModel.ExportPasswordCsvCommand.ExecuteAsync(null);
+        Assert.Contains("preview-secret", harness.ViewModel.ExportPreview);
+        Assert.Contains("preview-secret", harness.ViewModel.ExportCsvPreview);
+
+        harness.ViewModel.SelectedSyncPage = "Configuration";
+
+        Assert.Empty(harness.ViewModel.ExportPreview);
+        Assert.Empty(harness.ViewModel.ExportCsvPreview);
+    }
+
+    [Fact]
     public async Task ViewModel_restores_webdav_backup_and_rebinds_categories()
     {
         var sourceWebDav = new FakeWebDavBackupService();
@@ -2499,6 +2522,23 @@ public sealed class PasswordManagementTests
         var restoredTotp = Assert.Single(await target.Repository.GetSecureItemsByBoundPasswordIdAsync(restoredPassword.Id));
         Assert.Equal(restoredCategory.Id, restoredTotp.CategoryId);
         Assert.Equal(target.ViewModel.L.Format("RestoredWebDavBackupFormat", item.FileName, 1, 1, 1), target.ViewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task ViewModel_requires_confirmation_before_downloading_webdav_restore()
+    {
+        var webDav = new FakeWebDavBackupService { DownloadContent = "{}" };
+        var confirmation = new FakeConfirmationDialogService(result: false);
+        var harness = CreateHarness(webDavBackupService: webDav, confirmationDialogService: confirmation);
+        harness.ViewModel.WebDavEnabled = true;
+        harness.ViewModel.WebDavServerUrl = "https://dav.example.com/";
+        var item = new WebDavBackupHistoryItem("backup.monica.json", "/Monica/backup.monica.json", "2026/07/15 12:00", "1 KB", null);
+
+        await harness.ViewModel.RestoreWebDavBackupCommand.ExecuteAsync(item);
+
+        Assert.Single(confirmation.Requests);
+        Assert.Equal(0, webDav.DownloadCallCount);
+        Assert.False(harness.ViewModel.IsWebDavBusy);
     }
 
     [Fact]
@@ -3698,6 +3738,7 @@ public sealed class PasswordManagementTests
         public string UploadedContent { get; private set; } = "";
         public string DownloadContent { get; init; } = "";
         public List<string> DeletedPaths { get; } = [];
+        public int DownloadCallCount { get; private set; }
 
         public string NormalizeRemotePath(string rootPath, string relativePath)
         {
@@ -3720,8 +3761,11 @@ public sealed class PasswordManagementTests
             return Task.CompletedTask;
         }
 
-        public Task<string> DownloadTextAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) =>
-            Task.FromResult(string.IsNullOrEmpty(DownloadContent) ? UploadedContent : DownloadContent);
+        public Task<string> DownloadTextAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default)
+        {
+            DownloadCallCount++;
+            return Task.FromResult(string.IsNullOrEmpty(DownloadContent) ? UploadedContent : DownloadContent);
+        }
 
         public Task DeleteAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default)
         {

@@ -2,7 +2,8 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
-    private bool _hasAuthorizedExportPreview;
+    private static readonly TimeSpan ExportPreviewAuthorizationLifetime = TimeSpan.FromMinutes(2);
+    private DateTimeOffset? _exportPreviewAuthorizationExpiresAt;
 
     private async Task<bool> AuthorizeSensitiveExportAsync(bool grantFileExport = true)
     {
@@ -19,7 +20,7 @@ public sealed partial class MainWindowViewModel
         }
         else if (grantFileExport)
         {
-            _hasAuthorizedExportPreview = true;
+            _exportPreviewAuthorizationExpiresAt = DateTimeOffset.UtcNow.Add(ExportPreviewAuthorizationLifetime);
         }
 
         return authorized;
@@ -27,13 +28,25 @@ public sealed partial class MainWindowViewModel
 
     private async Task<bool> AuthorizeFileExportAsync()
     {
-        if (_hasAuthorizedExportPreview)
+        if (_exportPreviewAuthorizationExpiresAt is { } expiresAt && expiresAt >= DateTimeOffset.UtcNow)
         {
-            _hasAuthorizedExportPreview = false;
+            _exportPreviewAuthorizationExpiresAt = null;
             return true;
         }
 
+        _exportPreviewAuthorizationExpiresAt = null;
+
         var authorized = await AuthorizeSensitiveExportAsync(grantFileExport: false);
         return authorized;
+    }
+
+    private void ClearSensitiveExportPreviews()
+    {
+        ExportPreview = "";
+        ExportCsvPreview = "";
+        ExportNoteCsvPreview = "";
+        ExportTotpCsvPreview = "";
+        ExportAegisPreview = "";
+        _exportPreviewAuthorizationExpiresAt = null;
     }
 }

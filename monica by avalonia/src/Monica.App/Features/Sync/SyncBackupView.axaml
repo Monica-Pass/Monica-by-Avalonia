@@ -1,0 +1,126 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Sync.SyncBackupView" x:Name="SyncBackupRoot" x:DataType="vm:MainWindowViewModel" IsVisible="{Binding IsSyncBackupSelected}">
+    <StackPanel Spacing="14">
+        <fa:FASettingsExpander Header="{Binding L.WebDavBackupOptions}" Description="{Binding WebDavBackupOptionsSummaryText}" IsExpanded="True">
+            <fa:FASettingsExpander.IconSource>
+                <fa:FASymbolIconSource Symbol="Save" />
+            </fa:FASettingsExpander.IconSource>
+            <fa:FASettingsExpander.Items>
+                <fa:FASettingsExpanderItem Content="{Binding L.IncludePasswords}" Description="{Binding L.WebDavBackupOptionsDescription}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <CheckBox IsChecked="{Binding WebDavBackupIncludePasswords}" />
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+                <fa:FASettingsExpanderItem Content="{Binding L.IncludeTotp}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <CheckBox IsChecked="{Binding WebDavBackupIncludeTotp}" />
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+                <fa:FASettingsExpanderItem Content="{Binding L.IncludeNotes}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <CheckBox IsChecked="{Binding WebDavBackupIncludeNotes}" />
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+                <fa:FASettingsExpanderItem Content="{Binding L.IncludeCards}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <CheckBox IsChecked="{Binding WebDavBackupIncludeCards}" />
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+                <fa:FASettingsExpanderItem Content="{Binding L.IncludeDocuments}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <CheckBox IsChecked="{Binding WebDavBackupIncludeDocuments}" />
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+                <fa:FASettingsExpanderItem Content="{Binding L.IncludeImages}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <CheckBox IsChecked="{Binding WebDavBackupIncludeImages}" />
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+                <fa:FASettingsExpanderItem Content="{Binding L.IncludeCategories}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <CheckBox IsChecked="{Binding WebDavBackupIncludeCategories}" />
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+                <fa:FASettingsExpanderItem Content="{Binding L.EncryptBackup}" Description="{Binding L.EncryptBackupDescription}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <ToggleSwitch IsChecked="{Binding WebDavBackupEncryptionEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+                <fa:FASettingsExpanderItem Content="{Binding L.BackupEncryptionPassword}" Description="{Binding L.BackupEncryptionPasswordDescription}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <TextBox x:Name="WebDavBackupPasswordBox" MinWidth="220" MaxWidth="340" PasswordChar="*" Text="{Binding WebDavBackupEncryptionPassword}" AutomationProperties.Name="{Binding L.BackupEncryptionPassword}" />
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+            </fa:FASettingsExpander.Items>
+        </fa:FASettingsExpander>
+        <Border CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}">
+            <Grid RowDefinitions="Auto,Auto,*" MinHeight="260">
+                <Grid Margin="18,16,18,10" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="{Binding L.BackupHistory}" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding WebDavBackupHistoryCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Command="{Binding LoadWebDavBackupsCommand}" IsEnabled="{Binding !IsWebDavBusy}" AutomationProperties.Name="{Binding L.Refresh}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="ArrowClockwise" FontSize="18" />
+                            <TextBlock Text="{Binding L.Refresh}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="2" Classes="workspaceCommand" Command="{Binding RestoreLatestWebDavBackupCommand}" IsEnabled="{Binding !IsWebDavBusy}" AutomationProperties.Name="{Binding L.RestoreLatest}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="ArrowDownload" FontSize="18" />
+                            <TextBlock Text="{Binding L.RestoreLatest}" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+                <Border Grid.Row="1" Margin="14,0,14,10" Padding="12" CornerRadius="8" Background="{DynamicResource LayerFillColorSubtleBrush}" IsVisible="{Binding HasSelectedWebDavBackupHistoryItem}">
+                    <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto" ColumnSpacing="12" RowSpacing="4">
+                        <TextBlock Text="{Binding SelectedWebDavBackupHistoryItem.FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <WrapPanel Grid.Row="1">
+                            <TextBlock Text="{Binding SelectedWebDavBackupHistoryItem.DateString}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,12,4" />
+                            <TextBlock Text="{Binding SelectedWebDavBackupHistoryItem.SizeText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </WrapPanel>
+                        <TextBlock Grid.Row="2" Text="{Binding SelectedWebDavBackupHistoryItem.Path}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                        <WrapPanel Grid.Column="1" Grid.RowSpan="3" VerticalAlignment="Center">
+                            <Button x:Name="RestoreSelectedBackupButton" Classes="workspaceCommand" Command="{Binding RestoreWebDavBackupCommand}" CommandParameter="{Binding SelectedWebDavBackupHistoryItem}" IsEnabled="{Binding !IsWebDavBusy}" ToolTip.Tip="{Binding L.OperationRestore}" AutomationProperties.Name="{Binding L.OperationRestore}" Margin="0,0,8,4">
+                                <ic:FluentIcon Icon="ArrowDownload" FontSize="18" />
+                            </Button>
+                            <Button x:Name="DeleteSelectedBackupButton" Classes="workspaceCommand" Command="{Binding DeleteWebDavBackupCommand}" CommandParameter="{Binding SelectedWebDavBackupHistoryItem}" IsEnabled="{Binding !IsWebDavBusy}" ToolTip.Tip="{Binding L.Delete}" AutomationProperties.Name="{Binding L.Delete}" Margin="0,0,0,4">
+                                <ic:FluentIcon Icon="Delete" FontSize="18" />
+                            </Button>
+                        </WrapPanel>
+                    </Grid>
+                </Border>
+                <Grid Grid.Row="2">
+                    <TextBlock Text="{Binding L.NoBackupsFound}" IsVisible="{Binding !HasWebDavBackupHistory}" Margin="24" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <ListBox Classes="workspaceList" ItemsSource="{Binding WebDavBackupHistory}" SelectedItem="{Binding SelectedWebDavBackupHistoryItem}" IsVisible="{Binding HasWebDavBackupHistory}" SelectionMode="Single" Margin="8,0,8,8">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:WebDavBackupHistoryItem">
+                                <Border Classes="workspaceListRow compact">
+                                    <Grid RowDefinitions="Auto,Auto" RowSpacing="6">
+                                        <Button Classes="workspaceListRowButton" Command="{Binding #SyncBackupRoot.DataContext.ShowWebDavBackupDetailsCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding FileName}">
+                                            <Grid RowDefinitions="Auto,Auto" RowSpacing="4">
+                                                <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" />
+                                                <WrapPanel Grid.Row="1">
+                                                    <TextBlock Text="{Binding DateString}" Margin="0,0,12,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                    <TextBlock Text="{Binding SizeText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                </WrapPanel>
+                                            </Grid>
+                                        </Button>
+                                        <WrapPanel Grid.Row="1">
+                                            <Button Classes="workspaceCommand" Command="{Binding #SyncBackupRoot.DataContext.RestoreWebDavBackupCommand}" CommandParameter="{Binding}" IsEnabled="{Binding !#SyncBackupRoot.DataContext.IsWebDavBusy}" AutomationProperties.Name="{Binding #SyncBackupRoot.DataContext.L.OperationRestore}" Margin="0,0,8,4">
+                                                <TextBlock Text="{Binding #SyncBackupRoot.DataContext.L.OperationRestore}" />
+                                            </Button>
+                                            <Button Classes="workspaceCommand" Command="{Binding #SyncBackupRoot.DataContext.DeleteWebDavBackupCommand}" CommandParameter="{Binding}" IsEnabled="{Binding !#SyncBackupRoot.DataContext.IsWebDavBusy}" AutomationProperties.Name="{Binding #SyncBackupRoot.DataContext.L.Delete}" Margin="0,0,0,4">
+                                                <TextBlock Text="{Binding #SyncBackupRoot.DataContext.L.Delete}" />
+                                            </Button>
+                                        </WrapPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Grid>
+        </Border>
+    </StackPanel>
+</UserControl>

@@ -50,6 +50,9 @@ public sealed partial class MainWindowViewModel
     [ObservableProperty]
     private bool _mdbxLocalCacheEnabled = true;
 
+    [ObservableProperty]
+    private bool _isMdbxBusy;
+
     public string MdbxDatabaseCountText => _localization.Format("MdbxDatabaseCountFormat", MdbxDatabases.Count);
     public string MdbxLocalCountText => _localization.Format("MdbxSourceCountFormat", MdbxLocalDatabaseCount);
     public string MdbxWebDavCountText => _localization.Format("MdbxSourceCountFormat", MdbxWebDavDatabaseCount);

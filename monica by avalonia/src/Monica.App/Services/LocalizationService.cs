@@ -1039,6 +1039,8 @@ public sealed class LocalizationService : ILocalizationService
         ["DeleteWebDavBackupConfirmationMessageFormat"] = "Delete remote backup \"{0}\"? This cannot be undone.",
         ["DeleteWebDavBackupConfirmationPhrase"] = "DELETE REMOTE BACKUP",
         ["DeleteWebDavBackupConfirmationInstructionFormat"] = "Type \"{0}\" to delete this remote backup.",
+        ["RestoreWebDavBackupConfirmationTitle"] = "Restore WebDAV backup?",
+        ["RestoreWebDavBackupConfirmationMessageFormat"] = "Import the contents of remote backup \"{0}\" into this vault? Existing records are preserved and matching records may be updated.",
         ["DeleteFolderConfirmationTitle"] = "Delete folder?",
         ["DeleteFolderConfirmationMessageFormat"] = "Delete folder \"{0}\"? {1} password(s) will be moved to No folder.",
         ["DeleteAttachmentConfirmationTitle"] = "Delete attachment?",
@@ -1898,6 +1900,13 @@ public sealed class LocalizationService : ILocalizationService
         ["TotpCsv"] = "TOTP CSV",
         ["NoteCsv"] = "Notes CSV",
         ["PasswordCsv"] = "Password CSV",
+        ["WebDavOperationInProgress"] = "Another WebDAV operation is already in progress.",
+        ["MdbxOperationInProgress"] = "Another MDBX operation is already in progress.",
+        ["MdbxOperationFailedFormat"] = "MDBX {0} failed: {1}",
+        ["MdbxOperationCreate"] = "create",
+        ["MdbxOperationRefresh"] = "refresh",
+        ["MdbxOperationOpen"] = "open",
+        ["MdbxOperationSetDefault"] = "set default",
         ["CreatedMdbxMetadata"] = "Created a real MDBX-1 vault and registered its local metadata"
     };
 
@@ -2045,6 +2054,8 @@ public sealed class LocalizationService : ILocalizationService
         ["DeleteWebDavBackupConfirmationMessageFormat"] = "要删除远端备份“{0}”吗？此操作无法撤销。",
         ["DeleteWebDavBackupConfirmationPhrase"] = "删除远端备份",
         ["DeleteWebDavBackupConfirmationInstructionFormat"] = "请输入“{0}”以删除此远端备份。",
+        ["RestoreWebDavBackupConfirmationTitle"] = "恢复 WebDAV 备份？",
+        ["RestoreWebDavBackupConfirmationMessageFormat"] = "要把远端备份“{0}”的内容导入当前保险库吗？现有记录会保留，匹配记录可能会更新。",
         ["DeleteFolderConfirmationTitle"] = "删除文件夹？",
         ["DeleteFolderConfirmationMessageFormat"] = "要删除文件夹“{0}”吗？{1} 个密码会移动到无文件夹。",
         ["DeleteAttachmentConfirmationTitle"] = "删除附件？",
@@ -2789,6 +2800,13 @@ public sealed class LocalizationService : ILocalizationService
         ["TotpCsv"] = "TOTP CSV",
         ["NoteCsv"] = "笔记 CSV",
         ["PasswordCsv"] = "密码 CSV",
+        ["WebDavOperationInProgress"] = "已有另一个 WebDAV 操作正在进行。",
+        ["MdbxOperationInProgress"] = "已有另一个 MDBX 操作正在进行。",
+        ["MdbxOperationFailedFormat"] = "MDBX {0}失败：{1}",
+        ["MdbxOperationCreate"] = "创建",
+        ["MdbxOperationRefresh"] = "刷新",
+        ["MdbxOperationOpen"] = "打开",
+        ["MdbxOperationSetDefault"] = "设为默认",
         ["CreatedMdbxMetadata"] = "已创建真实 MDBX-1 保险库并登记本地元数据"
     };
 }

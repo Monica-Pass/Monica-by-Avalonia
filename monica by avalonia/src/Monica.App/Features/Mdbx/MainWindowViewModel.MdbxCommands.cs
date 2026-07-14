@@ -30,7 +30,10 @@ public sealed partial class MainWindowViewModel
     }
 
     [RelayCommand]
-    private async Task CreateMdbxVaultAsync()
+    private Task CreateMdbxVaultAsync() =>
+        RunMdbxOperationAsync("MdbxOperationCreate", CreateMdbxVaultCoreAsync);
+
+    private async Task CreateMdbxVaultCoreAsync()
     {
         var path = BuildMdbxWorkingCopyPath("local.mdbx");
         var existing = MdbxDatabases.FirstOrDefault(item => string.Equals(item.FilePath, path, StringComparison.OrdinalIgnoreCase));
@@ -54,7 +57,10 @@ public sealed partial class MainWindowViewModel
     }
 
     [RelayCommand]
-    private async Task CreateWebDavMdbxVaultAsync()
+    private Task CreateWebDavMdbxVaultAsync() =>
+        RunMdbxOperationAsync("MdbxOperationCreate", CreateWebDavMdbxVaultCoreAsync);
+
+    private async Task CreateWebDavMdbxVaultCoreAsync()
     {
         if (!WebDavEnabled)
         {
@@ -88,7 +94,10 @@ public sealed partial class MainWindowViewModel
     }
 
     [RelayCommand]
-    private async Task CreateOneDriveMdbxVaultAsync()
+    private Task CreateOneDriveMdbxVaultAsync() =>
+        RunMdbxOperationAsync("MdbxOperationCreate", CreateOneDriveMdbxVaultCoreAsync);
+
+    private async Task CreateOneDriveMdbxVaultCoreAsync()
     {
         if (!OneDriveEnabled)
         {
@@ -122,10 +131,14 @@ public sealed partial class MainWindowViewModel
     }
 
     [RelayCommand]
-    private async Task RefreshMdbxVaultsAsync()
+    private Task RefreshMdbxVaultsAsync() =>
+        RunMdbxOperationAsync("MdbxOperationRefresh", RefreshMdbxVaultsCoreAsync);
+
+    private async Task RefreshMdbxVaultsCoreAsync()
     {
+        var databases = await _repository.GetMdbxDatabasesAsync();
         MdbxDatabases.Clear();
-        foreach (var database in await _repository.GetMdbxDatabasesAsync())
+        foreach (var database in databases)
         {
             MdbxDatabases.Add(database);
         }
@@ -136,7 +149,10 @@ public sealed partial class MainWindowViewModel
     }
 
     [RelayCommand]
-    private async Task OpenMdbxDatabaseAsync(MdbxDatabaseDisplayItem? item)
+    private Task OpenMdbxDatabaseAsync(MdbxDatabaseDisplayItem? item) =>
+        RunMdbxOperationAsync("MdbxOperationOpen", () => OpenMdbxDatabaseCoreAsync(item));
+
+    private async Task OpenMdbxDatabaseCoreAsync(MdbxDatabaseDisplayItem? item)
     {
         if (item is null)
         {
@@ -158,7 +174,10 @@ public sealed partial class MainWindowViewModel
     }
 
     [RelayCommand]
-    private async Task SetDefaultMdbxDatabaseAsync(MdbxDatabaseDisplayItem? item)
+    private Task SetDefaultMdbxDatabaseAsync(MdbxDatabaseDisplayItem? item) =>
+        RunMdbxOperationAsync("MdbxOperationSetDefault", () => SetDefaultMdbxDatabaseCoreAsync(item));
+
+    private async Task SetDefaultMdbxDatabaseCoreAsync(MdbxDatabaseDisplayItem? item)
     {
         if (item is null)
         {

@@ -1,0 +1,108 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Sync.SyncImportView" x:DataType="vm:MainWindowViewModel">
+    <fa:FASettingsExpander Header="{Binding L.ImportData}" Description="{Binding L.ImportDataDescription}" IsExpanded="True" IsVisible="{Binding IsSyncImportSelected}">
+        <fa:FASettingsExpander.IconSource>
+            <fa:FASymbolIconSource Symbol="Folder" />
+        </fa:FASettingsExpander.IconSource>
+        <StackPanel Spacing="16">
+            <StackPanel Spacing="8">
+                <TextBlock Text="{Binding L.ImportMonicaJson}" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding L.ImportMonicaJsonDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <TextBox Text="{Binding ImportJsonText}" PlaceholderText="{Binding L.ImportJsonWatermark}" AcceptsReturn="True" MinHeight="120" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ImportMonicaJson}" />
+                <WrapPanel>
+                    <Button Classes="workspaceCommand" Command="{Binding ImportMonicaJsonFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="Folder" FontSize="18" />
+                            <TextBlock Text="{Binding L.ImportFromFile}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="workspaceCommand" Command="{Binding ImportDataCommand}" Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
+                            <TextBlock Text="{Binding L.Import}" />
+                        </StackPanel>
+                    </Button>
+                </WrapPanel>
+            </StackPanel>
+            <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
+            <StackPanel Spacing="8">
+                <TextBlock Text="{Binding L.ImportAegisJson}" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding L.ImportAegisJsonDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <TextBox Text="{Binding ImportAegisJsonText}" PlaceholderText="{Binding L.ImportAegisJsonWatermark}" AcceptsReturn="True" MinHeight="120" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ImportAegisJson}" />
+                <WrapPanel>
+                    <Button Classes="workspaceCommand" Command="{Binding ImportAegisJsonFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="Folder" FontSize="18" />
+                            <TextBlock Text="{Binding L.ImportFromFile}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="workspaceCommand" Command="{Binding ImportAegisJsonCommand}" Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
+                            <TextBlock Text="{Binding L.ImportAegisJson}" />
+                        </StackPanel>
+                    </Button>
+                </WrapPanel>
+            </StackPanel>
+            <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
+            <StackPanel Spacing="8">
+                <TextBlock Text="{Binding L.ImportTotpCsv}" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding L.ImportTotpCsvDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <TextBox Text="{Binding ImportTotpCsvText}" PlaceholderText="{Binding L.ImportTotpCsvWatermark}" AcceptsReturn="True" MinHeight="120" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ImportTotpCsv}" />
+                <WrapPanel>
+                    <Button Classes="workspaceCommand" Command="{Binding ImportTotpCsvFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="Folder" FontSize="18" />
+                            <TextBlock Text="{Binding L.ImportFromFile}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="workspaceCommand" Command="{Binding ImportTotpCsvCommand}" Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
+                            <TextBlock Text="{Binding L.ImportTotpCsv}" />
+                        </StackPanel>
+                    </Button>
+                </WrapPanel>
+            </StackPanel>
+            <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
+            <StackPanel Spacing="8">
+                <TextBlock Text="{Binding L.ImportNoteCsv}" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding L.ImportNoteCsvDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <TextBox Text="{Binding ImportNoteCsvText}" PlaceholderText="{Binding L.ImportNoteCsvWatermark}" AcceptsReturn="True" MinHeight="120" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ImportNoteCsv}" />
+                <WrapPanel>
+                    <Button Classes="workspaceCommand" Command="{Binding ImportNoteCsvFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="Folder" FontSize="18" />
+                            <TextBlock Text="{Binding L.ImportFromFile}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="workspaceCommand" Command="{Binding ImportNoteCsvCommand}" Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
+                            <TextBlock Text="{Binding L.ImportNoteCsv}" />
+                        </StackPanel>
+                    </Button>
+                </WrapPanel>
+            </StackPanel>
+            <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
+            <StackPanel Spacing="8">
+                <TextBlock Text="{Binding L.ImportPasswordCsv}" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding L.ImportPasswordCsvDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <TextBox Text="{Binding ImportCsvText}" PlaceholderText="{Binding L.ImportCsvWatermark}" AcceptsReturn="True" MinHeight="120" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ImportPasswordCsv}" />
+                <WrapPanel>
+                    <Button Classes="workspaceCommand" Command="{Binding ImportPasswordCsvFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="Folder" FontSize="18" />
+                            <TextBlock Text="{Binding L.ImportFromFile}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="workspaceCommand" Command="{Binding ImportPasswordCsvCommand}" Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
+                            <TextBlock Text="{Binding L.ImportPasswordCsv}" />
+                        </StackPanel>
+                    </Button>
+                </WrapPanel>
+            </StackPanel>
+        </StackPanel>
+    </fa:FASettingsExpander>
+</UserControl>

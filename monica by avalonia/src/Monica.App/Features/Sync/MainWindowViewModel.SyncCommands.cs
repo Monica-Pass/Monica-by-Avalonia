@@ -11,6 +11,13 @@ public sealed partial class MainWindowViewModel
         SelectedSyncPage = NormalizeSyncPage(page);
     }
 
+    [RelayCommand]
+    private void OpenSyncWorkspacePage(string? page)
+    {
+        SelectedSyncPage = NormalizeSyncPage(page);
+        SelectedSection = "Sync";
+    }
+
     private static string NormalizeSyncPage(string? page) =>
         page?.Trim().ToLowerInvariant() switch
         {
@@ -39,9 +46,13 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        if (!TryBeginWebDavOperation(isLoading: true))
+        {
+            return;
+        }
+
         try
         {
-            IsLoadingWebDavBackups = true;
             var entries = await _webDavBackupService.ListAsync(profile, "");
             WebDavBackupHistory.Clear();
             foreach (var item in entries
@@ -62,7 +73,7 @@ public sealed partial class MainWindowViewModel
         }
         finally
         {
-            IsLoadingWebDavBackups = false;
+            EndWebDavOperation(wasLoading: true);
         }
     }
 
@@ -74,9 +85,13 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        if (!TryBeginWebDavOperation(isLoading: true))
+        {
+            return;
+        }
+
         try
         {
-            IsLoadingWebDavBackups = true;
             var entries = await _webDavBackupService.ListAsync(profile, "");
             StatusMessage = _localization.Format("WebDavConnectionTestSucceededFormat", entries.Count);
         }
@@ -86,8 +101,7 @@ public sealed partial class MainWindowViewModel
         }
         finally
         {
-            IsLoadingWebDavBackups = false;
-            RaiseSyncPageState();
+            EndWebDavOperation(wasLoading: true);
         }
     }
 
@@ -117,14 +131,18 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        if (!await AuthorizeSensitiveExportAsync(grantFileExport: false))
+        if (!TryBeginWebDavOperation(isLoading: false))
         {
             return;
         }
 
         try
         {
-            IsRunningWebDavBackup = true;
+            if (!await AuthorizeSensitiveExportAsync(grantFileExport: false))
+            {
+                return;
+            }
+
             var json = await BuildMonicaJsonExportAsync(
                 WebDavBackupIncludePasswords,
                 WebDavBackupIncludeTotp,
@@ -164,7 +182,7 @@ public sealed partial class MainWindowViewModel
         }
         finally
         {
-            IsRunningWebDavBackup = false;
+            EndWebDavOperation(wasLoading: false);
         }
     }
 
@@ -182,9 +200,18 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        if (!TryBeginWebDavOperation(isLoading: false))
+        {
+            return;
+        }
+
         try
         {
-            IsRunningWebDavBackup = true;
+            if (!await ConfirmRestoreWebDavBackupAsync(item.FileName))
+            {
+                return;
+            }
+
             var content = await _webDavBackupService.DownloadTextAsync(profile, item.FileName);
             var json = IsEncryptedWebDavBackup(item.FileName)
                 ? DecryptWebDavBackupPayload(content, WebDavBackupEncryptionPassword)
@@ -198,7 +225,7 @@ public sealed partial class MainWindowViewModel
         }
         finally
         {
-            IsRunningWebDavBackup = false;
+            EndWebDavOperation(wasLoading: false);
         }
     }
 
@@ -226,6 +253,11 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        if (!TryBeginWebDavOperation(isLoading: false))
+        {
+            return;
+        }
+
         try
         {
             await _webDavBackupService.DeleteAsync(profile, item.FileName);
@@ -242,7 +274,18 @@ public sealed partial class MainWindowViewModel
         {
             StatusMessage = _localization.Format("DeleteWebDavBackupFailedFormat", ex.Message);
         }
+        finally
+        {
+            EndWebDavOperation(wasLoading: false);
+        }
     }
+
+    private Task<bool> ConfirmRestoreWebDavBackupAsync(string fileName) =>
+        _confirmationDialogService.ConfirmAsync(
+            _localization.Get("RestoreWebDavBackupConfirmationTitle"),
+            _localization.Format("RestoreWebDavBackupConfirmationMessageFormat", fileName),
+            _localization.Get("OperationRestore"),
+            _localization.Cancel);
 
     private Task<bool> ConfirmDeleteWebDavBackupAsync(string fileName) =>
         _confirmationDialogService.ConfirmTypedAsync(

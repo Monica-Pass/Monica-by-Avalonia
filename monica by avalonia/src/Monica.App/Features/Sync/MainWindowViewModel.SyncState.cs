@@ -6,6 +6,41 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    private int _webDavOperationActive;
+
+    private bool TryBeginWebDavOperation(bool isLoading)
+    {
+        if (Interlocked.CompareExchange(ref _webDavOperationActive, 1, 0) != 0)
+        {
+            StatusMessage = _localization.Get("WebDavOperationInProgress");
+            return false;
+        }
+
+        if (isLoading)
+        {
+            IsLoadingWebDavBackups = true;
+        }
+        else
+        {
+            IsRunningWebDavBackup = true;
+        }
+
+        return true;
+    }
+
+    private void EndWebDavOperation(bool wasLoading)
+    {
+        Interlocked.Exchange(ref _webDavOperationActive, 0);
+        if (wasLoading)
+        {
+            IsLoadingWebDavBackups = false;
+        }
+        else
+        {
+            IsRunningWebDavBackup = false;
+        }
+    }
+
     private void RaiseSyncPageState()
     {
         OnPropertyChanged(nameof(WebDavConnectionStatusText));

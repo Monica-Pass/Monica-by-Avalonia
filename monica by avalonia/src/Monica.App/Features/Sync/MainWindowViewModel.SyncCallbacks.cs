@@ -2,6 +2,14 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    partial void OnSelectedSyncPageChanged(string value)
+    {
+        if (!IsWorkspacePageSelected(value, "Export"))
+        {
+            ClearSensitiveExportPreviews();
+        }
+    }
+
     partial void OnWebDavEnabledChanged(bool value)
     {
         UpdateSettings(settings => settings.WebDavEnabled = value);
