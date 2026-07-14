@@ -6,6 +6,12 @@ namespace Monica.App.ViewModels;
 public sealed partial class MainWindowViewModel
 {
     [RelayCommand]
+    private void ClearRecycleBinSearch() => RecycleBinSearchText = "";
+
+    [RelayCommand]
+    private void CloseDeletedPasswordDetails() => RecycleBinNarrowShowsList = true;
+
+    [RelayCommand]
     private async Task RestorePasswordAsync(PasswordEntry? entry)
     {
         if (entry is null)
@@ -41,6 +47,7 @@ public sealed partial class MainWindowViewModel
         RefreshBoundTotpPresentation(siblings);
         RaiseCounts();
         RaiseFilteredPasswordsChanged();
+        RecycleBinNarrowShowsList = true;
         InvalidateSecurityAnalysis();
         StatusMessage = _localization.Format("RestoredPasswordFormat", entry.Title);
     }
@@ -81,6 +88,7 @@ public sealed partial class MainWindowViewModel
         RefreshBoundTotpPresentation(siblings);
         RaiseCounts();
         InvalidateSecurityAnalysis();
+        RecycleBinNarrowShowsList = true;
         StatusMessage = _localization.Format("DeletedPasswordPermanentlyFormat", entry.Title);
     }
 
@@ -124,6 +132,7 @@ public sealed partial class MainWindowViewModel
         if (entry is not null)
         {
             SelectedDeletedPassword = entry;
+            RecycleBinNarrowShowsList = false;
         }
     }
 

@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Monica.Core.Models;
+using Monica.Platform.Services;
 
 namespace Monica.App.ViewModels;
 
@@ -9,6 +10,13 @@ public sealed record TimelineEntry(string Title, string Description, string Time
 
 public sealed partial class MainWindowViewModel
 {
+    private IReadOnlyList<TimelineEntry> _filteredTimelineEntries = [];
+
+    private static readonly PlatformFilePickerFileType[] TimelineTsvFileTypes =
+    [
+        new("Timeline TSV", ["*.tsv"])
+    ];
+
     public ObservableCollection<TimelineEntry> TimelineEntries { get; } = new ObservableRangeCollection<TimelineEntry>();
 
     [ObservableProperty]
@@ -18,9 +26,33 @@ public sealed partial class MainWindowViewModel
     [NotifyPropertyChangedFor(nameof(HasSelectedTimelineEntry))]
     private TimelineEntry? _selectedTimelineEntry;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasTimelineSearchText))]
+    [NotifyPropertyChangedFor(nameof(ShowClearTimelineSearchInEmptyState))]
+    private string _timelineSearchText = "";
+
+    [ObservableProperty]
+    private bool _timelineNarrowShowsList = true;
+
     public string TimelineCountText => _localization.Format("TimelineCountFormat", TimelineEntries.Count);
     public bool HasSelectedTimelineEntry => SelectedTimelineEntry is not null;
     public bool HasTimelineEntries => TimelineEntries.Count > 0;
+    public bool HasTimelineSearchText => !string.IsNullOrWhiteSpace(TimelineSearchText);
+    public IReadOnlyList<TimelineEntry> FilteredTimelineEntries => _filteredTimelineEntries;
+    public bool HasFilteredTimelineEntries => FilteredTimelineEntries.Count > 0;
+    public bool ShowClearTimelineSearchInEmptyState =>
+        HasTimelineEntries && HasTimelineSearchText && !HasFilteredTimelineEntries;
+    public string TimelineEmptyStateText => ShowClearTimelineSearchInEmptyState
+        ? _localization.Format("TimelineNoSearchResultsFormat", TimelineSearchText.Trim())
+        : _localization.Get("TimelineEmptyHint");
+
+    partial void OnTimelineSearchTextChanged(string value) => RefreshTimelineSearchState();
+
+    [RelayCommand]
+    private void ClearTimelineSearch() => TimelineSearchText = "";
+
+    [RelayCommand]
+    private void CloseTimelineEntryDetails() => TimelineNarrowShowsList = true;
 
     [RelayCommand]
     private void ShowTimelineEntryDetails(TimelineEntry? entry)
@@ -28,6 +60,7 @@ public sealed partial class MainWindowViewModel
         if (entry is not null)
         {
             SelectedTimelineEntry = entry;
+            TimelineNarrowShowsList = false;
         }
     }
 
@@ -53,6 +86,7 @@ public sealed partial class MainWindowViewModel
         SelectedTimelineEntry ??= entry;
         OnPropertyChanged(nameof(TimelineCountText));
         OnPropertyChanged(nameof(HasTimelineEntries));
+        RefreshTimelineSearchState();
     }
 
     private async Task LoadTimelineDeferredAsync()
@@ -83,6 +117,29 @@ public sealed partial class MainWindowViewModel
 
         OnPropertyChanged(nameof(TimelineCountText));
         OnPropertyChanged(nameof(HasTimelineEntries));
+        RefreshTimelineSearchState();
+    }
+
+    private bool MatchesTimelineSearch(TimelineEntry entry)
+    {
+        var query = TimelineSearchText.Trim();
+        return query.Length == 0 ||
+            entry.Title.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
+            entry.Description.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
+            entry.OperationType.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+            entry.ItemType.Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void RefreshTimelineSearchState()
+    {
+        _filteredTimelineEntries = TimelineEntries.Where(MatchesTimelineSearch).ToArray();
+        OnPropertyChanged(nameof(FilteredTimelineEntries));
+        OnPropertyChanged(nameof(HasFilteredTimelineEntries));
+        OnPropertyChanged(nameof(ShowClearTimelineSearchInEmptyState));
+        OnPropertyChanged(nameof(TimelineEmptyStateText));
+        SelectedTimelineEntry =
+            FilteredTimelineEntries.FirstOrDefault(item => ReferenceEquals(item, SelectedTimelineEntry)) ??
+            FilteredTimelineEntries.FirstOrDefault();
     }
 
     private TimelineEntry CreateTimelineEntry(OperationLog log) =>
@@ -100,14 +157,14 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private async Task ExportTimelineAsync()
     {
-        if (!await AuthorizeSensitiveExportAsync())
-        {
-            return;
-        }
-
         if (TimelineEntries.Count == 0)
         {
             StatusMessage = _localization.Get("TimelineExportEmpty");
+            return;
+        }
+
+        if (!await AuthorizeSensitiveExportAsync())
+        {
             return;
         }
 
@@ -118,12 +175,50 @@ public sealed partial class MainWindowViewModel
 
         foreach (var entry in TimelineEntries)
         {
-            lines.Add($"{entry.Title}\t{entry.Description}\t{entry.TimestampText}\t{entry.OperationType}\t{entry.ItemType}");
+            lines.Add(string.Join('\t',
+                EscapeTimelineCell(entry.Title),
+                EscapeTimelineCell(entry.Description),
+                EscapeTimelineCell(entry.TimestampText),
+                EscapeTimelineCell(entry.OperationType),
+                EscapeTimelineCell(entry.ItemType)));
         }
 
         ExportTimelinePreview = string.Join(Environment.NewLine, lines);
         StatusMessage = _localization.Format("ExportedTimelineFormat", TimelineEntries.Count);
         await Task.CompletedTask;
+    }
+
+    private static string EscapeTimelineCell(string value)
+    {
+        var sanitized = value
+            .Replace('\t', ' ')
+            .Replace('\r', ' ')
+            .Replace('\n', ' ');
+        return sanitized.Length > 0 && sanitized[0] is '=' or '+' or '-' or '@'
+            ? $"'{sanitized}"
+            : sanitized;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUseFilePicker))]
+    private async Task SaveTimelineExportAsync()
+    {
+        if (TimelineEntries.Count == 0)
+        {
+            StatusMessage = _localization.Get("TimelineExportEmpty");
+            return;
+        }
+
+        await ExportTimelineAsync();
+        if (string.IsNullOrWhiteSpace(ExportTimelinePreview))
+        {
+            return;
+        }
+
+        await SaveExportTextAsync(
+            _localization.Get("Timeline"),
+            $"monica_timeline_{DateTimeOffset.Now:yyyyMMdd_HHmmss}.tsv",
+            ExportTimelinePreview,
+            TimelineTsvFileTypes);
     }
 
     private string LocalizeOperationType(string operationType)

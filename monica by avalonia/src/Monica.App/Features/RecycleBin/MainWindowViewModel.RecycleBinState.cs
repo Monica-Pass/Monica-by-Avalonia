@@ -4,6 +4,8 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    partial void OnRecycleBinSearchTextChanged(string value) => RefreshRecycleBinSearchState();
+
     private IEnumerable<PasswordEntry> GetDeletedPasswordSiblings(PasswordEntry entry)
     {
         var key = BuildSiblingGroupKey(entry);
@@ -14,8 +16,13 @@ public sealed partial class MainWindowViewModel
 
     private void RefreshRecycleBinSearchState()
     {
+        _filteredDeletedPasswords = DeletedPasswords
+            .Where(item => MatchesLifecyclePasswordSearch(item, RecycleBinSearchText))
+            .ToArray();
         OnPropertyChanged(nameof(FilteredDeletedPasswords));
         OnPropertyChanged(nameof(HasFilteredDeletedPasswords));
+        OnPropertyChanged(nameof(ShowClearRecycleBinSearchInEmptyState));
+        OnPropertyChanged(nameof(RecycleBinEmptyStateText));
         SelectedDeletedPassword =
             FilteredDeletedPasswords.FirstOrDefault(item => item.Id == SelectedDeletedPassword?.Id) ??
             FilteredDeletedPasswords.FirstOrDefault();
@@ -23,6 +30,9 @@ public sealed partial class MainWindowViewModel
 
     private void RefreshRecycleBinCountState()
     {
+        _filteredDeletedPasswords = DeletedPasswords
+            .Where(item => MatchesLifecyclePasswordSearch(item, RecycleBinSearchText))
+            .ToArray();
         SelectedDeletedPassword =
             DeletedPasswords.FirstOrDefault(item => item.Id == SelectedDeletedPassword?.Id) ??
             DeletedPasswords.FirstOrDefault();
@@ -30,5 +40,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(HasDeletedPasswords));
         OnPropertyChanged(nameof(FilteredDeletedPasswords));
         OnPropertyChanged(nameof(HasFilteredDeletedPasswords));
+        OnPropertyChanged(nameof(ShowClearRecycleBinSearchInEmptyState));
+        OnPropertyChanged(nameof(RecycleBinEmptyStateText));
     }
 }

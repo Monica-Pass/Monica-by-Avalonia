@@ -9,20 +9,25 @@
              x:DataType="vm:MainWindowViewModel">
 <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsArchive}}" RowDefinitions="Auto,*" HorizontalAlignment="Stretch" ClipToBounds="True">
     <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
-        <Grid ColumnDefinitions="*,320,Auto" ColumnSpacing="12" MinHeight="56">
+        <Grid x:Name="ArchiveHeaderGrid" ColumnDefinitions="*,320,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" MinHeight="56">
             <StackPanel MinWidth="0" VerticalAlignment="Center">
                 <TextBlock Classes="workspacePageTitle" Text="{Binding L.Archive}" />
                 <TextBlock Text="{Binding ArchivedPasswordCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
             </StackPanel>
-            <TextBox Grid.Column="1" PlaceholderText="{Binding L.Search}" Text="{Binding SearchText}" VerticalAlignment="Center" />
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <Button Classes="workspacePrimaryCommand" Command="{Binding UnarchivePasswordCommand}" CommandParameter="{Binding SelectedArchivedPassword}" ToolTip.Tip="{Binding L.UnarchivePassword}">
+            <Grid x:Name="ArchiveSearchRegion" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="6" VerticalAlignment="Center">
+                <TextBox x:Name="ArchiveSearchBox" PlaceholderText="{Binding L.Search}" Text="{Binding ArchiveSearchText}" AutomationProperties.Name="{Binding L.Search}" />
+                <Button x:Name="ArchiveSearchClearButton" Grid.Column="1" Classes="workspaceCommand" Command="{Binding ClearArchiveSearchCommand}" IsVisible="{Binding HasArchiveSearchText}" ToolTip.Tip="{Binding L[Clear]}" AutomationProperties.Name="{Binding L[Clear]}" Width="36" Height="36" Padding="0">
+                    <ic:FluentIcon Icon="Dismiss" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Button>
+            </Grid>
+            <StackPanel x:Name="ArchiveHeaderCommands" Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button Classes="workspacePrimaryCommand" Command="{Binding UnarchivePasswordCommand}" CommandParameter="{Binding SelectedArchivedPassword}" IsEnabled="{Binding HasSelectedArchivedPassword}" ToolTip.Tip="{Binding L.UnarchivePassword}" AutomationProperties.Name="{Binding L.UnarchivePassword}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <ic:FluentIcon Icon="ArrowUndo" FontSize="18" />
                         <TextBlock Text="{Binding L.UnarchivePassword}" />
                     </StackPanel>
                 </Button>
-                <Button Classes="workspaceCommand" Command="{Binding SelectSectionCommand}" CommandParameter="Passwords" ToolTip.Tip="{Binding L.Passwords}">
+                <Button Classes="workspaceCommand" Command="{Binding SelectSectionCommand}" CommandParameter="Passwords" ToolTip.Tip="{Binding L.Passwords}" AutomationProperties.Name="{Binding L.Passwords}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <ic:FluentIcon Icon="Key" FontSize="16" />
                         <TextBlock Text="{Binding L.Passwords}" />
@@ -32,8 +37,8 @@
         </Grid>
     </Border>
 
-    <Grid Grid.Row="1" ColumnDefinitions="300,*" ColumnSpacing="14" MinWidth="0">
-        <Border Classes="archiveFilterRail" ClipToBounds="True">
+    <Grid x:Name="ArchiveMasterDetailGrid" Grid.Row="1" ColumnDefinitions="300,*" ColumnSpacing="14" MinWidth="0">
+        <Border x:Name="ArchiveListRegion" Classes="archiveFilterRail" ClipToBounds="True">
             <Grid RowDefinitions="Auto,*">
                 <StackPanel Margin="14,12,14,8" Spacing="3">
                     <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.Archive}" />
@@ -43,7 +48,10 @@
                     <StackPanel IsVisible="{Binding !HasFilteredArchivedPasswords}" HorizontalAlignment="Left" VerticalAlignment="Top" Spacing="10" Margin="24" Width="240">
                         <ic:FluentIcon Icon="Archive" FontSize="32" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
                         <TextBlock Text="{Binding ArchivedPasswordCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding L.ArchiveEmptyHint}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding ArchiveEmptyStateText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap" />
+                        <Button x:Name="EmptyArchiveClearSearchButton" Classes="workspaceCommand" Command="{Binding ClearArchiveSearchCommand}" IsVisible="{Binding ShowClearArchiveSearchInEmptyState}" ToolTip.Tip="{Binding L[Clear]}" AutomationProperties.Name="{Binding L[Clear]}" HorizontalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="8"><ic:FluentIcon Icon="Dismiss" FontSize="12" /><TextBlock Text="{Binding L[Clear]}" /></StackPanel>
+                        </Button>
                         <Button Classes="workspaceCommand" Command="{Binding SelectSectionCommand}" CommandParameter="Passwords" ToolTip.Tip="{Binding L.Passwords}" HorizontalAlignment="Center">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <ic:FluentIcon Icon="Key" FontSize="16" />
@@ -51,14 +59,21 @@
                             </StackPanel>
                         </Button>
                     </StackPanel>
-                    <ListBox Classes="archiveRecoveryList" ItemsSource="{Binding FilteredArchivedPasswords}" SelectedItem="{Binding SelectedArchivedPassword}" IsVisible="{Binding HasFilteredArchivedPasswords}" SelectionMode="Single" Margin="8,0,8,8">
+                    <ListBox x:Name="ArchivePasswordList" Classes="archiveRecoveryList" ItemsSource="{Binding FilteredArchivedPasswords}" SelectedItem="{Binding SelectedArchivedPassword}" IsVisible="{Binding HasFilteredArchivedPasswords}" SelectionMode="Single" AutomationProperties.Name="{Binding L.Archive}" Margin="8,0,8,8">
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="models:PasswordEntry">
                                 <Border Classes="archiveRecoveryRow">
+                                    <Border.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="{Binding #ArchiveWorkspaceRoot.DataContext.L.UnarchivePassword}" Command="{Binding #ArchiveWorkspaceRoot.DataContext.UnarchivePasswordCommand}" CommandParameter="{Binding}" />
+                                            <MenuItem Header="{Binding #ArchiveWorkspaceRoot.DataContext.L.MoveToRecycleBin}" Command="{Binding #ArchiveWorkspaceRoot.DataContext.DeletePasswordCommand}" CommandParameter="{Binding}" />
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
                                     <Button Classes="archiveRecoveryRowButton"
                                             Command="{Binding #ArchiveWorkspaceRoot.DataContext.ShowArchivedPasswordDetailsCommand}"
                                             CommandParameter="{Binding}"
-                                            ToolTip.Tip="{Binding Title}">
+                                            ToolTip.Tip="{Binding Title}"
+                                            AutomationProperties.Name="{Binding Title}">
                                         <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="2">
                                             <Border Grid.RowSpan="3" Width="38" Height="38" CornerRadius="19" Background="#5B5FC7" VerticalAlignment="Top">
                                                 <TextBlock Text="{Binding AvatarText}" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -76,9 +91,12 @@
             </Grid>
         </Border>
 
-        <Border Grid.Column="1" Classes="archiveRecoveryPanel" Padding="24" MinWidth="0">
+        <Border x:Name="ArchiveDetailRegion" Grid.Column="1" Classes="archiveRecoveryPanel" Padding="24" MinWidth="0" Focusable="True">
             <Grid>
                 <StackPanel IsVisible="{Binding HasSelectedArchivedPassword}" Spacing="18">
+                    <Button x:Name="BackToArchiveListButton" Classes="workspaceCommand" Command="{Binding CloseArchivedPasswordDetailsCommand}" ToolTip.Tip="{Binding L[Back]}" AutomationProperties.Name="{Binding L[Back]}" HorizontalAlignment="Left" IsVisible="False">
+                        <StackPanel Orientation="Horizontal" Spacing="6"><ic:FluentIcon Icon="ArrowLeft" FontSize="16" /><TextBlock Text="{Binding L[Back]}" /></StackPanel>
+                    </Button>
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
                         <Border Width="54" Height="54" CornerRadius="27" Background="#5B5FC7">
                             <TextBlock Text="{Binding SelectedArchivedPassword.AvatarText}" Foreground="White" FontWeight="SemiBold" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />

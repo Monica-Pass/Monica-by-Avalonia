@@ -77,6 +77,7 @@ public sealed partial class MainWindowViewModel
         SaveNoteCsvExportCommand.NotifyCanExecuteChanged();
         SaveWalletCsvExportCommand.NotifyCanExecuteChanged();
         SaveAegisJsonExportCommand.NotifyCanExecuteChanged();
+        SaveTimelineExportCommand.NotifyCanExecuteChanged();
         ImportMarkdownNoteCommand.NotifyCanExecuteChanged();
         ExportCurrentNoteMarkdownCommand.NotifyCanExecuteChanged();
     }

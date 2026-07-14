@@ -740,6 +740,99 @@ public sealed class PasswordManagementTests
     }
 
     [Fact]
+    public void Lifecycle_workspaces_keep_search_state_independent_and_recover_empty_results()
+    {
+        var harness = CreateHarness();
+        harness.ViewModel.SearchText = "main vault";
+        harness.ViewModel.ArchivedPasswords.Add(new PasswordEntry
+        {
+            Id = 1,
+            Title = "Archived GitHub",
+            Username = "archive-user",
+            AuthenticatorKey = "ARCHIVE-SECRET"
+        });
+        harness.ViewModel.DeletedPasswords.Add(new PasswordEntry
+        {
+            Id = 2,
+            Title = "Deleted GitLab",
+            Username = "deleted-user"
+        });
+
+        harness.ViewModel.ArchiveSearchText = "github";
+        harness.ViewModel.RecycleBinSearchText = "missing";
+
+        Assert.Equal("main vault", harness.ViewModel.SearchText);
+        Assert.Same(harness.ViewModel.FilteredArchivedPasswords, harness.ViewModel.FilteredArchivedPasswords);
+        Assert.Same(harness.ViewModel.FilteredDeletedPasswords, harness.ViewModel.FilteredDeletedPasswords);
+        Assert.Single(harness.ViewModel.FilteredArchivedPasswords);
+        Assert.Empty(harness.ViewModel.FilteredDeletedPasswords);
+        Assert.False(harness.ViewModel.ShowClearArchiveSearchInEmptyState);
+        Assert.True(harness.ViewModel.ShowClearRecycleBinSearchInEmptyState);
+
+        harness.ViewModel.ArchiveSearchText = "ARCHIVE-SECRET";
+        Assert.Empty(harness.ViewModel.FilteredArchivedPasswords);
+
+        harness.ViewModel.ClearArchiveSearchCommand.Execute(null);
+        harness.ViewModel.ClearRecycleBinSearchCommand.Execute(null);
+
+        Assert.Empty(harness.ViewModel.ArchiveSearchText);
+        Assert.Empty(harness.ViewModel.RecycleBinSearchText);
+        Assert.Single(harness.ViewModel.FilteredDeletedPasswords);
+    }
+
+    [Fact]
+    public void Timeline_search_filters_stable_audit_metadata_and_can_be_cleared()
+    {
+        var harness = CreateHarness();
+        harness.ViewModel.TimelineEntries.Add(new TimelineEntry(
+            "GitHub",
+            "Updated PASSWORD on Desktop",
+            "2026-07-15 09:00",
+            "UPDATE",
+            "PASSWORD"));
+        harness.ViewModel.TimelineEntries.Add(new TimelineEntry(
+            "Backup",
+            "Exported VAULT on Desktop",
+            "2026-07-15 09:05",
+            "EXPORT",
+            "VAULT"));
+
+        harness.ViewModel.TimelineSearchText = "password";
+
+        Assert.Single(harness.ViewModel.FilteredTimelineEntries);
+        Assert.Equal("GitHub", harness.ViewModel.FilteredTimelineEntries.Single().Title);
+        Assert.True(harness.ViewModel.HasTimelineSearchText);
+
+        harness.ViewModel.ClearTimelineSearchCommand.Execute(null);
+
+        Assert.Equal(2, harness.ViewModel.FilteredTimelineEntries.Count());
+        Assert.False(harness.ViewModel.HasTimelineSearchText);
+    }
+
+    [Fact]
+    public async Task Timeline_export_performs_authorized_file_save_with_fresh_content()
+    {
+        var picker = new FakeFileSystemPickerService();
+        var authorization = new CountingExportAuthorizationService();
+        var harness = CreateHarness(fileSystemPickerService: picker, exportAuthorizationService: authorization);
+        harness.Crypto.InitializeSession("timeline export", new byte[16]);
+        harness.ViewModel.TimelineEntries.Add(new TimelineEntry(
+            "=GitHub",
+            "Updated PASSWORD\non Desktop",
+            "2026-07-15 09:00",
+            "UPDATE",
+            "PASSWORD"));
+
+        await harness.ViewModel.SaveTimelineExportCommand.ExecuteAsync(null);
+        await harness.ViewModel.SaveTimelineExportCommand.ExecuteAsync(null);
+
+        Assert.EndsWith(".tsv", picker.SuggestedFileName, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("'=GitHub", picker.SavedContent);
+        Assert.Contains("PASSWORD", picker.SavedContent);
+        Assert.Equal(2, authorization.RequestCount);
+    }
+
+    [Fact]
     public async Task Dangerous_delete_commands_do_not_mutate_when_confirmation_is_cancelled()
     {
         var confirmation = new FakeConfirmationDialogService(result: false);
@@ -938,11 +1031,11 @@ public sealed class PasswordManagementTests
         Assert.Empty(harness.ViewModel.TotpItems);
         Assert.Contains(harness.ViewModel.TimelineEntries, item => item.OperationType == "ARCHIVE" && item.Title == "Archive me");
 
-        harness.ViewModel.SearchText = "archive.example";
+        harness.ViewModel.ArchiveSearchText = "archive.example";
         Assert.Equal(2, harness.ViewModel.FilteredArchivedPasswords.Count());
-        harness.ViewModel.SearchText = "missing";
+        harness.ViewModel.ArchiveSearchText = "missing";
         Assert.Empty(harness.ViewModel.FilteredArchivedPasswords);
-        harness.ViewModel.SearchText = "";
+        harness.ViewModel.ArchiveSearchText = "";
 
         await harness.ViewModel.UnarchivePasswordCommand.ExecuteAsync(harness.ViewModel.ArchivedPasswords.First(item => item.Id == first.Id));
 
@@ -3353,7 +3446,9 @@ public sealed class PasswordManagementTests
     private static PasswordHarness CreateHarness(
         IPwnedPasswordService? pwnedPasswordService = null,
         IWebDavBackupService? webDavBackupService = null,
-        IConfirmationDialogService? confirmationDialogService = null)
+        IConfirmationDialogService? confirmationDialogService = null,
+        IFileSystemPickerService? fileSystemPickerService = null,
+        IExportAuthorizationService? exportAuthorizationService = null)
     {
         var databasePath = GetTempDatabasePath();
         var factory = new SqliteConnectionFactory(databasePath);
@@ -3391,7 +3486,9 @@ public sealed class PasswordManagementTests
             pwnedPasswordService: pwnedPasswordService,
             confirmationDialogService: confirmationDialogService,
             totpEditorDialogService: totpDialog,
-            walletItemEditorDialogService: walletDialog);
+            walletItemEditorDialogService: walletDialog,
+            fileSystemPickerService: fileSystemPickerService,
+            exportAuthorizationService: exportAuthorizationService);
 
         return new PasswordHarness(viewModel, repository, crypto, dialog, detailDialog, categoryPicker, totpDialog, walletDialog, clipboard, attachmentFileService, confirmationDialogService, databasePath);
     }
@@ -3630,6 +3727,40 @@ public sealed class PasswordManagementTests
         {
             DeletedPaths.Add(relativePath);
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeFileSystemPickerService : IFileSystemPickerService
+    {
+        public PlatformIntegrationCapability Capability { get; } = new(
+            "file-picker",
+            PlatformFeatureStatus.Available,
+            "Test file picker");
+        public string SuggestedFileName { get; private set; } = "";
+        public string SavedContent { get; private set; } = "";
+
+        public Task<PickedTextFile?> OpenTextFileAsync(string title, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
+            Task.FromResult<PickedTextFile?>(null);
+
+        public Task<PickedBinaryFile?> OpenBinaryFileAsync(string title, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
+            Task.FromResult<PickedBinaryFile?>(null);
+
+        public Task<string?> SaveTextFileAsync(string title, string suggestedFileName, string content, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default)
+        {
+            SuggestedFileName = suggestedFileName;
+            SavedContent = content;
+            return Task.FromResult<string?>(suggestedFileName);
+        }
+    }
+
+    private sealed class CountingExportAuthorizationService : IExportAuthorizationService
+    {
+        public int RequestCount { get; private set; }
+
+        public Task<bool> AuthorizeAsync(bool requireMasterPassword, CancellationToken cancellationToken = default)
+        {
+            RequestCount++;
+            return Task.FromResult(true);
         }
     }
 

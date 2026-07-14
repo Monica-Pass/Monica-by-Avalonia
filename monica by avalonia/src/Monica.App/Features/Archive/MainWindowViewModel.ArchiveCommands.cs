@@ -6,6 +6,12 @@ namespace Monica.App.ViewModels;
 public sealed partial class MainWindowViewModel
 {
     [RelayCommand]
+    private void ClearArchiveSearch() => ArchiveSearchText = "";
+
+    [RelayCommand]
+    private void CloseArchivedPasswordDetails() => ArchiveNarrowShowsList = true;
+
+    [RelayCommand]
     private async Task UnarchivePasswordAsync(PasswordEntry? entry)
     {
         if (entry is null)
@@ -43,6 +49,7 @@ public sealed partial class MainWindowViewModel
         RefreshBoundTotpPresentation(siblings);
         RaiseCounts();
         RaiseFilteredPasswordsChanged();
+        ArchiveNarrowShowsList = true;
         InvalidateSecurityAnalysis();
         StatusMessage = _localization.Format("UnarchivedPasswordFormat", entry.Title);
     }
@@ -53,6 +60,7 @@ public sealed partial class MainWindowViewModel
         if (entry is not null)
         {
             SelectedArchivedPassword = entry;
+            ArchiveNarrowShowsList = false;
         }
     }
 }

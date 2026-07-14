@@ -104,6 +104,11 @@ public partial class MainWindow : Window
             }
         }
 
+        if (TryHandleLifecycleWorkspaceShortcut(viewModel, e))
+        {
+            return;
+        }
+
         if (e.Key == Key.F5 && !IsTextEditingSource(e.Source))
         {
             if (viewModel.LoadCommand.CanExecute(null))

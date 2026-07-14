@@ -208,8 +208,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     partial void OnSearchTextChanged(string value)
     {
         RaiseFilteredPasswordsChanged();
-        RefreshArchiveSearchState();
-        RefreshRecycleBinSearchState();
         RaisePasswordSelectionState();
         ReconcileSelectedPasswordDetails();
     }
@@ -537,6 +535,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(PasswordCountText));
         OnPropertyChanged(nameof(HasFilteredPasswordRows));
         OnPropertyChanged(nameof(PasswordEmptyStateText));
+        OnPropertyChanged(nameof(ArchiveEmptyStateText));
+        OnPropertyChanged(nameof(RecycleBinEmptyStateText));
+        OnPropertyChanged(nameof(TimelineEmptyStateText));
         OnPropertyChanged(nameof(ShowAddPasswordInEmptyState));
         OnPropertyChanged(nameof(ShowClearPasswordFiltersInEmptyState));
         OnPropertyChanged(nameof(NoteCountText));
