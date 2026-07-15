@@ -14,7 +14,11 @@ internal sealed record VaultLoadSnapshot(
     IReadOnlyList<SecureItem> StoredTotps,
     IReadOnlyList<Category> Categories,
     IReadOnlyDictionary<long, PasswordQuickAccessRecord> PasswordQuickAccessRecords,
-    IReadOnlyList<LocalMdbxDatabase> MdbxDatabases);
+    IReadOnlyList<LocalMdbxDatabase> MdbxDatabases)
+{
+    public IEnumerable<PasswordEntry> AllPasswords =>
+        ActivePasswords.Concat(ArchivedPasswords).Concat(DeletedPasswords);
+}
 
 internal static class VaultSnapshotLoader
 {
@@ -23,7 +27,9 @@ internal static class VaultSnapshotLoader
         var allPasswords = await AppDiagnostics.MeasureAsync(
             "Load passwords",
             () => repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
-        var allPasswordItems = allPasswords.ToArray();
+        var allPasswordItems = allPasswords
+            .Select(static item => item.CreateDetachedCopy())
+            .ToArray();
         var activePasswords = allPasswordItems.Where(item => !item.IsDeleted && !item.IsArchived).ToArray();
         var archivedPasswords = allPasswordItems.Where(item => !item.IsDeleted && item.IsArchived).ToArray();
         var deletedPasswords = allPasswordItems.Where(item => item.IsDeleted).ToArray();

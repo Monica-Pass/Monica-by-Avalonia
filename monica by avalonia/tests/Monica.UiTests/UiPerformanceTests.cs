@@ -1,8 +1,15 @@
 using System.Diagnostics;
+using System.Reflection;
 using Avalonia.Controls;
+using Avalonia.Threading;
+using Microsoft.Extensions.DependencyInjection;
 using Monica.App.Controls;
 using Monica.App.Features.Notes;
 using Monica.App.Features.Passwords;
+using Monica.App.ViewModels;
+using Monica.Core.Models;
+using Monica.Core.Services;
+using Monica.Data.Repositories;
 
 namespace Monica.UiTests;
 
@@ -56,5 +63,117 @@ public sealed class UiPerformanceTests
         host.IsActive = true;
         Assert.IsType<PasswordVaultView>(host.CurrentWorkspace);
         Assert.NotSame(passwordView, host.CurrentWorkspace);
+    }
+
+    [Fact]
+    public void Vault_password_preparation_keeps_the_ui_dispatcher_responsive()
+    {
+        var repository = DispatchProxy.Create<IMonicaRepository, VaultLoadRepositoryProxy>();
+        var repositoryProbe = (VaultLoadRepositoryProxy)(object)repository;
+        var totpService = new DispatcherHeartbeatTotpService();
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window, overrides =>
+        {
+            overrides.AddSingleton(repository);
+            overrides.AddSingleton<ITotpService>(totpService);
+        });
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        Dispatcher.UIThread.Post(async () =>
+        {
+            try
+            {
+                await viewModel.LoadAsync();
+                completion.TrySetResult(null);
+            }
+            catch (Exception exception)
+            {
+                completion.TrySetException(exception);
+            }
+        });
+
+        var timeout = Stopwatch.StartNew();
+        while (!completion.Task.IsCompleted && timeout.Elapsed < TimeSpan.FromSeconds(5))
+        {
+            Dispatcher.UIThread.RunJobs();
+            Thread.Sleep(1);
+        }
+
+        Assert.True(completion.Task.IsCompleted, "Vault load did not finish before the responsiveness timeout.");
+        Assert.True(completion.Task.IsCompletedSuccessfully, completion.Task.Exception?.ToString());
+        Assert.True(
+            totpService.HeartbeatObservedDuringGeneration,
+            "The UI dispatcher could not service a heartbeat while password TOTP presentation was prepared.");
+        var displayed = Assert.Single(viewModel.Passwords);
+        Assert.NotSame(repositoryProbe.Password, displayed);
+        Assert.Equal("------", repositoryProbe.Password.TotpCode);
+        Assert.Equal("654321", displayed.TotpCode);
+    }
+
+    public class VaultLoadRepositoryProxy : DispatchProxy
+    {
+        public PasswordEntry Password { get; } = new()
+        {
+            Id = 1,
+            Title = "Responsive TOTP",
+            Username = "desktop",
+            AuthenticatorKey = "otpauth://totp/Monica:desktop?secret=JBSWY3DPEHPK3PXP&issuer=Monica"
+        };
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            ArgumentNullException.ThrowIfNull(targetMethod);
+            return targetMethod.Name switch
+            {
+                nameof(IMonicaRepository.GetPasswordsAsync) => Task.FromResult<IReadOnlyList<PasswordEntry>>(
+                    [Password]),
+                nameof(IMonicaRepository.GetCustomFieldsByEntryIdsAsync) =>
+                    Task.FromResult<IReadOnlyDictionary<long, IReadOnlyList<CustomField>>>(
+                        new Dictionary<long, IReadOnlyList<CustomField>>()),
+                nameof(IMonicaRepository.GetAttachmentsByOwnerIdsAsync) =>
+                    Task.FromResult<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>>(
+                        new Dictionary<long, IReadOnlyList<Attachment>>()),
+                nameof(IMonicaRepository.GetSecureItemsAsync) =>
+                    Task.FromResult<IReadOnlyList<SecureItem>>([]),
+                nameof(IMonicaRepository.GetCategoriesAsync) =>
+                    Task.FromResult<IReadOnlyList<Category>>([]),
+                nameof(IMonicaRepository.GetPasswordQuickAccessRecordsAsync) =>
+                    Task.FromResult<IReadOnlyList<PasswordQuickAccessRecord>>([]),
+                nameof(IMonicaRepository.GetMdbxDatabasesAsync) =>
+                    Task.FromResult<IReadOnlyList<LocalMdbxDatabase>>([]),
+                nameof(IMonicaRepository.GetOperationLogsAsync) =>
+                    Task.FromResult<IReadOnlyList<OperationLog>>([]),
+                _ => throw new NotSupportedException($"Unexpected repository call: {targetMethod.Name}")
+            };
+        }
+    }
+
+    private sealed class DispatcherHeartbeatTotpService : ITotpService
+    {
+        private readonly ManualResetEventSlim _heartbeat = new();
+        private int _generateCallCount;
+
+        public bool HeartbeatObservedDuringGeneration { get; private set; }
+
+        public string GenerateCode(
+            string secretKey,
+            int period = 30,
+            int digits = 6,
+            string otpType = "TOTP",
+            long counter = 0)
+        {
+            if (Interlocked.Increment(ref _generateCallCount) == 1)
+            {
+                Dispatcher.UIThread.Post(_heartbeat.Set, DispatcherPriority.Background);
+                HeartbeatObservedDuringGeneration = _heartbeat.Wait(TimeSpan.FromMilliseconds(300));
+            }
+
+            return "654321";
+        }
+
+        public int GetRemainingSeconds(int period = 30, DateTimeOffset? now = null) => 15;
+
+        public double GetProgress(int period = 30, DateTimeOffset? now = null) => 50;
     }
 }

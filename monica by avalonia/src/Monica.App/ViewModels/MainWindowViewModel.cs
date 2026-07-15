@@ -288,9 +288,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 AppDiagnostics.Info("Smoke UI vault load delay completed");
             }
 
-            var snapshot = await Task.Run(
-                () => VaultSnapshotLoader.LoadAsync(_repository),
-                sessionCancellationToken);
+            var snapshot = await Task.Run(async () =>
+            {
+                var loadedSnapshot = await VaultSnapshotLoader.LoadAsync(_repository);
+                VaultPasswordPresentationPreparer.Prepare(
+                    loadedSnapshot,
+                    _totpService,
+                    sessionCancellationToken);
+                return loadedSnapshot;
+            }, sessionCancellationToken);
             sessionCancellationToken.ThrowIfCancellationRequested();
             VaultLoadStageText = "正在整理密码列表...";
             await YieldVaultLoadUiAsync();
@@ -298,29 +304,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
             _passwordAttachments = snapshot.PasswordAttachments;
             _passwordQuickAccessRecords = snapshot.PasswordQuickAccessRecords;
 
-            AppDiagnostics.Measure("Apply password collections", () =>
+            AppDiagnostics.Measure("Track password selections", () =>
             {
-                foreach (var item in snapshot.ActivePasswords)
+                foreach (var item in snapshot.AllPasswords)
                 {
-                    RefreshPasswordTotpDisplay(item);
-                    RefreshPasswordAttachmentState(item);
-                    item.IsSelected = false;
-                    TrackPasswordSelection(item);
-                }
-
-                foreach (var item in snapshot.ArchivedPasswords)
-                {
-                    RefreshPasswordTotpDisplay(item);
-                    RefreshPasswordAttachmentState(item);
-                    item.IsSelected = false;
-                    TrackPasswordSelection(item);
-                }
-
-                foreach (var item in snapshot.DeletedPasswords)
-                {
-                    RefreshPasswordTotpDisplay(item);
-                    RefreshPasswordAttachmentState(item);
-                    item.IsSelected = false;
                     TrackPasswordSelection(item);
                 }
             });

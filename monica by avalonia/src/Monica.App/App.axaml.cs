@@ -82,7 +82,9 @@ public partial class App : Application
     }
 
 
-    internal static ServiceProvider ConfigureServices(MainWindow mainWindow)
+    internal static ServiceProvider ConfigureServices(
+        MainWindow mainWindow,
+        Action<IServiceCollection>? configureOverrides = null)
     {
         var services = new ServiceCollection();
         services.AddLogging();
@@ -170,6 +172,7 @@ public partial class App : Application
         services.AddSingleton<ILocalizationService, LocalizationService>();
         services.AddSingleton<IVaultUnlockCoordinator, VaultUnlockCoordinator>();
         services.AddSingleton<MainWindowViewModel>();
+        configureOverrides?.Invoke(services);
         return services.BuildServiceProvider();
     }
 }

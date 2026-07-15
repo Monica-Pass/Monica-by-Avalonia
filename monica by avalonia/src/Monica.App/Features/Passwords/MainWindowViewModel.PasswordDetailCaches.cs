@@ -103,9 +103,7 @@ public sealed partial class MainWindowViewModel
     }
 
     private void RefreshPasswordAttachmentState(PasswordEntry entry)
-    {
-        entry.HasAttachments = GetPasswordAttachments(entry.Id).Count > 0;
-    }
+        => PasswordPresentationState.RefreshAttachment(entry, _passwordAttachments);
 
     private async Task<IReadOnlyList<CustomField>> GetGroupCustomFieldsAsync(PasswordEntry entry, IReadOnlyList<PasswordEntry> siblings)
     {

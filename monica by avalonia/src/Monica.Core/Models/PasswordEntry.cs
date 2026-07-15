@@ -90,6 +90,63 @@ public partial class PasswordEntry : ObservableObject
     public bool IsKeePassEntry => KeepassDatabaseId is not null;
     public bool IsMdbxEntry => MdbxDatabaseId is not null;
 
+    public PasswordEntry CreateDetachedCopy() => new()
+    {
+        Id = Id,
+        Title = Title,
+        Website = Website,
+        Username = Username,
+        Password = Password,
+        Notes = Notes,
+        IsFavorite = IsFavorite,
+        SortOrder = SortOrder,
+        IsGroupCover = IsGroupCover,
+        AppPackageName = AppPackageName,
+        AppName = AppName,
+        Email = Email,
+        Phone = Phone,
+        AddressLine = AddressLine,
+        City = City,
+        State = State,
+        ZipCode = ZipCode,
+        Country = Country,
+        CreditCardNumber = CreditCardNumber,
+        CreditCardHolder = CreditCardHolder,
+        CreditCardExpiry = CreditCardExpiry,
+        CreditCardCvv = CreditCardCvv,
+        CategoryId = CategoryId,
+        BoundNoteId = BoundNoteId,
+        KeepassDatabaseId = KeepassDatabaseId,
+        KeepassGroupPath = KeepassGroupPath,
+        KeepassEntryUuid = KeepassEntryUuid,
+        KeepassGroupUuid = KeepassGroupUuid,
+        MdbxDatabaseId = MdbxDatabaseId,
+        MdbxFolderId = MdbxFolderId,
+        AuthenticatorKey = AuthenticatorKey,
+        PasskeyBindings = PasskeyBindings,
+        SshKeyData = SshKeyData,
+        LoginType = LoginType,
+        SsoProvider = SsoProvider,
+        SsoRefEntryId = SsoRefEntryId,
+        WifiMetadata = WifiMetadata,
+        CustomIconType = CustomIconType,
+        CustomIconValue = CustomIconValue,
+        CustomIconUpdatedAt = CustomIconUpdatedAt,
+        IsDeleted = IsDeleted,
+        DeletedAt = DeletedAt,
+        IsArchived = IsArchived,
+        ArchivedAt = ArchivedAt,
+        ReplicaGroupId = ReplicaGroupId,
+        BitwardenVaultId = BitwardenVaultId,
+        BitwardenCipherId = BitwardenCipherId,
+        BitwardenFolderId = BitwardenFolderId,
+        BitwardenRevisionDate = BitwardenRevisionDate,
+        BitwardenCipherType = BitwardenCipherType,
+        BitwardenLocalModified = BitwardenLocalModified,
+        CreatedAt = CreatedAt,
+        UpdatedAt = UpdatedAt
+    };
+
     private string BuildAvatarText()
     {
         if (!HasCustomIcon)

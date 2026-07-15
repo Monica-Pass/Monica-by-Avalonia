@@ -6,20 +6,7 @@ namespace Monica.App.ViewModels;
 public sealed partial class MainWindowViewModel
 {
     private void RefreshPasswordTotpDisplay(PasswordEntry entry)
-    {
-        var data = TotpDataResolver.FromAuthenticatorKey(entry.AuthenticatorKey, entry.Title, entry.Username);
-        if (data is null || string.IsNullOrWhiteSpace(data.Secret))
-        {
-            entry.TotpCode = "------";
-            entry.TotpTimeRemaining = "";
-            entry.TotpProgress = 0;
-            return;
-        }
-
-        entry.TotpCode = _totpService.GenerateCode(data.Secret, data.Period, data.Digits, data.OtpType, data.Counter);
-        entry.TotpTimeRemaining = $"{_totpService.GetRemainingSeconds(data.Period)}s";
-        entry.TotpProgress = _totpService.GetProgress(data.Period);
-    }
+        => PasswordPresentationState.RefreshTotp(entry, _totpService);
 
     private async Task SynchronizeBoundTotpAsync(PasswordEntry entry)
     {

@@ -44,65 +44,7 @@ public sealed partial class MainWindowViewModel
         clone.BitwardenLocalModified = true;
         return clone;
     }
-    private static PasswordEntry ClonePassword(PasswordEntry source)
-    {
-        return new PasswordEntry
-        {
-            Id = source.Id,
-            Title = source.Title,
-            Website = source.Website,
-            Username = source.Username,
-            Password = source.Password,
-            Notes = source.Notes,
-            IsFavorite = source.IsFavorite,
-            SortOrder = source.SortOrder,
-            IsGroupCover = source.IsGroupCover,
-            AppPackageName = source.AppPackageName,
-            AppName = source.AppName,
-            Email = source.Email,
-            Phone = source.Phone,
-            AddressLine = source.AddressLine,
-            City = source.City,
-            State = source.State,
-            ZipCode = source.ZipCode,
-            Country = source.Country,
-            CreditCardNumber = source.CreditCardNumber,
-            CreditCardHolder = source.CreditCardHolder,
-            CreditCardExpiry = source.CreditCardExpiry,
-            CreditCardCvv = source.CreditCardCvv,
-            CategoryId = source.CategoryId,
-            BoundNoteId = source.BoundNoteId,
-            KeepassDatabaseId = source.KeepassDatabaseId,
-            KeepassGroupPath = source.KeepassGroupPath,
-            KeepassEntryUuid = source.KeepassEntryUuid,
-            KeepassGroupUuid = source.KeepassGroupUuid,
-            MdbxDatabaseId = source.MdbxDatabaseId,
-            MdbxFolderId = source.MdbxFolderId,
-            AuthenticatorKey = source.AuthenticatorKey,
-            PasskeyBindings = source.PasskeyBindings,
-            SshKeyData = source.SshKeyData,
-            LoginType = source.LoginType,
-            SsoProvider = source.SsoProvider,
-            SsoRefEntryId = source.SsoRefEntryId,
-            WifiMetadata = source.WifiMetadata,
-            CustomIconType = source.CustomIconType,
-            CustomIconValue = source.CustomIconValue,
-            CustomIconUpdatedAt = source.CustomIconUpdatedAt,
-            IsDeleted = source.IsDeleted,
-            DeletedAt = source.DeletedAt,
-            IsArchived = source.IsArchived,
-            ArchivedAt = source.ArchivedAt,
-            ReplicaGroupId = source.ReplicaGroupId,
-            BitwardenVaultId = source.BitwardenVaultId,
-            BitwardenCipherId = source.BitwardenCipherId,
-            BitwardenFolderId = source.BitwardenFolderId,
-            BitwardenRevisionDate = source.BitwardenRevisionDate,
-            BitwardenCipherType = source.BitwardenCipherType,
-            BitwardenLocalModified = source.BitwardenLocalModified,
-            CreatedAt = source.CreatedAt,
-            UpdatedAt = source.UpdatedAt
-        };
-    }
+    private static PasswordEntry ClonePassword(PasswordEntry source) => source.CreateDetachedCopy();
 
     private static CustomField CloneCustomFieldForImport(CustomField source, long importedPasswordId)
     {

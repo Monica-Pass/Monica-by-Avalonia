@@ -289,62 +289,7 @@ public sealed class VaultDataProtector(ICryptoService cryptoService) : IVaultDat
         }
     }
 
-    private static PasswordEntry Clone(PasswordEntry source) => new()
-    {
-        Id = source.Id,
-        Title = source.Title,
-        Website = source.Website,
-        Username = source.Username,
-        Password = source.Password,
-        Notes = source.Notes,
-        CreatedAt = source.CreatedAt,
-        UpdatedAt = source.UpdatedAt,
-        IsFavorite = source.IsFavorite,
-        SortOrder = source.SortOrder,
-        IsGroupCover = source.IsGroupCover,
-        AppPackageName = source.AppPackageName,
-        AppName = source.AppName,
-        Email = source.Email,
-        Phone = source.Phone,
-        AddressLine = source.AddressLine,
-        City = source.City,
-        State = source.State,
-        ZipCode = source.ZipCode,
-        Country = source.Country,
-        CreditCardNumber = source.CreditCardNumber,
-        CreditCardHolder = source.CreditCardHolder,
-        CreditCardExpiry = source.CreditCardExpiry,
-        CreditCardCvv = source.CreditCardCvv,
-        CategoryId = source.CategoryId,
-        BoundNoteId = source.BoundNoteId,
-        KeepassDatabaseId = source.KeepassDatabaseId,
-        KeepassGroupPath = source.KeepassGroupPath,
-        KeepassEntryUuid = source.KeepassEntryUuid,
-        KeepassGroupUuid = source.KeepassGroupUuid,
-        MdbxDatabaseId = source.MdbxDatabaseId,
-        MdbxFolderId = source.MdbxFolderId,
-        AuthenticatorKey = source.AuthenticatorKey,
-        PasskeyBindings = source.PasskeyBindings,
-        SshKeyData = source.SshKeyData,
-        LoginType = source.LoginType,
-        SsoProvider = source.SsoProvider,
-        SsoRefEntryId = source.SsoRefEntryId,
-        WifiMetadata = source.WifiMetadata,
-        CustomIconType = source.CustomIconType,
-        CustomIconValue = source.CustomIconValue,
-        CustomIconUpdatedAt = source.CustomIconUpdatedAt,
-        IsDeleted = source.IsDeleted,
-        DeletedAt = source.DeletedAt,
-        IsArchived = source.IsArchived,
-        ArchivedAt = source.ArchivedAt,
-        ReplicaGroupId = source.ReplicaGroupId,
-        BitwardenVaultId = source.BitwardenVaultId,
-        BitwardenCipherId = source.BitwardenCipherId,
-        BitwardenFolderId = source.BitwardenFolderId,
-        BitwardenRevisionDate = source.BitwardenRevisionDate,
-        BitwardenCipherType = source.BitwardenCipherType,
-        BitwardenLocalModified = source.BitwardenLocalModified
-    };
+    private static PasswordEntry Clone(PasswordEntry source) => source.CreateDetachedCopy();
 
     private static SecureItem Clone(SecureItem source) => new()
     {
