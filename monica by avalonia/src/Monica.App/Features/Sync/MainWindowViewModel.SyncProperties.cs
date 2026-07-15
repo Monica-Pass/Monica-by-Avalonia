@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Monica.App.Services;
 using Monica.Core.Models;
 using Monica.Platform.Services;
 
@@ -8,6 +9,7 @@ namespace Monica.App.ViewModels;
 public sealed partial class MainWindowViewModel
 {
     private readonly IWebDavBackupService _webDavBackupService;
+    private readonly IWebDavBackupCryptoService _webDavBackupCryptoService;
     private readonly IOneDriveBackupService _oneDriveBackupService;
 
     public ObservableCollection<SyncHealthDisplayItem> SyncHealthItems { get; } = [];
@@ -103,6 +105,9 @@ public sealed partial class MainWindowViewModel
 
     [ObservableProperty]
     private bool _isRunningWebDavBackup;
+
+    [ObservableProperty]
+    private string _webDavOperationStageText = "";
 
     [ObservableProperty]
     private bool _webDavBackupIncludePasswords = true;

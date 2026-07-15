@@ -4,7 +4,7 @@
     </UserControl.Styles>
     <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsSync}}" RowDefinitions="Auto,*" MaxWidth="1080" HorizontalAlignment="Stretch" ClipToBounds="True">
         <Border Classes="workspacePageHeader">
-            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
                 <TextBlock Classes="workspacePageTitle" Text="{Binding L.SyncAndBackup}" />
                 <TextBlock Grid.Row="1" Classes="workspacePageSubtitle" Text="{Binding L.SyncSubtitle}" MaxWidth="620" HorizontalAlignment="Left" />
                 <WrapPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal">
@@ -21,6 +21,12 @@
                         </StackPanel>
                     </Button>
                 </WrapPanel>
+                <Border x:Name="WebDavOperationProgressRegion" Grid.Row="3" Grid.ColumnSpan="2" Padding="12,9" CornerRadius="7" BorderBrush="{DynamicResource AccentFillColorSecondaryBrush}" BorderThickness="1" Background="{DynamicResource LayerFillColorSubtleBrush}" IsVisible="{Binding IsWebDavBusy}" AutomationProperties.Name="{Binding WebDavOperationStageText}">
+                    <Grid ColumnDefinitions="160,*" ColumnSpacing="12">
+                        <ProgressBar x:Name="WebDavOperationProgressBar" IsIndeterminate="True" VerticalAlignment="Center" AutomationProperties.Name="{Binding WebDavOperationStageText}" />
+                        <TextBlock x:Name="WebDavOperationStageText" Grid.Column="1" Text="{Binding WebDavOperationStageText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
             </Grid>
         </Border>
         <Grid x:Name="SyncWorkspaceLayoutGrid" Grid.Row="1" ColumnDefinitions="320,*" RowDefinitions="*" ColumnSpacing="16" RowSpacing="12" MinWidth="0">

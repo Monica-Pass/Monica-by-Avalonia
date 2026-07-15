@@ -126,6 +126,7 @@ public partial class App : Application
         services.AddSingleton<IGlobalHotkeyService, CapabilityOnlyGlobalHotkeyService>();
         services.AddSingleton<IExternalLinkService, SystemExternalLinkService>();
         services.AddSingleton<IWebDavBackupService, WebDavBackupService>();
+        services.AddSingleton<IWebDavBackupCryptoService, WebDavBackupCryptoService>();
         services.AddSingleton<IOneDriveAccessTokenProvider, MsalOneDriveAccessTokenProvider>();
         services.AddSingleton<IOneDriveBackupService>(provider => new OneDriveBackupService(
             provider.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(OneDriveBackupService)),

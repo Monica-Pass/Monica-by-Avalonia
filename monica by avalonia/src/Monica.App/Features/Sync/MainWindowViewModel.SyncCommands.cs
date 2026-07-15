@@ -53,6 +53,7 @@ public sealed partial class MainWindowViewModel
 
         try
         {
+            WebDavOperationStageText = _localization.Get("WebDavLoadingBackups");
             var entries = await _webDavBackupService.ListAsync(profile, "");
             WebDavBackupHistory.Clear();
             foreach (var item in entries
@@ -92,6 +93,7 @@ public sealed partial class MainWindowViewModel
 
         try
         {
+            WebDavOperationStageText = _localization.Get("WebDavTestingConnection");
             var entries = await _webDavBackupService.ListAsync(profile, "");
             StatusMessage = _localization.Format("WebDavConnectionTestSucceededFormat", entries.Count);
         }
@@ -137,6 +139,7 @@ public sealed partial class MainWindowViewModel
                 return;
             }
 
+            WebDavOperationStageText = _localization.Get("WebDavPreparingBackup");
             var json = await BuildMonicaJsonExportAsync(
                 WebDavBackupIncludePasswords,
                 WebDavBackupIncludeTotp,
@@ -146,8 +149,10 @@ public sealed partial class MainWindowViewModel
                 WebDavBackupIncludeImages,
                 WebDavBackupIncludeCategories);
             var fileName = $"monica_backup_{DateTimeOffset.UtcNow:yyyyMMdd_HHmmss}.monica.enc.json";
-            var content = EncryptWebDavBackupPayload(json, WebDavBackupEncryptionPassword);
+            WebDavOperationStageText = _localization.Get("WebDavEncryptingBackup");
+            var content = await _webDavBackupCryptoService.EncryptAsync(json, WebDavBackupEncryptionPassword);
 
+            WebDavOperationStageText = _localization.Get("WebDavUploadingBackup");
             await _webDavBackupService.UploadTextAsync(profile, fileName, content);
             var path = _webDavBackupService.NormalizeRemotePath(profile.RootPath, fileName);
             var existing = WebDavBackupHistory.FirstOrDefault(item => string.Equals(item.Path, path, StringComparison.OrdinalIgnoreCase));
@@ -203,10 +208,16 @@ public sealed partial class MainWindowViewModel
                 return;
             }
 
+            WebDavOperationStageText = _localization.Get("WebDavDownloadingBackup");
             var content = await _webDavBackupService.DownloadTextAsync(profile, item.FileName);
-            var json = IsEncryptedWebDavBackup(item.FileName)
-                ? DecryptWebDavBackupPayload(content, WebDavBackupEncryptionPassword)
-                : content;
+            var json = content;
+            if (IsEncryptedWebDavBackup(item.FileName))
+            {
+                WebDavOperationStageText = _localization.Get("WebDavDecryptingBackup");
+                json = await _webDavBackupCryptoService.DecryptAsync(content, WebDavBackupEncryptionPassword);
+            }
+
+            WebDavOperationStageText = _localization.Get("WebDavRestoringBackup");
             var result = await ImportMonicaJsonAsync(json);
             StatusMessage = _localization.Format("RestoredWebDavBackupFormat", item.FileName, result.Passwords, result.SecureItems, result.Categories);
         }
@@ -251,6 +262,7 @@ public sealed partial class MainWindowViewModel
 
         try
         {
+            WebDavOperationStageText = _localization.Get("WebDavDeletingBackup");
             await _webDavBackupService.DeleteAsync(profile, item.FileName);
             WebDavBackupHistory.Remove(item);
             if (SelectedWebDavBackupHistoryItem == item)

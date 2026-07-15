@@ -2,52 +2,48 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
-namespace Monica.App.ViewModels;
+namespace Monica.App.Services;
 
-public sealed partial class MainWindowViewModel
+public interface IWebDavBackupCryptoService
 {
-    private const int WebDavBackupPackageVersion = 1;
-    private const string WebDavBackupKdf = "pbkdf2-sha256";
-    private const int WebDavBackupKdfIterations = 300_000;
-    private const int WebDavBackupSaltSize = 16;
-    private const int WebDavBackupNonceSize = 12;
-    private const int WebDavBackupTagSize = 16;
-    private const int WebDavBackupKeySize = 32;
+    Task<string> EncryptAsync(
+        string json,
+        string password,
+        CancellationToken cancellationToken = default);
 
-    private sealed record WebDavEncryptedBackupPackage(
-        int Version,
-        string Kdf,
-        int Iterations,
-        string Salt,
-        string Nonce,
-        string Tag,
-        string CipherText);
+    Task<string> DecryptAsync(
+        string content,
+        string password,
+        CancellationToken cancellationToken = default);
+}
 
-    private bool HasSelectedWebDavBackupOptions() =>
-        WebDavBackupIncludePasswords ||
-        WebDavBackupIncludeTotp ||
-        WebDavBackupIncludeNotes ||
-        WebDavBackupIncludeCards ||
-        WebDavBackupIncludeDocuments ||
-        WebDavBackupIncludeImages ||
-        WebDavBackupIncludeCategories;
+public sealed class WebDavBackupCryptoService : IWebDavBackupCryptoService
+{
+    private const int PackageVersion = 1;
+    private const string Kdf = "pbkdf2-sha256";
+    private const int KdfIterations = 300_000;
+    private const int SaltSize = 16;
+    private const int NonceSize = 12;
+    private const int TagSize = 16;
+    private const int KeySize = 32;
 
-    private int CountSelectedWebDavBackupOptions() =>
-        (WebDavBackupIncludePasswords ? 1 : 0) +
-        (WebDavBackupIncludeTotp ? 1 : 0) +
-        (WebDavBackupIncludeNotes ? 1 : 0) +
-        (WebDavBackupIncludeCards ? 1 : 0) +
-        (WebDavBackupIncludeDocuments ? 1 : 0) +
-        (WebDavBackupIncludeImages ? 1 : 0) +
-        (WebDavBackupIncludeCategories ? 1 : 0);
+    public Task<string> EncryptAsync(
+        string json,
+        string password,
+        CancellationToken cancellationToken = default) =>
+        Task.Run(() => Encrypt(json, password, cancellationToken), cancellationToken);
 
-    private static bool IsEncryptedWebDavBackup(string fileName) =>
-        fileName.EndsWith(".enc.json", StringComparison.OrdinalIgnoreCase);
+    public Task<string> DecryptAsync(
+        string content,
+        string password,
+        CancellationToken cancellationToken = default) =>
+        Task.Run(() => Decrypt(content, password, cancellationToken), cancellationToken);
 
-    private static string EncryptWebDavBackupPayload(string json, string password)
+    private static string Encrypt(string json, string password, CancellationToken cancellationToken)
     {
-        var salt = RandomNumberGenerator.GetBytes(WebDavBackupSaltSize);
-        var nonce = RandomNumberGenerator.GetBytes(WebDavBackupNonceSize);
+        cancellationToken.ThrowIfCancellationRequested();
+        var salt = RandomNumberGenerator.GetBytes(SaltSize);
+        var nonce = RandomNumberGenerator.GetBytes(NonceSize);
         var passwordBytes = Encoding.UTF8.GetBytes(password);
         byte[]? plainBytes = null;
         byte[]? key = null;
@@ -56,20 +52,22 @@ public sealed partial class MainWindowViewModel
         {
             plainBytes = Encoding.UTF8.GetBytes(json);
             var cipherBytes = new byte[plainBytes.Length];
-            var tag = new byte[WebDavBackupTagSize];
+            var tag = new byte[TagSize];
             key = Rfc2898DeriveBytes.Pbkdf2(
                 passwordBytes,
                 salt,
-                WebDavBackupKdfIterations,
+                KdfIterations,
                 HashAlgorithmName.SHA256,
-                WebDavBackupKeySize);
-            using var aes = new AesGcm(key, WebDavBackupTagSize);
+                KeySize);
+            cancellationToken.ThrowIfCancellationRequested();
+            using var aes = new AesGcm(key, TagSize);
             aes.Encrypt(nonce, plainBytes, cipherBytes, tag);
+            cancellationToken.ThrowIfCancellationRequested();
 
-            return JsonSerializer.Serialize(new WebDavEncryptedBackupPackage(
-                WebDavBackupPackageVersion,
-                WebDavBackupKdf,
-                WebDavBackupKdfIterations,
+            return JsonSerializer.Serialize(new EncryptedBackupPackage(
+                PackageVersion,
+                Kdf,
+                KdfIterations,
                 Convert.ToBase64String(salt),
                 Convert.ToBase64String(nonce),
                 Convert.ToBase64String(tag),
@@ -90,28 +88,29 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    private static string DecryptWebDavBackupPayload(string content, string password)
+    private static string Decrypt(string content, string password, CancellationToken cancellationToken)
     {
-        var package = JsonSerializer.Deserialize<WebDavEncryptedBackupPackage>(content)
+        cancellationToken.ThrowIfCancellationRequested();
+        var package = JsonSerializer.Deserialize<EncryptedBackupPackage>(content)
             ?? throw new InvalidOperationException("Invalid encrypted Monica backup payload.");
-        if (package.Version != WebDavBackupPackageVersion)
+        if (package.Version != PackageVersion)
         {
             throw new InvalidOperationException("Unsupported Monica backup encryption version.");
         }
 
-        if (!string.Equals(package.Kdf, WebDavBackupKdf, StringComparison.Ordinal))
+        if (!string.Equals(package.Kdf, Kdf, StringComparison.Ordinal))
         {
             throw new InvalidOperationException("Unsupported Monica backup encryption KDF.");
         }
 
-        if (package.Iterations != WebDavBackupKdfIterations)
+        if (package.Iterations != KdfIterations)
         {
             throw new InvalidOperationException("Unsupported Monica backup encryption iterations.");
         }
 
-        var salt = DecodeFixedLengthBase64(package.Salt, WebDavBackupSaltSize);
-        var nonce = DecodeFixedLengthBase64(package.Nonce, WebDavBackupNonceSize);
-        var tag = DecodeFixedLengthBase64(package.Tag, WebDavBackupTagSize);
+        var salt = DecodeFixedLengthBase64(package.Salt, SaltSize);
+        var nonce = DecodeFixedLengthBase64(package.Nonce, NonceSize);
+        var tag = DecodeFixedLengthBase64(package.Tag, TagSize);
         byte[] cipherBytes;
         try
         {
@@ -122,6 +121,7 @@ public sealed partial class MainWindowViewModel
             throw new InvalidOperationException("Invalid Monica backup ciphertext.", ex);
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         var passwordBytes = Encoding.UTF8.GetBytes(password);
         byte[]? plainBytes = null;
         byte[]? key = null;
@@ -132,11 +132,13 @@ public sealed partial class MainWindowViewModel
             key = Rfc2898DeriveBytes.Pbkdf2(
                 passwordBytes,
                 salt,
-                WebDavBackupKdfIterations,
+                KdfIterations,
                 HashAlgorithmName.SHA256,
-                WebDavBackupKeySize);
-            using var aes = new AesGcm(key, WebDavBackupTagSize);
+                KeySize);
+            cancellationToken.ThrowIfCancellationRequested();
+            using var aes = new AesGcm(key, TagSize);
             aes.Decrypt(nonce, cipherBytes, tag, plainBytes);
+            cancellationToken.ThrowIfCancellationRequested();
             return Encoding.UTF8.GetString(plainBytes);
         }
         finally
@@ -179,4 +181,13 @@ public sealed partial class MainWindowViewModel
 
         return decoded;
     }
+
+    private sealed record EncryptedBackupPackage(
+        int Version,
+        string Kdf,
+        int Iterations,
+        string Salt,
+        string Nonce,
+        string Tag,
+        string CipherText);
 }

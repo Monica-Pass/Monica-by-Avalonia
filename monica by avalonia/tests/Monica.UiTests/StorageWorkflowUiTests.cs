@@ -121,4 +121,14 @@ public sealed class StorageWorkflowUiTests
         Assert.IsNotType<ToggleSwitch>(encryptionItem.Footer);
         Assert.NotNull(backup.FindControl<Border>("WebDavBackupEncryptionStatus"));
     }
+
+    [Fact]
+    public void Sync_webdav_operations_expose_accessible_progress_feedback()
+    {
+        var sync = new SyncWorkspaceView();
+
+        Assert.NotNull(sync.FindControl<Border>("WebDavOperationProgressRegion"));
+        Assert.True(sync.FindControl<ProgressBar>("WebDavOperationProgressBar")!.IsIndeterminate);
+        Assert.NotNull(sync.FindControl<TextBlock>("WebDavOperationStageText"));
+    }
 }

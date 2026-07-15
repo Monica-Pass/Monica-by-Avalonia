@@ -2714,6 +2714,30 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
+    public async Task ViewModel_reports_webdav_backup_stage_until_upload_finishes()
+    {
+        var uploadRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var webDav = new FakeWebDavBackupService { UploadRelease = uploadRelease };
+        var harness = CreateHarness(webDavBackupService: webDav);
+        harness.Crypto.InitializeSession("source password", new byte[16]);
+        harness.ViewModel.WebDavEnabled = true;
+        harness.ViewModel.WebDavServerUrl = "https://dav.example.com/";
+        harness.ViewModel.WebDavBackupEncryptionPassword = "backup password";
+
+        var backup = harness.ViewModel.CreateWebDavBackupCommand.ExecuteAsync(null);
+        await webDav.UploadEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(harness.ViewModel.IsWebDavBusy);
+        Assert.Equal(harness.ViewModel.L.Get("WebDavUploadingBackup"), harness.ViewModel.WebDavOperationStageText);
+
+        uploadRelease.TrySetResult();
+        await backup;
+
+        Assert.False(harness.ViewModel.IsWebDavBusy);
+        Assert.Empty(harness.ViewModel.WebDavOperationStageText);
+    }
+
+    [Fact]
     public async Task ViewModel_clears_sensitive_export_previews_when_leaving_export_page()
     {
         var harness = CreateHarness();
@@ -4362,6 +4386,8 @@ public sealed partial class PasswordManagementTests
         public string DownloadContent { get; init; } = "";
         public List<string> DeletedPaths { get; } = [];
         public int DownloadCallCount { get; private set; }
+        public TaskCompletionSource UploadEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource? UploadRelease { get; init; }
 
         public string NormalizeRemotePath(string rootPath, string relativePath)
         {
@@ -4377,11 +4403,15 @@ public sealed partial class PasswordManagementTests
                     ? []
                     : [new RemoteFileEntry(NormalizeRemotePath(profile.RootPath, UploadedPath), false, UploadedContent.Length, DateTimeOffset.UtcNow)]);
 
-        public Task UploadTextAsync(WebDavProfile profile, string relativePath, string content, CancellationToken cancellationToken = default)
+        public async Task UploadTextAsync(WebDavProfile profile, string relativePath, string content, CancellationToken cancellationToken = default)
         {
             UploadedPath = relativePath;
             UploadedContent = content;
-            return Task.CompletedTask;
+            UploadEntered.TrySetResult();
+            if (UploadRelease is not null)
+            {
+                await UploadRelease.Task.WaitAsync(cancellationToken);
+            }
         }
 
         public Task<string> DownloadTextAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default)

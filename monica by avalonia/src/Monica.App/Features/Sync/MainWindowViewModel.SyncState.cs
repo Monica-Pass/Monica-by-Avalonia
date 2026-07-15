@@ -19,10 +19,12 @@ public sealed partial class MainWindowViewModel
         if (isLoading)
         {
             IsLoadingWebDavBackups = true;
+            WebDavOperationStageText = _localization.Get("WebDavLoadingBackups");
         }
         else
         {
             IsRunningWebDavBackup = true;
+            WebDavOperationStageText = _localization.Get("WebDavPreparingOperation");
         }
 
         return true;
@@ -39,6 +41,8 @@ public sealed partial class MainWindowViewModel
         {
             IsRunningWebDavBackup = false;
         }
+
+        WebDavOperationStageText = "";
     }
 
     private void RaiseSyncPageState()
