@@ -88,6 +88,15 @@ public sealed class StorageWorkflowUiTests
         Assert.True(import.FindControl<ProgressBar>("ImportBusyIndicator")!.IsIndeterminate);
         Assert.NotNull(import.FindControl<StackPanel>("ImportOperationContent"));
         Assert.Equal('*', import.FindControl<TextBox>("AegisImportPasswordBox")!.PasswordChar);
+        Assert.NotNull(import.FindControl<Border>("KeePassImportCard"));
+        Assert.Equal('*', import.FindControl<TextBox>("KeePassImportPasswordBox")!.PasswordChar);
+        Assert.NotNull(import.FindControl<Button>("SelectKeePassFileButton"));
+        Assert.NotNull(import.FindControl<Button>("PreviewKeePassImportButton"));
+        Assert.NotNull(import.FindControl<Button>("ImportKeePassVaultButton"));
+        Assert.NotNull(import.FindControl<Button>("CancelKeePassImportButton"));
+
+        var databaseWorkbench = new DatabaseWorkbenchView();
+        Assert.NotNull(databaseWorkbench.FindControl<Button>("OpenKeePassImportButton"));
 
         var restore = backup.FindControl<Button>("RestoreSelectedBackupButton");
         var delete = backup.FindControl<Button>("DeleteSelectedBackupButton");

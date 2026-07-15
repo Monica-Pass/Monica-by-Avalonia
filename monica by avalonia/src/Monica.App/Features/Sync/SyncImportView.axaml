@@ -8,7 +8,92 @@
                          IsIndeterminate="True"
                          IsVisible="{Binding IsImportExportBusy}"
                          AutomationProperties.Name="{Binding StatusMessage}" />
-            <StackPanel x:Name="ImportOperationContent" Spacing="16" IsEnabled="{Binding IsImportExportIdle}">
+            <Border x:Name="KeePassImportCard"
+                    Padding="16"
+                    CornerRadius="8"
+                    BorderBrush="{DynamicResource CardBorderBrush}"
+                    BorderThickness="1"
+                    Background="{DynamicResource LayerFillColorDefaultBrush}">
+                <StackPanel Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="{Binding L.KeePassImportTitle}" FontSize="18" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding L.KeePassImportDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <Button x:Name="SelectKeePassFileButton"
+                                Grid.Column="1"
+                                Classes="workspaceCommand"
+                                Command="{Binding SelectKeePassFileCommand}"
+                                IsEnabled="{Binding IsKeePassImportIdle}"
+                                AutomationProperties.Name="{Binding L.SelectKeePassFile}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="Folder" FontSize="18" />
+                                <TextBlock Text="{Binding L.SelectKeePassFile}" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                    <TextBlock x:Name="KeePassSelectedFileText"
+                               Text="{Binding KeePassSelectedFileName}"
+                               IsVisible="{Binding HasKeePassSelectedFile}"
+                               FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" IsVisible="{Binding HasKeePassSelectedFile}" IsEnabled="{Binding IsKeePassImportIdle}">
+                        <TextBox x:Name="KeePassImportPasswordBox"
+                                 MaxWidth="360"
+                                 HorizontalAlignment="Stretch"
+                                 PasswordChar="*"
+                                 Text="{Binding KeePassImportPassword}"
+                                 PlaceholderText="{Binding L.KeePassMasterPassword}"
+                                 AutomationProperties.Name="{Binding L.KeePassMasterPassword}" />
+                        <Button x:Name="PreviewKeePassImportButton"
+                                Grid.Column="1"
+                                Classes="workspacePrimaryCommand"
+                                Command="{Binding PreviewKeePassImportCommand}"
+                                AutomationProperties.Name="{Binding L.KeePassInspect}">
+                            <TextBlock Text="{Binding L.KeePassInspect}" />
+                        </Button>
+                    </Grid>
+                    <StackPanel Spacing="6" IsVisible="{Binding IsKeePassImportBusy}">
+                        <ProgressBar x:Name="KeePassImportProgress"
+                                     IsIndeterminate="{Binding IsKeePassImportProgressIndeterminate}"
+                                     Minimum="0"
+                                     Maximum="{Binding KeePassImportProgressMaximum}"
+                                     Value="{Binding KeePassImportProgress}"
+                                     AutomationProperties.Name="{Binding KeePassImportProgressText}" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                            <TextBlock Text="{Binding KeePassImportProgressText}" VerticalAlignment="Center" />
+                            <Button x:Name="CancelKeePassImportButton"
+                                    Grid.Column="1"
+                                    Classes="workspaceCommand"
+                                    Command="{Binding CancelKeePassImportCommand}">
+                                <TextBlock Text="{Binding L.Cancel}" />
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                    <Border x:Name="KeePassPreviewCard"
+                            Padding="14"
+                            CornerRadius="6"
+                            BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            IsVisible="{Binding HasKeePassImportPreview}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="{Binding KeePassPreviewSummaryText}" TextWrapping="Wrap" />
+                            <WrapPanel IsEnabled="{Binding IsKeePassImportIdle}">
+                                <Button x:Name="ImportKeePassVaultButton"
+                                        Classes="workspacePrimaryCommand"
+                                        Command="{Binding ImportKeePassVaultCommand}"
+                                        Margin="0,0,8,8">
+                                    <TextBlock Text="{Binding L.KeePassImportNow}" />
+                                </Button>
+                                <Button Classes="workspaceCommand" Command="{Binding ResetKeePassImportCommand}" Margin="0,0,0,8">
+                                    <TextBlock Text="{Binding L.KeePassChooseDifferentFile}" />
+                                </Button>
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+            <StackPanel x:Name="ImportOperationContent" Spacing="16" IsEnabled="{Binding IsImportWorkspaceIdle}">
             <StackPanel Spacing="8">
                 <TextBlock Text="{Binding L.ImportMonicaJson}" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding L.ImportMonicaJsonDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />

@@ -69,7 +69,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IVaultSessionService? vaultSessionService = null,
         IWindowPrivacyService? windowPrivacyService = null,
         IExportAuthorizationService? exportAuthorizationService = null,
-        IOneDriveBackupService? oneDriveBackupService = null)
+        IOneDriveBackupService? oneDriveBackupService = null,
+        IKeePassVaultService? keePassVaultService = null)
     {
         _repository = repository;
         _cryptoService = cryptoService;
@@ -83,6 +84,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _exportAuthorizationService = exportAuthorizationService ?? new SessionExportAuthorizationService(_cryptoService);
         _webDavBackupService = webDavBackupService ?? new DisabledWebDavBackupService();
         _oneDriveBackupService = oneDriveBackupService ?? new DisabledOneDriveBackupService();
+        _keePassVaultService = keePassVaultService ?? new KeePassVaultService();
         _mdbxVaultService = mdbxVaultService;
         _passwordAttachmentFileService = passwordAttachmentFileService;
         _passwordEditorDialogService = passwordEditorDialogService;

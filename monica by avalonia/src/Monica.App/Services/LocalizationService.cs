@@ -421,6 +421,13 @@ public interface ILocalizationService : INotifyPropertyChanged
     string CreateMdbxMetadataDescription { get; }
     string ImportData { get; }
     string ImportDataDescription { get; }
+    string KeePassImportTitle { get; }
+    string KeePassImportDescription { get; }
+    string KeePassMasterPassword { get; }
+    string KeePassInspect { get; }
+    string KeePassImportNow { get; }
+    string KeePassChooseDifferentFile { get; }
+    string SelectKeePassFile { get; }
     string ExportData { get; }
     string ExportDataDescription { get; }
     string BackupHistory { get; }
@@ -893,6 +900,13 @@ public sealed class LocalizationService : ILocalizationService
     public string CreateMdbxMetadataDescription => Text();
     public string ImportData => Text();
     public string ImportDataDescription => Text();
+    public string KeePassImportTitle => Text();
+    public string KeePassImportDescription => Text();
+    public string KeePassMasterPassword => Text();
+    public string KeePassInspect => Text();
+    public string KeePassImportNow => Text();
+    public string KeePassChooseDifferentFile => Text();
+    public string SelectKeePassFile => Text();
     public string ExportData => Text();
     public string ExportDataDescription => Text();
     public string BackupHistory => Text();
@@ -1653,7 +1667,32 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxLocalCacheDescription"] = "Retain a local MDBX working file for desktop vault operations.",
         ["CreateMdbxMetadataDescription"] = "Create local metadata for the desktop MDBX vault file.",
         ["ImportData"] = "Import data",
-        ["ImportDataDescription"] = "Bring Monica JSON packages or password CSV records into this vault.",
+        ["ImportDataDescription"] = "Bring KeePass KDBX databases, Monica JSON packages, or CSV records into this vault.",
+        ["SelectKeePassFile"] = "Select a KeePass database",
+        ["KeePassFileSelectedFormat"] = "Selected KeePass database: {0}",
+        ["KeePassFileSelectionFailed"] = "The KeePass file could not be selected.",
+        ["KeePassFileRequired"] = "Select a KeePass KDBX file first.",
+        ["KeePassPreviewLoading"] = "Unlocking the KeePass database for a local preview...",
+        ["KeePassPreviewEmpty"] = "Select a KDBX file, enter its master password, then inspect the local preview before importing.",
+        ["KeePassPreviewReadyFormat"] = "{0}: {1} entries in {2} groups are ready for review.",
+        ["KeePassPreviewRequired"] = "Inspect the KeePass database before importing it.",
+        ["KeePassUnlockFailed"] = "The KeePass database could not be unlocked. Check the password and file integrity.",
+        ["KeePassUnsupportedFormat"] = "This KeePass database format is not supported. Use a KDBX 3 or KDBX 4 database.",
+        ["KeePassResourceLimitExceeded"] = "The KeePass database exceeds the safe import limits.",
+        ["KeePassPreviewFailed"] = "The KeePass database could not be inspected safely.",
+        ["KeePassImportConfirmationTitle"] = "Import KeePass entries?",
+        ["KeePassImportConfirmationMessageFormat"] = "Import up to {1} entries from {0}. Existing entries with the same KeePass identity will be skipped.",
+        ["KeePassImportProgressFormat"] = "Importing {0} of {1}",
+        ["KeePassImportedFormat"] = "KeePass import completed: {0} imported, {1} already present.",
+        ["KeePassImportCanceled"] = "KeePass import canceled.",
+        ["KeePassImportCanceledAfterFormat"] = "KeePass import canceled: {0} imported, {1} already present.",
+        ["KeePassImportPartialFailureFormat"] = "KeePass import stopped safely: {0} imported, {1} already present. Remaining entries were not processed.",
+        ["KeePassImportTitle"] = "KeePass KDBX",
+        ["KeePassImportDescription"] = "Unlock locally, review the entry count, then confirm the import. The master password is cleared immediately after inspection.",
+        ["KeePassMasterPassword"] = "KeePass master password",
+        ["KeePassInspect"] = "Inspect",
+        ["KeePassImportNow"] = "Import reviewed entries",
+        ["KeePassChooseDifferentFile"] = "Choose a different file",
         ["ExportData"] = "Export data",
         ["ExportDataDescription"] = "Prepare readable Monica JSON and password CSV previews before saving elsewhere.",
         ["BackupHistory"] = "Backup history",
@@ -1702,7 +1741,7 @@ public sealed class LocalizationService : ILocalizationService
         ["Capability.bitwarden.Title"] = "Bitwarden",
         ["Capability.bitwarden.Description"] = "Vault mapping and sync service boundary.",
         ["Capability.keepass.Title"] = "KeePass",
-        ["Capability.keepass.Description"] = "KDBX metadata and library-backed open/read boundary.",
+        ["Capability.keepass.Description"] = "Local KDBX 3/4 unlock, review and import with groups, TOTP, custom fields, UUIDs and attachments.",
         ["Capability.mdbx.Title"] = "MDBX",
         ["Capability.mdbx.Description"] = "Vault create/open/sync metadata and local file-stream management.",
         ["Capability.webdav.Title"] = "WebDAV",
@@ -2434,6 +2473,33 @@ public sealed class LocalizationService : ILocalizationService
         ["LocalDatabaseDescription"] = "Avalonia 保留 SQLite 用于应用设置、本地缓存和迁移索引，敏感业务数据由 MDBX 工作副本承载。",
         ["ExternalDatabases"] = "外部数据库",
         ["ExternalDatabasesDescription"] = "KeePass KDBX、MDBX、Bitwarden 与 WebDAV 来源通过平台无关服务接入。",
+        ["ImportData"] = "导入数据",
+        ["ImportDataDescription"] = "将 KeePass KDBX 数据库、Monica JSON 数据包或 CSV 记录导入当前保险库。",
+        ["SelectKeePassFile"] = "选择 KeePass 数据库",
+        ["KeePassFileSelectedFormat"] = "已选择 KeePass 数据库：{0}",
+        ["KeePassFileSelectionFailed"] = "无法选择 KeePass 文件。",
+        ["KeePassFileRequired"] = "请先选择 KeePass KDBX 文件。",
+        ["KeePassPreviewLoading"] = "正在本地解锁 KeePass 数据库并生成预览……",
+        ["KeePassPreviewEmpty"] = "选择 KDBX 文件并输入主密码，检查本地预览后再确认导入。",
+        ["KeePassPreviewReadyFormat"] = "{0}：共 {1} 个条目，分布在 {2} 个分组中，可以检查并导入。",
+        ["KeePassPreviewRequired"] = "导入前需要先检查 KeePass 数据库。",
+        ["KeePassUnlockFailed"] = "无法解锁 KeePass 数据库，请检查密码及文件完整性。",
+        ["KeePassUnsupportedFormat"] = "此 KeePass 数据库格式暂不支持，请使用 KDBX 3 或 KDBX 4 数据库。",
+        ["KeePassResourceLimitExceeded"] = "KeePass 数据库超过安全导入限制。",
+        ["KeePassPreviewFailed"] = "无法安全检查 KeePass 数据库。",
+        ["KeePassImportConfirmationTitle"] = "导入 KeePass 条目？",
+        ["KeePassImportConfirmationMessageFormat"] = "准备从 {0} 导入最多 {1} 个条目。具有相同 KeePass 来源标识的现有条目会被跳过。",
+        ["KeePassImportProgressFormat"] = "正在导入第 {0} 项，共 {1} 项",
+        ["KeePassImportedFormat"] = "KeePass 导入完成：导入 {0} 项，已有 {1} 项。",
+        ["KeePassImportCanceled"] = "KeePass 导入已取消。",
+        ["KeePassImportCanceledAfterFormat"] = "KeePass 导入已取消：导入 {0} 项，已有 {1} 项。",
+        ["KeePassImportPartialFailureFormat"] = "KeePass 导入已安全停止：导入 {0} 项，已有 {1} 项，其余条目尚未处理。",
+        ["KeePassImportTitle"] = "KeePass KDBX",
+        ["KeePassImportDescription"] = "在本地解锁并检查条目数量，确认后再导入。检查完成后会立即清除主密码。",
+        ["KeePassMasterPassword"] = "KeePass 主密码",
+        ["KeePassInspect"] = "检查",
+        ["KeePassImportNow"] = "导入已检查条目",
+        ["KeePassChooseDifferentFile"] = "选择其他文件",
         ["MdbxDatabaseCount"] = "MDBX 保险库元数据",
         ["RegisteredDatabases"] = "已登记数据库",
         ["DatabaseSourcesEmptyHint"] = "登记本地 MDBX、WebDAV、OneDrive 或迁移元数据后，数据库来源会显示在这里。",
@@ -2724,7 +2790,7 @@ public sealed class LocalizationService : ILocalizationService
         ["Capability.bitwarden.Title"] = "Bitwarden",
         ["Capability.bitwarden.Description"] = "保险库映射和同步服务边界。",
         ["Capability.keepass.Title"] = "KeePass",
-        ["Capability.keepass.Description"] = "KDBX 元数据，以及基于库的打开/读取边界。",
+        ["Capability.keepass.Description"] = "在本地解锁、检查并导入 KDBX 3/4，保留分组、动态口令、自定义字段、UUID 与附件。",
         ["Capability.mdbx.Title"] = "MDBX",
         ["Capability.mdbx.Description"] = "保险库创建、打开、同步元数据和本地文件流管理。",
         ["Capability.webdav.Title"] = "WebDAV",

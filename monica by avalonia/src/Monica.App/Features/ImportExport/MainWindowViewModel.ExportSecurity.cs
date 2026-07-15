@@ -59,5 +59,6 @@ public sealed partial class MainWindowViewModel
         AegisImportPassword = "";
         IsAegisImportPasswordRequired = false;
         ImportTotpCsvText = "";
+        ClearKeePassImportState(cancelActiveOperation: true);
     }
 }

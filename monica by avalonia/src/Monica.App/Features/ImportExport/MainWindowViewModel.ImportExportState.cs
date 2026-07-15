@@ -26,9 +26,11 @@ public sealed partial class MainWindowViewModel
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsImportExportIdle))]
+    [NotifyPropertyChangedFor(nameof(IsImportWorkspaceIdle))]
     private bool _isImportExportBusy;
 
     public bool IsImportExportIdle => !IsImportExportBusy;
+    public bool IsImportWorkspaceIdle => !IsImportExportBusy && !IsKeePassImportBusy;
 
     [ObservableProperty]
     private string _exportPreview = "";

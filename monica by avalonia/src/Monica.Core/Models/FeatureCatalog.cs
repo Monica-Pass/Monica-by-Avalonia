@@ -20,7 +20,7 @@ public static class FeatureCatalog
         new("customization", "Personalization", "Page, card, icon and list customization entry points.", PlatformFeatureStatus.DesktopEquivalent),
         new("plus", "Monica Plus", "Subscription/status page shell for parity with mobile.", PlatformFeatureStatus.DesktopEquivalent),
         new("bitwarden", "Bitwarden", "Vault mapping and sync service boundary.", PlatformFeatureStatus.DesktopEquivalent),
-        new("keepass", "KeePass", "KDBX metadata and library-backed open/read boundary.", PlatformFeatureStatus.DesktopEquivalent),
+        new("keepass", "KeePass", "Local KDBX 3/4 unlock, review and import with groups, TOTP, custom fields, UUIDs and attachments.", PlatformFeatureStatus.DesktopEquivalent),
         new("mdbx", "MDBX", "Vault create/open/sync metadata and local file-stream management.", PlatformFeatureStatus.DesktopEquivalent),
         new("webdav", "WebDAV", "Remote backup and sync path handling.", PlatformFeatureStatus.Available),
         new("onedrive", "OneDrive", "Microsoft Graph/MSAL service boundary.", PlatformFeatureStatus.DesktopEquivalent),

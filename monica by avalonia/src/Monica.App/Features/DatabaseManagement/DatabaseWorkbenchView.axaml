@@ -60,7 +60,7 @@
                         <TextBlock Text="{Binding L.ExternalDatabases}" FontWeight="SemiBold" />
                         <TextBlock Text="{Binding L.ExternalDatabasesDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         <WrapPanel>
-                            <Button Classes="workspaceCommand" Command="{Binding SelectSectionCommand}" CommandParameter="Sync" Margin="0,0,8,8">
+                            <Button x:Name="OpenKeePassImportButton" Classes="workspaceCommand" Command="{Binding OpenSyncWorkspacePageCommand}" CommandParameter="Import" Margin="0,0,8,8">
                                 <TextBlock Text="KDBX" />
                             </Button>
                             <Button Classes="workspaceCommand" Command="{Binding SelectSectionCommand}" CommandParameter="Mdbx" Margin="0,0,8,8">

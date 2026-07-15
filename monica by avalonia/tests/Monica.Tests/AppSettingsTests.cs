@@ -1151,7 +1151,8 @@ public sealed partial class AppSettingsTests
         IMdbxVaultService? mdbxVaultService = null,
         IMonicaRepository? repository = null,
         IConfirmationDialogService? confirmationDialogService = null,
-        IOneDriveBackupService? oneDriveBackupService = null)
+        IOneDriveBackupService? oneDriveBackupService = null,
+        IKeePassVaultService? keePassVaultService = null)
     {
         var databasePath = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
         Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
@@ -1184,7 +1185,8 @@ public sealed partial class AppSettingsTests
             fileSystemPickerService: fileSystemPickerService,
             confirmationDialogService: confirmationDialogService,
             exportAuthorizationService: new ApprovingExportAuthorizationService(),
-            oneDriveBackupService: oneDriveBackupService);
+            oneDriveBackupService: oneDriveBackupService,
+            keePassVaultService: keePassVaultService);
     }
 
     private static string GetTempPath()
