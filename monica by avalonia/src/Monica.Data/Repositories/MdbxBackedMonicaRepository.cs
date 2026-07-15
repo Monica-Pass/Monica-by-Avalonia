@@ -537,12 +537,14 @@ public sealed class MdbxBackedMonicaRepository(
         }
     }
 
-    public async Task RecordPasswordQuickAccessAsync(long passwordId, CancellationToken cancellationToken = default)
+    public async Task<PasswordQuickAccessRecord?> RecordPasswordQuickAccessAsync(long passwordId, CancellationToken cancellationToken = default)
     {
         if ((await GetPasswordsAsync(includeDeleted: false, includeArchived: false, cancellationToken)).Any(entry => entry.Id == passwordId))
         {
-            await _quickAccessStore.RecordPasswordQuickAccessAsync(passwordId, cancellationToken);
+            return await _quickAccessStore.RecordPasswordQuickAccessAsync(passwordId, cancellationToken);
         }
+
+        return null;
     }
 
     public async Task<IReadOnlyList<PasswordQuickAccessRecord>> GetPasswordQuickAccessRecordsAsync(CancellationToken cancellationToken = default)

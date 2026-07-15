@@ -37,6 +37,7 @@ public sealed partial class MainWindowViewModel
     private IReadOnlyDictionary<long, IReadOnlyList<CustomField>> _passwordCustomFields = new Dictionary<long, IReadOnlyList<CustomField>>();
     private IReadOnlyDictionary<long, IReadOnlyList<Attachment>> _passwordAttachments = new Dictionary<long, IReadOnlyList<Attachment>>();
     private IReadOnlyDictionary<long, PasswordQuickAccessRecord> _passwordQuickAccessRecords = new Dictionary<long, PasswordQuickAccessRecord>();
+    internal int PasswordQuickAccessRecordCacheCount => _passwordQuickAccessRecords.Count;
     private IReadOnlyList<PasswordEntry> _filteredPasswords = [];
     private IReadOnlyList<PasswordListRow> _filteredPasswordRows = [];
     private bool _filteredPasswordsDirty = true;

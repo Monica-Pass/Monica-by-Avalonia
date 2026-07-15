@@ -436,12 +436,14 @@ public sealed partial class DataRepositoryTests
         await repository.RecordPasswordQuickAccessAsync(first.Id);
         await Task.Delay(5);
         await repository.RecordPasswordQuickAccessAsync(second.Id);
-        await repository.RecordPasswordQuickAccessAsync(second.Id);
+        var updatedSecond = await repository.RecordPasswordQuickAccessAsync(second.Id);
         await repository.RecordPasswordQuickAccessAsync(archived.Id);
 
         var records = await repository.GetPasswordQuickAccessRecordsAsync();
 
         Assert.Equal([second.Id, first.Id], records.Select(item => item.PasswordId).ToArray());
+        Assert.NotNull(updatedSecond);
+        Assert.Equal(2, updatedSecond.OpenCount);
         Assert.Equal(2, records[0].OpenCount);
         Assert.Equal(1, records[1].OpenCount);
     }

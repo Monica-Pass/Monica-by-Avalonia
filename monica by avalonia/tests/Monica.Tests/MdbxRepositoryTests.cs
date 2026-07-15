@@ -181,9 +181,12 @@ public sealed class MdbxRepositoryTests
         };
         await repository.SavePasswordAsync(password);
 
-        await repository.RecordPasswordQuickAccessAsync(password.Id);
+        var updated = await repository.RecordPasswordQuickAccessAsync(password.Id);
 
         Assert.Empty(await sqliteRepository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
+        Assert.NotNull(updated);
+        Assert.Equal(password.Id, updated.PasswordId);
+        Assert.Equal(1, updated.OpenCount);
         var record = Assert.Single(await repository.GetPasswordQuickAccessRecordsAsync());
         Assert.Equal(password.Id, record.PasswordId);
         Assert.Equal(1, record.OpenCount);

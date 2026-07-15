@@ -9,14 +9,6 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
-    private async Task LoadPasswordQuickAccessAsync()
-    {
-        _passwordQuickAccessRecords = (await _repository.GetPasswordQuickAccessRecordsAsync())
-            .Where(record => record.OpenCount > 0 && record.PasswordId > 0)
-            .ToDictionary(record => record.PasswordId);
-        RaisePasswordQuickAccessState();
-    }
-
     private async Task RecordPasswordQuickAccessAsync(PasswordEntry entry)
     {
         if (entry.Id <= 0 || entry.IsDeleted || entry.IsArchived)
@@ -24,25 +16,37 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        await _repository.RecordPasswordQuickAccessAsync(entry.Id);
-        var next = _passwordQuickAccessRecords.ToDictionary(pair => pair.Key, pair => pair.Value);
-        if (next.TryGetValue(entry.Id, out var existing))
+        var updatedRecord = await _repository.RecordPasswordQuickAccessAsync(entry.Id);
+        if (updatedRecord is null)
         {
-            existing.OpenCount++;
-            existing.LastOpenedAt = DateTimeOffset.UtcNow;
-        }
-        else
-        {
-            next[entry.Id] = new PasswordQuickAccessRecord
-            {
-                PasswordId = entry.Id,
-                OpenCount = 1,
-                LastOpenedAt = DateTimeOffset.UtcNow
-            };
+            return;
         }
 
-        _passwordQuickAccessRecords = next;
+        _passwordQuickAccessRecords = BuildBoundedPasswordQuickAccessCache(
+            _passwordQuickAccessRecords.Values
+                .Where(record => record.PasswordId != updatedRecord.PasswordId)
+                .Append(updatedRecord));
         RaisePasswordQuickAccessState();
+    }
+
+    private static IReadOnlyDictionary<long, PasswordQuickAccessRecord> BuildBoundedPasswordQuickAccessCache(
+        IEnumerable<PasswordQuickAccessRecord> records)
+    {
+        var validRecords = records
+            .Where(record => record.OpenCount > 0 && record.PasswordId > 0)
+            .ToArray();
+        var recent = validRecords
+            .OrderByDescending(record => record.LastOpenedAt)
+            .ThenByDescending(record => record.OpenCount)
+            .Take(PasswordQuickAccessLimit);
+        var frequent = validRecords
+            .OrderByDescending(record => record.OpenCount)
+            .ThenByDescending(record => record.LastOpenedAt)
+            .Take(PasswordQuickAccessLimit);
+        return recent
+            .Concat(frequent)
+            .DistinctBy(record => record.PasswordId)
+            .ToDictionary(record => record.PasswordId);
     }
 
     private IEnumerable<PasswordQuickAccessItem> BuildQuickAccessItems(QuickAccessSort sort)

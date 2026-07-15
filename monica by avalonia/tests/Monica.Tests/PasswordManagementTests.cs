@@ -1953,6 +1953,61 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
+    public async Task ViewModel_bounds_password_quick_access_cache_to_visible_rankings()
+    {
+        var harness = CreateHarness();
+        var entries = new List<PasswordEntry>();
+        for (var index = 0; index < 18; index++)
+        {
+            var entry = new PasswordEntry
+            {
+                Title = $"Account {index}",
+                Password = $"secret-{index}"
+            };
+            await harness.Repository.SavePasswordAsync(entry);
+            entries.Add(entry);
+        }
+
+        for (var index = 0; index < 6; index++)
+        {
+            for (var open = 0; open < index + 2; open++)
+            {
+                await harness.Repository.RecordPasswordQuickAccessAsync(entries[index].Id);
+            }
+        }
+
+        foreach (var entry in entries.Skip(6))
+        {
+            await harness.Repository.RecordPasswordQuickAccessAsync(entry.Id);
+        }
+
+        await harness.ViewModel.LoadAsync();
+
+        Assert.Equal(12, harness.ViewModel.PasswordQuickAccessRecordCacheCount);
+        Assert.Equal(6, harness.ViewModel.RecentPasswordQuickAccessItems.Count());
+        Assert.Equal(6, harness.ViewModel.FrequentPasswordQuickAccessItems.Count());
+        harness.ViewModel.SetUnlockedShellHibernated(true);
+        Assert.Equal(12, harness.ViewModel.PasswordQuickAccessRecordCacheCount);
+
+        harness.ViewModel.SetUnlockedShellHibernated(false);
+        var previouslyUncached = harness.ViewModel.Passwords.Single(item => item.Id == entries[6].Id);
+        await harness.ViewModel.ShowPasswordDetailsCommand.ExecuteAsync(previouslyUncached);
+
+        var visibleQuickAccessIds = harness.ViewModel.RecentPasswordQuickAccessItems
+            .Concat(harness.ViewModel.FrequentPasswordQuickAccessItems)
+            .Select(item => item.Entry.Id)
+            .Distinct()
+            .ToArray();
+        Assert.Equal(visibleQuickAccessIds.Length, harness.ViewModel.PasswordQuickAccessRecordCacheCount);
+        Assert.InRange(harness.ViewModel.PasswordQuickAccessRecordCacheCount, 1, 12);
+        Assert.Equal(
+            2,
+            harness.ViewModel.RecentPasswordQuickAccessItems
+                .Single(item => item.Entry.Id == previouslyUncached.Id)
+                .OpenCount);
+    }
+
+    [Fact]
     public async Task ViewModel_copies_username_and_batches_selected_passwords()
     {
         var harness = CreateHarness();

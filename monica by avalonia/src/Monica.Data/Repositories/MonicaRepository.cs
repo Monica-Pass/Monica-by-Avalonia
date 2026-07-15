@@ -27,7 +27,7 @@ public interface IMonicaRepository
     Task TrimPasswordHistoryAsync(long entryId, int limit, CancellationToken cancellationToken = default);
     Task DeletePasswordHistoryAsync(long id, CancellationToken cancellationToken = default);
     Task ClearPasswordHistoryAsync(long entryId, CancellationToken cancellationToken = default);
-    Task RecordPasswordQuickAccessAsync(long passwordId, CancellationToken cancellationToken = default);
+    Task<PasswordQuickAccessRecord?> RecordPasswordQuickAccessAsync(long passwordId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PasswordQuickAccessRecord>> GetPasswordQuickAccessRecordsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SecureItem>> GetSecureItemsAsync(VaultItemType? itemType = null, bool includeDeleted = false, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SecureItem>> GetSecureItemsByBoundPasswordIdAsync(long passwordId, bool includeDeleted = false, CancellationToken cancellationToken = default);
@@ -45,7 +45,7 @@ public interface IMonicaRepository
 
 public interface IPasswordQuickAccessStore
 {
-    Task RecordPasswordQuickAccessAsync(long passwordId, CancellationToken cancellationToken = default);
+    Task<PasswordQuickAccessRecord?> RecordPasswordQuickAccessAsync(long passwordId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PasswordQuickAccessRecord>> GetAllPasswordQuickAccessRecordsAsync(CancellationToken cancellationToken = default);
 }
 
@@ -535,24 +535,26 @@ public sealed class MonicaRepository(
         }
     }
 
-    public async Task RecordPasswordQuickAccessAsync(long passwordId, CancellationToken cancellationToken = default)
+    public async Task<PasswordQuickAccessRecord?> RecordPasswordQuickAccessAsync(long passwordId, CancellationToken cancellationToken = default)
     {
         if (passwordId <= 0)
         {
-            return;
+            return null;
         }
 
         await migrator.MigrateAsync(cancellationToken);
         await using var connection = connectionFactory.CreateConnection();
-        await connection.ExecuteAsync(
+        var row = await connection.QuerySingleAsync<PasswordQuickAccessRecordRow>(
             """
             INSERT INTO password_quick_access_records(password_id, open_count, last_opened_at)
             VALUES(@PasswordId, 1, @LastOpenedAt)
             ON CONFLICT(password_id) DO UPDATE SET
                 open_count = open_count + 1,
                 last_opened_at = excluded.last_opened_at
+            RETURNING password_id, open_count, last_opened_at
             """,
             new { PasswordId = passwordId, LastOpenedAt = ToUnixMilliseconds(DateTimeOffset.UtcNow) });
+        return ToModel(row);
     }
 
     public async Task<IReadOnlyList<PasswordQuickAccessRecord>> GetPasswordQuickAccessRecordsAsync(CancellationToken cancellationToken = default)
