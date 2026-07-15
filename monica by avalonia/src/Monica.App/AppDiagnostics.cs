@@ -8,7 +8,7 @@ internal static class AppDiagnostics
 {
     private const int QueueCapacity = 4_096;
     private static readonly string LogPath = MonicaAppDataPaths.GetPath("runtime.log");
-    private static readonly Channel<string> LogLines = Channel.CreateBounded<string>(
+    private static readonly Channel<DiagnosticEvent> LogEvents = Channel.CreateBounded<DiagnosticEvent>(
         new BoundedChannelOptions(QueueCapacity)
         {
             SingleReader = true,
@@ -26,7 +26,7 @@ internal static class AppDiagnostics
     public static void Info(string message) => Write("INFO", message);
 
     public static void Error(string message, Exception exception) =>
-        Write("ERROR", $"{message}: {exception}");
+        Write("ERROR", message, exception);
 
     public static async Task<T> MeasureAsync<T>(string name, Func<Task<T>> action)
     {
@@ -77,10 +77,9 @@ internal static class AppDiagnostics
         }
     }
 
-    private static void Write(string level, string message)
+    private static void Write(string level, string message, Exception? exception = null)
     {
-        var line = $"[{DateTimeOffset.Now:O}] [{level}] {message}{Environment.NewLine}";
-        if (!LogLines.Writer.TryWrite(line))
+        if (!LogEvents.Writer.TryWrite(new DiagnosticEvent(DateTimeOffset.Now, level, message, exception)))
         {
             Debug.WriteLine(message);
         }
@@ -105,11 +104,11 @@ internal static class AppDiagnostics
                 FileOptions.Asynchronous | FileOptions.SequentialScan);
             await using var writer = new StreamWriter(stream);
 
-            while (await LogLines.Reader.WaitToReadAsync().ConfigureAwait(false))
+            while (await LogEvents.Reader.WaitToReadAsync().ConfigureAwait(false))
             {
-                while (LogLines.Reader.TryRead(out var line))
+                while (LogEvents.Reader.TryRead(out var diagnosticEvent))
                 {
-                    await writer.WriteAsync(line).ConfigureAwait(false);
+                    await writer.WriteAsync(Format(diagnosticEvent)).ConfigureAwait(false);
                 }
 
                 await writer.FlushAsync().ConfigureAwait(false);
@@ -118,16 +117,24 @@ internal static class AppDiagnostics
         catch (Exception exception)
         {
             Debug.WriteLine($"Runtime diagnostic writer failed: {exception}");
-            while (LogLines.Reader.TryRead(out var line))
+            while (LogEvents.Reader.TryRead(out var diagnosticEvent))
             {
-                Debug.WriteLine(line);
+                Debug.WriteLine(Format(diagnosticEvent));
             }
         }
     }
 
+    private static string Format(DiagnosticEvent diagnosticEvent)
+    {
+        var message = diagnosticEvent.Exception is null
+            ? diagnosticEvent.Message
+            : $"{diagnosticEvent.Message}: {diagnosticEvent.Exception}";
+        return $"[{diagnosticEvent.Timestamp:O}] [{diagnosticEvent.Level}] {message}{Environment.NewLine}";
+    }
+
     private static void FlushForShutdown()
     {
-        LogLines.Writer.TryComplete();
+        LogEvents.Writer.TryComplete();
         try
         {
             WriterTask.Wait(TimeSpan.FromMilliseconds(500));
@@ -137,4 +144,10 @@ internal static class AppDiagnostics
             Debug.WriteLine($"Runtime diagnostic flush failed: {exception}");
         }
     }
+
+    private readonly record struct DiagnosticEvent(
+        DateTimeOffset Timestamp,
+        string Level,
+        string Message,
+        Exception? Exception);
 }
