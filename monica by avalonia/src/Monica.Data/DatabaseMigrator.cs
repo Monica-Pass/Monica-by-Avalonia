@@ -9,7 +9,7 @@ public interface IDatabaseMigrator
 
 public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory) : IDatabaseMigrator
 {
-    public const int CurrentSchemaVersion = 70;
+    public const int CurrentSchemaVersion = 71;
 
     public async Task MigrateAsync(CancellationToken cancellationToken = default)
     {
@@ -17,7 +17,7 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
         if (legacyDetection.RequiresImport)
         {
             throw new InvalidOperationException(
-                "This database looks like a Monica for Windows PascalCase vault. Import it through the desktop migration flow before using the Avalonia v69 schema.");
+                $"This database looks like a Monica for Windows PascalCase vault. Import it through the desktop migration flow before using the Avalonia v{CurrentSchemaVersion} schema.");
         }
 
         await using var connection = connectionFactory.CreateConnection();
@@ -36,6 +36,8 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
         await EnsurePasswordQuickAccessTableWithoutForeignKeyAsync(connection, cancellationToken);
         await EnsureColumnAsync(connection, "categories", "mdbx_folder_id", "TEXT DEFAULT NULL", cancellationToken);
         await EnsureColumnAsync(connection, "secure_items", "bound_password_id", "INTEGER DEFAULT NULL", cancellationToken);
+        await EnsureColumnAsync(connection, "local_mdbx_databases", "remote_etag", "TEXT DEFAULT NULL", cancellationToken);
+        await EnsureColumnAsync(connection, "local_mdbx_databases", "remote_last_modified_at", "INTEGER DEFAULT NULL", cancellationToken);
         await ExecuteAsync(connection, "CREATE INDEX IF NOT EXISTS index_secure_items_bound_password_id ON secure_items(bound_password_id);", cancellationToken);
         await ExecuteAsync(connection, $"PRAGMA user_version={CurrentSchemaVersion};", cancellationToken);
     }
@@ -374,7 +376,9 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
             cache_copy_path TEXT DEFAULT NULL,
             is_offline_available INTEGER NOT NULL DEFAULT 0,
             last_sync_status TEXT NOT NULL DEFAULT 'LOCAL_ONLY',
-            last_sync_error TEXT DEFAULT NULL
+            last_sync_error TEXT DEFAULT NULL,
+            remote_etag TEXT DEFAULT NULL,
+            remote_last_modified_at INTEGER DEFAULT NULL
         );
         """,
         "CREATE INDEX IF NOT EXISTS index_local_mdbx_databases_storage_location ON local_mdbx_databases(storage_location);",

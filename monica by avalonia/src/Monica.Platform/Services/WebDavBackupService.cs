@@ -22,7 +22,7 @@ public static class WebDavEndpointPolicy
     }
 }
 
-public sealed class WebDavBackupService(IHttpClientFactory httpClientFactory) : IWebDavBackupService
+public sealed partial class WebDavBackupService(IHttpClientFactory httpClientFactory) : IWebDavBackupService
 {
     public string NormalizeRemotePath(string rootPath, string relativePath)
     {
@@ -94,38 +94,6 @@ public sealed class WebDavBackupService(IHttpClientFactory httpClientFactory) : 
         }
 
         return await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-    }
-
-    public async Task UploadBinaryAsync(WebDavProfile profile, string relativePath, Stream content, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(content);
-        using var client = CreateClient(profile);
-        var path = NormalizeRemotePath(profile.RootPath, relativePath);
-        await EnsureCollectionAsync(client, path, cancellationToken).ConfigureAwait(false);
-        using var payload = new StreamContent(content);
-        payload.Headers.ContentType = new("application/octet-stream");
-        using var response = await client.PutAsync(ToRequestPath(path), payload, cancellationToken).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new InvalidOperationException($"WebDAV binary PUT failed for '{path}' with status {(int)response.StatusCode}.");
-        }
-    }
-
-    public async Task DownloadBinaryAsync(WebDavProfile profile, string relativePath, Stream destination, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(destination);
-        using var client = CreateClient(profile);
-        var path = NormalizeRemotePath(profile.RootPath, relativePath);
-        using var response = await client.GetAsync(
-            ToRequestPath(path),
-            HttpCompletionOption.ResponseHeadersRead,
-            cancellationToken).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new InvalidOperationException($"WebDAV binary GET failed for '{path}' with status {(int)response.StatusCode}.");
-        }
-
-        await response.Content.CopyToAsync(destination, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task DeleteAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default)

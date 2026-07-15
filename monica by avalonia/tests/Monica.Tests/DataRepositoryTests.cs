@@ -25,6 +25,81 @@ public sealed class DataRepositoryTests
     }
 
     [Fact]
+    public async Task Migration_adds_remote_validators_to_existing_mdbx_metadata()
+    {
+        var path = GetTempDatabasePath();
+        var factory = new SqliteConnectionFactory(path);
+        var migrator = new DatabaseMigrator(factory);
+
+        await using (var legacyConnection = factory.CreateConnection())
+        {
+            await legacyConnection.OpenAsync();
+            await using var legacyCommand = legacyConnection.CreateCommand();
+            legacyCommand.CommandText =
+                """
+                CREATE TABLE local_mdbx_databases (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    name TEXT NOT NULL,
+                    file_path TEXT NOT NULL,
+                    storage_location TEXT NOT NULL,
+                    source_type TEXT NOT NULL,
+                    source_id INTEGER DEFAULT NULL,
+                    tiga_mode TEXT NOT NULL DEFAULT 'MULTI',
+                    encrypted_password TEXT DEFAULT NULL,
+                    unlock_method TEXT NOT NULL DEFAULT 'password',
+                    kdf_profile TEXT NOT NULL DEFAULT 'argon2id',
+                    key_file_name TEXT DEFAULT NULL,
+                    key_file_uri TEXT DEFAULT NULL,
+                    key_file_fingerprint TEXT DEFAULT NULL,
+                    description TEXT DEFAULT NULL,
+                    created_at INTEGER NOT NULL,
+                    last_accessed_at INTEGER NOT NULL,
+                    last_synced_at INTEGER DEFAULT NULL,
+                    is_default INTEGER NOT NULL DEFAULT 0,
+                    project_count INTEGER NOT NULL DEFAULT 0,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    working_copy_path TEXT DEFAULT NULL,
+                    cache_copy_path TEXT DEFAULT NULL,
+                    is_offline_available INTEGER NOT NULL DEFAULT 0,
+                    last_sync_status TEXT NOT NULL DEFAULT 'LOCAL_ONLY',
+                    last_sync_error TEXT DEFAULT NULL
+                );
+                INSERT INTO local_mdbx_databases (
+                    name, file_path, storage_location, source_type, created_at, last_accessed_at,
+                    last_synced_at, is_default, working_copy_path, is_offline_available, last_sync_status)
+                VALUES ('Legacy WebDAV', '/Monica/legacy.mdbx', 'REMOTE_WEBDAV', 'REMOTE_WEBDAV',
+                    1000, 2000, 3000, 1, 'legacy-local.mdbx', 1, 'SYNCED');
+                PRAGMA user_version=70;
+                """;
+            await legacyCommand.ExecuteNonQueryAsync();
+        }
+
+        await migrator.MigrateAsync();
+
+        await using var connection = factory.CreateConnection();
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA table_info(local_mdbx_databases);";
+        await using var reader = await command.ExecuteReaderAsync();
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        while (await reader.ReadAsync())
+        {
+            columns.Add(reader.GetString(1));
+        }
+
+        Assert.Contains("remote_etag", columns);
+        Assert.Contains("remote_last_modified_at", columns);
+        await reader.DisposeAsync();
+        command.CommandText = "SELECT name, last_sync_status, remote_etag, remote_last_modified_at FROM local_mdbx_databases WHERE id = 1;";
+        await using var preservedReader = await command.ExecuteReaderAsync();
+        Assert.True(await preservedReader.ReadAsync());
+        Assert.Equal("Legacy WebDAV", preservedReader.GetString(0));
+        Assert.Equal("SYNCED", preservedReader.GetString(1));
+        Assert.True(preservedReader.IsDBNull(2));
+        Assert.True(preservedReader.IsDBNull(3));
+    }
+
+    [Fact]
     public async Task Migration_v70_removes_quick_access_foreign_key_and_preserves_existing_counters()
     {
         var path = GetTempDatabasePath();
@@ -138,14 +213,18 @@ public sealed class DataRepositoryTests
             Name = "Local",
             FilePath = Path.Combine(Path.GetTempPath(), "local.mdbx"),
             StorageLocation = MdbxStorageLocation.Internal,
-            SourceType = "LOCAL_INTERNAL"
+            SourceType = "LOCAL_INTERNAL",
+            RemoteETag = "\"repo-etag\"",
+            RemoteLastModifiedAt = DateTimeOffset.FromUnixTimeMilliseconds(1_700_000_000_000)
         };
         await repository.SaveMdbxDatabaseAsync(mdbx);
 
         Assert.Single(await repository.GetCategoriesAsync());
         Assert.Single(await repository.GetPasswordsAsync());
         Assert.Single(await repository.GetSecureItemsAsync(VaultItemType.Totp));
-        Assert.Single(await repository.GetMdbxDatabasesAsync());
+        var reloadedMdbx = Assert.Single(await repository.GetMdbxDatabasesAsync());
+        Assert.Equal(mdbx.RemoteETag, reloadedMdbx.RemoteETag);
+        Assert.Equal(mdbx.RemoteLastModifiedAt, reloadedMdbx.RemoteLastModifiedAt);
     }
 
     [Fact]

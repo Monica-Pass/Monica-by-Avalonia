@@ -96,6 +96,29 @@ public sealed class PlatformCapabilityService(IPlatformIntegrationService? platf
 
 public sealed record RemoteFileEntry(string Path, bool IsDirectory, long? Length, DateTimeOffset? LastModified);
 
+public sealed record RemoteFileVersion(string? ETag, DateTimeOffset? LastModified, long? Length)
+{
+    public bool HasValidator => !string.IsNullOrWhiteSpace(ETag) || LastModified is not null;
+}
+
+public sealed record RemoteWriteCondition(bool RequireMissing, RemoteFileVersion? ExpectedVersion)
+{
+    public static RemoteWriteCondition CreateOnly { get; } = new(true, null);
+
+    public static RemoteWriteCondition Match(RemoteFileVersion version)
+    {
+        ArgumentNullException.ThrowIfNull(version);
+        if (!version.HasValidator)
+        {
+            throw new ArgumentException("A remote ETag or Last-Modified validator is required.", nameof(version));
+        }
+
+        return new RemoteWriteCondition(false, version);
+    }
+}
+
+public sealed class RemoteFileConflictException(string message) : InvalidOperationException(message);
+
 public interface IWebDavBackupService
 {
     string NormalizeRemotePath(string rootPath, string relativePath);
@@ -106,6 +129,12 @@ public interface IWebDavBackupService
         Task.FromException(new NotSupportedException("Binary WebDAV upload is not available."));
     Task DownloadBinaryAsync(WebDavProfile profile, string relativePath, Stream destination, CancellationToken cancellationToken = default) =>
         Task.FromException(new NotSupportedException("Binary WebDAV download is not available."));
+    Task<RemoteFileVersion?> GetFileVersionAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) =>
+        Task.FromResult<RemoteFileVersion?>(null);
+    Task<RemoteFileVersion> UploadBinaryConditionallyAsync(WebDavProfile profile, string relativePath, Stream content, RemoteWriteCondition condition, CancellationToken cancellationToken = default) =>
+        Task.FromException<RemoteFileVersion>(new NotSupportedException("Conditional binary WebDAV upload is not available."));
+    Task<RemoteFileVersion> DownloadBinaryVersionedAsync(WebDavProfile profile, string relativePath, Stream destination, CancellationToken cancellationToken = default) =>
+        Task.FromException<RemoteFileVersion>(new NotSupportedException("Versioned binary WebDAV download is not available."));
     Task DeleteAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default);
 }
 

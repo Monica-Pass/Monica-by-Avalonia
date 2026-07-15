@@ -225,6 +225,8 @@ public interface ILocalizationService : INotifyPropertyChanged
     string MdbxRemotePath { get; }
     string MdbxLastSynced { get; }
     string MdbxSyncNow { get; }
+    string MdbxKeepLocal { get; }
+    string MdbxUseRemote { get; }
     string RegisteredMdbxVaults { get; }
     string NoMdbxVaults { get; }
     string MdbxEmptyHint { get; }
@@ -683,6 +685,8 @@ public sealed class LocalizationService : ILocalizationService
     public string MdbxRemotePath => Text();
     public string MdbxLastSynced => Text();
     public string MdbxSyncNow => Text();
+    public string MdbxKeepLocal => Text();
+    public string MdbxUseRemote => Text();
     public string RegisteredMdbxVaults => Text();
     public string NoMdbxVaults => Text();
     public string MdbxEmptyHint => Text();
@@ -1336,6 +1340,8 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxRemotePath"] = "Remote path",
         ["MdbxLastSynced"] = "Last synced",
         ["MdbxSyncNow"] = "Sync now",
+        ["MdbxKeepLocal"] = "Keep local",
+        ["MdbxUseRemote"] = "Use remote",
         ["RegisteredMdbxVaults"] = "Registered MDBX vaults",
         ["NoMdbxVaults"] = "No MDBX vault metadata has been registered yet.",
         ["MdbxEmptyHint"] = "Create a local MDBX working copy or configure a remote MDBX source to start using the encrypted business store.",
@@ -1728,6 +1734,16 @@ public sealed class LocalizationService : ILocalizationService
         ["CreatedMdbxWebDavMetadata"] = "Created and uploaded the WebDAV MDBX vault.",
         ["MdbxWebDavUploadSucceededFormat"] = "Uploaded {0} to WebDAV.",
         ["MdbxWebDavDownloadSucceededFormat"] = "Downloaded and verified {0} from WebDAV.",
+        ["MdbxWebDavConflictDetectedFormat"] = "Sync conflict for {0}: {1} Local and remote copies were preserved.",
+        ["MdbxWebDavMissingRevision"] = "The previous remote revision is unavailable, so Monica refused to overwrite the WebDAV vault.",
+        ["MdbxWebDavConflictRequiresResolution"] = "This WebDAV vault has a sync conflict. Monica will not overwrite either copy until you explicitly resolve it.",
+        ["MdbxKeepLocalConfirmationTitle"] = "Replace the remote vault?",
+        ["MdbxKeepLocalConfirmationMessageFormat"] = "Keep the local copy of {0} and replace the current WebDAV copy? Monica will verify the remote revision again before uploading.",
+        ["MdbxUseRemoteConfirmationTitle"] = "Replace the local working copy?",
+        ["MdbxUseRemoteConfirmationMessageFormat"] = "Use the current WebDAV copy of {0}? Monica will preserve the existing local copy as an encrypted conflict backup first.",
+        ["MdbxKeepLocalSucceededFormat"] = "Resolved {0} by uploading the local copy.",
+        ["MdbxUseRemoteSucceededFormat"] = "Resolved {0} by downloading the remote copy.",
+        ["MdbxUseRemoteWithBackupSucceededFormat"] = "Resolved {0} with the remote copy. The previous encrypted local copy is preserved at {1}.",
         ["CreatedMdbxOneDriveMetadata"] = "Created OneDrive MDBX working copy and registered remote source metadata.",
         ["EnableOneDriveFirst"] = "Enable OneDrive first.",
         ["MdbxVaultsRefreshed"] = "MDBX vault metadata refreshed.",
@@ -1919,6 +1935,7 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxOperationRefresh"] = "refresh",
         ["MdbxOperationOpen"] = "open",
         ["MdbxOperationSync"] = "sync",
+        ["MdbxOperationResolveConflict"] = "resolve conflict",
         ["MdbxOperationSetDefault"] = "set default",
         ["SecurityMaintenanceInProgress"] = "Another security maintenance operation is already in progress.",
         ["ClearVaultTypedConfirmationTitle"] = "Clear vault data?",
@@ -2353,6 +2370,8 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxRemotePath"] = "远程路径",
         ["MdbxLastSynced"] = "上次同步",
         ["MdbxSyncNow"] = "立即同步",
+        ["MdbxKeepLocal"] = "保留本地",
+        ["MdbxUseRemote"] = "采用远端",
         ["RegisteredMdbxVaults"] = "已登记 MDBX 保险库",
         ["NoMdbxVaults"] = "还没有登记 MDBX 保险库元数据。",
         ["MdbxEmptyHint"] = "创建本地 MDBX 工作副本，或配置远程 MDBX 来源，以开始使用加密业务存储。",
@@ -2724,6 +2743,16 @@ public sealed class LocalizationService : ILocalizationService
         ["CreatedMdbxWebDavMetadata"] = "已创建并上传 WebDAV MDBX 保险库。",
         ["MdbxWebDavUploadSucceededFormat"] = "已将 {0} 上传到 WebDAV。",
         ["MdbxWebDavDownloadSucceededFormat"] = "已从 WebDAV 下载并验证 {0}。",
+        ["MdbxWebDavConflictDetectedFormat"] = "{0} 发生同步冲突：{1} 本地与远程副本均已保留。",
+        ["MdbxWebDavMissingRevision"] = "缺少上一次远程修订信息，因此 Monica 已拒绝覆盖 WebDAV 保险库。",
+        ["MdbxWebDavConflictRequiresResolution"] = "此 WebDAV 保险库存在同步冲突。在你明确解决冲突前，Monica 不会覆盖任一副本。",
+        ["MdbxKeepLocalConfirmationTitle"] = "替换远程保险库？",
+        ["MdbxKeepLocalConfirmationMessageFormat"] = "保留 {0} 的本地副本并替换当前 WebDAV 副本吗？Monica 会在上传前再次验证远程修订。",
+        ["MdbxUseRemoteConfirmationTitle"] = "替换本地工作副本？",
+        ["MdbxUseRemoteConfirmationMessageFormat"] = "采用 {0} 当前的 WebDAV 副本吗？Monica 会先把现有本地副本保留为加密冲突备份。",
+        ["MdbxKeepLocalSucceededFormat"] = "已通过上传本地副本解决 {0} 的冲突。",
+        ["MdbxUseRemoteSucceededFormat"] = "已通过下载远程副本解决 {0} 的冲突。",
+        ["MdbxUseRemoteWithBackupSucceededFormat"] = "已采用远程副本解决 {0} 的冲突。原加密本地副本保存在 {1}。",
         ["CreatedMdbxOneDriveMetadata"] = "已创建 OneDrive MDBX 工作副本并登记远程来源元数据。",
         ["EnableOneDriveFirst"] = "请先启用 OneDrive。",
         ["MdbxVaultsRefreshed"] = "MDBX 保险库元数据已刷新。",
@@ -2843,6 +2872,7 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxOperationRefresh"] = "刷新",
         ["MdbxOperationOpen"] = "打开",
         ["MdbxOperationSync"] = "同步",
+        ["MdbxOperationResolveConflict"] = "解决冲突",
         ["MdbxOperationSetDefault"] = "设为默认",
         ["SecurityMaintenanceInProgress"] = "已有另一个安全维护操作正在进行。",
         ["ClearVaultTypedConfirmationTitle"] = "清空保险库数据？",

@@ -770,12 +770,12 @@ public sealed class MonicaRepository(
                     name, file_path, storage_location, source_type, source_id, tiga_mode, encrypted_password, unlock_method,
                     kdf_profile, key_file_name, key_file_uri, key_file_fingerprint, description, created_at, last_accessed_at,
                     last_synced_at, is_default, project_count, sort_order, working_copy_path, cache_copy_path, is_offline_available,
-                    last_sync_status, last_sync_error)
+                    last_sync_status, last_sync_error, remote_etag, remote_last_modified_at)
                 VALUES (
                     @Name, @FilePath, @StorageLocation, @SourceType, @SourceId, @TigaMode, @EncryptedPassword, @UnlockMethod,
                     @KdfProfile, @KeyFileName, @KeyFileUri, @KeyFileFingerprint, @Description, @CreatedAt, @LastAccessedAt,
                     @LastSyncedAt, @IsDefault, @ProjectCount, @SortOrder, @WorkingCopyPath, @CacheCopyPath, @IsOfflineAvailable,
-                    @LastSyncStatus, @LastSyncError);
+                    @LastSyncStatus, @LastSyncError, @RemoteETag, @RemoteLastModifiedAt);
                 """,
                 ToRow(_vaultDataProtector.Protect(database)));
             database.Id = await connection.ExecuteScalarAsync<long>("SELECT last_insert_rowid();");
@@ -790,7 +790,8 @@ public sealed class MonicaRepository(
                     key_file_fingerprint=@KeyFileFingerprint, description=@Description, last_accessed_at=@LastAccessedAt,
                     last_synced_at=@LastSyncedAt, is_default=@IsDefault, project_count=@ProjectCount, sort_order=@SortOrder,
                     working_copy_path=@WorkingCopyPath, cache_copy_path=@CacheCopyPath, is_offline_available=@IsOfflineAvailable,
-                    last_sync_status=@LastSyncStatus, last_sync_error=@LastSyncError
+                    last_sync_status=@LastSyncStatus, last_sync_error=@LastSyncError,
+                    remote_etag=@RemoteETag, remote_last_modified_at=@RemoteLastModifiedAt
                 WHERE id=@Id;
                 """,
                 ToRow(_vaultDataProtector.Protect(database)));
@@ -1237,7 +1238,9 @@ public sealed class MonicaRepository(
         CacheCopyPath = row.CacheCopyPath,
         IsOfflineAvailable = row.IsOfflineAvailable,
         LastSyncStatus = Enum.TryParse<SyncStatus>(row.LastSyncStatus.Replace("_", "", StringComparison.Ordinal), true, out var status) ? status : SyncStatus.LocalOnly,
-        LastSyncError = row.LastSyncError
+        LastSyncError = row.LastSyncError,
+        RemoteETag = row.RemoteETag,
+        RemoteLastModifiedAt = FromNullableUnixMilliseconds(row.RemoteLastModifiedAt)
     };
 
     private static MdbxDatabaseParameters ToRow(LocalMdbxDatabase database) => new()
@@ -1272,7 +1275,9 @@ public sealed class MonicaRepository(
         CacheCopyPath = database.CacheCopyPath,
         IsOfflineAvailable = database.IsOfflineAvailable ? 1 : 0,
         LastSyncStatus = database.LastSyncStatus.ToString().ToUpperInvariant(),
-        LastSyncError = database.LastSyncError
+        LastSyncError = database.LastSyncError,
+        RemoteETag = database.RemoteETag,
+        RemoteLastModifiedAt = ToNullableUnixMilliseconds(database.RemoteLastModifiedAt)
     };
 
     private sealed class MdbxDatabaseParameters
@@ -1302,6 +1307,8 @@ public sealed class MonicaRepository(
         public int IsOfflineAvailable { get; init; }
         public string LastSyncStatus { get; init; } = "";
         public string? LastSyncError { get; init; }
+        public string? RemoteETag { get; init; }
+        public long? RemoteLastModifiedAt { get; init; }
     }
 
     private static IReadOnlyList<string> GetClearVaultStatements(VaultClearScope scope) => scope switch
@@ -1522,6 +1529,8 @@ public sealed class MonicaRepository(
         public bool IsOfflineAvailable { get; init; }
         public string LastSyncStatus { get; init; } = "LOCAL_ONLY";
         public string? LastSyncError { get; init; }
+        public string? RemoteETag { get; init; }
+        public long? RemoteLastModifiedAt { get; init; }
     }
 
     private sealed class OperationLogRow

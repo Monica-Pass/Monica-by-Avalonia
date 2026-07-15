@@ -170,7 +170,8 @@ public sealed partial class MainWindowViewModel
             database.IsDefault,
             isLocal,
             !isLocal,
-            database.StorageLocation == MdbxStorageLocation.RemoteWebDav);
+            database.StorageLocation == MdbxStorageLocation.RemoteWebDav,
+            database.LastSyncStatus == SyncStatus.Conflict);
     }
 
     private static bool IsLocalMdbxDatabase(LocalMdbxDatabase database) =>

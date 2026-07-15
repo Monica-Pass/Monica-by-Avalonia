@@ -46,6 +46,18 @@
                                 <TextBlock Text="{Binding L.MdbxSyncNow}" />
                             </StackPanel>
                         </Button>
+                        <Button x:Name="KeepLocalWebDavMdbxButton" Classes="workspaceCommand" Command="{Binding KeepLocalWebDavMdbxCommand}" CommandParameter="{Binding SelectedMdbxDatabaseItem}" IsEnabled="{Binding !IsMdbxBusy}" IsVisible="{Binding SelectedMdbxDatabaseItem.IsConflict}" Margin="0,0,8,8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
+                                <TextBlock Text="{Binding L.MdbxKeepLocal}" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="UseRemoteWebDavMdbxButton" Classes="workspaceCommand" Command="{Binding UseRemoteWebDavMdbxCommand}" CommandParameter="{Binding SelectedMdbxDatabaseItem}" IsEnabled="{Binding !IsMdbxBusy}" IsVisible="{Binding SelectedMdbxDatabaseItem.IsConflict}" Margin="0,0,8,8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="ArrowDownload" FontSize="18" />
+                                <TextBlock Text="{Binding L.MdbxUseRemote}" />
+                            </StackPanel>
+                        </Button>
                         <Button Classes="workspaceCommand" Command="{Binding SetDefaultMdbxDatabaseCommand}" CommandParameter="{Binding SelectedMdbxDatabaseItem}" IsEnabled="{Binding !IsMdbxBusy}" Margin="0,0,0,8">
                             <TextBlock Text="{Binding L.SetDefault}" />
                         </Button>

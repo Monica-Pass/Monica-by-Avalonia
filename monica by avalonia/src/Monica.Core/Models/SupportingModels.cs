@@ -125,6 +125,8 @@ public sealed class LocalMdbxDatabase
     public bool IsOfflineAvailable { get; set; }
     public SyncStatus LastSyncStatus { get; set; } = SyncStatus.LocalOnly;
     public string? LastSyncError { get; set; }
+    public string? RemoteETag { get; set; }
+    public DateTimeOffset? RemoteLastModifiedAt { get; set; }
 }
 
 public sealed class WebDavProfile

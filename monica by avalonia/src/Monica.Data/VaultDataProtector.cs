@@ -319,6 +319,8 @@ public sealed class VaultDataProtector(ICryptoService cryptoService) : IVaultDat
         CacheCopyPath = source.CacheCopyPath,
         IsOfflineAvailable = source.IsOfflineAvailable,
         LastSyncStatus = source.LastSyncStatus,
-        LastSyncError = source.LastSyncError
+        LastSyncError = source.LastSyncError,
+        RemoteETag = source.RemoteETag,
+        RemoteLastModifiedAt = source.RemoteLastModifiedAt
     };
 }

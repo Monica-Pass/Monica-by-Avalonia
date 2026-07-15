@@ -1,4 +1,5 @@
 using Monica.Core.Models;
+using Monica.Platform.Services;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -9,6 +10,7 @@ public sealed partial class MainWindowViewModel
     private async Task UploadWebDavMdbxWorkingCopyAsync(
         LocalMdbxDatabase database,
         WebDavProfile profile,
+        RemoteWriteCondition? writeCondition = null,
         CancellationToken cancellationToken = default)
     {
         var workingCopyPath = GetMdbxWorkingCopyPath(database);
@@ -19,18 +21,29 @@ public sealed partial class MainWindowViewModel
 
         try
         {
+            var condition = writeCondition ?? BuildWebDavWriteCondition(database);
             await using var content = await _mdbxVaultService.OpenLocalStreamAsync(database, cancellationToken);
             content.Position = 0;
-            await _webDavBackupService.UploadBinaryAsync(
+            var version = await _webDavBackupService.UploadBinaryConditionallyAsync(
                 profile,
                 database.FilePath,
                 content,
+                condition,
                 cancellationToken);
-            await MarkWebDavMdbxSyncedAsync(database, workingCopyPath);
+            await MarkWebDavMdbxSyncedAsync(database, workingCopyPath, version);
+        }
+        catch (RemoteFileConflictException ex)
+        {
+            var message = _localization.Format("MdbxWebDavConflictDetectedFormat", database.Name, ex.Message);
+            await MarkWebDavMdbxSyncFailedAsync(database, SyncStatus.Conflict, message);
+            throw new RemoteFileConflictException(message);
         }
         catch (Exception ex)
         {
-            await MarkWebDavMdbxSyncFailedAsync(database, SyncStatus.PendingUpload, ex.Message);
+            var failureStatus = writeCondition is null
+                ? SyncStatus.PendingUpload
+                : SyncStatus.Conflict;
+            await MarkWebDavMdbxSyncFailedAsync(database, failureStatus, ex.Message);
             throw;
         }
     }
@@ -38,6 +51,7 @@ public sealed partial class MainWindowViewModel
     private async Task DownloadWebDavMdbxWorkingCopyAsync(
         LocalMdbxDatabase database,
         WebDavProfile profile,
+        SyncStatus failureStatus = SyncStatus.Failed,
         CancellationToken cancellationToken = default)
     {
         var workingCopyPath = GetMdbxWorkingCopyPath(database);
@@ -49,6 +63,7 @@ public sealed partial class MainWindowViewModel
 
         try
         {
+            RemoteFileVersion version;
             await using (var destination = new FileStream(
                 incomingPath,
                 FileMode.CreateNew,
@@ -57,7 +72,7 @@ public sealed partial class MainWindowViewModel
                 81920,
                 FileOptions.Asynchronous | FileOptions.SequentialScan))
             {
-                await _webDavBackupService.DownloadBinaryAsync(
+                version = await _webDavBackupService.DownloadBinaryVersionedAsync(
                     profile,
                     database.FilePath,
                     destination,
@@ -68,11 +83,11 @@ public sealed partial class MainWindowViewModel
 
             await ValidateIncomingMdbxWorkingCopyAsync(database, incomingPath, cancellationToken);
             File.Move(incomingPath, workingCopyPath, overwrite: true);
-            await MarkWebDavMdbxSyncedAsync(database, workingCopyPath);
+            await MarkWebDavMdbxSyncedAsync(database, workingCopyPath, version);
         }
         catch (Exception ex)
         {
-            await MarkWebDavMdbxSyncFailedAsync(database, SyncStatus.Failed, ex.Message);
+            await MarkWebDavMdbxSyncFailedAsync(database, failureStatus, ex.Message);
             throw;
         }
         finally
@@ -104,7 +119,8 @@ public sealed partial class MainWindowViewModel
 
     private async Task MarkWebDavMdbxSyncedAsync(
         LocalMdbxDatabase database,
-        string workingCopyPath)
+        string workingCopyPath,
+        RemoteFileVersion version)
     {
         database.WorkingCopyPath = workingCopyPath;
         database.CacheCopyPath = workingCopyPath;
@@ -112,6 +128,8 @@ public sealed partial class MainWindowViewModel
         database.LastSyncedAt = DateTimeOffset.UtcNow;
         database.LastSyncStatus = SyncStatus.Synced;
         database.LastSyncError = null;
+        database.RemoteETag = version.ETag;
+        database.RemoteLastModifiedAt = version.LastModified;
         await SaveMdbxSyncStateAsync(database);
     }
 
@@ -129,6 +147,25 @@ public sealed partial class MainWindowViewModel
     {
         await _repository.SaveMdbxDatabaseAsync(database);
         await ReloadMdbxVaultStateAsync();
+    }
+
+    private RemoteWriteCondition BuildWebDavWriteCondition(LocalMdbxDatabase database)
+    {
+        var expected = new RemoteFileVersion(
+            database.RemoteETag,
+            database.RemoteLastModifiedAt,
+            Length: null);
+        if (expected.HasValidator)
+        {
+            return RemoteWriteCondition.Match(expected);
+        }
+
+        if (database.LastSyncedAt is null)
+        {
+            return RemoteWriteCondition.CreateOnly;
+        }
+
+        throw new RemoteFileConflictException(_localization.Get("MdbxWebDavMissingRevision"));
     }
 
     private static string GetMdbxWorkingCopyPath(LocalMdbxDatabase database)

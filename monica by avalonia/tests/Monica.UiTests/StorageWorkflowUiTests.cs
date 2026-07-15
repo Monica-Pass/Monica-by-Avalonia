@@ -28,6 +28,8 @@ public sealed class StorageWorkflowUiTests
         Assert.NotNull(mdbx.FindControl<Border>("MdbxListRegion"));
         Assert.NotNull(mdbx.FindControl<ScrollViewer>("MdbxContentRegion"));
         Assert.NotNull(mdbxWorkbench.FindControl<Button>("SyncMdbxDatabaseButton"));
+        Assert.NotNull(mdbxWorkbench.FindControl<Button>("KeepLocalWebDavMdbxButton"));
+        Assert.NotNull(mdbxWorkbench.FindControl<Button>("UseRemoteWebDavMdbxButton"));
         Assert.NotNull(databases.FindControl<Grid>("DatabaseWorkspaceLayoutGrid"));
         Assert.NotNull(databases.FindControl<Border>("DatabaseListRegion"));
         Assert.NotNull(databases.FindControl<ScrollViewer>("DatabaseContentRegion"));

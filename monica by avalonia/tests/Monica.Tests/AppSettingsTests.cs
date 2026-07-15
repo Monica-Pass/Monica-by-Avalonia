@@ -11,7 +11,7 @@ using Microsoft.Data.Sqlite;
 
 namespace Monica.Tests;
 
-public sealed class AppSettingsTests
+public sealed partial class AppSettingsTests
 {
     [Fact]
     public async Task App_settings_roundtrip_interactive_values()
@@ -331,6 +331,8 @@ public sealed class AppSettingsTests
         Assert.NotNull(webDavDatabase.LastSyncedAt);
         Assert.Equal(webDavDatabase.FilePath, webDav.UploadedBinaryPath);
         Assert.NotEmpty(webDav.UploadedBytes);
+        Assert.Equal(webDav.RemoteVersion.ETag, webDavDatabase.RemoteETag);
+        Assert.Equal(webDav.RemoteVersion.LastModified, webDavDatabase.RemoteLastModifiedAt);
 
         var webDavItem = Assert.Single(
             viewModel.MdbxDatabaseItems,
@@ -1139,7 +1141,8 @@ public sealed class AppSettingsTests
         IExternalLinkService? externalLinkService = null,
         IFileSystemPickerService? fileSystemPickerService = null,
         IMdbxVaultService? mdbxVaultService = null,
-        IMonicaRepository? repository = null)
+        IMonicaRepository? repository = null,
+        IConfirmationDialogService? confirmationDialogService = null)
     {
         var databasePath = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
         Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
@@ -1170,6 +1173,7 @@ public sealed class AppSettingsTests
             masterPasswordMaintenanceService: masterPasswordMaintenanceService,
             externalLinkService: externalLinkService,
             fileSystemPickerService: fileSystemPickerService,
+            confirmationDialogService: confirmationDialogService,
             exportAuthorizationService: new ApprovingExportAuthorizationService());
     }
 
@@ -1178,6 +1182,15 @@ public sealed class AppSettingsTests
         var path = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.settings.json");
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         return path;
+    }
+
+    private static void ConfigureWebDav(MainWindowViewModel viewModel, string remotePath = "/Monica")
+    {
+        viewModel.WebDavEnabled = true;
+        viewModel.WebDavServerUrl = "https://dav.example.com";
+        viewModel.WebDavUsername = "user";
+        viewModel.WebDavPassword = "secret";
+        viewModel.WebDavRemotePath = remotePath;
     }
 
     private static async Task<string> ReadMdbxFormatVersionAsync(string path)
@@ -1351,6 +1364,11 @@ public sealed class AppSettingsTests
         public byte[] DownloadBytes { get; set; } = [];
         public Exception? UploadBinaryFailure { get; set; }
         public Exception? DownloadBinaryFailure { get; set; }
+        public RemoteFileVersion RemoteVersion { get; set; } = new(
+            "\"fixture-v1\"",
+            DateTimeOffset.FromUnixTimeMilliseconds(1_700_000_000_000),
+            null);
+        public RemoteWriteCondition? LastWriteCondition { get; private set; }
         public int UploadBinaryCallCount { get; private set; }
         public int ListCallCount { get; private set; }
 
@@ -1377,7 +1395,26 @@ public sealed class AppSettingsTests
 
         public async Task UploadBinaryAsync(WebDavProfile profile, string relativePath, Stream content, CancellationToken cancellationToken = default)
         {
+            _ = await UploadBinaryConditionallyAsync(
+                profile,
+                relativePath,
+                content,
+                RemoteWriteCondition.CreateOnly,
+                cancellationToken);
+        }
+
+        public Task<RemoteFileVersion?> GetFileVersionAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default) =>
+            Task.FromResult<RemoteFileVersion?>(RemoteVersion);
+
+        public async Task<RemoteFileVersion> UploadBinaryConditionallyAsync(
+            WebDavProfile profile,
+            string relativePath,
+            Stream content,
+            RemoteWriteCondition condition,
+            CancellationToken cancellationToken = default)
+        {
             UploadBinaryCallCount++;
+            LastWriteCondition = condition;
             if (UploadBinaryFailure is not null)
             {
                 throw UploadBinaryFailure;
@@ -1388,9 +1425,19 @@ public sealed class AppSettingsTests
             await using var copy = new MemoryStream();
             await content.CopyToAsync(copy, cancellationToken);
             UploadedBytes = copy.ToArray();
+            return RemoteVersion;
         }
 
         public async Task DownloadBinaryAsync(WebDavProfile profile, string relativePath, Stream destination, CancellationToken cancellationToken = default)
+        {
+            _ = await DownloadBinaryVersionedAsync(profile, relativePath, destination, cancellationToken);
+        }
+
+        public async Task<RemoteFileVersion> DownloadBinaryVersionedAsync(
+            WebDavProfile profile,
+            string relativePath,
+            Stream destination,
+            CancellationToken cancellationToken = default)
         {
             if (DownloadBinaryFailure is not null)
             {
@@ -1400,6 +1447,7 @@ public sealed class AppSettingsTests
             LastProfile = profile;
             DownloadedBinaryPath = relativePath;
             await destination.WriteAsync(DownloadBytes, cancellationToken);
+            return RemoteVersion;
         }
 
         public Task DeleteAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default)
@@ -1434,6 +1482,25 @@ public sealed class AppSettingsTests
             NewPassword = newPassword;
             return Task.FromResult(result);
         }
+    }
+
+    private sealed class ApprovingConfirmationDialogService : IConfirmationDialogService
+    {
+        public Task<bool> ConfirmAsync(
+            string title,
+            string message,
+            string primaryButtonText,
+            string? closeButtonText = null,
+            CancellationToken cancellationToken = default) => Task.FromResult(true);
+
+        public Task<bool> ConfirmTypedAsync(
+            string title,
+            string message,
+            string requiredPhrase,
+            string instruction,
+            string primaryButtonText,
+            string? closeButtonText = null,
+            CancellationToken cancellationToken = default) => Task.FromResult(true);
     }
 
     private sealed class NoopPasswordEditorDialogService : IPasswordEditorDialogService

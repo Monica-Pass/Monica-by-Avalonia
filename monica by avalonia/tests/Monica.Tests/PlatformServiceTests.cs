@@ -4,6 +4,7 @@ using Monica.Platform.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
+using System.Net.Http.Headers;
 
 namespace Monica.Tests;
 
@@ -69,10 +70,17 @@ public sealed class PlatformServiceTests
 
         await service.UploadBinaryAsync(profile, "/Monica/team/vault.mdbx", upload);
         await using var download = new MemoryStream();
-        await service.DownloadBinaryAsync(profile, "/Monica/team/vault.mdbx", download);
+        var downloadedVersion = await service.DownloadBinaryVersionedAsync(
+            profile,
+            "/Monica/team/vault.mdbx",
+            download);
+        var probedVersion = await service.GetFileVersionAsync(profile, "/Monica/team/vault.mdbx");
 
         Assert.Equal([1, 2, 3, 4], handler.UploadedBytes);
+        Assert.Equal("*", handler.UploadedIfNoneMatch);
         Assert.Equal([5, 6, 7, 8], download.ToArray());
+        Assert.Equal("\"fixture-v1\"", downloadedVersion.ETag);
+        Assert.Equal(downloadedVersion.ETag, probedVersion?.ETag);
         Assert.Contains(
             handler.Requests,
             request => request.Method == HttpMethod.Put &&
@@ -89,6 +97,54 @@ public sealed class PlatformServiceTests
             handler.Requests,
             request => request.Method.Method == "MKCOL" &&
                 request.Uri == new Uri("https://dav.example.com/dav/Monica/team"));
+    }
+
+    [Fact]
+    public async Task Webdav_conditional_upload_uses_etag_and_maps_precondition_failure_to_conflict()
+    {
+        var handler = new RecordingWebDavHandler([], HttpStatusCode.PreconditionFailed);
+        var service = new WebDavBackupService(new RecordingHttpClientFactory(handler));
+        var profile = new WebDavProfile
+        {
+            BaseUri = new Uri("https://dav.example.com/dav/"),
+            RootPath = "/Monica"
+        };
+        await using var upload = new MemoryStream([1, 2, 3, 4]);
+
+        var error = await Assert.ThrowsAsync<RemoteFileConflictException>(() =>
+            service.UploadBinaryConditionallyAsync(
+                profile,
+                "/Monica/team/vault.mdbx",
+                upload,
+                RemoteWriteCondition.Match(new RemoteFileVersion("\"fixture-v0\"", null, null))));
+
+        Assert.Equal("\"fixture-v0\"", handler.UploadedIfMatch);
+        Assert.Empty(handler.UploadedBytes);
+        Assert.Contains("changed", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Webdav_conditional_upload_falls_back_to_last_modified_validator()
+    {
+        var expectedLastModified = DateTimeOffset.FromUnixTimeSeconds(1_700_000_000);
+        var handler = new RecordingWebDavHandler([], HttpStatusCode.PreconditionFailed);
+        var service = new WebDavBackupService(new RecordingHttpClientFactory(handler));
+        var profile = new WebDavProfile
+        {
+            BaseUri = new Uri("https://dav.example.com/dav/"),
+            RootPath = "/Monica"
+        };
+        await using var upload = new MemoryStream([1, 2, 3, 4]);
+
+        await Assert.ThrowsAsync<RemoteFileConflictException>(() =>
+            service.UploadBinaryConditionallyAsync(
+                profile,
+                "/Monica/team/vault.mdbx",
+                upload,
+                RemoteWriteCondition.Match(new RemoteFileVersion(null, expectedLastModified, null))));
+
+        Assert.Equal(expectedLastModified, handler.UploadedIfUnmodifiedSince);
+        Assert.Empty(handler.UploadedBytes);
     }
 
     [Fact]
@@ -365,10 +421,15 @@ public sealed class PlatformServiceTests
         public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
     }
 
-    private sealed class RecordingWebDavHandler(byte[] downloadBytes) : HttpMessageHandler
+    private sealed class RecordingWebDavHandler(
+        byte[] downloadBytes,
+        HttpStatusCode putStatus = HttpStatusCode.Created) : HttpMessageHandler
     {
         public List<(HttpMethod Method, Uri? Uri)> Requests { get; } = [];
         public byte[] UploadedBytes { get; private set; } = [];
+        public string? UploadedIfNoneMatch { get; private set; }
+        public string? UploadedIfMatch { get; private set; }
+        public DateTimeOffset? UploadedIfUnmodifiedSince { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
@@ -382,17 +443,35 @@ public sealed class PlatformServiceTests
 
             if (request.Method == HttpMethod.Put)
             {
+                UploadedIfNoneMatch = request.Headers.IfNoneMatch.SingleOrDefault()?.ToString();
+                UploadedIfMatch = request.Headers.IfMatch.SingleOrDefault()?.ToString();
+                UploadedIfUnmodifiedSince = request.Headers.IfUnmodifiedSince;
+                if (putStatus == HttpStatusCode.PreconditionFailed)
+                {
+                    return new HttpResponseMessage(putStatus);
+                }
+
                 UploadedBytes = request.Content is null
                     ? []
                     : await request.Content.ReadAsByteArrayAsync(cancellationToken);
-                return new HttpResponseMessage(HttpStatusCode.Created);
+                return new HttpResponseMessage(putStatus)
+                {
+                    Headers =
+                    {
+                        ETag = new EntityTagHeaderValue("\"fixture-v1\"")
+                    }
+                };
             }
 
             if (request.Method == HttpMethod.Get)
             {
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new ByteArrayContent(downloadBytes)
+                    Content = new ByteArrayContent(downloadBytes),
+                    Headers =
+                    {
+                        ETag = new EntityTagHeaderValue("\"fixture-v1\"")
+                    }
                 };
             }
 

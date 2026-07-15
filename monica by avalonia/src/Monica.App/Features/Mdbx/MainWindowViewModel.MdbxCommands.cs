@@ -221,9 +221,27 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        if (database.LastSyncStatus == SyncStatus.Conflict)
+        {
+            StatusMessage = _localization.Get("MdbxWebDavConflictRequiresResolution");
+            return;
+        }
+
         await DownloadWebDavMdbxWorkingCopyAsync(database, profile);
         StatusMessage = _localization.Format("MdbxWebDavDownloadSucceededFormat", item.Name);
     }
+
+    [RelayCommand]
+    private Task KeepLocalWebDavMdbxAsync(MdbxDatabaseDisplayItem? item) =>
+        RunMdbxOperationAsync(
+            "MdbxOperationResolveConflict",
+            () => KeepLocalWebDavMdbxCoreAsync(item));
+
+    [RelayCommand]
+    private Task UseRemoteWebDavMdbxAsync(MdbxDatabaseDisplayItem? item) =>
+        RunMdbxOperationAsync(
+            "MdbxOperationResolveConflict",
+            () => UseRemoteWebDavMdbxCoreAsync(item));
 
     [RelayCommand]
     private Task SetDefaultMdbxDatabaseAsync(MdbxDatabaseDisplayItem? item) =>

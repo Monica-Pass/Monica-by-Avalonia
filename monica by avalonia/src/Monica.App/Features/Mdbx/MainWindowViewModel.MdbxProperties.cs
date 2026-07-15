@@ -27,7 +27,8 @@ public sealed record MdbxDatabaseDisplayItem(
     bool IsDefault,
     bool IsLocal,
     bool IsRemote,
-    bool IsWebDav);
+    bool IsWebDav,
+    bool IsConflict);
 
 public sealed partial class MainWindowViewModel
 {
