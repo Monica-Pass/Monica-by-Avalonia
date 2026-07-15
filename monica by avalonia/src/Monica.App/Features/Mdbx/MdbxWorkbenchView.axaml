@@ -40,6 +40,12 @@
                                 <TextBlock Text="{Binding L.Open}" />
                             </StackPanel>
                         </Button>
+                        <Button x:Name="SyncMdbxDatabaseButton" Classes="workspaceCommand" Command="{Binding SyncMdbxDatabaseCommand}" CommandParameter="{Binding SelectedMdbxDatabaseItem}" IsEnabled="{Binding !IsMdbxBusy}" IsVisible="{Binding SelectedMdbxDatabaseItem.IsWebDav}" Margin="0,0,8,8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="ArrowClockwise" FontSize="18" />
+                                <TextBlock Text="{Binding L.MdbxSyncNow}" />
+                            </StackPanel>
+                        </Button>
                         <Button Classes="workspaceCommand" Command="{Binding SetDefaultMdbxDatabaseCommand}" CommandParameter="{Binding SelectedMdbxDatabaseItem}" IsEnabled="{Binding !IsMdbxBusy}" Margin="0,0,0,8">
                             <TextBlock Text="{Binding L.SetDefault}" />
                         </Button>

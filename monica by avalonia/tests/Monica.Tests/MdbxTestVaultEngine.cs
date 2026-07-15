@@ -11,7 +11,7 @@ internal sealed class MdbxTestVaultEngine : IMdbxVaultEngine
     public async Task CreateVaultAsync(string path, string password, MdbxTigaMode mode, CancellationToken cancellationToken = default)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path) ?? Environment.CurrentDirectory);
-        await using var connection = new SqliteConnection($"Data Source={path}");
+        await using var connection = new SqliteConnection(CreateConnectionString(path));
         await connection.OpenAsync(cancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText =
@@ -53,7 +53,7 @@ internal sealed class MdbxTestVaultEngine : IMdbxVaultEngine
             return new MdbxVaultInspection(path, false, "", "", "File not found");
         }
 
-        await using var connection = new SqliteConnection($"Data Source={path}");
+        await using var connection = new SqliteConnection(CreateConnectionString(path));
         await connection.OpenAsync(cancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT vault_id, format_version FROM vault_meta LIMIT 1";
@@ -65,4 +65,10 @@ internal sealed class MdbxTestVaultEngine : IMdbxVaultEngine
 
         return new MdbxVaultInspection(path, true, reader.GetString(1), reader.GetString(0), "Available");
     }
+
+    private static string CreateConnectionString(string path) => new SqliteConnectionStringBuilder
+    {
+        DataSource = path,
+        Pooling = false
+    }.ToString();
 }

@@ -224,6 +224,7 @@ public interface ILocalizationService : INotifyPropertyChanged
     string MdbxDiagnostics { get; }
     string MdbxRemotePath { get; }
     string MdbxLastSynced { get; }
+    string MdbxSyncNow { get; }
     string RegisteredMdbxVaults { get; }
     string NoMdbxVaults { get; }
     string MdbxEmptyHint { get; }
@@ -681,6 +682,7 @@ public sealed class LocalizationService : ILocalizationService
     public string MdbxDiagnostics => Text();
     public string MdbxRemotePath => Text();
     public string MdbxLastSynced => Text();
+    public string MdbxSyncNow => Text();
     public string RegisteredMdbxVaults => Text();
     public string NoMdbxVaults => Text();
     public string MdbxEmptyHint => Text();
@@ -1320,7 +1322,7 @@ public sealed class LocalizationService : ILocalizationService
         ["DesktopEquivalentsMessage"] = "Android Autofill, IME, Accessibility and Credential Provider features are represented through quick search, clipboard, tray/browser extension boundaries, or platform-limited status.",
         ["CreateMdbxMetadata"] = "Create MDBX Metadata",
         ["MdbxVaults"] = "MDBX Vaults",
-        ["MdbxVaultsDescription"] = "Manage local, WebDAV and OneDrive MDBX vault metadata from one page. Local vaults can be opened on desktop now; remote MDBX entries are registered for the upcoming sync engine.",
+        ["MdbxVaultsDescription"] = "Manage local, WebDAV and OneDrive MDBX vaults from one page. WebDAV vaults use verified local working copies with explicit upload and download synchronization.",
         ["MdbxLocalSource"] = "Local MDBX",
         ["MdbxWebDavSource"] = "WebDAV MDBX",
         ["MdbxOneDriveSource"] = "OneDrive MDBX",
@@ -1333,6 +1335,7 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxDiagnostics"] = "Diagnostics",
         ["MdbxRemotePath"] = "Remote path",
         ["MdbxLastSynced"] = "Last synced",
+        ["MdbxSyncNow"] = "Sync now",
         ["RegisteredMdbxVaults"] = "Registered MDBX vaults",
         ["NoMdbxVaults"] = "No MDBX vault metadata has been registered yet.",
         ["MdbxEmptyHint"] = "Create a local MDBX working copy or configure a remote MDBX source to start using the encrypted business store.",
@@ -1345,7 +1348,7 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxAndroidParity"] = "Android parity",
         ["MdbxAndroidParityDescription"] = "Desktop MDBX now has a dedicated manager page matching the Android source hub shape.",
         ["MdbxAndroidParityLocal"] = "Local MDBX metadata and working-copy opening are available on desktop.",
-        ["MdbxAndroidParityRemote"] = "WebDAV and OneDrive MDBX sources now create local MDBX working copies for business storage; full remote sync/commit/conflict handling still requires the Android MDBX engine port.",
+        ["MdbxAndroidParityRemote"] = "WebDAV MDBX sources support streamed upload and verified atomic download. OneDrive sync plus Android commit-history and conflict merging remain platform boundaries.",
         ["LocalDatabase"] = "Local database",
         ["LocalDatabaseDescription"] = "Avalonia keeps SQLite for app settings, local cache and migration indexes while MDBX working copies carry sensitive business data.",
         ["ExternalDatabases"] = "External databases",
@@ -1719,10 +1722,12 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxWebDavVaultName"] = "WebDAV Monica Vault",
         ["MdbxOneDriveVaultName"] = "OneDrive Monica Vault",
         ["MdbxLocalMetadataDescription"] = "Local desktop MDBX metadata and working copy.",
-        ["MdbxWebDavMetadataDescription"] = "WebDAV MDBX metadata record for the upcoming remote sync engine.",
+        ["MdbxWebDavMetadataDescription"] = "WebDAV MDBX vault with a verified local working copy and binary remote synchronization.",
         ["MdbxOneDriveMetadataDescription"] = "OneDrive MDBX metadata record for the upcoming Microsoft Graph sync engine.",
         ["MdbxMetadataAlreadyRegisteredFormat"] = "{0} is already registered.",
-        ["CreatedMdbxWebDavMetadata"] = "Created WebDAV MDBX working copy and registered remote source metadata.",
+        ["CreatedMdbxWebDavMetadata"] = "Created and uploaded the WebDAV MDBX vault.",
+        ["MdbxWebDavUploadSucceededFormat"] = "Uploaded {0} to WebDAV.",
+        ["MdbxWebDavDownloadSucceededFormat"] = "Downloaded and verified {0} from WebDAV.",
         ["CreatedMdbxOneDriveMetadata"] = "Created OneDrive MDBX working copy and registered remote source metadata.",
         ["EnableOneDriveFirst"] = "Enable OneDrive first.",
         ["MdbxVaultsRefreshed"] = "MDBX vault metadata refreshed.",
@@ -1913,6 +1918,7 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxOperationCreate"] = "create",
         ["MdbxOperationRefresh"] = "refresh",
         ["MdbxOperationOpen"] = "open",
+        ["MdbxOperationSync"] = "sync",
         ["MdbxOperationSetDefault"] = "set default",
         ["SecurityMaintenanceInProgress"] = "Another security maintenance operation is already in progress.",
         ["ClearVaultTypedConfirmationTitle"] = "Clear vault data?",
@@ -2333,7 +2339,7 @@ public sealed class LocalizationService : ILocalizationService
         ["DesktopEquivalentsMessage"] = "Android 的自动填充、输入法、无障碍和凭据提供程序能力，在桌面端通过快速搜索、剪贴板、托盘/浏览器扩展接口或平台受限状态呈现。",
         ["CreateMdbxMetadata"] = "创建 MDBX 元数据",
         ["MdbxVaults"] = "MDBX 保险库",
-        ["MdbxVaultsDescription"] = "在一个页面管理本地、WebDAV 与 OneDrive 的 MDBX 保险库元数据。本地 MDBX 现在可在桌面端打开；远程 MDBX 会先登记为后续同步引擎使用的来源。",
+        ["MdbxVaultsDescription"] = "在一个页面管理本地、WebDAV 与 OneDrive MDBX 保险库。WebDAV 保险库使用经过验证的本地工作副本，并支持显式上传和下载同步。",
         ["MdbxLocalSource"] = "本地 MDBX",
         ["MdbxWebDavSource"] = "WebDAV MDBX",
         ["MdbxOneDriveSource"] = "OneDrive MDBX",
@@ -2346,6 +2352,7 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxDiagnostics"] = "诊断",
         ["MdbxRemotePath"] = "远程路径",
         ["MdbxLastSynced"] = "上次同步",
+        ["MdbxSyncNow"] = "立即同步",
         ["RegisteredMdbxVaults"] = "已登记 MDBX 保险库",
         ["NoMdbxVaults"] = "还没有登记 MDBX 保险库元数据。",
         ["MdbxEmptyHint"] = "创建本地 MDBX 工作副本，或配置远程 MDBX 来源，以开始使用加密业务存储。",
@@ -2358,7 +2365,7 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxAndroidParity"] = "Android 对齐",
         ["MdbxAndroidParityDescription"] = "桌面端 MDBX 现在拥有独立管理页，形态对齐 Android 的来源管理中心。",
         ["MdbxAndroidParityLocal"] = "桌面端已支持本地 MDBX 元数据和工作副本打开。",
-        ["MdbxAndroidParityRemote"] = "WebDAV 与 OneDrive MDBX 来源现在会创建本地 MDBX 工作副本承载业务数据；完整远程同步、提交历史和冲突处理仍需要移植 Android MDBX 引擎。",
+        ["MdbxAndroidParityRemote"] = "WebDAV MDBX 来源支持流式上传和验证后的原子下载；OneDrive 同步以及 Android 的提交历史与冲突合并仍属于平台边界。",
         ["LocalDatabase"] = "本地数据库",
         ["LocalDatabaseDescription"] = "Avalonia 保留 SQLite 用于应用设置、本地缓存和迁移索引，敏感业务数据由 MDBX 工作副本承载。",
         ["ExternalDatabases"] = "外部数据库",
@@ -2711,10 +2718,12 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxWebDavVaultName"] = "WebDAV Monica 保险库",
         ["MdbxOneDriveVaultName"] = "OneDrive Monica 保险库",
         ["MdbxLocalMetadataDescription"] = "本地桌面 MDBX 元数据和工作副本。",
-        ["MdbxWebDavMetadataDescription"] = "WebDAV 远程来源的本地 MDBX 工作副本，等待后续远程同步引擎上传。",
+        ["MdbxWebDavMetadataDescription"] = "带有已验证本地工作副本和二进制远程同步的 WebDAV MDBX 保险库。",
         ["MdbxOneDriveMetadataDescription"] = "OneDrive 远程来源的本地 MDBX 工作副本，等待后续 Microsoft Graph 同步引擎上传。",
         ["MdbxMetadataAlreadyRegisteredFormat"] = "{0} 已经登记。",
-        ["CreatedMdbxWebDavMetadata"] = "已创建 WebDAV MDBX 工作副本并登记远程来源元数据。",
+        ["CreatedMdbxWebDavMetadata"] = "已创建并上传 WebDAV MDBX 保险库。",
+        ["MdbxWebDavUploadSucceededFormat"] = "已将 {0} 上传到 WebDAV。",
+        ["MdbxWebDavDownloadSucceededFormat"] = "已从 WebDAV 下载并验证 {0}。",
         ["CreatedMdbxOneDriveMetadata"] = "已创建 OneDrive MDBX 工作副本并登记远程来源元数据。",
         ["EnableOneDriveFirst"] = "请先启用 OneDrive。",
         ["MdbxVaultsRefreshed"] = "MDBX 保险库元数据已刷新。",
@@ -2833,6 +2842,7 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxOperationCreate"] = "创建",
         ["MdbxOperationRefresh"] = "刷新",
         ["MdbxOperationOpen"] = "打开",
+        ["MdbxOperationSync"] = "同步",
         ["MdbxOperationSetDefault"] = "设为默认",
         ["SecurityMaintenanceInProgress"] = "已有另一个安全维护操作正在进行。",
         ["ClearVaultTypedConfirmationTitle"] = "清空保险库数据？",

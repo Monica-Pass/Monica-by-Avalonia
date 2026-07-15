@@ -3,6 +3,7 @@ using Monica.Data.Mdbx;
 using Monica.Platform.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+using System.Net;
 
 namespace Monica.Tests;
 
@@ -19,6 +20,75 @@ public sealed class PlatformServiceTests
         var path = service.NormalizeRemotePath("/Monica/", "/backup/vault.json");
 
         Assert.Equal("/Monica/backup/vault.json", path);
+        Assert.Equal(
+            path,
+            service.NormalizeRemotePath("/Monica/", "/Monica/backup/vault.json"));
+    }
+
+    [Fact]
+    public void Webdav_paths_preserve_case_sensitive_root_boundaries()
+    {
+        var services = new ServiceCollection();
+        services.AddHttpClient();
+        using var provider = services.BuildServiceProvider();
+        var service = new WebDavBackupService(provider.GetRequiredService<IHttpClientFactory>());
+
+        var path = service.NormalizeRemotePath("/Monica", "/monica/team/vault.mdbx");
+
+        Assert.Equal("/Monica/monica/team/vault.mdbx", path);
+    }
+
+    [Theory]
+    [InlineData("../outside/vault.mdbx")]
+    [InlineData("/Monica/%2e%2e/outside/vault.mdbx")]
+    [InlineData("team\\outside.mdbx")]
+    public void Webdav_paths_reject_escaping_segments(string relativePath)
+    {
+        var services = new ServiceCollection();
+        services.AddHttpClient();
+        using var provider = services.BuildServiceProvider();
+        var service = new WebDavBackupService(provider.GetRequiredService<IHttpClientFactory>());
+
+        Assert.Throws<ArgumentException>(() =>
+            service.NormalizeRemotePath("/Monica", relativePath));
+    }
+
+    [Fact]
+    public async Task Webdav_binary_transfer_streams_bytes_and_preserves_endpoint_base_path()
+    {
+        var handler = new RecordingWebDavHandler([5, 6, 7, 8]);
+        var service = new WebDavBackupService(new RecordingHttpClientFactory(handler));
+        var profile = new WebDavProfile
+        {
+            BaseUri = new Uri("https://dav.example.com/dav/"),
+            RootPath = "/Monica",
+            Username = "user",
+            Password = "secret"
+        };
+        await using var upload = new MemoryStream([1, 2, 3, 4]);
+
+        await service.UploadBinaryAsync(profile, "/Monica/team/vault.mdbx", upload);
+        await using var download = new MemoryStream();
+        await service.DownloadBinaryAsync(profile, "/Monica/team/vault.mdbx", download);
+
+        Assert.Equal([1, 2, 3, 4], handler.UploadedBytes);
+        Assert.Equal([5, 6, 7, 8], download.ToArray());
+        Assert.Contains(
+            handler.Requests,
+            request => request.Method == HttpMethod.Put &&
+                request.Uri == new Uri("https://dav.example.com/dav/Monica/team/vault.mdbx"));
+        Assert.Contains(
+            handler.Requests,
+            request => request.Method == HttpMethod.Get &&
+                request.Uri == new Uri("https://dav.example.com/dav/Monica/team/vault.mdbx"));
+        Assert.Contains(
+            handler.Requests,
+            request => request.Method.Method == "MKCOL" &&
+                request.Uri == new Uri("https://dav.example.com/dav/Monica"));
+        Assert.Contains(
+            handler.Requests,
+            request => request.Method.Method == "MKCOL" &&
+                request.Uri == new Uri("https://dav.example.com/dav/Monica/team"));
     }
 
     [Fact]
@@ -287,6 +357,46 @@ public sealed class PlatformServiceTests
 
         public void Dispose()
         {
+        }
+    }
+
+    private sealed class RecordingHttpClientFactory(HttpMessageHandler handler) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
+    }
+
+    private sealed class RecordingWebDavHandler(byte[] downloadBytes) : HttpMessageHandler
+    {
+        public List<(HttpMethod Method, Uri? Uri)> Requests { get; } = [];
+        public byte[] UploadedBytes { get; private set; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            Requests.Add((request.Method, request.RequestUri));
+            if (request.Method.Method == "MKCOL")
+            {
+                return new HttpResponseMessage(HttpStatusCode.MethodNotAllowed);
+            }
+
+            if (request.Method == HttpMethod.Put)
+            {
+                UploadedBytes = request.Content is null
+                    ? []
+                    : await request.Content.ReadAsByteArrayAsync(cancellationToken);
+                return new HttpResponseMessage(HttpStatusCode.Created);
+            }
+
+            if (request.Method == HttpMethod.Get)
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new ByteArrayContent(downloadBytes)
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK);
         }
     }
 

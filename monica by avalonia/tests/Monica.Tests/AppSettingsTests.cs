@@ -291,8 +291,12 @@ public sealed class AppSettingsTests
     [Fact]
     public async Task ViewModel_registers_remote_mdbx_sources_for_page_state()
     {
-        var viewModel = CreateViewModel(GetTempPath());
+        var webDav = new CapturingWebDavBackupService([]);
+        var viewModel = CreateViewModel(GetTempPath(), webDavBackupService: webDav);
         viewModel.WebDavEnabled = true;
+        viewModel.WebDavServerUrl = "https://dav.example.com";
+        viewModel.WebDavUsername = "user";
+        viewModel.WebDavPassword = "secret";
         viewModel.WebDavRemotePath = "/Monica";
         viewModel.OneDriveEnabled = true;
 
@@ -319,19 +323,174 @@ public sealed class AppSettingsTests
             Assert.Equal(database.FilePath, source.RemoteUrl);
         }
 
-        Assert.Equal("MDBX-1", await ReadMdbxFormatVersionAsync(viewModel.MdbxDatabases[0].WorkingCopyPath!));
+        var webDavDatabase = Assert.Single(
+            viewModel.MdbxDatabases,
+            database => database.StorageLocation == MdbxStorageLocation.RemoteWebDav);
+        Assert.Equal("MDBX-1", await ReadMdbxFormatVersionAsync(webDavDatabase.WorkingCopyPath!));
+        Assert.Equal(SyncStatus.Synced, webDavDatabase.LastSyncStatus);
+        Assert.NotNull(webDavDatabase.LastSyncedAt);
+        Assert.Equal(webDavDatabase.FilePath, webDav.UploadedBinaryPath);
+        Assert.NotEmpty(webDav.UploadedBytes);
 
-        await viewModel.OpenMdbxDatabaseCommand.ExecuteAsync(viewModel.MdbxDatabaseItems[0]);
+        var webDavItem = Assert.Single(
+            viewModel.MdbxDatabaseItems,
+            item => item.Database.StorageLocation == MdbxStorageLocation.RemoteWebDav);
+        await viewModel.OpenMdbxDatabaseCommand.ExecuteAsync(webDavItem);
 
-        Assert.Equal(SyncStatus.PendingUpload, viewModel.MdbxDatabases[0].LastSyncStatus);
+        Assert.Equal(SyncStatus.Synced, webDavDatabase.LastSyncStatus);
         Assert.StartsWith("Opened ", viewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ViewModel_downloads_missing_webdav_mdbx_working_copy_before_opening()
+    {
+        var webDav = new CapturingWebDavBackupService([]);
+        var viewModel = CreateViewModel(GetTempPath(), webDavBackupService: webDav);
+        viewModel.WebDavEnabled = true;
+        viewModel.WebDavServerUrl = "https://dav.example.com";
+        viewModel.WebDavUsername = "user";
+        viewModel.WebDavPassword = "secret";
+        viewModel.WebDavRemotePath = "/Monica";
+        await viewModel.CreateWebDavMdbxVaultCommand.ExecuteAsync(null);
+        var item = Assert.Single(viewModel.MdbxDatabaseItems);
+        var workingCopyPath = item.Database.WorkingCopyPath!;
+        webDav.DownloadBytes = webDav.UploadedBytes;
+        SqliteConnection.ClearAllPools();
+        File.Delete(workingCopyPath);
+
+        await viewModel.OpenMdbxDatabaseCommand.ExecuteAsync(item);
+
+        Assert.True(File.Exists(workingCopyPath));
+        Assert.Equal(webDav.DownloadBytes, await File.ReadAllBytesAsync(workingCopyPath));
+        Assert.Equal(item.Database.FilePath, webDav.DownloadedBinaryPath);
+        Assert.Equal(SyncStatus.Synced, item.Database.LastSyncStatus);
+        Assert.NotNull(item.Database.LastSyncedAt);
+        Assert.StartsWith("Opened ", viewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ViewModel_preserves_webdav_mdbx_working_copy_when_download_is_invalid()
+    {
+        var webDav = new CapturingWebDavBackupService([]);
+        var viewModel = CreateViewModel(GetTempPath(), webDavBackupService: webDav);
+        viewModel.WebDavEnabled = true;
+        viewModel.WebDavServerUrl = "https://dav.example.com";
+        viewModel.WebDavUsername = "user";
+        viewModel.WebDavPassword = "secret";
+        viewModel.WebDavRemotePath = "/Monica";
+        await viewModel.CreateWebDavMdbxVaultCommand.ExecuteAsync(null);
+        var item = Assert.Single(viewModel.MdbxDatabaseItems);
+        var workingCopyPath = item.Database.WorkingCopyPath!;
+        SqliteConnection.ClearAllPools();
+        var originalBytes = await File.ReadAllBytesAsync(workingCopyPath);
+        webDav.DownloadBytes = [1, 2, 3, 4];
+
+        await viewModel.SyncMdbxDatabaseCommand.ExecuteAsync(item);
+
+        SqliteConnection.ClearAllPools();
+        Assert.Equal(originalBytes, await File.ReadAllBytesAsync(workingCopyPath));
+        var currentDatabase = Assert.Single(viewModel.MdbxDatabases);
+        Assert.Equal(SyncStatus.Failed, currentDatabase.LastSyncStatus);
+        Assert.False(string.IsNullOrWhiteSpace(currentDatabase.LastSyncError));
+        Assert.Equal(viewModel.L.Get("Failed"), Assert.Single(viewModel.MdbxDatabaseItems).SyncStatus);
+        Assert.Empty(Directory.GetFiles(
+            Path.GetDirectoryName(workingCopyPath)!,
+            $".{Path.GetFileName(workingCopyPath)}.*.download"));
+    }
+
+    [Fact]
+    public async Task ViewModel_retries_pending_webdav_mdbx_upload_after_failure()
+    {
+        var webDav = new CapturingWebDavBackupService([])
+        {
+            UploadBinaryFailure = new InvalidOperationException("fixture upload failure")
+        };
+        var viewModel = CreateViewModel(GetTempPath(), webDavBackupService: webDav);
+        viewModel.WebDavEnabled = true;
+        viewModel.WebDavServerUrl = "https://dav.example.com";
+        viewModel.WebDavUsername = "user";
+        viewModel.WebDavPassword = "secret";
+        viewModel.WebDavRemotePath = "/Monica";
+
+        await viewModel.CreateWebDavMdbxVaultCommand.ExecuteAsync(null);
+
+        var database = Assert.Single(viewModel.MdbxDatabases);
+        Assert.Equal(SyncStatus.PendingUpload, database.LastSyncStatus);
+        Assert.Contains("fixture upload failure", database.LastSyncError, StringComparison.Ordinal);
+        webDav.UploadBinaryFailure = null;
+
+        await viewModel.CreateWebDavMdbxVaultCommand.ExecuteAsync(null);
+
+        Assert.Equal(SyncStatus.Synced, database.LastSyncStatus);
+        Assert.Null(database.LastSyncError);
+        Assert.NotEmpty(webDav.UploadedBytes);
+    }
+
+    [Fact]
+    public async Task ViewModel_refreshes_persisted_mdbx_status_before_choosing_sync_direction()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
+        var factory = new SqliteConnectionFactory(databasePath);
+        var repository = new MonicaRepository(factory, new DatabaseMigrator(factory));
+        var webDav = new CapturingWebDavBackupService([]);
+        var viewModel = CreateViewModel(
+            GetTempPath(),
+            webDavBackupService: webDav,
+            repository: repository);
+        viewModel.WebDavEnabled = true;
+        viewModel.WebDavServerUrl = "https://dav.example.com";
+        viewModel.WebDavUsername = "user";
+        viewModel.WebDavPassword = "secret";
+        viewModel.WebDavRemotePath = "/Monica";
+        await viewModel.CreateWebDavMdbxVaultCommand.ExecuteAsync(null);
+        var staleItem = Assert.Single(viewModel.MdbxDatabaseItems);
+        Assert.Equal(SyncStatus.Synced, staleItem.Database.LastSyncStatus);
+
+        var persisted = Assert.Single(await repository.GetMdbxDatabasesAsync());
+        persisted.LastSyncStatus = SyncStatus.PendingUpload;
+        await repository.SaveMdbxDatabaseAsync(persisted);
+
+        await viewModel.SyncMdbxDatabaseCommand.ExecuteAsync(staleItem);
+
+        Assert.Equal(2, webDav.UploadBinaryCallCount);
+        Assert.Empty(webDav.DownloadedBinaryPath);
+        Assert.Equal(SyncStatus.Synced, Assert.Single(viewModel.MdbxDatabases).LastSyncStatus);
+    }
+
+    [Fact]
+    public async Task ViewModel_uses_distinct_working_copies_for_webdav_mdbx_sources()
+    {
+        var webDav = new CapturingWebDavBackupService([]);
+        var viewModel = CreateViewModel(GetTempPath(), webDavBackupService: webDav);
+        viewModel.WebDavEnabled = true;
+        viewModel.WebDavServerUrl = "https://dav.example.com/dav";
+        viewModel.WebDavUsername = "user";
+        viewModel.WebDavPassword = "secret";
+        viewModel.WebDavRemotePath = "/Monica";
+        await viewModel.CreateWebDavMdbxVaultCommand.ExecuteAsync(null);
+        viewModel.WebDavRemotePath = "/Team";
+
+        await viewModel.CreateWebDavMdbxVaultCommand.ExecuteAsync(null);
+
+        Assert.Equal(2, viewModel.MdbxDatabases.Count);
+        Assert.Equal(
+            2,
+            viewModel.MdbxDatabases
+                .Select(database => database.WorkingCopyPath)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count());
+        Assert.All(viewModel.MdbxDatabases, database => Assert.Equal(SyncStatus.Synced, database.LastSyncStatus));
     }
 
     [Fact]
     public async Task ViewModel_updates_mdbx_management_summaries()
     {
-        var viewModel = CreateViewModel(GetTempPath());
+        var webDav = new CapturingWebDavBackupService([]);
+        var viewModel = CreateViewModel(GetTempPath(), webDavBackupService: webDav);
         viewModel.WebDavEnabled = true;
+        viewModel.WebDavServerUrl = "https://dav.example.com";
+        viewModel.WebDavUsername = "user";
+        viewModel.WebDavPassword = "secret";
         viewModel.WebDavRemotePath = "/Monica";
         viewModel.OneDriveEnabled = true;
 
@@ -343,18 +502,22 @@ public sealed class AppSettingsTests
         Assert.Equal(3, viewModel.MdbxWorkingCopyCount);
         Assert.Equal(3, viewModel.MdbxOfflineCopyCount);
         Assert.Equal(2, viewModel.MdbxRemoteDatabaseCount);
-        Assert.Equal(2, viewModel.MdbxPendingSyncCount);
+        Assert.Equal(1, viewModel.MdbxPendingSyncCount);
         Assert.Contains(viewModel.L.Get("MdbxWorkingCopies"), viewModel.MdbxHealthItems.Select(item => item.Label));
         Assert.Contains(viewModel.L.Get("MdbxRemoteSources"), viewModel.MdbxHealthItems.Select(item => item.Label));
         Assert.All(viewModel.MdbxDatabaseItems, item => Assert.Equal(viewModel.L.Get("MdbxWorkingCopyReady"), item.WorkingCopyStatus));
-        Assert.Equal(viewModel.L.Format("MdbxPendingSyncFormat", 2), viewModel.MdbxSyncDiagnosticsSummaryText);
+        Assert.Equal(viewModel.L.Format("MdbxPendingSyncFormat", 1), viewModel.MdbxSyncDiagnosticsSummaryText);
     }
 
     [Fact]
     public async Task ViewModel_opening_remote_mdbx_preserves_sync_status()
     {
-        var viewModel = CreateViewModel(GetTempPath());
+        var webDav = new CapturingWebDavBackupService([]);
+        var viewModel = CreateViewModel(GetTempPath(), webDavBackupService: webDav);
         viewModel.WebDavEnabled = true;
+        viewModel.WebDavServerUrl = "https://dav.example.com";
+        viewModel.WebDavUsername = "user";
+        viewModel.WebDavPassword = "secret";
         viewModel.WebDavRemotePath = "/Monica";
         await viewModel.CreateWebDavMdbxVaultCommand.ExecuteAsync(null);
 
@@ -975,7 +1138,8 @@ public sealed class AppSettingsTests
         IMasterPasswordMaintenanceService? masterPasswordMaintenanceService = null,
         IExternalLinkService? externalLinkService = null,
         IFileSystemPickerService? fileSystemPickerService = null,
-        IMdbxVaultService? mdbxVaultService = null)
+        IMdbxVaultService? mdbxVaultService = null,
+        IMonicaRepository? repository = null)
     {
         var databasePath = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
         Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
@@ -985,7 +1149,7 @@ public sealed class AppSettingsTests
         crypto.InitializeSession("test password", new byte[16]);
         platformIntegrationService ??= new PlatformIntegrationService();
         return new MainWindowViewModel(
-            new MonicaRepository(factory, migrator),
+            repository ?? new MonicaRepository(factory, migrator),
             new VaultCredentialStore(factory, migrator),
             crypto,
             new TotpService(),
@@ -1181,6 +1345,13 @@ public sealed class AppSettingsTests
     {
         public WebDavProfile? LastProfile { get; private set; }
         public string DeletedPath { get; private set; } = "";
+        public string UploadedBinaryPath { get; private set; } = "";
+        public string DownloadedBinaryPath { get; private set; } = "";
+        public byte[] UploadedBytes { get; private set; } = [];
+        public byte[] DownloadBytes { get; set; } = [];
+        public Exception? UploadBinaryFailure { get; set; }
+        public Exception? DownloadBinaryFailure { get; set; }
+        public int UploadBinaryCallCount { get; private set; }
         public int ListCallCount { get; private set; }
 
         public string NormalizeRemotePath(string rootPath, string relativePath) => relativePath;
@@ -1202,6 +1373,33 @@ public sealed class AppSettingsTests
         {
             LastProfile = profile;
             return Task.FromResult("");
+        }
+
+        public async Task UploadBinaryAsync(WebDavProfile profile, string relativePath, Stream content, CancellationToken cancellationToken = default)
+        {
+            UploadBinaryCallCount++;
+            if (UploadBinaryFailure is not null)
+            {
+                throw UploadBinaryFailure;
+            }
+
+            LastProfile = profile;
+            UploadedBinaryPath = relativePath;
+            await using var copy = new MemoryStream();
+            await content.CopyToAsync(copy, cancellationToken);
+            UploadedBytes = copy.ToArray();
+        }
+
+        public async Task DownloadBinaryAsync(WebDavProfile profile, string relativePath, Stream destination, CancellationToken cancellationToken = default)
+        {
+            if (DownloadBinaryFailure is not null)
+            {
+                throw DownloadBinaryFailure;
+            }
+
+            LastProfile = profile;
+            DownloadedBinaryPath = relativePath;
+            await destination.WriteAsync(DownloadBytes, cancellationToken);
         }
 
         public Task DeleteAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default)

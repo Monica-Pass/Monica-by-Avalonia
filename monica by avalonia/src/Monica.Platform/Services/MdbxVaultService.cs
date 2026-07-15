@@ -142,7 +142,12 @@ public sealed class MdbxCliVaultEngine : IMdbxVaultEngine
             return new MdbxVaultInspection(path, false, "", "", "File not found");
         }
 
-        await using var connection = new SqliteConnection($"Data Source={path}");
+        var connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = path,
+            Pooling = false
+        }.ToString();
+        await using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT vault_id, format_version FROM vault_meta LIMIT 1";

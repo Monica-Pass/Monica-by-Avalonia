@@ -102,6 +102,10 @@ public interface IWebDavBackupService
     Task<IReadOnlyList<RemoteFileEntry>> ListAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default);
     Task UploadTextAsync(WebDavProfile profile, string relativePath, string content, CancellationToken cancellationToken = default);
     Task<string> DownloadTextAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default);
+    Task UploadBinaryAsync(WebDavProfile profile, string relativePath, Stream content, CancellationToken cancellationToken = default) =>
+        Task.FromException(new NotSupportedException("Binary WebDAV upload is not available."));
+    Task DownloadBinaryAsync(WebDavProfile profile, string relativePath, Stream destination, CancellationToken cancellationToken = default) =>
+        Task.FromException(new NotSupportedException("Binary WebDAV download is not available."));
     Task DeleteAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default);
 }
 

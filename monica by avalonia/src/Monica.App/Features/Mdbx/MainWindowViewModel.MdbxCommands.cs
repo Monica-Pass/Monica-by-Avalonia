@@ -62,9 +62,8 @@ public sealed partial class MainWindowViewModel
 
     private async Task CreateWebDavMdbxVaultCoreAsync()
     {
-        if (!WebDavEnabled)
+        if (!TryCreateWebDavProfile(out var profile))
         {
-            StatusMessage = _localization.Get("EnableWebDavFirst");
             return;
         }
 
@@ -74,6 +73,13 @@ public sealed partial class MainWindowViewModel
             string.Equals(item.FilePath, remotePath, StringComparison.OrdinalIgnoreCase));
         if (existing is not null)
         {
+            if (existing.LastSyncStatus == SyncStatus.PendingUpload)
+            {
+                await UploadWebDavMdbxWorkingCopyAsync(existing, profile);
+                StatusMessage = _localization.Format("MdbxWebDavUploadSucceededFormat", existing.Name);
+                return;
+            }
+
             StatusMessage = _localization.Format("MdbxMetadataAlreadyRegisteredFormat", existing.Name);
             return;
         }
@@ -83,13 +89,12 @@ public sealed partial class MainWindowViewModel
             remotePath,
             MdbxStorageLocation.RemoteWebDav,
             "REMOTE_WEBDAV",
-            BuildMdbxWorkingCopyPath("webdav-local.mdbx"),
+            BuildWebDavMdbxWorkingCopyPath(profile, remotePath),
             _localization.Get("MdbxWebDavMetadataDescription"));
         metadata.IsDefault = MdbxDatabases.Count == 0;
         await _repository.SaveMdbxDatabaseAsync(metadata);
         MdbxDatabases.Add(metadata);
-        RefreshMdbxVaultState();
-        RefreshVaultSources();
+        await UploadWebDavMdbxWorkingCopyAsync(metadata, profile);
         StatusMessage = _localization.Get("CreatedMdbxWebDavMetadata");
     }
 
@@ -136,15 +141,7 @@ public sealed partial class MainWindowViewModel
 
     private async Task RefreshMdbxVaultsCoreAsync()
     {
-        var databases = await _repository.GetMdbxDatabasesAsync();
-        MdbxDatabases.Clear();
-        foreach (var database in databases)
-        {
-            MdbxDatabases.Add(database);
-        }
-
-        RefreshMdbxVaultState();
-        RefreshVaultSources();
+        await ReloadMdbxVaultStateAsync();
         StatusMessage = _localization.Get("MdbxVaultsRefreshed");
     }
 
@@ -159,18 +156,73 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(item.Database.WorkingCopyPath ?? item.Database.FilePath))
+        var database = await GetLatestMdbxDatabaseAsync(item.Database.Id);
+        if (database is null)
+        {
+            return;
+        }
+
+        if (database.StorageLocation == MdbxStorageLocation.RemoteWebDav)
+        {
+            if (!TryCreateWebDavProfile(out var profile))
+            {
+                return;
+            }
+
+            if (database.LastSyncStatus == SyncStatus.PendingUpload)
+            {
+                await UploadWebDavMdbxWorkingCopyAsync(database, profile);
+            }
+            else if (!File.Exists(database.WorkingCopyPath))
+            {
+                await DownloadWebDavMdbxWorkingCopyAsync(database, profile);
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(database.WorkingCopyPath ?? database.FilePath))
         {
             StatusMessage = _localization.Get("MdbxRemoteOpenPending");
             return;
         }
 
-        await using var stream = await _mdbxVaultService.OpenLocalStreamAsync(item.Database);
-        item.Database.LastAccessedAt = DateTimeOffset.UtcNow;
-        await _repository.SaveMdbxDatabaseAsync(item.Database);
-        RefreshMdbxVaultState();
-        RefreshVaultSources();
+        await using var stream = await _mdbxVaultService.OpenLocalStreamAsync(database);
+        database.LastAccessedAt = DateTimeOffset.UtcNow;
+        await _repository.SaveMdbxDatabaseAsync(database);
+        await ReloadMdbxVaultStateAsync();
         StatusMessage = _localization.Format("OpenedMdbxDatabaseFormat", item.Name, stream.Length);
+    }
+
+    [RelayCommand]
+    private Task SyncMdbxDatabaseAsync(MdbxDatabaseDisplayItem? item) =>
+        RunMdbxOperationAsync("MdbxOperationSync", () => SyncMdbxDatabaseCoreAsync(item));
+
+    private async Task SyncMdbxDatabaseCoreAsync(MdbxDatabaseDisplayItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        var database = await GetLatestMdbxDatabaseAsync(item.Database.Id);
+        if (database is null || database.StorageLocation != MdbxStorageLocation.RemoteWebDav)
+        {
+            return;
+        }
+
+        if (!TryCreateWebDavProfile(out var profile))
+        {
+            return;
+        }
+
+        if (database.LastSyncStatus == SyncStatus.PendingUpload)
+        {
+            await UploadWebDavMdbxWorkingCopyAsync(database, profile);
+            StatusMessage = _localization.Format("MdbxWebDavUploadSucceededFormat", item.Name);
+            return;
+        }
+
+        await DownloadWebDavMdbxWorkingCopyAsync(database, profile);
+        StatusMessage = _localization.Format("MdbxWebDavDownloadSucceededFormat", item.Name);
     }
 
     [RelayCommand]

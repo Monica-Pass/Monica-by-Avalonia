@@ -18,6 +18,7 @@ public sealed class StorageWorkflowUiTests
     {
         var sync = new SyncWorkspaceView();
         var mdbx = new MdbxWorkspaceView();
+        var mdbxWorkbench = new MdbxWorkbenchView();
         var databases = new DatabaseManagementWorkspaceView();
 
         Assert.NotNull(sync.FindControl<Grid>("SyncWorkspaceLayoutGrid"));
@@ -26,6 +27,7 @@ public sealed class StorageWorkflowUiTests
         Assert.NotNull(mdbx.FindControl<Grid>("MdbxWorkspaceLayoutGrid"));
         Assert.NotNull(mdbx.FindControl<Border>("MdbxListRegion"));
         Assert.NotNull(mdbx.FindControl<ScrollViewer>("MdbxContentRegion"));
+        Assert.NotNull(mdbxWorkbench.FindControl<Button>("SyncMdbxDatabaseButton"));
         Assert.NotNull(databases.FindControl<Grid>("DatabaseWorkspaceLayoutGrid"));
         Assert.NotNull(databases.FindControl<Border>("DatabaseListRegion"));
         Assert.NotNull(databases.FindControl<ScrollViewer>("DatabaseContentRegion"));

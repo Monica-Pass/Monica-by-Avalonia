@@ -26,7 +26,8 @@ public sealed record MdbxDatabaseDisplayItem(
     bool HasLastSyncError,
     bool IsDefault,
     bool IsLocal,
-    bool IsRemote);
+    bool IsRemote,
+    bool IsWebDav);
 
 public sealed partial class MainWindowViewModel
 {

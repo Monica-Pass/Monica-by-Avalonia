@@ -50,6 +50,23 @@ public sealed partial class MainWindowViewModel
         RaiseMdbxVaultState();
     }
 
+    private async Task<LocalMdbxDatabase?> GetLatestMdbxDatabaseAsync(long databaseId) =>
+        (await _repository.GetMdbxDatabasesAsync())
+            .FirstOrDefault(database => database.Id == databaseId);
+
+    private async Task ReloadMdbxVaultStateAsync()
+    {
+        var databases = await _repository.GetMdbxDatabasesAsync();
+        MdbxDatabases.Clear();
+        foreach (var database in databases)
+        {
+            MdbxDatabases.Add(database);
+        }
+
+        RefreshMdbxVaultState();
+        RefreshVaultSources();
+    }
+
     private void RaiseMdbxVaultState()
     {
         OnPropertyChanged(nameof(MdbxDatabaseCountText));
@@ -152,7 +169,8 @@ public sealed partial class MainWindowViewModel
             !string.IsNullOrWhiteSpace(database.LastSyncError),
             database.IsDefault,
             isLocal,
-            !isLocal);
+            !isLocal,
+            database.StorageLocation == MdbxStorageLocation.RemoteWebDav);
     }
 
     private static bool IsLocalMdbxDatabase(LocalMdbxDatabase database) =>

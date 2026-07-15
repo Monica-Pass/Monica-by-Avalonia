@@ -511,6 +511,57 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
+    public async Task Repository_marks_synced_webdav_working_copy_pending_before_business_write()
+    {
+        var repository = CreateRepository(out _);
+        var database = await SaveDefaultMdbxDatabaseAsync(
+            repository,
+            MdbxStorageLocation.RemoteWebDav,
+            "REMOTE_WEBDAV");
+        database.FilePath = "/Monica/team-vault.mdbx";
+        database.LastSyncStatus = SyncStatus.Synced;
+        database.LastSyncError = "old diagnostic";
+        database.LastSyncedAt = DateTimeOffset.UtcNow.AddMinutes(-5);
+        await repository.SaveMdbxDatabaseAsync(database);
+        var previousSyncedAt = Assert.Single(await repository.GetMdbxDatabasesAsync()).LastSyncedAt;
+
+        await repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "Local change",
+            Password = "secret"
+        });
+
+        var persisted = Assert.Single(await repository.GetMdbxDatabasesAsync());
+        Assert.Equal(SyncStatus.PendingUpload, persisted.LastSyncStatus);
+        Assert.Null(persisted.LastSyncError);
+        Assert.Equal(previousSyncedAt, persisted.LastSyncedAt);
+    }
+
+    [Fact]
+    public async Task Repository_keeps_synced_webdav_status_for_quick_access_metadata()
+    {
+        var repository = CreateRepository(out _);
+        var database = await SaveDefaultMdbxDatabaseAsync(
+            repository,
+            MdbxStorageLocation.RemoteWebDav,
+            "REMOTE_WEBDAV");
+        var password = new PasswordEntry
+        {
+            Title = "Quick access",
+            Password = "secret"
+        };
+        await repository.SavePasswordAsync(password);
+        database.LastSyncStatus = SyncStatus.Synced;
+        database.LastSyncError = null;
+        await repository.SaveMdbxDatabaseAsync(database);
+
+        await repository.RecordPasswordQuickAccessAsync(password.Id);
+
+        var persisted = Assert.Single(await repository.GetMdbxDatabasesAsync());
+        Assert.Equal(SyncStatus.Synced, persisted.LastSyncStatus);
+    }
+
+    [Fact]
     public async Task Repository_fails_closed_for_remote_mdbx_metadata_without_working_copy()
     {
         var repository = CreateRepository(out var bridge);
