@@ -22,31 +22,11 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        _passwordQuickAccessRecords = BuildBoundedPasswordQuickAccessCache(
+        _passwordQuickAccessRecords = PasswordQuickAccessCache.Create(
             _passwordQuickAccessRecords.Values
                 .Where(record => record.PasswordId != updatedRecord.PasswordId)
                 .Append(updatedRecord));
         RaisePasswordQuickAccessState();
-    }
-
-    private static IReadOnlyDictionary<long, PasswordQuickAccessRecord> BuildBoundedPasswordQuickAccessCache(
-        IEnumerable<PasswordQuickAccessRecord> records)
-    {
-        var validRecords = records
-            .Where(record => record.OpenCount > 0 && record.PasswordId > 0)
-            .ToArray();
-        var recent = validRecords
-            .OrderByDescending(record => record.LastOpenedAt)
-            .ThenByDescending(record => record.OpenCount)
-            .Take(PasswordQuickAccessLimit);
-        var frequent = validRecords
-            .OrderByDescending(record => record.OpenCount)
-            .ThenByDescending(record => record.LastOpenedAt)
-            .Take(PasswordQuickAccessLimit);
-        return recent
-            .Concat(frequent)
-            .DistinctBy(record => record.PasswordId)
-            .ToDictionary(record => record.PasswordId);
     }
 
     private IEnumerable<PasswordQuickAccessItem> BuildQuickAccessItems(QuickAccessSort sort)
@@ -72,7 +52,7 @@ public sealed partial class MainWindowViewModel
                         BuildQuickAccessSubtitle(entry));
             })
             .OfType<PasswordQuickAccessItem>()
-            .Take(PasswordQuickAccessLimit)
+            .Take(PasswordQuickAccessCache.RankingLimit)
             .ToArray();
     }
 

@@ -320,8 +320,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             await YieldVaultLoadUiAsync();
             _passwordCustomFields = snapshot.PasswordCustomFields;
             _passwordAttachments = snapshot.PasswordAttachments;
-            _passwordQuickAccessRecords = BuildBoundedPasswordQuickAccessCache(
-                snapshot.PasswordQuickAccessRecords.Values);
+            _passwordQuickAccessRecords = snapshot.PasswordQuickAccessRecords;
 
             AppDiagnostics.Measure("Track password selections", () =>
             {

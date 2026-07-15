@@ -9,7 +9,6 @@ namespace Monica.App.ViewModels;
 public sealed partial class MainWindowViewModel
 {
     private const int PasswordHistoryLimit = 10;
-    private const int PasswordQuickAccessLimit = 6;
     private static readonly TimeSpan SelectedPasswordDetailsCoalesceDelay = TimeSpan.FromMilliseconds(60);
     private static readonly TimeSpan SelectedPasswordDetailsLoadingDelay = TimeSpan.FromMilliseconds(120);
 

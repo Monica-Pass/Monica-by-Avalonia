@@ -80,9 +80,7 @@ internal static class VaultSnapshotLoader
             .ToArray();
 
         var categories = await categoriesTask;
-        var quickAccessRecords = (await quickAccessRecordsTask)
-            .Where(record => record.OpenCount > 0 && record.PasswordId > 0)
-            .ToDictionary(record => record.PasswordId);
+        var quickAccessRecords = PasswordQuickAccessCache.Create(await quickAccessRecordsTask);
         var databases = await databasesTask;
 
         return new VaultLoadSnapshot(
