@@ -47,7 +47,7 @@ public sealed partial class MainWindowViewModel
 
         ReplacePasswordGroup([], siblings);
         RefreshBoundTotpPresentation(siblings);
-        RaiseCounts();
+        RaisePasswordCountState();
         RaiseFilteredPasswordsChanged();
         ArchiveNarrowShowsList = true;
         InvalidateSecurityAnalysis();

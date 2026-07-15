@@ -268,6 +268,30 @@ public sealed class PasswordManagementTests
             });
         }
 
+        var totpItemData = TotpDataResolver.ToItemData(
+            new TotpData("JBSWY3DPEHPK3PXP", "Monica", "performance@example.com"));
+        for (var index = 0; index < 5_000; index++)
+        {
+            harness.ViewModel.TotpItems.Add(new SecureItem
+            {
+                Id = 20_000 + index,
+                ItemType = VaultItemType.Totp,
+                Title = $"Authenticator {index}",
+                ItemData = totpItemData
+            });
+            harness.ViewModel.WalletItems.Add(new SecureItem
+            {
+                Id = 30_000 + index,
+                ItemType = VaultItemType.BankCard,
+                Title = $"Wallet {index}"
+            });
+        }
+
+        _ = harness.ViewModel.FilteredTotpItems.Count;
+        _ = harness.ViewModel.FilteredWalletItems.Count;
+        var totpProjectionBuilds = harness.ViewModel.FilteredTotpProjectionBuildCount;
+        var walletProjectionBuilds = harness.ViewModel.FilteredWalletProjectionBuildCount;
+
         harness.Dialog.ConfigureNext(editor =>
         {
             editor.Title = "New account";
@@ -280,6 +304,8 @@ public sealed class PasswordManagementTests
         await harness.ViewModel.AddPasswordCommand.ExecuteAsync(null);
         stopwatch.Stop();
 
+        Assert.Equal(totpProjectionBuilds, harness.ViewModel.FilteredTotpProjectionBuildCount);
+        Assert.Equal(walletProjectionBuilds, harness.ViewModel.FilteredWalletProjectionBuildCount);
         Assert.True(
             stopwatch.ElapsedMilliseconds < 120,
             $"Adding one password to a 10,000-entry vault took {stopwatch.ElapsedMilliseconds} ms.");

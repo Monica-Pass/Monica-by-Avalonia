@@ -55,7 +55,7 @@ public sealed partial class MainWindowViewModel
         ReplacePasswordGroup([], entries);
         RefreshBoundTotpPresentation(entries);
         InvalidateSecurityAnalysis();
-        RaiseCounts();
+        RaisePasswordCountState();
         RaiseFilteredPasswordsChanged();
         StatusMessage = _localization.Format("CreatedPasswordFormat", entries[0].Title);
     }
@@ -135,7 +135,7 @@ public sealed partial class MainWindowViewModel
         ReplacePasswordGroup(siblings, updatedEntries);
         RefreshBoundTotpPresentation(siblings.Concat(updatedEntries));
         InvalidateSecurityAnalysis();
-        RaiseCounts();
+        RaisePasswordCountState();
         RaiseFilteredPasswordsChanged();
         StatusMessage = _localization.Format("UpdatedPasswordFormat", updatedEntries[0].Title);
     }

@@ -30,7 +30,7 @@ public sealed partial class MainWindowViewModel
         WalletItems.Insert(0, item);
         SelectedWalletItem = item;
         WalletNarrowShowsList = false;
-        RaiseCounts();
+        RaiseWalletCountState();
         StatusMessage = _localization.Format("SavedWalletItemFormat", item.Title);
     }
 
@@ -61,7 +61,7 @@ public sealed partial class MainWindowViewModel
         });
         SelectedWalletItem = item;
         SelectedWalletDetails = new WalletItemDetailsViewModel(_localization, item);
-        RaiseCounts();
+        RaiseWalletCountState();
         StatusMessage = _localization.Format("SavedWalletItemFormat", item.Title);
     }
 

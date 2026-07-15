@@ -71,11 +71,13 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        var presentationChanged = false;
         for (var index = TotpItems.Count - 1; index >= 0; index--)
         {
             if (TotpItems[index].BoundPasswordId is { } boundPasswordId && changedById.ContainsKey(boundPasswordId))
             {
                 TotpItems.RemoveAt(index);
+                presentationChanged = true;
             }
         }
 
@@ -91,6 +93,12 @@ public sealed partial class MainWindowViewModel
             TrackTotpSelection(item);
             RefreshTotpDisplay(item);
             TotpItems.Insert(0, item);
+            presentationChanged = true;
+        }
+
+        if (!presentationChanged)
+        {
+            return;
         }
 
         if (selectedBoundPasswordId is { } passwordId)
@@ -103,8 +111,6 @@ public sealed partial class MainWindowViewModel
             SelectedTotpItem = TotpItems.FirstOrDefault();
         }
 
-        OnPropertyChanged(nameof(HasTotpItems));
-        RaiseTotpFilterState();
-        RaiseTotpSelectionState();
+        RaiseTotpCountState();
     }
 }

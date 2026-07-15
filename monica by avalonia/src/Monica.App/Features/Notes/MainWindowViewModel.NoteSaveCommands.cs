@@ -22,7 +22,7 @@ public sealed partial class MainWindowViewModel
 
             var savedNote = await SaveNoteTabAsync(SelectedNoteTab);
             SelectedNote = savedNote;
-            RaiseCounts();
+            RaiseNoteCountState();
             StatusMessage = _localization.Format("SavedNoteFormat", savedNote.Title);
             return;
         }
@@ -79,7 +79,7 @@ public sealed partial class MainWindowViewModel
         }
 
         SelectedNote = item;
-        RaiseCounts();
+        RaiseNoteCountState();
         StatusMessage = _localization.Format("SavedNoteFormat", item.Title);
     }
 
@@ -119,7 +119,7 @@ public sealed partial class MainWindowViewModel
 
         if (savedCount > 0)
         {
-            RaiseCounts();
+            RaiseNoteCountState();
         }
 
         StatusMessage = skippedCount == 0

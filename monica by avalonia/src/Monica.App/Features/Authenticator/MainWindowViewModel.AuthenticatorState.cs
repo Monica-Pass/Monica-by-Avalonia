@@ -107,9 +107,6 @@ public sealed partial class MainWindowViewModel
             _suppressSelectedTotpRefresh = false;
         }
 
-        OnPropertyChanged(nameof(HasTotpItems));
-        RaiseTotpFilterState();
-        RaiseTotpSelectionState();
     }
 
     private async Task SetTotpFavoriteAsync(SecureItem item, bool isFavorite)
@@ -183,9 +180,7 @@ public sealed partial class MainWindowViewModel
             OperationType = "DELETE",
             DeviceName = Environment.MachineName
         });
-        RaiseCounts();
-        RaiseTotpFilterState();
-        RaiseTotpSelectionState();
+        RaiseTotpCountState();
         if (updateStatus)
         {
             StatusMessage = _localization.Format("MovedToRecycleBinFormat", item.Title);

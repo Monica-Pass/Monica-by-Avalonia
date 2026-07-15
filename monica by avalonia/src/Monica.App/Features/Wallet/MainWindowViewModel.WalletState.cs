@@ -113,8 +113,7 @@ public sealed partial class MainWindowViewModel
             OperationType = "DELETE",
             DeviceName = Environment.MachineName
         });
-        RaiseCounts();
-        RaiseWalletSelectionState();
+        RaiseWalletCountState();
         if (updateStatus)
         {
             StatusMessage = _localization.Format("MovedToRecycleBinFormat", item.Title);

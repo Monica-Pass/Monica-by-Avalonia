@@ -139,7 +139,7 @@ public sealed partial class MainWindowViewModel
         }
 
         RefreshBoundTotpPresentation(siblings);
-        RaiseCounts();
+        RaisePasswordCountState();
         RefreshPasswordSelectionStateFromPasswords();
         RaiseFilteredPasswordsChanged();
         InvalidateSecurityAnalysis();
@@ -188,7 +188,7 @@ public sealed partial class MainWindowViewModel
         }
 
         RefreshBoundTotpPresentation(siblings);
-        RaiseCounts();
+        RaisePasswordCountState();
         RefreshPasswordSelectionStateFromPasswords();
         RaiseFilteredPasswordsChanged();
         InvalidateSecurityAnalysis();

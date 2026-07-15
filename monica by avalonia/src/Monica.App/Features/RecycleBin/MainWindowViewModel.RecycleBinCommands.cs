@@ -45,7 +45,7 @@ public sealed partial class MainWindowViewModel
 
         ReplacePasswordGroup([], siblings);
         RefreshBoundTotpPresentation(siblings);
-        RaiseCounts();
+        RaisePasswordCountState();
         RaiseFilteredPasswordsChanged();
         RecycleBinNarrowShowsList = true;
         InvalidateSecurityAnalysis();
@@ -86,7 +86,7 @@ public sealed partial class MainWindowViewModel
         }
 
         RefreshBoundTotpPresentation(siblings);
-        RaiseCounts();
+        RaisePasswordCountState();
         InvalidateSecurityAnalysis();
         RecycleBinNarrowShowsList = true;
         StatusMessage = _localization.Format("DeletedPasswordPermanentlyFormat", entry.Title);
@@ -121,7 +121,7 @@ public sealed partial class MainWindowViewModel
 
         DeletedPasswords.Clear();
         RefreshBoundTotpPresentation(items);
-        RaiseCounts();
+        RaisePasswordCountState();
         InvalidateSecurityAnalysis();
         StatusMessage = _localization.Format("EmptiedRecycleBinFormat", items.Length);
     }

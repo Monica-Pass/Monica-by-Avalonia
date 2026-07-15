@@ -360,7 +360,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             AppDiagnostics.Measure("Finalize vault load UI state", () =>
             {
                 ReconcileSecureItemSelectionsAfterLoad();
-                RaiseCounts();
+                RaiseAllCountState();
                 RaiseFilteredPasswordsChanged();
             });
             EndPasswordProjectionNotificationDeferral();
@@ -441,57 +441,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
 
 
-    private void RaiseCounts()
-    {
-        RefreshArchiveCountState();
-        RefreshRecycleBinCountState();
-
-        OnPropertyChanged(nameof(PasswordCountText));
-        OnPropertyChanged(nameof(HasFilteredPasswordRows));
-        OnPropertyChanged(nameof(PasswordEmptyStateText));
-        OnPropertyChanged(nameof(ArchiveEmptyStateText));
-        OnPropertyChanged(nameof(RecycleBinEmptyStateText));
-        OnPropertyChanged(nameof(TimelineEmptyStateText));
-        OnPropertyChanged(nameof(ShowAddPasswordInEmptyState));
-        OnPropertyChanged(nameof(ShowClearPasswordFiltersInEmptyState));
-        OnPropertyChanged(nameof(NoteCountText));
-        OnPropertyChanged(nameof(TotpCountText));
-        OnPropertyChanged(nameof(HasTotpItems));
-        RaiseTotpFilterState(reconcileSelection: false);
-        OnPropertyChanged(nameof(WalletCountText));
-        OnPropertyChanged(nameof(HasWalletItems));
-        RaiseWalletFilterState();
-        OnPropertyChanged(nameof(TimelineCountText));
-        OnPropertyChanged(nameof(HasTimelineEntries));
-        OnPropertyChanged(nameof(SecurityIssueCountText));
-        OnPropertyChanged(nameof(HasSecurityIssues));
-        OnPropertyChanged(nameof(LocalDatabaseSummaryText));
-        OnPropertyChanged(nameof(MdbxDatabaseCountText));
-        RaiseNoteTreeState();
-        RaiseMdbxVaultState();
-        OnPropertyChanged(nameof(VaultSourceCountText));
-        RaiseTotpSelectionState();
-        RaiseWalletSelectionState();
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     private void RefreshLocalizedProperties()
@@ -538,18 +487,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ClearTotpFiltersText));
         OnPropertyChanged(nameof(TotpShowHiddenText));
         OnPropertyChanged(nameof(TotpHelpText));
-        RaiseTotpFilterState(reconcileSelection: false);
         if (SelectedTotpItem is not null)
         {
             SelectedTotpDetails = new TotpItemDetailsViewModel(_localization, SelectedTotpItem);
         }
-        OnPropertyChanged(nameof(WalletFilteredStatusText));
-        OnPropertyChanged(nameof(WalletEmptyStateText));
         if (SelectedWalletItem is not null)
         {
             SelectedWalletDetails = new WalletItemDetailsViewModel(_localization, SelectedWalletItem);
         }
-        RaiseCounts();
+        RaiseAllCountState();
         OnPropertyChanged(nameof(SecurityIssueCountText));
         OnPropertyChanged(nameof(NotePreviewMarkdown));
         OnPropertyChanged(nameof(NotePlainPreview));

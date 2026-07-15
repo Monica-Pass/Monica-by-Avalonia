@@ -60,9 +60,7 @@ public sealed partial class MainWindowViewModel
         TotpItems.Insert(0, item);
         SelectedTotpItem = item;
         TotpNarrowShowsList = false;
-        RaiseCounts();
-        RaiseTotpFilterState(reconcileSelection: false);
-        RaiseTotpSelectionState();
+        RaiseTotpCountState(reconcileSelection: false);
         StatusMessage = _localization.Format("SavedTotpFormat", item.Title);
     }
 
