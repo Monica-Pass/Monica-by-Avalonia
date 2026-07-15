@@ -3549,6 +3549,32 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
+    public async Task ViewModel_minimize_cancels_compromised_password_check()
+    {
+        var service = new BlockingPwnedPasswordService();
+        var harness = CreateHarness(service);
+        harness.Crypto.InitializeSession("target password", new byte[16]);
+        harness.ViewModel.IsUnlocked = true;
+        harness.ViewModel.Passwords.Add(new PasswordEntry
+        {
+            Id = 1,
+            Title = "Account",
+            Password = harness.Crypto.EncryptString("secret")
+        });
+
+        var check = harness.ViewModel.CheckCompromisedPasswordsCommand.ExecuteAsync(null);
+        await service.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        harness.ViewModel.SetUnlockedShellHibernated(true);
+        await check;
+
+        Assert.True(service.WasCancelled);
+        Assert.False(harness.ViewModel.IsCheckingCompromisedPasswords);
+        Assert.Empty(harness.ViewModel.SecuritySummaryItems);
+        Assert.Empty(harness.ViewModel.SecurityIssueItems);
+    }
+
+    [Fact]
     public void ViewModel_filters_security_issues_without_searching_password_payloads()
     {
         var harness = CreateHarness();
@@ -3591,6 +3617,44 @@ public sealed partial class PasswordManagementTests
         await refresh;
         Assert.False(harness.ViewModel.IsRefreshingSecurityAnalysis);
         Assert.Contains(harness.ViewModel.SecuritySummaryItems, item => item.Label == harness.ViewModel.L.SecurityScore);
+    }
+
+    [Fact]
+    public async Task ViewModel_minimize_cancels_automatic_large_security_analysis_before_cache_repopulation()
+    {
+        var generator = new BlockingPasswordGeneratorService();
+        var harness = CreateHarness(passwordGeneratorService: generator);
+        harness.Crypto.InitializeSession("target password", new byte[16]);
+        harness.ViewModel.IsUnlocked = true;
+        for (var index = 0; index < 500; index++)
+        {
+            harness.ViewModel.Passwords.Add(new PasswordEntry
+            {
+                Id = index + 1,
+                Title = $"Weak account {index}",
+                Password = harness.Crypto.EncryptString($"weak-{index}")
+            });
+        }
+
+        harness.ViewModel.SetUnlockedShellHibernated(true);
+        harness.ViewModel.SetUnlockedShellHibernated(false);
+        harness.ViewModel.SelectedSection = "SecurityAnalysis";
+        await generator.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(harness.ViewModel.IsRefreshingSecurityAnalysis);
+
+        harness.ViewModel.SetUnlockedShellHibernated(true);
+        Assert.Empty(harness.ViewModel.SecuritySummaryItems);
+        Assert.Empty(harness.ViewModel.SecurityIssueItems);
+        Assert.Empty(harness.ViewModel.FilteredSecurityIssueItems);
+
+        harness.ViewModel.SetUnlockedShellHibernated(false);
+        generator.Release();
+        WaitForCondition(() =>
+            !harness.ViewModel.IsRefreshingSecurityAnalysis &&
+            harness.ViewModel.SecuritySummaryItems.Count > 0);
+
+        Assert.Equal(500, harness.ViewModel.SecurityIssueItems.Count);
+        Assert.Equal(501, generator.AnalyzeCallCount);
     }
 
     [Fact]
@@ -4607,6 +4671,7 @@ public sealed partial class PasswordManagementTests
 
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public int AnalyzeThreadId { get; private set; }
+        public int AnalyzeCallCount { get; private set; }
 
         public string GeneratePassword(int length = 20, bool includeSymbols = true) =>
             _inner.GeneratePassword(length, includeSymbols);
@@ -4621,6 +4686,7 @@ public sealed partial class PasswordManagementTests
 
         public PasswordStrengthResult Analyze(string password)
         {
+            AnalyzeCallCount++;
             AnalyzeThreadId = Environment.CurrentManagedThreadId;
             Started.TrySetResult();
             _release.Wait(TimeSpan.FromSeconds(5));

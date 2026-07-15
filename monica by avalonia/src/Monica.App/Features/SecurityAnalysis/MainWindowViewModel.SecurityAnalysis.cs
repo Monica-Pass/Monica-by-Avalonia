@@ -88,6 +88,7 @@ public sealed partial class MainWindowViewModel
                     cancellationToken),
                 cancellationToken);
 
+            cancellationToken.ThrowIfCancellationRequested();
             _compromisedPasswordResults = next;
             _hasCompromisedPasswordCheckResults = true;
             CompromisedPasswordStatus = _localization.Format(
@@ -96,6 +97,7 @@ public sealed partial class MainWindowViewModel
                 next.Count);
             var currentEntries = Passwords.ToArray();
             var result = await BuildSecurityAnalysisAsync(currentEntries, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             ApplySecurityAnalysisResult(result);
         }
         catch (OperationCanceledException)
@@ -123,6 +125,7 @@ public sealed partial class MainWindowViewModel
         {
             var entries = Passwords.ToArray();
             var result = await BuildSecurityAnalysisAsync(entries, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             ApplySecurityAnalysisResult(result);
             CompromisedPasswordStatus = _localization.Get("SecurityAnalysisRefreshed");
         }
@@ -181,28 +184,6 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SecurityIssueCountText));
         OnPropertyChanged(nameof(HasSecurityIssues));
         RefreshSecurityIssueFilter();
-    }
-
-    private void InvalidateSecurityAnalysis()
-    {
-        _isSecurityAnalysisDirty = true;
-        RefreshSecurityAnalysisIfNeeded();
-    }
-
-    private void RefreshSecurityAnalysisIfNeeded()
-    {
-        if (_isSecurityAnalysisDirty &&
-            string.Equals(SelectedSection, "SecurityAnalysis", StringComparison.Ordinal))
-        {
-            if (Passwords.Count >= 500)
-            {
-                _ = RefreshSecurityAnalysisAsync(CancellationToken.None);
-            }
-            else
-            {
-                AppDiagnostics.Measure("Refresh visible security analysis", RefreshSecurityAnalysis);
-            }
-        }
     }
 
     private SecurityPasswordSnapshot[] BuildSecurityPasswordSnapshots(

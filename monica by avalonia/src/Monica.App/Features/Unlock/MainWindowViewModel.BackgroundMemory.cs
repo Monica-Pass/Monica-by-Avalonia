@@ -28,6 +28,7 @@ public sealed partial class MainWindowViewModel
         ReleaseSensitiveBackgroundDetails();
         ReleaseTransientBackgroundSecrets();
         SuspendPasswordSearchProjectionUpdates();
+        SuspendSecurityAnalysis();
         CancelNoteImagePreviewRefresh();
         Interlocked.Increment(ref _noteImagePreviewVersion);
         ReplaceNoteImagePreviews([]);
