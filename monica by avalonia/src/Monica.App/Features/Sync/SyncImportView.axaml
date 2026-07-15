@@ -8,6 +8,91 @@
                          IsIndeterminate="True"
                          IsVisible="{Binding IsImportExportBusy}"
                          AutomationProperties.Name="{Binding StatusMessage}" />
+            <Border x:Name="BitwardenImportCard"
+                    Padding="16"
+                    CornerRadius="8"
+                    BorderBrush="{DynamicResource CardBorderBrush}"
+                    BorderThickness="1"
+                    Background="{DynamicResource LayerFillColorDefaultBrush}">
+                <StackPanel Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="{Binding L.BitwardenImportTitle}" FontSize="18" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding L.BitwardenImportDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <Button x:Name="SelectBitwardenJsonFileButton"
+                                Grid.Column="1"
+                                Classes="workspaceCommand"
+                                Command="{Binding SelectBitwardenJsonFileCommand}"
+                                IsEnabled="{Binding IsBitwardenImportIdle}"
+                                AutomationProperties.Name="{Binding L.SelectBitwardenJsonFile}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="Folder" FontSize="18" />
+                                <TextBlock Text="{Binding L.SelectBitwardenJsonFile}" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                    <TextBlock x:Name="BitwardenSelectedFileText"
+                               Text="{Binding BitwardenSelectedFileName}"
+                               IsVisible="{Binding HasBitwardenSelectedFile}"
+                               FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis" />
+                    <WrapPanel IsVisible="{Binding HasBitwardenSelectedFile}" IsEnabled="{Binding IsBitwardenImportIdle}">
+                        <Button x:Name="PreviewBitwardenJsonImportButton"
+                                Classes="workspacePrimaryCommand"
+                                Command="{Binding PreviewBitwardenJsonImportCommand}"
+                                AutomationProperties.Name="{Binding L.BitwardenInspect}"
+                                Margin="0,0,8,8">
+                            <TextBlock Text="{Binding L.BitwardenInspect}" />
+                        </Button>
+                        <Button Classes="workspaceCommand" Command="{Binding ResetBitwardenImportCommand}" Margin="0,0,0,8">
+                            <TextBlock Text="{Binding L.BitwardenChooseDifferentFile}" />
+                        </Button>
+                    </WrapPanel>
+                    <StackPanel Spacing="6" IsVisible="{Binding IsBitwardenImportBusy}">
+                        <ProgressBar x:Name="BitwardenImportProgress"
+                                     IsIndeterminate="{Binding IsBitwardenImportProgressIndeterminate}"
+                                     Minimum="0"
+                                     Maximum="{Binding BitwardenImportProgressMaximum}"
+                                     Value="{Binding BitwardenImportProgress}"
+                                     AutomationProperties.Name="{Binding BitwardenImportProgressText}" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                            <TextBlock Text="{Binding BitwardenImportProgressText}" VerticalAlignment="Center" />
+                            <Button x:Name="CancelBitwardenImportButton"
+                                    Grid.Column="1"
+                                    Classes="workspaceCommand"
+                                    Command="{Binding CancelBitwardenImportCommand}">
+                                <TextBlock Text="{Binding L.Cancel}" />
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                    <Border x:Name="BitwardenPreviewCard"
+                            Padding="14"
+                            CornerRadius="6"
+                            BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            IsVisible="{Binding HasBitwardenImportPreview}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="{Binding BitwardenPreviewSummaryText}" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding BitwardenAttachmentNoticeText}"
+                                       IsVisible="{Binding HasBitwardenAttachmentMetadata}"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <WrapPanel IsEnabled="{Binding IsBitwardenImportIdle}">
+                                <Button x:Name="ImportBitwardenJsonVaultButton"
+                                        Classes="workspacePrimaryCommand"
+                                        Command="{Binding ImportBitwardenJsonVaultCommand}"
+                                        Margin="0,0,8,8">
+                                    <TextBlock Text="{Binding L.BitwardenImportNow}" />
+                                </Button>
+                                <Button Classes="workspaceCommand" Command="{Binding ResetBitwardenImportCommand}" Margin="0,0,0,8">
+                                    <TextBlock Text="{Binding L.BitwardenChooseDifferentFile}" />
+                                </Button>
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
             <Border x:Name="KeePassImportCard"
                     Padding="16"
                     CornerRadius="8"

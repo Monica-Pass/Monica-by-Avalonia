@@ -428,6 +428,12 @@ public interface ILocalizationService : INotifyPropertyChanged
     string KeePassImportNow { get; }
     string KeePassChooseDifferentFile { get; }
     string SelectKeePassFile { get; }
+    string BitwardenImportTitle { get; }
+    string BitwardenImportDescription { get; }
+    string SelectBitwardenJsonFile { get; }
+    string BitwardenInspect { get; }
+    string BitwardenImportNow { get; }
+    string BitwardenChooseDifferentFile { get; }
     string ExportData { get; }
     string ExportDataDescription { get; }
     string BackupHistory { get; }
@@ -907,6 +913,12 @@ public sealed class LocalizationService : ILocalizationService
     public string KeePassImportNow => Text();
     public string KeePassChooseDifferentFile => Text();
     public string SelectKeePassFile => Text();
+    public string BitwardenImportTitle => Text();
+    public string BitwardenImportDescription => Text();
+    public string SelectBitwardenJsonFile => Text();
+    public string BitwardenInspect => Text();
+    public string BitwardenImportNow => Text();
+    public string BitwardenChooseDifferentFile => Text();
     public string ExportData => Text();
     public string ExportDataDescription => Text();
     public string BackupHistory => Text();
@@ -1667,7 +1679,7 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxLocalCacheDescription"] = "Retain a local MDBX working file for desktop vault operations.",
         ["CreateMdbxMetadataDescription"] = "Create local metadata for the desktop MDBX vault file.",
         ["ImportData"] = "Import data",
-        ["ImportDataDescription"] = "Bring KeePass KDBX databases, Monica JSON packages, or CSV records into this vault.",
+        ["ImportDataDescription"] = "Bring Bitwarden JSON, KeePass KDBX, Monica JSON, or CSV records into this vault.",
         ["SelectKeePassFile"] = "Select a KeePass database",
         ["KeePassFileSelectedFormat"] = "Selected KeePass database: {0}",
         ["KeePassFileSelectionFailed"] = "The KeePass file could not be selected.",
@@ -1693,6 +1705,32 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassInspect"] = "Inspect",
         ["KeePassImportNow"] = "Import reviewed entries",
         ["KeePassChooseDifferentFile"] = "Choose a different file",
+        ["SelectBitwardenJsonFile"] = "Select a Bitwarden JSON export",
+        ["BitwardenFileSelectedFormat"] = "Selected Bitwarden export: {0}",
+        ["BitwardenFileSelectionFailed"] = "The Bitwarden export could not be selected.",
+        ["BitwardenFileRequired"] = "Select an unencrypted Bitwarden JSON export first.",
+        ["BitwardenPreviewLoading"] = "Inspecting the Bitwarden export locally...",
+        ["BitwardenPreviewEmpty"] = "Select an unencrypted Bitwarden JSON export and inspect the local preview before importing.",
+        ["BitwardenPreviewReadyFormat"] = "Ready for review: {0} passwords, {1} secure items, {2} folders, and {3} unsupported items.",
+        ["BitwardenAttachmentMetadataFormat"] = "The export references {0} attachments. Standard JSON exports contain attachment metadata only, so file contents cannot be imported.",
+        ["BitwardenPreviewRequired"] = "Inspect the Bitwarden export before importing it.",
+        ["BitwardenEncryptedExportRejected"] = "Encrypted Bitwarden exports cannot be imported locally. Create an unencrypted JSON export and keep it in a trusted location.",
+        ["BitwardenResourceLimitExceeded"] = "The Bitwarden export exceeds the safe import limits.",
+        ["BitwardenInvalidExport"] = "The Bitwarden export is invalid or damaged.",
+        ["BitwardenPreviewFailed"] = "The Bitwarden export could not be inspected safely.",
+        ["BitwardenImportConfirmationTitle"] = "Import Bitwarden items?",
+        ["BitwardenImportConfirmationMessageFormat"] = "Import up to {0} supported items. {1} unsupported items will be skipped. Existing items with the same Bitwarden source identity will not be duplicated.",
+        ["BitwardenImportProgressFormat"] = "Importing {0} of {1}",
+        ["BitwardenImportedFormat"] = "Bitwarden import completed: {0} imported, {1} already present, and {2} unsupported.",
+        ["BitwardenImportCanceled"] = "Bitwarden import canceled.",
+        ["BitwardenImportCanceledAfterFormat"] = "Bitwarden import canceled: {0} imported and {1} already present.",
+        ["BitwardenImportPartialFailureFormat"] = "Bitwarden import stopped safely: {0} imported and {1} already present. Remaining items were not processed.",
+        ["BitwardenImportTitle"] = "Bitwarden JSON",
+        ["BitwardenImportDescription"] = "Inspect and import a standard unencrypted JSON export locally. Secrets never leave this device, and the raw JSON is released immediately after preview.",
+        ["BitwardenInspect"] = "Inspect",
+        ["BitwardenImportNow"] = "Import reviewed items",
+        ["BitwardenChooseDifferentFile"] = "Choose a different file",
+        ["BitwardenJson"] = "Bitwarden JSON",
         ["ExportData"] = "Export data",
         ["ExportDataDescription"] = "Prepare readable Monica JSON and password CSV previews before saving elsewhere.",
         ["BackupHistory"] = "Backup history",
@@ -1739,7 +1777,7 @@ public sealed class LocalizationService : ILocalizationService
         ["Capability.plus.Title"] = "Monica Plus",
         ["Capability.plus.Description"] = "Subscription/status page shell for parity with mobile.",
         ["Capability.bitwarden.Title"] = "Bitwarden",
-        ["Capability.bitwarden.Description"] = "Vault mapping and sync service boundary.",
+        ["Capability.bitwarden.Description"] = "Secure offline JSON import is available; account login and online two-way sync are not yet available on desktop.",
         ["Capability.keepass.Title"] = "KeePass",
         ["Capability.keepass.Description"] = "Local KDBX 3/4 unlock, review and import with groups, TOTP, custom fields, UUIDs and attachments.",
         ["Capability.mdbx.Title"] = "MDBX",
@@ -2474,7 +2512,7 @@ public sealed class LocalizationService : ILocalizationService
         ["ExternalDatabases"] = "外部数据库",
         ["ExternalDatabasesDescription"] = "KeePass KDBX、MDBX、Bitwarden 与 WebDAV 来源通过平台无关服务接入。",
         ["ImportData"] = "导入数据",
-        ["ImportDataDescription"] = "将 KeePass KDBX 数据库、Monica JSON 数据包或 CSV 记录导入当前保险库。",
+        ["ImportDataDescription"] = "将 Bitwarden JSON、KeePass KDBX、Monica JSON 或 CSV 记录导入当前保险库。",
         ["SelectKeePassFile"] = "选择 KeePass 数据库",
         ["KeePassFileSelectedFormat"] = "已选择 KeePass 数据库：{0}",
         ["KeePassFileSelectionFailed"] = "无法选择 KeePass 文件。",
@@ -2500,6 +2538,32 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassInspect"] = "检查",
         ["KeePassImportNow"] = "导入已检查条目",
         ["KeePassChooseDifferentFile"] = "选择其他文件",
+        ["SelectBitwardenJsonFile"] = "选择 Bitwarden JSON 导出文件",
+        ["BitwardenFileSelectedFormat"] = "已选择 Bitwarden 导出文件：{0}",
+        ["BitwardenFileSelectionFailed"] = "无法选择 Bitwarden 导出文件。",
+        ["BitwardenFileRequired"] = "请先选择未加密的 Bitwarden JSON 导出文件。",
+        ["BitwardenPreviewLoading"] = "正在本地检查 Bitwarden 导出文件……",
+        ["BitwardenPreviewEmpty"] = "请选择未加密的 Bitwarden JSON 导出文件，检查本地预览后再确认导入。",
+        ["BitwardenPreviewReadyFormat"] = "可以检查：{0} 个密码、{1} 个安全项目、{2} 个文件夹，另有 {3} 个不支持的项目。",
+        ["BitwardenAttachmentMetadataFormat"] = "导出文件引用了 {0} 个附件。标准 JSON 只包含附件元数据，因此无法导入附件文件内容。",
+        ["BitwardenPreviewRequired"] = "导入前需要先检查 Bitwarden 导出文件。",
+        ["BitwardenEncryptedExportRejected"] = "无法在本地导入加密的 Bitwarden 导出文件。请创建未加密 JSON，并仅存放在可信位置。",
+        ["BitwardenResourceLimitExceeded"] = "Bitwarden 导出文件超过安全导入限制。",
+        ["BitwardenInvalidExport"] = "Bitwarden 导出文件无效或已损坏。",
+        ["BitwardenPreviewFailed"] = "无法安全检查 Bitwarden 导出文件。",
+        ["BitwardenImportConfirmationTitle"] = "导入 Bitwarden 项目？",
+        ["BitwardenImportConfirmationMessageFormat"] = "准备导入最多 {0} 个支持的项目；{1} 个不支持的项目会被跳过。具有相同 Bitwarden 来源标识的现有项目不会重复导入。",
+        ["BitwardenImportProgressFormat"] = "正在导入第 {0} 项，共 {1} 项",
+        ["BitwardenImportedFormat"] = "Bitwarden 导入完成：导入 {0} 项，已有 {1} 项，不支持 {2} 项。",
+        ["BitwardenImportCanceled"] = "Bitwarden 导入已取消。",
+        ["BitwardenImportCanceledAfterFormat"] = "Bitwarden 导入已取消：导入 {0} 项，已有 {1} 项。",
+        ["BitwardenImportPartialFailureFormat"] = "Bitwarden 导入已安全停止：导入 {0} 项，已有 {1} 项，其余项目尚未处理。",
+        ["BitwardenImportTitle"] = "Bitwarden JSON",
+        ["BitwardenImportDescription"] = "在本地检查并导入标准未加密 JSON。密钥不会离开此设备，生成预览后会立即释放原始 JSON。",
+        ["BitwardenInspect"] = "检查",
+        ["BitwardenImportNow"] = "导入已检查项目",
+        ["BitwardenChooseDifferentFile"] = "选择其他文件",
+        ["BitwardenJson"] = "Bitwarden JSON",
         ["MdbxDatabaseCount"] = "MDBX 保险库元数据",
         ["RegisteredDatabases"] = "已登记数据库",
         ["DatabaseSourcesEmptyHint"] = "登记本地 MDBX、WebDAV、OneDrive 或迁移元数据后，数据库来源会显示在这里。",
@@ -2788,7 +2852,7 @@ public sealed class LocalizationService : ILocalizationService
         ["Capability.plus.Title"] = "Monica Plus",
         ["Capability.plus.Description"] = "与移动端对齐的订阅/状态页面框架。",
         ["Capability.bitwarden.Title"] = "Bitwarden",
-        ["Capability.bitwarden.Description"] = "保险库映射和同步服务边界。",
+        ["Capability.bitwarden.Description"] = "已支持安全的离线 JSON 导入；桌面端尚未提供账户登录和在线双向同步。",
         ["Capability.keepass.Title"] = "KeePass",
         ["Capability.keepass.Description"] = "在本地解锁、检查并导入 KDBX 3/4，保留分组、动态口令、自定义字段、UUID 与附件。",
         ["Capability.mdbx.Title"] = "MDBX",

@@ -94,9 +94,15 @@ public sealed class StorageWorkflowUiTests
         Assert.NotNull(import.FindControl<Button>("PreviewKeePassImportButton"));
         Assert.NotNull(import.FindControl<Button>("ImportKeePassVaultButton"));
         Assert.NotNull(import.FindControl<Button>("CancelKeePassImportButton"));
+        Assert.NotNull(import.FindControl<Border>("BitwardenImportCard"));
+        Assert.NotNull(import.FindControl<Button>("SelectBitwardenJsonFileButton"));
+        Assert.NotNull(import.FindControl<Button>("PreviewBitwardenJsonImportButton"));
+        Assert.NotNull(import.FindControl<Button>("ImportBitwardenJsonVaultButton"));
+        Assert.NotNull(import.FindControl<Button>("CancelBitwardenImportButton"));
 
         var databaseWorkbench = new DatabaseWorkbenchView();
         Assert.NotNull(databaseWorkbench.FindControl<Button>("OpenKeePassImportButton"));
+        Assert.NotNull(databaseWorkbench.FindControl<Button>("OpenBitwardenImportButton"));
 
         var restore = backup.FindControl<Button>("RestoreSelectedBackupButton");
         var delete = backup.FindControl<Button>("DeleteSelectedBackupButton");

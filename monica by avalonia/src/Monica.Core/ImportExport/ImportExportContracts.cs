@@ -13,6 +13,7 @@ public interface IImportExportService
         IReadOnlyDictionary<long, IReadOnlyList<PasswordAttachmentExport>>? passwordAttachments = null,
         IReadOnlyDictionary<long, IReadOnlyList<SecureItemAttachmentExport>>? secureItemAttachments = null);
     MonicaExportPackage ImportJson(string json);
+    BitwardenJsonImportSnapshot ImportBitwardenJson(string json);
     string ExportPasswordCsv(IEnumerable<PasswordEntry> passwords);
     string ExportTotpCsv(IEnumerable<SecureItem> secureItems);
     string ExportNoteCsv(IEnumerable<SecureItem> secureItems);

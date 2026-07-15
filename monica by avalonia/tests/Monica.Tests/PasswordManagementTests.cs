@@ -4408,6 +4408,8 @@ public sealed class PasswordManagementTests
             return _inner.ImportJson(json);
         }
 
+        public BitwardenJsonImportSnapshot ImportBitwardenJson(string json) => _inner.ImportBitwardenJson(json);
+
         public string ExportPasswordCsv(IEnumerable<PasswordEntry> passwords) => _inner.ExportPasswordCsv(passwords);
         public string ExportTotpCsv(IEnumerable<SecureItem> secureItems) => _inner.ExportTotpCsv(secureItems);
         public string ExportNoteCsv(IEnumerable<SecureItem> secureItems) => _inner.ExportNoteCsv(secureItems);

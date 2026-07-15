@@ -30,7 +30,7 @@ public sealed partial class MainWindowViewModel
     private bool _isImportExportBusy;
 
     public bool IsImportExportIdle => !IsImportExportBusy;
-    public bool IsImportWorkspaceIdle => !IsImportExportBusy && !IsKeePassImportBusy;
+    public bool IsImportWorkspaceIdle => !IsImportExportBusy && !IsKeePassImportBusy && !IsBitwardenImportBusy;
 
     [ObservableProperty]
     private string _exportPreview = "";

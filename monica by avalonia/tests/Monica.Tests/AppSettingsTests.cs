@@ -1152,7 +1152,8 @@ public sealed partial class AppSettingsTests
         IMonicaRepository? repository = null,
         IConfirmationDialogService? confirmationDialogService = null,
         IOneDriveBackupService? oneDriveBackupService = null,
-        IKeePassVaultService? keePassVaultService = null)
+        IKeePassVaultService? keePassVaultService = null,
+        IImportExportService? importExportService = null)
     {
         var databasePath = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
         Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
@@ -1167,7 +1168,7 @@ public sealed partial class AppSettingsTests
             crypto,
             new TotpService(),
             new PasswordGeneratorService(),
-            new ImportExportService(),
+            importExportService ?? new ImportExportService(),
             new PlatformCapabilityService(platformIntegrationService),
             platformIntegrationService,
             new NoopClipboardService(),
