@@ -127,8 +127,10 @@ public sealed partial class MainWindowViewModel
         ClearItems(Passwords);
         ClearItems(ArchivedPasswords);
         ClearItems(DeletedPasswords);
+        ClearItems(PasswordFolderFilters);
         ClearItems(NoteItems);
         ClearItems(TotpItems);
+        ClearItems(TotpFilterChoices);
         ClearItems(WalletItems);
         ClearItems(Categories);
         ClearItems(OpenNoteTabs);
@@ -147,6 +149,7 @@ public sealed partial class MainWindowViewModel
     {
         SelectedPassword = null;
         SelectedPasswordDetails = null;
+        SelectedPasswordFolderFilter = null;
         SelectedArchivedPassword = null;
         SelectedDeletedPassword = null;
         SelectedNote = null;
@@ -158,8 +161,10 @@ public sealed partial class MainWindowViewModel
         NoteTitle = "";
         NoteContent = "";
         NoteTagsText = "";
+        NewFolderName = "";
         SetPasswordSearchImmediately("");
         TotpSearchText = "";
+        SelectedTotpFilterKey = TotpFilterAll;
         TotpNarrowShowsList = true;
         WalletSearchText = "";
         WalletNarrowShowsList = true;
@@ -224,6 +229,7 @@ public sealed partial class MainWindowViewModel
         _passwordCustomFields = new Dictionary<long, IReadOnlyList<CustomField>>();
         _passwordAttachments = new Dictionary<long, IReadOnlyList<Attachment>>();
         _passwordQuickAccessRecords = new Dictionary<long, PasswordQuickAccessRecord>();
+        ClearSensitiveProjectionCaches();
         _compromisedPasswordResults = new Dictionary<long, CompromisedPasswordResult>();
         _hasCompromisedPasswordCheckResults = false;
         _exportPreviewAuthorizationExpiresAt = null;
@@ -231,5 +237,19 @@ public sealed partial class MainWindowViewModel
         VaultLoadStageText = "";
         _vaultLoadVersion++;
         IsLoadingVault = false;
+    }
+
+    private void ClearSensitiveProjectionCaches()
+    {
+        _filteredPasswords = [];
+        _filteredPasswordRows = [];
+        _filteredPasswordsDirty = true;
+        _filteredPasswordRowsDirty = true;
+        _filteredTotpItems = [];
+        _filteredTotpItemsDirty = true;
+        _filteredWalletItems = [];
+        _filteredWalletItemsDirty = true;
+        _collapsedPasswordFolderKeys.Clear();
+        _expandedPasswordStackKeys.Clear();
     }
 }

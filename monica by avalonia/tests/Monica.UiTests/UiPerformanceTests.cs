@@ -151,6 +151,72 @@ public sealed class UiPerformanceTests
             folder => Assert.Equal(passwordCount / categoryCount, folder.Count));
     }
 
+    [Fact]
+    public void Secondary_list_projection_builds_once_per_filter_invalidation()
+    {
+        const int itemCount = 5000;
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        var totpItemData = TotpDataResolver.ToItemData(
+            new TotpData("JBSWY3DPEHPK3PXP", "Monica", "desktop@example.com"));
+
+        for (var id = 1; id <= itemCount; id++)
+        {
+            var title = id % 2 == 0 ? $"Target item {id}" : $"Other item {id}";
+            viewModel.TotpItems.Add(new SecureItem
+            {
+                Id = id,
+                ItemType = VaultItemType.Totp,
+                Title = title,
+                ItemData = totpItemData
+            });
+            viewModel.WalletItems.Add(new SecureItem
+            {
+                Id = itemCount + id,
+                ItemType = VaultItemType.BankCard,
+                Title = title
+            });
+        }
+
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            switch (args.PropertyName)
+            {
+                case nameof(MainWindowViewModel.FilteredTotpItems):
+                    _ = viewModel.FilteredTotpItems.Count;
+                    break;
+                case nameof(MainWindowViewModel.HasFilteredTotpItems):
+                    _ = viewModel.HasFilteredTotpItems;
+                    break;
+                case nameof(MainWindowViewModel.TotpFilteredStatusText):
+                    _ = viewModel.TotpFilteredStatusText;
+                    break;
+                case nameof(MainWindowViewModel.FilteredWalletItems):
+                    _ = viewModel.FilteredWalletItems.Count;
+                    break;
+                case nameof(MainWindowViewModel.HasFilteredWalletItems):
+                    _ = viewModel.HasFilteredWalletItems;
+                    break;
+                case nameof(MainWindowViewModel.WalletFilteredStatusText):
+                    _ = viewModel.WalletFilteredStatusText;
+                    break;
+            }
+        };
+
+        viewModel.TotpSearchText = "Target";
+        viewModel.WalletSearchText = "Target";
+
+        Assert.True(
+            viewModel.FilteredTotpProjectionBuildCount == 1 &&
+            viewModel.FilteredWalletProjectionBuildCount == 1,
+            $"Expected one secondary projection build per invalidation, but observed " +
+            $"TOTP={viewModel.FilteredTotpProjectionBuildCount} and " +
+            $"Wallet={viewModel.FilteredWalletProjectionBuildCount}.");
+        Assert.Equal(itemCount / 2, viewModel.FilteredTotpItems.Count);
+        Assert.Equal(itemCount / 2, viewModel.FilteredWalletItems.Count);
+    }
+
     private static void RunVaultLoad(MainWindowViewModel viewModel)
     {
         var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);

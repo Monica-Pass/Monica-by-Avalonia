@@ -27,10 +27,13 @@ public sealed class VaultCredentialTests
         var settings = new AppSettingsService(GetTempSettingsPath());
         var viewModel = CreateViewModel(GetTempDatabasePath(), crypto, clipboard, settingsService: settings);
         viewModel.IsUnlocked = true;
-        viewModel.Passwords.Add(new PasswordEntry { Title = "Account", Password = "plain-secret" });
+        viewModel.Passwords.Add(new PasswordEntry { Title = "private account query", Password = "plain-secret" });
         viewModel.NoteItems.Add(new SecureItem { Title = "Recovery", ItemData = "backup-code" });
         viewModel.WalletItems.Add(new SecureItem { Title = "Card", ItemData = "4111111111111111" });
         viewModel.TotpItems.Add(new SecureItem { Title = "TOTP", ItemData = "totp-seed" });
+        Assert.Single(viewModel.FilteredPasswords);
+        Assert.Single(viewModel.FilteredTotpItems);
+        Assert.Single(viewModel.FilteredWalletItems);
         viewModel.NoteContent = "private note";
         viewModel.ImportCsvText = "username,password";
         viewModel.ExportPreview = "plain export";
@@ -41,7 +44,6 @@ public sealed class VaultCredentialTests
         viewModel.CurrentMasterPassword = "old-master-password";
         viewModel.ToggleMasterPasswordVisibilityCommand.Execute(null);
         viewModel.ToggleConfirmMasterPasswordVisibilityCommand.Execute(null);
-
         await viewModel.LockCommand.ExecuteAsync(null);
 
         Assert.False(viewModel.IsUnlocked);
@@ -50,6 +52,9 @@ public sealed class VaultCredentialTests
         Assert.Empty(viewModel.NoteItems);
         Assert.Empty(viewModel.WalletItems);
         Assert.Empty(viewModel.TotpItems);
+        Assert.Empty(viewModel.FilteredPasswords);
+        Assert.Empty(viewModel.FilteredTotpItems);
+        Assert.Empty(viewModel.FilteredWalletItems);
         Assert.Equal("", viewModel.NoteContent);
         Assert.Equal("", viewModel.ImportCsvText);
         Assert.Equal("", viewModel.ExportPreview);

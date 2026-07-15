@@ -23,6 +23,7 @@ public sealed partial class MainWindowViewModel
 
     private void RaiseTotpFilterState(bool reconcileSelection = true)
     {
+        _filteredTotpItemsDirty = true;
         RefreshTotpFilterChoices();
         OnPropertyChanged(nameof(FilteredTotpItems));
         OnPropertyChanged(nameof(HasFilteredTotpItems));

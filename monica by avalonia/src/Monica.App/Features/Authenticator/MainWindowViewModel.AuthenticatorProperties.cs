@@ -12,6 +12,10 @@ public sealed partial class MainWindowViewModel
     private const string TotpFilterUnbound = "unbound";
     private const string TotpFilterIssuerPrefix = "issuer:";
     private bool _suppressSelectedTotpRefresh;
+    private IReadOnlyList<SecureItem> _filteredTotpItems = [];
+    private bool _filteredTotpItemsDirty = true;
+
+    internal int FilteredTotpProjectionBuildCount { get; private set; }
 
     public ObservableCollection<SecureItem> TotpItems { get; } = new ObservableRangeCollection<SecureItem>();
     public ObservableCollection<TotpFilterChoice> TotpFilterChoices { get; } = [];
@@ -52,7 +56,7 @@ public sealed partial class MainWindowViewModel
     public bool HasSelectedTotpItems => SelectedTotpCount > 0;
     public bool HasSelectedTotpItem => SelectedTotpItem is not null;
     public bool HasTotpItems => TotpItems.Count > 0;
-    public IReadOnlyList<SecureItem> FilteredTotpItems => TotpItems.Where(MatchesTotpFilters).ToArray();
+    public IReadOnlyList<SecureItem> FilteredTotpItems => BuildFilteredTotpItems();
     public bool HasFilteredTotpItems => FilteredTotpItems.Count > 0;
     public bool HasTotpFilterOrSearch =>
         !string.Equals(SelectedTotpFilterKey, TotpFilterAll, StringComparison.OrdinalIgnoreCase) ||
@@ -73,4 +77,16 @@ public sealed partial class MainWindowViewModel
     partial void OnSelectedTotpFilterKeyChanged(string value) => RaiseTotpFilterState();
 
     partial void OnTotpSearchTextChanged(string value) => RaiseTotpFilterState();
+
+    private IReadOnlyList<SecureItem> BuildFilteredTotpItems()
+    {
+        if (_filteredTotpItemsDirty)
+        {
+            _filteredTotpItems = TotpItems.Where(MatchesTotpFilters).ToArray();
+            _filteredTotpItemsDirty = false;
+            FilteredTotpProjectionBuildCount++;
+        }
+
+        return _filteredTotpItems;
+    }
 }

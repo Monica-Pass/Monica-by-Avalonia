@@ -2191,6 +2191,7 @@ public sealed class PasswordManagementTests
     {
         var harness = CreateHarness();
         await harness.ViewModel.LoadAsync();
+        Assert.Empty(harness.ViewModel.FilteredWalletItems);
         harness.WalletDialog.ConfigureNext(editor =>
         {
             editor.SelectedWalletType = editor.WalletTypeOptions.Single(item => item.Value == VaultItemType.Document);
@@ -2207,6 +2208,7 @@ public sealed class PasswordManagementTests
         await harness.ViewModel.AddWalletItemCommand.ExecuteAsync(null);
 
         var document = Assert.Single(harness.ViewModel.WalletItems);
+        Assert.Same(document, Assert.Single(harness.ViewModel.FilteredWalletItems));
         Assert.Equal(VaultItemType.Document, document.ItemType);
         Assert.Equal("Passport", document.Title);
         Assert.Contains("P12345678", document.ItemData);
@@ -2227,12 +2229,16 @@ public sealed class PasswordManagementTests
             editor.Cvv = "123";
             editor.ImagePathsText = "card-front.png";
         });
+        harness.ViewModel.WalletSearchText = "Passport";
 
         await harness.ViewModel.EditWalletItemCommand.ExecuteAsync(document);
 
         Assert.Equal(VaultItemType.BankCard, document.ItemType);
         Assert.Equal("Work card", document.Title);
+        Assert.Empty(harness.ViewModel.FilteredWalletItems);
         Assert.Contains("4111111111111111", document.ItemData);
+        harness.ViewModel.ClearWalletSearchCommand.Execute(null);
+        Assert.Same(document, Assert.Single(harness.ViewModel.FilteredWalletItems));
         Assert.Equal("**** **** **** 1111", harness.ViewModel.SelectedWalletDetails?.PrimaryText);
 
         await harness.ViewModel.CopySelectedWalletPrimaryFieldCommand.ExecuteAsync(null);
@@ -2243,6 +2249,7 @@ public sealed class PasswordManagementTests
         await harness.ViewModel.DeleteSelectedWalletItemsCommand.ExecuteAsync(null);
 
         Assert.Empty(harness.ViewModel.WalletItems);
+        Assert.Empty(harness.ViewModel.FilteredWalletItems);
         Assert.Empty(await harness.Repository.GetSecureItemsAsync(VaultItemType.BankCard));
         Assert.Single(await harness.Repository.GetSecureItemsAsync(VaultItemType.BankCard, includeDeleted: true));
         Assert.Equal(harness.ViewModel.L.Format("MovedSelectedWalletItemsToRecycleBinFormat", 1), harness.ViewModel.StatusMessage);

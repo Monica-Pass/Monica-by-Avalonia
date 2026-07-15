@@ -6,6 +6,11 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    private IReadOnlyList<SecureItem> _filteredWalletItems = [];
+    private bool _filteredWalletItemsDirty = true;
+
+    internal int FilteredWalletProjectionBuildCount { get; private set; }
+
     public ObservableCollection<SecureItem> WalletItems { get; } = new ObservableRangeCollection<SecureItem>();
 
     [ObservableProperty]
@@ -27,8 +32,7 @@ public sealed partial class MainWindowViewModel
     public bool HasSelectedWalletItem => SelectedWalletItem is not null;
     public bool HasWalletItems => WalletItems.Count > 0;
     public bool HasWalletSearchText => !string.IsNullOrWhiteSpace(WalletSearchText);
-    public IReadOnlyList<SecureItem> FilteredWalletItems =>
-        WalletItems.Where(item => MatchesWalletSearch(item, WalletSearchText)).ToArray();
+    public IReadOnlyList<SecureItem> FilteredWalletItems => BuildFilteredWalletItems();
     public bool HasFilteredWalletItems => FilteredWalletItems.Count > 0;
     public string WalletFilteredStatusText => _localization.Format(
         "WalletFilteredStatusFormat",
@@ -45,4 +49,18 @@ public sealed partial class MainWindowViewModel
     }
 
     partial void OnWalletSearchTextChanged(string value) => RaiseWalletFilterState();
+
+    private IReadOnlyList<SecureItem> BuildFilteredWalletItems()
+    {
+        if (_filteredWalletItemsDirty)
+        {
+            _filteredWalletItems = WalletItems
+                .Where(item => MatchesWalletSearch(item, WalletSearchText))
+                .ToArray();
+            _filteredWalletItemsDirty = false;
+            FilteredWalletProjectionBuildCount++;
+        }
+
+        return _filteredWalletItems;
+    }
 }

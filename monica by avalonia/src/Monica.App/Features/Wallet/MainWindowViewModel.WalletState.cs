@@ -17,6 +17,7 @@ public sealed partial class MainWindowViewModel
 
     private void RaiseWalletFilterState(bool reconcileSelection = true)
     {
+        _filteredWalletItemsDirty = true;
         OnPropertyChanged(nameof(FilteredWalletItems));
         OnPropertyChanged(nameof(HasFilteredWalletItems));
         OnPropertyChanged(nameof(HasWalletSearchText));
