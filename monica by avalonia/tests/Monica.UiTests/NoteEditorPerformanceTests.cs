@@ -11,7 +11,7 @@ public sealed class NoteEditorPerformanceTests
 {
     public NoteEditorPerformanceTests()
     {
-        TestAppBuilder.EnsureInitialized();
+        AvaloniaUiThreadTestContext.VerifyAccess();
     }
 
     [Fact]
@@ -119,13 +119,13 @@ public sealed class NoteEditorPerformanceTests
 
         Assert.Equal(0, probe.ReadCount);
         Assert.True(
-            probe.FirstReadStarted.Wait(TimeSpan.FromSeconds(2)),
+            probe.FirstReadStarted.Wait(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken),
             "The final image preview read did not start.");
         Thread.Sleep(350);
         Assert.Equal(1, probe.ReadCount);
         viewModel.NoteContent = "";
         Assert.True(
-            probe.ReadCancellationObserved.Wait(TimeSpan.FromSeconds(2)),
+            probe.ReadCancellationObserved.Wait(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken),
             "The final image preview read did not observe cancellation.");
     }
 
@@ -142,13 +142,13 @@ public sealed class NoteEditorPerformanceTests
         viewModel.IsUnlocked = true;
         viewModel.NoteContent = "Private\n\n![](monica-image://private.png)";
         Assert.True(
-            probe.FirstReadStarted.Wait(TimeSpan.FromSeconds(2)),
+            probe.FirstReadStarted.Wait(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken),
             "The blocking image preview read did not start.");
 
         viewModel.LockCommand.Execute(null);
 
         Assert.True(
-            probe.ReadCancellationObserved.Wait(TimeSpan.FromSeconds(2)),
+            probe.ReadCancellationObserved.Wait(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken),
             "The active image preview read did not observe cancellation.");
         Assert.Empty(viewModel.NoteImagePreviewItems);
     }

@@ -1,6 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Headless;
+using Avalonia.Threading;
 using Monica.App.Controls;
 using Monica.App.Features.Archive;
 using Monica.App.Features.Authenticator;
@@ -19,26 +19,9 @@ using Monica.App.Features.Wallet;
 
 namespace Monica.UiTests;
 
-public static class TestAppBuilder
+public static class AvaloniaUiThreadTestContext
 {
-    private static readonly object Gate = new();
-    private static bool _initialized;
-
-    public static void EnsureInitialized()
-    {
-        lock (Gate)
-        {
-            if (_initialized)
-            {
-                return;
-            }
-
-            AppBuilder.Configure<Monica.App.App>()
-                .UseHeadless(new AvaloniaHeadlessPlatformOptions())
-                .SetupWithoutStarting();
-            _initialized = true;
-        }
-    }
+    public static void VerifyAccess() => Dispatcher.UIThread.VerifyAccess();
 }
 
 [Collection(AvaloniaUiTestCollection.Name)]
@@ -46,7 +29,7 @@ public sealed class UiArchitectureTests
 {
     public UiArchitectureTests()
     {
-        TestAppBuilder.EnsureInitialized();
+        AvaloniaUiThreadTestContext.VerifyAccess();
     }
 
     [Fact]

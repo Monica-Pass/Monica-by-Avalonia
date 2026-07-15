@@ -9,7 +9,7 @@ public sealed class VaultAccessUiTests
 {
     public VaultAccessUiTests()
     {
-        TestAppBuilder.EnsureInitialized();
+        AvaloniaUiThreadTestContext.VerifyAccess();
     }
 
     [Fact]

@@ -6,7 +6,6 @@ using Monica.App.Features.Authenticator;
 using Monica.App.Features.Passwords;
 using Monica.App.Features.Wallet;
 using Monica.App.ViewModels;
-using Xunit.Abstractions;
 
 namespace Monica.UiTests;
 
@@ -19,7 +18,7 @@ public sealed class ColdStartupPerformanceTests(ITestOutputHelper output)
         var total = Stopwatch.StartNew();
         var phase = Stopwatch.StartNew();
 
-        TestAppBuilder.EnsureInitialized();
+        AvaloniaUiThreadTestContext.VerifyAccess();
         var frameworkMilliseconds = phase.Elapsed.TotalMilliseconds;
 
         phase.Restart();
@@ -51,7 +50,7 @@ public sealed class ColdStartupPerformanceTests(ITestOutputHelper output)
     [Fact]
     public void Cold_password_editor_construction_reports_first_use_cost()
     {
-        TestAppBuilder.EnsureInitialized();
+        AvaloniaUiThreadTestContext.VerifyAccess();
 
         var phase = Stopwatch.StartNew();
         var coldEditor = new Monica.App.PasswordEditorDialog();
@@ -71,7 +70,7 @@ public sealed class ColdStartupPerformanceTests(ITestOutputHelper output)
     [Fact]
     public void Password_editor_idle_warmup_removes_first_command_path_construction_cost()
     {
-        TestAppBuilder.EnsureInitialized();
+        AvaloniaUiThreadTestContext.VerifyAccess();
 
         var phase = Stopwatch.StartNew();
         VaultEditorDialogWarmup.EnsurePasswordWarmed();
@@ -94,7 +93,7 @@ public sealed class ColdStartupPerformanceTests(ITestOutputHelper output)
     [Fact]
     public void Secondary_editor_cold_construction_reports_first_use_cost()
     {
-        TestAppBuilder.EnsureInitialized();
+        AvaloniaUiThreadTestContext.VerifyAccess();
 
         var phase = Stopwatch.StartNew();
         var coldTotpEditor = new Monica.App.TotpEditorDialog();
@@ -128,7 +127,7 @@ public sealed class ColdStartupPerformanceTests(ITestOutputHelper output)
     [Fact]
     public void Secondary_editor_workspace_idle_warmup_removes_first_command_path_cost()
     {
-        TestAppBuilder.EnsureInitialized();
+        AvaloniaUiThreadTestContext.VerifyAccess();
 
         var authenticatorWorkspace = new AuthenticatorWorkspaceView();
         var walletWorkspace = new WalletWorkspaceView();

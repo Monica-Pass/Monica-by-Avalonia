@@ -11,7 +11,7 @@ public sealed class PasswordEditorWorkflowUiTests
 {
     public PasswordEditorWorkflowUiTests()
     {
-        TestAppBuilder.EnsureInitialized();
+        AvaloniaUiThreadTestContext.VerifyAccess();
     }
 
     [Fact]

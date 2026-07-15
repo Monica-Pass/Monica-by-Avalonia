@@ -8,7 +8,7 @@ public sealed class WalletWorkflowUiTests
 {
     public WalletWorkflowUiTests()
     {
-        TestAppBuilder.EnsureInitialized();
+        AvaloniaUiThreadTestContext.VerifyAccess();
     }
 
     [Fact]

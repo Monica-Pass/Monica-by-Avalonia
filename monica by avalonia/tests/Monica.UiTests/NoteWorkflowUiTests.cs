@@ -8,7 +8,7 @@ public sealed class NoteWorkflowUiTests
 {
     public NoteWorkflowUiTests()
     {
-        TestAppBuilder.EnsureInitialized();
+        AvaloniaUiThreadTestContext.VerifyAccess();
     }
 
     [Fact]

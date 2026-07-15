@@ -10,7 +10,7 @@ public sealed class StorageWorkflowUiTests
 {
     public StorageWorkflowUiTests()
     {
-        TestAppBuilder.EnsureInitialized();
+        AvaloniaUiThreadTestContext.VerifyAccess();
     }
 
     [Fact]

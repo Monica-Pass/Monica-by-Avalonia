@@ -19,7 +19,7 @@ public sealed class UiPerformanceTests
 {
     public UiPerformanceTests()
     {
-        TestAppBuilder.EnsureInitialized();
+        AvaloniaUiThreadTestContext.VerifyAccess();
     }
 
     [Fact]

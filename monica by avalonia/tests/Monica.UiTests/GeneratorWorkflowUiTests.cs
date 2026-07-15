@@ -8,7 +8,7 @@ public sealed class GeneratorWorkflowUiTests
 {
     public GeneratorWorkflowUiTests()
     {
-        TestAppBuilder.EnsureInitialized();
+        AvaloniaUiThreadTestContext.VerifyAccess();
     }
 
     [Fact]

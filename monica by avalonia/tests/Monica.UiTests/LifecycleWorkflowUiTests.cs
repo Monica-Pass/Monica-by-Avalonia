@@ -10,7 +10,7 @@ public sealed class LifecycleWorkflowUiTests
 {
     public LifecycleWorkflowUiTests()
     {
-        TestAppBuilder.EnsureInitialized();
+        AvaloniaUiThreadTestContext.VerifyAccess();
     }
 
     [Fact]

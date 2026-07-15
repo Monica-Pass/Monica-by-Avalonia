@@ -8,7 +8,7 @@ public sealed class PasswordWorkflowUiTests
 {
     public PasswordWorkflowUiTests()
     {
-        TestAppBuilder.EnsureInitialized();
+        AvaloniaUiThreadTestContext.VerifyAccess();
     }
 
     [Fact]

@@ -9,7 +9,7 @@ public sealed class SettingsSecurityWorkflowUiTests
 {
     public SettingsSecurityWorkflowUiTests()
     {
-        TestAppBuilder.EnsureInitialized();
+        AvaloniaUiThreadTestContext.VerifyAccess();
     }
 
     [Fact]

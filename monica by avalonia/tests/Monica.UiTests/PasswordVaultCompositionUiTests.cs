@@ -8,7 +8,7 @@ public sealed class PasswordVaultCompositionUiTests
 {
     public PasswordVaultCompositionUiTests()
     {
-        TestAppBuilder.EnsureInitialized();
+        AvaloniaUiThreadTestContext.VerifyAccess();
     }
 
     [Fact]

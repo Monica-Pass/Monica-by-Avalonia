@@ -174,17 +174,15 @@ try {
         '--results-directory',
         'TestResults/Monica.Tests'
     )
+    $uiTestResultsDirectory = 'TestResults/Monica.UiTests'
+    New-Item -ItemType Directory -Force -Path $uiTestResultsDirectory | Out-Null
     Invoke-CheckedCommand dotnet @(
-        'test',
-        'tests/Monica.UiTests/Monica.UiTests.csproj',
-        '--configuration',
-        $Configuration,
-        '--no-restore',
-        '--no-build',
-        '--logger',
-        'trx',
-        '--results-directory',
-        'TestResults/Monica.UiTests'
+        "tests/Monica.UiTests/bin/$Configuration/net10.0/Monica.UiTests.dll",
+        '-reporter',
+        'quiet',
+        '-noColor',
+        '-trx',
+        "$uiTestResultsDirectory/Monica.UiTests.trx"
     )
 
     Write-Host 'Commercial release verification passed.'
