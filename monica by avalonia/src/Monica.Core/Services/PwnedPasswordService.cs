@@ -7,7 +7,9 @@ namespace Monica.Core.Services;
 
 public interface IPwnedPasswordService
 {
-    Task<IReadOnlyDictionary<string, int>> CheckPasswordsAsync(IEnumerable<string> plaintextPasswords, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<int>> CheckPasswordsAsync(
+        IReadOnlyList<string> plaintextPasswords,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class PwnedPasswordService : IPwnedPasswordService
@@ -27,23 +29,28 @@ public sealed class PwnedPasswordService : IPwnedPasswordService
         _httpClient = httpClient;
     }
 
-    public async Task<IReadOnlyDictionary<string, int>> CheckPasswordsAsync(IEnumerable<string> plaintextPasswords, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<int>> CheckPasswordsAsync(
+        IReadOnlyList<string> plaintextPasswords,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(plaintextPasswords);
 
-        var prepared = plaintextPasswords
-            .Where(password => !string.IsNullOrWhiteSpace(password))
-            .Distinct(StringComparer.Ordinal)
-            .Select(password =>
-            {
-                var hash = Sha1Hex(password);
-                return new PreparedPassword(password, hash[..5], hash[5..]);
-            })
-            .ToArray();
-
-        if (prepared.Length == 0)
+        var prepared = new List<PreparedPassword>(plaintextPasswords.Count);
+        for (var index = 0; index < plaintextPasswords.Count; index++)
         {
-            return new Dictionary<string, int>(StringComparer.Ordinal);
+            var password = plaintextPasswords[index];
+            if (string.IsNullOrWhiteSpace(password))
+            {
+                continue;
+            }
+
+            var hash = Sha1Hex(password);
+            prepared.Add(new PreparedPassword(index, hash[..5], hash[5..]));
+        }
+
+        if (prepared.Count == 0)
+        {
+            return new int[plaintextPasswords.Count];
         }
 
         var rangeResults = new Dictionary<string, IReadOnlyDictionary<string, int>>(StringComparer.OrdinalIgnoreCase);
@@ -52,12 +59,17 @@ public sealed class PwnedPasswordService : IPwnedPasswordService
             rangeResults[prefix] = await GetRangeResultAsync(prefix, cancellationToken);
         }
 
-        return prepared.ToDictionary(
-            item => item.Password,
-            item => rangeResults.TryGetValue(item.Prefix, out var suffixCounts) && suffixCounts.TryGetValue(item.Suffix, out var count)
-                ? count
-                : 0,
-            StringComparer.Ordinal);
+        var exposureCounts = new int[plaintextPasswords.Count];
+        foreach (var item in prepared)
+        {
+            if (rangeResults.TryGetValue(item.Prefix, out var suffixCounts) &&
+                suffixCounts.TryGetValue(item.Suffix, out var count))
+            {
+                exposureCounts[item.Index] = count;
+            }
+        }
+
+        return exposureCounts;
     }
 
     private async Task<IReadOnlyDictionary<string, int>> GetRangeResultAsync(string prefix, CancellationToken cancellationToken)
@@ -111,10 +123,23 @@ public sealed class PwnedPasswordService : IPwnedPasswordService
 
     internal static string Sha1Hex(string value)
     {
-        var bytes = SHA1.HashData(Encoding.UTF8.GetBytes(value));
-        return Convert.ToHexString(bytes);
+        var plainBytes = Encoding.UTF8.GetBytes(value);
+        byte[]? hashBytes = null;
+        try
+        {
+            hashBytes = SHA1.HashData(plainBytes);
+            return Convert.ToHexString(hashBytes);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(plainBytes);
+            if (hashBytes is not null)
+            {
+                CryptographicOperations.ZeroMemory(hashBytes);
+            }
+        }
     }
 
-    private sealed record PreparedPassword(string Password, string Prefix, string Suffix);
+    private sealed record PreparedPassword(int Index, string Prefix, string Suffix);
     private sealed record CachedRangeResult(DateTimeOffset FetchedAt, IReadOnlyDictionary<string, int> SuffixCounts);
 }

@@ -4216,15 +4216,14 @@ public sealed partial class PasswordManagementTests
     {
         public IReadOnlyList<string> CheckedPasswords { get; private set; } = [];
 
-        public Task<IReadOnlyDictionary<string, int>> CheckPasswordsAsync(IEnumerable<string> plaintextPasswords, CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<int>> CheckPasswordsAsync(
+            IReadOnlyList<string> plaintextPasswords,
+            CancellationToken cancellationToken = default)
         {
             CheckedPasswords = plaintextPasswords.ToArray();
-            IReadOnlyDictionary<string, int> results = CheckedPasswords
-                .Distinct(StringComparer.Ordinal)
-                .ToDictionary(
-                    password => password,
-                    password => counts.TryGetValue(password, out var count) ? count : 0,
-                    StringComparer.Ordinal);
+            IReadOnlyList<int> results = CheckedPasswords
+                .Select(password => counts.TryGetValue(password, out var count) ? count : 0)
+                .ToArray();
             return Task.FromResult(results);
         }
     }
@@ -4333,7 +4332,9 @@ public sealed partial class PasswordManagementTests
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public bool WasCancelled { get; private set; }
 
-        public async Task<IReadOnlyDictionary<string, int>> CheckPasswordsAsync(IEnumerable<string> plaintextPasswords, CancellationToken cancellationToken = default)
+        public async Task<IReadOnlyList<int>> CheckPasswordsAsync(
+            IReadOnlyList<string> plaintextPasswords,
+            CancellationToken cancellationToken = default)
         {
             _ = plaintextPasswords.ToArray();
             Started.TrySetResult();
@@ -4347,7 +4348,7 @@ public sealed partial class PasswordManagementTests
                 throw;
             }
 
-            return new Dictionary<string, int>();
+            return [];
         }
     }
 

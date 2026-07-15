@@ -593,7 +593,7 @@ public sealed partial class CoreServicesTests
     }
 
     [Fact]
-    public async Task Pwned_password_service_queries_range_api_with_sha1_prefix()
+    public async Task Pwned_password_service_returns_ordered_counts_from_sha1_range_queries()
     {
         var password = "correct horse battery staple";
         var hash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(password)));
@@ -602,8 +602,7 @@ public sealed partial class CoreServicesTests
 
         var results = await service.CheckPasswordsAsync([password, password, ""]);
 
-        Assert.Equal(42, results[password]);
-        Assert.Single(results);
+        Assert.Equal([42, 42, 0], results);
         Assert.Equal(1, handler.RequestCount);
         Assert.EndsWith($"/range/{hash[..5]}", handler.LastRequestUri?.AbsoluteUri, StringComparison.OrdinalIgnoreCase);
         Assert.True(handler.SawPaddingHeader);

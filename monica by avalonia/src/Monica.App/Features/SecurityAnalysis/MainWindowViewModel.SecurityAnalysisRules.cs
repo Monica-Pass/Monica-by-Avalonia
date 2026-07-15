@@ -212,8 +212,24 @@ public sealed partial class MainWindowViewModel
         return count;
     }
 
-    private static string HashPasswordForSecurityCache(string value) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+    private static string HashPasswordForSecurityCache(string value)
+    {
+        var plainBytes = Encoding.UTF8.GetBytes(value);
+        byte[]? hashBytes = null;
+        try
+        {
+            hashBytes = SHA256.HashData(plainBytes);
+            return Convert.ToHexString(hashBytes);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(plainBytes);
+            if (hashBytes is not null)
+            {
+                CryptographicOperations.ZeroMemory(hashBytes);
+            }
+        }
+    }
 
     private sealed record SecurityPasswordSnapshot(PasswordEntry Entry, string PlainPassword, string[] NormalizedWebsites);
     private sealed record CompromisedPasswordCheckInput(SecurityPasswordSnapshot[] Snapshots, string[] PlainPasswords);

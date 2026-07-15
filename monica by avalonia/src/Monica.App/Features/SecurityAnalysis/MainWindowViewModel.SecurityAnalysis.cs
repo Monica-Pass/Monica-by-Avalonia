@@ -77,11 +77,15 @@ public sealed partial class MainWindowViewModel
                 "CompromisedPasswordCheckingFormat",
                 checkInput.PlainPasswords.Length);
 
-            var countsByPassword = await _pwnedPasswordService.CheckPasswordsAsync(
+            var exposureCounts = await _pwnedPasswordService.CheckPasswordsAsync(
                 checkInput.PlainPasswords,
                 cancellationToken);
             var next = await Task.Run(
-                () => BuildCompromisedPasswordResults(checkInput.Snapshots, countsByPassword, cancellationToken),
+                () => BuildCompromisedPasswordResults(
+                    checkInput.Snapshots,
+                    checkInput.PlainPasswords,
+                    exposureCounts,
+                    cancellationToken),
                 cancellationToken);
 
             _compromisedPasswordResults = next;
@@ -244,22 +248,42 @@ public sealed partial class MainWindowViewModel
 
     private static IReadOnlyDictionary<long, CompromisedPasswordResult> BuildCompromisedPasswordResults(
         IReadOnlyList<SecurityPasswordSnapshot> snapshots,
-        IReadOnlyDictionary<string, int> countsByPassword,
+        IReadOnlyList<string> checkedPasswords,
+        IReadOnlyList<int> exposureCounts,
         CancellationToken cancellationToken)
     {
+        if (checkedPasswords.Count != exposureCounts.Count)
+        {
+            throw new InvalidOperationException("Compromised-password results did not match the requested input count.");
+        }
+
+        var countsByFingerprint = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var index = 0; index < checkedPasswords.Count; index++)
+        {
+            if (exposureCounts[index] > 0)
+            {
+                countsByFingerprint[HashPasswordForSecurityCache(checkedPasswords[index])] = exposureCounts[index];
+            }
+        }
+
         var results = new Dictionary<long, CompromisedPasswordResult>();
         foreach (var snapshot in snapshots)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (string.IsNullOrWhiteSpace(snapshot.PlainPassword) ||
-                !countsByPassword.TryGetValue(snapshot.PlainPassword, out var count) ||
+            if (string.IsNullOrWhiteSpace(snapshot.PlainPassword))
+            {
+                continue;
+            }
+
+            var passwordFingerprint = HashPasswordForSecurityCache(snapshot.PlainPassword);
+            if (!countsByFingerprint.TryGetValue(passwordFingerprint, out var count) ||
                 count <= 0)
             {
                 continue;
             }
 
             results[snapshot.Entry.Id] = new CompromisedPasswordResult(
-                HashPasswordForSecurityCache(snapshot.PlainPassword),
+                passwordFingerprint,
                 count);
         }
 
