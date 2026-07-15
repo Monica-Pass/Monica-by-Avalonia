@@ -2,6 +2,7 @@ using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Monica.App.Features;
 using Monica.App.ViewModels;
 
 namespace Monica.App.Features.Authenticator;
@@ -20,6 +21,7 @@ public partial class AuthenticatorWorkspaceView : UserControl
         InitializeComponent();
         SizeChanged += (_, e) => UpdateResponsiveLayoutForWidth(e.NewSize.Width);
         DataContextChanged += OnDataContextChanged;
+        Dispatcher.UIThread.Post(VaultEditorDialogWarmup.EnsureTotpWarmed, DispatcherPriority.Background);
     }
 
     public bool IsNarrowLayout { get; private set; }

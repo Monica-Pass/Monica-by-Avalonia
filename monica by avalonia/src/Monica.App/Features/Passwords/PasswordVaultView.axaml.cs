@@ -2,6 +2,7 @@ using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Monica.App.Features;
 using Monica.App.ViewModels;
 
 namespace Monica.App.Features.Passwords;
@@ -17,7 +18,7 @@ public partial class PasswordVaultView : UserControl
         InitializeComponent();
         SizeChanged += (_, e) => UpdateResponsiveLayoutForWidth(e.NewSize.Width);
         DataContextChanged += OnDataContextChanged;
-        Dispatcher.UIThread.Post(PasswordEditorDialogWarmup.EnsureWarmed, DispatcherPriority.Background);
+        Dispatcher.UIThread.Post(VaultEditorDialogWarmup.EnsurePasswordWarmed, DispatcherPriority.Background);
     }
 
     public bool IsNarrowLayout { get; private set; }

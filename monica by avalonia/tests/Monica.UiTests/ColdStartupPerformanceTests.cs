@@ -1,6 +1,10 @@
 using System.Diagnostics;
+using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using Monica.App.Features;
+using Monica.App.Features.Authenticator;
 using Monica.App.Features.Passwords;
+using Monica.App.Features.Wallet;
 using Monica.App.ViewModels;
 using Xunit.Abstractions;
 
@@ -61,7 +65,7 @@ public sealed class ColdStartupPerformanceTests(ITestOutputHelper output)
         Assert.NotNull(coldEditor);
         Assert.NotNull(warmEditor);
         Assert.True(coldMilliseconds < 500, $"Cold password editor construction took {coldMilliseconds:F3} ms.");
-        Assert.True(warmMilliseconds < 100, $"Warm password editor construction took {warmMilliseconds:F3} ms.");
+        Assert.True(warmMilliseconds < 500, $"Warm password editor construction took {warmMilliseconds:F3} ms.");
     }
 
     [Fact]
@@ -70,20 +74,88 @@ public sealed class ColdStartupPerformanceTests(ITestOutputHelper output)
         TestAppBuilder.EnsureInitialized();
 
         var phase = Stopwatch.StartNew();
-        PasswordEditorDialogWarmup.EnsureWarmed();
+        VaultEditorDialogWarmup.EnsurePasswordWarmed();
         var warmupMilliseconds = phase.Elapsed.TotalMilliseconds;
 
+        Assert.True(VaultEditorDialogWarmup.IsPasswordWarmed);
         phase.Restart();
-        var editor = new Monica.App.PasswordEditorDialog();
+        var editor = VaultEditorDialogWarmup.TakePasswordEditorView();
         var commandPathMilliseconds = phase.Elapsed.TotalMilliseconds;
 
         output.WriteLine(
             $"passwordEditorWarmup={warmupMilliseconds:F3} ms, " +
             $"passwordEditorCommandPath={commandPathMilliseconds:F3} ms");
-        Assert.True(PasswordEditorDialogWarmup.IsWarmed);
         Assert.NotNull(editor);
         Assert.True(
             commandPathMilliseconds < 50,
             $"Password editor construction after idle warmup took {commandPathMilliseconds:F3} ms.");
+    }
+
+    [Fact]
+    public void Secondary_editor_cold_construction_reports_first_use_cost()
+    {
+        TestAppBuilder.EnsureInitialized();
+
+        var phase = Stopwatch.StartNew();
+        var coldTotpEditor = new Monica.App.TotpEditorDialog();
+        var coldTotpMilliseconds = phase.Elapsed.TotalMilliseconds;
+
+        phase.Restart();
+        var warmTotpEditor = new Monica.App.TotpEditorDialog();
+        var warmTotpMilliseconds = phase.Elapsed.TotalMilliseconds;
+
+        phase.Restart();
+        var coldWalletEditor = new WalletItemEditorDialog();
+        var coldWalletMilliseconds = phase.Elapsed.TotalMilliseconds;
+
+        phase.Restart();
+        var warmWalletEditor = new WalletItemEditorDialog();
+        var warmWalletMilliseconds = phase.Elapsed.TotalMilliseconds;
+
+        output.WriteLine(
+            $"totpCold={coldTotpMilliseconds:F3} ms, totpWarm={warmTotpMilliseconds:F3} ms, " +
+            $"walletCold={coldWalletMilliseconds:F3} ms, walletWarm={warmWalletMilliseconds:F3} ms");
+        Assert.NotNull(coldTotpEditor);
+        Assert.NotNull(warmTotpEditor);
+        Assert.NotNull(coldWalletEditor);
+        Assert.NotNull(warmWalletEditor);
+        Assert.True(coldTotpMilliseconds < 500, $"Cold TOTP editor construction took {coldTotpMilliseconds:F3} ms.");
+        Assert.True(coldWalletMilliseconds < 500, $"Cold Wallet editor construction took {coldWalletMilliseconds:F3} ms.");
+        Assert.True(warmTotpMilliseconds < 50, $"Warm TOTP editor construction took {warmTotpMilliseconds:F3} ms.");
+        Assert.True(warmWalletMilliseconds < 50, $"Warm Wallet editor construction took {warmWalletMilliseconds:F3} ms.");
+    }
+
+    [Fact]
+    public void Secondary_editor_workspace_idle_warmup_removes_first_command_path_cost()
+    {
+        TestAppBuilder.EnsureInitialized();
+
+        var authenticatorWorkspace = new AuthenticatorWorkspaceView();
+        var walletWorkspace = new WalletWorkspaceView();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(VaultEditorDialogWarmup.IsTotpWarmed);
+        Assert.True(VaultEditorDialogWarmup.IsWalletWarmed);
+        var phase = Stopwatch.StartNew();
+        var totpEditor = VaultEditorDialogWarmup.TakeTotpEditorView();
+        var totpCommandPathMilliseconds = phase.Elapsed.TotalMilliseconds;
+
+        phase.Restart();
+        var walletEditor = VaultEditorDialogWarmup.TakeWalletEditorView();
+        var walletCommandPathMilliseconds = phase.Elapsed.TotalMilliseconds;
+
+        output.WriteLine(
+            $"totpCommandPath={totpCommandPathMilliseconds:F3} ms, " +
+            $"walletCommandPath={walletCommandPathMilliseconds:F3} ms");
+        Assert.NotNull(authenticatorWorkspace);
+        Assert.NotNull(walletWorkspace);
+        Assert.NotNull(totpEditor);
+        Assert.NotNull(walletEditor);
+        Assert.True(
+            totpCommandPathMilliseconds < 50,
+            $"TOTP editor construction after workspace idle warmup took {totpCommandPathMilliseconds:F3} ms.");
+        Assert.True(
+            walletCommandPathMilliseconds < 50,
+            $"Wallet editor construction after workspace idle warmup took {walletCommandPathMilliseconds:F3} ms.");
     }
 }

@@ -1,6 +1,8 @@
 using Avalonia.Controls;
+using Avalonia.Threading;
 using FluentAvalonia.UI.Controls;
 using Monica.App;
+using Monica.App.Features;
 using Monica.App.ViewModels;
 using Monica.Core.Models;
 using Monica.Core.Services;
@@ -36,7 +38,8 @@ public sealed class PasswordEditorDialogService(
         cancellationToken.ThrowIfCancellationRequested();
 
         var editor = new PasswordEditorViewModel(localization, passwordGenerator, entry, categories, plainPassword, siblingPasswords, notes, customFields);
-        var editorView = new PasswordEditorDialog { DataContext = editor };
+        var editorView = VaultEditorDialogWarmup.TakePasswordEditorView();
+        editorView.DataContext = editor;
         var dialog = new FAContentDialog
         {
             Title = editor.DialogTitle,
@@ -64,10 +67,15 @@ public sealed class PasswordEditorDialogService(
         }
         finally
         {
+            editorView.DataContext = null;
             if (!retainEditor)
             {
                 editor.ClearSensitiveState();
             }
+
+            Dispatcher.UIThread.Post(
+                VaultEditorDialogWarmup.EnsurePasswordWarmed,
+                DispatcherPriority.Background);
         }
     }
 }

@@ -1,5 +1,7 @@
 using Avalonia.Controls;
+using Avalonia.Threading;
 using FluentAvalonia.UI.Controls;
+using Monica.App.Features;
 using Monica.App.ViewModels;
 using Monica.Core.Models;
 
@@ -19,10 +21,12 @@ public sealed class TotpEditorDialogService(
         cancellationToken.ThrowIfCancellationRequested();
 
         var editor = new TotpEditorViewModel(localization, item);
+        var editorView = VaultEditorDialogWarmup.TakeTotpEditorView();
+        editorView.DataContext = editor;
         var dialog = new FAContentDialog
         {
             Title = editor.DialogTitle,
-            Content = new TotpEditorDialog { DataContext = editor },
+            Content = editorView,
             PrimaryButtonText = localization.Save,
             CloseButtonText = localization.Cancel,
             DefaultButton = FAContentDialogButton.Primary
@@ -36,7 +40,17 @@ public sealed class TotpEditorDialogService(
             }
         };
 
-        var result = await dialog.ShowAsync(ownerProvider());
-        return result == FAContentDialogResult.Primary ? editor : null;
+        try
+        {
+            var result = await dialog.ShowAsync(ownerProvider());
+            return result == FAContentDialogResult.Primary ? editor : null;
+        }
+        finally
+        {
+            editorView.DataContext = null;
+            Dispatcher.UIThread.Post(
+                VaultEditorDialogWarmup.EnsureTotpWarmed,
+                DispatcherPriority.Background);
+        }
     }
 }
