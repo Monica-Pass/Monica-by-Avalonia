@@ -26,6 +26,7 @@ public sealed partial class MainWindowViewModel
     private void ReleaseRebuildableBackgroundCaches()
     {
         ReleaseSensitiveBackgroundDetails();
+        ReleaseTransientBackgroundSecrets();
         CancelNoteImagePreviewRefresh();
         Interlocked.Increment(ref _noteImagePreviewVersion);
         ReplaceNoteImagePreviews([]);
@@ -35,6 +36,11 @@ public sealed partial class MainWindowViewModel
     private void RestoreRebuildableBackgroundCaches()
     {
         RestoreBackgroundDetailState();
+        if (IsUnlocked && string.Equals(SelectedSection, "Generator", StringComparison.OrdinalIgnoreCase))
+        {
+            EnsureGeneratedPassword();
+        }
+
         if (IsUnlocked && string.Equals(SelectedSection, "Notes", StringComparison.OrdinalIgnoreCase))
         {
             QueueNoteImagePreviewRefresh(NoteContent);
@@ -55,6 +61,15 @@ public sealed partial class MainWindowViewModel
 
         SelectedTotpDetails = null;
         SelectedWalletDetails = null;
+    }
+
+    private void ReleaseTransientBackgroundSecrets()
+    {
+        ClearTransientSettingsSecurityInputs();
+        ClearTransferBuffers();
+        GeneratedPassword = "";
+        GeneratedPasswordHistory.Clear();
+        RaiseGeneratedPasswordHistoryState();
     }
 
     private void RestoreBackgroundDetailState()
