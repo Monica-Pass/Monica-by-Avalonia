@@ -114,6 +114,7 @@ public sealed partial class AppSettingsService : IAppSettingsService
         settings.AutoLockMinutes = Clamp(settings.AutoLockMinutes, 1, 120);
         settings.ClipboardClearSeconds = Clamp(settings.ClipboardClearSeconds, 10, 600);
         settings.BrowserIntegrationPort = Clamp(settings.BrowserIntegrationPort, 1024, 65535);
+        settings.WebDavBackupEncryptionEnabled = true;
         settings.SecurityRecovery ??= new SecurityRecoverySettings();
         NormalizeSecurityRecovery(settings.SecurityRecovery);
 

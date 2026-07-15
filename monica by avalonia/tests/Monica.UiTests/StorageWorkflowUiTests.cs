@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using FluentAvalonia.UI.Controls;
 using Monica.App.Features.DatabaseManagement;
 using Monica.App.Features.Mdbx;
 using Monica.App.Features.Sync;
@@ -108,5 +109,16 @@ public sealed class StorageWorkflowUiTests
         var delete = backup.FindControl<Button>("DeleteSelectedBackupButton");
         Assert.NotNull(restore);
         Assert.NotNull(delete);
+    }
+
+    [Fact]
+    public void Webdav_backup_encryption_is_presented_as_mandatory()
+    {
+        var backup = new SyncBackupView();
+
+        var encryptionItem = backup.FindControl<FASettingsExpanderItem>("WebDavBackupEncryptionItem");
+        Assert.NotNull(encryptionItem);
+        Assert.IsNotType<ToggleSwitch>(encryptionItem.Footer);
+        Assert.NotNull(backup.FindControl<Border>("WebDavBackupEncryptionStatus"));
     }
 }

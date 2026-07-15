@@ -14,6 +14,18 @@ namespace Monica.Tests;
 public sealed partial class AppSettingsTests
 {
     [Fact]
+    public async Task App_settings_migrates_legacy_disabled_webdav_backup_encryption()
+    {
+        var path = GetTempPath();
+        await File.WriteAllTextAsync(path, "{\"WebDavBackupEncryptionEnabled\":false}");
+
+        var settings = new AppSettingsService(path);
+        await settings.LoadAsync();
+
+        Assert.True(settings.Current.WebDavBackupEncryptionEnabled);
+    }
+
+    [Fact]
     public async Task App_settings_roundtrip_interactive_values()
     {
         var path = GetTempPath();

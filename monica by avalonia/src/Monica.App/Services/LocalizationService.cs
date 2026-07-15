@@ -403,6 +403,7 @@ public interface ILocalizationService : INotifyPropertyChanged
     string IncludeCategories { get; }
     string EncryptBackup { get; }
     string EncryptBackupDescription { get; }
+    string AlwaysEncrypted { get; }
     string BackupEncryptionPassword { get; }
     string BackupEncryptionPasswordDescription { get; }
     string SyncOnStartup { get; }
@@ -888,6 +889,7 @@ public sealed class LocalizationService : ILocalizationService
     public string IncludeCategories => Text();
     public string EncryptBackup => Text();
     public string EncryptBackupDescription => Text();
+    public string AlwaysEncrypted => Text();
     public string BackupEncryptionPassword => Text();
     public string BackupEncryptionPasswordDescription => Text();
     public string SyncOnStartup => Text();
@@ -1662,8 +1664,9 @@ public sealed class LocalizationService : ILocalizationService
         ["IncludeDocuments"] = "Documents",
         ["IncludeImages"] = "Image references",
         ["IncludeCategories"] = "Folders",
-        ["EncryptBackup"] = "Encrypt backup",
-        ["EncryptBackupDescription"] = "Protect the WebDAV backup package with a separate backup password.",
+        ["EncryptBackup"] = "Backup encryption",
+        ["EncryptBackupDescription"] = "WebDAV backups are always encrypted with the separate backup password.",
+        ["AlwaysEncrypted"] = "Always encrypted",
         ["BackupEncryptionPassword"] = "Backup password",
         ["BackupEncryptionPasswordDescription"] = "Required for encrypted backup and restore.",
         ["SyncOnStartup"] = "Sync on startup",
@@ -1892,7 +1895,6 @@ public sealed class LocalizationService : ILocalizationService
         ["WebDavBackupHistoryFailedFormat"] = "WebDAV backup history failed: {0}",
         ["WebDavBackupOptionsSummaryFormat"] = "{0} data group(s), {1}",
         ["Encrypted"] = "encrypted",
-        ["PlainJson"] = "plain Monica JSON",
         ["SelectWebDavBackupContent"] = "Select at least one WebDAV backup data group.",
         ["WebDavEncryptionPasswordRequired"] = "Enter the backup encryption password.",
         ["CreatedWebDavBackupFormat"] = "Created WebDAV backup {0}.",
@@ -1935,7 +1937,6 @@ public sealed class LocalizationService : ILocalizationService
         ["Locked"] = "Locked",
         ["LockVault"] = "Lock vault",
         ["VaultLocked"] = "Vault locked",
-        ["WebDavEncryptionRequired"] = "WebDAV backups containing vault data must be encrypted.",
         ["WebDavHttpsRequired"] = "WebDAV requires an HTTPS endpoint without credentials in the URL.",
         ["AuthorizeExportTitle"] = "Authorize sensitive export",
         ["AuthorizeExportDescription"] = "Enter the master password before exporting decrypted vault data.",
@@ -2806,6 +2807,11 @@ public sealed class LocalizationService : ILocalizationService
         ["RemoteSyncDescription"] = "WebDAV 连接信息和自动同步行为。",
         ["WebDavBackupOptions"] = "备份选项",
         ["WebDavBackupOptionsDescription"] = "选择手动 WebDAV 备份包含哪些 Monica 数据。",
+        ["EncryptBackup"] = "备份加密",
+        ["EncryptBackupDescription"] = "WebDAV 备份始终使用单独的备份密码加密。",
+        ["AlwaysEncrypted"] = "始终加密",
+        ["BackupEncryptionPassword"] = "备份密码",
+        ["BackupEncryptionPasswordDescription"] = "创建和恢复加密备份时必填。",
         ["SyncOnStartup"] = "启动时同步",
         ["SyncOnStartupDescription"] = "桌面保险库打开时拉取远程变更。",
         ["SyncAfterChanges"] = "本地变更后同步",
@@ -3009,7 +3015,6 @@ public sealed class LocalizationService : ILocalizationService
         ["Locked"] = "已锁定",
         ["LockVault"] = "锁定保险库",
         ["VaultLocked"] = "保险库已锁定",
-        ["WebDavEncryptionRequired"] = "包含保险库数据的 WebDAV 备份必须加密。",
         ["WebDavHttpsRequired"] = "WebDAV 必须使用 HTTPS 地址，且地址中不能包含凭据。",
         ["AuthorizeExportTitle"] = "授权敏感数据导出",
         ["AuthorizeExportDescription"] = "导出已解密的保险库数据前，请输入主密码。",

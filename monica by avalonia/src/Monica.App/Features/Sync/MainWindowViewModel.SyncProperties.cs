@@ -59,7 +59,7 @@ public sealed partial class MainWindowViewModel
     public string WebDavBackupOptionsSummaryText => _localization.Format(
         "WebDavBackupOptionsSummaryFormat",
         CountSelectedWebDavBackupOptions(),
-        WebDavBackupEncryptionEnabled ? _localization.Get("Encrypted") : _localization.Get("PlainJson"));
+        _localization.Get("Encrypted"));
     public bool IsSyncConfigurationSelected => IsWorkspacePageSelected(SelectedSyncPage, "Configuration");
     public bool IsSyncBackupSelected => IsWorkspacePageSelected(SelectedSyncPage, "Backup");
     public bool IsSyncSourcesSelected => IsWorkspacePageSelected(SelectedSyncPage, "Sources");
@@ -124,9 +124,6 @@ public sealed partial class MainWindowViewModel
 
     [ObservableProperty]
     private bool _webDavBackupIncludeCategories = true;
-
-    [ObservableProperty]
-    private bool _webDavBackupEncryptionEnabled = true;
 
     [ObservableProperty]
     private string _webDavBackupEncryptionPassword = "";

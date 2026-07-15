@@ -40,9 +40,14 @@
                         <CheckBox IsChecked="{Binding WebDavBackupIncludeCategories}" />
                     </fa:FASettingsExpanderItem.Footer>
                 </fa:FASettingsExpanderItem>
-                <fa:FASettingsExpanderItem Content="{Binding L.EncryptBackup}" Description="{Binding L.EncryptBackupDescription}">
+                <fa:FASettingsExpanderItem x:Name="WebDavBackupEncryptionItem" Content="{Binding L.EncryptBackup}" Description="{Binding L.EncryptBackupDescription}">
                     <fa:FASettingsExpanderItem.Footer>
-                        <ToggleSwitch IsChecked="{Binding WebDavBackupEncryptionEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+                        <Border x:Name="WebDavBackupEncryptionStatus" Padding="10,5" CornerRadius="6" BorderBrush="{DynamicResource AccentFillColorSecondaryBrush}" BorderThickness="1" Background="{DynamicResource LayerFillColorSubtleBrush}" AutomationProperties.Name="{Binding L.AlwaysEncrypted}">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <ic:FluentIcon Icon="LockClosed" FontSize="16" Foreground="{DynamicResource AccentFillColorDefaultBrush}" />
+                                <TextBlock Text="{Binding L.AlwaysEncrypted}" FontWeight="SemiBold" Foreground="{DynamicResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
                     </fa:FASettingsExpanderItem.Footer>
                 </fa:FASettingsExpanderItem>
                 <fa:FASettingsExpanderItem Content="{Binding L.BackupEncryptionPassword}" Description="{Binding L.BackupEncryptionPasswordDescription}">

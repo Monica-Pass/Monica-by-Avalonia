@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Collections.Concurrent;
 using System.Collections.Specialized;
 using System.Reflection;
+using System.Text.Json.Nodes;
 using Monica.App.Services;
 using Monica.App.ViewModels;
 using Monica.Core.ImportExport;
@@ -2637,7 +2638,7 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
-    public async Task Security_baseline_view_model_rejects_plaintext_webdav_backup()
+    public async Task Security_baseline_view_model_only_creates_encrypted_webdav_backup()
     {
         var webDav = new FakeWebDavBackupService();
         var harness = CreateHarness(webDavBackupService: webDav);
@@ -2667,13 +2668,13 @@ public sealed partial class PasswordManagementTests
         harness.ViewModel.WebDavBackupIncludeCards = false;
         harness.ViewModel.WebDavBackupIncludeDocuments = false;
         harness.ViewModel.WebDavBackupIncludeImages = false;
-        harness.ViewModel.WebDavBackupEncryptionEnabled = false;
+        harness.ViewModel.WebDavBackupEncryptionPassword = "backup password";
 
         await harness.ViewModel.CreateWebDavBackupCommand.ExecuteAsync(null);
 
-        Assert.Equal("", webDav.UploadedContent);
-        Assert.Empty(harness.ViewModel.WebDavBackupHistory);
-        Assert.Equal(harness.ViewModel.L.Get("WebDavEncryptionRequired"), harness.ViewModel.StatusMessage);
+        Assert.EndsWith(".monica.enc.json", webDav.UploadedPath);
+        Assert.DoesNotContain("plain-webdav-secret", webDav.UploadedContent);
+        Assert.Single(harness.ViewModel.WebDavBackupHistory);
     }
 
     [Fact]
@@ -2701,7 +2702,6 @@ public sealed partial class PasswordManagementTests
         harness.ViewModel.WebDavBackupIncludeCards = false;
         harness.ViewModel.WebDavBackupIncludeDocuments = false;
         harness.ViewModel.WebDavBackupIncludeCategories = false;
-        harness.ViewModel.WebDavBackupEncryptionEnabled = true;
         harness.ViewModel.WebDavBackupEncryptionPassword = "backup password";
 
         await harness.ViewModel.CreateWebDavBackupCommand.ExecuteAsync(null);
@@ -2763,7 +2763,6 @@ public sealed partial class PasswordManagementTests
         await source.ViewModel.LoadAsync();
         source.ViewModel.WebDavEnabled = true;
         source.ViewModel.WebDavServerUrl = "https://dav.example.com/";
-        source.ViewModel.WebDavBackupEncryptionEnabled = true;
         source.ViewModel.WebDavBackupEncryptionPassword = "backup password";
         await source.ViewModel.CreateWebDavBackupCommand.ExecuteAsync(null);
 
@@ -2823,7 +2822,6 @@ public sealed partial class PasswordManagementTests
         await source.ViewModel.LoadAsync();
         source.ViewModel.WebDavEnabled = true;
         source.ViewModel.WebDavServerUrl = "https://dav.example.com/";
-        source.ViewModel.WebDavBackupEncryptionEnabled = true;
         source.ViewModel.WebDavBackupEncryptionPassword = "backup password";
 
         await source.ViewModel.CreateWebDavBackupCommand.ExecuteAsync(null);
@@ -2843,6 +2841,43 @@ public sealed partial class PasswordManagementTests
 
         var restored = Assert.Single(await target.Repository.GetPasswordsAsync());
         Assert.Equal("encrypted-secret", target.Crypto.DecryptString(restored.Password));
+    }
+
+    [Fact]
+    public async Task ViewModel_rejects_unsupported_webdav_backup_package_version()
+    {
+        var content = await CreateEncryptedWebDavBackupPackageAsync("Versioned backup", "version-secret");
+        var unsupportedPackage = content.Replace("\"Version\":1", "\"Version\":2", StringComparison.Ordinal);
+        var target = await RestoreEncryptedWebDavBackupPackageAsync(unsupportedPackage);
+
+        Assert.Empty(await target.Repository.GetPasswordsAsync());
+        Assert.Contains("Unsupported Monica backup encryption version", target.ViewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ViewModel_rejects_unexpected_webdav_backup_kdf_iterations()
+    {
+        var content = await CreateEncryptedWebDavBackupPackageAsync("Iteration backup", "iteration-secret");
+        var unsupportedPackage = content.Replace("\"Iterations\":300000", "\"Iterations\":1", StringComparison.Ordinal);
+        var target = await RestoreEncryptedWebDavBackupPackageAsync(unsupportedPackage);
+
+        Assert.Empty(await target.Repository.GetPasswordsAsync());
+        Assert.Contains("Unsupported Monica backup encryption iterations", target.ViewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Salt")]
+    [InlineData("Nonce")]
+    [InlineData("Tag")]
+    public async Task ViewModel_rejects_invalid_webdav_backup_encryption_parameter_sizes(string parameterName)
+    {
+        var content = await CreateEncryptedWebDavBackupPackageAsync("Sized backup", "sized-secret");
+        var package = JsonNode.Parse(content)!.AsObject();
+        package[parameterName] = Convert.ToBase64String(new byte[1]);
+        var target = await RestoreEncryptedWebDavBackupPackageAsync(package.ToJsonString());
+
+        Assert.Empty(await target.Repository.GetPasswordsAsync());
+        Assert.Contains("Invalid Monica backup encryption parameters", target.ViewModel.StatusMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -4023,6 +4058,41 @@ public sealed partial class PasswordManagementTests
     {
         viewModel.PasswordSearchText = value;
         viewModel.PasswordSearchQuery = value;
+    }
+
+    private static async Task<string> CreateEncryptedWebDavBackupPackageAsync(string title, string secret)
+    {
+        var webDav = new FakeWebDavBackupService();
+        var source = CreateHarness(webDavBackupService: webDav);
+        source.Crypto.InitializeSession("source password", new byte[16]);
+        await source.Repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = title,
+            Password = source.Crypto.EncryptString(secret)
+        });
+        await source.ViewModel.LoadAsync();
+        source.ViewModel.WebDavEnabled = true;
+        source.ViewModel.WebDavServerUrl = "https://dav.example.com/";
+        source.ViewModel.WebDavBackupEncryptionPassword = "backup password";
+
+        await source.ViewModel.CreateWebDavBackupCommand.ExecuteAsync(null);
+
+        return webDav.UploadedContent;
+    }
+
+    private static async Task<PasswordHarness> RestoreEncryptedWebDavBackupPackageAsync(string content)
+    {
+        var webDav = new FakeWebDavBackupService { DownloadContent = content };
+        var target = CreateHarness(webDavBackupService: webDav);
+        target.Crypto.InitializeSession("target password", new byte[16]);
+        target.ViewModel.WebDavEnabled = true;
+        target.ViewModel.WebDavServerUrl = "https://dav.example.com/";
+        target.ViewModel.WebDavBackupEncryptionPassword = "backup password";
+        var item = new WebDavBackupHistoryItem("security-test.monica.enc.json", "/Monica/security-test.monica.enc.json", "2026/07/15 12:00", "1 KB", null);
+
+        await target.ViewModel.RestoreWebDavBackupCommand.ExecuteAsync(item);
+
+        return target;
     }
 
     private static PasswordHarness CreateHarness(

@@ -44,7 +44,6 @@ public sealed partial class MainWindowViewModel
             WebDavBackupIncludeDocuments = settings.WebDavBackupIncludeDocuments;
             WebDavBackupIncludeImages = settings.WebDavBackupIncludeImages;
             WebDavBackupIncludeCategories = settings.WebDavBackupIncludeCategories;
-            WebDavBackupEncryptionEnabled = settings.WebDavBackupEncryptionEnabled;
             WebDavBackupEncryptionPassword = settings.WebDavBackupEncryptionPassword;
             SyncConflictStrategy = settings.SyncConflictStrategy;
             OneDriveEnabled = settings.OneDriveEnabled;

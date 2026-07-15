@@ -119,12 +119,6 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        if (!WebDavBackupEncryptionEnabled)
-        {
-            StatusMessage = _localization.Get("WebDavEncryptionRequired");
-            return;
-        }
-
         if (string.IsNullOrWhiteSpace(WebDavBackupEncryptionPassword))
         {
             StatusMessage = _localization.Get("WebDavEncryptionPasswordRequired");
@@ -151,11 +145,8 @@ public sealed partial class MainWindowViewModel
                 WebDavBackupIncludeDocuments,
                 WebDavBackupIncludeImages,
                 WebDavBackupIncludeCategories);
-            var extension = WebDavBackupEncryptionEnabled ? "monica.enc.json" : "monica.json";
-            var fileName = $"monica_backup_{DateTimeOffset.UtcNow:yyyyMMdd_HHmmss}.{extension}";
-            var content = WebDavBackupEncryptionEnabled
-                ? EncryptWebDavBackupPayload(json, WebDavBackupEncryptionPassword)
-                : json;
+            var fileName = $"monica_backup_{DateTimeOffset.UtcNow:yyyyMMdd_HHmmss}.monica.enc.json";
+            var content = EncryptWebDavBackupPayload(json, WebDavBackupEncryptionPassword);
 
             await _webDavBackupService.UploadTextAsync(profile, fileName, content);
             var path = _webDavBackupService.NormalizeRemotePath(profile.RootPath, fileName);
