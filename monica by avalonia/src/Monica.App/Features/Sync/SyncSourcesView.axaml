@@ -4,9 +4,30 @@
             <fa:FASymbolIconSource Symbol="Folder" />
         </fa:FASettingsExpander.IconSource>
         <fa:FASettingsExpander.Items>
-            <fa:FASettingsExpanderItem Content="{Binding L.EnableOneDrive}" Description="{Binding L.EnableOneDriveDescription}">
+            <fa:FASettingsExpanderItem Content="{Binding L.EnableOneDrive}" Description="{Binding OneDriveConnectionStatusText}">
                 <fa:FASettingsExpanderItem.Footer>
-                    <ToggleSwitch IsChecked="{Binding OneDriveEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+                    <StackPanel Spacing="10" HorizontalAlignment="Right">
+                        <WrapPanel HorizontalAlignment="Right">
+                            <Button x:Name="OneDriveConnectButton" Classes="workspacePrimaryCommand" Command="{Binding ConnectOneDriveCommand}" IsEnabled="{Binding !IsOneDriveBusy}" IsVisible="{Binding !HasOneDriveAccount}" AutomationProperties.Name="{Binding L.OneDriveConnect}" Margin="0,0,8,0">
+                                <TextBlock Text="{Binding L.OneDriveConnect}" />
+                            </Button>
+                            <Button x:Name="OneDriveDisconnectButton" Classes="workspaceCommand" Command="{Binding DisconnectOneDriveCommand}" IsEnabled="{Binding !IsOneDriveBusy}" IsVisible="{Binding HasOneDriveAccount}" AutomationProperties.Name="{Binding L.OneDriveDisconnect}">
+                                <TextBlock Text="{Binding L.OneDriveDisconnect}" />
+                            </Button>
+                        </WrapPanel>
+                        <Border x:Name="OneDriveDeviceCodeCard" Padding="12" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" IsVisible="{Binding HasOneDriveDeviceCode}" MaxWidth="420">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="{Binding L.OneDriveDeviceCodeTitle}" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding L.OneDriveDeviceCodeDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <TextBlock x:Name="OneDriveDeviceCodeText" Text="{Binding OneDriveDeviceCode}" FontSize="22" FontWeight="SemiBold" LetterSpacing="2" AutomationProperties.Name="{Binding L.OneDriveDeviceCodeTitle}" />
+                                <WrapPanel>
+                                    <Button Command="{Binding CopyOneDriveDeviceCodeCommand}" Margin="0,0,8,0"><TextBlock Text="{Binding L.CopyCode}" /></Button>
+                                    <Button Command="{Binding OpenOneDriveVerificationCommand}" Margin="0,0,8,0"><TextBlock Text="{Binding L.OneDriveOpenSignIn}" /></Button>
+                                    <Button Command="{Binding CancelOneDriveSignInCommand}"><TextBlock Text="{Binding L.Cancel}" /></Button>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
                 </fa:FASettingsExpanderItem.Footer>
             </fa:FASettingsExpanderItem>
             <fa:FASettingsExpanderItem Content="{Binding L.MdbxLocalCache}" Description="{Binding L.MdbxLocalCacheDescription}">

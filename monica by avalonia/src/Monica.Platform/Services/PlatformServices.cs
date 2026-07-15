@@ -141,7 +141,35 @@ public interface IWebDavBackupService
 public interface IOneDriveBackupService
 {
     PlatformCapability GetCapability();
+    Task<OneDriveAccountInfo?> GetCachedAccountAsync(string? accountId = null, CancellationToken cancellationToken = default);
+    Task<OneDriveSignInChallenge> BeginSignInAsync(CancellationToken cancellationToken = default);
+    Task SignOutAsync(string? accountId = null, CancellationToken cancellationToken = default);
+    Task<RemoteFileVersion?> GetFileVersionAsync(string accountId, string remotePath, CancellationToken cancellationToken = default);
+    Task<RemoteFileVersion> UploadBinaryConditionallyAsync(
+        string accountId,
+        string remotePath,
+        Stream content,
+        RemoteWriteCondition condition,
+        CancellationToken cancellationToken = default);
+    Task<RemoteFileVersion> DownloadBinaryVersionedAsync(
+        string accountId,
+        string remotePath,
+        Stream destination,
+        CancellationToken cancellationToken = default);
+    Task ClearSensitiveCacheAsync(CancellationToken cancellationToken = default);
 }
+
+public sealed record OneDriveAccountInfo(string AccountId, string DisplayName, string Username);
+
+public sealed record OneDriveDeviceCodePrompt(
+    string UserCode,
+    Uri VerificationUri,
+    DateTimeOffset ExpiresAt,
+    string Message);
+
+public sealed record OneDriveSignInChallenge(
+    OneDriveDeviceCodePrompt Prompt,
+    Task<OneDriveAccountInfo> Completion);
 
 public interface IKeePassVaultService
 {

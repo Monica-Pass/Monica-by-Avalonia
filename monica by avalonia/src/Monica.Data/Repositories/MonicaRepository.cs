@@ -85,6 +85,7 @@ public sealed class MonicaRepository(
         await using var connection = connectionFactory.CreateConnection();
         if (entry.Id == 0)
         {
+            await connection.OpenAsync(cancellationToken);
             await connection.ExecuteAsync(
                 """
                 INSERT INTO password_entries (
@@ -384,6 +385,7 @@ public sealed class MonicaRepository(
         await using var connection = connectionFactory.CreateConnection();
         if (attachment.Id == 0)
         {
+            await connection.OpenAsync(cancellationToken);
             await connection.ExecuteAsync(
                 """
                 INSERT INTO attachments(owner_type, owner_id, file_name, content_type, storage_path, size_bytes, created_at, bitwarden_vault_id, keepass_binary_ref)
@@ -444,6 +446,7 @@ public sealed class MonicaRepository(
         await using var connection = connectionFactory.CreateConnection();
         if (entry.Id == 0)
         {
+            await connection.OpenAsync(cancellationToken);
             await connection.ExecuteAsync(
                 """
                 INSERT INTO password_history_entries(entry_id, password, last_used_at)
@@ -625,6 +628,7 @@ public sealed class MonicaRepository(
         await using var connection = connectionFactory.CreateConnection();
         if (item.Id == 0)
         {
+            await connection.OpenAsync(cancellationToken);
             await connection.ExecuteAsync(
                 """
                 INSERT INTO secure_items (
@@ -764,18 +768,19 @@ public sealed class MonicaRepository(
 
         if (database.Id == 0)
         {
+            await connection.OpenAsync(cancellationToken);
             await connection.ExecuteAsync(
                 """
                 INSERT INTO local_mdbx_databases (
                     name, file_path, storage_location, source_type, source_id, tiga_mode, encrypted_password, unlock_method,
                     kdf_profile, key_file_name, key_file_uri, key_file_fingerprint, description, created_at, last_accessed_at,
                     last_synced_at, is_default, project_count, sort_order, working_copy_path, cache_copy_path, is_offline_available,
-                    last_sync_status, last_sync_error, remote_etag, remote_last_modified_at)
+                    last_sync_status, last_sync_error, remote_etag, remote_last_modified_at, remote_account_id)
                 VALUES (
                     @Name, @FilePath, @StorageLocation, @SourceType, @SourceId, @TigaMode, @EncryptedPassword, @UnlockMethod,
                     @KdfProfile, @KeyFileName, @KeyFileUri, @KeyFileFingerprint, @Description, @CreatedAt, @LastAccessedAt,
                     @LastSyncedAt, @IsDefault, @ProjectCount, @SortOrder, @WorkingCopyPath, @CacheCopyPath, @IsOfflineAvailable,
-                    @LastSyncStatus, @LastSyncError, @RemoteETag, @RemoteLastModifiedAt);
+                    @LastSyncStatus, @LastSyncError, @RemoteETag, @RemoteLastModifiedAt, @RemoteAccountId);
                 """,
                 ToRow(_vaultDataProtector.Protect(database)));
             database.Id = await connection.ExecuteScalarAsync<long>("SELECT last_insert_rowid();");
@@ -791,7 +796,8 @@ public sealed class MonicaRepository(
                     last_synced_at=@LastSyncedAt, is_default=@IsDefault, project_count=@ProjectCount, sort_order=@SortOrder,
                     working_copy_path=@WorkingCopyPath, cache_copy_path=@CacheCopyPath, is_offline_available=@IsOfflineAvailable,
                     last_sync_status=@LastSyncStatus, last_sync_error=@LastSyncError,
-                    remote_etag=@RemoteETag, remote_last_modified_at=@RemoteLastModifiedAt
+                    remote_etag=@RemoteETag, remote_last_modified_at=@RemoteLastModifiedAt,
+                    remote_account_id=@RemoteAccountId
                 WHERE id=@Id;
                 """,
                 ToRow(_vaultDataProtector.Protect(database)));
@@ -1240,7 +1246,8 @@ public sealed class MonicaRepository(
         LastSyncStatus = Enum.TryParse<SyncStatus>(row.LastSyncStatus.Replace("_", "", StringComparison.Ordinal), true, out var status) ? status : SyncStatus.LocalOnly,
         LastSyncError = row.LastSyncError,
         RemoteETag = row.RemoteETag,
-        RemoteLastModifiedAt = FromNullableUnixMilliseconds(row.RemoteLastModifiedAt)
+        RemoteLastModifiedAt = FromNullableUnixMilliseconds(row.RemoteLastModifiedAt),
+        RemoteAccountId = row.RemoteAccountId
     };
 
     private static MdbxDatabaseParameters ToRow(LocalMdbxDatabase database) => new()
@@ -1277,7 +1284,8 @@ public sealed class MonicaRepository(
         LastSyncStatus = database.LastSyncStatus.ToString().ToUpperInvariant(),
         LastSyncError = database.LastSyncError,
         RemoteETag = database.RemoteETag,
-        RemoteLastModifiedAt = ToNullableUnixMilliseconds(database.RemoteLastModifiedAt)
+        RemoteLastModifiedAt = ToNullableUnixMilliseconds(database.RemoteLastModifiedAt),
+        RemoteAccountId = database.RemoteAccountId
     };
 
     private sealed class MdbxDatabaseParameters
@@ -1309,6 +1317,7 @@ public sealed class MonicaRepository(
         public string? LastSyncError { get; init; }
         public string? RemoteETag { get; init; }
         public long? RemoteLastModifiedAt { get; init; }
+        public string? RemoteAccountId { get; init; }
     }
 
     private static IReadOnlyList<string> GetClearVaultStatements(VaultClearScope scope) => scope switch
@@ -1531,6 +1540,7 @@ public sealed class MonicaRepository(
         public string? LastSyncError { get; init; }
         public string? RemoteETag { get; init; }
         public long? RemoteLastModifiedAt { get; init; }
+        public string? RemoteAccountId { get; init; }
     }
 
     private sealed class OperationLogRow

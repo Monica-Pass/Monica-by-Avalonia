@@ -292,7 +292,11 @@ public sealed partial class AppSettingsTests
     public async Task ViewModel_registers_remote_mdbx_sources_for_page_state()
     {
         var webDav = new CapturingWebDavBackupService([]);
-        var viewModel = CreateViewModel(GetTempPath(), webDavBackupService: webDav);
+        var oneDrive = new RecordingOneDriveBackupService();
+        var viewModel = CreateViewModel(
+            GetTempPath(),
+            webDavBackupService: webDav,
+            oneDriveBackupService: oneDrive);
         viewModel.WebDavEnabled = true;
         viewModel.WebDavServerUrl = "https://dav.example.com";
         viewModel.WebDavUsername = "user";
@@ -488,7 +492,11 @@ public sealed partial class AppSettingsTests
     public async Task ViewModel_updates_mdbx_management_summaries()
     {
         var webDav = new CapturingWebDavBackupService([]);
-        var viewModel = CreateViewModel(GetTempPath(), webDavBackupService: webDav);
+        var oneDrive = new RecordingOneDriveBackupService();
+        var viewModel = CreateViewModel(
+            GetTempPath(),
+            webDavBackupService: webDav,
+            oneDriveBackupService: oneDrive);
         viewModel.WebDavEnabled = true;
         viewModel.WebDavServerUrl = "https://dav.example.com";
         viewModel.WebDavUsername = "user";
@@ -504,11 +512,11 @@ public sealed partial class AppSettingsTests
         Assert.Equal(3, viewModel.MdbxWorkingCopyCount);
         Assert.Equal(3, viewModel.MdbxOfflineCopyCount);
         Assert.Equal(2, viewModel.MdbxRemoteDatabaseCount);
-        Assert.Equal(1, viewModel.MdbxPendingSyncCount);
+        Assert.Equal(0, viewModel.MdbxPendingSyncCount);
         Assert.Contains(viewModel.L.Get("MdbxWorkingCopies"), viewModel.MdbxHealthItems.Select(item => item.Label));
         Assert.Contains(viewModel.L.Get("MdbxRemoteSources"), viewModel.MdbxHealthItems.Select(item => item.Label));
         Assert.All(viewModel.MdbxDatabaseItems, item => Assert.Equal(viewModel.L.Get("MdbxWorkingCopyReady"), item.WorkingCopyStatus));
-        Assert.Equal(viewModel.L.Format("MdbxPendingSyncFormat", 1), viewModel.MdbxSyncDiagnosticsSummaryText);
+        Assert.Equal(viewModel.L.Get("MdbxNoSyncErrors"), viewModel.MdbxSyncDiagnosticsSummaryText);
     }
 
     [Fact]
@@ -1142,7 +1150,8 @@ public sealed partial class AppSettingsTests
         IFileSystemPickerService? fileSystemPickerService = null,
         IMdbxVaultService? mdbxVaultService = null,
         IMonicaRepository? repository = null,
-        IConfirmationDialogService? confirmationDialogService = null)
+        IConfirmationDialogService? confirmationDialogService = null,
+        IOneDriveBackupService? oneDriveBackupService = null)
     {
         var databasePath = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
         Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
@@ -1174,7 +1183,8 @@ public sealed partial class AppSettingsTests
             externalLinkService: externalLinkService,
             fileSystemPickerService: fileSystemPickerService,
             confirmationDialogService: confirmationDialogService,
-            exportAuthorizationService: new ApprovingExportAuthorizationService());
+            exportAuthorizationService: new ApprovingExportAuthorizationService(),
+            oneDriveBackupService: oneDriveBackupService);
     }
 
     private static string GetTempPath()

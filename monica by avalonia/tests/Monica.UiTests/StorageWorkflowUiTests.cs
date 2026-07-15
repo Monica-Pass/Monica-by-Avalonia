@@ -19,6 +19,7 @@ public sealed class StorageWorkflowUiTests
         var sync = new SyncWorkspaceView();
         var mdbx = new MdbxWorkspaceView();
         var mdbxWorkbench = new MdbxWorkbenchView();
+        var syncSources = new SyncSourcesView();
         var databases = new DatabaseManagementWorkspaceView();
 
         Assert.NotNull(sync.FindControl<Grid>("SyncWorkspaceLayoutGrid"));
@@ -28,8 +29,12 @@ public sealed class StorageWorkflowUiTests
         Assert.NotNull(mdbx.FindControl<Border>("MdbxListRegion"));
         Assert.NotNull(mdbx.FindControl<ScrollViewer>("MdbxContentRegion"));
         Assert.NotNull(mdbxWorkbench.FindControl<Button>("SyncMdbxDatabaseButton"));
-        Assert.NotNull(mdbxWorkbench.FindControl<Button>("KeepLocalWebDavMdbxButton"));
-        Assert.NotNull(mdbxWorkbench.FindControl<Button>("UseRemoteWebDavMdbxButton"));
+        Assert.NotNull(mdbxWorkbench.FindControl<Button>("KeepLocalRemoteMdbxButton"));
+        Assert.NotNull(mdbxWorkbench.FindControl<Button>("UseRemoteMdbxButton"));
+        Assert.NotNull(syncSources.FindControl<Button>("OneDriveConnectButton"));
+        Assert.NotNull(syncSources.FindControl<Button>("OneDriveDisconnectButton"));
+        Assert.NotNull(syncSources.FindControl<Border>("OneDriveDeviceCodeCard"));
+        Assert.NotNull(syncSources.FindControl<TextBlock>("OneDriveDeviceCodeText"));
         Assert.NotNull(databases.FindControl<Grid>("DatabaseWorkspaceLayoutGrid"));
         Assert.NotNull(databases.FindControl<Border>("DatabaseListRegion"));
         Assert.NotNull(databases.FindControl<ScrollViewer>("DatabaseContentRegion"));

@@ -127,6 +127,7 @@ public sealed class LocalMdbxDatabase
     public string? LastSyncError { get; set; }
     public string? RemoteETag { get; set; }
     public DateTimeOffset? RemoteLastModifiedAt { get; set; }
+    public string? RemoteAccountId { get; set; }
 }
 
 public sealed class WebDavProfile

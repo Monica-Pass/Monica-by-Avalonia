@@ -218,6 +218,11 @@ public interface ILocalizationService : INotifyPropertyChanged
     string CreateLocalMdbxVault { get; }
     string RegisterMdbxSource { get; }
     string Configure { get; }
+    string OneDriveConnect { get; }
+    string OneDriveDisconnect { get; }
+    string OneDriveDeviceCodeTitle { get; }
+    string OneDriveDeviceCodeDescription { get; }
+    string OneDriveOpenSignIn { get; }
     string MdbxSourcesSection { get; }
     string MdbxWorkingCopiesSection { get; }
     string MdbxHealthSection { get; }
@@ -685,6 +690,11 @@ public sealed class LocalizationService : ILocalizationService
     public string CreateLocalMdbxVault => Text();
     public string RegisterMdbxSource => Text();
     public string Configure => Text();
+    public string OneDriveConnect => Text();
+    public string OneDriveDisconnect => Text();
+    public string OneDriveDeviceCodeTitle => Text();
+    public string OneDriveDeviceCodeDescription => Text();
+    public string OneDriveOpenSignIn => Text();
     public string MdbxSourcesSection => Text();
     public string MdbxWorkingCopiesSection => Text();
     public string MdbxHealthSection => Text();
@@ -1347,6 +1357,11 @@ public sealed class LocalizationService : ILocalizationService
         ["CreateLocalMdbxVault"] = "Create local MDBX",
         ["RegisterMdbxSource"] = "Register source",
         ["Configure"] = "Configure",
+        ["OneDriveConnect"] = "Connect OneDrive",
+        ["OneDriveDisconnect"] = "Disconnect",
+        ["OneDriveDeviceCodeTitle"] = "Finish Microsoft sign-in",
+        ["OneDriveDeviceCodeDescription"] = "Open Microsoft's secure sign-in page and enter this temporary code. Monica never stores the code.",
+        ["OneDriveOpenSignIn"] = "Open Microsoft sign-in",
         ["MdbxSourcesSection"] = "Sources",
         ["MdbxWorkingCopiesSection"] = "Working copies",
         ["MdbxHealthSection"] = "Health and diagnostics",
@@ -1368,7 +1383,7 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxAndroidParity"] = "Android parity",
         ["MdbxAndroidParityDescription"] = "Desktop MDBX now has a dedicated manager page matching the Android source hub shape.",
         ["MdbxAndroidParityLocal"] = "Local MDBX metadata and working-copy opening are available on desktop.",
-        ["MdbxAndroidParityRemote"] = "WebDAV MDBX sources support streamed upload and verified atomic download. OneDrive sync plus Android commit-history and conflict merging remain platform boundaries.",
+        ["MdbxAndroidParityRemote"] = "WebDAV and OneDrive MDBX sources support conditional upload, verified atomic download, and explicit conflict recovery using desktop-native workflows.",
         ["LocalDatabase"] = "Local database",
         ["LocalDatabaseDescription"] = "Avalonia keeps SQLite for app settings, local cache and migration indexes while MDBX working copies carry sensitive business data.",
         ["ExternalDatabases"] = "External databases",
@@ -1630,10 +1645,10 @@ public sealed class LocalizationService : ILocalizationService
         ["ConflictStrategy"] = "Conflict strategy",
         ["ConflictStrategyDescription"] = "Choose how Monica should resolve local and remote edits that overlap.",
         ["CloudAndLocalVaults"] = "Cloud and local vaults",
-        ["CloudAndLocalVaultsDescription"] = "OneDrive boundary state and MDBX local vault metadata.",
+        ["CloudAndLocalVaultsDescription"] = "Connected cloud accounts and local MDBX working-copy controls.",
         ["OneDrive"] = "OneDrive",
-        ["EnableOneDrive"] = "Enable OneDrive boundary",
-        ["EnableOneDriveDescription"] = "Reserve OneDrive integration state for Microsoft Graph based sync.",
+        ["EnableOneDrive"] = "OneDrive account",
+        ["EnableOneDriveDescription"] = "Connect a Microsoft account for account-bound MDBX synchronization.",
         ["MdbxLocalCache"] = "Keep MDBX local cache",
         ["MdbxLocalCacheDescription"] = "Retain a local MDBX working file for desktop vault operations.",
         ["CreateMdbxMetadataDescription"] = "Create local metadata for the desktop MDBX vault file.",
@@ -1759,9 +1774,9 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxWebDavMissingRevision"] = "The previous remote revision is unavailable, so Monica refused to overwrite the WebDAV vault.",
         ["MdbxWebDavConflictRequiresResolution"] = "This WebDAV vault has a sync conflict. Monica will not overwrite either copy until you explicitly resolve it.",
         ["MdbxKeepLocalConfirmationTitle"] = "Replace the remote vault?",
-        ["MdbxKeepLocalConfirmationMessageFormat"] = "Keep the local copy of {0} and replace the current WebDAV copy? Monica will verify the remote revision again before uploading.",
+        ["MdbxKeepLocalConfirmationMessageFormat"] = "Keep the local copy of {0} and replace the current remote copy? Monica will verify the remote revision again before uploading.",
         ["MdbxUseRemoteConfirmationTitle"] = "Replace the local working copy?",
-        ["MdbxUseRemoteConfirmationMessageFormat"] = "Use the current WebDAV copy of {0}? Monica will preserve the existing local copy as an encrypted conflict backup first.",
+        ["MdbxUseRemoteConfirmationMessageFormat"] = "Use the current remote copy of {0}? Monica will preserve the existing local copy as an encrypted conflict backup first.",
         ["MdbxKeepLocalSucceededFormat"] = "Resolved {0} by uploading the local copy.",
         ["MdbxUseRemoteSucceededFormat"] = "Resolved {0} by downloading the remote copy.",
         ["MdbxUseRemoteWithBackupSucceededFormat"] = "Resolved {0} with the remote copy. The previous encrypted local copy is preserved at {1}.",
@@ -1785,6 +1800,10 @@ public sealed class LocalizationService : ILocalizationService
         ["SyncRecoveryBackupReadyFormat"] = "{0} backup file(s) can be used for recovery.",
         ["OneDriveBoundaryEnabled"] = "OneDrive boundary enabled",
         ["OneDriveBoundaryDescription"] = "OneDrive is reserved for Microsoft Graph based MDBX sync metadata.",
+        ["OneDriveConnectedFormat"] = "Connected to OneDrive as {0}.",
+        ["OneDriveDisconnected"] = "OneDrive has been disconnected. Existing account-bound vaults require that same account to reconnect.",
+        ["OneDriveSignInCanceled"] = "OneDrive sign-in was canceled.",
+        ["OneDriveConnectionFailedFormat"] = "OneDrive connection failed: {0}",
         ["WebDavConnectionTestSucceededFormat"] = "WebDAV connection test succeeded; {0} remote item(s) are visible.",
         ["WebDavConnectionTestFailedFormat"] = "WebDAV connection test failed: {0}",
         ["EnableWebDavFirst"] = "Enable WebDAV and configure the server before loading backups.",
@@ -2384,6 +2403,11 @@ public sealed class LocalizationService : ILocalizationService
         ["CreateLocalMdbxVault"] = "创建本地 MDBX",
         ["RegisterMdbxSource"] = "登记来源",
         ["Configure"] = "配置",
+        ["OneDriveConnect"] = "连接 OneDrive",
+        ["OneDriveDisconnect"] = "断开连接",
+        ["OneDriveDeviceCodeTitle"] = "完成 Microsoft 登录",
+        ["OneDriveDeviceCodeDescription"] = "打开 Microsoft 安全登录页并输入此临时代码。Monica 不会保存该代码。",
+        ["OneDriveOpenSignIn"] = "打开 Microsoft 登录页",
         ["MdbxSourcesSection"] = "来源",
         ["MdbxWorkingCopiesSection"] = "工作副本",
         ["MdbxHealthSection"] = "健康与诊断",
@@ -2405,7 +2429,7 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxAndroidParity"] = "Android 对齐",
         ["MdbxAndroidParityDescription"] = "桌面端 MDBX 现在拥有独立管理页，形态对齐 Android 的来源管理中心。",
         ["MdbxAndroidParityLocal"] = "桌面端已支持本地 MDBX 元数据和工作副本打开。",
-        ["MdbxAndroidParityRemote"] = "WebDAV MDBX 来源支持流式上传和验证后的原子下载；OneDrive 同步以及 Android 的提交历史与冲突合并仍属于平台边界。",
+        ["MdbxAndroidParityRemote"] = "WebDAV 与 OneDrive MDBX 来源均支持条件上传、验证后的原子下载，以及符合桌面操作逻辑的显式冲突恢复。",
         ["LocalDatabase"] = "本地数据库",
         ["LocalDatabaseDescription"] = "Avalonia 保留 SQLite 用于应用设置、本地缓存和迁移索引，敏感业务数据由 MDBX 工作副本承载。",
         ["ExternalDatabases"] = "外部数据库",
@@ -2645,13 +2669,13 @@ public sealed class LocalizationService : ILocalizationService
         ["ConflictStrategy"] = "冲突处理",
         ["ConflictStrategyDescription"] = "远程和本地同时变更时使用的处理策略。",
         ["OneDrive"] = "OneDrive",
-        ["EnableOneDrive"] = "启用 OneDrive 接口",
-        ["EnableOneDriveDescription"] = "预留基于 Microsoft Graph 的 OneDrive 同步状态。",
+        ["EnableOneDrive"] = "OneDrive 账户",
+        ["EnableOneDriveDescription"] = "连接 Microsoft 账户，用于绑定账户的 MDBX 同步。",
         ["MdbxLocalCache"] = "保留 MDBX 本地缓存",
         ["MdbxLocalCacheDescription"] = "为桌面端保险库操作保留本地 MDBX 工作文件。",
         ["CreateMdbxMetadataDescription"] = "为桌面端 MDBX 保险库文件创建本地元数据。",
         ["CloudAndLocalVaults"] = "云端与本地保险库",
-        ["CloudAndLocalVaultsDescription"] = "OneDrive 边界状态和 MDBX 本地保险库元数据。",
+        ["CloudAndLocalVaultsDescription"] = "管理已连接的云账户和 MDBX 本地工作副本。",
         ["BackupHistory"] = "备份历史",
         ["BackupNow"] = "立即备份",
         ["RestoreLatest"] = "恢复最新备份",
@@ -2775,9 +2799,9 @@ public sealed class LocalizationService : ILocalizationService
         ["MdbxWebDavMissingRevision"] = "缺少上一次远程修订信息，因此 Monica 已拒绝覆盖 WebDAV 保险库。",
         ["MdbxWebDavConflictRequiresResolution"] = "此 WebDAV 保险库存在同步冲突。在你明确解决冲突前，Monica 不会覆盖任一副本。",
         ["MdbxKeepLocalConfirmationTitle"] = "替换远程保险库？",
-        ["MdbxKeepLocalConfirmationMessageFormat"] = "保留 {0} 的本地副本并替换当前 WebDAV 副本吗？Monica 会在上传前再次验证远程修订。",
+        ["MdbxKeepLocalConfirmationMessageFormat"] = "保留 {0} 的本地副本并替换当前远程副本吗？Monica 会在上传前再次验证远程修订。",
         ["MdbxUseRemoteConfirmationTitle"] = "替换本地工作副本？",
-        ["MdbxUseRemoteConfirmationMessageFormat"] = "采用 {0} 当前的 WebDAV 副本吗？Monica 会先把现有本地副本保留为加密冲突备份。",
+        ["MdbxUseRemoteConfirmationMessageFormat"] = "采用 {0} 当前的远程副本吗？Monica 会先把现有本地副本保留为加密冲突备份。",
         ["MdbxKeepLocalSucceededFormat"] = "已通过上传本地副本解决 {0} 的冲突。",
         ["MdbxUseRemoteSucceededFormat"] = "已通过下载远程副本解决 {0} 的冲突。",
         ["MdbxUseRemoteWithBackupSucceededFormat"] = "已采用远程副本解决 {0} 的冲突。原加密本地副本保存在 {1}。",
@@ -2801,6 +2825,10 @@ public sealed class LocalizationService : ILocalizationService
         ["SyncRecoveryBackupReadyFormat"] = "已有 {0} 个备份文件可用于恢复。",
         ["OneDriveBoundaryEnabled"] = "OneDrive 接口已启用",
         ["OneDriveBoundaryDescription"] = "OneDrive 当前用于 Microsoft Graph MDBX 同步元数据边界。",
+        ["OneDriveConnectedFormat"] = "已使用 {0} 连接 OneDrive。",
+        ["OneDriveDisconnected"] = "已断开 OneDrive。现有账户绑定保险库重新连接时必须使用同一账户。",
+        ["OneDriveSignInCanceled"] = "已取消 OneDrive 登录。",
+        ["OneDriveConnectionFailedFormat"] = "OneDrive 连接失败：{0}",
         ["WebDavConnectionTestSucceededFormat"] = "WebDAV 连接测试成功；可见 {0} 个远程项目。",
         ["WebDavConnectionTestFailedFormat"] = "WebDAV 连接测试失败：{0}",
         ["EnableWebDavFirst"] = "请先启用 WebDAV 并配置服务器，再加载备份。",

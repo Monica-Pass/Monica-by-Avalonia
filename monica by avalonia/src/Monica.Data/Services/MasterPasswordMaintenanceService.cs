@@ -82,6 +82,7 @@ public sealed class MasterPasswordMaintenanceService(
         new("secure_items", "id", "image_paths", SecretBucket.SecureItems, true),
         new("local_mdbx_databases", "id", "encrypted_password", SecretBucket.Mdbx, false),
         new("local_mdbx_databases", "id", "key_file_uri", SecretBucket.Mdbx, true),
+        new("local_mdbx_databases", "id", "remote_account_id", SecretBucket.Mdbx, false),
         new("operation_logs", "id", "item_title", SecretBucket.OperationLogs, true),
         new("operation_logs", "id", "changes_json", SecretBucket.OperationLogs, true),
         new("mdbx_remote_sources", "id", "username_encrypted", SecretBucket.RemoteSources, false),

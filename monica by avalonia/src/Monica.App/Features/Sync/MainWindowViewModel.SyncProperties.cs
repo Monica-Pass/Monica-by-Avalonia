@@ -8,6 +8,7 @@ namespace Monica.App.ViewModels;
 public sealed partial class MainWindowViewModel
 {
     private readonly IWebDavBackupService _webDavBackupService;
+    private readonly IOneDriveBackupService _oneDriveBackupService;
 
     public ObservableCollection<SyncHealthDisplayItem> SyncHealthItems { get; } = [];
     public ObservableCollection<WebDavBackupHistoryItem> WebDavBackupHistory { get; } = [];
@@ -47,9 +48,10 @@ public sealed partial class MainWindowViewModel
                 : _localization.Get("SyncRecoveryNoBackupsLoaded");
         }
     }
-    public string OneDriveConnectionStatusText => OneDriveEnabled
-        ? _localization.Get("OneDriveBoundaryEnabled")
-        : _localization.Get("FeatureDisabled");
+    public string OneDriveConnectionStatusText => HasOneDriveAccount
+        ? OneDriveAccountDisplayName
+        : _localization.Get("EnableOneDriveDescription");
+    public bool HasOneDriveDeviceCode => !string.IsNullOrWhiteSpace(OneDriveDeviceCode);
     public string WebDavBackupHistoryCountText => _localization.Format("WebDavBackupHistoryCountFormat", WebDavBackupHistory.Count);
     public bool HasWebDavBackupHistory => WebDavBackupHistory.Count > 0;
     public bool HasSelectedWebDavBackupHistoryItem => SelectedWebDavBackupHistoryItem is not null;
@@ -134,6 +136,53 @@ public sealed partial class MainWindowViewModel
 
     [ObservableProperty]
     private bool _oneDriveEnabled;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OneDriveConnectionStatusText))]
+    private bool _hasOneDriveAccount;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OneDriveConnectionStatusText))]
+    private string _oneDriveAccountDisplayName = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasOneDriveDeviceCode))]
+    private string _oneDriveDeviceCode = "";
+
+    [ObservableProperty]
+    private string _oneDriveVerificationUrl = "";
+
+    [ObservableProperty]
+    private bool _isOneDriveBusy;
+
+    private sealed class DisabledOneDriveBackupService : IOneDriveBackupService
+    {
+        public PlatformCapability GetCapability() => new(
+            "onedrive",
+            "OneDrive",
+            "OneDrive is unavailable in this application host.",
+            PlatformFeatureStatus.Unsupported,
+            "OneDrive is unavailable in this application host.");
+
+        public Task<OneDriveAccountInfo?> GetCachedAccountAsync(string? accountId = null, CancellationToken cancellationToken = default) =>
+            Task.FromResult<OneDriveAccountInfo?>(null);
+
+        public Task<OneDriveSignInChallenge> BeginSignInAsync(CancellationToken cancellationToken = default) =>
+            Task.FromException<OneDriveSignInChallenge>(new NotSupportedException("OneDrive sign-in is unavailable."));
+
+        public Task SignOutAsync(string? accountId = null, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<RemoteFileVersion?> GetFileVersionAsync(string accountId, string remotePath, CancellationToken cancellationToken = default) =>
+            Task.FromResult<RemoteFileVersion?>(null);
+
+        public Task<RemoteFileVersion> UploadBinaryConditionallyAsync(string accountId, string remotePath, Stream content, RemoteWriteCondition condition, CancellationToken cancellationToken = default) =>
+            Task.FromException<RemoteFileVersion>(new NotSupportedException("OneDrive upload is unavailable."));
+
+        public Task<RemoteFileVersion> DownloadBinaryVersionedAsync(string accountId, string remotePath, Stream destination, CancellationToken cancellationToken = default) =>
+            Task.FromException<RemoteFileVersion>(new NotSupportedException("OneDrive download is unavailable."));
+
+        public Task ClearSensitiveCacheAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
 
     private sealed class DisabledWebDavBackupService : IWebDavBackupService
     {

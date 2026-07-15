@@ -97,6 +97,7 @@ public sealed partial class MainWindowViewModel
     partial void OnOneDriveEnabledChanged(bool value)
     {
         UpdateSettings(settings => settings.OneDriveEnabled = value);
+        OnPropertyChanged(nameof(OneDriveConnectionStatusText));
         RaiseSyncPageState();
         RefreshMdbxVaultState();
     }

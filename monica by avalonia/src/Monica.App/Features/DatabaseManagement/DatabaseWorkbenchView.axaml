@@ -99,12 +99,14 @@
                     </Grid>
                 </Border>
                 <Border Padding="16" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource LayerFillColorDefaultBrush}">
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                         <StackPanel Spacing="5">
                             <TextBlock Text="{Binding L.EnableOneDrive}" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding L.EnableOneDriveDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Text="{Binding OneDriveConnectionStatusText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding OneDriveEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+                        <Button Grid.Column="1" Classes="workspacePrimaryCommand" Command="{Binding ConnectOneDriveCommand}" IsEnabled="{Binding !IsOneDriveBusy}" IsVisible="{Binding !HasOneDriveAccount}" AutomationProperties.Name="{Binding L.OneDriveConnect}"><TextBlock Text="{Binding L.OneDriveConnect}" /></Button>
+                        <Button Grid.Column="1" Classes="workspaceCommand" Command="{Binding DisconnectOneDriveCommand}" IsEnabled="{Binding !IsOneDriveBusy}" IsVisible="{Binding HasOneDriveAccount}" AutomationProperties.Name="{Binding L.OneDriveDisconnect}"><TextBlock Text="{Binding L.OneDriveDisconnect}" /></Button>
+                        <Button Grid.Column="2" Classes="workspaceCommand" Command="{Binding OpenSyncWorkspacePageCommand}" CommandParameter="Sources"><TextBlock Text="{Binding L.Configure}" /></Button>
                     </Grid>
                 </Border>
             </StackPanel>

@@ -9,7 +9,7 @@ public interface IDatabaseMigrator
 
 public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory) : IDatabaseMigrator
 {
-    public const int CurrentSchemaVersion = 71;
+    public const int CurrentSchemaVersion = 72;
 
     public async Task MigrateAsync(CancellationToken cancellationToken = default)
     {
@@ -38,6 +38,7 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
         await EnsureColumnAsync(connection, "secure_items", "bound_password_id", "INTEGER DEFAULT NULL", cancellationToken);
         await EnsureColumnAsync(connection, "local_mdbx_databases", "remote_etag", "TEXT DEFAULT NULL", cancellationToken);
         await EnsureColumnAsync(connection, "local_mdbx_databases", "remote_last_modified_at", "INTEGER DEFAULT NULL", cancellationToken);
+        await EnsureColumnAsync(connection, "local_mdbx_databases", "remote_account_id", "TEXT DEFAULT NULL", cancellationToken);
         await ExecuteAsync(connection, "CREATE INDEX IF NOT EXISTS index_secure_items_bound_password_id ON secure_items(bound_password_id);", cancellationToken);
         await ExecuteAsync(connection, $"PRAGMA user_version={CurrentSchemaVersion};", cancellationToken);
     }
@@ -378,7 +379,8 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
             last_sync_status TEXT NOT NULL DEFAULT 'LOCAL_ONLY',
             last_sync_error TEXT DEFAULT NULL,
             remote_etag TEXT DEFAULT NULL,
-            remote_last_modified_at INTEGER DEFAULT NULL
+            remote_last_modified_at INTEGER DEFAULT NULL,
+            remote_account_id TEXT DEFAULT NULL
         );
         """,
         "CREATE INDEX IF NOT EXISTS index_local_mdbx_databases_storage_location ON local_mdbx_databases(storage_location);",

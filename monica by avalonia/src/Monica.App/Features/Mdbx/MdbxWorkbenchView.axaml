@@ -40,19 +40,19 @@
                                 <TextBlock Text="{Binding L.Open}" />
                             </StackPanel>
                         </Button>
-                        <Button x:Name="SyncMdbxDatabaseButton" Classes="workspaceCommand" Command="{Binding SyncMdbxDatabaseCommand}" CommandParameter="{Binding SelectedMdbxDatabaseItem}" IsEnabled="{Binding !IsMdbxBusy}" IsVisible="{Binding SelectedMdbxDatabaseItem.IsWebDav}" Margin="0,0,8,8">
+                        <Button x:Name="SyncMdbxDatabaseButton" Classes="workspaceCommand" Command="{Binding SyncMdbxDatabaseCommand}" CommandParameter="{Binding SelectedMdbxDatabaseItem}" IsEnabled="{Binding !IsMdbxBusy}" IsVisible="{Binding SelectedMdbxDatabaseItem.IsRemote}" Margin="0,0,8,8">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <ic:FluentIcon Icon="ArrowClockwise" FontSize="18" />
                                 <TextBlock Text="{Binding L.MdbxSyncNow}" />
                             </StackPanel>
                         </Button>
-                        <Button x:Name="KeepLocalWebDavMdbxButton" Classes="workspaceCommand" Command="{Binding KeepLocalWebDavMdbxCommand}" CommandParameter="{Binding SelectedMdbxDatabaseItem}" IsEnabled="{Binding !IsMdbxBusy}" IsVisible="{Binding SelectedMdbxDatabaseItem.IsConflict}" Margin="0,0,8,8">
+                        <Button x:Name="KeepLocalRemoteMdbxButton" Classes="workspaceCommand" Command="{Binding KeepLocalWebDavMdbxCommand}" CommandParameter="{Binding SelectedMdbxDatabaseItem}" IsEnabled="{Binding !IsMdbxBusy}" IsVisible="{Binding SelectedMdbxDatabaseItem.IsConflict}" Margin="0,0,8,8">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
                                 <TextBlock Text="{Binding L.MdbxKeepLocal}" />
                             </StackPanel>
                         </Button>
-                        <Button x:Name="UseRemoteWebDavMdbxButton" Classes="workspaceCommand" Command="{Binding UseRemoteWebDavMdbxCommand}" CommandParameter="{Binding SelectedMdbxDatabaseItem}" IsEnabled="{Binding !IsMdbxBusy}" IsVisible="{Binding SelectedMdbxDatabaseItem.IsConflict}" Margin="0,0,8,8">
+                        <Button x:Name="UseRemoteMdbxButton" Classes="workspaceCommand" Command="{Binding UseRemoteWebDavMdbxCommand}" CommandParameter="{Binding SelectedMdbxDatabaseItem}" IsEnabled="{Binding !IsMdbxBusy}" IsVisible="{Binding SelectedMdbxDatabaseItem.IsConflict}" Margin="0,0,8,8">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <ic:FluentIcon Icon="ArrowDownload" FontSize="18" />
                                 <TextBlock Text="{Binding L.MdbxUseRemote}" />

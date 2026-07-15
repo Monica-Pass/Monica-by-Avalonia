@@ -5,7 +5,7 @@ using Monica.Data.Repositories;
 
 namespace Monica.Tests;
 
-public sealed class DataRepositoryTests
+public sealed partial class DataRepositoryTests
 {
     [Fact]
     public async Task Migration_sets_current_schema_version()

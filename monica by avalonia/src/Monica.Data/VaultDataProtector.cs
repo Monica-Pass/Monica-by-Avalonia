@@ -167,6 +167,7 @@ public sealed class VaultDataProtector(ICryptoService cryptoService) : IVaultDat
         var protectedDatabase = Clone(database);
         protectedDatabase.EncryptedPassword = ProtectNullableText(database.EncryptedPassword, allowLegacyCipher: true);
         protectedDatabase.KeyFileUri = ProtectNullableText(database.KeyFileUri);
+        protectedDatabase.RemoteAccountId = ProtectNullableText(database.RemoteAccountId);
         return protectedDatabase;
     }
 
@@ -175,6 +176,7 @@ public sealed class VaultDataProtector(ICryptoService cryptoService) : IVaultDat
         var unprotectedDatabase = Clone(database);
         unprotectedDatabase.EncryptedPassword = UnprotectNullableText(database.EncryptedPassword, allowLegacyCipher: true);
         unprotectedDatabase.KeyFileUri = UnprotectNullableText(database.KeyFileUri);
+        unprotectedDatabase.RemoteAccountId = UnprotectNullableText(database.RemoteAccountId);
         return unprotectedDatabase;
     }
 
@@ -321,6 +323,7 @@ public sealed class VaultDataProtector(ICryptoService cryptoService) : IVaultDat
         LastSyncStatus = source.LastSyncStatus,
         LastSyncError = source.LastSyncError,
         RemoteETag = source.RemoteETag,
-        RemoteLastModifiedAt = source.RemoteLastModifiedAt
+        RemoteLastModifiedAt = source.RemoteLastModifiedAt,
+        RemoteAccountId = source.RemoteAccountId
     };
 }

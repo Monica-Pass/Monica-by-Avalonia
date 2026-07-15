@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.Input;
 using Monica.Core.Models;
+using Monica.Platform.Services;
 
 namespace Monica.App.ViewModels;
 
@@ -104,18 +105,21 @@ public sealed partial class MainWindowViewModel
 
     private async Task CreateOneDriveMdbxVaultCoreAsync()
     {
-        if (!OneDriveEnabled)
-        {
-            StatusMessage = _localization.Get("EnableOneDriveFirst");
-            return;
-        }
+        var account = await EnsureOneDriveAccountAsync();
 
-        const string remotePath = "OneDrive:/Monica/local.mdbx";
+        const string remotePath = "/Monica/local.mdbx";
         var existing = MdbxDatabases.FirstOrDefault(item =>
             item.StorageLocation == MdbxStorageLocation.RemoteOneDrive &&
+            string.Equals(item.RemoteAccountId, account.AccountId, StringComparison.Ordinal) &&
             string.Equals(item.FilePath, remotePath, StringComparison.OrdinalIgnoreCase));
         if (existing is not null)
         {
+            if (existing.LastSyncStatus == SyncStatus.PendingUpload)
+            {
+                await UploadOneDriveMdbxWorkingCopyAsync(existing);
+                return;
+            }
+
             StatusMessage = _localization.Format("MdbxMetadataAlreadyRegisteredFormat", existing.Name);
             return;
         }
@@ -125,13 +129,13 @@ public sealed partial class MainWindowViewModel
             remotePath,
             MdbxStorageLocation.RemoteOneDrive,
             "REMOTE_ONEDRIVE",
-            BuildMdbxWorkingCopyPath("onedrive-local.mdbx"),
+            BuildOneDriveMdbxWorkingCopyPath(account.AccountId, remotePath),
             _localization.Get("MdbxOneDriveMetadataDescription"));
+        metadata.RemoteAccountId = account.AccountId;
         metadata.IsDefault = MdbxDatabases.Count == 0;
         await _repository.SaveMdbxDatabaseAsync(metadata);
         MdbxDatabases.Add(metadata);
-        RefreshMdbxVaultState();
-        RefreshVaultSources();
+        await UploadOneDriveMdbxWorkingCopyAsync(metadata);
         StatusMessage = _localization.Get("CreatedMdbxOneDriveMetadata");
     }
 
@@ -178,6 +182,18 @@ public sealed partial class MainWindowViewModel
                 await DownloadWebDavMdbxWorkingCopyAsync(database, profile);
             }
         }
+        else if (database.StorageLocation == MdbxStorageLocation.RemoteOneDrive)
+        {
+            await EnsureBoundOneDriveAccountAsync(database);
+            if (database.LastSyncStatus == SyncStatus.PendingUpload)
+            {
+                await UploadOneDriveMdbxWorkingCopyAsync(database);
+            }
+            else if (!File.Exists(database.WorkingCopyPath))
+            {
+                await DownloadOneDriveMdbxWorkingCopyAsync(database);
+            }
+        }
 
         if (string.IsNullOrWhiteSpace(database.WorkingCopyPath ?? database.FilePath))
         {
@@ -204,7 +220,31 @@ public sealed partial class MainWindowViewModel
         }
 
         var database = await GetLatestMdbxDatabaseAsync(item.Database.Id);
-        if (database is null || database.StorageLocation != MdbxStorageLocation.RemoteWebDav)
+        if (database is null)
+        {
+            return;
+        }
+
+        if (database.StorageLocation == MdbxStorageLocation.RemoteOneDrive)
+        {
+            await EnsureBoundOneDriveAccountAsync(database);
+            if (database.LastSyncStatus == SyncStatus.PendingUpload)
+            {
+                await UploadOneDriveMdbxWorkingCopyAsync(database);
+                return;
+            }
+
+            if (database.LastSyncStatus == SyncStatus.Conflict)
+            {
+                StatusMessage = _localization.Get("MdbxWebDavConflictRequiresResolution");
+                return;
+            }
+
+            await DownloadOneDriveMdbxWorkingCopyAsync(database);
+            return;
+        }
+
+        if (database.StorageLocation != MdbxStorageLocation.RemoteWebDav)
         {
             return;
         }

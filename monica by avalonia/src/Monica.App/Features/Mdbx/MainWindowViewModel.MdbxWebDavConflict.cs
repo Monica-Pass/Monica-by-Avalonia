@@ -7,8 +7,8 @@ public sealed partial class MainWindowViewModel
 {
     private async Task KeepLocalWebDavMdbxCoreAsync(MdbxDatabaseDisplayItem? item)
     {
-        var database = await GetConflictedWebDavDatabaseAsync(item);
-        if (database is null || !TryCreateWebDavProfile(out var profile))
+        var database = await GetConflictedRemoteDatabaseAsync(item);
+        if (database is null)
         {
             return;
         }
@@ -23,18 +23,36 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var currentRemote = await _webDavBackupService.GetFileVersionAsync(profile, database.FilePath);
-        var condition = currentRemote is null
-            ? RemoteWriteCondition.CreateOnly
-            : RemoteWriteCondition.Match(currentRemote);
-        await UploadWebDavMdbxWorkingCopyAsync(database, profile, condition);
+        if (database.StorageLocation == MdbxStorageLocation.RemoteOneDrive)
+        {
+            await EnsureBoundOneDriveAccountAsync(database);
+            var accountId = GetBoundOneDriveAccountId(database);
+            var currentRemote = await _oneDriveBackupService.GetFileVersionAsync(accountId, database.FilePath);
+            var condition = currentRemote is null
+                ? RemoteWriteCondition.CreateOnly
+                : RemoteWriteCondition.Match(currentRemote);
+            await UploadOneDriveMdbxWorkingCopyAsync(database, condition);
+        }
+        else
+        {
+            if (!TryCreateWebDavProfile(out var profile))
+            {
+                return;
+            }
+
+            var currentRemote = await _webDavBackupService.GetFileVersionAsync(profile, database.FilePath);
+            var condition = currentRemote is null
+                ? RemoteWriteCondition.CreateOnly
+                : RemoteWriteCondition.Match(currentRemote);
+            await UploadWebDavMdbxWorkingCopyAsync(database, profile, condition);
+        }
         StatusMessage = _localization.Format("MdbxKeepLocalSucceededFormat", database.Name);
     }
 
     private async Task UseRemoteWebDavMdbxCoreAsync(MdbxDatabaseDisplayItem? item)
     {
-        var database = await GetConflictedWebDavDatabaseAsync(item);
-        if (database is null || !TryCreateWebDavProfile(out var profile))
+        var database = await GetConflictedRemoteDatabaseAsync(item);
+        if (database is null)
         {
             return;
         }
@@ -57,13 +75,26 @@ public sealed partial class MainWindowViewModel
             File.Copy(workingCopyPath, recoveryPath, overwrite: false);
         }
 
-        await DownloadWebDavMdbxWorkingCopyAsync(database, profile, SyncStatus.Conflict);
+        if (database.StorageLocation == MdbxStorageLocation.RemoteOneDrive)
+        {
+            await EnsureBoundOneDriveAccountAsync(database);
+            await DownloadOneDriveMdbxWorkingCopyAsync(database, SyncStatus.Conflict);
+        }
+        else
+        {
+            if (!TryCreateWebDavProfile(out var profile))
+            {
+                return;
+            }
+
+            await DownloadWebDavMdbxWorkingCopyAsync(database, profile, SyncStatus.Conflict);
+        }
         StatusMessage = recoveryPath is null
             ? _localization.Format("MdbxUseRemoteSucceededFormat", database.Name)
             : _localization.Format("MdbxUseRemoteWithBackupSucceededFormat", database.Name, recoveryPath);
     }
 
-    private async Task<LocalMdbxDatabase?> GetConflictedWebDavDatabaseAsync(MdbxDatabaseDisplayItem? item)
+    private async Task<LocalMdbxDatabase?> GetConflictedRemoteDatabaseAsync(MdbxDatabaseDisplayItem? item)
     {
         if (item is null)
         {
@@ -72,7 +103,7 @@ public sealed partial class MainWindowViewModel
 
         var database = await GetLatestMdbxDatabaseAsync(item.Database.Id);
         return database is not null &&
-            database.StorageLocation == MdbxStorageLocation.RemoteWebDav &&
+            database.StorageLocation is MdbxStorageLocation.RemoteWebDav or MdbxStorageLocation.RemoteOneDrive &&
             database.LastSyncStatus == SyncStatus.Conflict
                 ? database
                 : null;

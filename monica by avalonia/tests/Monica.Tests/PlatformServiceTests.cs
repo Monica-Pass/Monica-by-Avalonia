@@ -8,7 +8,7 @@ using System.Net.Http.Headers;
 
 namespace Monica.Tests;
 
-public sealed class PlatformServiceTests
+public sealed partial class PlatformServiceTests
 {
     [Fact]
     public void Webdav_paths_are_normalized_for_sync()
