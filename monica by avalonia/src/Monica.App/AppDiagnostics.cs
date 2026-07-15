@@ -79,7 +79,7 @@ internal static class AppDiagnostics
 
     private static void Write(string level, string message, Exception? exception = null)
     {
-        if (!LogEvents.Writer.TryWrite(new DiagnosticEvent(DateTimeOffset.Now, level, message, exception)))
+        if (!LogEvents.Writer.TryWrite(new DiagnosticEvent(DateTimeOffset.UtcNow, level, message, exception)))
         {
             Debug.WriteLine(message);
         }
