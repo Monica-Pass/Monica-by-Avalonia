@@ -18,7 +18,9 @@ internal readonly record struct NoteImagePreviewDecodePlan(
 
 internal static class NoteImagePreviewDecoder
 {
-    internal const int MaximumEdgePixels = 1600;
+    // Preview cards are 172 DIPs wide. 1024 px covers Windows' 500% display scale
+    // with margin while bounding a square BGRA preview to 4 MiB.
+    internal const int MaximumEdgePixels = 1024;
 
     internal static Bitmap Decode(byte[] encodedImage)
     {

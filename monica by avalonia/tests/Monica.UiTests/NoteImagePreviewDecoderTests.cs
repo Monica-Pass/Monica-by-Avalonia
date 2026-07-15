@@ -9,6 +9,9 @@ namespace Monica.UiTests;
 [Collection(AvaloniaUiTestCollection.Name)]
 public sealed class NoteImagePreviewDecoderTests
 {
+    private const int PreviewCardWidthDips = 172;
+    private const int ExtremeDesktopScale = 5;
+
     public NoteImagePreviewDecoderTests()
     {
         AvaloniaUiThreadTestContext.VerifyAccess();
@@ -24,6 +27,19 @@ public sealed class NoteImagePreviewDecoderTests
         Assert.Equal(new PixelSize(2400, 1600), plan.SourcePixelSize);
         Assert.Equal(NoteImagePreviewDecodeAxis.Width, plan.Axis);
         Assert.Equal(NoteImagePreviewDecoder.MaximumEdgePixels, plan.TargetPixels);
+    }
+
+    [Fact]
+    public void Maximum_decode_edge_covers_extreme_desktop_scale_without_excess_density()
+    {
+        const int expectedMaximumEdgePixels = 1024;
+
+        Assert.Equal(expectedMaximumEdgePixels, NoteImagePreviewDecoder.MaximumEdgePixels);
+        Assert.True(
+            NoteImagePreviewDecoder.MaximumEdgePixels >= PreviewCardWidthDips * ExtremeDesktopScale);
+        Assert.Equal(
+            4 * 1024 * 1024,
+            NoteImagePreviewDecoder.MaximumEdgePixels * NoteImagePreviewDecoder.MaximumEdgePixels * 4);
     }
 
     [Fact]
