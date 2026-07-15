@@ -1,9 +1,9 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using Avalonia;
-using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Monica.App.Features.Notes;
 using Monica.App.Services;
 using Monica.Core.Models;
 using Monica.Platform.Services;
@@ -135,12 +135,11 @@ public sealed partial class MainWindowViewModel
                         continue;
                     }
 
-                    using var stream = new MemoryStream(contentBytes);
                     previews.Add(new NoteImagePreviewItem(
                         imagePath,
                         BuildNoteImagePreviewName(imagePath, previews.Count + 1),
                         FormatByteSize(contentBytes.LongLength),
-                        new Bitmap(stream)));
+                        NoteImagePreviewDecoder.Decode(contentBytes)));
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
