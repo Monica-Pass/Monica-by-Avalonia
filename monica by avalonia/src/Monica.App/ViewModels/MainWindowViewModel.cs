@@ -277,17 +277,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             SelectedPassword = null;
             SelectedPasswordDetails = null;
             _selectedPasswordCount = 0;
-            Passwords.Clear();
-            ArchivedPasswords.Clear();
-            DeletedPasswords.Clear();
-            NoteItems.Clear();
-            TotpItems.Clear();
-            WalletItems.Clear();
-            Categories.Clear();
-            MdbxDatabases.Clear();
-            MdbxDatabaseItems.Clear();
-            VaultSources.Clear();
-            TimelineEntries.Clear();
 
             StatusMessage = "正在后台读取保险库数据...";
             VaultLoadStageText = "正在读取密码、笔记和分类...";
@@ -403,6 +392,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         catch (OperationCanceledException) when (sessionCancellationToken.IsCancellationRequested)
         {
             AppDiagnostics.Info("Vault load canceled because the session was locked");
+            ClearSensitiveSessionState();
             VaultLoadStageText = "";
         }
         catch (Exception ex)
@@ -410,6 +400,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             LastVaultLoadDurationMilliseconds = loadStopwatch.ElapsedMilliseconds;
             AppDiagnostics.Error($"Vault load failed after {loadStopwatch.ElapsedMilliseconds} ms", ex);
             IsUnlocked = false;
+            ClearSensitiveSessionState();
             VaultLoadStageText = "保险库加载失败";
             StatusMessage = _localization.Format("VaultLoadFailedFormat", ex.Message);
         }

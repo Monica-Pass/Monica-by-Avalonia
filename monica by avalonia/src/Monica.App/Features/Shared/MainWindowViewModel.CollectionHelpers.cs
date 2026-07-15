@@ -4,6 +4,13 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    private static void ClearItems<T>(ObservableCollection<T> target)
+    {
+        if (target.Count > 0)
+        {
+            target.Clear();
+        }
+    }
 
     private static void ReplaceItems<T>(ObservableCollection<T> target, IEnumerable<T> items)
     {

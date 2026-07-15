@@ -124,23 +124,23 @@ public sealed partial class MainWindowViewModel
 
     private void ClearVaultCollections()
     {
-        Passwords.Clear();
-        ArchivedPasswords.Clear();
-        DeletedPasswords.Clear();
-        NoteItems.Clear();
-        TotpItems.Clear();
-        WalletItems.Clear();
-        Categories.Clear();
-        OpenNoteTabs.Clear();
-        NoteImagePreviewItems.Clear();
-        GeneratedPasswordHistory.Clear();
-        TimelineEntries.Clear();
-        SecuritySummaryItems.Clear();
-        SecurityIssueItems.Clear();
-        WebDavBackupHistory.Clear();
-        MdbxDatabases.Clear();
-        MdbxDatabaseItems.Clear();
-        VaultSources.Clear();
+        ClearItems(Passwords);
+        ClearItems(ArchivedPasswords);
+        ClearItems(DeletedPasswords);
+        ClearItems(NoteItems);
+        ClearItems(TotpItems);
+        ClearItems(WalletItems);
+        ClearItems(Categories);
+        ClearItems(OpenNoteTabs);
+        ClearItems(NoteImagePreviewItems);
+        ClearItems(GeneratedPasswordHistory);
+        ClearItems(TimelineEntries);
+        ClearItems(SecuritySummaryItems);
+        ClearItems(SecurityIssueItems);
+        ClearItems(WebDavBackupHistory);
+        ClearItems(MdbxDatabases);
+        ClearItems(MdbxDatabaseItems);
+        ClearItems(VaultSources);
     }
 
     private void ClearEditorAndTransferBuffers()

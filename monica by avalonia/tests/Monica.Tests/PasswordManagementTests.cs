@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Collections.Concurrent;
+using System.Collections.Specialized;
+using System.Reflection;
 using Monica.App.Services;
 using Monica.App.ViewModels;
 using Monica.Core.ImportExport;
@@ -24,6 +26,63 @@ public sealed class PasswordManagementTestCollection
 [Collection(PasswordManagementTestCollection.Name)]
 public sealed class PasswordManagementTests
 {
+    [Fact]
+    public async Task Vault_load_publishes_password_collection_once()
+    {
+        var harness = CreateHarness();
+        await harness.Repository.SavePasswordAsync(new PasswordEntry { Title = "Published once" });
+        var collectionChanges = new List<NotifyCollectionChangedAction>();
+        harness.ViewModel.Passwords.CollectionChanged += (_, args) => collectionChanges.Add(args.Action);
+
+        await harness.ViewModel.LoadAsync();
+
+        Assert.Equal([NotifyCollectionChangedAction.Reset], collectionChanges);
+        Assert.Equal("Published once", Assert.Single(harness.ViewModel.Passwords).Title);
+    }
+
+    [Fact]
+    public async Task Vault_load_keeps_published_passwords_visible_until_replacement_is_ready()
+    {
+        var harness = CreateHarness();
+        await harness.Repository.SavePasswordAsync(new PasswordEntry { Title = "Still visible" });
+        await harness.ViewModel.LoadAsync();
+        var collectionChanges = 0;
+        harness.ViewModel.Passwords.CollectionChanged += (_, _) => collectionChanges++;
+        harness.ViewModel.SmokeVaultLoadDelayMilliseconds = 200;
+
+        var reload = harness.ViewModel.LoadAsync();
+        await Task.Delay(50);
+
+        Assert.True(harness.ViewModel.IsLoadingVault);
+        Assert.Equal("Still visible", Assert.Single(harness.ViewModel.Passwords).Title);
+        Assert.Equal(0, collectionChanges);
+
+        await reload;
+
+        Assert.Equal(1, collectionChanges);
+    }
+
+    [Fact]
+    public async Task Vault_load_failure_clears_previously_published_sensitive_state()
+    {
+        var repository = DispatchProxy.Create<IMonicaRepository, ThrowingVaultRepositoryProxy>();
+        var harness = CreateHarness(repositoryOverride: repository);
+        harness.Crypto.InitializeSession("source password", new byte[16]);
+        harness.ViewModel.Passwords.Add(new PasswordEntry
+        {
+            Title = "Must be cleared",
+            Password = "sensitive"
+        });
+        harness.ViewModel.ImportJsonText = "sensitive transfer buffer";
+
+        await harness.ViewModel.LoadAsync();
+
+        Assert.False(harness.ViewModel.IsUnlocked);
+        Assert.False(harness.ViewModel.IsLoadingVault);
+        Assert.Empty(harness.ViewModel.Passwords);
+        Assert.Equal("", harness.ViewModel.ImportJsonText);
+    }
+
     [Fact]
     public void ViewModel_note_workspace_uses_single_pane_navigation_when_narrow()
     {
@@ -3940,13 +3999,15 @@ public sealed class PasswordManagementTests
         IFileSystemPickerService? fileSystemPickerService = null,
         IExportAuthorizationService? exportAuthorizationService = null,
         IPasswordGeneratorService? passwordGeneratorService = null,
-        IImportExportService? importExportService = null)
+        IImportExportService? importExportService = null,
+        IMonicaRepository? repositoryOverride = null)
     {
         var databasePath = GetTempDatabasePath();
         var factory = new SqliteConnectionFactory(databasePath);
         var migrator = new DatabaseMigrator(factory);
         var attachmentFileService = new FakePasswordAttachmentFileService();
-        var repository = new MonicaRepository(factory, migrator, attachmentContentStore: attachmentFileService);
+        var repository = repositoryOverride ??
+            new MonicaRepository(factory, migrator, attachmentContentStore: attachmentFileService);
         var crypto = new CryptoService();
         var localization = new LocalizationService();
         var generator = passwordGeneratorService ?? new PasswordGeneratorService();
@@ -4098,6 +4159,14 @@ public sealed class PasswordManagementTests
         FakePasswordAttachmentFileService Attachments,
         IConfirmationDialogService? ConfirmationDialog,
         string DatabasePath);
+
+    public class ThrowingVaultRepositoryProxy : DispatchProxy
+    {
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args) =>
+            targetMethod?.Name == nameof(IMonicaRepository.GetPasswordsAsync)
+                ? Task.FromException<IReadOnlyList<PasswordEntry>>(new InvalidOperationException("Simulated vault read failure"))
+                : throw new NotSupportedException($"Unexpected repository call: {targetMethod?.Name}");
+    }
 
     private sealed class CapturingClipboardService : IClipboardService
     {
