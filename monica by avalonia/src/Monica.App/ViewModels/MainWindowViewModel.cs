@@ -27,19 +27,6 @@ using Monica.Data.Services;
 using Monica.Platform.Services;
 namespace Monica.App.ViewModels;
 
-internal sealed record VaultLoadSnapshot(
-    IReadOnlyList<PasswordEntry> ActivePasswords,
-    IReadOnlyList<PasswordEntry> ArchivedPasswords,
-    IReadOnlyList<PasswordEntry> DeletedPasswords,
-    IReadOnlyDictionary<long, IReadOnlyList<CustomField>> PasswordCustomFields,
-    IReadOnlyDictionary<long, IReadOnlyList<Attachment>> PasswordAttachments,
-    IReadOnlyList<SecureItem> NoteItems,
-    IReadOnlyList<SecureItem> WalletItems,
-    IReadOnlyList<SecureItem> StoredTotps,
-    IReadOnlyList<Category> Categories,
-    IReadOnlyDictionary<long, PasswordQuickAccessRecord> PasswordQuickAccessRecords,
-    IReadOnlyList<LocalMdbxDatabase> MdbxDatabases);
-
 public sealed partial class MainWindowViewModel : ObservableObject
 {
     private readonly IMonicaRepository _repository;
@@ -312,7 +299,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 AppDiagnostics.Info("Smoke UI vault load delay completed");
             }
 
-            var snapshot = await Task.Run(LoadVaultSnapshotAsync, sessionCancellationToken);
+            var snapshot = await Task.Run(
+                () => VaultSnapshotLoader.LoadAsync(_repository),
+                sessionCancellationToken);
             sessionCancellationToken.ThrowIfCancellationRequested();
             VaultLoadStageText = "正在整理密码列表...";
             await YieldVaultLoadUiAsync();
@@ -431,63 +420,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 IsLoadingVault = false;
             }
         }
-    }
-
-    private async Task<VaultLoadSnapshot> LoadVaultSnapshotAsync()
-    {
-        var allPasswords = await AppDiagnostics.MeasureAsync(
-            "Load passwords",
-            () => _repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
-        var allPasswordItems = allPasswords.ToArray();
-        var activePasswords = allPasswordItems.Where(item => !item.IsDeleted && !item.IsArchived).ToArray();
-        var archivedPasswords = allPasswordItems.Where(item => !item.IsDeleted && item.IsArchived).ToArray();
-        var deletedPasswords = allPasswordItems.Where(item => item.IsDeleted).ToArray();
-        var passwordIds = allPasswordItems.Select(item => item.Id).ToArray();
-
-        var customFields = await AppDiagnostics.MeasureAsync(
-            "Load password custom fields",
-            () => _repository.GetCustomFieldsByEntryIdsAsync(passwordIds));
-        var attachments = await AppDiagnostics.MeasureAsync(
-            "Load password attachments",
-            () => _repository.GetAttachmentsByOwnerIdsAsync("PASSWORD", passwordIds));
-
-        var secureItems = await AppDiagnostics.MeasureAsync(
-            "Load secure items",
-            () => _repository.GetSecureItemsAsync());
-        var noteItems = secureItems
-            .Where(item => item.ItemType == VaultItemType.Note)
-            .ToArray();
-        var walletItems = secureItems
-            .Where(item => item.ItemType is VaultItemType.BankCard or VaultItemType.Document)
-            .ToArray();
-        var storedTotps = secureItems
-            .Where(item => item.ItemType == VaultItemType.Totp)
-            .ToArray();
-
-        var categories = await AppDiagnostics.MeasureAsync(
-            "Load categories",
-            () => _repository.GetCategoriesAsync());
-        var quickAccessRecords = (await AppDiagnostics.MeasureAsync(
-                "Load password quick access",
-                () => _repository.GetPasswordQuickAccessRecordsAsync()))
-            .Where(record => record.OpenCount > 0 && record.PasswordId > 0)
-            .ToDictionary(record => record.PasswordId);
-        var databases = await AppDiagnostics.MeasureAsync(
-            "Load MDBX database metadata",
-            () => _repository.GetMdbxDatabasesAsync());
-
-        return new VaultLoadSnapshot(
-            activePasswords,
-            archivedPasswords,
-            deletedPasswords,
-            customFields,
-            attachments,
-            noteItems,
-            walletItems,
-            storedTotps,
-            categories,
-            quickAccessRecords,
-            databases);
     }
 
     [RelayCommand]

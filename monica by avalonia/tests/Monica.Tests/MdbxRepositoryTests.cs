@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Monica.App.ViewModels;
 using Monica.Core.Models;
 using Monica.Data;
 using Monica.Data.Mdbx;
@@ -395,6 +396,52 @@ public sealed class MdbxRepositoryTests
         Assert.True(
             bridge.OpenedPaths.Count <= 3,
             $"Expected the vault-load read path to reuse MDBX read caches, but MDBX was opened {bridge.OpenedPaths.Count} times.");
+    }
+
+    [Fact]
+    public async Task Vault_snapshot_loader_fanout_preserves_canonical_mdbx_results()
+    {
+        var repository = CreateRepository(out _);
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        var category = new Category { Name = "Work" };
+        await repository.SaveCategoryAsync(category);
+        var password = new PasswordEntry
+        {
+            Title = "Canonical login",
+            Username = "canonical-user",
+            Password = "secret",
+            CategoryId = category.Id
+        };
+        await repository.SavePasswordAsync(password);
+        await repository.ReplaceCustomFieldsAsync(password.Id,
+        [
+            new CustomField { EntryId = password.Id, Title = "Environment", Value = "Production" }
+        ]);
+        await repository.SaveAttachmentAsync(new Attachment
+        {
+            OwnerType = "PASSWORD",
+            OwnerId = password.Id,
+            FileName = "recovery.txt",
+            ContentType = "text/plain",
+            StoragePath = "secure_attachments/recovery.enc",
+            SizeBytes = 8
+        });
+        await repository.SaveSecureItemAsync(new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = "Canonical note"
+        });
+        await repository.RecordPasswordQuickAccessAsync(password.Id);
+
+        var snapshot = await VaultSnapshotLoader.LoadAsync(repository);
+
+        Assert.Equal(password.Id, Assert.Single(snapshot.ActivePasswords).Id);
+        Assert.Equal("Environment", Assert.Single(snapshot.PasswordCustomFields[password.Id]).Title);
+        Assert.Equal("recovery.txt", Assert.Single(snapshot.PasswordAttachments[password.Id]).FileName);
+        Assert.Equal("Canonical note", Assert.Single(snapshot.NoteItems).Title);
+        Assert.Equal(category.Id, Assert.Single(snapshot.Categories).Id);
+        Assert.Equal(1, snapshot.PasswordQuickAccessRecords[password.Id].OpenCount);
+        Assert.Single(snapshot.MdbxDatabases);
     }
 
     [Fact]
