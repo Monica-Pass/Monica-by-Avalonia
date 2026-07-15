@@ -267,6 +267,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ? _vaultSessionService.SessionCancellationToken
             : CancellationToken.None;
         var loadVersion = ++_vaultLoadVersion;
+        BeginPasswordProjectionNotificationDeferral();
         IsLoadingVault = true;
         VaultLoadStageText = "准备加载保险库...";
         var loadStopwatch = Stopwatch.StartNew();
@@ -362,6 +363,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 RaiseCounts();
                 RaiseFilteredPasswordsChanged();
             });
+            EndPasswordProjectionNotificationDeferral();
             StatusMessage = _localization.Get(
                 HasPendingLegacyBusinessData
                     ? "VaultUnlockedLegacyBusinessDataPending"
@@ -384,6 +386,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             AppDiagnostics.Info("Vault load canceled because the session was locked");
             ClearSensitiveSessionState();
+            EndPasswordProjectionNotificationDeferral();
             VaultLoadStageText = "";
         }
         catch (Exception ex)
@@ -392,11 +395,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
             AppDiagnostics.Error($"Vault load failed after {loadStopwatch.ElapsedMilliseconds} ms", ex);
             IsUnlocked = false;
             ClearSensitiveSessionState();
+            EndPasswordProjectionNotificationDeferral();
             VaultLoadStageText = "保险库加载失败";
             StatusMessage = _localization.Format("VaultLoadFailedFormat", ex.Message);
         }
         finally
         {
+            EndPasswordProjectionNotificationDeferral();
             if (loadVersion == _vaultLoadVersion)
             {
                 IsLoadingVault = false;

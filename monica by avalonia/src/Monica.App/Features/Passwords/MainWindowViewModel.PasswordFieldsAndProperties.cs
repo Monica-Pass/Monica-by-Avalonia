@@ -41,6 +41,9 @@ public sealed partial class MainWindowViewModel
     private IReadOnlyList<PasswordListRow> _filteredPasswordRows = [];
     private bool _filteredPasswordsDirty = true;
     private bool _filteredPasswordRowsDirty = true;
+    private int _passwordProjectionNotificationDeferralDepth;
+    private bool _filteredPasswordsNotificationPending;
+    private bool _filteredPasswordRowsNotificationPending;
     private int _selectedPasswordCount;
     private bool _suppressPasswordSelectionStateNotifications;
     private bool _isSyncingSelectedPasswordListRow;

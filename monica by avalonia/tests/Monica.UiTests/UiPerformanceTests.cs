@@ -92,7 +92,7 @@ public sealed class UiPerformanceTests
     }
 
     [Fact]
-    public void Vault_folder_projection_publishes_one_batched_collection_change()
+    public void Vault_password_projection_and_folder_publication_are_coalesced_during_load()
     {
         const int categoryCount = 500;
         const int passwordCount = 5000;
@@ -114,11 +114,35 @@ public sealed class UiPerformanceTests
             overrides.AddSingleton(repository));
         var viewModel = services.GetRequiredService<MainWindowViewModel>();
         var collectionChanges = new List<NotifyCollectionChangedAction>();
+        var filteredPasswordsNotifications = 0;
+        var filteredPasswordRowsNotifications = 0;
         viewModel.PasswordFolderFilters.CollectionChanged += (_, args) => collectionChanges.Add(args.Action);
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(MainWindowViewModel.FilteredPasswords))
+            {
+                filteredPasswordsNotifications++;
+                _ = viewModel.FilteredPasswords.Count;
+            }
+
+            if (args.PropertyName == nameof(MainWindowViewModel.FilteredPasswordRows))
+            {
+                filteredPasswordRowsNotifications++;
+                _ = viewModel.FilteredPasswordRows.Count;
+            }
+        };
 
         RunVaultLoad(viewModel);
 
         Assert.Equal([NotifyCollectionChangedAction.Reset], collectionChanges);
+        Assert.True(
+            filteredPasswordsNotifications == 1 && filteredPasswordRowsNotifications == 1,
+            $"Expected one final password projection publication, but observed " +
+            $"FilteredPasswords={filteredPasswordsNotifications} and " +
+            $"FilteredPasswordRows={filteredPasswordRowsNotifications}.");
+        Assert.True(viewModel.LastVaultLoadDurationMilliseconds > 0);
+        Assert.Equal(passwordCount, viewModel.FilteredPasswords.Count);
+        Assert.Equal(passwordCount, viewModel.FilteredPasswordRows.Count);
         Assert.Equal(categoryCount + 3, viewModel.PasswordFolderFilters.Count);
         Assert.Equal(categoryCount, viewModel.RegularPasswordFolderFilters.Count());
         Assert.All(

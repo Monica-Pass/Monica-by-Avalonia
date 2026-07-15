@@ -147,30 +147,6 @@ public sealed partial class MainWindowViewModel
         return _filteredPasswordRows;
     }
 
-    private void RaiseFilteredPasswordsChanged()
-    {
-        _filteredPasswordsDirty = true;
-        _filteredPasswordRowsDirty = true;
-        OnPropertyChanged(nameof(FilteredPasswords));
-        OnPropertyChanged(nameof(FilteredPasswordRows));
-        OnPropertyChanged(nameof(PasswordListStatusText));
-        OnPropertyChanged(nameof(VisiblePasswordNavigationEntries));
-        OnPropertyChanged(nameof(HasFilteredPasswordRows));
-        OnPropertyChanged(nameof(PasswordEmptyStateText));
-        OnPropertyChanged(nameof(ShowAddPasswordInEmptyState));
-        OnPropertyChanged(nameof(ShowClearPasswordFiltersInEmptyState));
-        SyncSelectedPasswordListRow(SelectedPassword);
-    }
-
-    private void RaiseFilteredPasswordRowsChanged()
-    {
-        _filteredPasswordRowsDirty = true;
-        OnPropertyChanged(nameof(FilteredPasswordRows));
-        OnPropertyChanged(nameof(VisiblePasswordNavigationEntries));
-        OnPropertyChanged(nameof(HasFilteredPasswordRows));
-        SyncSelectedPasswordListRow(SelectedPassword);
-    }
-
     private void RefreshPasswordFilters()
     {
         RefreshPasswordFolderFilters();
