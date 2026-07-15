@@ -22,8 +22,31 @@ public static class WebDavEndpointPolicy
     }
 }
 
-public sealed partial class WebDavBackupService(IHttpClientFactory httpClientFactory) : IWebDavBackupService
+public sealed partial class WebDavBackupService : IWebDavBackupService
 {
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly WebDavBackupTransferLimits _transferLimits;
+
+    public WebDavBackupService(IHttpClientFactory httpClientFactory)
+        : this(httpClientFactory, new WebDavBackupTransferLimits())
+    {
+    }
+
+    public WebDavBackupService(
+        IHttpClientFactory httpClientFactory,
+        WebDavBackupTransferLimits transferLimits)
+    {
+        ArgumentNullException.ThrowIfNull(httpClientFactory);
+        ArgumentNullException.ThrowIfNull(transferLimits);
+        if (transferLimits.MaximumTextBackupBytes <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(transferLimits));
+        }
+
+        _httpClientFactory = httpClientFactory;
+        _transferLimits = transferLimits;
+    }
+
     public string NormalizeRemotePath(string rootPath, string relativePath)
     {
         var root = string.IsNullOrWhiteSpace(rootPath) ? "/" : rootPath.Trim();
@@ -72,6 +95,14 @@ public sealed partial class WebDavBackupService(IHttpClientFactory httpClientFac
 
     public async Task UploadTextAsync(WebDavProfile profile, string relativePath, string content, CancellationToken cancellationToken = default)
     {
+        var contentLength = Encoding.UTF8.GetByteCount(content);
+        if (contentLength > _transferLimits.MaximumTextBackupBytes)
+        {
+            throw new WebDavTextPayloadTooLargeException(
+                _transferLimits.MaximumTextBackupBytes,
+                contentLength);
+        }
+
         using var client = CreateClient(profile);
         var path = NormalizeRemotePath(profile.RootPath, relativePath);
         await EnsureCollectionAsync(client, path, cancellationToken).ConfigureAwait(false);
@@ -87,13 +118,25 @@ public sealed partial class WebDavBackupService(IHttpClientFactory httpClientFac
     {
         using var client = CreateClient(profile);
         var path = NormalizeRemotePath(profile.RootPath, relativePath);
-        using var response = await client.GetAsync(ToRequestPath(path), cancellationToken).ConfigureAwait(false);
+        using var request = new HttpRequestMessage(HttpMethod.Get, ToRequestPath(path));
+        using var response = await client.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
         {
             throw new InvalidOperationException($"WebDAV GET failed for '{path}' with status {(int)response.StatusCode}.");
         }
 
-        return await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        var declaredLength = response.Content.Headers.ContentLength;
+        if (declaredLength > _transferLimits.MaximumTextBackupBytes)
+        {
+            throw new WebDavTextPayloadTooLargeException(
+                _transferLimits.MaximumTextBackupBytes,
+                declaredLength);
+        }
+
+        return await ReadTextWithinLimitAsync(response.Content, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task DeleteAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default)
@@ -111,7 +154,7 @@ public sealed partial class WebDavBackupService(IHttpClientFactory httpClientFac
     private HttpClient CreateClient(WebDavProfile profile)
     {
         WebDavEndpointPolicy.EnsureSecure(profile.BaseUri);
-        var client = httpClientFactory.CreateClient("webdav");
+        var client = _httpClientFactory.CreateClient("webdav");
         client.BaseAddress = new Uri(profile.BaseUri.ToString().TrimEnd('/') + "/", UriKind.Absolute);
         if (!string.IsNullOrEmpty(profile.Username))
         {

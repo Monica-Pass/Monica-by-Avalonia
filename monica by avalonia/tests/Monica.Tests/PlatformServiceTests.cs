@@ -100,6 +100,88 @@ public sealed partial class PlatformServiceTests
     }
 
     [Fact]
+    public async Task Webdav_text_download_rejects_declared_oversize_before_reading_content()
+    {
+        var content = new UnreadableDeclaredLengthContent(17);
+        var handler = new RecordingWebDavHandler([], downloadContent: content);
+        var service = new WebDavBackupService(
+            new RecordingHttpClientFactory(handler),
+            new WebDavBackupTransferLimits(MaximumTextBackupBytes: 16));
+        var profile = new WebDavProfile
+        {
+            BaseUri = new Uri("https://dav.example.com/dav/"),
+            RootPath = "/Monica"
+        };
+
+        var error = await Assert.ThrowsAsync<WebDavTextPayloadTooLargeException>(() =>
+            service.DownloadTextAsync(profile, "backup.monica.enc.json"));
+
+        Assert.Equal(16, error.MaximumBytes);
+        Assert.False(content.WasRead);
+    }
+
+    [Fact]
+    public async Task Webdav_text_transfer_stops_unknown_length_download_at_limit()
+    {
+        var content = new StreamContent(new NonSeekableReadStream(new byte[17]));
+        var handler = new RecordingWebDavHandler([], downloadContent: content);
+        var service = new WebDavBackupService(
+            new RecordingHttpClientFactory(handler),
+            new WebDavBackupTransferLimits(MaximumTextBackupBytes: 16));
+        var profile = new WebDavProfile
+        {
+            BaseUri = new Uri("https://dav.example.com/dav/"),
+            RootPath = "/Monica"
+        };
+
+        Assert.Null(content.Headers.ContentLength);
+        var error = await Assert.ThrowsAsync<WebDavTextPayloadTooLargeException>(() =>
+            service.DownloadTextAsync(profile, "backup.monica.enc.json"));
+
+        Assert.Equal(16, error.MaximumBytes);
+    }
+
+    [Fact]
+    public async Task Webdav_text_transfer_rejects_oversized_upload_before_request()
+    {
+        var handler = new RecordingWebDavHandler([]);
+        var service = new WebDavBackupService(
+            new RecordingHttpClientFactory(handler),
+            new WebDavBackupTransferLimits(MaximumTextBackupBytes: 16));
+        var profile = new WebDavProfile
+        {
+            BaseUri = new Uri("https://dav.example.com/dav/"),
+            RootPath = "/Monica"
+        };
+
+        var error = await Assert.ThrowsAsync<WebDavTextPayloadTooLargeException>(() =>
+            service.UploadTextAsync(profile, "backup.monica.enc.json", "12345678901234567"));
+
+        Assert.Equal(16, error.MaximumBytes);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task Webdav_text_transfer_roundtrips_normal_payload()
+    {
+        var handler = new RecordingWebDavHandler("secure backup"u8.ToArray());
+        var service = new WebDavBackupService(
+            new RecordingHttpClientFactory(handler),
+            new WebDavBackupTransferLimits(MaximumTextBackupBytes: 32));
+        var profile = new WebDavProfile
+        {
+            BaseUri = new Uri("https://dav.example.com/dav/"),
+            RootPath = "/Monica"
+        };
+
+        await service.UploadTextAsync(profile, "backup.monica.enc.json", "secure backup");
+        var downloaded = await service.DownloadTextAsync(profile, "backup.monica.enc.json");
+
+        Assert.Equal("secure backup"u8.ToArray(), handler.UploadedBytes);
+        Assert.Equal("secure backup", downloaded);
+    }
+
+    [Fact]
     public async Task Webdav_conditional_upload_uses_etag_and_maps_precondition_failure_to_conflict()
     {
         var handler = new RecordingWebDavHandler([], HttpStatusCode.PreconditionFailed);
@@ -423,7 +505,8 @@ public sealed partial class PlatformServiceTests
 
     private sealed class RecordingWebDavHandler(
         byte[] downloadBytes,
-        HttpStatusCode putStatus = HttpStatusCode.Created) : HttpMessageHandler
+        HttpStatusCode putStatus = HttpStatusCode.Created,
+        HttpContent? downloadContent = null) : HttpMessageHandler
     {
         public List<(HttpMethod Method, Uri? Uri)> Requests { get; } = [];
         public byte[] UploadedBytes { get; private set; } = [];
@@ -467,7 +550,7 @@ public sealed partial class PlatformServiceTests
             {
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new ByteArrayContent(downloadBytes),
+                    Content = downloadContent ?? new ByteArrayContent(downloadBytes),
                     Headers =
                     {
                         ETag = new EntityTagHeaderValue("\"fixture-v1\"")
@@ -476,6 +559,65 @@ public sealed partial class PlatformServiceTests
             }
 
             return new HttpResponseMessage(HttpStatusCode.OK);
+        }
+    }
+
+    private sealed class UnreadableDeclaredLengthContent(long declaredLength) : HttpContent
+    {
+        public bool WasRead { get; private set; }
+
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+        {
+            WasRead = true;
+            return Task.FromException(new InvalidOperationException("Oversized response content must not be read."));
+        }
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = declaredLength;
+            return true;
+        }
+    }
+
+    private sealed class NonSeekableReadStream(byte[] content) : Stream
+    {
+        private readonly MemoryStream _inner = new(content, writable: false);
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
+
+        public override int Read(Span<byte> buffer) => _inner.Read(buffer);
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            _inner.ReadAsync(buffer, cancellationToken);
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _inner.Dispose();
+            }
+
+            base.Dispose(disposing);
         }
     }
 

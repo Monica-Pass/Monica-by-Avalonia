@@ -172,6 +172,13 @@ public sealed partial class MainWindowViewModel
         return string.Format(_localization.Culture, "{0:0.#} {1}", value, units[unitIndex]);
     }
 
+    private void SetWebDavBackupSizeLimitError(WebDavTextPayloadTooLargeException exception)
+    {
+        StatusMessage = _localization.Format(
+            "WebDavBackupSizeLimitExceededFormat",
+            FormatByteSize(exception.MaximumBytes));
+    }
+
     private string BuildWebDavSourceStatus()
     {
         if (string.IsNullOrWhiteSpace(WebDavServerUrl))

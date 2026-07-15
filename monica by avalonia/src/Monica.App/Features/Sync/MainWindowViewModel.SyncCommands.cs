@@ -1,5 +1,6 @@
 using System.Text;
 using CommunityToolkit.Mvvm.Input;
+using Monica.Platform.Services;
 
 namespace Monica.App.ViewModels;
 
@@ -172,6 +173,10 @@ public sealed partial class MainWindowViewModel
             RaiseWebDavBackupHistoryState();
             StatusMessage = _localization.Format("CreatedWebDavBackupFormat", fileName);
         }
+        catch (WebDavTextPayloadTooLargeException ex)
+        {
+            SetWebDavBackupSizeLimitError(ex);
+        }
         catch (Exception ex)
         {
             StatusMessage = _localization.Format("CreateWebDavBackupFailedFormat", ex.Message);
@@ -220,6 +225,10 @@ public sealed partial class MainWindowViewModel
             WebDavOperationStageText = _localization.Get("WebDavRestoringBackup");
             var result = await ImportMonicaJsonAsync(json);
             StatusMessage = _localization.Format("RestoredWebDavBackupFormat", item.FileName, result.Passwords, result.SecureItems, result.Categories);
+        }
+        catch (WebDavTextPayloadTooLargeException ex)
+        {
+            SetWebDavBackupSizeLimitError(ex);
         }
         catch (Exception ex)
         {

@@ -2832,6 +2832,33 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
+    public async Task ViewModel_reports_actionable_webdav_backup_size_limit()
+    {
+        const long maximumBytes = 96L * 1024 * 1024;
+        var webDav = new FakeWebDavBackupService
+        {
+            DownloadError = new WebDavTextPayloadTooLargeException(maximumBytes, maximumBytes + 1)
+        };
+        var harness = CreateHarness(webDavBackupService: webDav);
+        harness.ViewModel.WebDavEnabled = true;
+        harness.ViewModel.WebDavServerUrl = "https://dav.example.com/";
+        harness.ViewModel.WebDavBackupEncryptionPassword = "backup password";
+        var item = new WebDavBackupHistoryItem(
+            "oversized.monica.enc.json",
+            "/Monica/oversized.monica.enc.json",
+            "2026/07/16 00:00",
+            "96 MB",
+            null);
+
+        await harness.ViewModel.RestoreWebDavBackupCommand.ExecuteAsync(item);
+
+        Assert.Equal(
+            harness.ViewModel.L.Format("WebDavBackupSizeLimitExceededFormat", "96 MB"),
+            harness.ViewModel.StatusMessage);
+        Assert.False(harness.ViewModel.IsWebDavBusy);
+    }
+
+    [Fact]
     public async Task ViewModel_creates_and_restores_encrypted_webdav_backup()
     {
         var webDav = new FakeWebDavBackupService();
@@ -4384,6 +4411,7 @@ public sealed partial class PasswordManagementTests
         public string UploadedPath { get; private set; } = "";
         public string UploadedContent { get; private set; } = "";
         public string DownloadContent { get; init; } = "";
+        public Exception? DownloadError { get; init; }
         public List<string> DeletedPaths { get; } = [];
         public int DownloadCallCount { get; private set; }
         public TaskCompletionSource UploadEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -4417,6 +4445,11 @@ public sealed partial class PasswordManagementTests
         public Task<string> DownloadTextAsync(WebDavProfile profile, string relativePath, CancellationToken cancellationToken = default)
         {
             DownloadCallCount++;
+            if (DownloadError is not null)
+            {
+                return Task.FromException<string>(DownloadError);
+            }
+
             return Task.FromResult(string.IsNullOrEmpty(DownloadContent) ? UploadedContent : DownloadContent);
         }
 
