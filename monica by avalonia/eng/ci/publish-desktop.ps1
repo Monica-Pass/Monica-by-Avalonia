@@ -34,6 +34,7 @@ if (-not (Test-Path -LiteralPath $Project)) {
 }
 
 $publishAot = if ($Mode -eq 'aot') { 'true' } else { 'false' }
+$publishReadyToRun = if ($Mode -eq 'jit') { 'true' } else { 'false' }
 $publishDir = Join-Path 'artifacts' (Join-Path 'publish' (Join-Path $RuntimeIdentifier $Mode))
 
 if (Test-Path -LiteralPath $publishDir) {
@@ -47,6 +48,7 @@ dotnet publish $Project `
     --output $publishDir `
     /p:ContinuousIntegrationBuild=true `
     /p:PublishAot=$publishAot `
+    /p:PublishReadyToRun=$publishReadyToRun `
     /p:PublishSingleFile=false `
     /p:Version=$Version `
     /p:VersionPrefix=$VersionPrefix `

@@ -9,6 +9,7 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <InvariantGlobalization>false</InvariantGlobalization>
     <PublishAot Condition="'$(PublishAot)' == ''">false</PublishAot>
+    <PublishReadyToRun Condition="'$(PublishAot)' != 'true' and '$(PublishReadyToRun)' == ''">true</PublishReadyToRun>
     <PublishTrimmed Condition="'$(PublishAot)' == 'true'">true</PublishTrimmed>
     <SelfContained Condition="'$(PublishAot)' == 'true'">true</SelfContained>
     <IlcGenerateStackTraceData>false</IlcGenerateStackTraceData>
