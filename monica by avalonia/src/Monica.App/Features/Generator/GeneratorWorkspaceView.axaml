@@ -6,6 +6,9 @@
              x:Class="Monica.App.Features.Generator.GeneratorWorkspaceView"
              x:Name="GeneratorWorkspaceRoot"
              x:DataType="vm:MainWindowViewModel">
+<UserControl.Styles>
+    <StyleInclude Source="/Features/Generator/GeneratorStyles.axaml" />
+</UserControl.Styles>
 <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsGenerator}}"
       RowDefinitions="Auto,*"
       HorizontalAlignment="Stretch"

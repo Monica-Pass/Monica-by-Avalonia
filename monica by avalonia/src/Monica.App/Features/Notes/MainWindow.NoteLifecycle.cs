@@ -133,9 +133,11 @@ public partial class MainWindow
             _observedViewModel.PropertyChanged += ViewModel_OnPropertyChanged;
         }
 
+        UpdateWorkspaceActivation(_observedViewModel);
+
         Dispatcher.UIThread.Post(() =>
         {
-            if (WorkspaceHost.TryGet<NoteWorkspaceView>("Notes", out var noteWorkspace))
+            if (CurrentWorkspaceHost?.TryGet<NoteWorkspaceView>("Notes", out var noteWorkspace) == true)
             {
                 noteWorkspace.UpdateTabScroll();
             }
@@ -144,11 +146,15 @@ public partial class MainWindow
 
     private void ViewModel_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(MainWindowViewModel.SelectedNoteTab))
+        if (e.PropertyName == nameof(MainWindowViewModel.IsUnlocked))
+        {
+            UpdateWorkspaceActivation(sender as MainWindowViewModel);
+        }
+        else if (e.PropertyName == nameof(MainWindowViewModel.SelectedNoteTab))
         {
             Dispatcher.UIThread.Post(() =>
             {
-                if (WorkspaceHost.TryGet<NoteWorkspaceView>("Notes", out var noteWorkspace))
+                if (CurrentWorkspaceHost?.TryGet<NoteWorkspaceView>("Notes", out var noteWorkspace) == true)
                 {
                     noteWorkspace.HandleSelectedTabChanged();
                 }
@@ -158,7 +164,7 @@ public partial class MainWindow
         {
             Dispatcher.UIThread.Post(() =>
             {
-                if (WorkspaceHost.TryGet<NoteWorkspaceView>("Notes", out var noteWorkspace))
+                if (CurrentWorkspaceHost?.TryGet<NoteWorkspaceView>("Notes", out var noteWorkspace) == true)
                 {
                     noteWorkspace.HandleTabWidthChanged();
                 }
@@ -169,7 +175,7 @@ public partial class MainWindow
         {
             Dispatcher.UIThread.Post(() =>
             {
-                if (WorkspaceHost.TryGet<NoteWorkspaceView>("Notes", out var noteWorkspace))
+                if (CurrentWorkspaceHost?.TryGet<NoteWorkspaceView>("Notes", out var noteWorkspace) == true)
                 {
                     noteWorkspace.FocusNoteTree();
                 }

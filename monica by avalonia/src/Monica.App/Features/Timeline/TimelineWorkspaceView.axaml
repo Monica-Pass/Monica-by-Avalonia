@@ -6,6 +6,9 @@
              x:Class="Monica.App.Features.Timeline.TimelineWorkspaceView"
              x:Name="TimelineWorkspaceRoot"
              x:DataType="vm:MainWindowViewModel">
+<UserControl.Styles>
+    <StyleInclude Source="/Features/Timeline/TimelineStyles.axaml" />
+</UserControl.Styles>
 <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsTimeline}}" RowDefinitions="Auto,*" HorizontalAlignment="Stretch" ClipToBounds="True">
     <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
         <Grid x:Name="TimelineHeaderGrid" ColumnDefinitions="*,320,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" MinHeight="56">

@@ -63,6 +63,7 @@ public sealed partial class MainWindowViewModel
 
     partial void OnIsUnlockedChanged(bool value)
     {
+        OnPropertyChanged(nameof(UnlockedShellContent));
         RaiseSecurityMaintenanceState();
         if (value)
         {

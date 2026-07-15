@@ -1,4 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:db="using:Monica.App.Features.DatabaseManagement" xmlns:ic="using:FluentIcons.Avalonia" xmlns:local="using:Monica.App" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.DatabaseManagement.DatabaseManagementWorkspaceView" x:Name="DatabaseManagementRoot" x:DataType="vm:MainWindowViewModel">
+    <UserControl.Styles>
+        <StyleInclude Source="/Features/DatabaseManagement/DatabaseManagementStyles.axaml" />
+    </UserControl.Styles>
     <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsDatabaseManagement}}" RowDefinitions="Auto,*" ClipToBounds="True">
         <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
             <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8">

@@ -1,4 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ic="using:FluentIcons.Avalonia" xmlns:local="using:Monica.App" xmlns:sync="using:Monica.App.Features.Sync" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Sync.SyncWorkspaceView" x:DataType="vm:MainWindowViewModel">
+    <UserControl.Styles>
+        <StyleInclude Source="/Features/Sync/SyncStyles.axaml" />
+    </UserControl.Styles>
     <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsSync}}" RowDefinitions="Auto,*" MaxWidth="1080" HorizontalAlignment="Stretch" ClipToBounds="True">
         <Border Classes="workspacePageHeader">
             <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">

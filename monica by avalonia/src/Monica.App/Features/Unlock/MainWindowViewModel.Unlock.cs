@@ -14,6 +14,8 @@ public sealed partial class MainWindowViewModel
     [NotifyPropertyChangedFor(nameof(HasRecoverableStatusMessage))]
     private bool _isUnlocked;
 
+    public MainWindowViewModel? UnlockedShellContent => IsUnlocked ? this : null;
+
     [ObservableProperty]
     private bool _isVaultInitialized;
 

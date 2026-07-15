@@ -8,6 +8,9 @@
              x:Class="Monica.App.Features.Authenticator.AuthenticatorWorkspaceView"
              x:Name="AuthenticatorWorkspaceRoot"
              x:DataType="vm:MainWindowViewModel">
+<UserControl.Styles>
+    <StyleInclude Source="/Features/Authenticator/AuthenticatorStyles.axaml" />
+</UserControl.Styles>
 <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsTotp}}"
       RowDefinitions="Auto,*"
       HorizontalAlignment="Stretch"

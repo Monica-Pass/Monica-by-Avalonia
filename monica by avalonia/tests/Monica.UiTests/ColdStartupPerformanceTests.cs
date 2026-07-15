@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
+using Monica.App.Controls;
 using Monica.App.Features;
 using Monica.App.Features.Authenticator;
 using Monica.App.Features.Passwords;
@@ -88,6 +90,91 @@ public sealed class ColdStartupPerformanceTests(ITestOutputHelper output)
         Assert.True(
             commandPathMilliseconds < 50,
             $"Password editor construction after idle warmup took {commandPathMilliseconds:F3} ms.");
+    }
+
+    [Fact]
+    public void Feature_workspace_first_navigation_stays_within_budget()
+    {
+        AvaloniaUiThreadTestContext.VerifyAccess();
+        var host = new WorkspaceHostView { IsActive = true };
+        string[] sections =
+        [
+            "Passwords", "Notes", "Totp", "Cards", "Generator", "Archive", "RecycleBin",
+            "Settings", "Sync", "Mdbx", "Timeline", "DatabaseManagement", "SecurityAnalysis"
+        ];
+        var measurements = new List<string>(sections.Length);
+        var total = Stopwatch.StartNew();
+
+        foreach (var section in sections)
+        {
+            var phase = Stopwatch.StartNew();
+            host.Section = section;
+            phase.Stop();
+            measurements.Add($"{section}={phase.Elapsed.TotalMilliseconds:F3} ms");
+            Assert.NotNull(host.CurrentWorkspace);
+            Assert.True(
+                phase.ElapsedMilliseconds < 250,
+                $"First navigation to {section} took {phase.Elapsed.TotalMilliseconds:F3} ms.");
+        }
+
+        total.Stop();
+        output.WriteLine(string.Join(", ", measurements));
+        output.WriteLine($"featureNavigationTotal={total.Elapsed.TotalMilliseconds:F3} ms");
+        Assert.True(
+            total.ElapsedMilliseconds < 1000,
+            $"First navigation through all feature workspaces took {total.Elapsed.TotalMilliseconds:F3} ms.");
+    }
+
+    [Fact]
+    public void Unlocked_navigation_shell_materialization_stays_within_budget()
+    {
+        AvaloniaUiThreadTestContext.VerifyAccess();
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        window.Show();
+        try
+        {
+            window.DataContext = viewModel;
+            var phase = Stopwatch.StartNew();
+            viewModel.IsUnlocked = true;
+            var propertyMilliseconds = phase.Elapsed.TotalMilliseconds;
+            phase.Restart();
+            Dispatcher.UIThread.RunJobs(DispatcherPriority.Render);
+            phase.Stop();
+            var firstFrameDispatcherMilliseconds = phase.Elapsed.TotalMilliseconds;
+
+            var host = Assert.Single(window.GetVisualDescendants().OfType<WorkspaceHostView>());
+            Assert.Null(host.CurrentWorkspace);
+            phase.Restart();
+            Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
+            phase.Stop();
+            var deferredWorkspaceMilliseconds = phase.Elapsed.TotalMilliseconds;
+
+            output.WriteLine(
+                $"workspaceHostActive={host.IsActive}, section={host.Section}, created={host.CreatedSections.Count}");
+            Assert.IsType<PasswordVaultView>(host.CurrentWorkspace);
+            var totalMilliseconds = propertyMilliseconds + firstFrameDispatcherMilliseconds + deferredWorkspaceMilliseconds;
+            output.WriteLine(
+                $"unlockedShellProperty={propertyMilliseconds:F3} ms, " +
+                $"unlockedShellFirstFrame={firstFrameDispatcherMilliseconds:F3} ms, " +
+                $"unlockedShellDeferredWorkspace={deferredWorkspaceMilliseconds:F3} ms, " +
+                $"unlockedShellMaterialization={totalMilliseconds:F3} ms");
+            Assert.True(
+                propertyMilliseconds + firstFrameDispatcherMilliseconds < 700,
+                $"Unlocked navigation shell first frame took " +
+                $"{propertyMilliseconds + firstFrameDispatcherMilliseconds:F3} ms.");
+            Assert.True(
+                deferredWorkspaceMilliseconds < 600,
+                $"Deferred password workspace materialization took {deferredWorkspaceMilliseconds:F3} ms.");
+            Assert.True(
+                totalMilliseconds < 1200,
+                $"Unlocked navigation shell materialization took {totalMilliseconds:F3} ms.");
+        }
+        finally
+        {
+            window.Close();
+        }
     }
 
     [Fact]

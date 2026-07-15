@@ -3,27 +3,13 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
-using Avalonia.Threading;
-using Avalonia.VisualTree;
 using FluentAvalonia.UI.Controls;
-using Monica.App.Features.Notes;
-using Monica.App.Features.Passwords;
-using Monica.App.Features.Generator;
 using Monica.App.ViewModels;
 
 namespace Monica.App;
 
 public partial class MainWindow : Window
 {
-    private PasswordVaultView PasswordVaultView =>
-        WorkspaceHost.GetOrCreate<PasswordVaultView>("Passwords");
-
-    private NoteWorkspaceView NoteWorkspaceView =>
-        WorkspaceHost.GetOrCreate<NoteWorkspaceView>("Notes");
-
-    private GeneratorWorkspaceView GeneratorWorkspaceView =>
-        WorkspaceHost.GetOrCreate<GeneratorWorkspaceView>("Generator");
-
     public MainWindow()
     {
         InitializeComponent();
@@ -302,14 +288,5 @@ public partial class MainWindow : Window
     }
 
     private static bool IsTextEditingSource(object? source) => source is TextBox;
-
-    private void WorkspaceHost_OnSizeChanged(object? sender, SizeChangedEventArgs e)
-    {
-        if (DataContext is MainWindowViewModel viewModel)
-        {
-            viewModel.OtherWorkspaceViewportWidth = e.NewSize.Width;
-            viewModel.OtherWorkspaceViewportHeight = e.NewSize.Height;
-        }
-    }
 
 }

@@ -3,6 +3,7 @@ using System.Collections.Specialized;
 using System.Reflection;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.App.Controls;
 using Monica.App.Features.Notes;
@@ -26,19 +27,21 @@ public sealed class UiPerformanceTests
     public void Performance_budget_warm_locked_shell_defers_vault_workspaces()
     {
         var warmupWindow = new Monica.App.MainWindow();
-        var warmupHost = warmupWindow.FindControl<WorkspaceHostView>("WorkspaceHost");
+        var warmupShellHost = warmupWindow.FindControl<ContentControl>("UnlockedShellHost");
 
-        Assert.NotNull(warmupHost);
-        Assert.Empty(warmupHost.CreatedSections);
+        Assert.NotNull(warmupShellHost);
+        Assert.Null(warmupShellHost.Content);
+        Assert.DoesNotContain(warmupWindow.GetVisualDescendants(), control => control is WorkspaceHostView);
 
         var stopwatch = Stopwatch.StartNew();
         var window = new Monica.App.MainWindow();
         stopwatch.Stop();
 
-        var host = window.FindControl<WorkspaceHostView>("WorkspaceHost");
+        var shellHost = window.FindControl<ContentControl>("UnlockedShellHost");
 
-        Assert.NotNull(host);
-        Assert.Empty(host.CreatedSections);
+        Assert.NotNull(shellHost);
+        Assert.Null(shellHost.Content);
+        Assert.DoesNotContain(window.GetVisualDescendants(), control => control is WorkspaceHostView);
         Assert.True(
             stopwatch.ElapsedMilliseconds < 250,
             $"Locked shell construction took {stopwatch.ElapsedMilliseconds} ms.");

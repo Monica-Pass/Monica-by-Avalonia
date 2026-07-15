@@ -5,6 +5,9 @@
              xmlns:vm="using:Monica.App.ViewModels"
              x:Class="Monica.App.Features.Notes.NoteWorkspaceView"
              x:DataType="vm:MainWindowViewModel">
+    <UserControl.Styles>
+        <StyleInclude Source="/Features/Notes/NoteStyles.axaml" />
+    </UserControl.Styles>
     <Grid Classes="notesWorkspace"
           IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsNotes}}"
           RowDefinitions="44,*"

@@ -8,6 +8,9 @@
              x:Class="Monica.App.Features.Wallet.WalletWorkspaceView"
              x:Name="WalletWorkspaceRoot"
              x:DataType="vm:MainWindowViewModel">
+<UserControl.Styles>
+    <StyleInclude Source="/Features/Wallet/WalletStyles.axaml" />
+</UserControl.Styles>
 <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsCards}}"
       RowDefinitions="Auto,*"
       HorizontalAlignment="Stretch"
