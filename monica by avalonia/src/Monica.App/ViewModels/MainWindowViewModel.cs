@@ -295,7 +295,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     loadedSnapshot,
                     _totpService,
                     sessionCancellationToken);
-                return loadedSnapshot;
+                var preparedTotpItems = VaultTotpPresentationPreparer.Prepare(
+                    loadedSnapshot,
+                    _totpService,
+                    sessionCancellationToken);
+                return loadedSnapshot with { PreparedTotpItems = preparedTotpItems };
             }, sessionCancellationToken);
             sessionCancellationToken.ThrowIfCancellationRequested();
             VaultLoadStageText = "正在整理密码列表...";
@@ -351,7 +355,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             await YieldVaultLoadUiAsync();
             VaultLoadStageText = "正在加载验证码...";
             await YieldVaultLoadUiAsync();
-            await AppDiagnostics.MeasureAsync("Apply TOTP collections", () => LoadTotpItemsAsync(snapshot.StoredTotps));
+            AppDiagnostics.Measure("Apply TOTP collections", () => ApplyPreparedTotpItems(snapshot.PreparedTotpItems));
             AppDiagnostics.Measure("Finalize vault load UI state", () =>
             {
                 ReconcileSecureItemSelectionsAfterLoad();

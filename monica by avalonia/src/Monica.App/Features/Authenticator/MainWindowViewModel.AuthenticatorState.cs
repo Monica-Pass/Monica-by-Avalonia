@@ -12,20 +12,7 @@ public sealed partial class MainWindowViewModel
     private readonly ITotpEditorDialogService _totpEditorDialogService;
 
     public void RefreshTotpDisplay(SecureItem item)
-    {
-        var data = TotpDataResolver.ParseStoredItemData(item.ItemData, item.Title, item.Notes);
-        if (data is null || string.IsNullOrWhiteSpace(data.Secret))
-        {
-            item.TotpCode = "------";
-            item.TotpTimeRemaining = "";
-            item.TotpProgress = 0;
-            return;
-        }
-
-        item.TotpCode = _totpService.GenerateCode(data.Secret, data.Period, data.Digits, data.OtpType, data.Counter);
-        item.TotpTimeRemaining = $"{_totpService.GetRemainingSeconds(data.Period)}s";
-        item.TotpProgress = _totpService.GetProgress(data.Period);
-    }
+        => TotpPresentationState.Refresh(item, _totpService);
 
     private void RaiseTotpSelectionState()
     {
@@ -99,43 +86,26 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    private async Task LoadTotpItemsAsync(IReadOnlyList<SecureItem>? preloadedTotps = null)
+    private void ApplyPreparedTotpItems(IReadOnlyList<SecureItem> preparedItems)
     {
         var selectedId = SelectedTotpItem?.Id;
-        var storedTotps = preloadedTotps ?? await AppDiagnostics.MeasureAsync(
-            "Load TOTP secure items",
-            () => _repository.GetSecureItemsAsync(VaultItemType.Totp));
-        var activePasswordIds = Passwords.Select(item => item.Id).ToHashSet();
-        var seenVirtualPasswordIds = new HashSet<long>();
-        var nextItems = new List<SecureItem>();
-
-        foreach (var item in storedTotps)
+        foreach (var item in preparedItems)
         {
-            if (item.BoundPasswordId is { } boundPasswordId && !activePasswordIds.Contains(boundPasswordId))
-            {
-                continue;
-            }
-
             TrackTotpSelection(item);
-            RefreshTotpDisplay(item);
-            nextItems.Add(item);
-            if (item.BoundPasswordId is { } passwordId)
-            {
-                seenVirtualPasswordIds.Add(passwordId);
-            }
         }
 
-        foreach (var password in Passwords.Where(item => item.HasAuthenticator && !seenVirtualPasswordIds.Contains(item.Id)))
+        ReplaceItems(TotpItems, preparedItems);
+        _suppressSelectedTotpRefresh = true;
+        try
         {
-            var virtualItem = BuildVirtualTotpItem(password);
-            TrackTotpSelection(virtualItem);
-            RefreshTotpDisplay(virtualItem);
-            nextItems.Add(virtualItem);
+            SelectedTotpItem = preparedItems.FirstOrDefault(item => item.Id == selectedId)
+                ?? preparedItems.FirstOrDefault();
+        }
+        finally
+        {
+            _suppressSelectedTotpRefresh = false;
         }
 
-        ReplaceItems(TotpItems, nextItems);
-        SelectedTotpItem = nextItems.FirstOrDefault(item => item.Id == selectedId)
-            ?? nextItems.FirstOrDefault();
         OnPropertyChanged(nameof(HasTotpItems));
         RaiseTotpFilterState();
         RaiseTotpSelectionState();

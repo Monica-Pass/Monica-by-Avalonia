@@ -18,6 +18,8 @@ internal sealed record VaultLoadSnapshot(
 {
     public IEnumerable<PasswordEntry> AllPasswords =>
         ActivePasswords.Concat(ArchivedPasswords).Concat(DeletedPasswords);
+
+    public IReadOnlyList<SecureItem> PreparedTotpItems { get; init; } = [];
 }
 
 internal static class VaultSnapshotLoader
@@ -64,7 +66,9 @@ internal static class VaultSnapshotLoader
 
         var customFields = await customFieldsTask;
         var attachments = await attachmentsTask;
-        var secureItems = await secureItemsTask;
+        var secureItems = (await secureItemsTask)
+            .Select(static item => item.CreateDetachedCopy())
+            .ToArray();
         var noteItems = secureItems
             .Where(item => item.ItemType == VaultItemType.Note)
             .ToArray();

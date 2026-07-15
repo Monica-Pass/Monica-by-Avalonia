@@ -66,7 +66,7 @@ public sealed class UiPerformanceTests
     }
 
     [Fact]
-    public void Vault_password_preparation_keeps_the_ui_dispatcher_responsive()
+    public void Vault_password_and_totp_preparation_keep_the_ui_dispatcher_responsive()
     {
         var repository = DispatchProxy.Create<IMonicaRepository, VaultLoadRepositoryProxy>();
         var repositoryProbe = (VaultLoadRepositoryProxy)(object)repository;
@@ -102,13 +102,15 @@ public sealed class UiPerformanceTests
 
         Assert.True(completion.Task.IsCompleted, "Vault load did not finish before the responsiveness timeout.");
         Assert.True(completion.Task.IsCompletedSuccessfully, completion.Task.Exception?.ToString());
-        Assert.True(
-            totpService.HeartbeatObservedDuringGeneration,
-            "The UI dispatcher could not service a heartbeat while password TOTP presentation was prepared.");
+        Assert.Equal([true, true], totpService.HeartbeatObservations);
         var displayed = Assert.Single(viewModel.Passwords);
         Assert.NotSame(repositoryProbe.Password, displayed);
         Assert.Equal("------", repositoryProbe.Password.TotpCode);
         Assert.Equal("654321", displayed.TotpCode);
+        var displayedTotp = Assert.Single(viewModel.TotpItems);
+        Assert.NotSame(repositoryProbe.Totp, displayedTotp);
+        Assert.Equal("------", repositoryProbe.Totp.TotpCode);
+        Assert.Equal("654321", displayedTotp.TotpCode);
     }
 
     public class VaultLoadRepositoryProxy : DispatchProxy
@@ -119,6 +121,16 @@ public sealed class UiPerformanceTests
             Title = "Responsive TOTP",
             Username = "desktop",
             AuthenticatorKey = "otpauth://totp/Monica:desktop?secret=JBSWY3DPEHPK3PXP&issuer=Monica"
+        };
+
+        public SecureItem Totp { get; } = new()
+        {
+            Id = 2,
+            ItemType = VaultItemType.Totp,
+            Title = "Responsive TOTP",
+            BoundPasswordId = 1,
+            ItemData = TotpDataResolver.ToItemData(
+                TotpDataResolver.FromAuthenticatorKey("JBSWY3DPEHPK3PXP", "Responsive TOTP", "desktop")!)
         };
 
         protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
@@ -135,7 +147,7 @@ public sealed class UiPerformanceTests
                     Task.FromResult<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>>(
                         new Dictionary<long, IReadOnlyList<Attachment>>()),
                 nameof(IMonicaRepository.GetSecureItemsAsync) =>
-                    Task.FromResult<IReadOnlyList<SecureItem>>([]),
+                    Task.FromResult<IReadOnlyList<SecureItem>>([Totp]),
                 nameof(IMonicaRepository.GetCategoriesAsync) =>
                     Task.FromResult<IReadOnlyList<Category>>([]),
                 nameof(IMonicaRepository.GetPasswordQuickAccessRecordsAsync) =>
@@ -151,10 +163,19 @@ public sealed class UiPerformanceTests
 
     private sealed class DispatcherHeartbeatTotpService : ITotpService
     {
-        private readonly ManualResetEventSlim _heartbeat = new();
-        private int _generateCallCount;
+        private readonly object _gate = new();
+        private readonly List<bool> _heartbeatObservations = [];
 
-        public bool HeartbeatObservedDuringGeneration { get; private set; }
+        public IReadOnlyList<bool> HeartbeatObservations
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return [.. _heartbeatObservations];
+                }
+            }
+        }
 
         public string GenerateCode(
             string secretKey,
@@ -163,10 +184,12 @@ public sealed class UiPerformanceTests
             string otpType = "TOTP",
             long counter = 0)
         {
-            if (Interlocked.Increment(ref _generateCallCount) == 1)
+            var heartbeat = new ManualResetEventSlim();
+            Dispatcher.UIThread.Post(heartbeat.Set, DispatcherPriority.Background);
+            var observed = heartbeat.Wait(TimeSpan.FromMilliseconds(300));
+            lock (_gate)
             {
-                Dispatcher.UIThread.Post(_heartbeat.Set, DispatcherPriority.Background);
-                HeartbeatObservedDuringGeneration = _heartbeat.Wait(TimeSpan.FromMilliseconds(300));
+                _heartbeatObservations.Add(observed);
             }
 
             return "654321";

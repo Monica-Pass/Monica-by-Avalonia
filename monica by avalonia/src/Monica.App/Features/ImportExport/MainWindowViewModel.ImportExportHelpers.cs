@@ -92,39 +92,7 @@ public sealed partial class MainWindowViewModel
         return clone;
     }
 
-    private static SecureItem CloneSecureItem(SecureItem source)
-    {
-        return new SecureItem
-        {
-            Id = source.Id,
-            ItemType = source.ItemType,
-            Title = source.Title,
-            Notes = source.Notes,
-            IsFavorite = source.IsFavorite,
-            SortOrder = source.SortOrder,
-            CreatedAt = source.CreatedAt,
-            UpdatedAt = source.UpdatedAt,
-            ItemData = source.ItemData,
-            ImagePaths = source.ImagePaths,
-            BoundPasswordId = source.BoundPasswordId,
-            CategoryId = source.CategoryId,
-            KeepassDatabaseId = source.KeepassDatabaseId,
-            KeepassGroupPath = source.KeepassGroupPath,
-            KeepassEntryUuid = source.KeepassEntryUuid,
-            KeepassGroupUuid = source.KeepassGroupUuid,
-            MdbxDatabaseId = source.MdbxDatabaseId,
-            MdbxFolderId = source.MdbxFolderId,
-            IsDeleted = source.IsDeleted,
-            DeletedAt = source.DeletedAt,
-            ReplicaGroupId = source.ReplicaGroupId,
-            BitwardenVaultId = source.BitwardenVaultId,
-            BitwardenCipherId = source.BitwardenCipherId,
-            BitwardenFolderId = source.BitwardenFolderId,
-            BitwardenRevisionDate = source.BitwardenRevisionDate,
-            BitwardenLocalModified = source.BitwardenLocalModified,
-            SyncStatus = source.SyncStatus
-        };
-    }
+    private static SecureItem CloneSecureItem(SecureItem source) => source.CreateDetachedCopy();
 
     private static Category CloneCategory(Category source)
     {

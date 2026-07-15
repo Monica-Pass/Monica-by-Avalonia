@@ -11,6 +11,7 @@ public sealed partial class MainWindowViewModel
     private const string TotpFilterExpiringSoon = "expiring-soon";
     private const string TotpFilterUnbound = "unbound";
     private const string TotpFilterIssuerPrefix = "issuer:";
+    private bool _suppressSelectedTotpRefresh;
 
     public ObservableCollection<SecureItem> TotpItems { get; } = new ObservableRangeCollection<SecureItem>();
     public ObservableCollection<TotpFilterChoice> TotpFilterChoices { get; } = [];
@@ -60,7 +61,7 @@ public sealed partial class MainWindowViewModel
 
     partial void OnSelectedTotpItemChanged(SecureItem? value)
     {
-        if (value is not null)
+        if (value is not null && !_suppressSelectedTotpRefresh)
         {
             RefreshTotpDisplay(value);
         }

@@ -58,22 +58,7 @@ public sealed partial class MainWindowViewModel
         }
     }
     private static SecureItem BuildVirtualTotpItem(PasswordEntry entry)
-    {
-        var data = TotpDataResolver.FromAuthenticatorKey(entry.AuthenticatorKey, entry.Title, entry.Username);
-        return new SecureItem
-        {
-            Id = -entry.Id,
-            ItemType = VaultItemType.Totp,
-            Title = entry.Title,
-            Notes = string.IsNullOrWhiteSpace(data?.AccountName) ? entry.Username : data.AccountName,
-            ItemData = data is null ? "{}" : TotpDataResolver.ToItemData(data),
-            BoundPasswordId = entry.Id,
-            CategoryId = entry.CategoryId,
-            IsFavorite = entry.IsFavorite,
-            CreatedAt = entry.CreatedAt,
-            UpdatedAt = entry.UpdatedAt
-        };
-    }
+        => TotpPresentationState.BuildVirtualItem(entry);
 
     private void RefreshBoundTotpPresentation(IEnumerable<PasswordEntry> changedPasswords)
     {

@@ -50,4 +50,35 @@ public partial class SecureItem : ObservableObject
 
     [ObservableProperty]
     private double _totpProgress;
+
+    public SecureItem CreateDetachedCopy() => new()
+    {
+        Id = Id,
+        ItemType = ItemType,
+        Title = Title,
+        Notes = Notes,
+        IsFavorite = IsFavorite,
+        SortOrder = SortOrder,
+        CreatedAt = CreatedAt,
+        UpdatedAt = UpdatedAt,
+        ItemData = ItemData,
+        ImagePaths = ImagePaths,
+        BoundPasswordId = BoundPasswordId,
+        CategoryId = CategoryId,
+        KeepassDatabaseId = KeepassDatabaseId,
+        KeepassGroupPath = KeepassGroupPath,
+        KeepassEntryUuid = KeepassEntryUuid,
+        KeepassGroupUuid = KeepassGroupUuid,
+        MdbxDatabaseId = MdbxDatabaseId,
+        MdbxFolderId = MdbxFolderId,
+        IsDeleted = IsDeleted,
+        DeletedAt = DeletedAt,
+        ReplicaGroupId = ReplicaGroupId,
+        BitwardenVaultId = BitwardenVaultId,
+        BitwardenCipherId = BitwardenCipherId,
+        BitwardenFolderId = BitwardenFolderId,
+        BitwardenRevisionDate = BitwardenRevisionDate,
+        BitwardenLocalModified = BitwardenLocalModified,
+        SyncStatus = SyncStatus
+    };
 }
