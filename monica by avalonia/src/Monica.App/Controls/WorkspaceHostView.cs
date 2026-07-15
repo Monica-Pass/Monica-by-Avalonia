@@ -121,6 +121,11 @@ public sealed class WorkspaceHostView : ContentControl
         if (!IsActive)
         {
             Content = null;
+            foreach (var workspace in _workspaces.Values)
+            {
+                workspace.DataContext = null;
+            }
+
             _workspaces.Clear();
             _createdSections.Clear();
             return;

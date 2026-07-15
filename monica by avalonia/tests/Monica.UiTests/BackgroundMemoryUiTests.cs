@@ -1,11 +1,17 @@
 using System.Runtime.CompilerServices;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.App.Controls;
 using Monica.App.Features;
+using Monica.App.Features.Notes;
+using Monica.App.Features.SecurityAnalysis;
 using Monica.App.ViewModels;
+using Monica.Core.Models;
 
 namespace Monica.UiTests;
 
@@ -18,7 +24,7 @@ public sealed class BackgroundMemoryUiTests
     }
 
     [Fact]
-    public void Background_memory_minimize_releases_unlocked_shell_and_prepared_editors()
+    public async Task Background_memory_minimize_releases_unlocked_shell_and_prepared_editors()
     {
         var window = new Monica.App.MainWindow();
         using var services = Monica.App.App.ConfigureServices(window);
@@ -51,12 +57,10 @@ public sealed class BackgroundMemoryUiTests
 
             window.WindowState = WindowState.Minimized;
             Dispatcher.UIThread.RunJobs();
-            ForceFullCollection();
 
             Assert.Null(shellHost.Content);
             Assert.DoesNotContain(window.GetVisualDescendants(), control => control is WorkspaceHostView);
-            Assert.False(workspaceHostReference.IsAlive);
-            Assert.False(activeWorkspaceReference.IsAlive);
+            await AssertEventuallyCollectedAsync([workspaceHostReference, activeWorkspaceReference]);
             Assert.False(VaultEditorDialogWarmup.IsPasswordWarmed);
             Assert.False(VaultEditorDialogWarmup.IsTotpWarmed);
             Assert.False(VaultEditorDialogWarmup.IsWalletWarmed);
@@ -81,6 +85,72 @@ public sealed class BackgroundMemoryUiTests
         }
     }
 
+    [Fact]
+    public async Task Background_memory_minimize_releases_rebuildable_view_model_caches()
+    {
+        const int itemCount = 256;
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        PopulateVaultSources(viewModel, itemCount);
+        viewModel.PasswordSearchText = "Memory";
+        viewModel.TotpSearchText = "Memory";
+        viewModel.WalletSearchText = "Memory";
+        viewModel.NoteSearchText = "Memory";
+        viewModel.NoteContent = $"# Unsaved memory draft\n\n{new string('x', 256 * 1024)}";
+        await Task.Delay(350, TestContext.Current.CancellationToken);
+        Dispatcher.UIThread.RunJobs();
+
+        var (cacheReferences, initialBuilds) = CaptureRebuildableCacheReferences(viewModel);
+        window.Show();
+        try
+        {
+            window.DataContext = viewModel;
+            viewModel.IsUnlocked = true;
+            Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
+
+            window.WindowState = WindowState.Minimized;
+            Dispatcher.UIThread.RunJobs();
+
+            await AssertEventuallyCollectedAsync(cacheReferences);
+            Assert.Empty(viewModel.NoteImagePreviewItems);
+            Assert.Empty(viewModel.SecuritySummaryItems);
+            Assert.Empty(viewModel.SecurityIssueItems);
+            Assert.Empty(viewModel.FilteredSecurityIssueItems);
+            Assert.Equal(itemCount, viewModel.Passwords.Count);
+            Assert.Equal(itemCount, viewModel.TotpItems.Count);
+            Assert.Equal(itemCount, viewModel.WalletItems.Count);
+            Assert.Equal(itemCount, viewModel.NoteItems.Count);
+            Assert.Equal("Memory", viewModel.PasswordSearchText);
+            Assert.Equal("Memory", viewModel.TotpSearchText);
+            Assert.Equal("Memory", viewModel.WalletSearchText);
+            Assert.Equal("Memory", viewModel.NoteSearchText);
+            Assert.StartsWith("# Unsaved memory draft", viewModel.NoteContent, StringComparison.Ordinal);
+
+            window.WindowState = WindowState.Normal;
+            Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
+
+            Assert.True(viewModel.FilteredPasswordsProjectionBuildCount > initialBuilds.Passwords);
+            Assert.Equal(initialBuilds.Totp, viewModel.FilteredTotpProjectionBuildCount);
+            Assert.Equal(initialBuilds.Wallet, viewModel.FilteredWalletProjectionBuildCount);
+            Assert.Equal(initialBuilds.NoteTree, viewModel.FilteredNoteProjectionBuildCount);
+            Assert.Equal(initialBuilds.NotePreview, viewModel.NotePreviewProjectionBuildCount);
+
+            Assert.Equal(itemCount, viewModel.FilteredTotpItems.Count);
+            Assert.Equal(itemCount, viewModel.FilteredWalletItems.Count);
+            Assert.Equal(itemCount, viewModel.FilteredNoteItems.Count);
+            Assert.StartsWith("# Unsaved memory draft", viewModel.NotePreviewMarkdown, StringComparison.Ordinal);
+            Assert.True(viewModel.FilteredTotpProjectionBuildCount > initialBuilds.Totp);
+            Assert.True(viewModel.FilteredWalletProjectionBuildCount > initialBuilds.Wallet);
+            Assert.True(viewModel.FilteredNoteProjectionBuildCount > initialBuilds.NoteTree);
+            Assert.True(viewModel.NotePreviewProjectionBuildCount > initialBuilds.NotePreview);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static (WeakReference Host, WeakReference Workspace) CaptureWorkspaceReferences(
         Monica.App.MainWindow window)
@@ -91,10 +161,114 @@ public sealed class BackgroundMemoryUiTests
         return (new WeakReference(host), new WeakReference(host.CurrentWorkspace));
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static (IReadOnlyList<WeakReference> References, ProjectionBuildCounts Builds)
+        CaptureRebuildableCacheReferences(MainWindowViewModel viewModel)
+    {
+        var passwordRows = viewModel.FilteredPasswordRows;
+        var totpItems = viewModel.FilteredTotpItems;
+        var walletItems = viewModel.FilteredWalletItems;
+        var noteTreeGroups = viewModel.NoteTreeGroups;
+        var notePreviewMarkdown = viewModel.NotePreviewMarkdown;
+        var previewBitmap = new WriteableBitmap(
+            new PixelSize(1024, 1024),
+            new Vector(96, 96),
+            PixelFormat.Bgra8888,
+            AlphaFormat.Premul);
+        viewModel.NoteImagePreviewItems.Add(new NoteImagePreviewItem(
+            "memory-preview.png",
+            "Memory preview",
+            "4 MB",
+            previewBitmap));
+        var securityIssue = new SecurityIssueItem(
+            "Memory issue",
+            "Rebuildable details",
+            "Memory",
+            "Medium",
+            SecurityIssueSeverityLevel.Medium,
+            viewModel.Passwords[0].Id,
+            viewModel.Passwords[0],
+            50);
+        viewModel.SecuritySummaryItems.Add(new SecuritySummaryItem("Memory", "1", "Rebuildable"));
+        viewModel.SecurityIssueItems.Add(securityIssue);
+        viewModel.FilteredSecurityIssueItems.Add(securityIssue);
+
+        return (
+            [
+                new WeakReference(passwordRows),
+                new WeakReference(totpItems),
+                new WeakReference(walletItems),
+                new WeakReference(noteTreeGroups),
+                new WeakReference(notePreviewMarkdown),
+                new WeakReference(previewBitmap),
+                new WeakReference(securityIssue)
+            ],
+            new ProjectionBuildCounts(
+                viewModel.FilteredPasswordsProjectionBuildCount,
+                viewModel.FilteredTotpProjectionBuildCount,
+                viewModel.FilteredWalletProjectionBuildCount,
+                viewModel.FilteredNoteProjectionBuildCount,
+                viewModel.NotePreviewProjectionBuildCount));
+    }
+
+    private static void PopulateVaultSources(MainWindowViewModel viewModel, int itemCount)
+    {
+        for (var index = 0; index < itemCount; index++)
+        {
+            var id = index + 1;
+            viewModel.Passwords.Add(new PasswordEntry
+            {
+                Id = id,
+                Title = $"Memory account {id}",
+                Username = $"user-{id}"
+            });
+            viewModel.TotpItems.Add(new SecureItem
+            {
+                Id = id,
+                ItemType = VaultItemType.Totp,
+                Title = $"Memory TOTP {id}"
+            });
+            viewModel.WalletItems.Add(new SecureItem
+            {
+                Id = id,
+                ItemType = VaultItemType.BankCard,
+                Title = $"Memory card {id}"
+            });
+            viewModel.NoteItems.Add(new SecureItem
+            {
+                Id = id,
+                ItemType = VaultItemType.Note,
+                Title = $"Memory note {id}"
+            });
+        }
+    }
+
     private static void ForceFullCollection()
     {
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
     }
+
+    private static async Task AssertEventuallyCollectedAsync(IReadOnlyList<WeakReference> references)
+    {
+        for (var attempt = 0; attempt < 5 && references.Any(reference => reference.IsAlive); attempt++)
+        {
+            Dispatcher.UIThread.RunJobs();
+            ForceFullCollection();
+            if (references.Any(reference => reference.IsAlive))
+            {
+                await Task.Delay(20, TestContext.Current.CancellationToken);
+            }
+        }
+
+        Assert.All(references, reference => Assert.False(reference.IsAlive));
+    }
+
+    private sealed record ProjectionBuildCounts(
+        int Passwords,
+        int Totp,
+        int Wallet,
+        int NoteTree,
+        int NotePreview);
 }

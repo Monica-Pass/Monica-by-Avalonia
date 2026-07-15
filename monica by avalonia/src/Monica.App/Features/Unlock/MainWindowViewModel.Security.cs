@@ -236,20 +236,7 @@ public sealed partial class MainWindowViewModel
 
     private void ClearSensitiveProjectionCaches()
     {
-        _filteredPasswords = [];
-        _filteredPasswordRows = [];
-        _filteredPasswordsDirty = true;
-        _filteredPasswordRowsDirty = true;
-        _filteredTotpItems = [];
-        _filteredTotpItemsDirty = true;
-        _filteredWalletItems = [];
-        _filteredWalletItemsDirty = true;
-        _filteredNoteItems = [];
-        _favoriteNoteItems = [];
-        _noteTreeGroups = [];
-        _favoriteNoteCount = 0;
-        _noteTreeProjectionDirty = true;
-        ClearSensitiveNoteEditorProjectionCaches();
+        ClearRebuildableProjectionCaches();
         _collapsedPasswordFolderKeys.Clear();
         _expandedPasswordStackKeys.Clear();
     }
