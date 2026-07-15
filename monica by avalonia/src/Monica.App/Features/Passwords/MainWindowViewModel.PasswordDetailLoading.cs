@@ -64,21 +64,30 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        var dispatcher = Dispatcher.CurrentDispatcher;
         var cts = new CancellationTokenSource();
         _selectedPasswordDetailsCts = cts;
         AppDiagnostics.Info($"Password selection changed. id={entry.Id}, version={version}");
-        _ = RefreshSelectedPasswordDetailsDeferredAsync(entry, version, cts);
+        _ = RefreshSelectedPasswordDetailsDeferredAsync(entry, version, dispatcher, cts);
     }
 
-    private async Task RefreshSelectedPasswordDetailsDeferredAsync(PasswordEntry entry, int version, CancellationTokenSource cts)
+    private async Task RefreshSelectedPasswordDetailsDeferredAsync(
+        PasswordEntry entry,
+        int version,
+        Dispatcher dispatcher,
+        CancellationTokenSource cts)
     {
         var stopwatch = Stopwatch.StartNew();
         var cancellationToken = cts.Token;
         try
         {
-            _ = ShowSelectedPasswordLoadingDeferredAsync(entry.Id, version, cancellationToken);
+            _ = ShowSelectedPasswordLoadingDeferredAsync(
+                entry.Id,
+                version,
+                dispatcher,
+                cancellationToken);
             await Task.Delay(SelectedPasswordDetailsCoalesceDelay, cancellationToken).ConfigureAwait(false);
-            var sourceSnapshot = await Dispatcher.UIThread.InvokeAsync(
+            var sourceSnapshot = await dispatcher.InvokeAsync(
                 () =>
                 {
                     if (cancellationToken.IsCancellationRequested ||
@@ -119,7 +128,7 @@ public sealed partial class MainWindowViewModel
             var ownershipTransferred = false;
             try
             {
-                await Dispatcher.UIThread.InvokeAsync(() =>
+                await dispatcher.InvokeAsync(() =>
                 {
                     if (cancellationToken.IsCancellationRequested ||
                         !IsCurrentSelectedPasswordDetailsRequest(version) ||
@@ -132,10 +141,14 @@ public sealed partial class MainWindowViewModel
                     ownershipTransferred = true;
                     IsLoadingSelectedPasswordDetails = false;
                     AppDiagnostics.Info($"Password selection fast details applied in {stopwatch.ElapsedMilliseconds} ms. id={entry.Id}, version={version}");
-                    Dispatcher.UIThread.Post(
+                    dispatcher.Post(
                         () => AppDiagnostics.Info($"Password selection details UI idle after {stopwatch.ElapsedMilliseconds} ms. id={entry.Id}, version={version}"),
                         DispatcherPriority.ApplicationIdle);
-                    _ = LoadSelectedPasswordHistoryDeferredAsync(entry.Id, version, details);
+                    _ = LoadSelectedPasswordHistoryDeferredAsync(
+                        entry.Id,
+                        version,
+                        details,
+                        dispatcher);
                 }, DispatcherPriority.Background);
             }
             finally
@@ -152,7 +165,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            await dispatcher.InvokeAsync(() =>
             {
                 if (IsCurrentSelectedPasswordDetailsRequest(version))
                 {
@@ -174,12 +187,16 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    private async Task ShowSelectedPasswordLoadingDeferredAsync(long entryId, int version, CancellationToken cancellationToken)
+    private async Task ShowSelectedPasswordLoadingDeferredAsync(
+        long entryId,
+        int version,
+        Dispatcher dispatcher,
+        CancellationToken cancellationToken)
     {
         try
         {
             await Task.Delay(SelectedPasswordDetailsLoadingDelay, cancellationToken).ConfigureAwait(false);
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            await dispatcher.InvokeAsync(() =>
             {
                 if (cancellationToken.IsCancellationRequested ||
                     !IsCurrentSelectedPasswordDetailsRequest(version) ||
@@ -200,14 +217,18 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    private async Task LoadSelectedPasswordHistoryDeferredAsync(long entryId, int version, PasswordDetailViewModel details)
+    private async Task LoadSelectedPasswordHistoryDeferredAsync(
+        long entryId,
+        int version,
+        PasswordDetailViewModel details,
+        Dispatcher dispatcher)
     {
         try
         {
             var history = await AppDiagnostics.MeasureAsync(
                 $"Load selected password history id={entryId}",
                 async () => await Task.Run(async () => await GetPasswordHistoryDisplayItemsAsync(entryId)));
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            await dispatcher.InvokeAsync(() =>
             {
                 if (IsCurrentSelectedPasswordDetailsRequest(version) &&
                     SelectedPassword?.Id == entryId &&

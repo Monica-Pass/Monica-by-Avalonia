@@ -61,7 +61,7 @@ public sealed partial class MainWindowViewModel
     {
         if (!ReferenceEquals(oldValue, newValue))
         {
-            Dispatcher.UIThread.Post(() => oldValue?.Dispose(), DispatcherPriority.Background);
+            Dispatcher.CurrentDispatcher.Post(() => oldValue?.Dispose(), DispatcherPriority.Background);
         }
     }
 

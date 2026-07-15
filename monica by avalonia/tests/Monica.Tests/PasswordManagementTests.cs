@@ -1537,7 +1537,7 @@ public sealed class PasswordManagementTests
                 field => field.CopyValue == "temporary-plain-secret");
 
             harness.ViewModel.SelectedPassword = null;
-            Dispatcher.UIThread.RunJobs();
+            Dispatcher.CurrentDispatcher.RunJobs();
 
             Assert.True(oldDetails.IsSensitiveStateCleared);
             Assert.Empty(oldDetails.Groups);
@@ -1584,7 +1584,7 @@ public sealed class PasswordManagementTests
             field => field.DisplayValue == "first-secret");
 
         Thread.Sleep(150);
-        Dispatcher.UIThread.RunJobs();
+        Dispatcher.CurrentDispatcher.RunJobs();
 
         Assert.Equal(second.Id, harness.ViewModel.SelectedPasswordDetails?.Entry.Id);
     }
@@ -1670,7 +1670,7 @@ public sealed class PasswordManagementTests
             field => field.DisplayValue == "secret-29");
 
         Thread.Sleep(200);
-        Dispatcher.UIThread.RunJobs();
+        Dispatcher.CurrentDispatcher.RunJobs();
 
         Assert.Equal(latest.Id, harness.ViewModel.SelectedPasswordDetails?.Entry.Id);
         Assert.DoesNotContain(
@@ -4114,7 +4114,7 @@ public sealed class PasswordManagementTests
         var deadline = DateTimeOffset.UtcNow.AddMilliseconds(timeoutMilliseconds);
         while (DateTimeOffset.UtcNow < deadline)
         {
-            Dispatcher.UIThread.RunJobs();
+            Dispatcher.CurrentDispatcher.RunJobs();
             if (predicate())
             {
                 return;
@@ -4123,7 +4123,7 @@ public sealed class PasswordManagementTests
             Thread.Sleep(20);
         }
 
-        Dispatcher.UIThread.RunJobs();
+        Dispatcher.CurrentDispatcher.RunJobs();
         Assert.True(predicate(), "Condition was not satisfied before timeout.");
     }
 
@@ -4161,7 +4161,7 @@ public sealed class PasswordManagementTests
 
         private void RunLoop()
         {
-            _ = Dispatcher.UIThread;
+            _ = Dispatcher.CurrentDispatcher;
             foreach (var workItem in _workItems.GetConsumingEnumerable())
             {
                 try
