@@ -145,6 +145,7 @@ public sealed partial class MainWindowViewModel
 
     private void RaiseNoteTreeState()
     {
+        _noteTreeProjectionDirty = true;
         OnPropertyChanged(nameof(FavoriteNoteItems));
         OnPropertyChanged(nameof(FilteredNoteItems));
         OnPropertyChanged(nameof(NoteTreeGroups));
@@ -181,108 +182,5 @@ public sealed partial class MainWindowViewModel
         SelectPreviousNoteTabCommand.NotifyCanExecuteChanged();
         SelectNextNoteTabCommand.NotifyCanExecuteChanged();
     }
-
-    private IReadOnlyList<SecureItem> BuildFilteredNoteItems(bool favoritesOnly)
-    {
-        var query = NoteSearchText ?? "";
-        return NoteItems
-            .Where(item => (!favoritesOnly || item.IsFavorite) && MatchesNoteSearch(item, query))
-            .OrderByDescending(item => item.IsFavorite)
-            .ThenByDescending(item => item.UpdatedAt)
-            .ThenBy(item => item.Title, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-    }
-
-    private IReadOnlyList<NoteTreeGroup> BuildNoteTreeGroups(IReadOnlyList<SecureItem> notes)
-    {
-        var taggedGroups = new SortedDictionary<string, List<SecureItem>>(StringComparer.OrdinalIgnoreCase);
-        var untagged = new List<SecureItem>();
-
-        foreach (var note in notes)
-        {
-            var tags = GetNoteTreeTags(note);
-            if (tags.Count == 0)
-            {
-                untagged.Add(note);
-                continue;
-            }
-
-            foreach (var tag in tags)
-            {
-                if (!taggedGroups.TryGetValue(tag, out var bucket))
-                {
-                    bucket = [];
-                    taggedGroups[tag] = bucket;
-                }
-
-                bucket.Add(note);
-            }
-        }
-
-        var groups = taggedGroups
-            .Select(pair => new NoteTreeGroup(pair.Key, pair.Value.Count, pair.Value, IsUntagged: false))
-            .ToList();
-
-        if (untagged.Count > 0)
-        {
-            groups.Add(new NoteTreeGroup(_localization.Get("NoteUntagged"), untagged.Count, untagged, IsUntagged: true));
-        }
-
-        return groups;
-    }
-
-    private static IReadOnlyList<string> GetNoteTreeTags(SecureItem item)
-    {
-        try
-        {
-            return NoteContentCodec.DecodeFromItem(item).Tags
-                .Where(tag => !string.IsNullOrWhiteSpace(tag))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-        }
-        catch
-        {
-            return [];
-        }
-    }
-
-    private static bool MatchesNoteSearch(SecureItem item, string query)
-    {
-        if (string.IsNullOrWhiteSpace(query))
-        {
-            return true;
-        }
-
-        var terms = query
-            .Split([' ', '\t', '\r', '\n', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (terms.Length == 0)
-        {
-            return true;
-        }
-
-        var decodedContent = "";
-        var decodedTags = "";
-        try
-        {
-            var decoded = NoteContentCodec.DecodeFromItem(item);
-            decodedContent = decoded.Content;
-            decodedTags = string.Join(" ", decoded.Tags);
-        }
-        catch
-        {
-            // Keep the file tree usable even when a legacy note payload cannot be decoded.
-        }
-
-        return terms.All(term =>
-            ContainsOrdinalIgnoreCase(item.Title, term) ||
-            ContainsOrdinalIgnoreCase(item.Notes, term) ||
-            ContainsOrdinalIgnoreCase(decodedContent, term) ||
-            ContainsOrdinalIgnoreCase(decodedTags, term));
-    }
-
-    private static bool ContainsOrdinalIgnoreCase(string? source, string value) =>
-        !string.IsNullOrEmpty(source) &&
-        source.Contains(value, StringComparison.OrdinalIgnoreCase);
 
 }

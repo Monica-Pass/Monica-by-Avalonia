@@ -14,6 +14,15 @@ public sealed partial class MainWindowViewModel
 
     private bool _isLoadingNoteEditor;
     private int _noteImagePreviewVersion;
+    private IReadOnlyList<SecureItem> _filteredNoteItems = [];
+    private IReadOnlyList<SecureItem> _favoriteNoteItems = [];
+    private IReadOnlyList<NoteTreeGroup> _noteTreeGroups = [];
+    private int _favoriteNoteCount;
+    private bool _noteTreeProjectionDirty = true;
+
+    internal int FilteredNoteProjectionBuildCount { get; private set; }
+    internal int NoteTreeGroupProjectionBuildCount { get; private set; }
+    internal int NotePayloadDecodeCount { get; private set; }
 
     public ObservableCollection<SecureItem> NoteItems { get; } = new ObservableRangeCollection<SecureItem>();
     public ObservableCollection<NoteEditorTab> OpenNoteTabs { get; } = [];
@@ -65,10 +74,41 @@ public sealed partial class MainWindowViewModel
     public int NoteImagePreviewCount => NoteImagePreviewItems.Count;
     public bool HasNoteImagePreviewItems => NoteImagePreviewCount > 0;
     public string NoteFormatText => NoteIsMarkdown ? "Markdown" : _localization.PlainText;
-    public IReadOnlyList<SecureItem> FavoriteNoteItems => BuildFilteredNoteItems(favoritesOnly: true);
-    public IReadOnlyList<SecureItem> FilteredNoteItems => BuildFilteredNoteItems(favoritesOnly: false);
-    public IReadOnlyList<NoteTreeGroup> NoteTreeGroups => BuildNoteTreeGroups(FilteredNoteItems);
-    public int FavoriteNoteCount => NoteItems.Count(item => item.IsFavorite);
+    public IReadOnlyList<SecureItem> FavoriteNoteItems
+    {
+        get
+        {
+            EnsureNoteTreeProjection();
+            return _favoriteNoteItems;
+        }
+    }
+
+    public IReadOnlyList<SecureItem> FilteredNoteItems
+    {
+        get
+        {
+            EnsureNoteTreeProjection();
+            return _filteredNoteItems;
+        }
+    }
+
+    public IReadOnlyList<NoteTreeGroup> NoteTreeGroups
+    {
+        get
+        {
+            EnsureNoteTreeProjection();
+            return _noteTreeGroups;
+        }
+    }
+
+    public int FavoriteNoteCount
+    {
+        get
+        {
+            EnsureNoteTreeProjection();
+            return _favoriteNoteCount;
+        }
+    }
     public bool HasFavoriteNoteItems => FavoriteNoteItems.Count > 0;
     public bool HasFilteredNoteItems => FilteredNoteItems.Count > 0;
     public bool HasNoteTreeGroups => NoteTreeGroups.Count > 0;

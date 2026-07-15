@@ -249,6 +249,11 @@ public sealed partial class MainWindowViewModel
         _filteredTotpItemsDirty = true;
         _filteredWalletItems = [];
         _filteredWalletItemsDirty = true;
+        _filteredNoteItems = [];
+        _favoriteNoteItems = [];
+        _noteTreeGroups = [];
+        _favoriteNoteCount = 0;
+        _noteTreeProjectionDirty = true;
         _collapsedPasswordFolderKeys.Clear();
         _expandedPasswordStackKeys.Clear();
     }

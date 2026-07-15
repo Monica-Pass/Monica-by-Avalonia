@@ -217,6 +217,83 @@ public sealed class UiPerformanceTests
         Assert.Equal(itemCount / 2, viewModel.FilteredWalletItems.Count);
     }
 
+    [Fact]
+    public void Note_tree_projection_builds_once_and_decodes_each_payload_once()
+    {
+        const int itemCount = 5000;
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        var payload = NoteContentCodec.BuildSavePayload(
+            "Performance note",
+            "# Recovery\n\nDesktop note content",
+            "performance, private",
+            isMarkdown: true);
+
+        for (var id = 1; id <= itemCount; id++)
+        {
+            viewModel.NoteItems.Add(new SecureItem
+            {
+                Id = id,
+                ItemType = VaultItemType.Note,
+                Title = id % 2 == 0 ? $"Target note {id}" : $"Other note {id}",
+                Notes = payload.NotesCache,
+                ItemData = payload.ItemData
+            });
+        }
+
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            switch (args.PropertyName)
+            {
+                case nameof(MainWindowViewModel.FavoriteNoteItems):
+                    _ = viewModel.FavoriteNoteItems.Count;
+                    break;
+                case nameof(MainWindowViewModel.FilteredNoteItems):
+                    _ = viewModel.FilteredNoteItems.Count;
+                    break;
+                case nameof(MainWindowViewModel.NoteTreeGroups):
+                    _ = viewModel.NoteTreeGroups.Count;
+                    break;
+                case nameof(MainWindowViewModel.FavoriteNoteCount):
+                    _ = viewModel.FavoriteNoteCount;
+                    break;
+                case nameof(MainWindowViewModel.HasFavoriteNoteItems):
+                    _ = viewModel.HasFavoriteNoteItems;
+                    break;
+                case nameof(MainWindowViewModel.HasFilteredNoteItems):
+                    _ = viewModel.HasFilteredNoteItems;
+                    break;
+                case nameof(MainWindowViewModel.HasNoteTreeGroups):
+                    _ = viewModel.HasNoteTreeGroups;
+                    break;
+                case nameof(MainWindowViewModel.ShowClearNoteSearchInEmptyTree):
+                    _ = viewModel.ShowClearNoteSearchInEmptyTree;
+                    break;
+                case nameof(MainWindowViewModel.NoteTreeEmptyText):
+                    _ = viewModel.NoteTreeEmptyText;
+                    break;
+                case nameof(MainWindowViewModel.NoteTreeStatusText):
+                    _ = viewModel.NoteTreeStatusText;
+                    break;
+            }
+        };
+
+        viewModel.NoteSearchText = "Target";
+
+        Assert.True(
+            viewModel.FilteredNoteProjectionBuildCount == 1 &&
+            viewModel.NoteTreeGroupProjectionBuildCount == 1 &&
+            viewModel.NotePayloadDecodeCount == itemCount,
+            $"Expected one note projection build and one decode per item, but observed " +
+            $"filtered={viewModel.FilteredNoteProjectionBuildCount}, " +
+            $"groups={viewModel.NoteTreeGroupProjectionBuildCount}, " +
+            $"decodes={viewModel.NotePayloadDecodeCount}.");
+        Assert.Equal(itemCount / 2, viewModel.FilteredNoteItems.Count);
+        Assert.Equal(2, viewModel.NoteTreeGroups.Count);
+        Assert.All(viewModel.NoteTreeGroups, group => Assert.Equal(itemCount / 2, group.Count));
+    }
+
     private static void RunVaultLoad(MainWindowViewModel viewModel)
     {
         var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
