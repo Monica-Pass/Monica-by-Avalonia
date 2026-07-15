@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Monica.App.Services;
+using Monica.Core.Services;
 using Monica.Data;
 
 namespace Monica.App.ViewModels;
@@ -73,6 +74,37 @@ public sealed partial class MainWindowViewModel
         IsConfirmMasterPasswordVisible ? _localization.HidePassword : _localization.ShowPassword;
 
     public string MasterPasswordPrivacyNotice => _localization.Get("MasterPasswordPrivacyNotice");
+
+    public bool ShowCreateVaultPasswordGuidance =>
+        IsVaultAccessReady &&
+        !IsVaultInitialized &&
+        !_legacyVaultDetection.RequiresImport;
+
+    public bool IsCreateVaultPasswordLengthValid =>
+        !string.IsNullOrWhiteSpace(MasterPassword) &&
+        VaultMasterPasswordPolicy.MeetsMinimumLength(MasterPassword);
+
+    public bool IsCreateVaultPasswordConfirmationValid =>
+        !string.IsNullOrEmpty(ConfirmMasterPassword) &&
+        string.Equals(MasterPassword, ConfirmMasterPassword, StringComparison.Ordinal);
+
+    public bool IsCreateVaultPasswordInputValid =>
+        IsCreateVaultPasswordLengthValid &&
+        IsCreateVaultPasswordConfirmationValid;
+
+    public string CreateVaultPasswordLengthStatusText =>
+        _localization.Format(
+            IsCreateVaultPasswordLengthValid
+                ? "CreateVaultPasswordLengthRequirementMetFormat"
+                : "CreateVaultPasswordLengthRequirementFormat",
+            VaultMasterPasswordPolicy.MinimumLength);
+
+    public string CreateVaultPasswordConfirmationStatusText =>
+        string.IsNullOrEmpty(ConfirmMasterPassword)
+            ? _localization.Get("MasterPasswordConfirmationRequired")
+            : IsCreateVaultPasswordConfirmationValid
+                ? _localization.Get("MasterPasswordConfirmationMatches")
+                : _localization.Get("ConfirmationMismatch");
 
     public bool HasUnlockStatusMessage => !string.IsNullOrWhiteSpace(StatusMessage);
 
@@ -177,7 +209,7 @@ public sealed partial class MainWindowViewModel
         !IsUnlocking &&
         !_legacyVaultDetection.RequiresImport &&
         !string.IsNullOrEmpty(MasterPassword) &&
-        (IsVaultInitialized || !string.IsNullOrEmpty(ConfirmMasterPassword));
+        (IsVaultInitialized || IsCreateVaultPasswordInputValid);
 
     [RelayCommand]
     private void ToggleMasterPasswordVisibility()
@@ -231,7 +263,18 @@ public sealed partial class MainWindowViewModel
         }
 
         ClearUnlockErrorForCorrectedInput();
+        RaiseCreateVaultPasswordGuidanceState();
         UnlockCommand.NotifyCanExecuteChanged();
+    }
+
+    private void RaiseCreateVaultPasswordGuidanceState()
+    {
+        OnPropertyChanged(nameof(ShowCreateVaultPasswordGuidance));
+        OnPropertyChanged(nameof(IsCreateVaultPasswordLengthValid));
+        OnPropertyChanged(nameof(IsCreateVaultPasswordConfirmationValid));
+        OnPropertyChanged(nameof(IsCreateVaultPasswordInputValid));
+        OnPropertyChanged(nameof(CreateVaultPasswordLengthStatusText));
+        OnPropertyChanged(nameof(CreateVaultPasswordConfirmationStatusText));
     }
 
     partial void OnMasterPasswordChanged(string value) =>
@@ -259,6 +302,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(LoginTitle));
         OnPropertyChanged(nameof(LoginDescription));
         OnPropertyChanged(nameof(LoginButtonText));
+        RaiseCreateVaultPasswordGuidanceState();
         UnlockCommand.NotifyCanExecuteChanged();
     }
 
@@ -266,6 +310,7 @@ public sealed partial class MainWindowViewModel
     {
         OnPropertyChanged(nameof(HasLegacyVaultImportPrompt));
         OnPropertyChanged(nameof(LegacyVaultImportPromptText));
+        RaiseCreateVaultPasswordGuidanceState();
         UnlockCommand.NotifyCanExecuteChanged();
     }
 

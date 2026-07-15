@@ -62,6 +62,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(LoginTitle));
         OnPropertyChanged(nameof(LoginDescription));
         OnPropertyChanged(nameof(LoginButtonText));
+        RaiseCreateVaultPasswordGuidanceState();
         UnlockCommand.NotifyCanExecuteChanged();
     }
 }

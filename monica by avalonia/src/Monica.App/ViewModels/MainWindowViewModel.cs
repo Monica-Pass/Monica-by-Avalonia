@@ -469,6 +469,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(LoginDescription));
         OnPropertyChanged(nameof(LoginButtonText));
         OnPropertyChanged(nameof(MasterPasswordPrivacyNotice));
+        OnPropertyChanged(nameof(CreateVaultPasswordLengthStatusText));
+        OnPropertyChanged(nameof(CreateVaultPasswordConfirmationStatusText));
         OnPropertyChanged(nameof(ToggleMasterPasswordVisibilityLabel));
         OnPropertyChanged(nameof(ToggleConfirmMasterPasswordVisibilityLabel));
         OnPropertyChanged(nameof(LockVaultText));

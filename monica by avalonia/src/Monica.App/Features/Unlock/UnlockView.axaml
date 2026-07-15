@@ -67,6 +67,21 @@
         <Style Selector="Border.unlockFeedback.error">
             <Setter Property="BorderBrush" Value="{DynamicResource SystemFillColorCriticalBrush}" />
         </Style>
+        <Style Selector="Border.unlockRequirements">
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Background" Value="{DynamicResource LayerFillColorSubtleBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="TextBlock.unlockRequirement">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBlock.unlockRequirement.met">
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+        </Style>
     </UserControl.Styles>
 
     <Grid Classes="unlockSurface"
@@ -161,6 +176,24 @@
                         </Button>
                     </Grid>
                 </StackPanel>
+                <Border x:Name="CreateVaultPasswordRequirementsPanel"
+                        Classes="unlockRequirements"
+                        IsVisible="{Binding ShowCreateVaultPasswordGuidance}">
+                    <StackPanel Spacing="6">
+                        <TextBlock x:Name="CreateVaultPasswordLengthStatusText"
+                                   Classes="unlockRequirement"
+                                   Classes.met="{Binding IsCreateVaultPasswordLengthValid}"
+                                   Text="{Binding CreateVaultPasswordLengthStatusText}"
+                                   AutomationProperties.Name="{Binding CreateVaultPasswordLengthStatusText}"
+                                   AutomationProperties.LiveSetting="Polite" />
+                        <TextBlock x:Name="CreateVaultPasswordConfirmationStatusText"
+                                   Classes="unlockRequirement"
+                                   Classes.met="{Binding IsCreateVaultPasswordConfirmationValid}"
+                                   Text="{Binding CreateVaultPasswordConfirmationStatusText}"
+                                   AutomationProperties.Name="{Binding CreateVaultPasswordConfirmationStatusText}"
+                                   AutomationProperties.LiveSetting="Polite" />
+                    </StackPanel>
+                </Border>
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
                     <ic:FluentIcon Icon="LockClosed"
                                    FontSize="16"

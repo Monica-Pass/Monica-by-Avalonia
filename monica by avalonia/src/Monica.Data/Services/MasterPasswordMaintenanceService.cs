@@ -104,9 +104,10 @@ public sealed class MasterPasswordMaintenanceService(
             return MasterPasswordMaintenanceResult.Failure("Current master password is required.");
         }
 
-        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 8)
+        if (string.IsNullOrWhiteSpace(newPassword) || !VaultMasterPasswordPolicy.MeetsMinimumLength(newPassword))
         {
-            return MasterPasswordMaintenanceResult.Failure("New master password must be at least 8 characters.");
+            return MasterPasswordMaintenanceResult.Failure(
+                $"New master password must be at least {VaultMasterPasswordPolicy.MinimumLength} characters.");
         }
 
         await migrator.MigrateAsync(cancellationToken);
@@ -131,9 +132,10 @@ public sealed class MasterPasswordMaintenanceService(
         string newPassword,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 8)
+        if (string.IsNullOrWhiteSpace(newPassword) || !VaultMasterPasswordPolicy.MeetsMinimumLength(newPassword))
         {
-            return MasterPasswordMaintenanceResult.Failure("New master password must be at least 8 characters.");
+            return MasterPasswordMaintenanceResult.Failure(
+                $"New master password must be at least {VaultMasterPasswordPolicy.MinimumLength} characters.");
         }
 
         if (!cryptoService.IsUnlocked)

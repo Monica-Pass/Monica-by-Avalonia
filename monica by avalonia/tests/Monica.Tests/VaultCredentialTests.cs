@@ -16,7 +16,7 @@ public sealed class VaultCredentialTestCollection
 }
 
 [Collection(VaultCredentialTestCollection.Name)]
-public sealed class VaultCredentialTests
+public sealed partial class VaultCredentialTests
 {
     [Fact]
     public async Task Security_baseline_lock_clears_sensitive_view_state()
@@ -226,16 +226,14 @@ public sealed class VaultCredentialTests
 
         viewModel.MasterPassword = "password-one";
         viewModel.ConfirmMasterPassword = "password-two";
-        await viewModel.UnlockCommand.ExecuteAsync(null);
 
         Assert.False(viewModel.IsUnlocked);
-        Assert.Equal(viewModel.L.Get("ConfirmationMismatch"), viewModel.StatusMessage);
-        Assert.True(viewModel.HasUnlockError);
+        Assert.False(viewModel.UnlockCommand.CanExecute(null));
+        Assert.Equal(viewModel.L.Get("ConfirmationMismatch"), viewModel.CreateVaultPasswordConfirmationStatusText);
 
         viewModel.ConfirmMasterPassword = "password-one";
 
-        Assert.False(viewModel.HasUnlockError);
-        Assert.Equal("", viewModel.StatusMessage);
+        Assert.True(viewModel.UnlockCommand.CanExecute(null));
     }
 
     [Fact]

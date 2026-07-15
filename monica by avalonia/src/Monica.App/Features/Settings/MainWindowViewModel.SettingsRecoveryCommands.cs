@@ -95,7 +95,7 @@ public sealed partial class MainWindowViewModel
         if (!recovery.HasCompleteSetup) return FailRecoveryReset("SecurityQuestionsNotConfigured");
         if (string.IsNullOrWhiteSpace(answer1) || string.IsNullOrWhiteSpace(answer2)) return FailRecoveryReset("SecurityQuestionAnswersRequired");
         if (string.IsNullOrWhiteSpace(newPassword)) return FailRecoveryReset("EnterNewMasterPassword");
-        if (newPassword.Length < 8) return FailRecoveryReset("MasterPasswordMinLength");
+        if (!VaultMasterPasswordPolicy.MeetsMinimumLength(newPassword)) return FailRecoveryReset("MasterPasswordMinLength");
         if (!string.Equals(newPassword, RecoveryConfirmNewMasterPassword, StringComparison.Ordinal)) return FailRecoveryReset("ConfirmationMismatch");
         return true;
     }

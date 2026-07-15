@@ -112,7 +112,7 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        if (NewMasterPassword.Length < 8)
+        if (!VaultMasterPasswordPolicy.MeetsMinimumLength(NewMasterPassword))
         {
             StatusMessage = _localization.Get("MasterPasswordMinLength");
             return;

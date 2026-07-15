@@ -74,7 +74,7 @@ public sealed class VaultUnlockCoordinator(
             var created = false;
             if (storedHash is null)
             {
-                if (masterPassword.Length < 8)
+                if (!VaultMasterPasswordPolicy.MeetsMinimumLength(masterPassword))
                 {
                     return new VaultUnlockResult(VaultUnlockStatus.PasswordTooShort, false, "MasterPasswordMinLength");
                 }

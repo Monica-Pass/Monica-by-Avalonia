@@ -25,6 +25,9 @@ public sealed class VaultAccessUiTests
         Assert.NotNull(view.FindControl<TextBlock>("ConfirmMasterPasswordLabel"));
         Assert.NotNull(view.FindControl<TextBox>("ConfirmMasterPasswordInput"));
         Assert.NotNull(view.FindControl<Button>("ToggleConfirmMasterPasswordVisibilityButton"));
+        Assert.NotNull(view.FindControl<Border>("CreateVaultPasswordRequirementsPanel"));
+        Assert.NotNull(view.FindControl<TextBlock>("CreateVaultPasswordLengthStatusText"));
+        Assert.NotNull(view.FindControl<TextBlock>("CreateVaultPasswordConfirmationStatusText"));
         Assert.NotNull(view.FindControl<ProgressBar>("UnlockProgress"));
 
         var submit = view.FindControl<Button>("UnlockButton");
