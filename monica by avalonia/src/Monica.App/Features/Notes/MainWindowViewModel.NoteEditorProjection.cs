@@ -16,12 +16,14 @@ public sealed partial class MainWindowViewModel
 
         NoteContentAnalysisBuildCount++;
         var content = NoteContent;
-        var lineCount = CountNoteLines(content);
+        var lineStartIndexes = BuildNoteLineStartIndexes(content);
+        var lineCount = lineStartIndexes.Length;
         _noteContentAnalysis = new NoteContentAnalysis(
             BuildLineNumbersText(lineCount),
             lineCount,
             CountNoteWords(content),
             content.Length,
+            lineStartIndexes,
             BuildNoteOutlineItems(content),
             BuildNoteReferenceItems(content));
         _noteContentAnalysisDirty = false;
@@ -59,15 +61,28 @@ public sealed partial class MainWindowViewModel
     private void ClearSensitiveNoteEditorProjectionCaches() =>
         InvalidateNoteEditorProjections();
 
+    private (int Line, int Column) GetNoteCaretPosition(int caretIndex)
+    {
+        var lineStartIndexes = GetNoteContentAnalysis().LineStartIndexes;
+        var lineIndex = Array.BinarySearch(lineStartIndexes, caretIndex);
+        if (lineIndex < 0)
+        {
+            lineIndex = Math.Max(0, ~lineIndex - 1);
+        }
+
+        return (lineIndex + 1, caretIndex - lineStartIndexes[lineIndex] + 1);
+    }
+
     private sealed record NoteContentAnalysis(
         string LineNumbersText,
         int LineCount,
         int WordCount,
         int CharacterCount,
+        int[] LineStartIndexes,
         IReadOnlyList<NoteOutlineItem> OutlineItems,
         IReadOnlyList<NoteReferenceItem> ReferenceItems)
     {
-        public static NoteContentAnalysis Empty { get; } = new("1", 1, 0, 0, [], []);
+        public static NoteContentAnalysis Empty { get; } = new("1", 1, 0, 0, [0], [], []);
     }
 
     private sealed record NotePreviewProjection(string Markdown, string PlainText)

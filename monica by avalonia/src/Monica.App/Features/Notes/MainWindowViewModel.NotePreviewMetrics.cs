@@ -14,11 +14,18 @@ public sealed partial class MainWindowViewModel
     private static string BuildLineNumbersText(int lineCount) =>
         string.Join(Environment.NewLine, Enumerable.Range(1, lineCount));
 
-    private static int CountNoteLines(string content)
+    private static int[] BuildNoteLineStartIndexes(string content)
     {
-        return string.IsNullOrEmpty(content)
-            ? 1
-            : content.Count(character => character == '\n') + 1;
+        var lineStarts = new List<int> { 0 };
+        for (var index = 0; index < content.Length; index++)
+        {
+            if (content[index] == '\n')
+            {
+                lineStarts.Add(index + 1);
+            }
+        }
+
+        return lineStarts.ToArray();
     }
 
     private static int CountNoteWords(string content)

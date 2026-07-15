@@ -21,20 +21,7 @@ public sealed partial class MainWindowViewModel
         caretIndex = Math.Clamp(caretIndex, 0, text.Length);
         selectionStart = Math.Clamp(selectionStart, 0, text.Length);
         selectionEnd = Math.Clamp(selectionEnd, 0, text.Length);
-        var line = 1;
-        var column = 1;
-        for (var index = 0; index < caretIndex; index++)
-        {
-            if (text[index] == '\n')
-            {
-                line++;
-                column = 1;
-            }
-            else
-            {
-                column++;
-            }
-        }
+        var (line, column) = GetNoteCaretPosition(caretIndex);
 
         NoteCaretLine = line;
         NoteCaretColumn = column;

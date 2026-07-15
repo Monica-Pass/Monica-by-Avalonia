@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Monica.App.Services;
 using Monica.App.ViewModels;
 using Monica.Core.ImportExport;
@@ -11,6 +12,54 @@ namespace Monica.Tests;
 
 public sealed class SecureNoteTests
 {
+    [Fact]
+    public void Note_editor_caret_lookup_uses_cached_line_index()
+    {
+        const int lineCount = 5000;
+        const int updateCount = 500;
+        var viewModel = CreateViewModel();
+        var firstLine = "Line 0001 recovery content";
+        var lastLine = $"Line {lineCount:D4} recovery content";
+        var content = string.Join(
+            '\n',
+            Enumerable.Range(1, lineCount)
+                .Select(index => $"Line {index:D4} recovery content"));
+        viewModel.NoteContent = content;
+        _ = viewModel.NoteLineCount;
+
+        var stopwatch = Stopwatch.StartNew();
+        for (var index = 0; index < updateCount; index++)
+        {
+            var caretIndex = content.Length - (index % lastLine.Length);
+            viewModel.UpdateNoteEditorStatus(caretIndex, caretIndex - 7, caretIndex);
+        }
+        stopwatch.Stop();
+
+        Assert.Equal(1, viewModel.NoteContentAnalysisBuildCount);
+        Assert.True(
+            stopwatch.ElapsedMilliseconds < 50,
+            $"Repeated caret lookup took {stopwatch.ElapsedMilliseconds} ms.");
+
+        viewModel.UpdateNoteEditorStatus(content.Length + 100, -100, content.Length + 100);
+        Assert.Equal(lineCount, viewModel.NoteCaretLine);
+        Assert.Equal(lastLine.Length + 1, viewModel.NoteCaretColumn);
+        Assert.Equal(content.Length, viewModel.NoteSelectedCharacterCount);
+
+        viewModel.UpdateNoteEditorStatus(firstLine.Length, firstLine.Length, firstLine.Length);
+        Assert.Equal(1, viewModel.NoteCaretLine);
+        Assert.Equal(firstLine.Length + 1, viewModel.NoteCaretColumn);
+
+        viewModel.UpdateNoteEditorStatus(firstLine.Length + 1, firstLine.Length + 1, firstLine.Length + 1);
+        Assert.Equal(2, viewModel.NoteCaretLine);
+        Assert.Equal(1, viewModel.NoteCaretColumn);
+
+        viewModel.NoteContent = "One\nTwo";
+        viewModel.UpdateNoteEditorStatus(4, 4, 4);
+        Assert.Equal(2, viewModel.NoteContentAnalysisBuildCount);
+        Assert.Equal(2, viewModel.NoteCaretLine);
+        Assert.Equal(1, viewModel.NoteCaretColumn);
+    }
+
     [Fact]
     public void Note_content_codec_roundtrips_markdown_tags_and_preview()
     {
