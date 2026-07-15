@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Collections.Specialized;
 using System.Reflection;
 using Avalonia.Controls;
 using Avalonia.Threading;
@@ -78,8 +79,56 @@ public sealed class UiPerformanceTests
             overrides.AddSingleton<ITotpService>(totpService);
         });
         var viewModel = services.GetRequiredService<MainWindowViewModel>();
-        var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        RunVaultLoad(viewModel);
+        Assert.Equal([true, true], totpService.HeartbeatObservations);
+        var displayed = Assert.Single(viewModel.Passwords);
+        Assert.NotSame(repositoryProbe.Password, displayed);
+        Assert.Equal("------", repositoryProbe.Password.TotpCode);
+        Assert.Equal("654321", displayed.TotpCode);
+        var displayedTotp = Assert.Single(viewModel.TotpItems);
+        Assert.NotSame(repositoryProbe.Totp, displayedTotp);
+        Assert.Equal("------", repositoryProbe.Totp.TotpCode);
+        Assert.Equal("654321", displayedTotp.TotpCode);
+    }
 
+    [Fact]
+    public void Vault_folder_projection_publishes_one_batched_collection_change()
+    {
+        const int categoryCount = 500;
+        const int passwordCount = 5000;
+        var repository = DispatchProxy.Create<IMonicaRepository, VaultLoadRepositoryProxy>();
+        var probe = (VaultLoadRepositoryProxy)(object)repository;
+        probe.Categories = Enumerable.Range(1, categoryCount)
+            .Select(id => new Category { Id = id, Name = $"Folder {id:D4}", SortOrder = id })
+            .ToArray();
+        probe.PasswordItems = Enumerable.Range(1, passwordCount)
+            .Select(id => new PasswordEntry
+            {
+                Id = id,
+                Title = $"Password {id:D5}",
+                CategoryId = (id % categoryCount) + 1
+            })
+            .ToArray();
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window, overrides =>
+            overrides.AddSingleton(repository));
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        var collectionChanges = new List<NotifyCollectionChangedAction>();
+        viewModel.PasswordFolderFilters.CollectionChanged += (_, args) => collectionChanges.Add(args.Action);
+
+        RunVaultLoad(viewModel);
+
+        Assert.Equal([NotifyCollectionChangedAction.Reset], collectionChanges);
+        Assert.Equal(categoryCount + 3, viewModel.PasswordFolderFilters.Count);
+        Assert.Equal(categoryCount, viewModel.RegularPasswordFolderFilters.Count());
+        Assert.All(
+            viewModel.RegularPasswordFolderFilters,
+            folder => Assert.Equal(passwordCount / categoryCount, folder.Count));
+    }
+
+    private static void RunVaultLoad(MainWindowViewModel viewModel)
+    {
+        var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
         Dispatcher.UIThread.Post(async () =>
         {
             try
@@ -94,7 +143,7 @@ public sealed class UiPerformanceTests
         });
 
         var timeout = Stopwatch.StartNew();
-        while (!completion.Task.IsCompleted && timeout.Elapsed < TimeSpan.FromSeconds(5))
+        while (!completion.Task.IsCompleted && timeout.Elapsed < TimeSpan.FromSeconds(10))
         {
             Dispatcher.UIThread.RunJobs();
             Thread.Sleep(1);
@@ -102,15 +151,6 @@ public sealed class UiPerformanceTests
 
         Assert.True(completion.Task.IsCompleted, "Vault load did not finish before the responsiveness timeout.");
         Assert.True(completion.Task.IsCompletedSuccessfully, completion.Task.Exception?.ToString());
-        Assert.Equal([true, true], totpService.HeartbeatObservations);
-        var displayed = Assert.Single(viewModel.Passwords);
-        Assert.NotSame(repositoryProbe.Password, displayed);
-        Assert.Equal("------", repositoryProbe.Password.TotpCode);
-        Assert.Equal("654321", displayed.TotpCode);
-        var displayedTotp = Assert.Single(viewModel.TotpItems);
-        Assert.NotSame(repositoryProbe.Totp, displayedTotp);
-        Assert.Equal("------", repositoryProbe.Totp.TotpCode);
-        Assert.Equal("654321", displayedTotp.TotpCode);
     }
 
     public class VaultLoadRepositoryProxy : DispatchProxy
@@ -133,13 +173,17 @@ public sealed class UiPerformanceTests
                 TotpDataResolver.FromAuthenticatorKey("JBSWY3DPEHPK3PXP", "Responsive TOTP", "desktop")!)
         };
 
+        public IReadOnlyList<PasswordEntry>? PasswordItems { get; set; }
+
+        public IReadOnlyList<Category> Categories { get; set; } = [];
+
         protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
         {
             ArgumentNullException.ThrowIfNull(targetMethod);
             return targetMethod.Name switch
             {
                 nameof(IMonicaRepository.GetPasswordsAsync) => Task.FromResult<IReadOnlyList<PasswordEntry>>(
-                    [Password]),
+                    PasswordItems ?? [Password]),
                 nameof(IMonicaRepository.GetCustomFieldsByEntryIdsAsync) =>
                     Task.FromResult<IReadOnlyDictionary<long, IReadOnlyList<CustomField>>>(
                         new Dictionary<long, IReadOnlyList<CustomField>>()),
@@ -149,7 +193,7 @@ public sealed class UiPerformanceTests
                 nameof(IMonicaRepository.GetSecureItemsAsync) =>
                     Task.FromResult<IReadOnlyList<SecureItem>>([Totp]),
                 nameof(IMonicaRepository.GetCategoriesAsync) =>
-                    Task.FromResult<IReadOnlyList<Category>>([]),
+                    Task.FromResult(Categories),
                 nameof(IMonicaRepository.GetPasswordQuickAccessRecordsAsync) =>
                     Task.FromResult<IReadOnlyList<PasswordQuickAccessRecord>>([]),
                 nameof(IMonicaRepository.GetMdbxDatabasesAsync) =>

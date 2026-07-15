@@ -76,7 +76,8 @@ public sealed partial class MainWindowViewModel
     public ObservableCollection<PasswordEntry> Passwords { get; } = new ObservableRangeCollection<PasswordEntry>();
     public ObservableCollection<Category> Categories { get; } = new ObservableRangeCollection<Category>();
     public ObservableCollection<SettingsChoice> PasswordSortOptions { get; } = [];
-    public ObservableCollection<PasswordFolderFilterChoice> PasswordFolderFilters { get; } = [];
+    public ObservableCollection<PasswordFolderFilterChoice> PasswordFolderFilters { get; } =
+        new ObservableRangeCollection<PasswordFolderFilterChoice>();
     public IEnumerable<PasswordFolderFilterChoice> SystemPasswordFolderFilters =>
         PasswordFolderFilters.Where(item => item.IsSystemNode);
     public IEnumerable<PasswordFolderFilterChoice> RegularPasswordFolderFilters =>

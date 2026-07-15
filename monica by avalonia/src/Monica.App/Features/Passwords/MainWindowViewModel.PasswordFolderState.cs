@@ -32,31 +32,38 @@ public sealed partial class MainWindowViewModel
             ? CategorySelectionKey(preferredCategoryId.Value)
             : SelectedPasswordFolderFilter?.SelectionKey;
         var folderCountPasswords = Passwords.Where(MatchesPasswordNonFolderFilters).ToArray();
-        PasswordFolderFilters.Clear();
-        PasswordFolderFilters.Add(new PasswordFolderFilterChoice(
+        var passwordCountByCategoryId = folderCountPasswords
+            .Where(password => password.CategoryId is not null)
+            .GroupBy(password => password.CategoryId!.Value)
+            .ToDictionary(group => group.Key, group => group.Count());
+        var nextFilters = new List<PasswordFolderFilterChoice>
+        {
+            new(
             null,
             _localization.Get("AllFolders"),
             folderCountPasswords.Length,
             IsSystemNode: true,
-            SelectionKey: "system:all"));
-        PasswordFolderFilters.Add(new PasswordFolderFilterChoice(
+            SelectionKey: "system:all"),
+            new(
             -2,
             _localization.Get("QuickFilterFavorite"),
             folderCountPasswords.Count(password => password.IsFavorite),
             IsSystemNode: true,
-            SelectionKey: "system:favorites"));
+            SelectionKey: "system:favorites")
+        };
 
-        foreach (var root in BuildPasswordFolderTree(folderCountPasswords))
+        foreach (var root in BuildPasswordFolderTree(passwordCountByCategoryId))
         {
-            AddVisiblePasswordFolder(root);
+            AddVisiblePasswordFolder(root, nextFilters);
         }
 
-        PasswordFolderFilters.Add(new PasswordFolderFilterChoice(
+        nextFilters.Add(new PasswordFolderFilterChoice(
             -1,
             _localization.Get("NoFolder"),
             folderCountPasswords.Count(password => password.CategoryId is null),
             IsSystemNode: true,
             SelectionKey: "system:none"));
+        ReplaceItems(PasswordFolderFilters, nextFilters);
 
         SelectedPasswordFolderFilter =
             PasswordFolderFilters.FirstOrDefault(item => string.Equals(item.SelectionKey, selectedKey, StringComparison.OrdinalIgnoreCase)) ??
@@ -68,7 +75,8 @@ public sealed partial class MainWindowViewModel
         RaisePasswordFilterState();
     }
 
-    private IReadOnlyList<PasswordFolderTreeNode> BuildPasswordFolderTree(IReadOnlyList<PasswordEntry> folderCountPasswords)
+    private IReadOnlyList<PasswordFolderTreeNode> BuildPasswordFolderTree(
+        IReadOnlyDictionary<long, int> passwordCountByCategoryId)
     {
         var roots = new List<PasswordFolderTreeNode>();
         var nodes = new Dictionary<string, PasswordFolderTreeNode>(StringComparer.OrdinalIgnoreCase);
@@ -102,7 +110,7 @@ public sealed partial class MainWindowViewModel
                 if (index == pathParts.Length - 1)
                 {
                     node.Category = category;
-                    node.ExactCount = folderCountPasswords.Count(password => password.CategoryId == category.Id);
+                    node.ExactCount = passwordCountByCategoryId.GetValueOrDefault(category.Id);
                 }
 
                 parent = node;
@@ -142,11 +150,13 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    private void AddVisiblePasswordFolder(PasswordFolderTreeNode node)
+    private void AddVisiblePasswordFolder(
+        PasswordFolderTreeNode node,
+        ICollection<PasswordFolderFilterChoice> filters)
     {
         var hasChildren = node.Children.Count > 0;
         var isExpanded = hasChildren && !_collapsedPasswordFolderKeys.Contains(PathSelectionKey(node.Key));
-        PasswordFolderFilters.Add(new PasswordFolderFilterChoice(
+        filters.Add(new PasswordFolderFilterChoice(
             node.Category?.Id,
             node.Category?.Name ?? node.Key,
             node.DescendantCount,
@@ -164,7 +174,7 @@ public sealed partial class MainWindowViewModel
 
         foreach (var child in node.Children)
         {
-            AddVisiblePasswordFolder(child);
+            AddVisiblePasswordFolder(child, filters);
         }
     }
 
