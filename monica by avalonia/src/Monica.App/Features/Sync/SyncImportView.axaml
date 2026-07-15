@@ -33,6 +33,16 @@
                 <TextBlock Text="{Binding L.ImportAegisJson}" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding L.ImportAegisJsonDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                 <TextBox Text="{Binding ImportAegisJsonText}" PlaceholderText="{Binding L.ImportAegisJsonWatermark}" AcceptsReturn="True" MinHeight="120" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ImportAegisJson}" />
+                <StackPanel Spacing="5" IsVisible="{Binding IsAegisImportPasswordRequired}">
+                    <TextBlock Text="{Binding L.AegisImportPassword}" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding L.AegisImportPasswordDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <TextBox x:Name="AegisImportPasswordBox"
+                             MaxWidth="360"
+                             HorizontalAlignment="Left"
+                             PasswordChar="*"
+                             Text="{Binding AegisImportPassword}"
+                             AutomationProperties.Name="{Binding L.AegisImportPassword}" />
+                </StackPanel>
                 <WrapPanel>
                     <Button Classes="workspaceCommand" Command="{Binding ImportAegisJsonFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
                         <StackPanel Orientation="Horizontal" Spacing="8">

@@ -82,6 +82,7 @@ public sealed class StorageWorkflowUiTests
         var import = new SyncImportView();
         Assert.True(import.FindControl<ProgressBar>("ImportBusyIndicator")!.IsIndeterminate);
         Assert.NotNull(import.FindControl<StackPanel>("ImportOperationContent"));
+        Assert.Equal('*', import.FindControl<TextBox>("AegisImportPasswordBox")!.PasswordChar);
 
         var restore = backup.FindControl<Button>("RestoreSelectedBackupButton");
         var delete = backup.FindControl<Button>("DeleteSelectedBackupButton");

@@ -49,4 +49,15 @@ public sealed partial class MainWindowViewModel
         ExportAegisPreview = "";
         _exportPreviewAuthorizationExpiresAt = null;
     }
+
+    private void ClearSensitiveImportBuffers()
+    {
+        ImportJsonText = "";
+        ImportCsvText = "";
+        ImportNoteCsvText = "";
+        ImportAegisJsonText = "";
+        AegisImportPassword = "";
+        IsAegisImportPasswordRequired = false;
+        ImportTotpCsvText = "";
+    }
 }

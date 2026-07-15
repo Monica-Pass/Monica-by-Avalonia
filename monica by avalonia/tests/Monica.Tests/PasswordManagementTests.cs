@@ -4415,7 +4415,8 @@ public sealed class PasswordManagementTests
         public string ExportAegisJson(IEnumerable<SecureItem> secureItems) => _inner.ExportAegisJson(secureItems);
         public IReadOnlyList<SecureItem> ImportTotpCsv(string csv) => _inner.ImportTotpCsv(csv);
         public IReadOnlyList<SecureItem> ImportNoteCsv(string csv) => _inner.ImportNoteCsv(csv);
-        public IReadOnlyList<SecureItem> ImportAegisJson(string json) => _inner.ImportAegisJson(json);
+        public bool IsEncryptedAegisJson(string json) => _inner.IsEncryptedAegisJson(json);
+        public IReadOnlyList<SecureItem> ImportAegisJson(string json, string? password = null) => _inner.ImportAegisJson(json, password);
         public IReadOnlyList<PasswordEntry> ImportPasswordCsv(string csv) => _inner.ImportPasswordCsv(csv);
     }
 

@@ -199,6 +199,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ClearTransientSettingsSecurityInputs();
         }
 
+        if (!string.Equals(value, "Sync", StringComparison.OrdinalIgnoreCase))
+        {
+            ClearSensitiveImportBuffers();
+            ClearSensitiveExportPreviews();
+        }
+
         if (string.Equals(value, "Generator", StringComparison.OrdinalIgnoreCase))
         {
             EnsureGeneratedPassword();

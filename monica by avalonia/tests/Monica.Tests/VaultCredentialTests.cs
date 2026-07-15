@@ -44,6 +44,9 @@ public sealed class VaultCredentialTests
         Assert.Single(noteOutlineBeforeLock);
         Assert.Single(noteReferencesBeforeLock);
         viewModel.ImportCsvText = "username,password";
+        viewModel.ImportAegisJsonText = AegisEncryptedTestData.Json;
+        viewModel.AegisImportPassword = AegisEncryptedTestData.Password;
+        viewModel.IsAegisImportPasswordRequired = true;
         viewModel.ExportPreview = "plain export";
         viewModel.GeneratedPassword = "generated-secret";
         viewModel.PasswordSearchText = "private account query";
@@ -73,6 +76,9 @@ public sealed class VaultCredentialTests
         Assert.NotSame(noteReferencesBeforeLock, viewModel.NoteReferenceItems);
         Assert.Equal("", viewModel.NoteContent);
         Assert.Equal("", viewModel.ImportCsvText);
+        Assert.Equal("", viewModel.ImportAegisJsonText);
+        Assert.Equal("", viewModel.AegisImportPassword);
+        Assert.False(viewModel.IsAegisImportPasswordRequired);
         Assert.Equal("", viewModel.ExportPreview);
         Assert.Equal("", viewModel.GeneratedPassword);
         Assert.Equal("", viewModel.PasswordSearchText);

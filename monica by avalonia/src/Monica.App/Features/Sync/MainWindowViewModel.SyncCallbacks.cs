@@ -4,6 +4,11 @@ public sealed partial class MainWindowViewModel
 {
     partial void OnSelectedSyncPageChanged(string value)
     {
+        if (!IsWorkspacePageSelected(value, "Import"))
+        {
+            ClearSensitiveImportBuffers();
+        }
+
         if (!IsWorkspacePageSelected(value, "Export"))
         {
             ClearSensitiveExportPreviews();

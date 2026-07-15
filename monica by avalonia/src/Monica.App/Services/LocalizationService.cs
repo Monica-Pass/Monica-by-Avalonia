@@ -260,6 +260,13 @@ public interface ILocalizationService : INotifyPropertyChanged
     string ImportAegisJson { get; }
     string ImportAegisJsonDescription { get; }
     string ImportAegisJsonWatermark { get; }
+    string AegisImportPassword { get; }
+    string AegisImportPasswordDescription { get; }
+    string AegisImportPasswordRequired { get; }
+    string AegisImportDecryptionFailed { get; }
+    string AegisImportUnsupportedKeySlot { get; }
+    string AegisImportUnsafeParameters { get; }
+    string AegisImportInvalidFormat { get; }
     string ImportTotpCsv { get; }
     string ImportTotpCsvDescription { get; }
     string ImportTotpCsvWatermark { get; }
@@ -720,6 +727,13 @@ public sealed class LocalizationService : ILocalizationService
     public string ImportAegisJson => Text();
     public string ImportAegisJsonDescription => Text();
     public string ImportAegisJsonWatermark => Text();
+    public string AegisImportPassword => Text();
+    public string AegisImportPasswordDescription => Text();
+    public string AegisImportPasswordRequired => Text();
+    public string AegisImportDecryptionFailed => Text();
+    public string AegisImportUnsupportedKeySlot => Text();
+    public string AegisImportUnsafeParameters => Text();
+    public string AegisImportInvalidFormat => Text();
     public string ImportTotpCsv => Text();
     public string ImportTotpCsvDescription => Text();
     public string ImportTotpCsvWatermark => Text();
@@ -1390,8 +1404,15 @@ public sealed class LocalizationService : ILocalizationService
         ["ImportMonicaJsonDescription"] = "Paste a Monica JSON export package and import its passwords, notes, wallet items and authenticators into this vault.",
         ["ImportJsonWatermark"] = "Paste Monica JSON export here",
         ["ImportAegisJson"] = "Import Aegis JSON",
-        ["ImportAegisJsonDescription"] = "Import unencrypted Aegis JSON authenticator exports into the TOTP vault. Encrypted Aegis files are reported as unsupported for now.",
-        ["ImportAegisJsonWatermark"] = "Paste unencrypted Aegis JSON here",
+        ["ImportAegisJsonDescription"] = "Import plaintext or password-encrypted Aegis JSON authenticator backups into the TOTP vault.",
+        ["ImportAegisJsonWatermark"] = "Paste an Aegis JSON backup here",
+        ["AegisImportPassword"] = "Aegis backup password",
+        ["AegisImportPasswordDescription"] = "Required only for password-encrypted Aegis backups. The password is cleared after each attempt.",
+        ["AegisImportPasswordRequired"] = "Enter the password for this encrypted Aegis backup, then choose Import again.",
+        ["AegisImportDecryptionFailed"] = "The Aegis backup password is incorrect or the file was modified or damaged.",
+        ["AegisImportUnsupportedKeySlot"] = "This Aegis backup does not contain a supported password key slot.",
+        ["AegisImportUnsafeParameters"] = "This Aegis backup requests unsafe key-derivation resources and was rejected.",
+        ["AegisImportInvalidFormat"] = "The Aegis backup format is invalid.",
         ["ImportTotpCsv"] = "Import TOTP CSV",
         ["ImportTotpCsvDescription"] = "Import Monica for Windows compatible TOTP secure-item CSV rows.",
         ["ImportTotpCsvWatermark"] = "Paste TOTP CSV here",
@@ -2420,8 +2441,15 @@ public sealed class LocalizationService : ILocalizationService
         ["ImportMonicaJsonDescription"] = "选择或粘贴 Monica JSON 导出包，将密码、笔记、卡包和验证器导入此保险库。",
         ["ImportJsonWatermark"] = "在此粘贴 Monica JSON 导出内容",
         ["ImportAegisJson"] = "导入 Aegis JSON",
-        ["ImportAegisJsonDescription"] = "将未加密的 Aegis JSON 验证器导出导入到 TOTP 保险库。加密 Aegis 文件目前会提示暂不支持。",
-        ["ImportAegisJsonWatermark"] = "在此粘贴未加密的 Aegis JSON",
+        ["ImportAegisJsonDescription"] = "将明文或密码加密的 Aegis JSON 验证器备份导入 TOTP 保险库。",
+        ["ImportAegisJsonWatermark"] = "在此粘贴 Aegis JSON 备份",
+        ["AegisImportPassword"] = "Aegis 备份密码",
+        ["AegisImportPasswordDescription"] = "仅密码加密的 Aegis 备份需要填写；每次尝试后都会清除密码。",
+        ["AegisImportPasswordRequired"] = "请输入此加密 Aegis 备份的密码，然后再次选择“导入”。",
+        ["AegisImportDecryptionFailed"] = "Aegis 备份密码错误，或文件已被修改或损坏。",
+        ["AegisImportUnsupportedKeySlot"] = "此 Aegis 备份不包含受支持的密码密钥槽。",
+        ["AegisImportUnsafeParameters"] = "此 Aegis 备份请求了不安全的密钥派生资源，已拒绝处理。",
+        ["AegisImportInvalidFormat"] = "Aegis 备份格式无效。",
         ["ImportTotpCsv"] = "导入 TOTP CSV",
         ["ImportTotpCsvDescription"] = "导入 Monica for Windows 兼容的 TOTP 安全项目 CSV 行。",
         ["ImportTotpCsvWatermark"] = "在此粘贴 TOTP CSV",

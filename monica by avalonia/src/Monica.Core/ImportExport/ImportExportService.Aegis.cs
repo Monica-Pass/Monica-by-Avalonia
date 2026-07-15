@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using Monica.Core.Models;
 using Monica.Core.Services;
@@ -6,6 +7,8 @@ namespace Monica.Core.ImportExport;
 
 public sealed partial class ImportExportService
 {
+    private const int MaximumAegisJsonCharacters = 64 * 1024 * 1024;
+
     public string ExportAegisJson(IEnumerable<SecureItem> secureItems)
     {
         var entries = secureItems
@@ -20,23 +23,85 @@ public sealed partial class ImportExportService
         return JsonSerializer.Serialize(package, MonicaJsonContext.Default.AegisExportPackageDto);
     }
 
-    public IReadOnlyList<SecureItem> ImportAegisJson(string json)
+    public bool IsEncryptedAegisJson(string json)
     {
-        using var document = JsonDocument.Parse(json);
+        if (string.IsNullOrWhiteSpace(json) || json.Length > MaximumAegisJsonCharacters)
+        {
+            return false;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            return document.RootElement.ValueKind == JsonValueKind.Object &&
+                document.RootElement.TryGetProperty("db", out var db) &&
+                db.ValueKind == JsonValueKind.String;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    public IReadOnlyList<SecureItem> ImportAegisJson(string json, string? password = null)
+    {
+        using var document = ParseAegisDocument(json);
         var root = document.RootElement;
-        if (!root.TryGetProperty("db", out var db))
+        if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("db", out var db))
         {
-            throw new InvalidOperationException("Invalid Aegis JSON payload.");
+            throw InvalidAegisFormat();
         }
 
-        if (db.ValueKind == JsonValueKind.String)
+        if (db.ValueKind != JsonValueKind.String)
         {
-            throw new NotSupportedException("Encrypted Aegis JSON imports are not supported yet.");
+            return ImportAegisDatabase(db);
         }
 
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            throw new AegisImportException(
+                AegisImportFailureReason.PasswordRequired,
+                "The encrypted Aegis backup password is required.");
+        }
+
+        var decryptedDatabase = AegisEncryptedBackupDecryptor.Decrypt(root, password);
+        try
+        {
+            using var decryptedDocument = JsonDocument.Parse(decryptedDatabase);
+            return ImportAegisDatabase(decryptedDocument.RootElement);
+        }
+        catch (JsonException)
+        {
+            throw InvalidAegisFormat();
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(decryptedDatabase);
+        }
+    }
+
+    private static JsonDocument ParseAegisDocument(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json) || json.Length > MaximumAegisJsonCharacters)
+        {
+            throw InvalidAegisFormat();
+        }
+
+        try
+        {
+            return JsonDocument.Parse(json);
+        }
+        catch (JsonException)
+        {
+            throw InvalidAegisFormat();
+        }
+    }
+
+    private static IReadOnlyList<SecureItem> ImportAegisDatabase(JsonElement db)
+    {
         if (db.ValueKind != JsonValueKind.Object || !db.TryGetProperty("entries", out var entries) || entries.ValueKind != JsonValueKind.Array)
         {
-            throw new InvalidOperationException("Invalid Aegis database payload.");
+            throw InvalidAegisFormat();
         }
 
         var imported = new List<SecureItem>();
@@ -51,6 +116,9 @@ public sealed partial class ImportExportService
 
         return imported;
     }
+
+    private static AegisImportException InvalidAegisFormat() =>
+        new(AegisImportFailureReason.InvalidFormat, "The Aegis backup format is invalid.");
 
     private static AegisEntryDto? CreateAegisEntry(SecureItem item)
     {

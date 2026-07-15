@@ -7,7 +7,7 @@ using Monica.Core.Services;
 
 namespace Monica.Tests;
 
-public sealed class CoreServicesTests
+public sealed partial class CoreServicesTests
 {
     [Fact]
     public void Totp_generates_known_rfc_vector()
@@ -485,14 +485,14 @@ public sealed class CoreServicesTests
     }
 
     [Fact]
-    public void Import_export_reports_encrypted_aegis_json_as_unsupported()
+    public void Import_export_reports_password_required_for_encrypted_aegis_json()
     {
         var service = new ImportExportService();
         var json = """{"version":1,"header":{"slots":[]},"db":"encrypted-payload"}""";
 
-        var ex = Assert.Throws<NotSupportedException>(() => service.ImportAegisJson(json));
+        var ex = Assert.Throws<AegisImportException>(() => service.ImportAegisJson(json));
 
-        Assert.Contains("Encrypted Aegis JSON", ex.Message);
+        Assert.Equal(AegisImportFailureReason.PasswordRequired, ex.Reason);
     }
 
     [Fact]

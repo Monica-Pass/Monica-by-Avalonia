@@ -20,7 +20,8 @@ public interface IImportExportService
     string ExportAegisJson(IEnumerable<SecureItem> secureItems);
     IReadOnlyList<SecureItem> ImportTotpCsv(string csv);
     IReadOnlyList<SecureItem> ImportNoteCsv(string csv);
-    IReadOnlyList<SecureItem> ImportAegisJson(string json);
+    bool IsEncryptedAegisJson(string json);
+    IReadOnlyList<SecureItem> ImportAegisJson(string json, string? password = null);
     IReadOnlyList<PasswordEntry> ImportPasswordCsv(string csv);
 }
 

@@ -176,16 +176,8 @@ public sealed partial class MainWindowViewModel
 
     private void ClearTransferBuffers()
     {
-        ImportJsonText = "";
-        ImportCsvText = "";
-        ImportNoteCsvText = "";
-        ImportAegisJsonText = "";
-        ImportTotpCsvText = "";
-        ExportPreview = "";
-        ExportCsvPreview = "";
-        ExportNoteCsvPreview = "";
-        ExportTotpCsvPreview = "";
-        ExportAegisPreview = "";
+        ClearSensitiveImportBuffers();
+        ClearSensitiveExportPreviews();
         ExportWalletCsvPreview = "";
         ExportTimelinePreview = "";
     }

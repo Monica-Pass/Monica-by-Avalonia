@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Monica.Core.ImportExport;
 using Monica.Core.Models;
 using Monica.Platform.Services;
 
@@ -19,6 +20,12 @@ public sealed partial class MainWindowViewModel
 
     [ObservableProperty]
     private string _importAegisJsonText = "";
+
+    [ObservableProperty]
+    private string _aegisImportPassword = "";
+
+    [ObservableProperty]
+    private bool _isAegisImportPasswordRequired;
 
     [ObservableProperty]
     private string _importTotpCsvText = "";
@@ -85,6 +92,15 @@ public sealed partial class MainWindowViewModel
             }
 
             ImportAegisJsonText = file.Content;
+            IsAegisImportPasswordRequired = _importExportService.IsEncryptedAegisJson(file.Content);
+            if (IsAegisImportPasswordRequired && string.IsNullOrWhiteSpace(AegisImportPassword))
+            {
+                SelectedSection = "Sync";
+                SelectedSyncPage = "Import";
+                StatusMessage = _localization.AegisImportPasswordRequired;
+                return;
+            }
+
             await ImportAegisJsonAsync();
         }
         catch (Exception ex)
@@ -181,13 +197,26 @@ public sealed partial class MainWindowViewModel
     {
         if (string.IsNullOrWhiteSpace(ImportAegisJsonText))
         {
+            AegisImportPassword = "";
+            IsAegisImportPasswordRequired = false;
             StatusMessage = _localization.Get("ImportAegisJsonRequired");
             return;
         }
 
+        var encrypted = _importExportService.IsEncryptedAegisJson(ImportAegisJsonText);
+        IsAegisImportPasswordRequired = encrypted;
+        if (encrypted && string.IsNullOrWhiteSpace(AegisImportPassword))
+        {
+            StatusMessage = _localization.AegisImportPasswordRequired;
+            return;
+        }
+
+        var json = ImportAegisJsonText;
+        var password = encrypted ? AegisImportPassword : null;
         try
         {
-            var entries = _importExportService.ImportAegisJson(ImportAegisJsonText);
+            // Aegis scrypt is intentionally CPU- and memory-hard, so it must not run on the interaction thread.
+            var entries = await Task.Run(() => _importExportService.ImportAegisJson(json, password));
             var existingTitles = (await _repository.GetSecureItemsAsync(VaultItemType.Totp))
                 .Select(item => item.Title)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -215,14 +244,33 @@ public sealed partial class MainWindowViewModel
             });
 
             ImportAegisJsonText = "";
+            IsAegisImportPasswordRequired = false;
             await LoadAsync();
             StatusMessage = _localization.Format("ImportedAegisJsonFormat", importedTotps, skippedTotps);
+        }
+        catch (AegisImportException ex)
+        {
+            IsAegisImportPasswordRequired = ex.Reason == AegisImportFailureReason.PasswordRequired || encrypted;
+            StatusMessage = LocalizeAegisImportFailure(ex.Reason);
         }
         catch (Exception ex)
         {
             StatusMessage = _localization.Format("ImportFailedFormat", ex.Message);
         }
+        finally
+        {
+            AegisImportPassword = "";
+        }
     }
+
+    private string LocalizeAegisImportFailure(AegisImportFailureReason reason) => reason switch
+    {
+        AegisImportFailureReason.PasswordRequired => _localization.AegisImportPasswordRequired,
+        AegisImportFailureReason.DecryptionFailed => _localization.AegisImportDecryptionFailed,
+        AegisImportFailureReason.UnsupportedKeySlot => _localization.AegisImportUnsupportedKeySlot,
+        AegisImportFailureReason.UnsafeKeyDerivationParameters => _localization.AegisImportUnsafeParameters,
+        _ => _localization.AegisImportInvalidFormat
+    };
 
     [RelayCommand]
     private async Task ImportTotpCsvAsync()
