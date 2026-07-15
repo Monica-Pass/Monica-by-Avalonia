@@ -61,6 +61,12 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        if (_passwordProjectionNotificationDeferralDepth == 1 && _passwordSelectionReconciliationPending)
+        {
+            _passwordSelectionReconciliationPending = false;
+            ReconcileSelectedPasswordDetailsImmediately();
+        }
+
         _passwordProjectionNotificationDeferralDepth--;
         if (_passwordProjectionNotificationDeferralDepth > 0)
         {

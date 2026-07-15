@@ -44,6 +44,7 @@ public sealed partial class MainWindowViewModel
     private int _passwordProjectionNotificationDeferralDepth;
     private bool _filteredPasswordsNotificationPending;
     private bool _filteredPasswordRowsNotificationPending;
+    private bool _passwordSelectionReconciliationPending;
     private int _selectedPasswordCount;
     private bool _suppressPasswordSelectionStateNotifications;
     private bool _isSyncingSelectedPasswordListRow;

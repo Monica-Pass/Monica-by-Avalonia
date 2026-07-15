@@ -141,6 +141,7 @@ public sealed class UiPerformanceTests
             $"FilteredPasswords={filteredPasswordsNotifications} and " +
             $"FilteredPasswordRows={filteredPasswordRowsNotifications}.");
         Assert.True(viewModel.LastVaultLoadDurationMilliseconds > 0);
+        Assert.Equal(1, viewModel.FilteredPasswordsProjectionBuildCount);
         Assert.Equal(passwordCount, viewModel.FilteredPasswords.Count);
         Assert.Equal(passwordCount, viewModel.FilteredPasswordRows.Count);
         Assert.Equal(categoryCount + 3, viewModel.PasswordFolderFilters.Count);

@@ -9,6 +9,8 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    internal int FilteredPasswordsProjectionBuildCount { get; private set; }
+
     private void RaisePasswordSelectionState()
     {
         OnPropertyChanged(nameof(SelectedPasswordCount));
@@ -66,6 +68,7 @@ public sealed partial class MainWindowViewModel
         {
             var stopwatch = Stopwatch.StartNew();
             _filteredPasswords = ApplyPasswordSort(Passwords.Where(MatchesPasswordFilters)).ToArray();
+            FilteredPasswordsProjectionBuildCount++;
             AppDiagnostics.Info($"Rebuild filtered password list completed in {stopwatch.ElapsedMilliseconds} ms. count={_filteredPasswords.Count}");
             _filteredPasswordsDirty = false;
         }
@@ -159,6 +162,17 @@ public sealed partial class MainWindowViewModel
     }
 
     private void ReconcileSelectedPasswordDetails()
+    {
+        if (_passwordProjectionNotificationDeferralDepth > 0)
+        {
+            _passwordSelectionReconciliationPending = true;
+            return;
+        }
+
+        ReconcileSelectedPasswordDetailsImmediately();
+    }
+
+    private void ReconcileSelectedPasswordDetailsImmediately()
     {
         var visiblePasswords = FilteredPasswords.ToArray();
         if (SelectedPassword is not null && visiblePasswords.All(item => item.Id != SelectedPassword.Id))
