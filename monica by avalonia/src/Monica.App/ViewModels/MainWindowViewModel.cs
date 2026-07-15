@@ -199,7 +199,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(SelectedSectionTitle));
         RaiseShellStatus();
-        RestoreBackgroundDetailState();
+        RestoreActiveWorkspaceState();
         RefreshSecurityAnalysisIfNeeded();
         if (!string.Equals(value, "Settings", StringComparison.OrdinalIgnoreCase))
         {

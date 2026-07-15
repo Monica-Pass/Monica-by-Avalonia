@@ -151,6 +151,84 @@ public sealed class BackgroundMemoryUiTests
         }
     }
 
+    [Fact]
+    public async Task Background_password_search_stays_suspended_until_passwords_restore()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        PopulatePasswordSearchSources(viewModel);
+        window.Show();
+        try
+        {
+            window.DataContext = viewModel;
+            viewModel.IsUnlocked = true;
+            Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
+            var initialBuilds = viewModel.FilteredPasswordsProjectionBuildCount;
+
+            viewModel.PasswordSearchText = "Target";
+            window.WindowState = WindowState.Minimized;
+            Dispatcher.UIThread.RunJobs();
+            await Task.Delay(350, cancellationToken);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Empty(viewModel.PasswordSearchQuery);
+            Assert.Equal(initialBuilds, viewModel.FilteredPasswordsProjectionBuildCount);
+
+            window.WindowState = WindowState.Normal;
+            Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
+
+            Assert.Equal("Target", viewModel.PasswordSearchQuery);
+            Assert.Equal(["Target account"], viewModel.FilteredPasswords.Select(item => item.Title));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [Fact]
+    public async Task Background_password_search_waits_for_inactive_password_workspace()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        PopulatePasswordSearchSources(viewModel);
+        window.Show();
+        try
+        {
+            window.DataContext = viewModel;
+            viewModel.IsUnlocked = true;
+            Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
+            var initialBuilds = viewModel.FilteredPasswordsProjectionBuildCount;
+
+            viewModel.SelectSectionCommand.Execute("Cards");
+            window.WindowState = WindowState.Minimized;
+            Dispatcher.UIThread.RunJobs();
+            viewModel.PasswordSearchText = "Target";
+            await Task.Delay(350, cancellationToken);
+            Dispatcher.UIThread.RunJobs();
+
+            window.WindowState = WindowState.Normal;
+            Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
+
+            Assert.Empty(viewModel.PasswordSearchQuery);
+            Assert.Equal(initialBuilds, viewModel.FilteredPasswordsProjectionBuildCount);
+
+            viewModel.SelectSectionCommand.Execute("Passwords");
+            Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
+
+            Assert.Equal("Target", viewModel.PasswordSearchQuery);
+            Assert.Equal(["Target account"], viewModel.FilteredPasswords.Select(item => item.Title));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static (WeakReference Host, WeakReference Workspace) CaptureWorkspaceReferences(
         Monica.App.MainWindow window)
@@ -241,6 +319,20 @@ public sealed class BackgroundMemoryUiTests
                 Title = $"Memory note {id}"
             });
         }
+    }
+
+    private static void PopulatePasswordSearchSources(MainWindowViewModel viewModel)
+    {
+        viewModel.Passwords.Add(new PasswordEntry
+        {
+            Id = 1,
+            Title = "Target account"
+        });
+        viewModel.Passwords.Add(new PasswordEntry
+        {
+            Id = 2,
+            Title = "Other account"
+        });
     }
 
     private static void ForceFullCollection()

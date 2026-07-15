@@ -27,6 +27,7 @@ public sealed partial class MainWindowViewModel
     {
         ReleaseSensitiveBackgroundDetails();
         ReleaseTransientBackgroundSecrets();
+        SuspendPasswordSearchProjectionUpdates();
         CancelNoteImagePreviewRefresh();
         Interlocked.Increment(ref _noteImagePreviewVersion);
         ReplaceNoteImagePreviews([]);
@@ -35,7 +36,7 @@ public sealed partial class MainWindowViewModel
 
     private void RestoreRebuildableBackgroundCaches()
     {
-        RestoreBackgroundDetailState();
+        RestoreActiveWorkspaceState();
         if (IsUnlocked && string.Equals(SelectedSection, "Generator", StringComparison.OrdinalIgnoreCase))
         {
             EnsureGeneratedPassword();
@@ -72,13 +73,19 @@ public sealed partial class MainWindowViewModel
         RaiseGeneratedPasswordHistoryState();
     }
 
-    private void RestoreBackgroundDetailState()
+    private void RestoreActiveWorkspaceState()
     {
         if (_isUnlockedShellHibernated || !IsUnlocked)
         {
             return;
         }
 
+        RestorePasswordSearchQueryIfActive();
+        RestoreBackgroundDetailState();
+    }
+
+    private void RestoreBackgroundDetailState()
+    {
         switch (SelectedSection)
         {
             case "Passwords" when SelectedPassword is not null:

@@ -139,6 +139,11 @@ public sealed partial class MainWindowViewModel
     private void QueuePasswordSearchQuery(string value)
     {
         CancelPasswordSearchDebounce();
+        if (_isUnlockedShellHibernated)
+        {
+            return;
+        }
+
         var cts = new CancellationTokenSource();
         _passwordSearchDebounceCts = cts;
         _ = ApplyPasswordSearchQueryAsync(value, cts);
