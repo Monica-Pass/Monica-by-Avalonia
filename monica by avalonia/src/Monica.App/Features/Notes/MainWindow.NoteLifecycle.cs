@@ -130,6 +130,7 @@ public partial class MainWindow
         _observedViewModel = DataContext as MainWindowViewModel;
         if (_observedViewModel is not null)
         {
+            SynchronizeBackgroundMemoryState(_observedViewModel);
             _observedViewModel.PropertyChanged += ViewModel_OnPropertyChanged;
         }
 

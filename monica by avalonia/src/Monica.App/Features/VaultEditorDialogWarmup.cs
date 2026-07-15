@@ -5,6 +5,7 @@ namespace Monica.App.Features;
 
 internal static class VaultEditorDialogWarmup
 {
+    private static int _isSuspended;
     private static readonly EditorWarmup<PasswordEditorDialog> PasswordEditor = new(
         "password editor view",
         static () => new PasswordEditorDialog());
@@ -19,12 +20,32 @@ internal static class VaultEditorDialogWarmup
     internal static bool IsTotpWarmed => TotpEditor.IsWarmed;
     internal static bool IsWalletWarmed => WalletEditor.IsWarmed;
 
-    internal static void EnsurePasswordWarmed() => PasswordEditor.EnsureWarmed();
-    internal static void EnsureTotpWarmed() => TotpEditor.EnsureWarmed();
-    internal static void EnsureWalletWarmed() => WalletEditor.EnsureWarmed();
+    internal static void EnsurePasswordWarmed() => EnsureWarmed(PasswordEditor);
+    internal static void EnsureTotpWarmed() => EnsureWarmed(TotpEditor);
+    internal static void EnsureWalletWarmed() => EnsureWarmed(WalletEditor);
     internal static PasswordEditorDialog TakePasswordEditorView() => PasswordEditor.TakePreparedView();
     internal static TotpEditorDialog TakeTotpEditorView() => TotpEditor.TakePreparedView();
     internal static WalletItemEditorDialog TakeWalletEditorView() => WalletEditor.TakePreparedView();
+
+    internal static void SuspendPreparedViews()
+    {
+        Dispatcher.UIThread.VerifyAccess();
+        Volatile.Write(ref _isSuspended, 1);
+        PasswordEditor.ReleasePreparedView();
+        TotpEditor.ReleasePreparedView();
+        WalletEditor.ReleasePreparedView();
+    }
+
+    internal static void ResumePreparedViews() => Volatile.Write(ref _isSuspended, 0);
+
+    private static void EnsureWarmed<TView>(EditorWarmup<TView> warmup)
+        where TView : class
+    {
+        if (Volatile.Read(ref _isSuspended) == 0)
+        {
+            warmup.EnsureWarmed();
+        }
+    }
 
     private sealed class EditorWarmup<TView>(string diagnosticName, Func<TView> constructView)
         where TView : class
@@ -39,6 +60,11 @@ internal static class VaultEditorDialogWarmup
             if (!Dispatcher.UIThread.CheckAccess())
             {
                 Dispatcher.UIThread.Post(EnsureWarmed, DispatcherPriority.Background);
+                return;
+            }
+
+            if (Volatile.Read(ref _isSuspended) != 0)
+            {
                 return;
             }
 
@@ -72,6 +98,13 @@ internal static class VaultEditorDialogWarmup
             _preparedView = null;
             Volatile.Write(ref _state, 0);
             return preparedView ?? constructView();
+        }
+
+        internal void ReleasePreparedView()
+        {
+            Dispatcher.UIThread.VerifyAccess();
+            _preparedView = null;
+            Volatile.Write(ref _state, 0);
         }
     }
 }

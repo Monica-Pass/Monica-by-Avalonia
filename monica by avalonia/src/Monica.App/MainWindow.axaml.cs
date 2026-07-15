@@ -18,6 +18,7 @@ public partial class MainWindow : Window
         Closed += OnClosed;
         DataContextChanged += OnDataContextChanged;
         InitializeSecurityLifecycle();
+        InitializeBackgroundMemoryLifecycle();
     }
 
     private async void OnOpened(object? sender, EventArgs e)
