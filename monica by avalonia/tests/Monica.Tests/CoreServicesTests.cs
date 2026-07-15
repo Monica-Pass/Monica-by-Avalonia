@@ -608,6 +608,51 @@ public sealed partial class CoreServicesTests
         Assert.True(handler.SawPaddingHeader);
     }
 
+    [Fact]
+    public async Task Pwned_password_service_bounds_cached_ranges()
+    {
+        var passwords = new List<string>();
+        var prefixes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; passwords.Count < 65; index++)
+        {
+            var password = $"distinct cached password {index}";
+            var hash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(password)));
+            if (prefixes.Add(hash[..5]))
+            {
+                passwords.Add(password);
+            }
+        }
+
+        var handler = new CountingPwnedPasswordHandler();
+        var service = new PwnedPasswordService(new HttpClient(handler));
+
+        await service.CheckPasswordsAsync(passwords);
+        await service.CheckPasswordsAsync([passwords[^1]]);
+
+        Assert.Equal(65, handler.RequestCount);
+
+        await service.CheckPasswordsAsync([passwords[0]]);
+
+        Assert.Equal(66, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task Pwned_password_service_does_not_refill_cache_after_background_clear()
+    {
+        var handler = new BlockingCountingPwnedPasswordHandler();
+        var service = new PwnedPasswordService(new HttpClient(handler));
+        var firstCheck = service.CheckPasswordsAsync(["background cache password"]);
+        await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        ((ITransientPwnedPasswordCache)service).ClearCachedRanges();
+        handler.Release.TrySetResult();
+        await firstCheck;
+
+        await service.CheckPasswordsAsync(["background cache password"]);
+
+        Assert.Equal(2, handler.RequestCount);
+    }
+
     private sealed class FakePwnedPasswordHandler(string expectedPrefix, string responseContent) : HttpMessageHandler
     {
         public int RequestCount { get; private set; }
@@ -624,6 +669,40 @@ public sealed partial class CoreServicesTests
             {
                 Content = new StringContent(responseContent)
             });
+        }
+    }
+
+    private sealed class CountingPwnedPasswordHandler : HttpMessageHandler
+    {
+        public int RequestCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            RequestCount++;
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent("00000000000000000000000000000000000:1")
+            });
+        }
+    }
+
+    private sealed class BlockingCountingPwnedPasswordHandler : HttpMessageHandler
+    {
+        public int RequestCount { get; private set; }
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            RequestCount++;
+            Started.TrySetResult();
+            await Release.Task;
+            return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent("00000000000000000000000000000000000:1")
+            };
         }
     }
 }

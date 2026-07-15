@@ -3624,6 +3624,7 @@ public sealed partial class PasswordManagementTests
         await check;
 
         Assert.True(service.WasCancelled);
+        Assert.Equal(1, service.ClearCachedRangesCallCount);
         Assert.False(harness.ViewModel.IsCheckingCompromisedPasswords);
         Assert.Empty(harness.ViewModel.SecuritySummaryItems);
         Assert.Empty(harness.ViewModel.SecurityIssueItems);
@@ -4579,10 +4580,16 @@ public sealed partial class PasswordManagementTests
         }
     }
 
-    private sealed class BlockingPwnedPasswordService : IPwnedPasswordService
+    private sealed class BlockingPwnedPasswordService : IPwnedPasswordService, ITransientPwnedPasswordCache
     {
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int ClearCachedRangesCallCount { get; private set; }
         public bool WasCancelled { get; private set; }
+
+        public void ClearCachedRanges()
+        {
+            ClearCachedRangesCallCount++;
+        }
 
         public async Task<IReadOnlyList<int>> CheckPasswordsAsync(
             IReadOnlyList<string> plaintextPasswords,

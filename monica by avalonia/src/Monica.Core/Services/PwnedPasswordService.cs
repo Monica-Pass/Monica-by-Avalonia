@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
@@ -12,12 +11,21 @@ public interface IPwnedPasswordService
         CancellationToken cancellationToken = default);
 }
 
-public sealed class PwnedPasswordService : IPwnedPasswordService
+public interface ITransientPwnedPasswordCache
 {
+    void ClearCachedRanges();
+}
+
+public sealed class PwnedPasswordService : IPwnedPasswordService, ITransientPwnedPasswordCache
+{
+    private const int MaxCachedRangeCount = 64;
     private const string RangeEndpoint = "https://api.pwnedpasswords.com/range/";
     private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(24);
     private readonly HttpClient _httpClient;
-    private readonly ConcurrentDictionary<string, CachedRangeResult> _rangeCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _rangeCacheGate = new();
+    private readonly Dictionary<string, CachedRangeResult> _rangeCache = new(StringComparer.OrdinalIgnoreCase);
+    private long _rangeCacheGeneration;
+    private long _rangeCacheSequence;
 
     public PwnedPasswordService()
         : this(new HttpClient { Timeout = TimeSpan.FromSeconds(10) })
@@ -74,15 +82,57 @@ public sealed class PwnedPasswordService : IPwnedPasswordService
 
     private async Task<IReadOnlyDictionary<string, int>> GetRangeResultAsync(string prefix, CancellationToken cancellationToken)
     {
-        var now = DateTimeOffset.UtcNow;
-        if (_rangeCache.TryGetValue(prefix, out var cached) && now - cached.FetchedAt <= CacheTtl)
+        long cacheGeneration;
+        lock (_rangeCacheGate)
         {
-            return cached.SuffixCounts;
+            cacheGeneration = _rangeCacheGeneration;
+            if (_rangeCache.TryGetValue(prefix, out var cached))
+            {
+                if (DateTimeOffset.UtcNow - cached.FetchedAt <= CacheTtl)
+                {
+                    return cached.SuffixCounts;
+                }
+
+                _rangeCache.Remove(prefix);
+            }
         }
 
         var fetched = await FetchRangeResultAsync(prefix, cancellationToken);
-        _rangeCache[prefix] = new CachedRangeResult(now, fetched);
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_rangeCacheGate)
+        {
+            if (cacheGeneration == _rangeCacheGeneration)
+            {
+                _rangeCache[prefix] = new CachedRangeResult(
+                    DateTimeOffset.UtcNow,
+                    ++_rangeCacheSequence,
+                    fetched);
+                TrimRangeCache();
+            }
+        }
+
         return fetched;
+    }
+
+    private void TrimRangeCache()
+    {
+        while (_rangeCache.Count > MaxCachedRangeCount)
+        {
+            var oldestKey = _rangeCache
+                .OrderBy(item => item.Value.Sequence)
+                .First()
+                .Key;
+            _rangeCache.Remove(oldestKey);
+        }
+    }
+
+    void ITransientPwnedPasswordCache.ClearCachedRanges()
+    {
+        lock (_rangeCacheGate)
+        {
+            _rangeCacheGeneration++;
+            _rangeCache.Clear();
+        }
     }
 
     private async Task<IReadOnlyDictionary<string, int>> FetchRangeResultAsync(string prefix, CancellationToken cancellationToken)
@@ -141,5 +191,8 @@ public sealed class PwnedPasswordService : IPwnedPasswordService
     }
 
     private sealed record PreparedPassword(int Index, string Prefix, string Suffix);
-    private sealed record CachedRangeResult(DateTimeOffset FetchedAt, IReadOnlyDictionary<string, int> SuffixCounts);
+    private sealed record CachedRangeResult(
+        DateTimeOffset FetchedAt,
+        long Sequence,
+        IReadOnlyDictionary<string, int> SuffixCounts);
 }

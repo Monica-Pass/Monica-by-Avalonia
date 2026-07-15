@@ -1,3 +1,5 @@
+using Monica.Core.Services;
+
 namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
@@ -29,6 +31,7 @@ public sealed partial class MainWindowViewModel
         ReleaseTransientBackgroundSecrets();
         SuspendPasswordSearchProjectionUpdates();
         SuspendSecurityAnalysis();
+        (_pwnedPasswordService as ITransientPwnedPasswordCache)?.ClearCachedRanges();
         CancelNoteImagePreviewRefresh();
         Interlocked.Increment(ref _noteImagePreviewVersion);
         ReplaceNoteImagePreviews([]);
