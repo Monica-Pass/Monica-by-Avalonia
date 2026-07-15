@@ -19,6 +19,8 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(CanStackSelectedPasswords));
         OnPropertyChanged(nameof(AreAllFilteredPasswordsSelected));
         RaiseFilteredPasswordRowsChanged();
+        RaiseArchiveSelectionState();
+        RaiseRecycleBinSelectionState();
     }
 
     private void RefreshPasswordSelectionStateFromPasswords()

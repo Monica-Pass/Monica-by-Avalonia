@@ -23,6 +23,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(HasFilteredDeletedPasswords));
         OnPropertyChanged(nameof(ShowClearRecycleBinSearchInEmptyState));
         OnPropertyChanged(nameof(RecycleBinEmptyStateText));
+        RaiseRecycleBinSelectionState();
         SelectedDeletedPassword =
             FilteredDeletedPasswords.FirstOrDefault(item => item.Id == SelectedDeletedPassword?.Id) ??
             FilteredDeletedPasswords.FirstOrDefault();
@@ -42,5 +43,6 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(HasFilteredDeletedPasswords));
         OnPropertyChanged(nameof(ShowClearRecycleBinSearchInEmptyState));
         OnPropertyChanged(nameof(RecycleBinEmptyStateText));
+        RaiseRecycleBinSelectionState();
     }
 }

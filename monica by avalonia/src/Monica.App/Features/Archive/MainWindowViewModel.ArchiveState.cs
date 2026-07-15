@@ -43,6 +43,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(HasFilteredArchivedPasswords));
         OnPropertyChanged(nameof(ShowClearArchiveSearchInEmptyState));
         OnPropertyChanged(nameof(ArchiveEmptyStateText));
+        RaiseArchiveSelectionState();
         SelectedArchivedPassword =
             FilteredArchivedPasswords.FirstOrDefault(item => item.Id == SelectedArchivedPassword?.Id) ??
             FilteredArchivedPasswords.FirstOrDefault();
@@ -61,5 +62,6 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(HasFilteredArchivedPasswords));
         OnPropertyChanged(nameof(ShowClearArchiveSearchInEmptyState));
         OnPropertyChanged(nameof(ArchiveEmptyStateText));
+        RaiseArchiveSelectionState();
     }
 }

@@ -24,7 +24,7 @@ public sealed class PasswordManagementTestCollection
 }
 
 [Collection(PasswordManagementTestCollection.Name)]
-public sealed class PasswordManagementTests
+public sealed partial class PasswordManagementTests
 {
     [Fact]
     public async Task Vault_load_publishes_password_collection_once()

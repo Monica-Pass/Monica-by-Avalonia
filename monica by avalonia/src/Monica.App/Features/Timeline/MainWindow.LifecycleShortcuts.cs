@@ -15,7 +15,7 @@ public partial class MainWindow
     private TimelineWorkspaceView TimelineWorkspaceView =>
         WorkspaceHost.GetOrCreate<TimelineWorkspaceView>("Timeline");
 
-    private bool TryHandleLifecycleWorkspaceShortcut(MainWindowViewModel viewModel, KeyEventArgs e)
+    internal bool TryHandleLifecycleWorkspaceShortcut(MainWindowViewModel viewModel, KeyEventArgs e)
     {
         switch (viewModel.SelectedSection)
         {
@@ -37,6 +37,7 @@ public partial class MainWindow
 
     private void HandleArchiveShortcut(MainWindowViewModel viewModel, KeyEventArgs e)
     {
+        if (TryHandleArchiveSelectionShortcut(viewModel, e)) return;
         if (HandleLifecycleNavigation(e, ArchiveWorkspaceView, viewModel.ArchiveSearchText, viewModel.ClearArchiveSearchCommand,
             () => viewModel.ArchiveNarrowShowsList, () => viewModel.CloseArchivedPasswordDetailsCommand.Execute(null))) return;
         if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.F) ArchiveWorkspaceView.FocusSearch();
@@ -56,6 +57,7 @@ public partial class MainWindow
 
     private void HandleRecycleBinShortcut(MainWindowViewModel viewModel, KeyEventArgs e)
     {
+        if (TryHandleRecycleBinSelectionShortcut(viewModel, e)) return;
         if (HandleLifecycleNavigation(e, RecycleBinWorkspaceView, viewModel.RecycleBinSearchText, viewModel.ClearRecycleBinSearchCommand,
             () => viewModel.RecycleBinNarrowShowsList, () => viewModel.CloseDeletedPasswordDetailsCommand.Execute(null))) return;
         if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.F) RecycleBinWorkspaceView.FocusSearch();
@@ -67,10 +69,45 @@ public partial class MainWindow
         }
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.R && viewModel.SelectedDeletedPassword is not null)
             viewModel.RestorePasswordCommand.Execute(viewModel.SelectedDeletedPassword);
-        else if (e.KeyModifiers == KeyModifiers.Shift && e.Key == Key.Delete && viewModel.SelectedDeletedPassword is not null)
+        else if (e.KeyModifiers == KeyModifiers.Shift && e.Key == Key.Delete && !IsTextEditingSource(e.Source) && viewModel.SelectedDeletedPassword is not null)
             viewModel.DeletePasswordPermanentlyCommand.Execute(viewModel.SelectedDeletedPassword);
         else return;
         e.Handled = true;
+    }
+
+    private static bool TryHandleArchiveSelectionShortcut(MainWindowViewModel viewModel, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape && viewModel.HasSelectedArchivedPasswords)
+            viewModel.ClearArchivedPasswordSelectionCommand.Execute(null);
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.A &&
+                 !IsTextEditingSource(e.Source) && viewModel.HasFilteredArchivedPasswords)
+            viewModel.AreAllFilteredArchivedPasswordsSelected = true;
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.R && viewModel.HasSelectedArchivedPasswords)
+            viewModel.UnarchiveSelectedArchivedPasswordsCommand.Execute(null);
+        else
+            return false;
+
+        e.Handled = true;
+        return true;
+    }
+
+    private static bool TryHandleRecycleBinSelectionShortcut(MainWindowViewModel viewModel, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape && viewModel.HasSelectedDeletedPasswords)
+            viewModel.ClearDeletedPasswordSelectionCommand.Execute(null);
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.A &&
+                 !IsTextEditingSource(e.Source) && viewModel.HasFilteredDeletedPasswords)
+            viewModel.AreAllFilteredDeletedPasswordsSelected = true;
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.R && viewModel.HasSelectedDeletedPasswords)
+            viewModel.RestoreSelectedDeletedPasswordsCommand.Execute(null);
+        else if (e.KeyModifiers == KeyModifiers.Shift && e.Key == Key.Delete &&
+                 !IsTextEditingSource(e.Source) && viewModel.HasSelectedDeletedPasswords)
+            viewModel.DeleteSelectedDeletedPasswordsPermanentlyCommand.Execute(null);
+        else
+            return false;
+
+        e.Handled = true;
+        return true;
     }
 
     private void HandleTimelineShortcut(MainWindowViewModel viewModel, KeyEventArgs e)

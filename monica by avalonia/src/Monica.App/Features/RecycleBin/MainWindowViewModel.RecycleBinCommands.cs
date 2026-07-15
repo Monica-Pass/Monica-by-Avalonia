@@ -65,9 +65,21 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        var siblings = await PurgeDeletedPasswordGroupAsync(entry);
+
+        RefreshBoundTotpPresentation(siblings);
+        RaisePasswordCountState();
+        InvalidateSecurityAnalysis();
+        RecycleBinNarrowShowsList = true;
+        StatusMessage = _localization.Format("DeletedPasswordPermanentlyFormat", entry.Title);
+    }
+
+    private async Task<IReadOnlyList<PasswordEntry>> PurgeDeletedPasswordGroupAsync(PasswordEntry entry)
+    {
         var siblings = GetDeletedPasswordSiblings(entry).ToList();
         foreach (var item in siblings)
         {
+            item.IsSelected = false;
             await _repository.DeletePasswordPermanentlyAsync(item.Id);
             await LogOperationAsync(new OperationLog
             {
@@ -85,11 +97,7 @@ public sealed partial class MainWindowViewModel
             }
         }
 
-        RefreshBoundTotpPresentation(siblings);
-        RaisePasswordCountState();
-        InvalidateSecurityAnalysis();
-        RecycleBinNarrowShowsList = true;
-        StatusMessage = _localization.Format("DeletedPasswordPermanentlyFormat", entry.Title);
+        return siblings;
     }
 
     [RelayCommand]
