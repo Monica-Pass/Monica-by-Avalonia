@@ -98,9 +98,15 @@ public partial class SecurityAnalysisWorkspaceView : UserControl
             _viewModel.RefreshSecurityAnalysisCommand.Execute(null);
             e.Handled = true;
         }
-        else if (IsNarrowLayout && (e.Key == Key.Escape || e.Key == Key.Left && e.KeyModifiers.HasFlag(KeyModifiers.Alt)))
+        else if (IsNarrowLayout && !_viewModel.SecurityAnalysisNarrowShowsList &&
+                 (e.Key == Key.Escape || e.Key == Key.Left && e.KeyModifiers.HasFlag(KeyModifiers.Alt)))
         {
             _viewModel.ShowSecurityIssueListCommand.Execute(null);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape && _viewModel.HasSecurityIssueFilters)
+        {
+            _viewModel.ClearSecurityIssueFiltersCommand.Execute(null);
             e.Handled = true;
         }
         else if (!isEditingSearch && e.Key is Key.Up or Key.Down)

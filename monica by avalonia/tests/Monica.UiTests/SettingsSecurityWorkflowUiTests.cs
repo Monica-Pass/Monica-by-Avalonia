@@ -54,6 +54,11 @@ public sealed class SettingsSecurityWorkflowUiTests
         Assert.NotNull(view.FindControl<Button>("CancelCompromisedCheckButton"));
         Assert.NotNull(view.FindControl<Button>("CancelSecurityAnalysisRefreshButton"));
         Assert.NotNull(view.FindControl<ListBox>("SecurityIssueList"));
+        Assert.NotNull(view.FindControl<Button>("SecurityIssueSeverityAllButton"));
+        Assert.NotNull(view.FindControl<Button>("SecurityIssueSeverityHighButton"));
+        Assert.NotNull(view.FindControl<Button>("SecurityIssueSeverityMediumButton"));
+        Assert.NotNull(view.FindControl<Button>("SecurityIssueSeverityLowButton"));
+        Assert.NotNull(view.FindControl<Button>("ClearSecurityIssueFiltersButton"));
 
         view.UpdateResponsiveLayoutForWidth(680);
 

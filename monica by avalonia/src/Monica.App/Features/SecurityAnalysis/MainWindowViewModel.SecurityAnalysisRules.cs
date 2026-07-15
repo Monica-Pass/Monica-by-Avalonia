@@ -92,7 +92,7 @@ public sealed partial class MainWindowViewModel
             count++;
             issues.Add(new SecurityIssueItem(snapshot.Entry.Title,
                 _localization.Format("CompromisedPasswordIssueFormat", result.ExposureCount),
-                _localization.CompromisedPasswords, _localization.Get("HighSeverity"),
+                _localization.CompromisedPasswords, _localization.Get("HighSeverity"), SecurityIssueSeverityLevel.High,
                 snapshot.Entry.Id, snapshot.Entry, 40));
         }
         return count;
@@ -113,7 +113,7 @@ public sealed partial class MainWindowViewModel
             count++;
             issues.Add(new SecurityIssueItem(snapshot.Entry.Title,
                 _localization.Format("WeakPasswordIssueFormat", PasswordStrengthLocalization.Label(_localization, strength.Label)),
-                _localization.WeakPasswords, _localization.Get("HighSeverity"),
+                _localization.WeakPasswords, _localization.Get("HighSeverity"), SecurityIssueSeverityLevel.High,
                 snapshot.Entry.Id, snapshot.Entry, 30));
         }
         return count;
@@ -136,7 +136,7 @@ public sealed partial class MainWindowViewModel
                 count++;
                 issues.Add(new SecurityIssueItem(snapshot.Entry.Title,
                     _localization.Format("DuplicatePasswordIssueFormat", group.Count(), titles),
-                    _localization.DuplicatePasswords, _localization.Get("HighSeverity"),
+                    _localization.DuplicatePasswords, _localization.Get("HighSeverity"), SecurityIssueSeverityLevel.High,
                     snapshot.Entry.Id, snapshot.Entry, 28));
             }
         }
@@ -164,7 +164,7 @@ public sealed partial class MainWindowViewModel
                 count++;
                 issues.Add(new SecurityIssueItem(entry.Title,
                     _localization.Format("DuplicateWebsiteIssueFormat", group.Key, entries.Length),
-                    _localization.DuplicateWebsites, _localization.Get("MediumSeverity"),
+                    _localization.DuplicateWebsites, _localization.Get("MediumSeverity"), SecurityIssueSeverityLevel.Medium,
                     entry.Id, entry, 18));
             }
         }
@@ -187,7 +187,7 @@ public sealed partial class MainWindowViewModel
             count++;
             issues.Add(new SecurityIssueItem(snapshot.Entry.Title,
                 _localization.Format("MissingTwoFactorIssueFormat", domain),
-                _localization.MissingTwoFactor, _localization.Get("MediumSeverity"),
+                _localization.MissingTwoFactor, _localization.Get("MediumSeverity"), SecurityIssueSeverityLevel.Medium,
                 snapshot.Entry.Id, snapshot.Entry, 16));
         }
         return count;
@@ -206,7 +206,7 @@ public sealed partial class MainWindowViewModel
             count++;
             issues.Add(new SecurityIssueItem(snapshot.Entry.Title,
                 _localization.Format("StalePasswordIssueFormat", snapshot.Entry.UpdatedAt.LocalDateTime.ToString("d", _localization.Culture)),
-                _localization.StalePasswords, _localization.Get("LowSeverity"),
+                _localization.StalePasswords, _localization.Get("LowSeverity"), SecurityIssueSeverityLevel.Low,
                 snapshot.Entry.Id, snapshot.Entry, 8));
         }
         return count;
