@@ -9,7 +9,7 @@ namespace Monica.Data.Repositories;
 public sealed class MdbxBackedMonicaRepository(
     IMonicaRepository inner,
     IMdbxVaultStore mdbxVaultStore,
-    IAttachmentContentStore? attachmentContentStore = null) : IMonicaRepository
+    IAttachmentContentStore? attachmentContentStore = null) : IMonicaRepository, ITransientVaultReadCache
 {
     private static readonly TimeSpan ReadCacheTtl = TimeSpan.FromMinutes(2);
     private readonly IPasswordQuickAccessStore _quickAccessStore = inner as IPasswordQuickAccessStore
@@ -1034,6 +1034,12 @@ public sealed class MdbxBackedMonicaRepository(
     {
         ClearDefaultLocalMdbxDatabaseCache();
         ClearCategoryReadCache();
+        ClearPasswordReadSnapshot();
+        ClearSecureItemReadSnapshot();
+    }
+
+    void ITransientVaultReadCache.ReleaseVaultItemSnapshots()
+    {
         ClearPasswordReadSnapshot();
         ClearSecureItemReadSnapshot();
     }

@@ -448,6 +448,43 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
+    public async Task Vault_snapshot_loader_releases_mdbx_item_snapshots_after_detaching_results()
+    {
+        var repository = CreateRepository(out var bridge);
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "Detached login",
+            Password = "secret"
+        };
+        var note = new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = "Detached note",
+            Notes = "note"
+        };
+        await repository.SavePasswordAsync(password);
+        await repository.SaveSecureItemAsync(note);
+
+        bridge.OpenedPaths.Clear();
+        var snapshot = await VaultSnapshotLoader.LoadAsync(repository);
+        var vaultLoadOpenCount = bridge.OpenedPaths.Count;
+
+        bridge.OpenedPaths.Clear();
+        var reloadedPasswords = await repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true);
+        var reloadedSecureItems = await repository.GetSecureItemsAsync(includeDeleted: true);
+
+        Assert.Equal(password.Id, Assert.Single(snapshot.ActivePasswords).Id);
+        Assert.Equal(note.Id, Assert.Single(snapshot.NoteItems).Id);
+        Assert.Equal(password.Id, Assert.Single(reloadedPasswords).Id);
+        Assert.Equal(note.Id, Assert.Single(reloadedSecureItems).Id);
+        Assert.True(
+            vaultLoadOpenCount <= 2,
+            $"Expected Vault Access to reuse one password and one secure-item snapshot, but MDBX was opened {vaultLoadOpenCount} times.");
+        Assert.Equal(2, bridge.OpenedPaths.Count);
+    }
+
+    [Fact]
     public async Task Repository_cascades_password_delete_restore_to_mdbx_bound_totps_when_sqlite_cache_is_missing()
     {
         var repository = CreateRepository(out var bridge, out var sqliteRepository);

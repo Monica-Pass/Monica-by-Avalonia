@@ -26,6 +26,18 @@ internal static class VaultSnapshotLoader
 {
     public static async Task<VaultLoadSnapshot> LoadAsync(IMonicaRepository repository)
     {
+        try
+        {
+            return await LoadCoreAsync(repository);
+        }
+        finally
+        {
+            (repository as ITransientVaultReadCache)?.ReleaseVaultItemSnapshots();
+        }
+    }
+
+    private static async Task<VaultLoadSnapshot> LoadCoreAsync(IMonicaRepository repository)
+    {
         var allPasswords = await AppDiagnostics.MeasureAsync(
             "Load passwords",
             () => repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
