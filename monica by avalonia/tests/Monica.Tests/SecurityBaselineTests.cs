@@ -24,6 +24,28 @@ public sealed class SecurityBaselineTests
     }
 
     [Fact]
+    public void Security_baseline_session_reports_monotonic_remaining_inactivity()
+    {
+        var timeProvider = new ManualTimeProvider();
+        var session = new VaultSessionService(timeProvider);
+
+        Assert.Null(session.GetRemainingInactivity(TimeSpan.FromMinutes(5)));
+        session.MarkUnlocked();
+        Assert.Equal(TimeSpan.FromMinutes(5), session.GetRemainingInactivity(TimeSpan.FromMinutes(5)));
+
+        timeProvider.Advance(TimeSpan.FromMinutes(2));
+        Assert.Equal(TimeSpan.FromMinutes(3), session.GetRemainingInactivity(TimeSpan.FromMinutes(5)));
+
+        session.RecordActivity();
+        Assert.Equal(TimeSpan.FromMinutes(5), session.GetRemainingInactivity(TimeSpan.FromMinutes(5)));
+
+        timeProvider.Advance(TimeSpan.FromMinutes(6));
+        Assert.Equal(TimeSpan.Zero, session.GetRemainingInactivity(TimeSpan.FromMinutes(5)));
+        session.MarkLocked();
+        Assert.Null(session.GetRemainingInactivity(TimeSpan.FromMinutes(5)));
+    }
+
+    [Fact]
     public async Task Security_baseline_new_sensitive_copy_cancels_previous_expiry()
     {
         var adapter = new MemoryClipboardAdapter();

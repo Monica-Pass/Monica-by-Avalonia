@@ -7,6 +7,7 @@ public interface IVaultSessionService
     CancellationToken SessionCancellationToken { get; }
     void MarkUnlocked();
     void RecordActivity();
+    TimeSpan? GetRemainingInactivity(TimeSpan inactivityTimeout);
     bool IsExpired(TimeSpan inactivityTimeout);
     void MarkLocked();
 }
@@ -58,15 +59,16 @@ public sealed class VaultSessionService(TimeProvider? timeProvider = null) : IVa
     {
         lock (_sync)
         {
-            if (!IsUnlocked)
-            {
-                return false;
-            }
+            return GetRemainingInactivityUnsafe(inactivityTimeout) is { } remaining &&
+                remaining <= TimeSpan.Zero;
+        }
+    }
 
-            var elapsed = _timeProvider.GetElapsedTime(
-                _lastActivityTimestamp,
-                _timeProvider.GetTimestamp());
-            return elapsed >= inactivityTimeout;
+    public TimeSpan? GetRemainingInactivity(TimeSpan inactivityTimeout)
+    {
+        lock (_sync)
+        {
+            return GetRemainingInactivityUnsafe(inactivityTimeout);
         }
     }
 
@@ -94,5 +96,19 @@ public sealed class VaultSessionService(TimeProvider? timeProvider = null) : IVa
         _sessionCancellation.Cancel();
         _sessionCancellation.Dispose();
         _sessionCancellation = new CancellationTokenSource();
+    }
+
+    private TimeSpan? GetRemainingInactivityUnsafe(TimeSpan inactivityTimeout)
+    {
+        if (!IsUnlocked)
+        {
+            return null;
+        }
+
+        var elapsed = _timeProvider.GetElapsedTime(
+            _lastActivityTimestamp,
+            _timeProvider.GetTimestamp());
+        var remaining = inactivityTimeout - elapsed;
+        return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
     }
 }

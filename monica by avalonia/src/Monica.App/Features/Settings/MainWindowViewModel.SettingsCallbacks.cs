@@ -60,8 +60,17 @@ public sealed partial class MainWindowViewModel
     }
 
     partial void OnStartupSectionChanged(string value) => UpdateSettings(settings => settings.StartupSection = value);
-    partial void OnAutoLockEnabledChanged(bool value) => UpdateSettings(settings => settings.AutoLockEnabled = value);
-    partial void OnAutoLockMinutesChanged(int value) => UpdateSettings(settings => settings.AutoLockMinutes = value);
+    partial void OnAutoLockEnabledChanged(bool value)
+    {
+        UpdateSettings(settings => settings.AutoLockEnabled = value);
+        NotifyAutoLockScheduleChanged();
+    }
+
+    partial void OnAutoLockMinutesChanged(int value)
+    {
+        UpdateSettings(settings => settings.AutoLockMinutes = value);
+        NotifyAutoLockScheduleChanged();
+    }
     partial void OnClearClipboardEnabledChanged(bool value)
     {
         ApplyClipboardPolicy();

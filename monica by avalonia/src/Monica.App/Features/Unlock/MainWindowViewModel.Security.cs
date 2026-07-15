@@ -9,6 +9,8 @@ public sealed partial class MainWindowViewModel
 {
     private bool _isWindowActive = true;
 
+    internal event EventHandler? AutoLockScheduleChanged;
+
     [ObservableProperty]
     private bool _isPrivacyScreenVisible;
 
@@ -17,7 +19,32 @@ public sealed partial class MainWindowViewModel
     public bool EnableWindowCaptureProtection() =>
         _windowPrivacyService.EnableCaptureProtection();
 
-    public void RecordUserActivity() => _vaultSessionService.RecordActivity();
+    public void RecordUserActivity()
+    {
+        _vaultSessionService.RecordActivity();
+        NotifyAutoLockScheduleChanged();
+    }
+
+    internal bool TryGetAutoLockDelay(out TimeSpan delay)
+    {
+        delay = TimeSpan.Zero;
+        if (!IsUnlocked || !AutoLockEnabled)
+        {
+            return false;
+        }
+
+        var timeout = GetAutoLockTimeout();
+        var remaining = _vaultSessionService.GetRemainingInactivity(timeout);
+        if (remaining is null)
+        {
+            return false;
+        }
+
+        delay = remaining.Value > TimeSpan.Zero
+            ? remaining.Value
+            : TimeSpan.FromMilliseconds(1);
+        return true;
+    }
 
     public async Task HandleWindowActivatedAsync()
     {
@@ -69,16 +96,24 @@ public sealed partial class MainWindowViewModel
         {
             _vaultSessionService.MarkUnlocked();
             IsPrivacyScreenVisible = false;
+            NotifyAutoLockScheduleChanged();
             return;
         }
 
         _vaultSessionService.MarkLocked();
+        NotifyAutoLockScheduleChanged();
     }
+
+    private void NotifyAutoLockScheduleChanged() =>
+        AutoLockScheduleChanged?.Invoke(this, EventArgs.Empty);
 
     private bool ShouldAutoLock() =>
         IsUnlocked &&
         AutoLockEnabled &&
-        _vaultSessionService.IsExpired(TimeSpan.FromMinutes(AutoLockMinutes));
+        _vaultSessionService.IsExpired(GetAutoLockTimeout());
+
+    private TimeSpan GetAutoLockTimeout() =>
+        TimeSpan.FromMinutes(Math.Max(1, AutoLockMinutes));
 
     private async Task ClearOwnedClipboardAsync()
     {
