@@ -70,7 +70,9 @@ public sealed partial class MainWindowViewModel
             RefreshTotpDisplay(value);
         }
 
-        SelectedTotpDetails = value is null ? null : new TotpItemDetailsViewModel(_localization, value);
+        SelectedTotpDetails = value is null || _isUnlockedShellHibernated
+            ? null
+            : new TotpItemDetailsViewModel(_localization, value);
         OnPropertyChanged(nameof(HasSelectedTotpItem));
     }
 

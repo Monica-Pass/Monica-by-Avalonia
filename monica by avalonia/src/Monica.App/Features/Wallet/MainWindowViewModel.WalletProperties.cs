@@ -44,8 +44,20 @@ public sealed partial class MainWindowViewModel
 
     partial void OnSelectedWalletItemChanged(SecureItem? value)
     {
-        SelectedWalletDetails = value is null ? null : new WalletItemDetailsViewModel(_localization, value);
+        SelectedWalletDetails = value is null || _isUnlockedShellHibernated
+            ? null
+            : new WalletItemDetailsViewModel(_localization, value);
         OnPropertyChanged(nameof(HasSelectedWalletItem));
+    }
+
+    partial void OnSelectedWalletDetailsChanged(
+        WalletItemDetailsViewModel? oldValue,
+        WalletItemDetailsViewModel? newValue)
+    {
+        if (!ReferenceEquals(oldValue, newValue))
+        {
+            oldValue?.Dispose();
+        }
     }
 
     partial void OnWalletSearchTextChanged(string value) => RaiseWalletFilterState();

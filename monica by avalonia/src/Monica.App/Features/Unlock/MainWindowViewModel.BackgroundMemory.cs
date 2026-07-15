@@ -25,6 +25,7 @@ public sealed partial class MainWindowViewModel
 
     private void ReleaseRebuildableBackgroundCaches()
     {
+        ReleaseSensitiveBackgroundDetails();
         CancelNoteImagePreviewRefresh();
         Interlocked.Increment(ref _noteImagePreviewVersion);
         ReplaceNoteImagePreviews([]);
@@ -33,12 +34,53 @@ public sealed partial class MainWindowViewModel
 
     private void RestoreRebuildableBackgroundCaches()
     {
+        RestoreBackgroundDetailState();
         if (IsUnlocked && string.Equals(SelectedSection, "Notes", StringComparison.OrdinalIgnoreCase))
         {
             QueueNoteImagePreviewRefresh(NoteContent);
         }
 
         RefreshSecurityAnalysisIfNeeded();
+    }
+
+    private void ReleaseSensitiveBackgroundDetails()
+    {
+        Interlocked.Increment(ref _selectedPasswordDetailsVersion);
+        CancelSelectedPasswordDetailsRefresh();
+        IsLoadingSelectedPasswordDetails = false;
+        SelectedPasswordDetailsError = null;
+        var passwordDetails = SelectedPasswordDetails;
+        SelectedPasswordDetails = null;
+        passwordDetails?.Dispose();
+
+        SelectedTotpDetails = null;
+        SelectedWalletDetails = null;
+    }
+
+    private void RestoreBackgroundDetailState()
+    {
+        if (_isUnlockedShellHibernated || !IsUnlocked)
+        {
+            return;
+        }
+
+        switch (SelectedSection)
+        {
+            case "Passwords" when SelectedPassword is not null:
+                QueueSelectedPasswordDetailsRefresh(SelectedPassword);
+                break;
+            case "Totp" when
+                SelectedTotpItem is not null &&
+                SelectedTotpDetails?.Item.Id != SelectedTotpItem.Id:
+                RefreshTotpDisplay(SelectedTotpItem);
+                SelectedTotpDetails = new TotpItemDetailsViewModel(_localization, SelectedTotpItem);
+                break;
+            case "Cards" when
+                SelectedWalletItem is not null &&
+                SelectedWalletDetails?.Item.Id != SelectedWalletItem.Id:
+                SelectedWalletDetails = new WalletItemDetailsViewModel(_localization, SelectedWalletItem);
+                break;
+        }
     }
 
     private void ClearRebuildableProjectionCaches()

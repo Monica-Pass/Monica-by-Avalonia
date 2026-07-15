@@ -16,9 +16,9 @@ public sealed partial class WalletFieldDisplayItem : ObservableObject
     }
 
     public string Label { get; }
-    public string Value { get; }
+    public string Value { get; private set; }
     public bool IsSensitive { get; }
-    public string MaskedValue { get; }
+    public string MaskedValue { get; private set; }
     public string DisplayValue => IsSensitive && !IsRevealed ? MaskedValue : Value;
 
     [ObservableProperty]
@@ -32,6 +32,16 @@ public sealed partial class WalletFieldDisplayItem : ObservableObject
         {
             IsRevealed = !IsRevealed;
         }
+    }
+
+    internal void ClearSensitiveState()
+    {
+        Value = "";
+        MaskedValue = "";
+        IsRevealed = false;
+        OnPropertyChanged(nameof(Value));
+        OnPropertyChanged(nameof(MaskedValue));
+        OnPropertyChanged(nameof(DisplayValue));
     }
 
     private static string MaskValue(string value)
@@ -66,7 +76,7 @@ public sealed partial class WalletFieldDisplayItem : ObservableObject
     }
 }
 
-public sealed partial class WalletItemDetailsViewModel : ObservableObject
+public sealed partial class WalletItemDetailsViewModel : ObservableObject, IDisposable
 {
     public WalletItemDetailsViewModel(ILocalizationService localization, SecureItem item)
     {
@@ -84,19 +94,63 @@ public sealed partial class WalletItemDetailsViewModel : ObservableObject
     }
 
     public ILocalizationService L { get; }
-    public SecureItem Item { get; }
-    public string Title { get; }
-    public string KindText { get; }
+    public SecureItem Item { get; private set; }
+    public string Title { get; private set; }
+    public string KindText { get; private set; }
     public string PrimaryText { get; private set; } = "";
     public string SecondaryText { get; private set; } = "";
     public string ExpiryText { get; private set; } = "";
-    public string Notes { get; }
+    public string Notes { get; private set; }
     public bool HasNotes => !string.IsNullOrWhiteSpace(Notes);
-    public IReadOnlyList<WalletFieldDisplayItem> Fields { get; }
+    public IReadOnlyList<WalletFieldDisplayItem> Fields { get; private set; }
     public IReadOnlyList<string> ImagePaths { get; private set; } = [];
-    public bool HasImages { get; }
-    public string FrontImagePath { get; }
-    public string BackImagePath { get; }
+    public bool HasImages { get; private set; }
+    public string FrontImagePath { get; private set; }
+    public string BackImagePath { get; private set; }
+    public bool IsSensitiveStateCleared { get; private set; }
+
+    public void ClearSensitiveState()
+    {
+        if (IsSensitiveStateCleared)
+        {
+            return;
+        }
+
+        foreach (var field in Fields)
+        {
+            field.ClearSensitiveState();
+        }
+
+        Item = new SecureItem();
+        Title = "";
+        KindText = "";
+        PrimaryText = "";
+        SecondaryText = "";
+        ExpiryText = "";
+        Notes = "";
+        Fields = [];
+        ImagePaths = [];
+        HasImages = false;
+        FrontImagePath = "";
+        BackImagePath = "";
+        IsSensitiveStateCleared = true;
+        OnPropertyChanged(nameof(Item));
+        OnPropertyChanged(nameof(Title));
+        OnPropertyChanged(nameof(KindText));
+        OnPropertyChanged(nameof(PrimaryText));
+        OnPropertyChanged(nameof(SecondaryText));
+        OnPropertyChanged(nameof(ExpiryText));
+        OnPropertyChanged(nameof(Notes));
+        OnPropertyChanged(nameof(HasNotes));
+        OnPropertyChanged(nameof(Fields));
+        OnPropertyChanged(nameof(ImagePaths));
+        OnPropertyChanged(nameof(HasImages));
+        OnPropertyChanged(nameof(FrontImagePath));
+        OnPropertyChanged(nameof(BackImagePath));
+        OnPropertyChanged(nameof(IsSensitiveStateCleared));
+    }
+
+    public void Dispose() => ClearSensitiveState();
 
     private IReadOnlyList<WalletFieldDisplayItem> BuildBankCardDetails(
         ILocalizationService localization,

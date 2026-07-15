@@ -59,6 +59,12 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        if (_isUnlockedShellHibernated)
+        {
+            SelectedPasswordDetails = null;
+            return;
+        }
+
         if (SelectedPasswordDetails?.Entry.Id == entry.Id)
         {
             return;
