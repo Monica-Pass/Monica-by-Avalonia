@@ -11,15 +11,15 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
-    private static string BuildLineNumbersText(string content)
-    {
-        return string.Join(Environment.NewLine, Enumerable.Range(1, CountNoteLines(content)));
-    }
+    private static string BuildLineNumbersText(int lineCount) =>
+        string.Join(Environment.NewLine, Enumerable.Range(1, lineCount));
 
-    private static int CountNoteLines(string content) =>
-        string.IsNullOrEmpty(content)
+    private static int CountNoteLines(string content)
+    {
+        return string.IsNullOrEmpty(content)
             ? 1
             : content.Count(character => character == '\n') + 1;
+    }
 
     private static int CountNoteWords(string content)
     {
@@ -93,6 +93,9 @@ public sealed partial class MainWindowViewModel
 
         return builder.ToString();
     }
+
+    private string BuildNotePlainPreview(string content, bool isMarkdown)
+        => NoteContentCodec.ToPlainPreview(content, isMarkdown);
 
     private static void AppendPreviewMarkdownLine(StringBuilder builder, string line, bool appendLineBreak)
     {

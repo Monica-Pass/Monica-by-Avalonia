@@ -10,6 +10,7 @@ public sealed partial class MainWindowViewModel
 {
     partial void OnNoteContentChanged(string value)
     {
+        InvalidateNoteEditorProjections();
         OnPropertyChanged(nameof(NotePreviewMarkdown));
         OnPropertyChanged(nameof(NotePlainPreview));
         OnPropertyChanged(nameof(NoteLineNumbersText));
@@ -31,6 +32,7 @@ public sealed partial class MainWindowViewModel
 
     partial void OnNoteIsMarkdownChanged(bool value)
     {
+        InvalidateNotePreviewProjection();
         OnPropertyChanged(nameof(NotePreviewMarkdown));
         OnPropertyChanged(nameof(NotePlainPreview));
         OnPropertyChanged(nameof(NoteFormatText));

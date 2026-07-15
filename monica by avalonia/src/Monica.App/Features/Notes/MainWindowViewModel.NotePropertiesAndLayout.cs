@@ -9,8 +9,8 @@ namespace Monica.App.ViewModels;
 public sealed partial class MainWindowViewModel
 {
     public string NoteCountText => _localization.Format("NoteCountFormat", NoteItems.Count);
-    public string NotePreviewMarkdown => NoteIsMarkdown ? BuildNotePreviewMarkdown(NoteContent) : "";
-    public string NotePlainPreview => NoteContentCodec.ToPlainPreview(NoteContent, NoteIsMarkdown);
+    public string NotePreviewMarkdown => GetNotePreviewProjection().Markdown;
+    public string NotePlainPreview => GetNotePreviewProjection().PlainText;
 
     private bool _isLoadingNoteEditor;
     private int _noteImagePreviewVersion;
@@ -23,6 +23,8 @@ public sealed partial class MainWindowViewModel
     internal int FilteredNoteProjectionBuildCount { get; private set; }
     internal int NoteTreeGroupProjectionBuildCount { get; private set; }
     internal int NotePayloadDecodeCount { get; private set; }
+    internal int NoteContentAnalysisBuildCount { get; private set; }
+    internal int NotePreviewProjectionBuildCount { get; private set; }
 
     public ObservableCollection<SecureItem> NoteItems { get; } = new ObservableRangeCollection<SecureItem>();
     public ObservableCollection<NoteEditorTab> OpenNoteTabs { get; } = [];
@@ -61,16 +63,16 @@ public sealed partial class MainWindowViewModel
     [ObservableProperty]
     private bool _noteNarrowShowsTree = true;
 
-    public string NoteLineNumbersText => BuildLineNumbersText(NoteContent);
-    public int NoteLineCount => CountNoteLines(NoteContent);
-    public int NoteWordCount => CountNoteWords(NoteContent);
-    public int NoteCharacterCount => NoteContent.Length;
-    public IReadOnlyList<NoteOutlineItem> NoteOutlineItems => BuildNoteOutlineItems(NoteContent);
-    public IReadOnlyList<NoteReferenceItem> NoteReferenceItems => BuildNoteReferenceItems(NoteContent);
-    public int NoteOutlineCount => NoteOutlineItems.Count;
-    public int NoteReferenceCount => NoteReferenceItems.Count;
-    public bool HasNoteOutlineItems => NoteOutlineCount > 0;
-    public bool HasNoteReferenceItems => NoteReferenceCount > 0;
+    public string NoteLineNumbersText => GetNoteContentAnalysis().LineNumbersText;
+    public int NoteLineCount => GetNoteContentAnalysis().LineCount;
+    public int NoteWordCount => GetNoteContentAnalysis().WordCount;
+    public int NoteCharacterCount => GetNoteContentAnalysis().CharacterCount;
+    public IReadOnlyList<NoteOutlineItem> NoteOutlineItems => GetNoteContentAnalysis().OutlineItems;
+    public IReadOnlyList<NoteReferenceItem> NoteReferenceItems => GetNoteContentAnalysis().ReferenceItems;
+    public int NoteOutlineCount => GetNoteContentAnalysis().OutlineItems.Count;
+    public int NoteReferenceCount => GetNoteContentAnalysis().ReferenceItems.Count;
+    public bool HasNoteOutlineItems => GetNoteContentAnalysis().OutlineItems.Count > 0;
+    public bool HasNoteReferenceItems => GetNoteContentAnalysis().ReferenceItems.Count > 0;
     public int NoteImagePreviewCount => NoteImagePreviewItems.Count;
     public bool HasNoteImagePreviewItems => NoteImagePreviewCount > 0;
     public string NoteFormatText => NoteIsMarkdown ? "Markdown" : _localization.PlainText;

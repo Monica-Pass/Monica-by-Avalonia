@@ -38,7 +38,11 @@ public sealed class VaultCredentialTests
         var noteGroupsBeforeLock = viewModel.NoteTreeGroups;
         Assert.Single(filteredNotesBeforeLock);
         Assert.Single(noteGroupsBeforeLock);
-        viewModel.NoteContent = "private note";
+        viewModel.NoteContent = "# private note\n[secret](https://private.example)";
+        var noteOutlineBeforeLock = viewModel.NoteOutlineItems;
+        var noteReferencesBeforeLock = viewModel.NoteReferenceItems;
+        Assert.Single(noteOutlineBeforeLock);
+        Assert.Single(noteReferencesBeforeLock);
         viewModel.ImportCsvText = "username,password";
         viewModel.ExportPreview = "plain export";
         viewModel.GeneratedPassword = "generated-secret";
@@ -63,6 +67,10 @@ public sealed class VaultCredentialTests
         Assert.Empty(viewModel.NoteTreeGroups);
         Assert.NotSame(filteredNotesBeforeLock, viewModel.FilteredNoteItems);
         Assert.NotSame(noteGroupsBeforeLock, viewModel.NoteTreeGroups);
+        Assert.Empty(viewModel.NoteOutlineItems);
+        Assert.Empty(viewModel.NoteReferenceItems);
+        Assert.NotSame(noteOutlineBeforeLock, viewModel.NoteOutlineItems);
+        Assert.NotSame(noteReferencesBeforeLock, viewModel.NoteReferenceItems);
         Assert.Equal("", viewModel.NoteContent);
         Assert.Equal("", viewModel.ImportCsvText);
         Assert.Equal("", viewModel.ExportPreview);

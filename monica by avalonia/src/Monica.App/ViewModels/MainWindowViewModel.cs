@@ -497,6 +497,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         RaiseAllCountState();
         OnPropertyChanged(nameof(SecurityIssueCountText));
+        InvalidateNoteEditorProjections();
         OnPropertyChanged(nameof(NotePreviewMarkdown));
         OnPropertyChanged(nameof(NotePlainPreview));
         OnPropertyChanged(nameof(NoteFormatText));

@@ -254,6 +254,7 @@ public sealed partial class MainWindowViewModel
         _noteTreeGroups = [];
         _favoriteNoteCount = 0;
         _noteTreeProjectionDirty = true;
+        ClearSensitiveNoteEditorProjectionCaches();
         _collapsedPasswordFolderKeys.Clear();
         _expandedPasswordStackKeys.Clear();
     }
