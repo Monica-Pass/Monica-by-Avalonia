@@ -25,7 +25,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(HasNoteReferenceItems));
         OnPropertyChanged(nameof(NoteEditorStatusText));
         MarkSelectedNoteTabDirty();
-        _ = RefreshNoteImagePreviewsAsync(value);
+        QueueNoteImagePreviewRefresh(value);
     }
 
     partial void OnNoteTagsTextChanged(string value) => MarkSelectedNoteTabDirty();

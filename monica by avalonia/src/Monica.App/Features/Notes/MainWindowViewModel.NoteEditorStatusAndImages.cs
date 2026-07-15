@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Avalonia;
 using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Monica.App.Services;
 using Monica.Core.Models;
@@ -11,6 +12,9 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    private static readonly TimeSpan NoteImagePreviewRefreshDelay = TimeSpan.FromMilliseconds(250);
+    private CancellationTokenSource? _noteImagePreviewRefreshCts;
+
     public void UpdateNoteEditorStatus(int caretIndex, int selectionStart, int selectionEnd)
     {
         var text = NoteContent ?? "";
@@ -42,64 +46,160 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    private async Task RefreshNoteImagePreviewsAsync(string content)
+    private void QueueNoteImagePreviewRefresh(string content)
+    {
+        CancelNoteImagePreviewRefresh();
+        if (string.IsNullOrEmpty(content))
+        {
+            Interlocked.Increment(ref _noteImagePreviewVersion);
+            ReplaceNoteImagePreviews([]);
+            return;
+        }
+
+        var ownerId = SelectedNoteTab?.Source?.Id ?? SelectedNote?.Id ?? 0;
+        var dispatcher = Dispatcher.CurrentDispatcher;
+        var cts = new CancellationTokenSource();
+        _noteImagePreviewRefreshCts = cts;
+        _ = RefreshNoteImagePreviewsAfterDelayAsync(content, ownerId, dispatcher, cts);
+    }
+
+    private async Task RefreshNoteImagePreviewsAfterDelayAsync(
+        string content,
+        long ownerId,
+        Dispatcher dispatcher,
+        CancellationTokenSource cts)
+    {
+        try
+        {
+            await Task.Delay(NoteImagePreviewRefreshDelay, cts.Token).ConfigureAwait(false);
+            await RefreshNoteImagePreviewsAsync(
+                content,
+                ownerId,
+                dispatcher,
+                cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            AppDiagnostics.Error("Note image preview refresh failed", exception);
+        }
+        finally
+        {
+            if (ReferenceEquals(_noteImagePreviewRefreshCts, cts))
+            {
+                _noteImagePreviewRefreshCts = null;
+            }
+
+            cts.Dispose();
+        }
+    }
+
+    private void CancelNoteImagePreviewRefresh()
+    {
+        var cts = _noteImagePreviewRefreshCts;
+        if (cts is null)
+        {
+            return;
+        }
+
+        _noteImagePreviewRefreshCts = null;
+        cts.Cancel();
+    }
+
+    private async Task RefreshNoteImagePreviewsAsync(
+        string content,
+        long ownerId,
+        Dispatcher dispatcher,
+        CancellationToken cancellationToken)
     {
         var version = Interlocked.Increment(ref _noteImagePreviewVersion);
+        cancellationToken.ThrowIfCancellationRequested();
         var imagePaths = NoteContentCodec.ExtractInlineImageIds(content)
             .Where(path => !string.IsNullOrWhiteSpace(path))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         if (imagePaths.Length == 0)
         {
-            if (version == _noteImagePreviewVersion)
-            {
-                ReplaceNoteImagePreviews([]);
-            }
-
+            await PublishNoteImagePreviewsAsync(
+                [],
+                version,
+                dispatcher,
+                cancellationToken).ConfigureAwait(false);
             return;
         }
 
         var previews = new List<NoteImagePreviewItem>();
-        foreach (var imagePath in imagePaths)
+        try
         {
-            try
+            foreach (var imagePath in imagePaths)
             {
-                var attachment = CreateNoteImageAttachment(imagePath);
-                var contentBytes = await _repository.TryReadAttachmentContentAsync(attachment);
-                if (contentBytes is null || contentBytes.Length == 0)
+                cancellationToken.ThrowIfCancellationRequested();
+                try
                 {
-                    continue;
+                    var attachment = CreateNoteImageAttachment(imagePath, ownerId);
+                    var contentBytes = await _repository.TryReadAttachmentContentAsync(
+                        attachment,
+                        cancellationToken).ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (contentBytes is null || contentBytes.Length == 0)
+                    {
+                        continue;
+                    }
+
+                    using var stream = new MemoryStream(contentBytes);
+                    previews.Add(new NoteImagePreviewItem(
+                        imagePath,
+                        BuildNoteImagePreviewName(imagePath, previews.Count + 1),
+                        FormatByteSize(contentBytes.LongLength),
+                        new Bitmap(stream)));
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    AppDiagnostics.Error($"Note image preview failed for {imagePath}", ex);
+                }
+            }
 
-                using var stream = new MemoryStream(contentBytes);
-                previews.Add(new NoteImagePreviewItem(
-                    imagePath,
-                    BuildNoteImagePreviewName(imagePath, previews.Count + 1),
-                    FormatByteSize(contentBytes.LongLength),
-                    new Bitmap(stream)));
-            }
-            catch (Exception ex)
-            {
-                AppDiagnostics.Error($"Note image preview failed for {imagePath}", ex);
-            }
+            await PublishNoteImagePreviewsAsync(
+                previews,
+                version,
+                dispatcher,
+                cancellationToken).ConfigureAwait(false);
         }
-
-        if (version == _noteImagePreviewVersion)
+        catch (OperationCanceledException)
         {
-            ReplaceNoteImagePreviews(previews);
-        }
-        else
-        {
-            foreach (var preview in previews)
-            {
-                preview.Image.Dispose();
-            }
+            DisposeNoteImagePreviews(previews);
+            throw;
         }
     }
 
-    private Attachment CreateNoteImageAttachment(string imagePath)
+    private async Task PublishNoteImagePreviewsAsync(
+        IReadOnlyList<NoteImagePreviewItem> previews,
+        int version,
+        Dispatcher dispatcher,
+        CancellationToken cancellationToken)
     {
-        var ownerId = SelectedNoteTab?.Source?.Id ?? SelectedNote?.Id ?? 0;
+        await dispatcher.InvokeAsync(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (version == _noteImagePreviewVersion)
+            {
+                ReplaceNoteImagePreviews(previews);
+            }
+            else
+            {
+                DisposeNoteImagePreviews(previews);
+            }
+        });
+    }
+
+    private Attachment CreateNoteImageAttachment(string imagePath, long ownerId)
+    {
         return new Attachment
         {
             OwnerType = "SECURE_ITEM",
@@ -114,14 +214,19 @@ public sealed partial class MainWindowViewModel
 
     private void ReplaceNoteImagePreviews(IReadOnlyList<NoteImagePreviewItem> previews)
     {
-        foreach (var preview in NoteImagePreviewItems)
-        {
-            preview.Image.Dispose();
-        }
+        DisposeNoteImagePreviews(NoteImagePreviewItems);
 
         ReplaceItems(NoteImagePreviewItems, previews);
         OnPropertyChanged(nameof(NoteImagePreviewCount));
         OnPropertyChanged(nameof(HasNoteImagePreviewItems));
+    }
+
+    private static void DisposeNoteImagePreviews(IEnumerable<NoteImagePreviewItem> previews)
+    {
+        foreach (var preview in previews)
+        {
+            preview.Image.Dispose();
+        }
     }
 
     private string BuildNoteImagePreviewName(string imagePath, int fallbackIndex)

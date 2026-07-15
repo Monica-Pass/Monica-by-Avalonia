@@ -108,6 +108,7 @@ public sealed partial class MainWindowViewModel
         CancelSensitiveBackgroundWork();
         ClearVaultCollections();
         ClearEditorAndTransferBuffers();
+        CancelNoteImagePreviewRefresh();
         ClearCredentialForms();
         ClearSensitiveCaches();
     }
@@ -120,6 +121,7 @@ public sealed partial class MainWindowViewModel
         _selectedPasswordDetailsCts?.Cancel();
         _selectedPasswordDetailsCts?.Dispose();
         _selectedPasswordDetailsCts = null;
+        CancelNoteImagePreviewRefresh();
     }
 
     private void ClearVaultCollections()
@@ -134,7 +136,7 @@ public sealed partial class MainWindowViewModel
         ClearItems(WalletItems);
         ClearItems(Categories);
         ClearItems(OpenNoteTabs);
-        ClearItems(NoteImagePreviewItems);
+        ReplaceNoteImagePreviews([]);
         ClearItems(GeneratedPasswordHistory);
         ClearItems(TimelineEntries);
         ClearItems(SecuritySummaryItems);

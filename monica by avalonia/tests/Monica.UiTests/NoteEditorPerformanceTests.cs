@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.App.ViewModels;
+using Monica.Data.Repositories;
 
 namespace Monica.UiTests;
 
@@ -97,5 +99,102 @@ public sealed class NoteEditorPerformanceTests
         Assert.Equal(2, viewModel.NotePreviewProjectionBuildCount);
         Assert.Same(outlineItems, viewModel.NoteOutlineItems);
         Assert.Same(referenceItems, viewModel.NoteReferenceItems);
+    }
+
+    [Fact]
+    public void Note_image_preview_refresh_debounces_rapid_content_changes()
+    {
+        var repository = DispatchProxy.Create<IMonicaRepository, AttachmentReadRepositoryProxy>();
+        var probe = (AttachmentReadRepositoryProxy)(object)repository;
+        probe.BlockReads = true;
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window, overrides =>
+            overrides.AddSingleton(repository));
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+
+        for (var index = 0; index < 10; index++)
+        {
+            viewModel.NoteContent = $"Edit {index}\n\n![](monica-image://preview.png)";
+        }
+
+        Assert.Equal(0, probe.ReadCount);
+        Assert.True(
+            probe.FirstReadStarted.Wait(TimeSpan.FromSeconds(2)),
+            "The final image preview read did not start.");
+        Thread.Sleep(350);
+        Assert.Equal(1, probe.ReadCount);
+        viewModel.NoteContent = "";
+        Assert.True(
+            probe.ReadCancellationObserved.Wait(TimeSpan.FromSeconds(2)),
+            "The final image preview read did not observe cancellation.");
+    }
+
+    [Fact]
+    public void Note_image_preview_refresh_is_cancelled_when_vault_locks()
+    {
+        var repository = DispatchProxy.Create<IMonicaRepository, AttachmentReadRepositoryProxy>();
+        var probe = (AttachmentReadRepositoryProxy)(object)repository;
+        probe.BlockReads = true;
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window, overrides =>
+            overrides.AddSingleton(repository));
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        viewModel.IsUnlocked = true;
+        viewModel.NoteContent = "Private\n\n![](monica-image://private.png)";
+        Assert.True(
+            probe.FirstReadStarted.Wait(TimeSpan.FromSeconds(2)),
+            "The blocking image preview read did not start.");
+
+        viewModel.LockCommand.Execute(null);
+
+        Assert.True(
+            probe.ReadCancellationObserved.Wait(TimeSpan.FromSeconds(2)),
+            "The active image preview read did not observe cancellation.");
+        Assert.Empty(viewModel.NoteImagePreviewItems);
+    }
+
+    public class AttachmentReadRepositoryProxy : DispatchProxy
+    {
+        private int _readCount;
+
+        public bool BlockReads { get; set; }
+        public int ReadCount => Volatile.Read(ref _readCount);
+        public ManualResetEventSlim FirstReadStarted { get; } = new();
+        public ManualResetEventSlim ReadCancellationObserved { get; } = new();
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            ArgumentNullException.ThrowIfNull(targetMethod);
+            if (targetMethod.Name != nameof(IMonicaRepository.TryReadAttachmentContentAsync))
+            {
+                throw new NotSupportedException($"Unexpected repository call: {targetMethod.Name}");
+            }
+
+            Interlocked.Increment(ref _readCount);
+            FirstReadStarted.Set();
+            if (!BlockReads)
+            {
+                return Task.FromResult<byte[]?>(null);
+            }
+
+            var cancellationToken = args is { Length: > 1 } && args[1] is CancellationToken token
+                ? token
+                : CancellationToken.None;
+            return WaitForCancellationAsync(cancellationToken);
+        }
+
+        private async Task<byte[]?> WaitForCancellationAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return null;
+            }
+            catch (OperationCanceledException)
+            {
+                ReadCancellationObserved.Set();
+                throw;
+            }
+        }
     }
 }
