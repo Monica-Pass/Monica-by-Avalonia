@@ -35,12 +35,12 @@ public sealed class BackgroundMemoryUiTests
             window.DataContext = viewModel;
             viewModel.IsUnlocked = true;
             viewModel.NoteContent = "Unsaved background draft";
-            Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
+            Dispatcher.UIThread.RunJobs();
 
             foreach (var section in new[] { "Notes", "Totp", "Cards" })
             {
                 viewModel.SelectSectionCommand.Execute(section);
-                Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
+                Dispatcher.UIThread.RunJobs();
             }
 
             VaultEditorDialogWarmup.EnsurePasswordWarmed();
@@ -68,7 +68,7 @@ public sealed class BackgroundMemoryUiTests
             Assert.Equal("Unsaved background draft", viewModel.NoteContent);
 
             window.WindowState = WindowState.Normal;
-            Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
+            Dispatcher.UIThread.RunJobs();
 
             Assert.Same(viewModel, shellHost.Content);
             var restoredHost = Assert.Single(window.GetVisualDescendants().OfType<WorkspaceHostView>());
@@ -107,7 +107,7 @@ public sealed class BackgroundMemoryUiTests
         {
             window.DataContext = viewModel;
             viewModel.IsUnlocked = true;
-            Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
+            Dispatcher.UIThread.RunJobs();
 
             window.WindowState = WindowState.Minimized;
             Dispatcher.UIThread.RunJobs();
@@ -128,7 +128,7 @@ public sealed class BackgroundMemoryUiTests
             Assert.StartsWith("# Unsaved memory draft", viewModel.NoteContent, StringComparison.Ordinal);
 
             window.WindowState = WindowState.Normal;
-            Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
+            Dispatcher.UIThread.RunJobs();
 
             Assert.True(viewModel.FilteredPasswordsProjectionBuildCount > initialBuilds.Passwords);
             Assert.Equal(initialBuilds.Totp, viewModel.FilteredTotpProjectionBuildCount);

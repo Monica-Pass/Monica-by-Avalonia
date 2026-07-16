@@ -28,15 +28,6 @@ public partial class MainWindow
     private GeneratorWorkspaceView GeneratorWorkspaceView =>
         WorkspaceHost.GetOrCreate<GeneratorWorkspaceView>("Generator");
 
-    private void WorkspaceHost_OnSizeChanged(object? sender, SizeChangedEventArgs e)
-    {
-        if (DataContext is MainWindowViewModel viewModel)
-        {
-            viewModel.OtherWorkspaceViewportWidth = e.NewSize.Width;
-            viewModel.OtherWorkspaceViewportHeight = e.NewSize.Height;
-        }
-    }
-
     private void UpdateWorkspaceActivation(MainWindowViewModel? viewModel)
     {
         var activationVersion = ++_workspaceActivationVersion;

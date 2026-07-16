@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using FluentAvalonia.UI.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.App.Controls;
 using Monica.App.Features.Archive;
@@ -88,6 +89,16 @@ public sealed class UiArchitectureTests
             var workspaceHost = Assert.Single(window.GetVisualDescendants().OfType<WorkspaceHostView>());
             Assert.IsType<PasswordVaultView>(workspaceHost.CurrentWorkspace);
             Assert.Equal(["Passwords"], workspaceHost.CreatedSections);
+
+            var navigation = Assert.Single(window.GetVisualDescendants().OfType<FANavigationView>());
+            var notesItem = navigation.MenuItems
+                .OfType<FANavigationViewItem>()
+                .Single(item => string.Equals(item.Tag?.ToString(), "Notes", StringComparison.Ordinal));
+            navigation.SelectedItem = notesItem;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal("Notes", viewModel.SelectedSection);
+            Assert.IsType<NoteWorkspaceView>(workspaceHost.CurrentWorkspace);
 
             viewModel.IsUnlocked = false;
             Dispatcher.UIThread.RunJobs();

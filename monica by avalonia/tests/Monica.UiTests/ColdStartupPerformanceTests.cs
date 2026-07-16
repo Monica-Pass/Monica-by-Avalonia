@@ -6,6 +6,7 @@ using Monica.App.Controls;
 using Monica.App.Features;
 using Monica.App.Features.Authenticator;
 using Monica.App.Features.Passwords;
+using Monica.App.Features.Unlock;
 using Monica.App.Features.Wallet;
 using Monica.App.ViewModels;
 
@@ -14,6 +15,118 @@ namespace Monica.UiTests;
 [Collection(AvaloniaUiTestCollection.Name)]
 public sealed class ColdStartupPerformanceTests(ITestOutputHelper output)
 {
+    [Fact]
+    public void Cold_unlocked_shell_view_constructor_reports_first_use_cost()
+    {
+        AvaloniaUiThreadTestContext.VerifyAccess();
+
+        var phase = Stopwatch.StartNew();
+        var shell = new UnlockedShellView();
+        phase.Stop();
+
+        output.WriteLine($"unlockedShellView={phase.Elapsed.TotalMilliseconds:F3} ms");
+        Assert.NotNull(shell);
+        Assert.True(
+            phase.ElapsedMilliseconds < 700,
+            $"Cold unlocked shell view construction took {phase.Elapsed.TotalMilliseconds:F3} ms.");
+    }
+
+    [Fact]
+    public void Cold_unlock_view_constructor_reports_first_use_cost()
+    {
+        AvaloniaUiThreadTestContext.VerifyAccess();
+
+        var phase = Stopwatch.StartNew();
+        var unlock = new UnlockView();
+        phase.Stop();
+
+        output.WriteLine($"unlockView={phase.Elapsed.TotalMilliseconds:F3} ms");
+        Assert.NotNull(unlock);
+        Assert.True(
+            phase.ElapsedMilliseconds < 700,
+            $"Cold unlock view construction took {phase.Elapsed.TotalMilliseconds:F3} ms.");
+    }
+
+    [Fact]
+    public void Cold_password_vault_constructor_reports_first_use_cost()
+    {
+        AvaloniaUiThreadTestContext.VerifyAccess();
+
+        var phase = Stopwatch.StartNew();
+        var vault = new PasswordVaultView();
+        phase.Stop();
+
+        output.WriteLine($"passwordVaultView={phase.Elapsed.TotalMilliseconds:F3} ms");
+        Assert.NotNull(vault);
+        Assert.True(
+            phase.ElapsedMilliseconds < 700,
+            $"Cold Password Vault view construction took {phase.Elapsed.TotalMilliseconds:F3} ms.");
+    }
+
+    [Fact]
+    public void Cold_password_list_constructor_reports_first_use_cost()
+    {
+        AvaloniaUiThreadTestContext.VerifyAccess();
+
+        var phase = Stopwatch.StartNew();
+        var list = new PasswordListPaneView();
+        phase.Stop();
+
+        output.WriteLine($"passwordListPaneView={phase.Elapsed.TotalMilliseconds:F3} ms");
+        Assert.NotNull(list);
+        Assert.True(
+            phase.ElapsedMilliseconds < 700,
+            $"Cold Password list view construction took {phase.Elapsed.TotalMilliseconds:F3} ms.");
+    }
+
+    [Fact]
+    public void Cold_password_detail_constructor_reports_first_use_cost()
+    {
+        AvaloniaUiThreadTestContext.VerifyAccess();
+
+        var phase = Stopwatch.StartNew();
+        var detail = new PasswordDetailPaneView();
+        phase.Stop();
+
+        output.WriteLine($"passwordDetailPaneView={phase.Elapsed.TotalMilliseconds:F3} ms");
+        Assert.NotNull(detail);
+        Assert.True(
+            phase.ElapsedMilliseconds < 700,
+            $"Cold Password detail view construction took {phase.Elapsed.TotalMilliseconds:F3} ms.");
+    }
+
+    [Fact]
+    public void Cold_password_toolbar_constructor_reports_first_use_cost()
+    {
+        AvaloniaUiThreadTestContext.VerifyAccess();
+
+        var phase = Stopwatch.StartNew();
+        var toolbar = new PasswordVaultToolbarView();
+        phase.Stop();
+
+        output.WriteLine($"passwordToolbarView={phase.Elapsed.TotalMilliseconds:F3} ms");
+        Assert.NotNull(toolbar);
+        Assert.True(
+            phase.ElapsedMilliseconds < 700,
+            $"Cold Password toolbar view construction took {phase.Elapsed.TotalMilliseconds:F3} ms.");
+    }
+
+    [Fact]
+    public void Cold_password_folder_filter_constructor_reports_first_use_cost()
+    {
+        AvaloniaUiThreadTestContext.VerifyAccess();
+
+        var phase = Stopwatch.StartNew();
+        var filters = new PasswordFolderFilterView();
+        phase.Stop();
+
+        output.WriteLine($"passwordFolderFilterView={phase.Elapsed.TotalMilliseconds:F3} ms");
+        Assert.NotNull(filters);
+        Assert.True(
+            phase.ElapsedMilliseconds < 700,
+            $"Cold Password folder filter view construction took {phase.Elapsed.TotalMilliseconds:F3} ms.");
+    }
+
     [Fact]
     public void Cold_locked_shell_composition_reports_each_phase_and_stays_within_budget()
     {
@@ -144,26 +257,39 @@ public sealed class ColdStartupPerformanceTests(ITestOutputHelper output)
             phase.Stop();
             var firstFrameDispatcherMilliseconds = phase.Elapsed.TotalMilliseconds;
 
-            var host = Assert.Single(window.GetVisualDescendants().OfType<WorkspaceHostView>());
-            Assert.Null(host.CurrentWorkspace);
+            Assert.DoesNotContain(window.GetVisualDescendants(), control => control is WorkspaceHostView);
             phase.Restart();
             Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
+            phase.Stop();
+
+            var host = Assert.Single(window.GetVisualDescendants().OfType<WorkspaceHostView>());
+            var deferredShellMilliseconds = phase.Elapsed.TotalMilliseconds;
+            Assert.NotNull(host.CurrentWorkspace);
+            Assert.IsNotType<PasswordVaultView>(host.CurrentWorkspace);
+
+            phase.Restart();
+            Dispatcher.UIThread.RunJobs(DispatcherPriority.ContextIdle);
             phase.Stop();
             var deferredWorkspaceMilliseconds = phase.Elapsed.TotalMilliseconds;
 
             output.WriteLine(
                 $"workspaceHostActive={host.IsActive}, section={host.Section}, created={host.CreatedSections.Count}");
             Assert.IsType<PasswordVaultView>(host.CurrentWorkspace);
-            var totalMilliseconds = propertyMilliseconds + firstFrameDispatcherMilliseconds + deferredWorkspaceMilliseconds;
+            var totalMilliseconds = propertyMilliseconds + firstFrameDispatcherMilliseconds +
+                deferredShellMilliseconds + deferredWorkspaceMilliseconds;
             output.WriteLine(
                 $"unlockedShellProperty={propertyMilliseconds:F3} ms, " +
                 $"unlockedShellFirstFrame={firstFrameDispatcherMilliseconds:F3} ms, " +
+                $"unlockedShellDeferredShell={deferredShellMilliseconds:F3} ms, " +
                 $"unlockedShellDeferredWorkspace={deferredWorkspaceMilliseconds:F3} ms, " +
                 $"unlockedShellMaterialization={totalMilliseconds:F3} ms");
             Assert.True(
                 propertyMilliseconds + firstFrameDispatcherMilliseconds < 700,
                 $"Unlocked navigation shell first frame took " +
                 $"{propertyMilliseconds + firstFrameDispatcherMilliseconds:F3} ms.");
+            Assert.True(
+                deferredShellMilliseconds < 600,
+                $"Deferred navigation shell materialization took {deferredShellMilliseconds:F3} ms.");
             Assert.True(
                 deferredWorkspaceMilliseconds < 600,
                 $"Deferred password workspace materialization took {deferredWorkspaceMilliseconds:F3} ms.");

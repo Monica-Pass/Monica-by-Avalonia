@@ -51,12 +51,15 @@ public sealed class UiPerformanceTests
     public void Performance_budget_workspace_host_creates_once_and_reuses_instances()
     {
         var host = new WorkspaceHostView { IsActive = true, Section = "Passwords" };
+        Dispatcher.UIThread.RunJobs(DispatcherPriority.ContextIdle);
         var passwordView = Assert.IsType<PasswordVaultView>(host.CurrentWorkspace);
 
         host.Section = "Notes";
+        Dispatcher.UIThread.RunJobs(DispatcherPriority.ContextIdle);
         Assert.IsType<NoteWorkspaceView>(host.CurrentWorkspace);
 
         host.Section = "Passwords";
+        Dispatcher.UIThread.RunJobs(DispatcherPriority.ContextIdle);
         Assert.Same(passwordView, host.CurrentWorkspace);
         Assert.Equal(["Passwords", "Notes"], host.CreatedSections);
 
@@ -65,6 +68,7 @@ public sealed class UiPerformanceTests
         Assert.Empty(host.CreatedSections);
 
         host.IsActive = true;
+        Dispatcher.UIThread.RunJobs(DispatcherPriority.ContextIdle);
         Assert.IsType<PasswordVaultView>(host.CurrentWorkspace);
         Assert.NotSame(passwordView, host.CurrentWorkspace);
     }
