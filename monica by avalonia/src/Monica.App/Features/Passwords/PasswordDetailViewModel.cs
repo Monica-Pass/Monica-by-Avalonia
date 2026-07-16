@@ -10,7 +10,7 @@ namespace Monica.App.ViewModels;
 public sealed partial class PasswordDetailViewModel : ObservableObject, IDisposable
 {
     private readonly IClipboardService _clipboardService;
-    private Func<PasswordEntry, Task>? _addAttachment;
+    private Func<PasswordEntry, Task<PasswordAttachmentAddResult>>? _addAttachment;
     private Func<Attachment, Task<PasswordAttachmentSaveResult>>? _saveAttachment;
     private Func<Attachment, Task<bool>>? _deleteAttachment;
     private Func<PasswordHistoryEntry, Task<bool>>? _deletePasswordHistory;
@@ -28,7 +28,7 @@ public sealed partial class PasswordDetailViewModel : ObservableObject, IDisposa
         IReadOnlyList<Attachment> attachments,
         IReadOnlyList<CustomField> customFields,
         IReadOnlyList<PasswordHistoryDisplayItem>? passwordHistory = null,
-        Func<PasswordEntry, Task>? addAttachment = null,
+        Func<PasswordEntry, Task<PasswordAttachmentAddResult>>? addAttachment = null,
         Func<Attachment, Task<PasswordAttachmentSaveResult>>? saveAttachment = null,
         Func<Attachment, Task<bool>>? deleteAttachment = null,
         Func<PasswordHistoryEntry, Task<bool>>? deletePasswordHistory = null,
@@ -80,6 +80,7 @@ public sealed partial class PasswordDetailViewModel : ObservableObject, IDisposa
     public string Subtitle { get; private set; }
     public string Initial { get; private set; }
     public string CopyLabel => L.Get("Copy");
+    public string AddAttachmentActionLabel => L.Get(IsAddingAttachment ? "AddingAttachment" : "AddAttachment");
     public string SaveAttachmentLabel => L.Get("SaveAttachment");
     public string DeleteLabel => L.Get("Delete");
     public string PasswordHistoryTitle => L.Get("PasswordHistory");
@@ -95,6 +96,13 @@ public sealed partial class PasswordDetailViewModel : ObservableObject, IDisposa
 
     [ObservableProperty]
     private string _statusText = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AddAttachmentActionLabel))]
+    private bool _isAddingAttachment;
+
+    partial void OnIsAddingAttachmentChanged(bool value) =>
+        AddAttachmentCommand.NotifyCanExecuteChanged();
 
     public void SetPasswordHistory(IReadOnlyList<PasswordHistoryDisplayItem> passwordHistory)
     {
@@ -138,6 +146,7 @@ public sealed partial class PasswordDetailViewModel : ObservableObject, IDisposa
         Initial = "";
         StatusText = "";
         _addAttachment = null;
+        IsAddingAttachment = false;
         _saveAttachment = null;
         _deleteAttachment = null;
         _deletePasswordHistory = null;
@@ -149,6 +158,7 @@ public sealed partial class PasswordDetailViewModel : ObservableObject, IDisposa
         OnPropertyChanged(nameof(Initial));
         OnPropertyChanged(nameof(IsSensitiveStateCleared));
         OnPropertyChanged(nameof(HasAttachments));
+        AddAttachmentCommand.NotifyCanExecuteChanged();
     }
 
     public void Dispose() => ClearSensitiveState();

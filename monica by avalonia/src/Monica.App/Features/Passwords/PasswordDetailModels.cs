@@ -4,6 +4,20 @@ using Monica.Core.Models;
 
 namespace Monica.App.ViewModels;
 
+public enum PasswordAttachmentAddOutcome
+{
+    Added,
+    Cancelled,
+    VaultLocked,
+    TooLarge,
+    Failed
+}
+
+public readonly record struct PasswordAttachmentAddResult(
+    PasswordAttachmentAddOutcome Outcome,
+    Attachment? Attachment = null,
+    string StatusText = "");
+
 public enum PasswordAttachmentSaveOutcome
 {
     Saved,

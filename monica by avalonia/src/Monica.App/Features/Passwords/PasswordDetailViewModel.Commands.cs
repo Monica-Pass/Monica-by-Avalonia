@@ -27,16 +27,56 @@ public sealed partial class PasswordDetailViewModel
         field.IsVisible = !field.IsVisible;
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanAddAttachment))]
     private async Task AddAttachmentAsync()
     {
-        if (IsSensitiveStateCleared || _addAttachment is null)
+        if (!CanAddAttachment())
         {
             return;
         }
 
-        await _addAttachment(Entry);
-        StatusText = L.Get("AttachmentAddedRefreshDetails");
+        IsAddingAttachment = true;
+        try
+        {
+            var result = await _addAttachment!(Entry);
+            if (IsSensitiveStateCleared)
+            {
+                return;
+            }
+
+            if (result.Outcome == PasswordAttachmentAddOutcome.Added && result.Attachment is not null)
+            {
+                InsertAttachmentIfMissing(result.Attachment);
+            }
+
+            if (!string.IsNullOrWhiteSpace(result.StatusText))
+            {
+                StatusText = result.StatusText;
+            }
+        }
+        finally
+        {
+            IsAddingAttachment = false;
+        }
+    }
+
+    private bool CanAddAttachment() =>
+        !IsSensitiveStateCleared && !IsAddingAttachment && _addAttachment is not null;
+
+    private void InsertAttachmentIfMissing(Monica.Core.Models.Attachment attachment)
+    {
+        var alreadyPresent = Attachments.Any(item =>
+            attachment.Id > 0 && item.Attachment.Id == attachment.Id ||
+            attachment.Id <= 0 &&
+            string.Equals(item.Attachment.StoragePath, attachment.StoragePath, StringComparison.Ordinal) &&
+            string.Equals(item.FileName, attachment.FileName, StringComparison.Ordinal));
+        if (alreadyPresent)
+        {
+            return;
+        }
+
+        Attachments.Insert(0, new PasswordAttachmentItem(L, attachment));
+        OnPropertyChanged(nameof(HasAttachments));
     }
 
     [RelayCommand]

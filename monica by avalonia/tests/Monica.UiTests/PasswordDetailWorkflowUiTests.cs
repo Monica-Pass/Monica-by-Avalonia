@@ -23,8 +23,12 @@ public sealed class PasswordDetailWorkflowUiTests
             "AutomationProperties.Name=\"{Binding ClearPasswordHistoryLabel}\"",
             xaml,
             StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"PasswordAttachmentAddButton\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"PasswordAttachmentAddProgress\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("IsEnabled=\"{Binding !IsAddingAttachment}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding IsAddingAttachment}\"", xaml, StringComparison.Ordinal);
         Assert.Contains(
-            "AutomationProperties.Name=\"{Binding L.AddAttachment}\"",
+            "AutomationProperties.Name=\"{Binding AddAttachmentActionLabel}\"",
             xaml,
             StringComparison.Ordinal);
         Assert.Contains("x:Name=\"PasswordAttachmentSaveButton\"", xaml, StringComparison.Ordinal);

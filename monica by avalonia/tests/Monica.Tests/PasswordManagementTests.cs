@@ -3396,12 +3396,16 @@ public sealed partial class PasswordManagementTests
         Assert.False(harness.ViewModel.Passwords.Single().HasAttachments);
         Assert.Equal(harness.ViewModel.L.Format("DeletedAttachmentFormat", "old.txt"), harness.ViewModel.StatusMessage);
 
-        await harness.ViewModel.AddPasswordAttachmentCommand.ExecuteAsync(harness.ViewModel.Passwords.Single());
+        await details.AddAttachmentCommand.ExecuteAsync(null);
         var added = Assert.Single(await harness.Repository.GetAttachmentsAsync("PASSWORD", entry.Id));
         Assert.Equal("picked.txt", added.FileName);
         Assert.Equal("secure_attachments/picked.enc", added.StoragePath);
         Assert.Equal(1, harness.Attachments.BridgeWriteCount);
         Assert.True(harness.ViewModel.Passwords.Single().HasAttachments);
+        Assert.Equal("picked.txt", Assert.Single(details.Attachments).FileName);
+        Assert.Equal(harness.ViewModel.L.Format("AddedAttachmentFormat", "picked.txt", "GitHub"), details.StatusText);
+        Assert.NotNull(harness.Attachments.LastPickedContent);
+        Assert.All(harness.Attachments.LastPickedContent!, value => Assert.Equal(0, value));
     }
 
     [Fact]
@@ -3423,6 +3427,8 @@ public sealed partial class PasswordManagementTests
         Assert.Equal(0, harness.Attachments.BridgeWriteCount);
         Assert.StartsWith("mdbx:", added.StoragePath, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("picked attachment"u8.ToArray(), embedded!.SavedContent);
+        Assert.NotNull(harness.Attachments.LastPickedContent);
+        Assert.All(harness.Attachments.LastPickedContent!, value => Assert.Equal(0, value));
     }
 
     [Fact]
@@ -3443,6 +3449,61 @@ public sealed partial class PasswordManagementTests
         Assert.Equal(
             harness.ViewModel.L.Format("AttachmentTooLargeFormat", "257 MB", "256 MB"),
             harness.ViewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task Password_detail_attachment_picker_cancel_does_not_report_success()
+    {
+        var harness = CreateHarness();
+        var entry = new PasswordEntry { Title = "GitHub", Username = "dev", Password = "one" };
+        await harness.Repository.SavePasswordAsync(entry);
+        await harness.ViewModel.LoadAsync();
+        harness.Attachments.CancelPick = true;
+
+        await harness.ViewModel.ShowPasswordDetailsCommand.ExecuteAsync(harness.ViewModel.Passwords.Single());
+        var details = Assert.IsType<PasswordDetailViewModel>(harness.DetailDialog.LastDetails);
+        await details.AddAttachmentCommand.ExecuteAsync(null);
+
+        Assert.Empty(details.Attachments);
+        Assert.Empty(await harness.Repository.GetAttachmentsAsync("PASSWORD", entry.Id));
+        Assert.Empty(details.StatusText);
+    }
+
+    [Fact]
+    public async Task Password_attachment_picker_stops_at_lock_boundary_and_zeroes_plaintext()
+    {
+        var harness = CreateHarness();
+        var entry = new PasswordEntry { Title = "GitHub", Username = "dev", Password = "one" };
+        await harness.Repository.SavePasswordAsync(entry);
+        await harness.ViewModel.LoadAsync();
+        harness.ViewModel.IsUnlocked = true;
+        harness.Attachments.OnPick = () => harness.ViewModel.IsUnlocked = false;
+
+        await harness.ViewModel.AddPasswordAttachmentCommand.ExecuteAsync(harness.ViewModel.Passwords.Single());
+
+        Assert.Empty(await harness.Repository.GetAttachmentsAsync("PASSWORD", entry.Id));
+        Assert.Equal(0, harness.Attachments.BridgeWriteCount);
+        Assert.NotNull(harness.Attachments.LastPickedContent);
+        Assert.All(harness.Attachments.LastPickedContent!, value => Assert.Equal(0, value));
+        Assert.Equal(harness.ViewModel.L.Get("VaultLocked"), harness.ViewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task Password_attachment_add_failure_removes_staged_file_and_zeroes_plaintext()
+    {
+        var harness = CreateHarness(repositoryDecorator: FailingAttachmentSaveRepositoryProxy.Create);
+        var entry = new PasswordEntry { Title = "GitHub", Username = "dev", Password = "one" };
+        await harness.Repository.SavePasswordAsync(entry);
+        await harness.ViewModel.LoadAsync();
+
+        await harness.ViewModel.AddPasswordAttachmentCommand.ExecuteAsync(harness.ViewModel.Passwords.Single());
+
+        Assert.Empty(await harness.Repository.GetAttachmentsAsync("PASSWORD", entry.Id));
+        Assert.Equal(1, harness.Attachments.BridgeWriteCount);
+        Assert.Null(harness.Attachments.TryRead("secure_attachments/picked.enc"));
+        Assert.NotNull(harness.Attachments.LastPickedContent);
+        Assert.All(harness.Attachments.LastPickedContent!, value => Assert.Equal(0, value));
+        Assert.Equal(harness.ViewModel.L.Get("AttachmentAddFailed"), harness.ViewModel.StatusMessage);
     }
 
     [Fact]
@@ -4676,6 +4737,9 @@ public sealed partial class PasswordManagementTests
         private int _nextAttachmentId;
         public int BridgeWriteCount { get; private set; }
         public int ReadCount { get; private set; }
+        public bool CancelPick { get; set; }
+        public Action? OnPick { get; set; }
+        public byte[]? LastPickedContent { get; private set; }
 
         public void Put(string storagePath, byte[] content)
         {
@@ -4696,7 +4760,14 @@ public sealed partial class PasswordManagementTests
                 return Task.FromException<PasswordAttachmentFileDraft?>(PickFailure);
             }
 
+            if (CancelPick)
+            {
+                return Task.FromResult<PasswordAttachmentFileDraft?>(null);
+            }
+
             var content = "picked attachment"u8.ToArray();
+            LastPickedContent = content;
+            OnPick?.Invoke();
             return Task.FromResult<PasswordAttachmentFileDraft?>(new PasswordAttachmentFileDraft(
                 "picked.txt",
                 "",
@@ -4822,6 +4893,30 @@ public sealed partial class PasswordManagementTests
             {
                 SavedContent = content.ToArray();
                 attachment.StoragePath = $"mdbx:{Guid.NewGuid():N}";
+            }
+
+            return targetMethod?.Invoke(_inner, args);
+        }
+    }
+
+    private class FailingAttachmentSaveRepositoryProxy : DispatchProxy
+    {
+        private IMonicaRepository _inner = null!;
+
+        public static IMonicaRepository Create(IMonicaRepository inner)
+        {
+            var repository = DispatchProxy.Create<IMonicaRepository, FailingAttachmentSaveRepositoryProxy>();
+            ((FailingAttachmentSaveRepositoryProxy)(object)repository)._inner = inner;
+            return repository;
+        }
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod?.Name == nameof(IMonicaRepository.SaveAttachmentAsync) &&
+                args is { Length: >= 2 } &&
+                args[1] is byte[])
+            {
+                return Task.FromException<long>(new IOException("Simulated attachment metadata failure"));
             }
 
             return targetMethod?.Invoke(_inner, args);
@@ -5156,7 +5251,7 @@ public sealed partial class PasswordManagementTests
             IReadOnlyList<Attachment> attachments,
             IReadOnlyList<CustomField> customFields,
             IReadOnlyList<PasswordHistoryDisplayItem> passwordHistory,
-            Func<PasswordEntry, Task>? addAttachment,
+            Func<PasswordEntry, Task<PasswordAttachmentAddResult>>? addAttachment,
             Func<Attachment, Task<PasswordAttachmentSaveResult>>? saveAttachment,
             Func<Attachment, Task<bool>>? deleteAttachment,
             Func<PasswordHistoryEntry, Task<bool>>? deletePasswordHistory,

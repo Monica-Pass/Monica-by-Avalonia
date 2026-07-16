@@ -274,7 +274,7 @@ public sealed class SecureNoteTests
             IReadOnlyList<Attachment> attachments,
             IReadOnlyList<CustomField> customFields,
             IReadOnlyList<PasswordHistoryDisplayItem> passwordHistory,
-            Func<PasswordEntry, Task>? addAttachment,
+            Func<PasswordEntry, Task<PasswordAttachmentAddResult>>? addAttachment,
             Func<Attachment, Task<PasswordAttachmentSaveResult>>? saveAttachment,
             Func<Attachment, Task<bool>>? deleteAttachment,
             Func<PasswordHistoryEntry, Task<bool>>? deletePasswordHistory,

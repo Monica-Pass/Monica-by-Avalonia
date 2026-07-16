@@ -39,7 +39,7 @@ public sealed partial class MainWindowViewModel
             attachments,
             customFields,
             history,
-            AddPasswordAttachmentAsync,
+            TryAddPasswordAttachmentAsync,
             SavePasswordAttachmentAsync,
             DeletePasswordAttachmentAsync,
             DeletePasswordHistoryAsync,
