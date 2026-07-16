@@ -1,3 +1,4 @@
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Monica.App.Features.Unlock;
@@ -29,6 +30,9 @@ public sealed class VaultAccessUiTests
         Assert.NotNull(view.FindControl<TextBlock>("CreateVaultPasswordLengthStatusText"));
         Assert.NotNull(view.FindControl<TextBlock>("CreateVaultPasswordConfirmationStatusText"));
         Assert.NotNull(view.FindControl<ProgressBar>("UnlockProgress"));
+        var feedback = view.FindControl<TextBlock>("VaultAccessFeedbackText");
+        Assert.NotNull(feedback);
+        Assert.Equal(AutomationLiveSetting.Assertive, AutomationProperties.GetLiveSetting(feedback));
 
         var submit = view.FindControl<Button>("UnlockButton");
         Assert.NotNull(submit);

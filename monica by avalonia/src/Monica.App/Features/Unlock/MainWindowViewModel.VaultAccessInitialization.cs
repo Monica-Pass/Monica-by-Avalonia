@@ -49,7 +49,8 @@ public sealed partial class MainWindowViewModel
         {
             AppDiagnostics.Error("Initialize failed", ex);
             IsVaultInitialized = DefaultVaultDatabaseExists();
-            SetUnlockError(_localization.Format("VaultMetadataLoadFailedFormat", ex.Message));
+            ClearVaultAccessSecrets();
+            SetUnlockError(_localization.Get("VaultAccessInitializationFailed"));
         }
         finally
         {

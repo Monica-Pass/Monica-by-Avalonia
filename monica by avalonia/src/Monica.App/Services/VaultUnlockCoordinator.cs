@@ -107,7 +107,7 @@ public sealed class VaultUnlockCoordinator(
         }
         catch (Exception ex)
         {
-            return new VaultUnlockResult(VaultUnlockStatus.Failed, false, "UnlockFailedFormat", ex);
+            return new VaultUnlockResult(VaultUnlockStatus.Failed, false, "VaultAccessUnlockFailed", ex);
         }
     }
 }

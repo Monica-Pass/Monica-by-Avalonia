@@ -221,9 +221,12 @@
                 <Border Classes="unlockFeedback"
                         Classes.error="{Binding HasUnlockError}"
                         IsVisible="{Binding HasUnlockStatusMessage}">
-                    <TextBlock Classes="unlockDescription"
+                    <TextBlock x:Name="VaultAccessFeedbackText"
+                               Classes="unlockDescription"
                                Text="{Binding StatusMessage}"
-                               TextAlignment="Left" />
+                               TextAlignment="Left"
+                               AutomationProperties.Name="{Binding StatusMessage}"
+                               AutomationProperties.LiveSetting="Assertive" />
                 </Border>
             </StackPanel>
         </StackPanel>

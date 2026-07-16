@@ -82,6 +82,9 @@ public sealed partial class PasswordManagementTests
         Assert.False(harness.ViewModel.IsLoadingVault);
         Assert.Empty(harness.ViewModel.Passwords);
         Assert.Equal("", harness.ViewModel.ImportJsonText);
+        Assert.Equal(harness.ViewModel.L.Get("VaultLoadFailed"), harness.ViewModel.StatusMessage);
+        Assert.NotEqual("VaultLoadFailed", harness.ViewModel.StatusMessage);
+        Assert.DoesNotContain("Simulated vault read failure", harness.ViewModel.StatusMessage, StringComparison.Ordinal);
     }
 
     [Fact]

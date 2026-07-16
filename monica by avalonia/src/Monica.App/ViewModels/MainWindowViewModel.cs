@@ -419,7 +419,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ClearSensitiveSessionState();
             EndPasswordProjectionNotificationDeferral();
             VaultLoadStageText = "保险库加载失败";
-            StatusMessage = _localization.Format("VaultLoadFailedFormat", ex.Message);
+            StatusMessage = _localization.Get("VaultLoadFailed");
         }
         finally
         {

@@ -334,6 +334,10 @@ public sealed partial class VaultCredentialTests
         var viewModel = CreateViewModel(
             GetTempDatabasePath(),
             vaultUnlockCoordinator: new FailingStartupVaultCoordinator());
+        viewModel.MasterPassword = "initialization secret";
+        viewModel.ConfirmMasterPassword = "initialization secret";
+        viewModel.ToggleMasterPasswordVisibilityCommand.Execute(null);
+        viewModel.ToggleConfirmMasterPasswordVisibilityCommand.Execute(null);
 
         Assert.True(viewModel.IsVaultAccessInitializing);
 
@@ -342,7 +346,60 @@ public sealed partial class VaultCredentialTests
         Assert.False(viewModel.IsVaultAccessInitializing);
         Assert.True(viewModel.IsVaultAccessReady);
         Assert.True(viewModel.HasUnlockError);
-        Assert.Contains("metadata unavailable", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(viewModel.L.Get("VaultAccessInitializationFailed"), viewModel.StatusMessage);
+        Assert.NotEqual("VaultAccessInitializationFailed", viewModel.StatusMessage);
+        Assert.DoesNotContain("metadata unavailable", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(viewModel.MasterPassword);
+        Assert.Empty(viewModel.ConfirmMasterPassword);
+        Assert.False(viewModel.IsMasterPasswordVisible);
+        Assert.False(viewModel.IsConfirmMasterPasswordVisible);
+    }
+
+    [Fact]
+    public async Task Vault_access_failed_result_hides_details_and_clears_secret_state()
+    {
+        const string sensitiveDetail = @"C:\Users\private\vault.db could not be opened";
+        var viewModel = CreateViewModel(
+            GetTempDatabasePath(),
+            vaultUnlockCoordinator: new FailedVaultUnlockCoordinator(sensitiveDetail));
+        await viewModel.InitializeAsync();
+        viewModel.MasterPassword = "correct password";
+        viewModel.ConfirmMasterPassword = "correct password";
+        viewModel.ToggleMasterPasswordVisibilityCommand.Execute(null);
+        viewModel.ToggleConfirmMasterPasswordVisibilityCommand.Execute(null);
+
+        await viewModel.UnlockCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsUnlocked);
+        Assert.True(viewModel.HasUnlockError);
+        Assert.Equal(viewModel.L.Get("VaultAccessUnlockFailed"), viewModel.StatusMessage);
+        Assert.NotEqual("VaultAccessUnlockFailed", viewModel.StatusMessage);
+        Assert.DoesNotContain(sensitiveDetail, viewModel.StatusMessage, StringComparison.Ordinal);
+        Assert.Empty(viewModel.MasterPassword);
+        Assert.Empty(viewModel.ConfirmMasterPassword);
+        Assert.False(viewModel.IsMasterPasswordVisible);
+        Assert.False(viewModel.IsConfirmMasterPasswordVisible);
+    }
+
+    [Fact]
+    public async Task Vault_access_thrown_failure_hides_details_and_clears_secret_state()
+    {
+        const string sensitiveDetail = @"C:\Users\private\vault.key is unavailable";
+        var viewModel = CreateViewModel(
+            GetTempDatabasePath(),
+            vaultUnlockCoordinator: new ThrowingVaultUnlockCoordinator(sensitiveDetail));
+        await viewModel.InitializeAsync();
+        viewModel.MasterPassword = "correct password";
+        viewModel.ToggleMasterPasswordVisibilityCommand.Execute(null);
+
+        await viewModel.UnlockCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsUnlocked);
+        Assert.True(viewModel.HasUnlockError);
+        Assert.Equal(viewModel.L.Get("VaultAccessUnlockFailed"), viewModel.StatusMessage);
+        Assert.DoesNotContain(sensitiveDetail, viewModel.StatusMessage, StringComparison.Ordinal);
+        Assert.Empty(viewModel.MasterPassword);
+        Assert.False(viewModel.IsMasterPasswordVisible);
     }
 
     [Fact]
@@ -578,6 +635,36 @@ public sealed partial class VaultCredentialTests
             LegacyVaultDetection legacyVaultDetection,
             CancellationToken cancellationToken = default) =>
             Task.FromException<VaultUnlockResult>(new NotSupportedException());
+    }
+
+    private sealed class FailedVaultUnlockCoordinator(string detail) : IVaultUnlockCoordinator
+    {
+        public Task<VaultInitializationState> InitializeAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new VaultInitializationState(LegacyVaultDetection.Empty, true));
+
+        public Task<VaultUnlockResult> UnlockOrCreateAsync(
+            string masterPassword,
+            string confirmMasterPassword,
+            LegacyVaultDetection legacyVaultDetection,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new VaultUnlockResult(
+                VaultUnlockStatus.Failed,
+                true,
+                "UnlockFailedFormat",
+                new InvalidOperationException(detail)));
+    }
+
+    private sealed class ThrowingVaultUnlockCoordinator(string detail) : IVaultUnlockCoordinator
+    {
+        public Task<VaultInitializationState> InitializeAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new VaultInitializationState(LegacyVaultDetection.Empty, true));
+
+        public Task<VaultUnlockResult> UnlockOrCreateAsync(
+            string masterPassword,
+            string confirmMasterPassword,
+            LegacyVaultDetection legacyVaultDetection,
+            CancellationToken cancellationToken = default) =>
+            Task.FromException<VaultUnlockResult>(new InvalidOperationException(detail));
     }
 
     private static string GetTempDatabasePath()
