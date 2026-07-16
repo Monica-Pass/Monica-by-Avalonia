@@ -66,7 +66,9 @@ public sealed partial class MainWindowViewModel
             _passwordCustomFields);
     }
 
-    private PasswordDetailSnapshot BuildCachedPasswordDetailSnapshot(PasswordDetailSourceSnapshot source)
+    private async Task<PasswordDetailSnapshot> BuildPasswordDetailSnapshotAsync(
+        PasswordDetailSourceSnapshot source,
+        CancellationToken cancellationToken)
     {
         var entry = source.Entry;
         var siblings = GetPasswordDetailSiblings(entry, source.SiblingCandidates).ToArray();
@@ -76,6 +78,11 @@ public sealed partial class MainWindowViewModel
         var boundNote = entry.BoundNoteId is null
             ? null
             : source.NoteItems.FirstOrDefault(item => item.Id == entry.BoundNoteId);
+        var customFields = await GetGroupCustomFieldsAsync(
+            entry,
+            siblings,
+            source.PasswordCustomFields,
+            cancellationToken);
 
         return new PasswordDetailSnapshot(
             entry,
@@ -83,7 +90,7 @@ public sealed partial class MainWindowViewModel
             category,
             boundNote,
             GetGroupAttachments(entry, siblings, source.PasswordAttachments),
-            GetCachedGroupCustomFields(entry, siblings, source.PasswordCustomFields),
+            customFields,
             []);
     }
 

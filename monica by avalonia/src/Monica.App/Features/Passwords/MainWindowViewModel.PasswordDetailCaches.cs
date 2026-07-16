@@ -58,6 +58,28 @@ public sealed partial class MainWindowViewModel
         }
 
         _passwordCustomFields = next;
+        RefreshPasswordCustomFieldSearchMatch(entryId, fields);
+    }
+
+    private void RefreshPasswordCustomFieldSearchMatch(long entryId, IReadOnlyList<CustomField> fields)
+    {
+        var query = _passwordCustomFieldSearchQuery.Trim();
+        if (query.Length == 0)
+        {
+            return;
+        }
+
+        var matches = _passwordCustomFieldSearchMatches.ToHashSet();
+        if (fields.Any(field => ContainsAny(query, field.Title, field.Value)))
+        {
+            matches.Add(entryId);
+        }
+        else
+        {
+            matches.Remove(entryId);
+        }
+
+        _passwordCustomFieldSearchMatches = matches;
     }
 
     private IReadOnlyList<Attachment> GetPasswordAttachments(long entryId)
@@ -105,13 +127,45 @@ public sealed partial class MainWindowViewModel
     private void RefreshPasswordAttachmentState(PasswordEntry entry)
         => PasswordPresentationState.RefreshAttachment(entry, _passwordAttachments);
 
-    private async Task<IReadOnlyList<CustomField>> GetGroupCustomFieldsAsync(PasswordEntry entry, IReadOnlyList<PasswordEntry> siblings)
+    private Task<IReadOnlyList<CustomField>> GetGroupCustomFieldsAsync(
+        PasswordEntry entry,
+        IReadOnlyList<PasswordEntry> siblings,
+        CancellationToken cancellationToken = default) =>
+        GetGroupCustomFieldsAsync(entry, siblings, _passwordCustomFields, cancellationToken);
+
+    private async Task<IReadOnlyList<CustomField>> GetGroupCustomFieldsAsync(
+        PasswordEntry entry,
+        IReadOnlyList<PasswordEntry> siblings,
+        IReadOnlyDictionary<long, IReadOnlyList<CustomField>> customFieldsByPasswordId,
+        CancellationToken cancellationToken)
     {
         foreach (var candidate in siblings)
         {
-            var fields = _passwordCustomFields.TryGetValue(candidate.Id, out var cachedFields)
-                ? cachedFields
-                : await _repository.GetCustomFieldsAsync(candidate.Id);
+            cancellationToken.ThrowIfCancellationRequested();
+            IReadOnlyList<CustomField> fields;
+            if (customFieldsByPasswordId.TryGetValue(candidate.Id, out var cachedFields))
+            {
+                fields = cachedFields;
+            }
+            else
+            {
+                try
+                {
+                    fields = await _repository.GetCustomFieldsAsync(candidate.Id, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    // Custom fields enrich the detail view, but their storage being temporarily
+                    // unavailable must not hide the password's primary details.
+                    AppDiagnostics.Error($"Load password custom fields failed. id={candidate.Id}", ex);
+                    fields = [];
+                }
+            }
+
             if (fields.Count > 0 || candidate.Id == entry.Id)
             {
                 return fields;

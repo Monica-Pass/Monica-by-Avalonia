@@ -7,7 +7,6 @@ internal sealed record VaultLoadSnapshot(
     IReadOnlyList<PasswordEntry> ActivePasswords,
     IReadOnlyList<PasswordEntry> ArchivedPasswords,
     IReadOnlyList<PasswordEntry> DeletedPasswords,
-    IReadOnlyDictionary<long, IReadOnlyList<CustomField>> PasswordCustomFields,
     IReadOnlyDictionary<long, IReadOnlyList<Attachment>> PasswordAttachments,
     IReadOnlyList<SecureItem> NoteItems,
     IReadOnlyList<SecureItem> WalletItems,
@@ -49,9 +48,6 @@ internal static class VaultSnapshotLoader
         var deletedPasswords = allPasswordItems.Where(item => item.IsDeleted).ToArray();
         var passwordIds = allPasswordItems.Select(item => item.Id).ToArray();
 
-        var customFieldsTask = AppDiagnostics.MeasureAsync(
-            "Load password custom fields",
-            () => repository.GetCustomFieldsByEntryIdsAsync(passwordIds));
         var attachmentsTask = AppDiagnostics.MeasureAsync(
             "Load password attachments",
             () => repository.GetAttachmentsByOwnerIdsAsync("PASSWORD", passwordIds));
@@ -69,14 +65,12 @@ internal static class VaultSnapshotLoader
             () => repository.GetMdbxDatabasesAsync());
 
         await Task.WhenAll(
-            customFieldsTask,
             attachmentsTask,
             secureItemsTask,
             categoriesTask,
             quickAccessRecordsTask,
             databasesTask);
 
-        var customFields = await customFieldsTask;
         var attachments = await attachmentsTask;
         var secureItems = (await secureItemsTask)
             .Select(static item => item.CreateDetachedCopy())
@@ -99,7 +93,6 @@ internal static class VaultSnapshotLoader
             activePasswords,
             archivedPasswords,
             deletedPasswords,
-            customFields,
             attachments,
             noteItems,
             walletItems,

@@ -135,6 +135,11 @@ public sealed partial class MainWindowViewModel
             return true;
         }
 
+        if (_passwordCustomFieldSearchMatches.Contains(item.Id))
+        {
+            return true;
+        }
+
         if (_passwordCustomFields.TryGetValue(item.Id, out var fields) &&
             fields.Any(field => ContainsAny(term, field.Title, field.Value)))
         {

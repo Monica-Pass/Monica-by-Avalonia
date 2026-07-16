@@ -318,6 +318,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge, ICryptoServic
         var records = await ListPasswordRecordsAsync(vault, projects, includeDeleted: true, cancellationToken);
 
         return records
+            .Where(record => !record.Deleted)
             .Select(record => DeserializePasswordPayload(record.PayloadJson, record.Title))
             .Where(payload => payload?.CustomFields is not null)
             .Select(payload => payload!)

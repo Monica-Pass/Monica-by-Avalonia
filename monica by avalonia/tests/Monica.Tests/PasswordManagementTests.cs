@@ -599,6 +599,36 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
+    public void ViewModel_searches_existing_custom_fields_on_demand()
+    {
+        RunOnStaThread(() =>
+        {
+            var harness = CreateHarness();
+            var matching = new PasswordEntry { Title = "Matching account", Password = "one" };
+            var other = new PasswordEntry { Title = "Other account", Password = "two" };
+            harness.Repository.SavePasswordAsync(matching).GetAwaiter().GetResult();
+            harness.Repository.SavePasswordAsync(other).GetAwaiter().GetResult();
+            harness.Repository.ReplaceCustomFieldsAsync(matching.Id,
+            [
+                new CustomField { Title = "Recovery hint", Value = "deep blue", SortOrder = 0 }
+            ]).GetAwaiter().GetResult();
+            harness.ViewModel.LoadAsync().GetAwaiter().GetResult();
+
+            harness.ViewModel.PasswordSearchText = "deep blue";
+            WaitForCondition(() => harness.ViewModel.PasswordSearchQuery == "deep blue");
+
+            Assert.Equal(
+                [matching.Id],
+                harness.ViewModel.FilteredPasswords.Select(item => item.Id).ToArray());
+
+            harness.ViewModel.LoadAsync().GetAwaiter().GetResult();
+            WaitForCondition(() =>
+                harness.ViewModel.FilteredPasswords.Count == 1 &&
+                harness.ViewModel.FilteredPasswords[0].Id == matching.Id);
+        });
+    }
+
+    [Fact]
     public async Task ViewModel_adds_grouped_passwords_from_multiple_password_lines()
     {
         var harness = CreateHarness();
@@ -1563,6 +1593,14 @@ public sealed partial class PasswordManagementTests
         };
         harness.Repository.SavePasswordAsync(first).GetAwaiter().GetResult();
         harness.Repository.SavePasswordAsync(second).GetAwaiter().GetResult();
+        harness.Repository.ReplaceCustomFieldsAsync(first.Id,
+        [
+            new CustomField { Title = "Selection marker", Value = "first-field" }
+        ]).GetAwaiter().GetResult();
+        harness.Repository.ReplaceCustomFieldsAsync(second.Id,
+        [
+            new CustomField { Title = "Selection marker", Value = "second-field" }
+        ]).GetAwaiter().GetResult();
         harness.ViewModel.LoadAsync().GetAwaiter().GetResult();
 
         var displayedFirst = harness.ViewModel.Passwords.Single(item => item.Id == first.Id);
@@ -1582,7 +1620,10 @@ public sealed partial class PasswordManagementTests
         Assert.Equal(second.Id, harness.ViewModel.SelectedPasswordDetails?.Entry.Id);
         Assert.DoesNotContain(
             harness.ViewModel.SelectedPasswordDetails!.Groups.SelectMany(group => group.Fields),
-            field => field.DisplayValue == "first-secret");
+            field => field.DisplayValue is "first-secret" or "first-field");
+        Assert.Contains(
+            harness.ViewModel.SelectedPasswordDetails.Groups.SelectMany(group => group.Fields),
+            field => field.DisplayValue == "second-field");
 
         Thread.Sleep(150);
         Dispatcher.CurrentDispatcher.RunJobs();
@@ -1750,6 +1791,9 @@ public sealed partial class PasswordManagementTests
         Assert.Contains(
             harness.ViewModel.SelectedPasswordDetails!.Groups.SelectMany(group => group.Fields),
             field => field.DisplayValue == "large-secret");
+        Assert.Contains(
+            harness.ViewModel.SelectedPasswordDetails.Groups.SelectMany(group => group.Fields),
+            field => field.Label == "Field 149" && field.DisplayValue == "value-149");
     }
 
     [Fact]

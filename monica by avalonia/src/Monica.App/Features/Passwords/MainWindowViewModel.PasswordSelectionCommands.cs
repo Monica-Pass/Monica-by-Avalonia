@@ -107,6 +107,7 @@ public sealed partial class MainWindowViewModel
     private void SetPasswordSearchImmediately(string value)
     {
         CancelPasswordSearchDebounce();
+        PublishPasswordCustomFieldSearchMatches(value, []);
         _isApplyingPasswordSearchImmediately = true;
         try
         {
@@ -145,25 +146,33 @@ public sealed partial class MainWindowViewModel
         }
 
         var cts = new CancellationTokenSource();
+        var dispatcher = _viewModelDispatcher;
         _passwordSearchDebounceCts = cts;
-        _ = ApplyPasswordSearchQueryAsync(value, cts);
+        _ = ApplyPasswordSearchQueryAsync(value, dispatcher, cts);
     }
 
-    private async Task ApplyPasswordSearchQueryAsync(string value, CancellationTokenSource cts)
+    private async Task ApplyPasswordSearchQueryAsync(
+        string value,
+        Dispatcher dispatcher,
+        CancellationTokenSource cts)
     {
         try
         {
             await Task.Delay(250, cts.Token);
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                if (ReferenceEquals(_passwordSearchDebounceCts, cts))
-                {
-                    PasswordSearchQuery = value;
-                }
-            });
+            var customFieldMatches = string.IsNullOrWhiteSpace(value)
+                ? []
+                : await Task.Run(
+                    () => _repository.SearchEntryIdsByCustomFieldContentAsync(value, cts.Token),
+                    cts.Token);
+            await PublishPasswordSearchQueryAsync(value, customFieldMatches, dispatcher, cts);
         }
         catch (OperationCanceledException)
         {
+        }
+        catch (Exception ex)
+        {
+            AppDiagnostics.Error("Password custom-field search failed", ex);
+            await PublishPasswordSearchQueryAsync(value, [], dispatcher, cts);
         }
         finally
         {
@@ -172,6 +181,43 @@ public sealed partial class MainWindowViewModel
                 _passwordSearchDebounceCts = null;
             }
             cts.Dispose();
+        }
+    }
+
+    private async Task PublishPasswordSearchQueryAsync(
+        string query,
+        IEnumerable<long> customFieldMatches,
+        Dispatcher dispatcher,
+        CancellationTokenSource cts)
+    {
+        await dispatcher.InvokeAsync(() =>
+        {
+            if (ReferenceEquals(_passwordSearchDebounceCts, cts))
+            {
+                PublishPasswordCustomFieldSearchMatches(query, customFieldMatches);
+                if (string.Equals(PasswordSearchQuery, query, StringComparison.Ordinal))
+                {
+                    RefreshPasswordFilters();
+                }
+                else
+                {
+                    PasswordSearchQuery = query;
+                }
+            }
+        });
+    }
+
+    private void PublishPasswordCustomFieldSearchMatches(string query, IEnumerable<long> matches)
+    {
+        _passwordCustomFieldSearchQuery = query;
+        _passwordCustomFieldSearchMatches = matches.ToHashSet();
+    }
+
+    private void ReconcilePasswordCustomFieldSearchQuery(string query)
+    {
+        if (!string.Equals(query, _passwordCustomFieldSearchQuery, StringComparison.Ordinal))
+        {
+            PublishPasswordCustomFieldSearchMatches(query, []);
         }
     }
 

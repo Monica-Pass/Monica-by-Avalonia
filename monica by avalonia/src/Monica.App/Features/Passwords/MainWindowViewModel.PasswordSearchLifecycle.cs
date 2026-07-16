@@ -17,6 +17,10 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        SetPasswordSearchImmediately(PasswordSearchText);
+        // Restore the inexpensive in-memory projection immediately so returning from the
+        // background never waits on MDBX custom-field I/O. The debounced query below only
+        // enriches the already-visible results with custom-field matches.
+        PasswordSearchQuery = PasswordSearchText;
+        QueuePasswordSearchQuery(PasswordSearchText);
     }
 }

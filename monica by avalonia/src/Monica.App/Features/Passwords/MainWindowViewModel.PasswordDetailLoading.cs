@@ -70,7 +70,7 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var dispatcher = Dispatcher.CurrentDispatcher;
+        var dispatcher = _viewModelDispatcher;
         var cts = new CancellationTokenSource();
         _selectedPasswordDetailsCts = cts;
         AppDiagnostics.Info($"Password selection changed. id={entry.Id}, version={version}");
@@ -118,12 +118,14 @@ public sealed partial class MainWindowViewModel
             }
 
             cancellationToken.ThrowIfCancellationRequested();
+            var snapshot = await AppDiagnostics.MeasureAsync(
+                $"Load selected password detail data id={entry.Id}",
+                () => BuildPasswordDetailSnapshotAsync(sourceSnapshot, cancellationToken));
             var details = await AppDiagnostics.MeasureAsync(
                 $"Build selected password details VM id={entry.Id}",
                 () => Task.Run(
                     () =>
                     {
-                        var snapshot = BuildCachedPasswordDetailSnapshot(sourceSnapshot);
                         AppDiagnostics.Info(
                             $"Build selected password detail payload ready. id={entry.Id}, version={version}, " +
                             $"siblings={snapshot.Siblings.Count}, attachments={snapshot.Attachments.Count}, " +

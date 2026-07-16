@@ -439,7 +439,7 @@ public sealed class MdbxRepositoryTests
         var snapshot = await VaultSnapshotLoader.LoadAsync(repository);
 
         Assert.Equal(password.Id, Assert.Single(snapshot.ActivePasswords).Id);
-        Assert.Equal("Environment", Assert.Single(snapshot.PasswordCustomFields[password.Id]).Title);
+        Assert.Equal("Environment", Assert.Single(await repository.GetCustomFieldsAsync(password.Id)).Title);
         Assert.Equal("recovery.txt", Assert.Single(snapshot.PasswordAttachments[password.Id]).FileName);
         Assert.Equal("Canonical note", Assert.Single(snapshot.NoteItems).Title);
         Assert.Equal(category.Id, Assert.Single(snapshot.Categories).Id);

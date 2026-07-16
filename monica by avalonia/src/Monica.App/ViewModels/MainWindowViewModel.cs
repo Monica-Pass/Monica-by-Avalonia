@@ -73,6 +73,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IKeePassVaultService? keePassVaultService = null,
         IWebDavBackupCryptoService? webDavBackupCryptoService = null)
     {
+        _viewModelDispatcher = Dispatcher.CurrentDispatcher;
         _repository = repository;
         _cryptoService = cryptoService;
         _totpService = totpService;
@@ -318,7 +319,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
             sessionCancellationToken.ThrowIfCancellationRequested();
             VaultLoadStageText = "正在整理密码列表...";
             await YieldVaultLoadUiAsync();
-            _passwordCustomFields = snapshot.PasswordCustomFields;
+            _passwordCustomFields = new Dictionary<long, IReadOnlyList<CustomField>>();
+            _passwordCustomFieldSearchMatches = new HashSet<long>();
+            _passwordCustomFieldSearchQuery = "";
             _passwordAttachments = snapshot.PasswordAttachments;
             _passwordQuickAccessRecords = snapshot.PasswordQuickAccessRecords;
 
@@ -376,6 +379,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 RaiseAllCountState();
                 RaiseFilteredPasswordsChanged();
             });
+            if (!string.IsNullOrWhiteSpace(PasswordSearchText))
+            {
+                QueuePasswordSearchQuery(PasswordSearchText);
+            }
             EndPasswordProjectionNotificationDeferral();
             StatusMessage = _localization.Get(
                 HasPendingLegacyBusinessData

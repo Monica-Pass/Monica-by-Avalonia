@@ -257,6 +257,8 @@ public sealed partial class MainWindowViewModel
     private void ClearSensitiveCaches()
     {
         _passwordCustomFields = new Dictionary<long, IReadOnlyList<CustomField>>();
+        _passwordCustomFieldSearchMatches = new HashSet<long>();
+        _passwordCustomFieldSearchQuery = "";
         _passwordAttachments = new Dictionary<long, IReadOnlyList<Attachment>>();
         _passwordQuickAccessRecords = new Dictionary<long, PasswordQuickAccessRecord>();
         ClearSensitiveProjectionCaches();

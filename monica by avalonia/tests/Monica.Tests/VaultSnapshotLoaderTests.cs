@@ -23,14 +23,14 @@ public sealed class VaultSnapshotLoaderTests(ITestOutputHelper output)
             $"snapshot={stopwatch.Elapsed.TotalMilliseconds:F3} ms, " +
             $"reads={probe.ReadCallCount}, maxConcurrency={probe.MaxConcurrentReadCount}");
         Assert.Single(snapshot.ActivePasswords);
-        Assert.Equal(7, probe.ReadCallCount);
+        Assert.Equal(6, probe.ReadCallCount);
         Assert.True(probe.AllPostPasswordReadsStartedAfterPassword);
         Assert.True(
-            probe.MaxConcurrentReadCount >= 6,
-            $"Expected six post-password reads to overlap, but observed {probe.MaxConcurrentReadCount} concurrent read(s).");
+            probe.MaxConcurrentReadCount >= 5,
+            $"Expected five post-password reads to overlap, but observed {probe.MaxConcurrentReadCount} concurrent read(s).");
         Assert.True(
             stopwatch.ElapsedMilliseconds < 450,
-            $"Seven simulated 100 ms reads took {stopwatch.ElapsedMilliseconds} ms; expected one password phase plus one parallel fan-out phase.");
+            $"Six simulated 100 ms reads took {stopwatch.ElapsedMilliseconds} ms; expected one password phase plus one parallel fan-out phase.");
     }
 
     [Fact]
@@ -63,6 +63,17 @@ public sealed class VaultSnapshotLoaderTests(ITestOutputHelper output)
             snapshot.PasswordQuickAccessRecords.Keys.Order().ToArray());
     }
 
+    [Fact]
+    public async Task Vault_snapshot_loader_skips_eager_custom_fields()
+    {
+        var repository = DispatchProxy.Create<IMonicaRepository, DelayedVaultRepositoryProxy>();
+        var probe = (DelayedVaultRepositoryProxy)(object)repository;
+
+        await VaultSnapshotLoader.LoadAsync(repository);
+
+        Assert.Equal(0, probe.CustomFieldReadCallCount);
+    }
+
     public class DelayedVaultRepositoryProxy : DispatchProxy
     {
         private static readonly TimeSpan ReadDelay = TimeSpan.FromMilliseconds(100);
@@ -74,6 +85,7 @@ public sealed class VaultSnapshotLoaderTests(ITestOutputHelper output)
 
         public int MaxConcurrentReadCount => Volatile.Read(ref _maxConcurrentReadCount);
         public int ReadCallCount => Volatile.Read(ref _readCallCount);
+        public int CustomFieldReadCallCount { get; private set; }
         public IReadOnlyList<PasswordQuickAccessRecord> QuickAccessRecords { get; set; } = [];
         public bool AllPostPasswordReadsStartedAfterPassword =>
             Volatile.Read(ref _allPostPasswordReadsStartedAfterPassword) == 1;
@@ -88,10 +100,7 @@ public sealed class VaultSnapshotLoaderTests(ITestOutputHelper output)
             return targetMethod.Name switch
             {
                 nameof(IMonicaRepository.GetPasswordsAsync) => DelayPasswordReadAsync(cancellationToken),
-                nameof(IMonicaRepository.GetCustomFieldsByEntryIdsAsync) =>
-                    DelayPostPasswordReadAsync<IReadOnlyDictionary<long, IReadOnlyList<CustomField>>>(
-                    new Dictionary<long, IReadOnlyList<CustomField>>(),
-                    cancellationToken),
+                nameof(IMonicaRepository.GetCustomFieldsByEntryIdsAsync) => DelayCustomFieldReadAsync(cancellationToken),
                 nameof(IMonicaRepository.GetAttachmentsByOwnerIdsAsync) =>
                     DelayPostPasswordReadAsync<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>>(
                     new Dictionary<long, IReadOnlyList<Attachment>>(),
@@ -108,6 +117,15 @@ public sealed class VaultSnapshotLoaderTests(ITestOutputHelper output)
                     DelayPostPasswordReadAsync<IReadOnlyList<LocalMdbxDatabase>>([], cancellationToken),
                 _ => throw new NotSupportedException($"Unexpected repository call: {targetMethod.Name}")
             };
+        }
+
+        private Task<IReadOnlyDictionary<long, IReadOnlyList<CustomField>>> DelayCustomFieldReadAsync(
+            CancellationToken cancellationToken)
+        {
+            CustomFieldReadCallCount++;
+            return DelayPostPasswordReadAsync<IReadOnlyDictionary<long, IReadOnlyList<CustomField>>>(
+                new Dictionary<long, IReadOnlyList<CustomField>>(),
+                cancellationToken);
         }
 
         private async Task<IReadOnlyList<PasswordEntry>> DelayPasswordReadAsync(CancellationToken cancellationToken)

@@ -33,9 +33,12 @@ public sealed partial class MainWindowViewModel
     private readonly IPasswordEditorDialogService _passwordEditorDialogService;
     private readonly IPasswordDetailDialogService _passwordDetailDialogService;
     private readonly ICategoryPickerDialogService _categoryPickerDialogService;
+    private readonly Avalonia.Threading.Dispatcher _viewModelDispatcher;
     private IReadOnlyDictionary<long, IReadOnlyList<CustomField>> _passwordCustomFields = new Dictionary<long, IReadOnlyList<CustomField>>();
     private IReadOnlyDictionary<long, IReadOnlyList<Attachment>> _passwordAttachments = new Dictionary<long, IReadOnlyList<Attachment>>();
     private IReadOnlyDictionary<long, PasswordQuickAccessRecord> _passwordQuickAccessRecords = new Dictionary<long, PasswordQuickAccessRecord>();
+    private IReadOnlySet<long> _passwordCustomFieldSearchMatches = new HashSet<long>();
+    private string _passwordCustomFieldSearchQuery = "";
     internal int PasswordQuickAccessRecordCacheCount => _passwordQuickAccessRecords.Count;
     private IReadOnlyList<PasswordEntry> _filteredPasswords = [];
     private IReadOnlyList<PasswordListRow> _filteredPasswordRows = [];

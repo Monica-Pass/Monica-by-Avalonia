@@ -237,18 +237,7 @@ public sealed class MdbxBackedMonicaRepository(
             return [];
         }
 
-        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        var existingIds = (await GetPasswordReadSnapshotAsync(database, categories, cancellationToken)).Passwords
-            .Where(entry => !entry.IsDeleted)
-            .Select(entry => entry.Id)
-            .ToHashSet();
-        if (existingIds.Count == 0)
-        {
-            return [];
-        }
-
         return (await mdbxVaultStore.SearchPasswordEntryIdsByCustomFieldContentAsync(database, query, cancellationToken))
-            .Where(existingIds.Contains)
             .Distinct()
             .OrderBy(id => id)
             .ToList();

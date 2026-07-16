@@ -23,6 +23,7 @@ public sealed partial class MainWindowViewModel
 
     partial void OnPasswordSearchQueryChanged(string value)
     {
+        ReconcilePasswordCustomFieldSearchQuery(value);
         RefreshPasswordFilters();
     }
 
@@ -61,7 +62,7 @@ public sealed partial class MainWindowViewModel
     {
         if (!ReferenceEquals(oldValue, newValue))
         {
-            Dispatcher.CurrentDispatcher.Post(() => oldValue?.Dispose(), DispatcherPriority.Background);
+            _viewModelDispatcher.Post(() => oldValue?.Dispose(), DispatcherPriority.Background);
         }
     }
 
