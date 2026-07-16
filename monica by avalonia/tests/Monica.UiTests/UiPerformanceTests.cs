@@ -416,6 +416,8 @@ public sealed class UiPerformanceTests
                 nameof(IMonicaRepository.GetAttachmentsByOwnerIdsAsync) =>
                     Task.FromResult<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>>(
                         new Dictionary<long, IReadOnlyList<Attachment>>()),
+                nameof(IMonicaRepository.GetAttachmentOwnerIdsAsync) =>
+                    Task.FromResult<IReadOnlyList<long>>([]),
                 nameof(IMonicaRepository.GetSecureItemsAsync) =>
                     Task.FromResult<IReadOnlyList<SecureItem>>([Totp]),
                 nameof(IMonicaRepository.GetCategoriesAsync) =>

@@ -260,7 +260,9 @@ public sealed partial class MainWindowViewModel
         _passwordCustomFields = new Dictionary<long, IReadOnlyList<CustomField>>();
         _passwordCustomFieldSearchMatches = new HashSet<long>();
         _passwordCustomFieldSearchQuery = "";
-        _passwordAttachments = new Dictionary<long, IReadOnlyList<Attachment>>();
+        _passwordAttachmentOwnerIds = new HashSet<long>();
+        _passwordAttachmentSearchMatches = new HashSet<long>();
+        _passwordAttachmentSearchQuery = "";
         _passwordQuickAccessRecords = new Dictionary<long, PasswordQuickAccessRecord>();
         ClearSensitiveProjectionCaches();
         _compromisedPasswordResults = new Dictionary<long, CompromisedPasswordResult>();

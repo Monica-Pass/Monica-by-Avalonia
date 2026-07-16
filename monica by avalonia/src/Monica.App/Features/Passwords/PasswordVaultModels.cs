@@ -78,7 +78,6 @@ internal sealed record PasswordDetailSourceSnapshot(
     IReadOnlyList<PasswordEntry> Siblings,
     Category? Category,
     SecureItem? BoundNote,
-    IReadOnlyDictionary<long, IReadOnlyList<Attachment>> PasswordAttachments,
     IReadOnlyDictionary<long, IReadOnlyList<CustomField>> PasswordCustomFields);
 public sealed record PasswordFolderFilterChoice(
     long? Id,

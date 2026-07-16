@@ -26,7 +26,7 @@ public sealed partial class MainWindowViewModel
         var boundNote = entry.BoundNoteId is null
             ? null
             : NoteItems.FirstOrDefault(item => item.Id == entry.BoundNoteId);
-        var attachments = GetGroupAttachments(entry, siblings);
+        var attachments = await GetGroupAttachmentsAsync(entry, siblings);
         var history = includeHistory
             ? await GetPasswordHistoryDisplayItemsAsync(entry.Id)
             : [];
@@ -64,7 +64,6 @@ public sealed partial class MainWindowViewModel
             siblings,
             category,
             boundNote,
-            _passwordAttachments,
             _passwordCustomFields);
     }
 
@@ -78,13 +77,14 @@ public sealed partial class MainWindowViewModel
             source.Siblings,
             source.PasswordCustomFields,
             cancellationToken);
+        var attachments = await GetGroupAttachmentsAsync(entry, source.Siblings, cancellationToken);
 
         return new PasswordDetailSnapshot(
             entry,
             source.Siblings,
             source.Category,
             source.BoundNote,
-            GetGroupAttachments(entry, source.Siblings, source.PasswordAttachments),
+            attachments,
             customFields,
             []);
     }

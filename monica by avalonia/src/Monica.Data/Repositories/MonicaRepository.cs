@@ -17,6 +17,8 @@ public interface IMonicaRepository
     Task<IReadOnlyList<long>> SearchEntryIdsByCustomFieldContentAsync(string query, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Attachment>> GetAttachmentsAsync(string ownerType, long ownerId, CancellationToken cancellationToken = default);
     Task<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>> GetAttachmentsByOwnerIdsAsync(string ownerType, IReadOnlyList<long> ownerIds, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<long>> GetAttachmentOwnerIdsAsync(string ownerType, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<long>> SearchAttachmentOwnerIdsAsync(string ownerType, string query, CancellationToken cancellationToken = default);
     Task<byte[]?> TryReadAttachmentContentAsync(Attachment attachment, CancellationToken cancellationToken = default);
     Task<long> SaveAttachmentAsync(Attachment attachment, CancellationToken cancellationToken = default);
     Task<long> SaveAttachmentAsync(Attachment attachment, byte[] content, CancellationToken cancellationToken = default);
@@ -49,7 +51,7 @@ public interface IPasswordQuickAccessStore
     Task<IReadOnlyList<PasswordQuickAccessRecord>> GetAllPasswordQuickAccessRecordsAsync(CancellationToken cancellationToken = default);
 }
 
-public sealed class MonicaRepository(
+public sealed partial class MonicaRepository(
     ISqliteConnectionFactory connectionFactory,
     IDatabaseMigrator migrator,
     IVaultDataProtector? vaultDataProtector = null,

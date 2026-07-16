@@ -146,13 +146,7 @@ public sealed partial class MainWindowViewModel
             return true;
         }
 
-        return _passwordAttachments.TryGetValue(item.Id, out var attachments) &&
-            attachments.Any(attachment => ContainsAny(
-                term,
-                attachment.FileName,
-                attachment.ContentType,
-                attachment.StoragePath,
-                attachment.KeepassBinaryRef ?? ""));
+        return _passwordAttachmentSearchMatches.Contains(item.Id);
     }
 
     private static bool IsLocalOnlyPassword(PasswordEntry item)

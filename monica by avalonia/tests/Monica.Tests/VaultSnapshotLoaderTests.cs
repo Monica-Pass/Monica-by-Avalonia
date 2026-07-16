@@ -74,6 +74,18 @@ public sealed class VaultSnapshotLoaderTests(ITestOutputHelper output)
         Assert.Equal(0, probe.CustomFieldReadCallCount);
     }
 
+    [Fact]
+    public async Task Vault_snapshot_loader_skips_eager_password_attachments()
+    {
+        var repository = DispatchProxy.Create<IMonicaRepository, DelayedVaultRepositoryProxy>();
+        var probe = (DelayedVaultRepositoryProxy)(object)repository;
+
+        await VaultSnapshotLoader.LoadAsync(repository);
+
+        Assert.Equal(0, probe.AttachmentReadCallCount);
+        Assert.Equal(1, probe.AttachmentOwnerReadCallCount);
+    }
+
     public class DelayedVaultRepositoryProxy : DispatchProxy
     {
         private static readonly TimeSpan ReadDelay = TimeSpan.FromMilliseconds(100);
@@ -86,6 +98,8 @@ public sealed class VaultSnapshotLoaderTests(ITestOutputHelper output)
         public int MaxConcurrentReadCount => Volatile.Read(ref _maxConcurrentReadCount);
         public int ReadCallCount => Volatile.Read(ref _readCallCount);
         public int CustomFieldReadCallCount { get; private set; }
+        public int AttachmentReadCallCount { get; private set; }
+        public int AttachmentOwnerReadCallCount { get; private set; }
         public IReadOnlyList<PasswordQuickAccessRecord> QuickAccessRecords { get; set; } = [];
         public bool AllPostPasswordReadsStartedAfterPassword =>
             Volatile.Read(ref _allPostPasswordReadsStartedAfterPassword) == 1;
@@ -101,10 +115,8 @@ public sealed class VaultSnapshotLoaderTests(ITestOutputHelper output)
             {
                 nameof(IMonicaRepository.GetPasswordsAsync) => DelayPasswordReadAsync(cancellationToken),
                 nameof(IMonicaRepository.GetCustomFieldsByEntryIdsAsync) => DelayCustomFieldReadAsync(cancellationToken),
-                nameof(IMonicaRepository.GetAttachmentsByOwnerIdsAsync) =>
-                    DelayPostPasswordReadAsync<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>>(
-                    new Dictionary<long, IReadOnlyList<Attachment>>(),
-                    cancellationToken),
+                nameof(IMonicaRepository.GetAttachmentsByOwnerIdsAsync) => DelayAttachmentReadAsync(cancellationToken),
+                nameof(IMonicaRepository.GetAttachmentOwnerIdsAsync) => DelayAttachmentOwnerReadAsync(cancellationToken),
                 nameof(IMonicaRepository.GetSecureItemsAsync) => DelayPostPasswordReadAsync<IReadOnlyList<SecureItem>>(
                     [],
                     cancellationToken),
@@ -126,6 +138,21 @@ public sealed class VaultSnapshotLoaderTests(ITestOutputHelper output)
             return DelayPostPasswordReadAsync<IReadOnlyDictionary<long, IReadOnlyList<CustomField>>>(
                 new Dictionary<long, IReadOnlyList<CustomField>>(),
                 cancellationToken);
+        }
+
+        private Task<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>> DelayAttachmentReadAsync(
+            CancellationToken cancellationToken)
+        {
+            AttachmentReadCallCount++;
+            return DelayPostPasswordReadAsync<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>>(
+                new Dictionary<long, IReadOnlyList<Attachment>>(),
+                cancellationToken);
+        }
+
+        private Task<IReadOnlyList<long>> DelayAttachmentOwnerReadAsync(CancellationToken cancellationToken)
+        {
+            AttachmentOwnerReadCallCount++;
+            return DelayPostPasswordReadAsync<IReadOnlyList<long>>([1], cancellationToken);
         }
 
         private async Task<IReadOnlyList<PasswordEntry>> DelayPasswordReadAsync(CancellationToken cancellationToken)

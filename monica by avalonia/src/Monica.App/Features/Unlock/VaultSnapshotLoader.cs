@@ -7,7 +7,7 @@ internal sealed record VaultLoadSnapshot(
     IReadOnlyList<PasswordEntry> ActivePasswords,
     IReadOnlyList<PasswordEntry> ArchivedPasswords,
     IReadOnlyList<PasswordEntry> DeletedPasswords,
-    IReadOnlyDictionary<long, IReadOnlyList<Attachment>> PasswordAttachments,
+    IReadOnlyList<long> PasswordAttachmentOwnerIds,
     IReadOnlyList<SecureItem> NoteItems,
     IReadOnlyList<SecureItem> WalletItems,
     IReadOnlyList<SecureItem> StoredTotps,
@@ -46,11 +46,9 @@ internal static class VaultSnapshotLoader
         var activePasswords = allPasswordItems.Where(item => !item.IsDeleted && !item.IsArchived).ToArray();
         var archivedPasswords = allPasswordItems.Where(item => !item.IsDeleted && item.IsArchived).ToArray();
         var deletedPasswords = allPasswordItems.Where(item => item.IsDeleted).ToArray();
-        var passwordIds = allPasswordItems.Select(item => item.Id).ToArray();
-
-        var attachmentsTask = AppDiagnostics.MeasureAsync(
-            "Load password attachments",
-            () => repository.GetAttachmentsByOwnerIdsAsync("PASSWORD", passwordIds));
+        var attachmentOwnerIdsTask = AppDiagnostics.MeasureAsync(
+            "Load password attachment owner IDs",
+            () => repository.GetAttachmentOwnerIdsAsync("PASSWORD"));
         var secureItemsTask = AppDiagnostics.MeasureAsync(
             "Load secure items",
             () => repository.GetSecureItemsAsync());
@@ -65,13 +63,13 @@ internal static class VaultSnapshotLoader
             () => repository.GetMdbxDatabasesAsync());
 
         await Task.WhenAll(
-            attachmentsTask,
+            attachmentOwnerIdsTask,
             secureItemsTask,
             categoriesTask,
             quickAccessRecordsTask,
             databasesTask);
 
-        var attachments = await attachmentsTask;
+        var attachmentOwnerIds = await attachmentOwnerIdsTask;
         var secureItems = (await secureItemsTask)
             .Select(static item => item.CreateDetachedCopy())
             .ToArray();
@@ -93,7 +91,7 @@ internal static class VaultSnapshotLoader
             activePasswords,
             archivedPasswords,
             deletedPasswords,
-            attachments,
+            attachmentOwnerIds,
             noteItems,
             walletItems,
             storedTotps,

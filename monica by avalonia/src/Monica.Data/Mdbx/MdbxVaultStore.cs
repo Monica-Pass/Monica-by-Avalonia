@@ -25,6 +25,7 @@ public interface IMdbxVaultStore
     Task<IReadOnlyList<PasswordHistoryEntry>?> GetPasswordHistoryAsync(LocalMdbxDatabase database, long entryId, CancellationToken cancellationToken = default);
     Task<long?> FindPasswordHistoryOwnerIdAsync(LocalMdbxDatabase database, long historyId, CancellationToken cancellationToken = default);
     Task<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>> GetPasswordAttachmentsByEntryIdsAsync(LocalMdbxDatabase database, IReadOnlyList<long> entryIds, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<long>> SearchPasswordEntryIdsByAttachmentMetadataAsync(LocalMdbxDatabase database, string query, CancellationToken cancellationToken = default);
     Task<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>> GetSecureItemAttachmentsByItemIdsAsync(LocalMdbxDatabase database, IReadOnlyList<long> itemIds, CancellationToken cancellationToken = default);
     Task<byte[]?> TryReadAttachmentContentAsync(LocalMdbxDatabase database, Attachment attachment, CancellationToken cancellationToken = default);
     Task SoftDeletePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, CancellationToken cancellationToken = default);
@@ -50,7 +51,7 @@ public sealed record MdbxPasswordReadSnapshot(
     IReadOnlyDictionary<long, IReadOnlyList<CustomField>> CustomFieldsByEntryId,
     IReadOnlyDictionary<long, IReadOnlyList<Attachment>> AttachmentsByEntryId);
 
-public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge, ICryptoService? cryptoService = null) : IMdbxVaultStore
+public sealed partial class MdbxVaultStore(IMdbxNativeBridge nativeBridge, ICryptoService? cryptoService = null) : IMdbxVaultStore
 {
     private const string DefaultProjectTitle = "Monica";
     private const string DeviceId = "monica-avalonia";
@@ -408,7 +409,7 @@ public sealed class MdbxVaultStore(IMdbxNativeBridge nativeBridge, ICryptoServic
 
         foreach (var item in records
                      .Select(record => (Record: record, Payload: DeserializePasswordPayload(record.PayloadJson, record.Title)))
-                     .Where(item => item.Payload is not null)
+                     .Where(item => !item.Record.Deleted && item.Payload is not null)
                      .OrderBy(item => item.Record.Deleted))
         {
             var payload = item.Payload!;

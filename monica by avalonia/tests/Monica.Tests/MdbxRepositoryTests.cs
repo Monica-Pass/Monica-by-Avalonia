@@ -440,7 +440,8 @@ public sealed class MdbxRepositoryTests
 
         Assert.Equal(password.Id, Assert.Single(snapshot.ActivePasswords).Id);
         Assert.Equal("Environment", Assert.Single(await repository.GetCustomFieldsAsync(password.Id)).Title);
-        Assert.Equal("recovery.txt", Assert.Single(snapshot.PasswordAttachments[password.Id]).FileName);
+        Assert.Contains(password.Id, snapshot.PasswordAttachmentOwnerIds);
+        Assert.Equal("recovery.txt", Assert.Single(await repository.GetAttachmentsAsync("PASSWORD", password.Id)).FileName);
         Assert.Equal("Canonical note", Assert.Single(snapshot.NoteItems).Title);
         Assert.Equal(category.Id, Assert.Single(snapshot.Categories).Id);
         Assert.Equal(1, snapshot.PasswordQuickAccessRecords[password.Id].OpenCount);
@@ -1910,6 +1911,12 @@ public sealed class MdbxRepositoryTests
             Password = "secret"
         };
         await repository.SavePasswordAsync(password);
+        var withoutAttachment = new PasswordEntry
+        {
+            Title = "MDBX without attachment",
+            Password = "secret"
+        };
+        await repository.SavePasswordAsync(withoutAttachment);
         var content = "attachment metadata bytes"u8.ToArray();
         var attachment = new Attachment
         {
@@ -1935,11 +1942,17 @@ public sealed class MdbxRepositoryTests
 
         var attachments = await repository.GetAttachmentsAsync("PASSWORD", password.Id);
         var grouped = await repository.GetAttachmentsByOwnerIdsAsync("PASSWORD", [password.Id]);
+        var ownerIds = await repository.GetAttachmentOwnerIdsAsync("PASSWORD");
+        var searchMatches = await repository.SearchAttachmentOwnerIdsAsync("PASSWORD", "codes");
 
         var saved = Assert.Single(attachments);
         Assert.Equal("codes.txt", saved.FileName);
         Assert.StartsWith("mdbx:", saved.StoragePath, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(["codes.txt"], grouped[password.Id].Select(item => item.FileName).ToArray());
+        Assert.Contains(password.Id, ownerIds);
+        Assert.DoesNotContain(withoutAttachment.Id, ownerIds);
+        Assert.Equal([password.Id], searchMatches);
+        Assert.Empty(await repository.SearchAttachmentOwnerIdsAsync("PASSWORD", "sqlite-stale"));
     }
 
     [Fact]

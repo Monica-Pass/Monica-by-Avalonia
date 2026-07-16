@@ -28,7 +28,7 @@ public sealed partial class MainWindowViewModel
         var boundNote = entry.BoundNoteId is null
             ? null
             : NoteItems.FirstOrDefault(item => item.Id == entry.BoundNoteId);
-        var attachments = GetGroupAttachments(entry, siblings);
+        var attachments = await GetGroupAttachmentsAsync(entry, siblings);
         var history = await GetPasswordHistoryDisplayItemsAsync(entry.Id);
 
         await _passwordDetailDialogService.ShowAsync(

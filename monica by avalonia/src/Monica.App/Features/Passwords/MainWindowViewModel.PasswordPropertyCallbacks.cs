@@ -23,7 +23,7 @@ public sealed partial class MainWindowViewModel
 
     partial void OnPasswordSearchQueryChanged(string value)
     {
-        ReconcilePasswordCustomFieldSearchQuery(value);
+        ReconcilePasswordSearchQuery(value);
         RefreshPasswordFilters();
     }
 

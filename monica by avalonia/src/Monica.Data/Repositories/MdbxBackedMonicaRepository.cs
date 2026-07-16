@@ -6,7 +6,7 @@ using Monica.Data.Services;
 
 namespace Monica.Data.Repositories;
 
-public sealed class MdbxBackedMonicaRepository(
+public sealed partial class MdbxBackedMonicaRepository(
     IMonicaRepository inner,
     IMdbxVaultStore mdbxVaultStore,
     IAttachmentContentStore? attachmentContentStore = null) : IMonicaRepository, ITransientVaultReadCache
@@ -278,27 +278,7 @@ public sealed class MdbxBackedMonicaRepository(
             return await mdbxVaultStore.GetSecureItemAttachmentsByItemIdsAsync(database, ids, cancellationToken);
         }
 
-        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        var snapshot = await GetPasswordReadSnapshotAsync(database, categories, cancellationToken);
-        var existingIds = snapshot.Passwords
-            .Where(entry => !entry.IsDeleted)
-            .Select(entry => entry.Id)
-            .ToHashSet();
-        ids = ids.Where(existingIds.Contains).ToArray();
-        if (ids.Length == 0)
-        {
-            return new Dictionary<long, IReadOnlyList<Attachment>>();
-        }
-
-        var mdbxAttachments = new Dictionary<long, IReadOnlyList<Attachment>>();
-        foreach (var id in ids)
-        {
-            if (snapshot.AttachmentsByEntryId.TryGetValue(id, out var attachments))
-            {
-                mdbxAttachments[id] = attachments;
-            }
-        }
-        return mdbxAttachments;
+        return await mdbxVaultStore.GetPasswordAttachmentsByEntryIdsAsync(database, ids, cancellationToken);
     }
 
     public async Task<byte[]?> TryReadAttachmentContentAsync(Attachment attachment, CancellationToken cancellationToken = default)

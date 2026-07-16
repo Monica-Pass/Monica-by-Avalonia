@@ -18,8 +18,8 @@ public sealed partial class MainWindowViewModel
         }
 
         // Restore the inexpensive in-memory projection immediately so returning from the
-        // background never waits on MDBX custom-field I/O. The debounced query below only
-        // enriches the already-visible results with custom-field matches.
+        // background never waits on MDBX metadata I/O. The debounced query below only
+        // enriches the already-visible results with custom-field and attachment matches.
         PasswordSearchQuery = PasswordSearchText;
         QueuePasswordSearchQuery(PasswordSearchText);
     }

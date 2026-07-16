@@ -372,10 +372,15 @@ public sealed partial class DataRepositoryTests
 
         var attachments = await repository.GetAttachmentsAsync("PASSWORD", 42);
         var grouped = await repository.GetAttachmentsByOwnerIdsAsync("PASSWORD", [42, 100]);
+        var ownerIds = await repository.GetAttachmentOwnerIdsAsync("PASSWORD");
+        var searchMatches = await repository.SearchAttachmentOwnerIdsAsync("PASSWORD", "recovery");
 
         Assert.Equal(["backup.txt", "recovery.pdf"], attachments.Select(item => item.FileName).ToArray());
         Assert.Equal("PASSWORD", first.OwnerType);
         Assert.Equal(2, grouped[42].Count);
+        Assert.Equal([42L], ownerIds);
+        Assert.Equal([42L], searchMatches);
+        Assert.Empty(await repository.SearchAttachmentOwnerIdsAsync("PASSWORD", "missing"));
 
         await repository.DeleteAttachmentAsync(first.Id);
 

@@ -23,10 +23,8 @@ internal static class PasswordPresentationState
 
     public static void RefreshAttachment(
         PasswordEntry entry,
-        IReadOnlyDictionary<long, IReadOnlyList<Attachment>> attachmentsByPasswordId)
+        IReadOnlyCollection<long> attachmentOwnerIds)
     {
-        entry.HasAttachments =
-            attachmentsByPasswordId.TryGetValue(entry.Id, out var attachments) &&
-            attachments.Count > 0;
+        entry.HasAttachments = attachmentOwnerIds.Contains(entry.Id);
     }
 }

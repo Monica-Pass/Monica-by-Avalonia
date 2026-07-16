@@ -42,7 +42,8 @@ public sealed partial class MainWindowViewModel
             await _passwordAttachmentFileService.DeleteStoredAttachmentAsync(originalStoragePath, cancellationToken);
         }
 
-        SetPasswordAttachments(entry.Id, [.. GetPasswordAttachments(entry.Id), attachment]);
+        SetPasswordAttachmentOwnerState(entry.Id, hasAttachments: true);
+        AddPasswordAttachmentSearchMatch(entry.Id, attachment);
         RefreshPasswordAttachmentState(entry);
         RaiseFilteredPasswordsChanged();
         await LogOperationAsync(new OperationLog
@@ -83,10 +84,9 @@ public sealed partial class MainWindowViewModel
 
         await _repository.DeleteAttachmentAsync(attachment.Id, attachment);
         await _passwordAttachmentFileService.DeleteStoredAttachmentAsync(attachment.StoragePath);
-        var remaining = GetPasswordAttachments(attachment.OwnerId)
-            .Where(item => item.Id != attachment.Id)
-            .ToArray();
-        SetPasswordAttachments(attachment.OwnerId, remaining);
+        var remaining = await _repository.GetAttachmentsAsync("PASSWORD", attachment.OwnerId);
+        SetPasswordAttachmentOwnerState(attachment.OwnerId, remaining.Count > 0);
+        RefreshPasswordAttachmentSearchMatch(attachment.OwnerId, remaining);
 
         var entry = Passwords
             .Concat(ArchivedPasswords)

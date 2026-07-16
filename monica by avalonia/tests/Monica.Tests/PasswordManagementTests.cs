@@ -3294,54 +3294,58 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
-    public async Task ViewModel_filters_searches_and_shows_password_attachments()
+    public void ViewModel_filters_searches_and_shows_password_attachments()
     {
-        var harness = CreateHarness();
-        var withAttachment = new PasswordEntry
+        RunOnStaThread(() =>
         {
-            Title = "Passport",
-            Website = "travel.example",
-            Username = "traveler",
-            Password = "one"
-        };
-        var withoutAttachment = new PasswordEntry
-        {
-            Title = "No files",
-            Username = "plain",
-            Password = "two"
-        };
-        await harness.Repository.SavePasswordAsync(withAttachment);
-        await harness.Repository.SavePasswordAsync(withoutAttachment);
-        await harness.Repository.SaveAttachmentAsync(new Attachment
-        {
-            OwnerType = "PASSWORD",
-            OwnerId = withAttachment.Id,
-            FileName = "passport-scan.pdf",
-            ContentType = "application/pdf",
-            StoragePath = "secure_attachments/passport-scan.enc",
-            SizeBytes = 4096
+            var harness = CreateHarness();
+            var withAttachment = new PasswordEntry
+            {
+                Title = "Passport",
+                Website = "travel.example",
+                Username = "traveler",
+                Password = "one"
+            };
+            var withoutAttachment = new PasswordEntry
+            {
+                Title = "No files",
+                Username = "plain",
+                Password = "two"
+            };
+            harness.Repository.SavePasswordAsync(withAttachment).GetAwaiter().GetResult();
+            harness.Repository.SavePasswordAsync(withoutAttachment).GetAwaiter().GetResult();
+            harness.Repository.SaveAttachmentAsync(new Attachment
+            {
+                OwnerType = "PASSWORD",
+                OwnerId = withAttachment.Id,
+                FileName = "passport-scan.pdf",
+                ContentType = "application/pdf",
+                StoragePath = "secure_attachments/passport-scan.enc",
+                SizeBytes = 4096
+            }).GetAwaiter().GetResult();
+            harness.ViewModel.LoadAsync().GetAwaiter().GetResult();
+
+            var displayed = harness.ViewModel.Passwords.Single(item => item.Id == withAttachment.Id);
+            Assert.True(displayed.HasAttachments);
+
+            harness.ViewModel.QuickFilterAttachments = true;
+            Assert.Equal(["Passport"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
+
+            harness.ViewModel.QuickFilterAttachments = false;
+            harness.ViewModel.PasswordSearchText = "passport-scan";
+            WaitForCondition(() => harness.ViewModel.PasswordSearchQuery == "passport-scan");
+            Assert.Equal(["Passport"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
+
+            harness.ViewModel.ShowPasswordDetailsCommand.ExecuteAsync(displayed).GetAwaiter().GetResult();
+
+            var details = Assert.IsType<PasswordDetailViewModel>(harness.DetailDialog.LastDetails);
+            var attachmentItem = Assert.Single(details.Attachments, item => item.FileName == "passport-scan.pdf");
+            Assert.Contains("4 KB", attachmentItem.DisplayValue, StringComparison.Ordinal);
+
+            details.CopyAttachmentPathCommand.ExecuteAsync(attachmentItem).GetAwaiter().GetResult();
+
+            Assert.Equal("secure_attachments/passport-scan.enc", harness.Clipboard.Text);
         });
-        await harness.ViewModel.LoadAsync();
-
-        var displayed = harness.ViewModel.Passwords.Single(item => item.Id == withAttachment.Id);
-        Assert.True(displayed.HasAttachments);
-
-        harness.ViewModel.QuickFilterAttachments = true;
-        Assert.Equal(["Passport"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
-
-        harness.ViewModel.QuickFilterAttachments = false;
-        SetPasswordSearch(harness.ViewModel, "passport-scan");
-        Assert.Equal(["Passport"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
-
-        await harness.ViewModel.ShowPasswordDetailsCommand.ExecuteAsync(displayed);
-
-        var details = Assert.IsType<PasswordDetailViewModel>(harness.DetailDialog.LastDetails);
-        var attachmentItem = Assert.Single(details.Attachments, item => item.FileName == "passport-scan.pdf");
-        Assert.Contains("4 KB", attachmentItem.DisplayValue, StringComparison.Ordinal);
-
-        await details.CopyAttachmentPathCommand.ExecuteAsync(attachmentItem);
-
-        Assert.Equal("secure_attachments/passport-scan.enc", harness.Clipboard.Text);
     }
 
     [Fact]

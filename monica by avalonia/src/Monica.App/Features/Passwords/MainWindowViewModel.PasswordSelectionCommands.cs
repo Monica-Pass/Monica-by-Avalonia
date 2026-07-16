@@ -107,7 +107,7 @@ public sealed partial class MainWindowViewModel
     private void SetPasswordSearchImmediately(string value)
     {
         CancelPasswordSearchDebounce();
-        PublishPasswordCustomFieldSearchMatches(value, []);
+        PublishPasswordSearchMatches(value, [], []);
         _isApplyingPasswordSearchImmediately = true;
         try
         {
@@ -159,12 +159,32 @@ public sealed partial class MainWindowViewModel
         try
         {
             await Task.Delay(250, cts.Token);
-            var customFieldMatches = string.IsNullOrWhiteSpace(value)
-                ? []
-                : await Task.Run(
+            IReadOnlyList<long> customFieldMatches;
+            IReadOnlyList<long> attachmentMatches;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                customFieldMatches = [];
+                attachmentMatches = [];
+            }
+            else
+            {
+                var customFieldTask = Task.Run(
                     () => _repository.SearchEntryIdsByCustomFieldContentAsync(value, cts.Token),
                     cts.Token);
-            await PublishPasswordSearchQueryAsync(value, customFieldMatches, dispatcher, cts);
+                var attachmentTask = Task.Run(
+                    () => _repository.SearchAttachmentOwnerIdsAsync("PASSWORD", value, cts.Token),
+                    cts.Token);
+                await Task.WhenAll(customFieldTask, attachmentTask);
+                customFieldMatches = await customFieldTask;
+                attachmentMatches = await attachmentTask;
+            }
+
+            await PublishPasswordSearchQueryAsync(
+                value,
+                customFieldMatches,
+                attachmentMatches,
+                dispatcher,
+                cts);
         }
         catch (OperationCanceledException)
         {
@@ -172,7 +192,7 @@ public sealed partial class MainWindowViewModel
         catch (Exception ex)
         {
             AppDiagnostics.Error("Password custom-field search failed", ex);
-            await PublishPasswordSearchQueryAsync(value, [], dispatcher, cts);
+            await PublishPasswordSearchQueryAsync(value, [], [], dispatcher, cts);
         }
         finally
         {
@@ -187,6 +207,7 @@ public sealed partial class MainWindowViewModel
     private async Task PublishPasswordSearchQueryAsync(
         string query,
         IEnumerable<long> customFieldMatches,
+        IEnumerable<long> attachmentMatches,
         Dispatcher dispatcher,
         CancellationTokenSource cts)
     {
@@ -194,7 +215,7 @@ public sealed partial class MainWindowViewModel
         {
             if (ReferenceEquals(_passwordSearchDebounceCts, cts))
             {
-                PublishPasswordCustomFieldSearchMatches(query, customFieldMatches);
+                PublishPasswordSearchMatches(query, customFieldMatches, attachmentMatches);
                 if (string.Equals(PasswordSearchQuery, query, StringComparison.Ordinal))
                 {
                     RefreshPasswordFilters();
@@ -207,17 +228,23 @@ public sealed partial class MainWindowViewModel
         });
     }
 
-    private void PublishPasswordCustomFieldSearchMatches(string query, IEnumerable<long> matches)
+    private void PublishPasswordSearchMatches(
+        string query,
+        IEnumerable<long> customFieldMatches,
+        IEnumerable<long> attachmentMatches)
     {
         _passwordCustomFieldSearchQuery = query;
-        _passwordCustomFieldSearchMatches = matches.ToHashSet();
+        _passwordCustomFieldSearchMatches = customFieldMatches.ToHashSet();
+        _passwordAttachmentSearchQuery = query;
+        _passwordAttachmentSearchMatches = attachmentMatches.ToHashSet();
     }
 
-    private void ReconcilePasswordCustomFieldSearchQuery(string query)
+    private void ReconcilePasswordSearchQuery(string query)
     {
-        if (!string.Equals(query, _passwordCustomFieldSearchQuery, StringComparison.Ordinal))
+        if (!string.Equals(query, _passwordCustomFieldSearchQuery, StringComparison.Ordinal) ||
+            !string.Equals(query, _passwordAttachmentSearchQuery, StringComparison.Ordinal))
         {
-            PublishPasswordCustomFieldSearchMatches(query, []);
+            PublishPasswordSearchMatches(query, [], []);
         }
     }
 

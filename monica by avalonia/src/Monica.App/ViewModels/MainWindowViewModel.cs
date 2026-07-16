@@ -322,7 +322,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
             _passwordCustomFields = new Dictionary<long, IReadOnlyList<CustomField>>();
             _passwordCustomFieldSearchMatches = new HashSet<long>();
             _passwordCustomFieldSearchQuery = "";
-            _passwordAttachments = snapshot.PasswordAttachments;
+            _passwordAttachmentOwnerIds = snapshot.PasswordAttachmentOwnerIds.ToHashSet();
+            _passwordAttachmentSearchMatches = new HashSet<long>();
+            _passwordAttachmentSearchQuery = "";
             _passwordQuickAccessRecords = snapshot.PasswordQuickAccessRecords;
 
             AppDiagnostics.Measure("Track password selections", () =>

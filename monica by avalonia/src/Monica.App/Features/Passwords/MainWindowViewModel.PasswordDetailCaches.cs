@@ -82,50 +82,106 @@ public sealed partial class MainWindowViewModel
         _passwordCustomFieldSearchMatches = matches;
     }
 
-    private IReadOnlyList<Attachment> GetPasswordAttachments(long entryId)
+    private void AddPasswordAttachmentSearchMatch(long entryId, Attachment attachment)
     {
-        return _passwordAttachments.TryGetValue(entryId, out var attachments)
-            ? attachments
-            : [];
-    }
-
-    private IReadOnlyList<Attachment> GetGroupAttachments(PasswordEntry entry, IReadOnlyList<PasswordEntry> siblings) =>
-        GetGroupAttachments(entry, siblings, _passwordAttachments);
-
-    private static IReadOnlyList<Attachment> GetGroupAttachments(
-        PasswordEntry entry,
-        IReadOnlyList<PasswordEntry> siblings,
-        IReadOnlyDictionary<long, IReadOnlyList<Attachment>> attachmentsByPasswordId)
-    {
-        var siblingIds = siblings.Count == 0
-            ? [entry.Id]
-            : siblings.Select(item => item.Id).ToArray();
-        return siblingIds
-            .SelectMany(id => attachmentsByPasswordId.TryGetValue(id, out var attachments)
-                ? attachments
-                : Array.Empty<Attachment>())
-            .OrderByDescending(attachment => attachment.CreatedAt)
-            .ThenByDescending(attachment => attachment.Id)
-            .ToArray();
-    }
-
-    private void SetPasswordAttachments(long entryId, IReadOnlyList<Attachment> attachments)
-    {
-        var next = _passwordAttachments.ToDictionary(pair => pair.Key, pair => pair.Value);
-        if (attachments.Count == 0)
+        var query = _passwordAttachmentSearchQuery.Trim();
+        if (query.Length == 0 || !MatchesAttachmentMetadata(attachment, query))
         {
-            next.Remove(entryId);
+            return;
+        }
+
+        var matches = _passwordAttachmentSearchMatches.ToHashSet();
+        matches.Add(entryId);
+        _passwordAttachmentSearchMatches = matches;
+    }
+
+    private void RefreshPasswordAttachmentSearchMatch(long entryId, IReadOnlyList<Attachment> attachments)
+    {
+        var query = _passwordAttachmentSearchQuery.Trim();
+        if (query.Length == 0)
+        {
+            return;
+        }
+
+        var matches = _passwordAttachmentSearchMatches.ToHashSet();
+        if (attachments.Any(attachment => MatchesAttachmentMetadata(attachment, query)))
+        {
+            matches.Add(entryId);
         }
         else
         {
-            next[entryId] = attachments;
+            matches.Remove(entryId);
         }
 
-        _passwordAttachments = next;
+        _passwordAttachmentSearchMatches = matches;
+    }
+
+    private static bool MatchesAttachmentMetadata(Attachment attachment, string query) =>
+        ContainsAny(
+            query,
+            attachment.FileName,
+            attachment.ContentType,
+            attachment.StoragePath,
+            attachment.KeepassBinaryRef ?? "");
+
+    private async Task<IReadOnlyList<Attachment>> GetGroupAttachmentsAsync(
+        PasswordEntry entry,
+        IReadOnlyList<PasswordEntry> siblings,
+        CancellationToken cancellationToken = default)
+    {
+        var siblingIds = siblings.Count == 0
+            ? [entry.Id]
+            : siblings.Select(item => item.Id).Distinct().ToArray();
+        var ownerIds = siblingIds
+            .Where(_passwordAttachmentOwnerIds.Contains)
+            .ToArray();
+        if (ownerIds.Length == 0)
+        {
+            return [];
+        }
+
+        try
+        {
+            var attachmentsByOwnerId = await _repository.GetAttachmentsByOwnerIdsAsync(
+                "PASSWORD",
+                ownerIds,
+                cancellationToken);
+            return ownerIds
+                .SelectMany(id => attachmentsByOwnerId.TryGetValue(id, out var attachments)
+                    ? attachments
+                    : Array.Empty<Attachment>())
+                .OrderByDescending(attachment => attachment.CreatedAt)
+                .ThenByDescending(attachment => attachment.Id)
+                .ToArray();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            AppDiagnostics.Error($"Load password attachments failed. id={entry.Id}", ex);
+            return [];
+        }
+    }
+
+    private void SetPasswordAttachmentOwnerState(long entryId, bool hasAttachments)
+    {
+        var next = _passwordAttachmentOwnerIds.ToHashSet();
+        if (hasAttachments)
+        {
+            next.Add(entryId);
+        }
+        else
+        {
+            next.Remove(entryId);
+        }
+
+        _passwordAttachmentOwnerIds = next;
     }
 
     private void RefreshPasswordAttachmentState(PasswordEntry entry)
-        => PasswordPresentationState.RefreshAttachment(entry, _passwordAttachments);
+        => PasswordPresentationState.RefreshAttachment(entry, _passwordAttachmentOwnerIds);
 
     private Task<IReadOnlyList<CustomField>> GetGroupCustomFieldsAsync(
         PasswordEntry entry,

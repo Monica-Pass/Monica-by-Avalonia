@@ -13,7 +13,7 @@ internal static class VaultPasswordPresentationPreparer
         {
             cancellationToken.ThrowIfCancellationRequested();
             PasswordPresentationState.RefreshTotp(entry, totpService);
-            PasswordPresentationState.RefreshAttachment(entry, snapshot.PasswordAttachments);
+            PasswordPresentationState.RefreshAttachment(entry, snapshot.PasswordAttachmentOwnerIds);
             entry.IsSelected = false;
         }
     }
