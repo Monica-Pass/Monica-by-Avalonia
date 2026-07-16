@@ -15,6 +15,21 @@ public interface IMasterPasswordMaintenanceService
         CancellationToken cancellationToken = default);
 }
 
+public enum MasterPasswordMaintenanceFailureReason
+{
+    None = 0,
+    Unknown,
+    CurrentPasswordRequired,
+    CurrentPasswordIncorrect,
+    NewPasswordInvalid,
+    VaultNotInitialized,
+    VaultLocked,
+    ExistingDataDecryptionFailed,
+    NewDataEncryptionFailed,
+    PersistenceFailed,
+    Unavailable
+}
+
 public sealed record MasterPasswordMaintenanceResult(
     bool Success,
     string Message,
@@ -25,7 +40,8 @@ public sealed record MasterPasswordMaintenanceResult(
     int SecureItemsReencrypted = 0,
     int OperationLogsReencrypted = 0,
     int RemoteSourceSecretsReencrypted = 0,
-    int BitwardenSecretsReencrypted = 0)
+    int BitwardenSecretsReencrypted = 0,
+    MasterPasswordMaintenanceFailureReason FailureReason = MasterPasswordMaintenanceFailureReason.None)
 {
     public int TotalSecretsReencrypted =>
         PasswordsReencrypted +
@@ -37,7 +53,10 @@ public sealed record MasterPasswordMaintenanceResult(
         RemoteSourceSecretsReencrypted +
         BitwardenSecretsReencrypted;
 
-    public static MasterPasswordMaintenanceResult Failure(string message) => new(false, message);
+    public static MasterPasswordMaintenanceResult Failure(
+        string message,
+        MasterPasswordMaintenanceFailureReason failureReason = MasterPasswordMaintenanceFailureReason.Unknown) =>
+        new(false, message, FailureReason: failureReason);
 }
 
 public sealed class MasterPasswordMaintenanceService(
@@ -101,13 +120,16 @@ public sealed class MasterPasswordMaintenanceService(
     {
         if (string.IsNullOrWhiteSpace(currentPassword))
         {
-            return MasterPasswordMaintenanceResult.Failure("Current master password is required.");
+            return MasterPasswordMaintenanceResult.Failure(
+                "Current master password is required.",
+                MasterPasswordMaintenanceFailureReason.CurrentPasswordRequired);
         }
 
         if (string.IsNullOrWhiteSpace(newPassword) || !VaultMasterPasswordPolicy.MeetsMinimumLength(newPassword))
         {
             return MasterPasswordMaintenanceResult.Failure(
-                $"New master password must be at least {VaultMasterPasswordPolicy.MinimumLength} characters.");
+                $"New master password must be at least {VaultMasterPasswordPolicy.MinimumLength} characters.",
+                MasterPasswordMaintenanceFailureReason.NewPasswordInvalid);
         }
 
         await migrator.MigrateAsync(cancellationToken);
@@ -117,12 +139,16 @@ public sealed class MasterPasswordMaintenanceService(
         var storedHash = await LoadCredentialAsync(connection, cancellationToken);
         if (storedHash is null)
         {
-            return MasterPasswordMaintenanceResult.Failure("Vault credential is not initialized.");
+            return MasterPasswordMaintenanceResult.Failure(
+                "Vault credential is not initialized.",
+                MasterPasswordMaintenanceFailureReason.VaultNotInitialized);
         }
 
         if (!cryptoService.VerifyMasterPassword(currentPassword, storedHash))
         {
-            return MasterPasswordMaintenanceResult.Failure("Current master password is incorrect.");
+            return MasterPasswordMaintenanceResult.Failure(
+                "Current master password is incorrect.",
+                MasterPasswordMaintenanceFailureReason.CurrentPasswordIncorrect);
         }
 
         return await ReEncryptUnlockedVaultAsync(connection, newPassword, cancellationToken);
@@ -135,12 +161,15 @@ public sealed class MasterPasswordMaintenanceService(
         if (string.IsNullOrWhiteSpace(newPassword) || !VaultMasterPasswordPolicy.MeetsMinimumLength(newPassword))
         {
             return MasterPasswordMaintenanceResult.Failure(
-                $"New master password must be at least {VaultMasterPasswordPolicy.MinimumLength} characters.");
+                $"New master password must be at least {VaultMasterPasswordPolicy.MinimumLength} characters.",
+                MasterPasswordMaintenanceFailureReason.NewPasswordInvalid);
         }
 
         if (!cryptoService.IsUnlocked)
         {
-            return MasterPasswordMaintenanceResult.Failure("Vault must be unlocked before resetting the master password.");
+            return MasterPasswordMaintenanceResult.Failure(
+                "Vault must be unlocked before resetting the master password.",
+                MasterPasswordMaintenanceFailureReason.VaultLocked);
         }
 
         await migrator.MigrateAsync(cancellationToken);
@@ -150,7 +179,9 @@ public sealed class MasterPasswordMaintenanceService(
         var storedHash = await LoadCredentialAsync(connection, cancellationToken);
         if (storedHash is null)
         {
-            return MasterPasswordMaintenanceResult.Failure("Vault credential is not initialized.");
+            return MasterPasswordMaintenanceResult.Failure(
+                "Vault credential is not initialized.",
+                MasterPasswordMaintenanceFailureReason.VaultNotInitialized);
         }
 
         return await ReEncryptUnlockedVaultAsync(connection, newPassword, cancellationToken);
@@ -168,7 +199,9 @@ public sealed class MasterPasswordMaintenanceService(
         }
         catch (Exception ex)
         {
-            return MasterPasswordMaintenanceResult.Failure($"Failed to decrypt existing vault data: {ex.Message}");
+            return MasterPasswordMaintenanceResult.Failure(
+                $"Failed to decrypt existing vault data: {ex.Message}",
+                MasterPasswordMaintenanceFailureReason.ExistingDataDecryptionFailed);
         }
 
         var newHash = cryptoService.HashMasterPassword(newPassword);
@@ -186,7 +219,9 @@ public sealed class MasterPasswordMaintenanceService(
         }
         catch (Exception ex)
         {
-            return MasterPasswordMaintenanceResult.Failure($"Failed to encrypt vault data with the new master password: {ex.Message}");
+            return MasterPasswordMaintenanceResult.Failure(
+                $"Failed to encrypt vault data with the new master password: {ex.Message}",
+                MasterPasswordMaintenanceFailureReason.NewDataEncryptionFailed);
         }
 
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -203,7 +238,9 @@ public sealed class MasterPasswordMaintenanceService(
         catch (Exception ex)
         {
             await transaction.RollbackAsync(cancellationToken);
-            return MasterPasswordMaintenanceResult.Failure($"Failed to save re-encrypted vault data: {ex.Message}");
+            return MasterPasswordMaintenanceResult.Failure(
+                $"Failed to save re-encrypted vault data: {ex.Message}",
+                MasterPasswordMaintenanceFailureReason.PersistenceFailed);
         }
 
         cryptoService.InitializeSession(newPassword, newHash.Salt);

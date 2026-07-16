@@ -90,6 +90,7 @@ public sealed class MasterPasswordMaintenanceTests
         var result = await harness.Service.ChangeMasterPasswordAsync("wrong password", "new password");
 
         Assert.False(result.Success);
+        Assert.Equal(MasterPasswordMaintenanceFailureReason.CurrentPasswordIncorrect, result.FailureReason);
         Assert.Contains("incorrect", result.Message, StringComparison.OrdinalIgnoreCase);
         var loadedCredential = await harness.CredentialStore.GetAsync();
         Assert.NotNull(loadedCredential);
@@ -115,6 +116,7 @@ public sealed class MasterPasswordMaintenanceTests
         var result = await harness.Service.ChangeMasterPasswordAsync("old password", "new password");
 
         Assert.False(result.Success);
+        Assert.Equal(MasterPasswordMaintenanceFailureReason.ExistingDataDecryptionFailed, result.FailureReason);
         Assert.Contains("decrypt", result.Message, StringComparison.OrdinalIgnoreCase);
         var loadedCredential = await harness.CredentialStore.GetAsync();
         Assert.NotNull(loadedCredential);
@@ -158,6 +160,7 @@ public sealed class MasterPasswordMaintenanceTests
         var result = await lockedService.ResetMasterPasswordFromUnlockedVaultAsync("new password");
 
         Assert.False(result.Success);
+        Assert.Equal(MasterPasswordMaintenanceFailureReason.VaultLocked, result.FailureReason);
         Assert.Contains("unlocked", result.Message, StringComparison.OrdinalIgnoreCase);
         var loadedCredential = await harness.CredentialStore.GetAsync();
         Assert.NotNull(loadedCredential);

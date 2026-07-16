@@ -27,7 +27,10 @@ public sealed partial class MainWindowViewModel
             var result = await _masterPasswordMaintenanceService.ResetMasterPasswordFromUnlockedVaultAsync(newPassword);
             if (!result.Success)
             {
-                StatusMessage = _localization.Format("ResetMasterPasswordFailedFormat", result.Message);
+                ReportSettingsFailure(
+                    "Master password reset reported a failure",
+                    "ResetMasterPasswordFailed",
+                    result.Message);
                 return;
             }
 
@@ -38,7 +41,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            StatusMessage = _localization.Format("ResetMasterPasswordFailedFormat", ex.Message);
+            ReportSettingsFailure("Master password reset failed", "ResetMasterPasswordFailed", ex);
         }
         finally
         {
@@ -58,11 +61,10 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        if (!TryBuildSecurityQuestionDrafts(out var question1, out var question2)) return;
         if (!TryBeginSecurityMaintenance(() => IsSavingSecurityQuestions = true)) return;
         try
         {
-            var question1 = new SecurityQuestionDraft(SecurityQuestion1Id, GetSecurityQuestionText(SecurityQuestion1Id, SecurityQuestion1CustomText), SecurityQuestion1Answer);
-            var question2 = new SecurityQuestionDraft(SecurityQuestion2Id, GetSecurityQuestionText(SecurityQuestion2Id, SecurityQuestion2CustomText), SecurityQuestion2Answer);
             var setup = await Task.Run(() => _securityQuestionService.CreateSetup(question1, question2));
             _settingsService.Current.SecurityRecovery = setup;
             ApplySecurityRecoverySettings(setup);
@@ -72,12 +74,42 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            StatusMessage = _localization.Format("SecurityQuestionsSaveFailedFormat", ex.Message);
+            ReportSettingsFailure("Saving security questions failed", "SecurityQuestionsSaveFailed", ex);
         }
         finally
         {
             EndSecurityMaintenance(() => IsSavingSecurityQuestions = false);
         }
+    }
+
+    private bool TryBuildSecurityQuestionDrafts(
+        out SecurityQuestionDraft question1,
+        out SecurityQuestionDraft question2)
+    {
+        var question1Text = GetSecurityQuestionText(SecurityQuestion1Id, SecurityQuestion1CustomText);
+        var question2Text = GetSecurityQuestionText(SecurityQuestion2Id, SecurityQuestion2CustomText);
+        question1 = new(SecurityQuestion1Id, question1Text, SecurityQuestion1Answer);
+        question2 = new(SecurityQuestion2Id, question2Text, SecurityQuestion2Answer);
+
+        if (string.IsNullOrWhiteSpace(question1Text) || string.IsNullOrWhiteSpace(question2Text))
+        {
+            StatusMessage = _localization.Get("SecurityQuestionTextRequired");
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(SecurityQuestion1Answer) || string.IsNullOrWhiteSpace(SecurityQuestion2Answer))
+        {
+            StatusMessage = _localization.Get("SecurityQuestionAnswersRequired");
+            return false;
+        }
+
+        if (string.Equals(question1Text.Trim(), question2Text.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            StatusMessage = _localization.Get("SecurityQuestionsMustDiffer");
+            return false;
+        }
+
+        return true;
     }
 
     private bool TryValidateSecurityRecoveryReset(

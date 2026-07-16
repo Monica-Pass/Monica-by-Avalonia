@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.Input;
 using Monica.Core.Models;
 using Monica.Core.Services;
+using Monica.Data.Services;
 
 namespace Monica.App.ViewModels;
 
@@ -35,7 +36,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            StatusMessage = _localization.Format("GitHubRepositoryOpenFailedFormat", ex.Message);
+            ReportSettingsFailure("Opening the GitHub repository failed", "GitHubRepositoryOpenFailed", ex);
         }
     }
 
@@ -83,7 +84,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            StatusMessage = _localization.Format("ClearVaultDataFailedFormat", ex.Message);
+            ReportSettingsFailure("Clearing vault data failed", "ClearVaultDataFailed", ex);
         }
         finally
         {
@@ -140,10 +141,16 @@ public sealed partial class MainWindowViewModel
                 newPassword);
             if (!result.Success)
             {
-                var message = result.Message.Contains("incorrect", StringComparison.OrdinalIgnoreCase)
-                    ? _localization.Get("WrongMasterPassword")
-                    : result.Message;
-                StatusMessage = _localization.Format("ChangeMasterPasswordFailedFormat", message);
+                if (result.FailureReason == MasterPasswordMaintenanceFailureReason.CurrentPasswordIncorrect)
+                {
+                    StatusMessage = _localization.Get("WrongMasterPassword");
+                    return;
+                }
+
+                ReportSettingsFailure(
+                    "Master password update reported a failure",
+                    "ChangeMasterPasswordFailed",
+                    result.Message);
                 return;
             }
 
@@ -156,7 +163,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            StatusMessage = _localization.Format("ChangeMasterPasswordFailedFormat", ex.Message);
+            ReportSettingsFailure("Master password update failed", "ChangeMasterPasswordFailed", ex);
         }
         finally
         {
