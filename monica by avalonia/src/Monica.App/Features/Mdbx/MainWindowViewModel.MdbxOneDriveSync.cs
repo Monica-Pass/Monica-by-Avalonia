@@ -31,7 +31,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            StatusMessage = _localization.Format("OneDriveConnectionFailedFormat", ex.Message);
+            ReportRemoteSyncFailure("Connecting OneDrive failed", "OneDriveConnectionFailed", ex);
         }
         finally
         {
@@ -60,7 +60,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            StatusMessage = _localization.Format("OneDriveConnectionFailedFormat", ex.Message);
+            ReportRemoteSyncFailure("Disconnecting OneDrive failed", "OneDriveConnectionFailed", ex);
         }
         finally
         {
@@ -167,17 +167,17 @@ public sealed partial class MainWindowViewModel
                 cancellationToken);
             await MarkOneDriveMdbxSyncedAsync(database, workingCopyPath, version);
         }
-        catch (RemoteFileConflictException ex)
+        catch (RemoteFileConflictException)
         {
-            await MarkOneDriveMdbxSyncFailedAsync(database, SyncStatus.Conflict, ex.Message);
+            await MarkOneDriveMdbxSyncFailedAsync(database, SyncStatus.Conflict, MdbxRemoteConflictFailureCode);
             throw;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             await MarkOneDriveMdbxSyncFailedAsync(
                 database,
                 writeCondition is null ? SyncStatus.PendingUpload : SyncStatus.Conflict,
-                ex.Message);
+                MdbxOneDriveSyncFailureCode);
             throw;
         }
     }
@@ -216,9 +216,9 @@ public sealed partial class MainWindowViewModel
             File.Move(incomingPath, workingCopyPath, overwrite: true);
             await MarkOneDriveMdbxSyncedAsync(database, workingCopyPath, version);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            await MarkOneDriveMdbxSyncFailedAsync(database, failureStatus, ex.Message);
+            await MarkOneDriveMdbxSyncFailedAsync(database, failureStatus, MdbxOneDriveSyncFailureCode);
             throw;
         }
         finally
@@ -246,10 +246,13 @@ public sealed partial class MainWindowViewModel
         await SaveMdbxSyncStateAsync(database);
     }
 
-    private Task MarkOneDriveMdbxSyncFailedAsync(LocalMdbxDatabase database, SyncStatus status, string error)
+    private Task MarkOneDriveMdbxSyncFailedAsync(
+        LocalMdbxDatabase database,
+        SyncStatus status,
+        string failureCode)
     {
         database.LastSyncStatus = status;
-        database.LastSyncError = error;
+        database.LastSyncError = failureCode;
         return SaveMdbxSyncStateAsync(database);
     }
 

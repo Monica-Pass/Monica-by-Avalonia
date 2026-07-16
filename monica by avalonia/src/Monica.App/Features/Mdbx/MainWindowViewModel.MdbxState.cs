@@ -1,10 +1,15 @@
 using Monica.Core.Models;
 using Monica.Data;
+using Monica.Platform.Services;
 
 namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    private const string MdbxRemoteConflictFailureCode = "remote-conflict";
+    private const string MdbxMissingRemoteRevisionFailureCode = "missing-remote-revision";
+    private const string MdbxOneDriveSyncFailureCode = "onedrive-sync-failed";
+    private const string MdbxWebDavSyncFailureCode = "webdav-sync-failed";
     private int _mdbxOperationActive;
 
     private async Task RunMdbxOperationAsync(string operationKey, Func<Task> action)
@@ -20,12 +25,14 @@ public sealed partial class MainWindowViewModel
         {
             await action();
         }
+        catch (OneDriveAccountUnavailableException ex)
+        {
+            AppDiagnostics.Error($"MDBX OneDrive account unavailable: {operationKey}", ex);
+            StatusMessage = _localization.Get("MdbxOneDriveAccountRequired");
+        }
         catch (Exception ex)
         {
-            StatusMessage = _localization.Format(
-                "MdbxOperationFailedFormat",
-                _localization.Get(operationKey),
-                ex.Message);
+            ReportRemoteSyncFailure($"MDBX operation failed: {operationKey}", "MdbxOperationFailed", ex);
         }
         finally
         {
@@ -145,9 +152,7 @@ public sealed partial class MainWindowViewModel
         var cachePath = string.IsNullOrWhiteSpace(database.CacheCopyPath)
             ? _localization.Get("NotConfigured")
             : database.CacheCopyPath;
-        var lastSyncError = string.IsNullOrWhiteSpace(database.LastSyncError)
-            ? _localization.Get("MdbxNoSyncErrors")
-            : database.LastSyncError!;
+        var lastSyncError = LocalizeMdbxSyncError(database);
 
         return new MdbxDatabaseDisplayItem(
             database,
@@ -189,9 +194,43 @@ public sealed partial class MainWindowViewModel
         database.LastSyncStatus is SyncStatus.Failed or SyncStatus.Conflict ||
         !string.IsNullOrWhiteSpace(database.LastSyncError);
 
+    private string LocalizeMdbxSyncError(LocalMdbxDatabase database)
+    {
+        if (string.IsNullOrWhiteSpace(database.LastSyncError))
+        {
+            return _localization.Get("MdbxNoSyncErrors");
+        }
+
+        if (string.Equals(database.LastSyncError, MdbxMissingRemoteRevisionFailureCode, StringComparison.Ordinal))
+        {
+            return _localization.Get("MdbxWebDavMissingRevision");
+        }
+
+        if (database.LastSyncStatus == SyncStatus.Conflict ||
+            string.Equals(database.LastSyncError, MdbxRemoteConflictFailureCode, StringComparison.Ordinal))
+        {
+            return _localization.Get("MdbxRemoteConflictDetected");
+        }
+
+        if (database.StorageLocation == MdbxStorageLocation.RemoteWebDav ||
+            string.Equals(database.LastSyncError, MdbxWebDavSyncFailureCode, StringComparison.Ordinal))
+        {
+            return _localization.Get("MdbxWebDavSyncFailed");
+        }
+
+        return database.StorageLocation == MdbxStorageLocation.RemoteOneDrive ||
+               string.Equals(database.LastSyncError, MdbxOneDriveSyncFailureCode, StringComparison.Ordinal)
+            ? _localization.Get("MdbxOneDriveSyncFailed")
+            : _localization.Get("MdbxSyncFailed");
+    }
+
     private static string BuildMdbxWorkingCopyPath(string fileName)
     {
         return MonicaAppDataPaths.GetPath(Path.Combine("mdbx", fileName));
+    }
+
+    private sealed class MdbxMissingRemoteRevisionException : InvalidOperationException
+    {
     }
 
     private async Task<LocalMdbxDatabase> CreateRemoteMdbxMetadataAsync(

@@ -32,18 +32,25 @@ public sealed partial class MainWindowViewModel
                 cancellationToken);
             await MarkWebDavMdbxSyncedAsync(database, workingCopyPath, version);
         }
-        catch (RemoteFileConflictException ex)
+        catch (MdbxMissingRemoteRevisionException)
         {
-            var message = _localization.Format("MdbxWebDavConflictDetectedFormat", database.Name, ex.Message);
-            await MarkWebDavMdbxSyncFailedAsync(database, SyncStatus.Conflict, message);
-            throw new RemoteFileConflictException(message);
+            await MarkWebDavMdbxSyncFailedAsync(
+                database,
+                SyncStatus.Conflict,
+                MdbxMissingRemoteRevisionFailureCode);
+            throw;
         }
-        catch (Exception ex)
+        catch (RemoteFileConflictException)
+        {
+            await MarkWebDavMdbxSyncFailedAsync(database, SyncStatus.Conflict, MdbxRemoteConflictFailureCode);
+            throw;
+        }
+        catch (Exception)
         {
             var failureStatus = writeCondition is null
                 ? SyncStatus.PendingUpload
                 : SyncStatus.Conflict;
-            await MarkWebDavMdbxSyncFailedAsync(database, failureStatus, ex.Message);
+            await MarkWebDavMdbxSyncFailedAsync(database, failureStatus, MdbxWebDavSyncFailureCode);
             throw;
         }
     }
@@ -85,9 +92,9 @@ public sealed partial class MainWindowViewModel
             File.Move(incomingPath, workingCopyPath, overwrite: true);
             await MarkWebDavMdbxSyncedAsync(database, workingCopyPath, version);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            await MarkWebDavMdbxSyncFailedAsync(database, failureStatus, ex.Message);
+            await MarkWebDavMdbxSyncFailedAsync(database, failureStatus, MdbxWebDavSyncFailureCode);
             throw;
         }
         finally
@@ -136,10 +143,10 @@ public sealed partial class MainWindowViewModel
     private async Task MarkWebDavMdbxSyncFailedAsync(
         LocalMdbxDatabase database,
         SyncStatus status,
-        string error)
+        string failureCode)
     {
         database.LastSyncStatus = status;
-        database.LastSyncError = error;
+        database.LastSyncError = failureCode;
         await SaveMdbxSyncStateAsync(database);
     }
 
@@ -165,7 +172,7 @@ public sealed partial class MainWindowViewModel
             return RemoteWriteCondition.CreateOnly;
         }
 
-        throw new RemoteFileConflictException(_localization.Get("MdbxWebDavMissingRevision"));
+        throw new MdbxMissingRemoteRevisionException();
     }
 
     private static string GetMdbxWorkingCopyPath(LocalMdbxDatabase database)

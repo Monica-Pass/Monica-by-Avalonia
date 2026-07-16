@@ -1,5 +1,6 @@
 using System.Text;
 using CommunityToolkit.Mvvm.Input;
+using Monica.App.Services;
 using Monica.Platform.Services;
 
 namespace Monica.App.ViewModels;
@@ -71,7 +72,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            StatusMessage = _localization.Format("WebDavBackupHistoryFailedFormat", ex.Message);
+            ReportRemoteSyncFailure("Loading WebDAV backup history failed", "WebDavBackupHistoryFailed", ex);
         }
         finally
         {
@@ -100,7 +101,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            StatusMessage = _localization.Format("WebDavConnectionTestFailedFormat", ex.Message);
+            ReportRemoteSyncFailure("WebDAV connection test failed", "WebDavConnectionTestFailed", ex);
         }
         finally
         {
@@ -179,7 +180,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            StatusMessage = _localization.Format("CreateWebDavBackupFailedFormat", ex.Message);
+            ReportRemoteSyncFailure("Creating WebDAV backup failed", "CreateWebDavBackupFailed", ex);
         }
         finally
         {
@@ -230,9 +231,13 @@ public sealed partial class MainWindowViewModel
         {
             SetWebDavBackupSizeLimitError(ex);
         }
+        catch (WebDavBackupCryptoException ex)
+        {
+            SetWebDavBackupCryptoError(ex);
+        }
         catch (Exception ex)
         {
-            StatusMessage = _localization.Format("RestoreWebDavBackupFailedFormat", ex.Message);
+            ReportRemoteSyncFailure("Restoring WebDAV backup failed", "RestoreWebDavBackupFailed", ex);
         }
         finally
         {
@@ -284,7 +289,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            StatusMessage = _localization.Format("DeleteWebDavBackupFailedFormat", ex.Message);
+            ReportRemoteSyncFailure("Deleting WebDAV backup failed", "DeleteWebDavBackupFailed", ex);
         }
         finally
         {

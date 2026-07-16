@@ -17,6 +17,25 @@ public interface IWebDavBackupCryptoService
         CancellationToken cancellationToken = default);
 }
 
+public enum WebDavBackupCryptoFailureReason
+{
+    InvalidPayload,
+    UnsupportedVersion,
+    UnsupportedKdf,
+    UnsupportedIterations,
+    InvalidParameters,
+    InvalidCiphertext,
+    DecryptionFailed
+}
+
+public sealed class WebDavBackupCryptoException(
+    WebDavBackupCryptoFailureReason reason,
+    string message,
+    Exception? innerException = null) : InvalidOperationException(message, innerException)
+{
+    public WebDavBackupCryptoFailureReason Reason { get; } = reason;
+}
+
 public sealed class WebDavBackupCryptoService : IWebDavBackupCryptoService
 {
     private const int PackageVersion = 1;
@@ -91,21 +110,44 @@ public sealed class WebDavBackupCryptoService : IWebDavBackupCryptoService
     private static string Decrypt(string content, string password, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var package = JsonSerializer.Deserialize<EncryptedBackupPackage>(content)
-            ?? throw new InvalidOperationException("Invalid encrypted Monica backup payload.");
+        EncryptedBackupPackage? package;
+        try
+        {
+            package = JsonSerializer.Deserialize<EncryptedBackupPackage>(content);
+        }
+        catch (JsonException ex)
+        {
+            throw new WebDavBackupCryptoException(
+                WebDavBackupCryptoFailureReason.InvalidPayload,
+                "Invalid encrypted Monica backup payload.",
+                ex);
+        }
+
+        if (package is null)
+        {
+            throw new WebDavBackupCryptoException(
+                WebDavBackupCryptoFailureReason.InvalidPayload,
+                "Invalid encrypted Monica backup payload.");
+        }
         if (package.Version != PackageVersion)
         {
-            throw new InvalidOperationException("Unsupported Monica backup encryption version.");
+            throw new WebDavBackupCryptoException(
+                WebDavBackupCryptoFailureReason.UnsupportedVersion,
+                "Unsupported Monica backup encryption version.");
         }
 
         if (!string.Equals(package.Kdf, Kdf, StringComparison.Ordinal))
         {
-            throw new InvalidOperationException("Unsupported Monica backup encryption KDF.");
+            throw new WebDavBackupCryptoException(
+                WebDavBackupCryptoFailureReason.UnsupportedKdf,
+                "Unsupported Monica backup encryption KDF.");
         }
 
         if (package.Iterations != KdfIterations)
         {
-            throw new InvalidOperationException("Unsupported Monica backup encryption iterations.");
+            throw new WebDavBackupCryptoException(
+                WebDavBackupCryptoFailureReason.UnsupportedIterations,
+                "Unsupported Monica backup encryption iterations.");
         }
 
         var salt = DecodeFixedLengthBase64(package.Salt, SaltSize);
@@ -118,7 +160,10 @@ public sealed class WebDavBackupCryptoService : IWebDavBackupCryptoService
         }
         catch (FormatException ex)
         {
-            throw new InvalidOperationException("Invalid Monica backup ciphertext.", ex);
+            throw new WebDavBackupCryptoException(
+                WebDavBackupCryptoFailureReason.InvalidCiphertext,
+                "Invalid Monica backup ciphertext.",
+                ex);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -137,7 +182,17 @@ public sealed class WebDavBackupCryptoService : IWebDavBackupCryptoService
                 KeySize);
             cancellationToken.ThrowIfCancellationRequested();
             using var aes = new AesGcm(key, TagSize);
-            aes.Decrypt(nonce, cipherBytes, tag, plainBytes);
+            try
+            {
+                aes.Decrypt(nonce, cipherBytes, tag, plainBytes);
+            }
+            catch (CryptographicException ex)
+            {
+                throw new WebDavBackupCryptoException(
+                    WebDavBackupCryptoFailureReason.DecryptionFailed,
+                    "Could not decrypt the Monica backup.",
+                    ex);
+            }
             cancellationToken.ThrowIfCancellationRequested();
             return Encoding.UTF8.GetString(plainBytes);
         }
@@ -161,7 +216,9 @@ public sealed class WebDavBackupCryptoService : IWebDavBackupCryptoService
         var expectedEncodedLength = ((expectedByteLength + 2) / 3) * 4;
         if (value is null || value.Length != expectedEncodedLength)
         {
-            throw new InvalidOperationException("Invalid Monica backup encryption parameters.");
+            throw new WebDavBackupCryptoException(
+                WebDavBackupCryptoFailureReason.InvalidParameters,
+                "Invalid Monica backup encryption parameters.");
         }
 
         byte[] decoded;
@@ -171,12 +228,17 @@ public sealed class WebDavBackupCryptoService : IWebDavBackupCryptoService
         }
         catch (FormatException ex)
         {
-            throw new InvalidOperationException("Invalid Monica backup encryption parameters.", ex);
+            throw new WebDavBackupCryptoException(
+                WebDavBackupCryptoFailureReason.InvalidParameters,
+                "Invalid Monica backup encryption parameters.",
+                ex);
         }
 
         if (decoded.Length != expectedByteLength)
         {
-            throw new InvalidOperationException("Invalid Monica backup encryption parameters.");
+            throw new WebDavBackupCryptoException(
+                WebDavBackupCryptoFailureReason.InvalidParameters,
+                "Invalid Monica backup encryption parameters.");
         }
 
         return decoded;

@@ -106,6 +106,9 @@ public sealed partial class AppSettingsTests
         public OneDriveAccountInfo Account { get; } = new("account-1", "Monica User", "user@example.com");
         public int SignInCalls { get; private set; }
         public bool ConflictOnUpload { get; set; }
+        public string ConflictMessage { get; set; } = "remote changed";
+        public Exception? SignInFailure { get; set; }
+        public Exception? UploadFailure { get; set; }
         public List<RemoteWriteCondition> UploadConditions { get; } = [];
         public List<string> DownloadAccountIds { get; } = [];
         public byte[] DownloadContent { get; set; } = [];
@@ -119,6 +122,11 @@ public sealed partial class AppSettingsTests
         public Task<OneDriveSignInChallenge> BeginSignInAsync(CancellationToken cancellationToken = default)
         {
             SignInCalls++;
+            if (SignInFailure is not null)
+            {
+                return Task.FromException<OneDriveSignInChallenge>(SignInFailure);
+            }
+
             _signedIn = true;
             return Task.FromResult(new OneDriveSignInChallenge(
                 new OneDriveDeviceCodePrompt(
@@ -147,9 +155,14 @@ public sealed partial class AppSettingsTests
         {
             Assert.Equal(Account.AccountId, accountId);
             UploadConditions.Add(condition);
+            if (UploadFailure is not null)
+            {
+                throw UploadFailure;
+            }
+
             if (ConflictOnUpload)
             {
-                throw new RemoteFileConflictException("remote changed");
+                throw new RemoteFileConflictException(ConflictMessage);
             }
 
             _ = await ReadAllBytesAsync(content, cancellationToken);

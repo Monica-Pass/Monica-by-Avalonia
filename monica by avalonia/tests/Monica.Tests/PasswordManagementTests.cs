@@ -3004,7 +3004,7 @@ public sealed partial class PasswordManagementTests
         var target = await RestoreEncryptedWebDavBackupPackageAsync(unsupportedPackage);
 
         Assert.Empty(await target.Repository.GetPasswordsAsync());
-        Assert.Contains("Unsupported Monica backup encryption version", target.ViewModel.StatusMessage, StringComparison.Ordinal);
+        Assert.Equal(target.ViewModel.L.Get("WebDavBackupUnsupportedVersion"), target.ViewModel.StatusMessage);
     }
 
     [Fact]
@@ -3015,7 +3015,7 @@ public sealed partial class PasswordManagementTests
         var target = await RestoreEncryptedWebDavBackupPackageAsync(unsupportedPackage);
 
         Assert.Empty(await target.Repository.GetPasswordsAsync());
-        Assert.Contains("Unsupported Monica backup encryption iterations", target.ViewModel.StatusMessage, StringComparison.Ordinal);
+        Assert.Equal(target.ViewModel.L.Get("WebDavBackupUnsupportedIterations"), target.ViewModel.StatusMessage);
     }
 
     [Theory]
@@ -3030,7 +3030,18 @@ public sealed partial class PasswordManagementTests
         var target = await RestoreEncryptedWebDavBackupPackageAsync(package.ToJsonString());
 
         Assert.Empty(await target.Repository.GetPasswordsAsync());
-        Assert.Contains("Invalid Monica backup encryption parameters", target.ViewModel.StatusMessage, StringComparison.Ordinal);
+        Assert.Equal(target.ViewModel.L.Get("WebDavBackupInvalidParameters"), target.ViewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task ViewModel_rejects_wrong_webdav_backup_password_without_exposing_crypto_details()
+    {
+        var content = await CreateEncryptedWebDavBackupPackageAsync("Password backup", "password-secret");
+        var target = await RestoreEncryptedWebDavBackupPackageAsync(content, "wrong password");
+
+        Assert.Empty(await target.Repository.GetPasswordsAsync());
+        Assert.Equal(target.ViewModel.L.Get("WebDavBackupDecryptionFailed"), target.ViewModel.StatusMessage);
+        Assert.DoesNotContain("authentication tag", target.ViewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -4495,14 +4506,16 @@ public sealed partial class PasswordManagementTests
         return webDav.UploadedContent;
     }
 
-    private static async Task<PasswordHarness> RestoreEncryptedWebDavBackupPackageAsync(string content)
+    private static async Task<PasswordHarness> RestoreEncryptedWebDavBackupPackageAsync(
+        string content,
+        string backupPassword = "backup password")
     {
         var webDav = new FakeWebDavBackupService { DownloadContent = content };
         var target = CreateHarness(webDavBackupService: webDav);
         target.Crypto.InitializeSession("target password", new byte[16]);
         target.ViewModel.WebDavEnabled = true;
         target.ViewModel.WebDavServerUrl = "https://dav.example.com/";
-        target.ViewModel.WebDavBackupEncryptionPassword = "backup password";
+        target.ViewModel.WebDavBackupEncryptionPassword = backupPassword;
         var item = new WebDavBackupHistoryItem("security-test.monica.enc.json", "/Monica/security-test.monica.enc.json", "2026/07/15 12:00", "1 KB", null);
 
         await target.ViewModel.RestoreWebDavBackupCommand.ExecuteAsync(item);

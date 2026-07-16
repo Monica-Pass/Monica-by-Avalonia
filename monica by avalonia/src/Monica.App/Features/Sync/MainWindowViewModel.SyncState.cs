@@ -179,6 +179,23 @@ public sealed partial class MainWindowViewModel
             FormatByteSize(exception.MaximumBytes));
     }
 
+    private void SetWebDavBackupCryptoError(WebDavBackupCryptoException exception)
+    {
+        AppDiagnostics.Error("WebDAV backup cryptographic validation failed", exception);
+        var messageKey = exception.Reason switch
+        {
+            WebDavBackupCryptoFailureReason.InvalidPayload => "WebDavBackupInvalidPayload",
+            WebDavBackupCryptoFailureReason.UnsupportedVersion => "WebDavBackupUnsupportedVersion",
+            WebDavBackupCryptoFailureReason.UnsupportedKdf => "WebDavBackupUnsupportedKdf",
+            WebDavBackupCryptoFailureReason.UnsupportedIterations => "WebDavBackupUnsupportedIterations",
+            WebDavBackupCryptoFailureReason.InvalidParameters => "WebDavBackupInvalidParameters",
+            WebDavBackupCryptoFailureReason.InvalidCiphertext => "WebDavBackupInvalidCiphertext",
+            WebDavBackupCryptoFailureReason.DecryptionFailed => "WebDavBackupDecryptionFailed",
+            _ => "RestoreWebDavBackupFailed"
+        };
+        StatusMessage = _localization.Get(messageKey);
+    }
+
     private string BuildWebDavSourceStatus()
     {
         if (string.IsNullOrWhiteSpace(WebDavServerUrl))

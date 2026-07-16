@@ -434,7 +434,8 @@ public sealed partial class AppSettingsTests
 
         var database = Assert.Single(viewModel.MdbxDatabases);
         Assert.Equal(SyncStatus.PendingUpload, database.LastSyncStatus);
-        Assert.Contains("fixture upload failure", database.LastSyncError, StringComparison.Ordinal);
+        Assert.DoesNotContain("fixture upload failure", database.LastSyncError ?? "", StringComparison.Ordinal);
+        Assert.Equal(viewModel.L.Get("MdbxWebDavSyncFailed"), Assert.Single(viewModel.MdbxDatabaseItems).LastSyncErrorText);
         webDav.UploadBinaryFailure = null;
 
         await viewModel.CreateWebDavMdbxVaultCommand.ExecuteAsync(null);
@@ -609,7 +610,8 @@ public sealed partial class AppSettingsTests
 
         Assert.False(viewModel.IsMdbxBusy);
         Assert.Empty(viewModel.MdbxDatabases);
-        Assert.Equal(viewModel.L.Format("MdbxOperationFailedFormat", viewModel.L.Get("MdbxOperationCreate"), "fixture failure"), viewModel.StatusMessage);
+        Assert.Equal(viewModel.L.Get("MdbxOperationFailed"), viewModel.StatusMessage);
+        Assert.DoesNotContain("fixture failure", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

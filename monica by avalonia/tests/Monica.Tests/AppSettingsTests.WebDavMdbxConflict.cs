@@ -36,13 +36,14 @@ public sealed partial class AppSettingsTests
 
         var current = Assert.Single(viewModel.MdbxDatabases);
         Assert.Equal(SyncStatus.Conflict, current.LastSyncStatus);
-        Assert.Contains("remote version changed", current.LastSyncError, StringComparison.Ordinal);
+        Assert.DoesNotContain("remote version changed", current.LastSyncError ?? "", StringComparison.Ordinal);
         Assert.Equal(localBytes, await File.ReadAllBytesAsync(workingCopyPath));
         Assert.Equal(initiallyUploadedBytes, webDav.UploadedBytes);
         Assert.Empty(webDav.DownloadedBinaryPath);
         Assert.Equal("\"fixture-v1\"", webDav.LastWriteCondition?.ExpectedVersion?.ETag);
 
         var conflictItem = Assert.Single(viewModel.MdbxDatabaseItems);
+        Assert.Equal(viewModel.L.Get("MdbxRemoteConflictDetected"), conflictItem.LastSyncErrorText);
         await viewModel.SyncMdbxDatabaseCommand.ExecuteAsync(conflictItem);
         Assert.Equal(2, webDav.UploadBinaryCallCount);
         Assert.Empty(webDav.DownloadedBinaryPath);
@@ -95,7 +96,8 @@ public sealed partial class AppSettingsTests
 
         var current = Assert.Single(viewModel.MdbxDatabases);
         Assert.Equal(SyncStatus.Conflict, current.LastSyncStatus);
-        Assert.Contains(viewModel.L.Get("MdbxWebDavMissingRevision"), current.LastSyncError, StringComparison.Ordinal);
+        Assert.Equal(viewModel.L.Get("MdbxWebDavMissingRevision"), Assert.Single(viewModel.MdbxDatabaseItems).LastSyncErrorText);
+        Assert.NotEqual(viewModel.L.Get("MdbxWebDavMissingRevision"), current.LastSyncError);
         Assert.Equal(1, webDav.UploadBinaryCallCount);
         Assert.Empty(webDav.DownloadedBinaryPath);
     }
