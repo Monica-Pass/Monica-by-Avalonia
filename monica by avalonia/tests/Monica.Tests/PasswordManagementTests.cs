@@ -4377,16 +4377,12 @@ public sealed partial class PasswordManagementTests
 
     private static string GetTempDatabasePath()
     {
-        var path = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        return path;
+        return TestTempPaths.CreateFilePath(".db");
     }
 
     private static string GetTempSettingsPath()
     {
-        var path = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.settings.json");
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        return path;
+        return TestTempPaths.CreateFilePath(".settings.json");
     }
 
     private static string[] SplitRows(string value)

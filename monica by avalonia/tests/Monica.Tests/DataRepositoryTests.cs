@@ -538,9 +538,7 @@ public sealed partial class DataRepositoryTests
 
     private static string GetTempDatabasePath()
     {
-        var path = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        return path;
+        return TestTempPaths.CreateFilePath(".db");
     }
 
     private static async Task<bool> HasTableAsync(Microsoft.Data.Sqlite.SqliteConnection connection, string tableName)

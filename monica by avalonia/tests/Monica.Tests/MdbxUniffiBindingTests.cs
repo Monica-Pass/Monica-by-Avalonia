@@ -12,8 +12,7 @@ public sealed class MdbxUniffiBindingTests
         var bridge = new MdbxUniffiNativeBridge();
         Assert.True(bridge.IsAvailable);
         var service = new MdbxVaultService(new ThrowingMdbxVaultEngine(), bridge);
-        var path = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.mdbx");
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var path = TestTempPaths.CreateFilePath(".mdbx");
 
         var metadata = await service.CreateLocalMetadataAsync("Native service", path, MdbxTigaMode.Multi);
         await using var stream = await service.OpenLocalStreamAsync(metadata);
@@ -30,8 +29,7 @@ public sealed class MdbxUniffiBindingTests
         var bridge = new MdbxUniffiNativeBridge();
         Assert.True(bridge.IsAvailable);
 
-        var path = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.mdbx");
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var path = TestTempPaths.CreateFilePath(".mdbx");
         const string password = "native-test-password";
         const string deviceId = "native-test-device";
 

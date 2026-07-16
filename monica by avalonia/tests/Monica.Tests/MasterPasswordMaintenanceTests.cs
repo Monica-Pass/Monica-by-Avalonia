@@ -300,9 +300,7 @@ public sealed class MasterPasswordMaintenanceTests
 
     private static string GetTempDatabasePath()
     {
-        var path = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        return path;
+        return TestTempPaths.CreateFilePath(".db");
     }
 
     private static string UnprotectStoredSecret(CryptoService crypto, string value)

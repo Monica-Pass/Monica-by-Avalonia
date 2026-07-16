@@ -11,7 +11,7 @@ public sealed partial class AppSettingsTests
     [Fact]
     public async Task ViewModel_preserves_local_webdav_mdbx_when_conditional_upload_conflicts()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
+        var databasePath = TestTempPaths.CreateFilePath(".db");
         var factory = new SqliteConnectionFactory(databasePath);
         var repository = new MonicaRepository(factory, new DatabaseMigrator(factory));
         var webDav = new CapturingWebDavBackupService([]);
@@ -73,7 +73,7 @@ public sealed partial class AppSettingsTests
     [Fact]
     public async Task ViewModel_refuses_legacy_pending_upload_without_remote_revision()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
+        var databasePath = TestTempPaths.CreateFilePath(".db");
         var factory = new SqliteConnectionFactory(databasePath);
         var repository = new MonicaRepository(factory, new DatabaseMigrator(factory));
         var webDav = new CapturingWebDavBackupService([]);
@@ -103,7 +103,7 @@ public sealed partial class AppSettingsTests
     [Fact]
     public async Task ViewModel_resolves_webdav_conflict_by_conditionally_uploading_local_copy()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
+        var databasePath = TestTempPaths.CreateFilePath(".db");
         var factory = new SqliteConnectionFactory(databasePath);
         var repository = new MonicaRepository(factory, new DatabaseMigrator(factory));
         var webDav = new CapturingWebDavBackupService([]);
@@ -139,7 +139,7 @@ public sealed partial class AppSettingsTests
     [Fact]
     public async Task ViewModel_resolves_webdav_conflict_with_remote_copy_and_preserves_local_backup()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
+        var databasePath = TestTempPaths.CreateFilePath(".db");
         var factory = new SqliteConnectionFactory(databasePath);
         var repository = new MonicaRepository(factory, new DatabaseMigrator(factory));
         var webDav = new CapturingWebDavBackupService([]);

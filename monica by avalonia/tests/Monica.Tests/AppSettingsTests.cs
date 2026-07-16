@@ -447,7 +447,7 @@ public sealed partial class AppSettingsTests
     [Fact]
     public async Task ViewModel_refreshes_persisted_mdbx_status_before_choosing_sync_direction()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
+        var databasePath = TestTempPaths.CreateFilePath(".db");
         var factory = new SqliteConnectionFactory(databasePath);
         var repository = new MonicaRepository(factory, new DatabaseMigrator(factory));
         var webDav = new CapturingWebDavBackupService([]);
@@ -1167,8 +1167,7 @@ public sealed partial class AppSettingsTests
         IKeePassVaultService? keePassVaultService = null,
         IImportExportService? importExportService = null)
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
-        Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
+        var databasePath = TestTempPaths.CreateFilePath(".db");
         var factory = new SqliteConnectionFactory(databasePath);
         var migrator = new DatabaseMigrator(factory);
         var crypto = new CryptoService();
@@ -1204,9 +1203,7 @@ public sealed partial class AppSettingsTests
 
     private static string GetTempPath()
     {
-        var path = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.settings.json");
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        return path;
+        return TestTempPaths.CreateFilePath(".settings.json");
     }
 
     private static void ConfigureWebDav(MainWindowViewModel viewModel, string remotePath = "/Monica")

@@ -39,7 +39,7 @@ public sealed partial class AppSettingsTests
     [Fact]
     public async Task KeePass_import_skips_existing_source_entries_and_maps_metadata()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
+        var databasePath = TestTempPaths.CreateFilePath(".db");
         var factory = new SqliteConnectionFactory(databasePath);
         var repository = new MonicaRepository(factory, new DatabaseMigrator(factory));
         await repository.SavePasswordAsync(new PasswordEntry

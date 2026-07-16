@@ -242,7 +242,7 @@ public sealed partial class PlatformServiceTests
     public async Task Mdbx_service_creates_metadata_and_stream()
     {
         var service = new MdbxVaultService(new MdbxTestVaultEngine());
-        var path = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.mdbx");
+        var path = TestTempPaths.CreateFilePath(".mdbx");
 
         var metadata = await service.CreateLocalMetadataAsync("Test", path, MdbxTigaMode.Sky);
         await using var stream = await service.OpenLocalStreamAsync(metadata);
@@ -259,7 +259,7 @@ public sealed partial class PlatformServiceTests
     {
         var bridge = new RecordingNativeBridge();
         var service = new MdbxVaultService(new ThrowingMdbxVaultEngine(), bridge);
-        var path = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.mdbx");
+        var path = TestTempPaths.CreateFilePath(".mdbx");
 
         var metadata = await service.CreateLocalMetadataAsync("Native", path, MdbxTigaMode.Power);
         await using var stream = await service.OpenLocalStreamAsync(metadata);
@@ -276,8 +276,7 @@ public sealed partial class PlatformServiceTests
     {
         var bridge = new RecordingNativeBridge();
         var service = new MdbxVaultService(new ThrowingMdbxVaultEngine(), bridge);
-        var path = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.mdbx");
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var path = TestTempPaths.CreateFilePath(".mdbx");
         File.WriteAllText(path, "existing native vault");
 
         var metadata = await service.CreateLocalMetadataAsync("Existing native", path, MdbxTigaMode.Multi);

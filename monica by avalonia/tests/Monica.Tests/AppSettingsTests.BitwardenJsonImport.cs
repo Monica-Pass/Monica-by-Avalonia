@@ -208,7 +208,7 @@ public sealed partial class AppSettingsTests
 
     private static MonicaRepository CreateRepository()
     {
-        var path = Path.Combine(Path.GetTempPath(), "monica-tests", $"{Guid.NewGuid():N}.db");
+        var path = TestTempPaths.CreateFilePath(".db");
         var factory = new SqliteConnectionFactory(path);
         return new MonicaRepository(factory, new DatabaseMigrator(factory));
     }

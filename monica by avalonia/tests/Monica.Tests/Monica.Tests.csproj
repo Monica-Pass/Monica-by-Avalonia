@@ -31,4 +31,12 @@
     </None>
   </ItemGroup>
 
+  <Target Name="CleanupMonicaTestTempRoots" AfterTargets="VSTest">
+    <ReadLinesFromFile File="$(TargetDir)monica-test-temp-roots.txt" Condition="Exists('$(TargetDir)monica-test-temp-roots.txt')">
+      <Output TaskParameter="Lines" ItemName="MonicaTestTempRoots" />
+    </ReadLinesFromFile>
+    <RemoveDir Directories="@(MonicaTestTempRoots)" Condition="@(MonicaTestTempRoots) != ''" />
+    <Delete Files="$(TargetDir)monica-test-temp-roots.txt" Condition="Exists('$(TargetDir)monica-test-temp-roots.txt')" />
+  </Target>
+
 </Project>

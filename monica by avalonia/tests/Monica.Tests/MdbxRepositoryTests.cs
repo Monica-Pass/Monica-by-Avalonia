@@ -2584,22 +2584,7 @@ public sealed class MdbxRepositoryTests
 
     private static string GetTempRootPath()
     {
-        var current = AppContext.BaseDirectory;
-        while (!string.IsNullOrWhiteSpace(current))
-        {
-            if (File.Exists(Path.Combine(current, "Monica by Avalonia.slnx")))
-            {
-                var root = Path.Combine(current, "artifacts", "monica-tests");
-                Directory.CreateDirectory(root);
-                return root;
-            }
-
-            current = Directory.GetParent(current)?.FullName;
-        }
-
-        var fallback = Path.Combine(Path.GetTempPath(), "monica-tests");
-        Directory.CreateDirectory(fallback);
-        return fallback;
+        return TestTempPaths.Root;
     }
 
     private sealed class FakeMdbxNativeBridge : IMdbxNativeBridge

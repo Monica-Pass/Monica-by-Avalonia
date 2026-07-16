@@ -59,8 +59,7 @@ public sealed class CanonicalVaultBootstrapServiceTests
 
     private static TestContext CreateContext()
     {
-        var root = Path.Combine(Path.GetTempPath(), "monica-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
+        var root = TestTempPaths.CreateDirectoryPath();
         var factory = new SqliteConnectionFactory(Path.Combine(root, "metadata.db"));
         var migrator = new DatabaseMigrator(factory);
         var sqliteRepository = new MonicaRepository(factory, migrator);
