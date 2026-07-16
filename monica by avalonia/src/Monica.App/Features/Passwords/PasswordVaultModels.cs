@@ -75,9 +75,9 @@ internal sealed record PasswordDetailSnapshot(
     IReadOnlyList<PasswordHistoryDisplayItem> History);
 internal sealed record PasswordDetailSourceSnapshot(
     PasswordEntry Entry,
-    IReadOnlyList<PasswordEntry> SiblingCandidates,
-    IReadOnlyList<Category> Categories,
-    IReadOnlyList<SecureItem> NoteItems,
+    IReadOnlyList<PasswordEntry> Siblings,
+    Category? Category,
+    SecureItem? BoundNote,
     IReadOnlyDictionary<long, IReadOnlyList<Attachment>> PasswordAttachments,
     IReadOnlyDictionary<long, IReadOnlyList<CustomField>> PasswordCustomFields);
 public sealed record PasswordFolderFilterChoice(

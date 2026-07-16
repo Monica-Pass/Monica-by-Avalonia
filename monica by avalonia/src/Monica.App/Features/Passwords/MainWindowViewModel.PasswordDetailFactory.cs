@@ -51,17 +51,19 @@ public sealed partial class MainWindowViewModel
 
     private PasswordDetailSourceSnapshot BuildPasswordDetailSourceSnapshot(PasswordEntry entry)
     {
-        var candidates = entry.IsDeleted
-            ? DeletedPasswords.ToArray()
-            : entry.IsArchived
-                ? ArchivedPasswords.ToArray()
-                : Passwords.ToArray();
+        var siblings = GetPasswordDetailSiblings(entry);
+        var category = entry.CategoryId is null
+            ? null
+            : Categories.FirstOrDefault(item => item.Id == entry.CategoryId);
+        var boundNote = entry.BoundNoteId is null
+            ? null
+            : NoteItems.FirstOrDefault(item => item.Id == entry.BoundNoteId);
 
         return new PasswordDetailSourceSnapshot(
             entry,
-            candidates,
-            Categories.ToArray(),
-            NoteItems.ToArray(),
+            siblings,
+            category,
+            boundNote,
             _passwordAttachments,
             _passwordCustomFields);
     }
@@ -71,25 +73,18 @@ public sealed partial class MainWindowViewModel
         CancellationToken cancellationToken)
     {
         var entry = source.Entry;
-        var siblings = GetPasswordDetailSiblings(entry, source.SiblingCandidates).ToArray();
-        var category = entry.CategoryId is null
-            ? null
-            : source.Categories.FirstOrDefault(item => item.Id == entry.CategoryId);
-        var boundNote = entry.BoundNoteId is null
-            ? null
-            : source.NoteItems.FirstOrDefault(item => item.Id == entry.BoundNoteId);
         var customFields = await GetGroupCustomFieldsAsync(
             entry,
-            siblings,
+            source.Siblings,
             source.PasswordCustomFields,
             cancellationToken);
 
         return new PasswordDetailSnapshot(
             entry,
-            siblings,
-            category,
-            boundNote,
-            GetGroupAttachments(entry, siblings, source.PasswordAttachments),
+            source.Siblings,
+            source.Category,
+            source.BoundNote,
+            GetGroupAttachments(entry, source.Siblings, source.PasswordAttachments),
             customFields,
             []);
     }
@@ -114,15 +109,15 @@ public sealed partial class MainWindowViewModel
 
     private IReadOnlyList<PasswordEntry> GetPasswordDetailSiblings(PasswordEntry entry)
     {
-        var candidates = entry.IsDeleted
-            ? DeletedPasswords.ToArray()
+        IEnumerable<PasswordEntry> candidates = entry.IsDeleted
+            ? DeletedPasswords
             : entry.IsArchived
-                ? ArchivedPasswords.ToArray()
-                : Passwords.ToArray();
+                ? ArchivedPasswords
+                : Passwords;
         return GetPasswordDetailSiblings(entry, candidates).ToArray();
     }
 
-    private static IEnumerable<PasswordEntry> GetPasswordDetailSiblings(PasswordEntry entry, IReadOnlyList<PasswordEntry> candidates)
+    private static IEnumerable<PasswordEntry> GetPasswordDetailSiblings(PasswordEntry entry, IEnumerable<PasswordEntry> candidates)
     {
         var key = BuildSiblingGroupKey(entry);
         return candidates

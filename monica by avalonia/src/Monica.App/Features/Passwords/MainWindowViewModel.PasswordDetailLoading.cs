@@ -107,8 +107,7 @@ public sealed partial class MainWindowViewModel
                     var snapshot = BuildPasswordDetailSourceSnapshot(entry);
                     AppDiagnostics.Info(
                         $"Build selected password detail source snapshot completed in {snapshotStopwatch.ElapsedMilliseconds} ms. " +
-                        $"id={entry.Id}, version={version}, candidates={snapshot.SiblingCandidates.Count}, " +
-                        $"categories={snapshot.Categories.Count}, notes={snapshot.NoteItems.Count}");
+                        $"id={entry.Id}, version={version}, siblings={snapshot.Siblings.Count}");
                     return snapshot;
                 },
                 DispatcherPriority.ApplicationIdle);

@@ -155,6 +155,61 @@ public sealed class UiPerformanceTests
     }
 
     [Fact]
+    public void Password_detail_source_snapshot_keeps_only_relevant_vault_references()
+    {
+        const int unrelatedPasswordCount = 10_000;
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        var category = new Category { Id = 41, Name = "Relevant category" };
+        var boundNote = new SecureItem
+        {
+            Id = 42,
+            ItemType = VaultItemType.Note,
+            Title = "Relevant note"
+        };
+        viewModel.Categories.Add(category);
+        viewModel.NoteItems.Add(boundNote);
+        for (var id = 1; id <= unrelatedPasswordCount; id++)
+        {
+            viewModel.Passwords.Add(new PasswordEntry
+            {
+                Id = id,
+                Title = $"Unrelated password {id:D5}",
+                ReplicaGroupId = $"unrelated-{id}"
+            });
+        }
+
+        const string replicaGroupId = "detail-snapshot-group";
+        var selected = new PasswordEntry
+        {
+            Id = unrelatedPasswordCount + 1,
+            Title = "Selected password",
+            ReplicaGroupId = replicaGroupId,
+            CategoryId = category.Id,
+            BoundNoteId = boundNote.Id
+        };
+        var sibling = new PasswordEntry
+        {
+            Id = unrelatedPasswordCount + 2,
+            Title = "Selected password replica",
+            ReplicaGroupId = replicaGroupId
+        };
+        viewModel.Passwords.Add(selected);
+        viewModel.Passwords.Add(sibling);
+
+        var buildSnapshot = typeof(MainWindowViewModel).GetMethod(
+            "BuildPasswordDetailSourceSnapshot",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        var snapshot = Assert.IsType<PasswordDetailSourceSnapshot>(
+            buildSnapshot?.Invoke(viewModel, [selected]));
+
+        Assert.Equal([selected.Id, sibling.Id], snapshot.Siblings.Select(item => item.Id));
+        Assert.Same(category, snapshot.Category);
+        Assert.Same(boundNote, snapshot.BoundNote);
+    }
+
+    [Fact]
     public void Secondary_list_projection_builds_once_per_filter_invalidation()
     {
         const int itemCount = 5000;
