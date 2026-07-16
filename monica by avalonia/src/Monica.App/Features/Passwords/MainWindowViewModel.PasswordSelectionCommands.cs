@@ -159,6 +159,7 @@ public sealed partial class MainWindowViewModel
         try
         {
             await Task.Delay(250, cts.Token);
+            cts.Token.ThrowIfCancellationRequested();
             IReadOnlyList<long> customFieldMatches;
             IReadOnlyList<long> attachmentMatches;
             if (string.IsNullOrWhiteSpace(value))
@@ -175,6 +176,7 @@ public sealed partial class MainWindowViewModel
                 attachmentMatches = metadataMatches.AttachmentMatchIds;
             }
 
+            cts.Token.ThrowIfCancellationRequested();
             await PublishPasswordSearchQueryAsync(
                 value,
                 customFieldMatches,
@@ -183,6 +185,9 @@ public sealed partial class MainWindowViewModel
                 cts);
         }
         catch (OperationCanceledException)
+        {
+        }
+        catch (Exception) when (cts.Token.IsCancellationRequested || !_cryptoService.IsUnlocked)
         {
         }
         catch (Exception ex)
@@ -209,7 +214,8 @@ public sealed partial class MainWindowViewModel
     {
         await dispatcher.InvokeAsync(() =>
         {
-            if (ReferenceEquals(_passwordSearchDebounceCts, cts))
+            if (!cts.Token.IsCancellationRequested &&
+                ReferenceEquals(_passwordSearchDebounceCts, cts))
             {
                 PublishPasswordSearchMatches(query, customFieldMatches, attachmentMatches);
                 if (string.Equals(PasswordSearchQuery, query, StringComparison.Ordinal))

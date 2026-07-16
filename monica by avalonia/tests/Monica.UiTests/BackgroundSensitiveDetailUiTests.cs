@@ -20,9 +20,11 @@ public sealed class BackgroundSensitiveDetailUiTests
     [Fact]
     public async Task Minimize_releases_sensitive_details_and_restores_them_on_demand()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var window = new Monica.App.MainWindow();
         using var services = Monica.App.App.ConfigureServices(window);
         var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        services.GetRequiredService<ICryptoService>().InitializeSession("test password", new byte[16]);
         var password = new PasswordEntry
         {
             Id = 1001,
@@ -88,7 +90,7 @@ public sealed class BackgroundSensitiveDetailUiTests
             Assert.Equal("background-secret", password.Password);
             Assert.Equal("123", WalletItemDataCodec.DecodeBankCard(wallet).Cvv);
 
-            await Task.Delay(250, TestContext.Current.CancellationToken);
+            await Task.Delay(250, cancellationToken);
             Dispatcher.UIThread.RunJobs();
             Assert.Null(viewModel.SelectedPasswordDetails);
 
@@ -104,7 +106,8 @@ public sealed class BackgroundSensitiveDetailUiTests
             viewModel.SelectedSection = "Passwords";
             await AssertEventuallyAsync(
                 () => viewModel.SelectedPasswordDetails?.Entry.Id == password.Id,
-                "Password details were not restored after returning to Password Vault.");
+                "Password details were not restored after returning to Password Vault.",
+                cancellationToken);
         }
         finally
         {
@@ -112,12 +115,82 @@ public sealed class BackgroundSensitiveDetailUiTests
         }
     }
 
-    private static async Task AssertEventuallyAsync(Func<bool> condition, string failureMessage)
+    [Fact]
+    public async Task Locking_does_not_publish_protected_detail_errors_from_pending_work()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        var crypto = services.GetRequiredService<ICryptoService>();
+        crypto.InitializeSession("test password", new byte[16]);
+        var password = new PasswordEntry
+        {
+            Id = 1101,
+            Title = "Pending detail",
+            Username = "pending-user",
+            Password = "pending-secret"
+        };
+        viewModel.Passwords.Add(password);
+
+        try
+        {
+            viewModel.IsUnlocked = true;
+            viewModel.SelectedPassword = password;
+            crypto.Lock();
+            viewModel.IsUnlocked = false;
+
+            await AssertEventuallyAsync(
+                () => !viewModel.IsLoadingSelectedPasswordDetails,
+                "Pending password detail work did not settle after locking.",
+                cancellationToken);
+
+            Assert.Null(viewModel.SelectedPasswordDetails);
+            Assert.Null(viewModel.SelectedPasswordDetailsError);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [Fact]
+    public async Task Locking_does_not_publish_stale_password_search_results()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        var crypto = services.GetRequiredService<ICryptoService>();
+        crypto.InitializeSession("test password", new byte[16]);
+
+        try
+        {
+            viewModel.IsUnlocked = true;
+            viewModel.PasswordSearchText = "stale-search";
+            crypto.Lock();
+            viewModel.IsUnlocked = false;
+
+            await Task.Delay(350, cancellationToken);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.NotEqual("stale-search", viewModel.PasswordSearchQuery);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static async Task AssertEventuallyAsync(
+        Func<bool> condition,
+        string failureMessage,
+        CancellationToken cancellationToken)
     {
         for (var attempt = 0; attempt < 40 && !condition(); attempt++)
         {
             Dispatcher.UIThread.RunJobs();
-            await Task.Delay(25, TestContext.Current.CancellationToken);
+            await Task.Delay(25, cancellationToken);
         }
 
         Assert.True(condition(), failureMessage);

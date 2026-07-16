@@ -100,6 +100,7 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        CancelSensitiveBackgroundWork();
         _vaultSessionService.MarkLocked();
         NotifyAutoLockScheduleChanged();
     }

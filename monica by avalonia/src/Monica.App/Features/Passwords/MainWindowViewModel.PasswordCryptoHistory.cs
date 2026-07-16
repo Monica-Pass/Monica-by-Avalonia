@@ -69,9 +69,11 @@ public sealed partial class MainWindowViewModel
         await _repository.TrimPasswordHistoryAsync(entryId, PasswordHistoryLimit);
     }
 
-    private async Task<IReadOnlyList<PasswordHistoryDisplayItem>> GetPasswordHistoryDisplayItemsAsync(long entryId)
+    private async Task<IReadOnlyList<PasswordHistoryDisplayItem>> GetPasswordHistoryDisplayItemsAsync(
+        long entryId,
+        CancellationToken cancellationToken = default)
     {
-        var history = await _repository.GetPasswordHistoryAsync(entryId);
+        var history = await _repository.GetPasswordHistoryAsync(entryId, cancellationToken);
         return history
             .Select(item =>
             {

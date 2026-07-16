@@ -98,7 +98,7 @@ public sealed partial class MainWindowViewModel
             var sourceSnapshot = await dispatcher.InvokeAsync(
                 () =>
                 {
-                    if (cancellationToken.IsCancellationRequested ||
+                    if (!CanReadVault(cancellationToken) ||
                         !IsCurrentSelectedPasswordDetailsRequest(version) ||
                         SelectedPassword?.Id != entry.Id)
                     {
@@ -118,10 +118,19 @@ public sealed partial class MainWindowViewModel
                 return;
             }
 
-            cancellationToken.ThrowIfCancellationRequested();
+            if (!CanReadVault(cancellationToken))
+            {
+                return;
+            }
+
             var snapshot = await AppDiagnostics.MeasureAsync(
                 $"Load selected password detail data id={entry.Id}",
                 () => BuildPasswordDetailSnapshotAsync(sourceSnapshot, cancellationToken));
+            if (!CanReadVault(cancellationToken))
+            {
+                return;
+            }
+
             var details = await AppDiagnostics.MeasureAsync(
                 $"Build selected password details VM id={entry.Id}",
                 () => Task.Run(
@@ -139,7 +148,7 @@ public sealed partial class MainWindowViewModel
             {
                 await dispatcher.InvokeAsync(() =>
                 {
-                    if (cancellationToken.IsCancellationRequested ||
+                    if (!CanReadVault(cancellationToken) ||
                         !IsCurrentSelectedPasswordDetailsRequest(version) ||
                         SelectedPassword?.Id != entry.Id)
                     {
@@ -157,7 +166,8 @@ public sealed partial class MainWindowViewModel
                         entry.Id,
                         version,
                         details,
-                        dispatcher);
+                        dispatcher,
+                        cancellationToken);
                 }, DispatcherPriority.Background);
             }
             finally
@@ -172,11 +182,16 @@ public sealed partial class MainWindowViewModel
         {
             AppDiagnostics.Info($"Password selection details cancelled after {stopwatch.ElapsedMilliseconds} ms. id={entry.Id}, version={version}");
         }
+        catch (Exception) when (!CanReadVault(cancellationToken))
+        {
+            AppDiagnostics.Info($"Password selection details stopped at the vault boundary after {stopwatch.ElapsedMilliseconds} ms. id={entry.Id}, version={version}");
+        }
         catch (Exception ex)
         {
             await dispatcher.InvokeAsync(() =>
             {
-                if (IsCurrentSelectedPasswordDetailsRequest(version))
+                if (CanReadVault(cancellationToken) &&
+                    IsCurrentSelectedPasswordDetailsRequest(version))
                 {
                     IsLoadingSelectedPasswordDetails = false;
                     SelectedPasswordDetailsError = _localization.Format("PasswordDetailsLoadFailedFormat", ex.Message);
@@ -226,32 +241,8 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    private async Task LoadSelectedPasswordHistoryDeferredAsync(
-        long entryId,
-        int version,
-        PasswordDetailViewModel details,
-        Dispatcher dispatcher)
-    {
-        try
-        {
-            var history = await AppDiagnostics.MeasureAsync(
-                $"Load selected password history id={entryId}",
-                async () => await Task.Run(async () => await GetPasswordHistoryDisplayItemsAsync(entryId)));
-            await dispatcher.InvokeAsync(() =>
-            {
-                if (IsCurrentSelectedPasswordDetailsRequest(version) &&
-                    SelectedPassword?.Id == entryId &&
-                    ReferenceEquals(SelectedPasswordDetails, details))
-                {
-                    details.SetPasswordHistory(history);
-                }
-            }, DispatcherPriority.Background);
-        }
-        catch (Exception ex)
-        {
-            AppDiagnostics.Error($"Load selected password history failed. id={entryId}, version={version}", ex);
-        }
-    }
+    private bool CanReadVault(CancellationToken cancellationToken) =>
+        !cancellationToken.IsCancellationRequested && _cryptoService.IsUnlocked;
 
     private bool IsCurrentSelectedPasswordDetailsRequest(int version) =>
         Volatile.Read(ref _selectedPasswordDetailsVersion) == version;
