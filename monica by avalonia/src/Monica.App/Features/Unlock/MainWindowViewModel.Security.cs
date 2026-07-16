@@ -132,13 +132,24 @@ public sealed partial class MainWindowViewModel
 
     private async Task ClearSettingsSensitiveCacheAsync()
     {
+        await _settingsSensitiveCacheClearGate.WaitAsync();
         try
         {
+            if (_settingsSensitiveCacheCleared)
+            {
+                return;
+            }
+
             await _settingsService.ClearSensitiveCacheAsync();
+            _settingsSensitiveCacheCleared = true;
         }
         catch (Exception exception)
         {
             AppDiagnostics.Error("Settings secret cache clearing failed while locking", exception);
+        }
+        finally
+        {
+            _settingsSensitiveCacheClearGate.Release();
         }
     }
 
@@ -154,6 +165,8 @@ public sealed partial class MainWindowViewModel
 
     private void CancelSensitiveBackgroundWork()
     {
+        _oneDriveSignInCancellation?.Cancel();
+        SuspendSecurityAnalysis();
         _passwordSearchDebounceCts?.Cancel();
         _passwordSearchDebounceCts?.Dispose();
         _passwordSearchDebounceCts = null;

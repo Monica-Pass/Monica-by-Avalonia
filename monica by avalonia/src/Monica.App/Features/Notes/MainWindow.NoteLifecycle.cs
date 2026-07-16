@@ -10,9 +10,11 @@ namespace Monica.App;
 
 public partial class MainWindow
 {
-    private bool _isClosingAfterUnsavedNoteDecision;
+    private bool _isClosingAfterShutdown;
     private bool _isHandlingUnsavedWindowClose;
     private MainWindowViewModel? _observedViewModel;
+
+    internal Func<Task>? ShutdownRequestedAsync { get; set; }
 
     private async void HandleNoteWorkspaceShortcut(MainWindowViewModel viewModel, KeyEventArgs e)
     {
@@ -66,6 +68,7 @@ public partial class MainWindow
 
     private void OnClosed(object? sender, EventArgs e)
     {
+        ShutdownRequestedAsync = null;
         if (_observedViewModel is not null)
         {
             _observedViewModel.PropertyChanged -= ViewModel_OnPropertyChanged;
@@ -75,14 +78,15 @@ public partial class MainWindow
 
     private async void OnClosing(object? sender, WindowClosingEventArgs e)
     {
-        if (_isClosingAfterUnsavedNoteDecision ||
-            DataContext is not MainWindowViewModel viewModel)
+        if (_isClosingAfterShutdown)
         {
             return;
         }
 
-        var dirtyCount = viewModel.OpenNoteTabs.Count(tab => tab.IsDirty);
-        if (dirtyCount == 0)
+        var viewModel = DataContext as MainWindowViewModel;
+        var dirtyCount = viewModel?.OpenNoteTabs.Count(tab => tab.IsDirty) ?? 0;
+        var shutdownRequested = ShutdownRequestedAsync;
+        if (dirtyCount == 0 && shutdownRequested is null)
         {
             return;
         }
@@ -96,23 +100,37 @@ public partial class MainWindow
         _isHandlingUnsavedWindowClose = true;
         try
         {
-            var result = await NoteWorkspaceView.ShowUnsavedTabsDialogAsync(dirtyCount);
-            if (result == FAContentDialogResult.Primary)
+            if (dirtyCount > 0 && viewModel is not null)
             {
-                await viewModel.SaveAllNoteTabsCommand.ExecuteAsync(null);
-                if (viewModel.OpenNoteTabs.Any(tab => tab.IsDirty))
+                var result = await NoteWorkspaceView.ShowUnsavedTabsDialogAsync(dirtyCount);
+                if (result == FAContentDialogResult.Primary)
+                {
+                    await viewModel.SaveAllNoteTabsCommand.ExecuteAsync(null);
+                    if (viewModel.OpenNoteTabs.Any(tab => tab.IsDirty))
+                    {
+                        return;
+                    }
+                }
+                else if (result != FAContentDialogResult.Secondary)
                 {
                     return;
                 }
+            }
 
-                _isClosingAfterUnsavedNoteDecision = true;
-                Close();
-            }
-            else if (result == FAContentDialogResult.Secondary)
+            if (shutdownRequested is not null)
             {
-                _isClosingAfterUnsavedNoteDecision = true;
-                Close();
+                try
+                {
+                    await shutdownRequested();
+                }
+                catch (Exception exception)
+                {
+                    AppDiagnostics.Error("Application shutdown cleanup failed", exception);
+                }
             }
+
+            _isClosingAfterShutdown = true;
+            Close();
         }
         finally
         {

@@ -77,6 +77,19 @@ public sealed partial class AppSettingsTests
         Assert.Equal(2, settings.SaveCallCount);
     }
 
+    [Fact]
+    public async Task ViewModel_repeated_lock_clears_sensitive_settings_once()
+    {
+        var settings = new RecordingSettingsService();
+        var viewModel = CreateViewModel(GetTempPath(), settingsService: settings);
+        viewModel.IsUnlocked = true;
+
+        await viewModel.LockCommand.ExecuteAsync(null);
+        await viewModel.LockCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, settings.Calls.Count(call => call == "clear"));
+    }
+
     private sealed class RecordingSettingsService : IAppSettingsService
     {
         public DesktopAppSettings Current { get; } = new();

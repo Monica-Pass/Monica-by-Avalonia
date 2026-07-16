@@ -20,6 +20,8 @@ public sealed partial class MainWindowViewModel
     private bool _settingsSaveSuspended;
     private CancellationTokenSource? _settingsSaveCancellation;
     private Task _settingsSaveTask = Task.CompletedTask;
+    private readonly SemaphoreSlim _settingsSensitiveCacheClearGate = new(1, 1);
+    private bool _settingsSensitiveCacheCleared;
 
     public ObservableCollection<SettingsChoice> LanguageOptions { get; } = [];
     public ObservableCollection<SettingsChoice> ThemeOptions { get; } = [];

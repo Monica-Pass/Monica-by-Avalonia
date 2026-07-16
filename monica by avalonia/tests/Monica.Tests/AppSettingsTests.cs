@@ -1166,7 +1166,8 @@ public sealed partial class AppSettingsTests
         IOneDriveBackupService? oneDriveBackupService = null,
         IKeePassVaultService? keePassVaultService = null,
         IImportExportService? importExportService = null,
-        IAppSettingsService? settingsService = null)
+        IAppSettingsService? settingsService = null,
+        IClipboardService? clipboardService = null)
     {
         var databasePath = TestTempPaths.CreateFilePath(".db");
         var factory = new SqliteConnectionFactory(databasePath);
@@ -1183,7 +1184,7 @@ public sealed partial class AppSettingsTests
             importExportService ?? new ImportExportService(),
             new PlatformCapabilityService(platformIntegrationService),
             platformIntegrationService,
-            new NoopClipboardService(),
+            clipboardService ?? new NoopClipboardService(),
             webDavBackupService ?? new NoopWebDavBackupService(),
             mdbxVaultService ?? new MdbxVaultService(new MdbxTestVaultEngine()),
             new NoopPasswordAttachmentFileService(),

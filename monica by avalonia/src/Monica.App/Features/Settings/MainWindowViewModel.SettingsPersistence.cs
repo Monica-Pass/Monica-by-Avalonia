@@ -10,6 +10,7 @@ public sealed partial class MainWindowViewModel
 
     private void ApplySettings(DesktopAppSettings settings)
     {
+        _settingsSensitiveCacheCleared = false;
         _isApplyingSettings = true;
         try
         {

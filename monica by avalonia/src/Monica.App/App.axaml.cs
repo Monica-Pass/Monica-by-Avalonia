@@ -19,8 +19,10 @@ namespace Monica.App;
 
 public partial class App : Application
 {
+    private readonly object _shutdownSync = new();
     private ServiceProvider? _services;
     private MainWindow? _mainWindow;
+    private Task? _shutdownTask;
 
     public override void Initialize()
     {
@@ -35,7 +37,9 @@ public partial class App : Application
             _services = ConfigureServices(_mainWindow);
             var viewModel = _services.GetRequiredService<MainWindowViewModel>();
             _mainWindow.DataContext = viewModel;
+            _mainWindow.ShutdownRequestedAsync = () => EnsureShutdownAsync(viewModel);
             desktop.MainWindow = _mainWindow;
+            desktop.Exit += OnDesktopExit;
 
             var smokePassword = GetSmokeUiUnlockPassword(desktop.Args);
             var smokeSection = GetSmokeUiSection(desktop.Args);
@@ -79,6 +83,55 @@ public partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private Task EnsureShutdownAsync(MainWindowViewModel viewModel)
+    {
+        lock (_shutdownSync)
+        {
+            return _shutdownTask ??= ShutdownCoreAsync(viewModel);
+        }
+    }
+
+    private async Task ShutdownCoreAsync(MainWindowViewModel viewModel)
+    {
+        var services = _services;
+        if (services is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await ShutdownServicesAsync(viewModel, services);
+        }
+        finally
+        {
+            _services = null;
+        }
+    }
+
+    internal static async Task ShutdownServicesAsync(
+        MainWindowViewModel viewModel,
+        ServiceProvider services)
+    {
+        await viewModel.PrepareForShutdownAsync();
+        await services.DisposeAsync();
+    }
+
+    private void OnDesktopExit(object? sender, ControlledApplicationLifetimeExitEventArgs e)
+    {
+        ServiceProvider? services = null;
+        lock (_shutdownSync)
+        {
+            if (_shutdownTask is null)
+            {
+                services = _services;
+                _services = null;
+            }
+        }
+
+        services?.Dispose();
     }
 
 
