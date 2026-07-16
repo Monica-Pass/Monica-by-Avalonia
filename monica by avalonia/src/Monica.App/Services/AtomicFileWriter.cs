@@ -26,13 +26,20 @@ internal static class AtomicFileWriter
 
         try
         {
-            await using (var stream = new FileStream(
-                temporaryPath,
-                FileMode.CreateNew,
-                FileAccess.Write,
-                FileShare.None,
-                BufferSize,
-                FileOptions.Asynchronous | FileOptions.SequentialScan))
+            var streamOptions = new FileStreamOptions
+            {
+                Mode = FileMode.CreateNew,
+                Access = FileAccess.Write,
+                Share = FileShare.None,
+                BufferSize = BufferSize,
+                Options = FileOptions.Asynchronous | FileOptions.SequentialScan
+            };
+            if (!OperatingSystem.IsWindows())
+            {
+                streamOptions.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+            }
+
+            await using (var stream = new FileStream(temporaryPath, streamOptions))
             {
                 await writeAsync(stream, cancellationToken);
                 await stream.FlushAsync(cancellationToken);

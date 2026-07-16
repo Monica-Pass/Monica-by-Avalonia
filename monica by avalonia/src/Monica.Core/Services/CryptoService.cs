@@ -14,6 +14,8 @@ public interface ICryptoService
     bool IsUnlocked { get; }
     string EncryptString(string plainText);
     string DecryptString(string protectedText);
+    string EncryptBytes(ReadOnlySpan<byte> plainBytes) => EncryptString(Convert.ToBase64String(plainBytes));
+    byte[] DecryptBytes(string protectedText) => Convert.FromBase64String(DecryptString(protectedText));
 }
 
 public sealed record MasterPasswordHash(string Hash, byte[] Salt, string Kdf, int Iterations, int MemoryKiB, int Parallelism);
@@ -78,8 +80,25 @@ public sealed class CryptoService : ICryptoService
             return "";
         }
 
-        var key = _sessionKey ?? throw new InvalidOperationException("Vault is locked.");
         var plainBytes = Encoding.UTF8.GetBytes(plainText);
+        try
+        {
+            return EncryptBytes(plainBytes);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(plainBytes);
+        }
+    }
+
+    public string EncryptBytes(ReadOnlySpan<byte> plainBytes)
+    {
+        if (plainBytes.IsEmpty)
+        {
+            return "";
+        }
+
+        var key = _sessionKey ?? throw new InvalidOperationException("Vault is locked.");
         var nonce = new byte[NonceSize];
         var tag = new byte[TagSize];
         var cipherBytes = new byte[plainBytes.Length];
@@ -103,6 +122,24 @@ public sealed class CryptoService : ICryptoService
             return "";
         }
 
+        var plainBytes = DecryptBytes(protectedText);
+        try
+        {
+            return Encoding.UTF8.GetString(plainBytes);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(plainBytes);
+        }
+    }
+
+    public byte[] DecryptBytes(string protectedText)
+    {
+        if (string.IsNullOrEmpty(protectedText))
+        {
+            return [];
+        }
+
         var key = _sessionKey ?? throw new InvalidOperationException("Vault is locked.");
         var payload = Convert.FromBase64String(protectedText);
         if (payload.Length < NonceSize + TagSize)
@@ -117,7 +154,7 @@ public sealed class CryptoService : ICryptoService
 
         using var aes = new AesGcm(key, TagSize);
         aes.Decrypt(nonce, cipherBytes, tag, plainBytes);
-        return Encoding.UTF8.GetString(plainBytes);
+        return plainBytes;
     }
 
     private static byte[] DeriveKey(string password, MasterPasswordHash storedHash)
