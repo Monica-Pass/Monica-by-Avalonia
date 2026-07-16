@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Avalonia;
@@ -123,10 +124,11 @@ public sealed partial class MainWindowViewModel
             foreach (var imagePath in imagePaths)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                byte[]? contentBytes = null;
                 try
                 {
                     var attachment = CreateNoteImageAttachment(imagePath, ownerId);
-                    var contentBytes = await _repository.TryReadAttachmentContentAsync(
+                    contentBytes = await _repository.TryReadAttachmentContentAsync(
                         attachment,
                         cancellationToken).ConfigureAwait(false);
                     cancellationToken.ThrowIfCancellationRequested();
@@ -148,6 +150,13 @@ public sealed partial class MainWindowViewModel
                 catch (Exception ex)
                 {
                     AppDiagnostics.Error($"Note image preview failed for {imagePath}", ex);
+                }
+                finally
+                {
+                    if (contentBytes is { Length: > 0 })
+                    {
+                        CryptographicOperations.ZeroMemory(contentBytes);
+                    }
                 }
             }
 

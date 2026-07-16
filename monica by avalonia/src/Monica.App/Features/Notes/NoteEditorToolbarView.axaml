@@ -31,7 +31,30 @@
             <Button Tag="table" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarTable]}" AutomationProperties.Name="{Binding L[NoteToolbarTable]}" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="Table" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
             <Button Tag="link" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarLink]}" AutomationProperties.Name="{Binding L[NoteToolbarLink]}" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="Link" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
             <Button Tag="hr" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarHorizontalRule]}" AutomationProperties.Name="{Binding L[NoteToolbarHorizontalRule]}" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="Subtract" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-            <Button Tag="image" Click="ToolbarButton_OnClick" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding L[InsertImage]}" AutomationProperties.Name="{Binding L[InsertImage]}" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="Image" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
+            <Button x:Name="InsertNoteImageButton"
+                    Tag="image"
+                    Click="ToolbarButton_OnClick"
+                    IsEnabled="{Binding CanInsertNoteImage}"
+                    ToolTip.Tip="{Binding InsertNoteImageActionLabel}"
+                    AutomationProperties.Name="{Binding InsertNoteImageActionLabel}"
+                    Width="32"
+                    Height="32"
+                    Padding="0">
+                <Grid>
+                    <ProgressBar x:Name="InsertNoteImageProgress"
+                                 Width="18"
+                                 Height="4"
+                                 IsIndeterminate="True"
+                                 IsVisible="{Binding IsInsertingNoteImage}"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center" />
+                    <ic:FluentIcon Icon="Image"
+                                   FontSize="16"
+                                   IsVisible="{Binding !IsInsertingNoteImage}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                </Grid>
+            </Button>
         </WrapPanel>
     </Border>
 </UserControl>

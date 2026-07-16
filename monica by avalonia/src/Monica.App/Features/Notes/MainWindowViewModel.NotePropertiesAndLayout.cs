@@ -61,6 +61,14 @@ public sealed partial class MainWindowViewModel
     private bool _noteIsFavorite;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanInsertNoteImage))]
+    [NotifyPropertyChangedFor(nameof(InsertNoteImageActionLabel))]
+    private bool _isInsertingNoteImage;
+
+    partial void OnIsInsertingNoteImageChanged(bool value) =>
+        InsertNoteImageCommand.NotifyCanExecuteChanged();
+
+    [ObservableProperty]
     private bool _noteNarrowShowsTree = true;
 
     public string NoteLineNumbersText => GetNoteContentAnalysis().LineNumbersText;
@@ -75,6 +83,8 @@ public sealed partial class MainWindowViewModel
     public bool HasNoteReferenceItems => GetNoteContentAnalysis().ReferenceItems.Count > 0;
     public int NoteImagePreviewCount => NoteImagePreviewItems.Count;
     public bool HasNoteImagePreviewItems => NoteImagePreviewCount > 0;
+    public bool CanInsertNoteImage => CanUseFilePicker && !IsInsertingNoteImage;
+    public string InsertNoteImageActionLabel => _localization.Get(IsInsertingNoteImage ? "InsertingImage" : "InsertImage");
     public string NoteFormatText => NoteIsMarkdown ? "Markdown" : _localization.PlainText;
     public IReadOnlyList<SecureItem> FavoriteNoteItems
     {

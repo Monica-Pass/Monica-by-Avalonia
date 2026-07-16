@@ -64,11 +64,23 @@ public sealed class AvaloniaFileSystemPickerService(
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        var properties = await file.GetBasicPropertiesAsync();
+        long? declaredLength = null;
+        if (properties.Size is { } reportedSize)
+        {
+            declaredLength = reportedSize > long.MaxValue ? long.MaxValue : (long)reportedSize;
+        }
+
         await using var stream = await file.OpenReadAsync();
-        using var buffer = new MemoryStream();
-        await stream.CopyToAsync(buffer, cancellationToken);
-        return new PickedBinaryFile(file.Name, buffer.ToArray());
+        var content = await ReadBinaryContentAsync(stream, declaredLength, cancellationToken);
+        return new PickedBinaryFile(file.Name, content);
     }
+
+    internal static Task<byte[]> ReadBinaryContentAsync(
+        Stream source,
+        long? declaredLength = null,
+        CancellationToken cancellationToken = default) =>
+        AttachmentContentReader.ReadAsync(source, declaredLength, cancellationToken);
 
     public async Task<string?> SaveTextFileAsync(
         string title,

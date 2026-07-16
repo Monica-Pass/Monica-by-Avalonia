@@ -62,6 +62,20 @@ public sealed class AttachmentContentReaderTests
     }
 
     [Fact]
+    public async Task Avalonia_binary_picker_reader_rejects_oversize_content_before_reading()
+    {
+        await using var source = new ThrowOnReadStream();
+
+        var exception = await Assert.ThrowsAsync<AttachmentTooLargeException>(() =>
+            AvaloniaFileSystemPickerService.ReadBinaryContentAsync(
+                source,
+                AttachmentContentReader.MaximumAttachmentBytes + 1));
+
+        Assert.Equal(AttachmentContentReader.MaximumAttachmentBytes, exception.MaximumBytes);
+        Assert.Equal(0, source.ReadCallCount);
+    }
+
+    [Fact]
     public async Task Truncated_declared_length_is_rejected()
     {
         await using var source = new ShortReadStream("short"u8.ToArray(), maximumReadSize: 2);

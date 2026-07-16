@@ -60,7 +60,7 @@
                                 <MenuItem Header="{Binding L[SaveAllNotes]}" Command="{Binding SaveAllNoteTabsCommand}" />
                                 <MenuItem Header="{Binding L[ImportMarkdown]}" Command="{Binding ImportMarkdownNoteCommand}" IsEnabled="{Binding CanUseFilePicker}" />
                                 <MenuItem Header="{Binding L[ExportMarkdown]}" Command="{Binding ExportCurrentNoteMarkdownCommand}" IsEnabled="{Binding HasOpenNoteTabs}" />
-                                <MenuItem Header="{Binding L[InsertImage]}" Command="{Binding InsertNoteImageCommand}" IsEnabled="{Binding HasOpenNoteTabs}" />
+                            <MenuItem Header="{Binding InsertNoteImageActionLabel}" Command="{Binding InsertNoteImageCommand}" IsEnabled="{Binding HasOpenNoteTabs}" />
                                 <MenuItem Header="{Binding L.Favorite}" Command="{Binding ToggleNoteFavoriteCommand}" IsEnabled="{Binding HasOpenNoteTabs}" />
                                 <Separator />
                                 <MenuItem Header="{Binding L[NoteEditMode]}" Click="SetNoteEditModeMenuItem_OnClick" IsEnabled="{Binding HasOpenNoteTabs}" />

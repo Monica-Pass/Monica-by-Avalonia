@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Reflection;
+using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.App.ViewModels;
 using Monica.Data.Repositories;
@@ -153,11 +154,40 @@ public sealed class NoteEditorPerformanceTests
         Assert.Empty(viewModel.NoteImagePreviewItems);
     }
 
+    [Fact]
+    public async Task Note_image_preview_zeroes_encoded_bytes_after_decode()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var repository = DispatchProxy.Create<IMonicaRepository, AttachmentReadRepositoryProxy>();
+        var probe = (AttachmentReadRepositoryProxy)(object)repository;
+        probe.ContentToReturn = Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+        var returnedContent = probe.ContentToReturn;
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window, overrides =>
+            overrides.AddSingleton(repository));
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+
+        viewModel.NoteContent = "Private\n\n![](monica-image://private.png)";
+        for (var attempt = 0; attempt < 80 && viewModel.NoteImagePreviewItems.Count == 0; attempt++)
+        {
+            Dispatcher.UIThread.RunJobs();
+            await Task.Delay(25, cancellationToken);
+        }
+
+        Assert.Single(viewModel.NoteImagePreviewItems);
+        Assert.NotNull(returnedContent);
+        Assert.All(returnedContent!, value => Assert.Equal(0, value));
+        viewModel.NoteContent = "";
+        Dispatcher.UIThread.RunJobs();
+    }
+
     public class AttachmentReadRepositoryProxy : DispatchProxy
     {
         private int _readCount;
 
         public bool BlockReads { get; set; }
+        public byte[]? ContentToReturn { get; set; }
         public int ReadCount => Volatile.Read(ref _readCount);
         public ManualResetEventSlim FirstReadStarted { get; } = new();
         public ManualResetEventSlim ReadCancellationObserved { get; } = new();
@@ -174,7 +204,7 @@ public sealed class NoteEditorPerformanceTests
             FirstReadStarted.Set();
             if (!BlockReads)
             {
-                return Task.FromResult<byte[]?>(null);
+                return Task.FromResult(ContentToReturn);
             }
 
             var cancellationToken = args is { Length: > 1 } && args[1] is CancellationToken token

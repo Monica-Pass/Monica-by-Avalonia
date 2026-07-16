@@ -13,6 +13,16 @@ namespace Monica.Tests;
 public sealed class SecureNoteTests
 {
     [Fact]
+    public void Note_image_insert_status_is_localized_for_simplified_chinese()
+    {
+        var localization = new LocalizationService();
+        localization.SetLanguage("zh-CN");
+
+        Assert.Equal("正在插入图片...", localization.Get("InsertingImage"));
+        Assert.Equal("无法插入图片。", localization.Get("InsertNoteImageFailed"));
+    }
+
+    [Fact]
     public void Note_editor_caret_lookup_uses_cached_line_index()
     {
         const int lineCount = 5000;
@@ -94,7 +104,8 @@ public sealed class SecureNoteTests
     [Fact]
     public async Task ViewModel_picks_note_image_as_inline_markdown_attachment()
     {
-        var picker = new CapturingFileSystemPickerService(new PickedBinaryFile("inline.png", [1, 2, 3, 4]));
+        var content = new byte[] { 1, 2, 3, 4 };
+        var picker = new CapturingFileSystemPickerService(new PickedBinaryFile("inline.png", content));
         var attachments = new CapturingPasswordAttachmentFileService("secure-notes/inline.png");
         var viewModel = CreateViewModel(fileSystemPickerService: picker, passwordAttachmentFileService: attachments);
 
@@ -107,6 +118,108 @@ public sealed class SecureNoteTests
         Assert.Contains("inline.png", viewModel.StatusMessage);
         Assert.Contains("*.png", picker.OpenFileTypes.SelectMany(type => type.Patterns));
         Assert.Contains("*.jpg", picker.OpenFileTypes.SelectMany(type => type.Patterns));
+        Assert.All(content, value => Assert.Equal(0, value));
+    }
+
+    [Fact]
+    public async Task Note_image_insert_stops_at_lock_boundary_and_zeroes_picker_content()
+    {
+        var content = new byte[] { 5, 6, 7, 8 };
+        var picker = new CapturingFileSystemPickerService(new PickedBinaryFile("private.png", content));
+        var attachments = new CapturingPasswordAttachmentFileService("secure-notes/private.png");
+        var viewModel = CreateViewModel(fileSystemPickerService: picker, passwordAttachmentFileService: attachments);
+        viewModel.IsUnlocked = true;
+        picker.OnOpen = () => viewModel.IsUnlocked = false;
+
+        var markdown = await viewModel.PickNoteImageMarkdownAsync();
+
+        Assert.Null(markdown);
+        Assert.Equal(0, attachments.StoreCallCount);
+        Assert.Empty(attachments.DeletedStoragePaths);
+        Assert.All(content, value => Assert.Equal(0, value));
+        Assert.Equal(viewModel.L.Get("VaultLocked"), viewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task Note_image_insert_removes_staged_file_when_vault_locks_during_store()
+    {
+        var content = new byte[] { 9, 10, 11, 12 };
+        var picker = new CapturingFileSystemPickerService(new PickedBinaryFile("private.png", content));
+        var attachments = new CapturingPasswordAttachmentFileService("secure-notes/private.png");
+        var viewModel = CreateViewModel(fileSystemPickerService: picker, passwordAttachmentFileService: attachments);
+        viewModel.IsUnlocked = true;
+        attachments.OnStore = () => viewModel.IsUnlocked = false;
+
+        var markdown = await viewModel.PickNoteImageMarkdownAsync();
+
+        Assert.Null(markdown);
+        Assert.Equal(["secure-notes/private.png"], attachments.DeletedStoragePaths);
+        Assert.All(content, value => Assert.Equal(0, value));
+        Assert.Equal(viewModel.L.Get("VaultLocked"), viewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task Note_image_insert_reports_safe_failure_and_zeroes_picker_content()
+    {
+        var content = new byte[] { 13, 14, 15, 16 };
+        var picker = new CapturingFileSystemPickerService(new PickedBinaryFile("private.png", content));
+        var attachments = new CapturingPasswordAttachmentFileService("secure-notes/private.png")
+        {
+            StoreFailure = new IOException("C:\\Users\\private\\secret.png")
+        };
+        var viewModel = CreateViewModel(fileSystemPickerService: picker, passwordAttachmentFileService: attachments);
+
+        var markdown = await viewModel.PickNoteImageMarkdownAsync();
+
+        Assert.Null(markdown);
+        Assert.All(content, value => Assert.Equal(0, value));
+        Assert.Equal(viewModel.L.Get("InsertNoteImageFailed"), viewModel.StatusMessage);
+        Assert.DoesNotContain("C:\\Users", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Note_image_insert_rejects_oversize_picker_result_with_friendly_status()
+    {
+        var picker = new CapturingFileSystemPickerService(null)
+        {
+            OpenFailure = new AttachmentTooLargeException(
+                AttachmentContentReader.MaximumAttachmentBytes,
+                AttachmentContentReader.MaximumAttachmentBytes + 1)
+        };
+        var viewModel = CreateViewModel(fileSystemPickerService: picker);
+
+        var markdown = await viewModel.PickNoteImageMarkdownAsync();
+
+        Assert.Null(markdown);
+        Assert.Equal(
+            viewModel.L.Format("AttachmentTooLargeFormat", "256 MB", "256 MB"),
+            viewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task Note_image_insert_blocks_duplicate_picker_requests()
+    {
+        var content = new byte[] { 21, 22, 23, 24 };
+        var picker = new CapturingFileSystemPickerService(new PickedBinaryFile("inline.png", content))
+        {
+            OpenRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)
+        };
+        var attachments = new CapturingPasswordAttachmentFileService("secure-notes/inline.png");
+        var viewModel = CreateViewModel(fileSystemPickerService: picker, passwordAttachmentFileService: attachments);
+
+        var first = viewModel.PickNoteImageMarkdownAsync();
+        await picker.OpenStarted.Task;
+        var second = viewModel.PickNoteImageMarkdownAsync();
+
+        Assert.True(viewModel.IsInsertingNoteImage);
+        Assert.Equal(1, picker.OpenCallCount);
+        picker.OpenRelease.TrySetResult();
+        var results = await Task.WhenAll(first, second);
+
+        Assert.False(viewModel.IsInsertingNoteImage);
+        Assert.Equal(1, picker.OpenCallCount);
+        Assert.Equal(1, attachments.StoreCallCount);
+        Assert.Single(results, result => !string.IsNullOrWhiteSpace(result));
     }
 
     [Fact]
@@ -300,25 +413,44 @@ public sealed class SecureNoteTests
         public string FileName { get; private set; } = "";
         public byte[] Content { get; private set; } = [];
         public string ContentType { get; private set; } = "";
+        public int StoreCallCount { get; private set; }
+        public List<string> DeletedStoragePaths { get; } = [];
+        public Action? OnStore { get; set; }
+        public Exception? StoreFailure { get; set; }
 
         public Task<PasswordAttachmentFileDraft?> PickAttachmentAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<PasswordAttachmentFileDraft?>(null);
 
         public Task<PasswordAttachmentFileDraft> StoreAttachmentAsync(string fileName, byte[] content, string contentType = "", CancellationToken cancellationToken = default)
         {
+            StoreCallCount++;
+            if (StoreFailure is not null)
+            {
+                return Task.FromException<PasswordAttachmentFileDraft>(StoreFailure);
+            }
+
             FileName = fileName;
-            Content = content;
+            Content = content.ToArray();
             ContentType = contentType;
+            OnStore?.Invoke();
             return Task.FromResult(new PasswordAttachmentFileDraft(fileName, storagePath, content.LongLength, contentType, content));
         }
 
-        public Task DeleteStoredAttachmentAsync(string storagePath, CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
+        public Task DeleteStoredAttachmentAsync(string storagePath, CancellationToken cancellationToken = default)
+        {
+            DeletedStoragePaths.Add(storagePath);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class CapturingFileSystemPickerService(PickedBinaryFile? openFile) : IFileSystemPickerService
     {
         public IReadOnlyList<PlatformFilePickerFileType> OpenFileTypes { get; private set; } = [];
+        public int OpenCallCount { get; private set; }
+        public Action? OnOpen { get; set; }
+        public Exception? OpenFailure { get; set; }
+        public TaskCompletionSource? OpenRelease { get; set; }
+        public TaskCompletionSource OpenStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public PlatformIntegrationCapability Capability { get; } = PlatformIntegrationService.Available(
             PlatformFeatureKeys.FilePicker,
             "Test file picking works.");
@@ -326,10 +458,23 @@ public sealed class SecureNoteTests
         public Task<PickedTextFile?> OpenTextFileAsync(string title, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
             Task.FromResult<PickedTextFile?>(null);
 
-        public Task<PickedBinaryFile?> OpenBinaryFileAsync(string title, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default)
+        public async Task<PickedBinaryFile?> OpenBinaryFileAsync(string title, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default)
         {
+            OpenCallCount++;
             OpenFileTypes = fileTypes;
-            return Task.FromResult(openFile);
+            OnOpen?.Invoke();
+            OpenStarted.TrySetResult();
+            if (OpenFailure is not null)
+            {
+                throw OpenFailure;
+            }
+
+            if (OpenRelease is not null)
+            {
+                await OpenRelease.Task.WaitAsync(cancellationToken);
+            }
+
+            return openFile;
         }
 
         public Task<string?> SaveTextFileAsync(string title, string suggestedFileName, string content, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
