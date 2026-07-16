@@ -1956,6 +1956,38 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
+    public async Task Repository_combined_password_metadata_search_reuses_one_mdbx_scan()
+    {
+        var repository = CreateRepository(out var bridge);
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "Combined metadata search",
+            Password = "secret"
+        };
+        await repository.SavePasswordAsync(password);
+        await repository.ReplaceCustomFieldsAsync(password.Id,
+        [
+            new CustomField { Title = "Recovery", Value = "blue" }
+        ]);
+        await repository.SaveAttachmentAsync(new Attachment
+        {
+            OwnerType = "PASSWORD",
+            OwnerId = password.Id,
+            FileName = "recovery.txt",
+            ContentType = "text/plain",
+            StoragePath = "secure_attachments/recovery.enc"
+        });
+
+        bridge.OpenedPaths.Clear();
+        var result = await repository.SearchPasswordMetadataAsync("recovery");
+
+        Assert.Equal([password.Id], result.CustomFieldMatchIds);
+        Assert.Equal([password.Id], result.AttachmentMatchIds);
+        Assert.Single(bridge.OpenedPaths);
+    }
+
+    [Fact]
     public async Task Repository_preserves_mdbx_only_attachment_metadata_when_password_is_resaved()
     {
         var repository = CreateRepository(out var bridge, out var sqliteRepository);

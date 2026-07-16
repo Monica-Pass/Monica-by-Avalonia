@@ -117,6 +117,8 @@ public sealed class VaultSnapshotLoaderTests(ITestOutputHelper output)
                 nameof(IMonicaRepository.GetCustomFieldsByEntryIdsAsync) => DelayCustomFieldReadAsync(cancellationToken),
                 nameof(IMonicaRepository.GetAttachmentsByOwnerIdsAsync) => DelayAttachmentReadAsync(cancellationToken),
                 nameof(IMonicaRepository.GetAttachmentOwnerIdsAsync) => DelayAttachmentOwnerReadAsync(cancellationToken),
+                nameof(IMonicaRepository.SearchPasswordMetadataAsync) =>
+                    Task.FromResult(new PasswordMetadataSearchResult([], [])),
                 nameof(IMonicaRepository.GetSecureItemsAsync) => DelayPostPasswordReadAsync<IReadOnlyList<SecureItem>>(
                     [],
                     cancellationToken),

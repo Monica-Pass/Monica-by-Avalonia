@@ -168,15 +168,11 @@ public sealed partial class MainWindowViewModel
             }
             else
             {
-                var customFieldTask = Task.Run(
-                    () => _repository.SearchEntryIdsByCustomFieldContentAsync(value, cts.Token),
+                var metadataMatches = await Task.Run(
+                    () => _repository.SearchPasswordMetadataAsync(value, cts.Token),
                     cts.Token);
-                var attachmentTask = Task.Run(
-                    () => _repository.SearchAttachmentOwnerIdsAsync("PASSWORD", value, cts.Token),
-                    cts.Token);
-                await Task.WhenAll(customFieldTask, attachmentTask);
-                customFieldMatches = await customFieldTask;
-                attachmentMatches = await attachmentTask;
+                customFieldMatches = metadataMatches.CustomFieldMatchIds;
+                attachmentMatches = metadataMatches.AttachmentMatchIds;
             }
 
             await PublishPasswordSearchQueryAsync(

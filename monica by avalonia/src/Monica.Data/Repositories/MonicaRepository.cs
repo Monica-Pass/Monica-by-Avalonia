@@ -4,6 +4,10 @@ using Monica.Data.Services;
 
 namespace Monica.Data.Repositories;
 
+public sealed record PasswordMetadataSearchResult(
+    IReadOnlyList<long> CustomFieldMatchIds,
+    IReadOnlyList<long> AttachmentMatchIds);
+
 public interface IMonicaRepository
 {
     Task<IReadOnlyList<PasswordEntry>> GetPasswordsAsync(bool includeDeleted = false, bool includeArchived = false, CancellationToken cancellationToken = default);
@@ -15,6 +19,7 @@ public interface IMonicaRepository
     Task<IReadOnlyDictionary<long, IReadOnlyList<CustomField>>> GetCustomFieldsByEntryIdsAsync(IReadOnlyList<long> entryIds, CancellationToken cancellationToken = default);
     Task ReplaceCustomFieldsAsync(long entryId, IReadOnlyList<CustomField> fields, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<long>> SearchEntryIdsByCustomFieldContentAsync(string query, CancellationToken cancellationToken = default);
+    Task<PasswordMetadataSearchResult> SearchPasswordMetadataAsync(string query, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Attachment>> GetAttachmentsAsync(string ownerType, long ownerId, CancellationToken cancellationToken = default);
     Task<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>> GetAttachmentsByOwnerIdsAsync(string ownerType, IReadOnlyList<long> ownerIds, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<long>> GetAttachmentOwnerIdsAsync(string ownerType, CancellationToken cancellationToken = default);

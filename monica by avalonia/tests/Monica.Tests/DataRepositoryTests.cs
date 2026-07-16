@@ -389,6 +389,36 @@ public sealed partial class DataRepositoryTests
     }
 
     [Fact]
+    public async Task Repository_combined_password_metadata_search_preserves_both_match_families()
+    {
+        var path = GetTempDatabasePath();
+        var factory = new SqliteConnectionFactory(path);
+        var repository = new MonicaRepository(factory, new DatabaseMigrator(factory));
+        var password = new PasswordEntry { Title = "Combined metadata", Password = "secret" };
+        await repository.SavePasswordAsync(password);
+        await repository.ReplaceCustomFieldsAsync(password.Id,
+        [
+            new CustomField { Title = "Recovery hint", Value = "blue" }
+        ]);
+        await repository.SaveAttachmentAsync(new Attachment
+        {
+            OwnerType = "PASSWORD",
+            OwnerId = password.Id,
+            FileName = "recovery.txt",
+            ContentType = "text/plain",
+            StoragePath = "attachments/recovery.enc"
+        });
+
+        var result = await repository.SearchPasswordMetadataAsync("recovery");
+
+        Assert.Equal([password.Id], result.CustomFieldMatchIds);
+        Assert.Equal([password.Id], result.AttachmentMatchIds);
+        var empty = await repository.SearchPasswordMetadataAsync("");
+        Assert.Empty(empty.CustomFieldMatchIds);
+        Assert.Empty(empty.AttachmentMatchIds);
+    }
+
+    [Fact]
     public async Task Repository_saves_trims_deletes_and_clears_password_history()
     {
         var path = GetTempDatabasePath();
