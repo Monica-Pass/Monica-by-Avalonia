@@ -4,11 +4,10 @@
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:local="using:Monica.App"
              xmlns:vm="using:Monica.App.ViewModels"
-             xmlns:controls="using:Monica.App.Controls"
              x:Class="Monica.App.Features.UnlockedShellView"
              x:DataType="vm:MainWindowViewModel">
     <UserControl.Styles>
-        <StyleInclude Source="/Controls/VaultShellStyles.axaml" />
+        <StyleInclude Source="/Controls/UnlockedShellStyles.axaml" />
     </UserControl.Styles>
 
     <Grid RowDefinitions="*,24">
@@ -27,70 +26,7 @@
                         <fa:FASymbolIconSource Symbol="Permissions" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                     </fa:FANavigationViewItem.IconSource>
                 </fa:FANavigationViewItem>
-                <fa:FANavigationViewItem Content="{Binding L.SecureNotes}" Tag="Notes">
-                    <fa:FANavigationViewItem.IconSource>
-                        <fa:FASymbolIconSource Symbol="ProtectedDocument" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    </fa:FANavigationViewItem.IconSource>
-                </fa:FANavigationViewItem>
-                <fa:FANavigationViewItem Content="{Binding L.Totp}" Tag="Totp">
-                    <fa:FANavigationViewItem.IconSource>
-                        <fa:FASymbolIconSource Symbol="Clock" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    </fa:FANavigationViewItem.IconSource>
-                </fa:FANavigationViewItem>
-                <fa:FANavigationViewItem Content="{Binding L.Cards}" Tag="Cards">
-                    <fa:FANavigationViewItem.IconSource>
-                        <fa:FASymbolIconSource Symbol="ContactInfo" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    </fa:FANavigationViewItem.IconSource>
-                </fa:FANavigationViewItem>
-                <fa:FANavigationViewItem Content="{Binding L.Generator}" Tag="Generator">
-                    <fa:FANavigationViewItem.IconSource>
-                        <fa:FASymbolIconSource Symbol="Edit" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    </fa:FANavigationViewItem.IconSource>
-                </fa:FANavigationViewItem>
-                <fa:FANavigationViewItem Content="{Binding L.Archive}" Tag="Archive">
-                    <fa:FANavigationViewItem.IconSource>
-                        <fa:FASymbolIconSource Symbol="Library" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    </fa:FANavigationViewItem.IconSource>
-                </fa:FANavigationViewItem>
-                <fa:FANavigationViewItem Content="{Binding L.RecycleBin}" Tag="RecycleBin">
-                    <fa:FANavigationViewItem.IconSource>
-                        <fa:FASymbolIconSource Symbol="Delete" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    </fa:FANavigationViewItem.IconSource>
-                </fa:FANavigationViewItem>
-                <fa:FANavigationViewItem Content="{Binding L.SecurityAnalysis}" Tag="SecurityAnalysis">
-                    <fa:FANavigationViewItem.IconSource>
-                        <fa:FASymbolIconSource Symbol="Permissions" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    </fa:FANavigationViewItem.IconSource>
-                </fa:FANavigationViewItem>
-                <fa:FANavigationViewItem Content="{Binding L.Timeline}" Tag="Timeline">
-                    <fa:FANavigationViewItem.IconSource>
-                        <fa:FASymbolIconSource Symbol="Clock" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    </fa:FANavigationViewItem.IconSource>
-                </fa:FANavigationViewItem>
-                <fa:FANavigationViewItem Content="{Binding L.MdbxVaults}" Tag="Mdbx">
-                    <fa:FANavigationViewItem.IconSource>
-                        <fa:FASymbolIconSource Symbol="Folder" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    </fa:FANavigationViewItem.IconSource>
-                </fa:FANavigationViewItem>
             </fa:FANavigationView.MenuItems>
-
-            <fa:FANavigationView.FooterMenuItems>
-                <fa:FANavigationViewItem Content="{Binding L.DatabaseManagement}" Tag="DatabaseManagement">
-                    <fa:FANavigationViewItem.IconSource>
-                        <fa:FASymbolIconSource Symbol="Library" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    </fa:FANavigationViewItem.IconSource>
-                </fa:FANavigationViewItem>
-                <fa:FANavigationViewItem Content="{Binding L.SyncAndBackup}" Tag="Sync">
-                    <fa:FANavigationViewItem.IconSource>
-                        <fa:FASymbolIconSource Symbol="Sync" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    </fa:FANavigationViewItem.IconSource>
-                </fa:FANavigationViewItem>
-                <fa:FANavigationViewItem Content="{Binding L.Settings}" Tag="Settings">
-                    <fa:FANavigationViewItem.IconSource>
-                        <fa:FASymbolIconSource Symbol="Setting" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    </fa:FANavigationViewItem.IconSource>
-                </fa:FANavigationViewItem>
-            </fa:FANavigationView.FooterMenuItems>
 
             <Grid Margin="18" RowDefinitions="Auto,Auto,*" Background="{DynamicResource LayerFillColorDefaultBrush}">
                 <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,18" IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsContentHeaderVisible}}">
@@ -127,10 +63,7 @@
                     </Grid>
                 </Border>
 
-                <controls:WorkspaceHostView x:Name="WorkspaceHost"
-                                            Grid.Row="2"
-                                            Section="{Binding SelectedSection}"
-                                            SizeChanged="WorkspaceHost_OnSizeChanged" />
+                <ContentControl x:Name="WorkspaceHostSlot" Grid.Row="2" />
             </Grid>
         </fa:FANavigationView>
 

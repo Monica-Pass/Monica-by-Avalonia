@@ -30,7 +30,9 @@ public sealed class PasswordWorkflowUiTests
     public void Password_workflow_exposes_responsive_detail_recovery_controls()
     {
         var view = new PasswordVaultView();
-        var details = view.FindControl<PasswordDetailPaneView>("PasswordDetailPane")!;
+        view.FocusDetails();
+        var detailHost = view.FindControl<ContentControl>("PasswordDetailPaneHost")!;
+        var details = Assert.IsType<PasswordDetailPaneView>(detailHost.Content);
 
         Assert.NotNull(view.FindControl<Grid>("PasswordMasterDetailGrid"));
         Assert.NotNull(view.FindControl<Border>("PasswordListRegion"));

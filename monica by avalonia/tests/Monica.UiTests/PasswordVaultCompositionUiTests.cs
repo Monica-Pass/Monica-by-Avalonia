@@ -19,7 +19,13 @@ public sealed class PasswordVaultCompositionUiTests
         Assert.NotNull(view.FindControl<PasswordVaultToolbarView>("PasswordVaultToolbar"));
         Assert.NotNull(view.FindControl<PasswordFolderFilterView>("PasswordFolderFilters"));
         Assert.NotNull(view.FindControl<PasswordListPaneView>("PasswordListPane"));
-        Assert.NotNull(view.FindControl<PasswordDetailPaneView>("PasswordDetailPane"));
+        var detailHost = view.FindControl<ContentControl>("PasswordDetailPaneHost");
+        Assert.NotNull(detailHost);
+        Assert.IsNotType<PasswordDetailPaneView>(detailHost.Content);
+
+        view.FocusDetails();
+
+        Assert.IsType<PasswordDetailPaneView>(detailHost.Content);
     }
 
     [Fact]

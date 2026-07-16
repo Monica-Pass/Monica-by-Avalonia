@@ -12,13 +12,14 @@ public partial class PasswordVaultView : UserControl
     public const double NarrowLayoutBreakpoint = 760;
 
     private MainWindowViewModel? _observedViewModel;
+    private PasswordDetailPaneView? _passwordDetailPane;
 
     public PasswordVaultView()
     {
         InitializeComponent();
         SizeChanged += (_, e) => UpdateResponsiveLayoutForWidth(e.NewSize.Width);
         DataContextChanged += OnDataContextChanged;
-        Dispatcher.UIThread.Post(VaultEditorDialogWarmup.EnsurePasswordWarmed, DispatcherPriority.Background);
+        Dispatcher.UIThread.Post(VaultEditorDialogWarmup.EnsurePasswordWarmed, DispatcherPriority.SystemIdle);
     }
 
     public bool IsNarrowLayout { get; private set; }
@@ -56,7 +57,11 @@ public partial class PasswordVaultView : UserControl
 
     public void ScrollIntoView(PasswordListRow row) => PasswordListPane.ScrollIntoView(row);
 
-    public void FocusDetails() => PasswordDetailRegion.Focus();
+    public void FocusDetails()
+    {
+        EnsurePasswordDetailPane();
+        PasswordDetailRegion.Focus();
+    }
 
     public bool IsDetailFocused => PasswordDetailRegion.IsFocused;
 
@@ -79,6 +84,10 @@ public partial class PasswordVaultView : UserControl
         if (_observedViewModel is not null)
         {
             _observedViewModel.PropertyChanged += ViewModelOnPropertyChanged;
+            if (_observedViewModel.SelectedPassword is not null)
+            {
+                EnsurePasswordDetailPane();
+            }
         }
 
         ApplyResponsiveLayout();
@@ -89,6 +98,11 @@ public partial class PasswordVaultView : UserControl
         if (e.PropertyName != nameof(MainWindowViewModel.SelectedPassword))
         {
             return;
+        }
+
+        if (_observedViewModel?.SelectedPassword is not null)
+        {
+            EnsurePasswordDetailPane();
         }
 
         if (Dispatcher.UIThread.CheckAccess())
@@ -109,6 +123,7 @@ public partial class PasswordVaultView : UserControl
         }
 
         var hasSelection = _observedViewModel?.SelectedPassword is not null;
+        var detailPane = hasSelection ? EnsurePasswordDetailPane() : _passwordDetailPane;
         var columns = PasswordMasterDetailGrid.ColumnDefinitions;
         columns[0].Width = IsNarrowLayout
             ? new GridLength(1, GridUnitType.Star)
@@ -124,7 +139,10 @@ public partial class PasswordVaultView : UserControl
             PasswordListRegion.IsVisible = !hasSelection;
             PasswordDetailRegion.IsVisible = hasSelection;
             PasswordDetailRegion.Margin = new Thickness(0);
-            PasswordDetailPane.ShowBackButton = hasSelection;
+            if (detailPane is not null)
+            {
+                detailPane.ShowBackButton = hasSelection;
+            }
             if (!hasSelection)
             {
                 FocusPasswordList();
@@ -138,6 +156,21 @@ public partial class PasswordVaultView : UserControl
         PasswordListRegion.IsVisible = true;
         PasswordDetailRegion.IsVisible = true;
         PasswordDetailRegion.Margin = new Thickness(12, 0, 0, 0);
-        PasswordDetailPane.ShowBackButton = false;
+        if (detailPane is not null)
+        {
+            detailPane.ShowBackButton = false;
+        }
+    }
+
+    private PasswordDetailPaneView EnsurePasswordDetailPane()
+    {
+        if (_passwordDetailPane is not null)
+        {
+            return _passwordDetailPane;
+        }
+
+        _passwordDetailPane = new PasswordDetailPaneView { Name = "PasswordDetailPane" };
+        PasswordDetailPaneHost.Content = _passwordDetailPane;
+        return _passwordDetailPane;
     }
 }

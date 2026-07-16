@@ -91,6 +91,18 @@ public sealed class UiArchitectureTests
             Assert.Equal(["Passwords"], workspaceHost.CreatedSections);
 
             var navigation = Assert.Single(window.GetVisualDescendants().OfType<FANavigationView>());
+            var navigationTags = navigation.MenuItems
+                .Concat(navigation.FooterMenuItems)
+                .OfType<FANavigationViewItem>()
+                .Select(item => item.Tag?.ToString() ?? "")
+                .ToArray();
+            Assert.Equal(
+                [
+                    "Passwords", "Notes", "Totp", "Cards", "Generator", "Archive",
+                    "RecycleBin", "SecurityAnalysis", "Timeline", "Mdbx",
+                    "DatabaseManagement", "Sync", "Settings"
+                ],
+                navigationTags);
             var notesItem = navigation.MenuItems
                 .OfType<FANavigationViewItem>()
                 .Single(item => string.Equals(item.Tag?.ToString(), "Notes", StringComparison.Ordinal));
