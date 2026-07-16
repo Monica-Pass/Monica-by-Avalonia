@@ -189,7 +189,7 @@ public sealed partial class MainWindowViewModel
         ClearItems(Categories);
         ClearItems(OpenNoteTabs);
         ReplaceNoteImagePreviews([]);
-        ClearItems(GeneratedPasswordHistory);
+        ClearGeneratedPasswordHistorySecrets();
         ClearItems(TimelineEntries);
         ClearItems(SecuritySummaryItems);
         ClearItems(SecurityIssueItems);

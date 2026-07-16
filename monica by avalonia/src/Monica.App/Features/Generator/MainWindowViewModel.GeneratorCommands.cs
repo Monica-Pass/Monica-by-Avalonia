@@ -29,15 +29,14 @@ public sealed partial class MainWindowViewModel
     [RelayCommand(CanExecute = nameof(HasGeneratedPasswordHistory))]
     private void ClearGeneratedPasswordHistory()
     {
-        GeneratedPasswordHistory.Clear();
-        RaiseGeneratedPasswordHistoryState();
+        ClearGeneratedPasswordHistorySecrets();
         StatusMessage = _localization.Get("GeneratedPasswordHistoryCleared");
     }
 
     [RelayCommand]
     private void UseGeneratedPasswordHistoryItem(GeneratorHistoryItem? item)
     {
-        if (item is null)
+        if (item is null || string.IsNullOrEmpty(item.Value))
         {
             return;
         }
@@ -49,7 +48,7 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private async Task CopyGeneratedPasswordHistoryItemAsync(GeneratorHistoryItem? item)
     {
-        if (item is null)
+        if (item is null || string.IsNullOrEmpty(item.Value))
         {
             return;
         }
@@ -101,6 +100,7 @@ public sealed partial class MainWindowViewModel
         if (existing is not null)
         {
             GeneratedPasswordHistory.Remove(existing);
+            existing.ClearSensitiveState();
         }
 
         var strength = _passwordGenerator.Analyze(value);
@@ -112,7 +112,9 @@ public sealed partial class MainWindowViewModel
 
         while (GeneratedPasswordHistory.Count > MaxGeneratorHistoryItems)
         {
+            var removed = GeneratedPasswordHistory[^1];
             GeneratedPasswordHistory.RemoveAt(GeneratedPasswordHistory.Count - 1);
+            removed.ClearSensitiveState();
         }
 
         RaiseGeneratedPasswordHistoryState();
@@ -122,6 +124,17 @@ public sealed partial class MainWindowViewModel
     {
         OnPropertyChanged(nameof(HasGeneratedPasswordHistory));
         ClearGeneratedPasswordHistoryCommand.NotifyCanExecuteChanged();
+    }
+
+    private void ClearGeneratedPasswordHistorySecrets()
+    {
+        foreach (var item in GeneratedPasswordHistory)
+        {
+            item.ClearSensitiveState();
+        }
+
+        GeneratedPasswordHistory.Clear();
+        RaiseGeneratedPasswordHistoryState();
     }
 
 }

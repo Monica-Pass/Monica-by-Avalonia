@@ -75,8 +75,7 @@ public sealed partial class MainWindowViewModel
         ClearTransientSettingsSecurityInputs();
         ClearTransferBuffers();
         GeneratedPassword = "";
-        GeneratedPasswordHistory.Clear();
-        RaiseGeneratedPasswordHistoryState();
+        ClearGeneratedPasswordHistorySecrets();
     }
 
     private void RestoreActiveWorkspaceState()
