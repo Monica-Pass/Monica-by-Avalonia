@@ -6,6 +6,8 @@ namespace Monica.Core.ImportExport;
 
 public sealed partial class ImportExportService : IImportExportService
 {
+    private const int MaximumMonicaJsonCharacters = 64 * 1024 * 1024;
+
     public string ExportJson(
         IEnumerable<PasswordEntry> passwords,
         IEnumerable<SecureItem> secureItems,
@@ -39,10 +41,27 @@ public sealed partial class ImportExportService : IImportExportService
 
     public MonicaExportPackage ImportJson(string json)
     {
-        var package = JsonSerializer.Deserialize(json, MonicaJsonContext.Default.MonicaExportDtoPackage);
-        return package is null
-            ? new MonicaExportPackage(68, [], [], [], [], [], [], [])
-            : new MonicaExportPackage(
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            throw InvalidMonicaJsonFormat();
+        }
+
+        if (json.Length > MaximumMonicaJsonCharacters)
+        {
+            throw new MonicaJsonImportException(
+                MonicaJsonImportError.ResourceLimitExceeded,
+                "The Monica JSON import exceeds the safe size limit.");
+        }
+
+        try
+        {
+            var package = JsonSerializer.Deserialize(json, MonicaJsonContext.Default.MonicaExportDtoPackage);
+            if (package is null || package.Passwords is null || package.SecureItems is null)
+            {
+                throw InvalidMonicaJsonFormat();
+            }
+
+            return new MonicaExportPackage(
                 package.SchemaVersion,
                 package.Passwords.Select(item => item.ToModel()).ToList(),
                 package.SecureItems.Select(item => item.ToModel()).ToList(),
@@ -51,7 +70,19 @@ public sealed partial class ImportExportService : IImportExportService
                 (package.PasswordHistory ?? []).Select(item => item.ToModel()).ToList(),
                 (package.PasswordAttachments ?? []).Select(item => item.ToModel()).ToList(),
                 (package.SecureItemAttachments ?? []).Select(item => item.ToModel()).ToList());
+        }
+        catch (JsonException)
+        {
+            throw InvalidMonicaJsonFormat();
+        }
+        catch (NotSupportedException)
+        {
+            throw InvalidMonicaJsonFormat();
+        }
     }
+
+    private static MonicaJsonImportException InvalidMonicaJsonFormat() =>
+        new(MonicaJsonImportError.InvalidFormat, "The Monica JSON import format is invalid.");
 
     private static IReadOnlyList<PasswordCustomFieldGroupDto> ToCustomFieldGroupDtos(
         IReadOnlyDictionary<long, IReadOnlyList<CustomField>>? customFields,

@@ -1,3 +1,4 @@
+using Monica.Core.ImportExport;
 using Monica.Core.Models;
 
 namespace Monica.App.ViewModels;
@@ -38,9 +39,17 @@ public sealed partial class MainWindowViewModel
             await LoadAsync();
             StatusMessage = _localization.Format("ImportedPasswordCsvFormat", importedPasswords);
         }
+        catch (CsvImportException error)
+        {
+            StatusMessage = _localization.Get(error.Error switch
+            {
+                CsvImportError.ResourceLimitExceeded => "ImportResourceLimitExceeded",
+                _ => "ImportCsvInvalidFormat"
+            });
+        }
         catch (Exception ex)
         {
-            StatusMessage = _localization.Format("ImportFailedFormat", ex.Message);
+            ReportImportExportFailure("Importing password CSV failed", "ImportUnexpectedFailure", ex);
         }
     }
 
@@ -87,9 +96,17 @@ public sealed partial class MainWindowViewModel
             await LoadAsync();
             StatusMessage = _localization.Format("ImportedNoteCsvFormat", importedNotes, skippedNotes);
         }
+        catch (CsvImportException error)
+        {
+            StatusMessage = _localization.Get(error.Error switch
+            {
+                CsvImportError.ResourceLimitExceeded => "ImportResourceLimitExceeded",
+                _ => "ImportCsvInvalidFormat"
+            });
+        }
         catch (Exception ex)
         {
-            StatusMessage = _localization.Format("ImportFailedFormat", ex.Message);
+            ReportImportExportFailure("Importing note CSV failed", "ImportUnexpectedFailure", ex);
         }
     }
 }

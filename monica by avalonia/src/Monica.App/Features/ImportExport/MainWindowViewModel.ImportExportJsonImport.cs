@@ -24,9 +24,21 @@ public sealed partial class MainWindowViewModel
 
             StatusMessage = FormatMonicaJsonImportStatus(result);
         }
+        catch (PasswordSecretUnavailableException error)
+        {
+            StatusMessage = GetPasswordSecretUnavailableMessage(error);
+        }
+        catch (MonicaJsonImportException error)
+        {
+            StatusMessage = _localization.Get(error.Error switch
+            {
+                MonicaJsonImportError.ResourceLimitExceeded => "ImportResourceLimitExceeded",
+                _ => "ImportInvalidFormat"
+            });
+        }
         catch (Exception ex)
         {
-            StatusMessage = _localization.Format("ImportFailedFormat", ex.Message);
+            ReportImportExportFailure("Importing Monica JSON failed", "ImportUnexpectedFailure", ex);
         }
     }
 

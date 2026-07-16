@@ -8,8 +8,11 @@ namespace Monica.Core.ImportExport;
 
 public sealed partial class ImportExportService
 {
+    private const int MaximumImportCsvCharacters = 64 * 1024 * 1024;
+
     public IReadOnlyList<SecureItem> ImportTotpCsv(string csvText)
     {
+        EnsureCsvWithinResourceLimit(csvText);
         using var reader = new StringReader(csvText);
         using var csv = new CsvReader(reader, CreateCsvConfiguration());
         var items = new List<SecureItem>();
@@ -19,6 +22,9 @@ public sealed partial class ImportExportService
         }
 
         csv.ReadHeader();
+        EnsureRecognizedHeader(
+            csv.HeaderRecord,
+            "type", "itemType", "item_type", "title", "name", "data", "itemData", "item_data", "notes", "note");
         while (csv.Read())
         {
             var type = ReadField(csv, "type", "itemType", "item_type");
@@ -52,6 +58,7 @@ public sealed partial class ImportExportService
 
     public IReadOnlyList<SecureItem> ImportNoteCsv(string csvText)
     {
+        EnsureCsvWithinResourceLimit(csvText);
         using var reader = new StringReader(csvText);
         using var csv = new CsvReader(reader, CreateCsvConfiguration());
         var items = new List<SecureItem>();
@@ -61,6 +68,9 @@ public sealed partial class ImportExportService
         }
 
         csv.ReadHeader();
+        EnsureRecognizedHeader(
+            csv.HeaderRecord,
+            "type", "itemType", "item_type", "title", "name", "data", "itemData", "item_data", "notes", "note");
         while (csv.Read())
         {
             var type = ReadField(csv, "type", "itemType", "item_type");
@@ -101,6 +111,7 @@ public sealed partial class ImportExportService
 
     public IReadOnlyList<PasswordEntry> ImportPasswordCsv(string csvText)
     {
+        EnsureCsvWithinResourceLimit(csvText);
         using var reader = new StringReader(csvText);
         using var csv = new CsvReader(reader, CreateCsvConfiguration());
         var passwords = new List<PasswordEntry>();
@@ -110,6 +121,10 @@ public sealed partial class ImportExportService
         }
 
         csv.ReadHeader();
+        EnsureRecognizedHeader(
+            csv.HeaderRecord,
+            "title", "name", "folder/name", "login_title", "website", "url", "uri", "login_uri", "login_uri_1",
+            "username", "login_username", "user", "email", "password", "login_password");
         while (csv.Read())
         {
             var title = ReadField(csv, "title", "name", "folder/name", "login_title");
@@ -139,6 +154,27 @@ public sealed partial class ImportExportService
         }
 
         return passwords;
+    }
+
+    private static void EnsureCsvWithinResourceLimit(string csvText)
+    {
+        if (csvText.Length > MaximumImportCsvCharacters)
+        {
+            throw new CsvImportException(
+                CsvImportError.ResourceLimitExceeded,
+                "The CSV import exceeds the safe size limit.");
+        }
+    }
+
+    private static void EnsureRecognizedHeader(string[]? headers, params string[] recognizedNames)
+    {
+        if (headers is { Length: > 0 } && headers.Any(
+                header => recognizedNames.Contains(header, StringComparer.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        throw new CsvImportException(CsvImportError.InvalidFormat, "The CSV import headers are not recognized.");
     }
 
     private static CsvConfiguration CreateCsvConfiguration() =>

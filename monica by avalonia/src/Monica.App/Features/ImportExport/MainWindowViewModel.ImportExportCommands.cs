@@ -84,7 +84,7 @@ public sealed partial class MainWindowViewModel
         catch (PasswordSecretUnavailableException ex)
         {
             ExportPreview = "";
-            StatusMessage = ex.Message;
+            StatusMessage = GetPasswordSecretUnavailableMessage(ex);
             return false;
         }
 
@@ -109,7 +109,7 @@ public sealed partial class MainWindowViewModel
         catch (PasswordSecretUnavailableException ex)
         {
             ExportCsvPreview = "";
-            StatusMessage = ex.Message;
+            StatusMessage = GetPasswordSecretUnavailableMessage(ex);
             return false;
         }
 
@@ -151,7 +151,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            StatusMessage = _localization.Format("SaveExportFileFailedFormat", ex.Message);
+            ReportImportExportFailure("Saving text export failed", "SaveExportFileFailed", ex);
         }
     }
 }

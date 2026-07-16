@@ -34,9 +34,9 @@ public sealed partial class MainWindowViewModel
         {
             StatusMessage = _localization.Get("KeePassImportCanceled");
         }
-        catch (Exception)
+        catch (Exception error)
         {
-            StatusMessage = _localization.Get("KeePassFileSelectionFailed");
+            ReportImportExportFailure("Selecting KeePass import failed", "KeePassFileSelectionFailed", error);
         }
     }
 
@@ -90,9 +90,9 @@ public sealed partial class MainWindowViewModel
                 _ => "KeePassUnlockFailed"
             });
         }
-        catch (Exception)
+        catch (Exception error)
         {
-            StatusMessage = _localization.Get("KeePassPreviewFailed");
+            ReportImportExportFailure("Previewing KeePass import failed", "KeePassPreviewFailed", error);
         }
         finally
         {
@@ -218,8 +218,9 @@ public sealed partial class MainWindowViewModel
         {
             StatusMessage = _localization.Format("KeePassImportCanceledAfterFormat", imported, skipped);
         }
-        catch (Exception)
+        catch (Exception error)
         {
+            RecordImportExportFailure("Importing KeePass vault failed", error);
             StatusMessage = _localization.Format("KeePassImportPartialFailureFormat", imported, skipped);
         }
         finally

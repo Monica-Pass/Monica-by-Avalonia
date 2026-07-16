@@ -4338,9 +4338,7 @@ public sealed partial class PasswordManagementTests
         Assert.Empty(await harness.Repository.GetPasswordsAsync());
         Assert.Empty(await harness.Repository.GetCategoriesAsync());
         Assert.NotEmpty(harness.ViewModel.ImportJsonText);
-        Assert.Equal(
-            harness.ViewModel.L.Format("ImportFailedFormat", harness.ViewModel.L.Get("PasswordSecretUnavailable")),
-            harness.ViewModel.StatusMessage);
+        Assert.Equal(harness.ViewModel.L.Get("PasswordSecretUnavailable"), harness.ViewModel.StatusMessage);
     }
 
     [Fact]

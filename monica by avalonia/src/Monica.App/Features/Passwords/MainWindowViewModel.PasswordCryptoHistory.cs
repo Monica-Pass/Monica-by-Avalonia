@@ -35,10 +35,10 @@ public sealed partial class MainWindowViewModel
             return result.Value;
         }
 
-        var messageKey = result.State == PasswordSecretState.Locked
-            ? "VaultLocked"
-            : "PasswordSecretUnavailable";
-        throw new PasswordSecretUnavailableException(_localization.Get(messageKey));
+        var reason = result.State == PasswordSecretState.Locked
+            ? PasswordSecretUnavailableReason.VaultLocked
+            : PasswordSecretUnavailableReason.UnreadableData;
+        throw new PasswordSecretUnavailableException(reason);
     }
 
     private async Task SavePasswordHistorySnapshotIfChangedAsync(long entryId, string oldPlainPassword, string newPlainPassword)

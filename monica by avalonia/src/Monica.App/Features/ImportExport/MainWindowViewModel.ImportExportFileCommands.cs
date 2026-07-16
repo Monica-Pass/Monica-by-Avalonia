@@ -20,7 +20,7 @@ public sealed partial class MainWindowViewModel
             }
             catch (Exception ex)
             {
-                StatusMessage = _localization.Format("ImportFailedFormat", ex.Message);
+                ReportImportExportFailure("Opening Monica JSON import failed", "ImportFileSelectionFailed", ex);
             }
         });
 
@@ -40,7 +40,7 @@ public sealed partial class MainWindowViewModel
             }
             catch (Exception ex)
             {
-                StatusMessage = _localization.Format("ImportFailedFormat", ex.Message);
+                ReportImportExportFailure("Opening password CSV import failed", "ImportFileSelectionFailed", ex);
             }
         });
 
@@ -60,7 +60,7 @@ public sealed partial class MainWindowViewModel
             }
             catch (Exception ex)
             {
-                StatusMessage = _localization.Format("ImportFailedFormat", ex.Message);
+                ReportImportExportFailure("Opening note CSV import failed", "ImportFileSelectionFailed", ex);
             }
         });
 

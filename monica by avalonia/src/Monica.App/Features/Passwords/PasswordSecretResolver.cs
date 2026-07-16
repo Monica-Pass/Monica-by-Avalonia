@@ -132,4 +132,14 @@ internal static class PasswordSecretResolver
         exception is FormatException or CryptographicException or ArgumentException;
 }
 
-internal sealed class PasswordSecretUnavailableException(string message) : InvalidOperationException(message);
+internal enum PasswordSecretUnavailableReason
+{
+    VaultLocked,
+    UnreadableData
+}
+
+internal sealed class PasswordSecretUnavailableException(PasswordSecretUnavailableReason reason)
+    : InvalidOperationException("The password secret is unavailable.")
+{
+    public PasswordSecretUnavailableReason Reason { get; } = reason;
+}

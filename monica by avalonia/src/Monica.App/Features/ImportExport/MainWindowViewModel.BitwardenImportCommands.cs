@@ -34,9 +34,9 @@ public sealed partial class MainWindowViewModel
         {
             StatusMessage = _localization.Get("BitwardenImportCanceled");
         }
-        catch (Exception)
+        catch (Exception error)
         {
-            StatusMessage = _localization.Get("BitwardenFileSelectionFailed");
+            ReportImportExportFailure("Selecting Bitwarden JSON import failed", "BitwardenFileSelectionFailed", error);
         }
     }
 
@@ -89,10 +89,10 @@ public sealed partial class MainWindowViewModel
                 _ => "BitwardenInvalidExport"
             });
         }
-        catch (Exception)
+        catch (Exception error)
         {
             BitwardenSelectedFileName = "";
-            StatusMessage = _localization.Get("BitwardenPreviewFailed");
+            ReportImportExportFailure("Previewing Bitwarden JSON import failed", "BitwardenPreviewFailed", error);
         }
         finally
         {
@@ -162,8 +162,9 @@ public sealed partial class MainWindowViewModel
                 progress.Imported,
                 progress.Skipped);
         }
-        catch (Exception)
+        catch (Exception error)
         {
+            RecordImportExportFailure("Importing Bitwarden JSON vault failed", error);
             StatusMessage = _localization.Format(
                 "BitwardenImportPartialFailureFormat",
                 progress.Imported,
