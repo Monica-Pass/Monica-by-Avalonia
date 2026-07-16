@@ -120,6 +120,40 @@ public sealed class UiArchitectureTests
     }
 
     [Fact]
+    public void Unlock_view_host_releases_hidden_sensitive_visual_tree_after_unlock()
+    {
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<Monica.App.ViewModels.MainWindowViewModel>();
+        window.Show();
+        try
+        {
+            window.DataContext = viewModel;
+            Dispatcher.UIThread.RunJobs();
+
+            var host = Assert.Single(window.GetVisualDescendants().OfType<UnlockViewHost>());
+            var releasedView = Assert.IsType<UnlockView>(host.Content);
+
+            viewModel.IsUnlocked = true;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Null(host.Content);
+            Assert.DoesNotContain(window.GetVisualDescendants(), control => control is UnlockView);
+            Assert.Null(TopLevel.GetTopLevel(window)?.FocusManager?.GetFocusedElement());
+            Assert.Null(releasedView.DataContext);
+            Assert.Null(releasedView.Content);
+
+            viewModel.IsUnlocked = false;
+            Dispatcher.UIThread.RunJobs();
+            Assert.NotSame(releasedView, Assert.IsType<UnlockView>(host.Content));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [Fact]
     public void Feature_workspaces_own_their_style_dictionaries()
     {
         UserControl[] workspaces =

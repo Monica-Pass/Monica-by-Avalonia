@@ -1,25 +1,35 @@
 using System.ComponentModel;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Monica.App.ViewModels;
 
 namespace Monica.App.Features.Unlock;
 
-public partial class UnlockView : UserControl
+public partial class UnlockView : UserControl, IDisposable
 {
     private MainWindowViewModel? _subscribedViewModel;
+    private bool _disposed;
 
     public UnlockView()
     {
         InitializeComponent();
-        DataContextChanged += (_, _) => AttachViewModel(DataContext as MainWindowViewModel);
-        AttachedToVisualTree += (_, _) =>
-        {
-            AttachViewModel(DataContext as MainWindowViewModel);
-            FocusMasterPasswordWhenReady();
-        };
-        DetachedFromVisualTree += (_, _) => AttachViewModel(null);
+        DataContextChanged += OnDataContextChanged;
+        AttachedToVisualTree += OnAttachedToVisualTree;
+        DetachedFromVisualTree += OnDetachedFromVisualTree;
     }
+
+    private void OnDataContextChanged(object? sender, EventArgs e) =>
+        AttachViewModel(DataContext as MainWindowViewModel);
+
+    private void OnAttachedToVisualTree(object? sender, VisualTreeAttachmentEventArgs e)
+    {
+        AttachViewModel(DataContext as MainWindowViewModel);
+        FocusMasterPasswordWhenReady();
+    }
+
+    private void OnDetachedFromVisualTree(object? sender, VisualTreeAttachmentEventArgs e) =>
+        AttachViewModel(null);
 
     private void AttachViewModel(MainWindowViewModel? viewModel)
     {
@@ -53,17 +63,41 @@ public partial class UnlockView : UserControl
 
     private void FocusMasterPasswordWhenReady()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         if (_subscribedViewModel is { IsVaultAccessReady: false } or { IsUnlocked: true })
         {
             return;
         }
 
+        var weakView = new WeakReference<UnlockView>(this);
         Dispatcher.UIThread.Post(() =>
         {
-            if (MasterPasswordInput.IsEnabled)
+            if (weakView.TryGetTarget(out var view) &&
+                !view._disposed &&
+                view.MasterPasswordInput.IsEnabled)
             {
-                MasterPasswordInput.Focus();
+                view.MasterPasswordInput.Focus();
             }
         }, DispatcherPriority.Input);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        DataContextChanged -= OnDataContextChanged;
+        AttachedToVisualTree -= OnAttachedToVisualTree;
+        DetachedFromVisualTree -= OnDetachedFromVisualTree;
+        AttachViewModel(null);
+        DataContext = null;
+        Content = null;
     }
 }

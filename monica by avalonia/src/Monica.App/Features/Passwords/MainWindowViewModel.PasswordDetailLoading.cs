@@ -93,6 +93,8 @@ public sealed partial class MainWindowViewModel
                 dispatcher,
                 cancellationToken);
             await Task.Delay(SelectedPasswordDetailsCoalesceDelay, cancellationToken).ConfigureAwait(false);
+            // Snapshot construction is part of the restore contract. Keep it
+            // ahead of idle-only work so a busy workspace cannot starve it.
             var sourceSnapshot = await dispatcher.InvokeAsync(
                 () =>
                 {
@@ -110,7 +112,7 @@ public sealed partial class MainWindowViewModel
                         $"id={entry.Id}, version={version}, siblings={snapshot.Siblings.Count}");
                     return snapshot;
                 },
-                DispatcherPriority.ApplicationIdle);
+                DispatcherPriority.Background);
             if (sourceSnapshot is null)
             {
                 return;

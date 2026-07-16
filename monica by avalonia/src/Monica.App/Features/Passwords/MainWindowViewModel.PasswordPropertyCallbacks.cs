@@ -73,6 +73,16 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        // A newly materialized ListBox can report null before its ItemsSource
+        // has applied the existing selection. Preserve a still-visible VM
+        // selection and let the binding converge on the next notification.
+        if (value is null && SelectedPassword is { } selectedPassword &&
+            FilteredPasswords.Any(entry => entry.Id == selectedPassword.Id))
+        {
+            SyncSelectedPasswordListRow(selectedPassword);
+            return;
+        }
+
         SelectedPassword = value?.Entry;
     }
 

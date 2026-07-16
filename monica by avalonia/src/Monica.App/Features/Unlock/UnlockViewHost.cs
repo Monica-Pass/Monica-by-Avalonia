@@ -23,9 +23,18 @@ public sealed class UnlockViewHost : UserControl
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
-        if (change.Property == IsVisibleProperty && IsVisible)
+        if (change.Property != IsVisibleProperty)
+        {
+            return;
+        }
+
+        if (IsVisible)
         {
             QueueUnlockViewCreation();
+        }
+        else
+        {
+            ReleaseUnlockView();
         }
     }
 
@@ -36,6 +45,7 @@ public sealed class UnlockViewHost : UserControl
             return;
         }
 
+        Content ??= CreateLoadingPlaceholder();
         _creationQueued = true;
         Dispatcher.UIThread.Post(EnsureUnlockView, DispatcherPriority.Background);
     }
@@ -55,6 +65,18 @@ public sealed class UnlockViewHost : UserControl
 
         _viewCreated = true;
         Content = new UnlockView();
+    }
+
+    private void ReleaseUnlockView()
+    {
+        _creationQueued = false;
+        if (Content is UnlockView view)
+        {
+            view.Dispose();
+        }
+
+        Content = null;
+        _viewCreated = false;
     }
 
     private static Control CreateLoadingPlaceholder() =>
