@@ -45,7 +45,8 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            StatusMessage = _localization.Format("ImportMarkdownFailedFormat", ex.Message);
+            AppDiagnostics.Error("Importing secure note Markdown failed", ex);
+            StatusMessage = _localization.Get("ImportMarkdownFailed");
         }
     }
 

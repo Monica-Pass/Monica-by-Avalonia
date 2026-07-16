@@ -24,7 +24,8 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            StatusMessage = _localization.Format("OpenReferenceFailedFormat", ex.Message);
+            AppDiagnostics.Error("Opening secure note reference failed", ex);
+            StatusMessage = _localization.Get("OpenReferenceFailed");
         }
     }
 
