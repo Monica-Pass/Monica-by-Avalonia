@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.Input;
+using Monica.App.Services;
 using Monica.Core.Models;
 
 namespace Monica.App.ViewModels;
@@ -36,6 +37,7 @@ public sealed partial class MainWindowViewModel
             ? await _repository.SaveAttachmentAsync(attachment, cancellationToken)
             : await _repository.SaveAttachmentAsync(attachment, content, cancellationToken);
         if (content is not null &&
+            !string.IsNullOrWhiteSpace(originalStoragePath) &&
             !string.Equals(originalStoragePath, attachment.StoragePath, StringComparison.Ordinal) &&
             !originalStoragePath.StartsWith("mdbx:", StringComparison.OrdinalIgnoreCase))
         {
@@ -66,10 +68,31 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var draft = await _passwordAttachmentFileService.PickAndStoreAttachmentAsync(entry);
+        PasswordAttachmentFileDraft? draft;
+        try
+        {
+            draft = await _passwordAttachmentFileService.PickAttachmentAsync();
+        }
+        catch (AttachmentTooLargeException ex)
+        {
+            StatusMessage = _localization.Format(
+                "AttachmentTooLargeFormat",
+                FormatByteSize(ex.ActualBytes),
+                FormatByteSize(ex.MaximumBytes));
+            return;
+        }
+
         if (draft is null)
         {
             return;
+        }
+
+        if (!_repository.PersistsAttachmentContent || draft.Content is not { Length: > 0 })
+        {
+            draft = await _passwordAttachmentFileService.StoreAttachmentAsync(
+                draft.FileName,
+                draft.Content ?? [],
+                draft.ContentType);
         }
 
         await AddPasswordAttachmentMetadataAsync(entry, draft.FileName, draft.StoragePath, draft.SizeBytes, draft.ContentType, draft.Content);

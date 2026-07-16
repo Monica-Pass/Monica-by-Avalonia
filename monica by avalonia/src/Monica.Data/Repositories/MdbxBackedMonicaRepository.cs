@@ -12,6 +12,7 @@ public sealed partial class MdbxBackedMonicaRepository(
     IAttachmentContentStore? attachmentContentStore = null) : IMonicaRepository, ITransientVaultReadCache
 {
     private static readonly TimeSpan ReadCacheTtl = TimeSpan.FromMinutes(2);
+    public bool PersistsAttachmentContent => true;
     private readonly IPasswordQuickAccessStore _quickAccessStore = inner as IPasswordQuickAccessStore
         ?? throw new ArgumentException("The local repository must provide password quick-access storage.", nameof(inner));
     private long? _defaultLocalMdbxDatabaseId;

@@ -1560,7 +1560,7 @@ public sealed partial class AppSettingsTests
 
     private sealed class NoopPasswordAttachmentFileService : IPasswordAttachmentFileService
     {
-        public Task<PasswordAttachmentFileDraft?> PickAndStoreAttachmentAsync(PasswordEntry entry, CancellationToken cancellationToken = default) =>
+        public Task<PasswordAttachmentFileDraft?> PickAttachmentAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<PasswordAttachmentFileDraft?>(null);
 
         public Task<PasswordAttachmentFileDraft> StoreAttachmentAsync(string fileName, byte[] content, string contentType = "", CancellationToken cancellationToken = default) =>

@@ -12,7 +12,7 @@ public sealed record PasswordAttachmentFileDraft(string FileName, string Storage
 
 public interface IPasswordAttachmentFileService
 {
-    Task<PasswordAttachmentFileDraft?> PickAndStoreAttachmentAsync(PasswordEntry entry, CancellationToken cancellationToken = default);
+    Task<PasswordAttachmentFileDraft?> PickAttachmentAsync(CancellationToken cancellationToken = default);
     Task<PasswordAttachmentFileDraft> StoreAttachmentAsync(string fileName, byte[] content, string contentType = "", CancellationToken cancellationToken = default);
     Task DeleteStoredAttachmentAsync(string storagePath, CancellationToken cancellationToken = default);
 }
@@ -26,7 +26,7 @@ public sealed class PasswordAttachmentFileService(
     private const string AttachmentFolderName = "secure_attachments";
     private readonly string _attachmentRoot = attachmentRoot ?? MonicaAppDataPaths.GetPath(AttachmentFolderName);
 
-    public async Task<PasswordAttachmentFileDraft?> PickAndStoreAttachmentAsync(PasswordEntry entry, CancellationToken cancellationToken = default)
+    public async Task<PasswordAttachmentFileDraft?> PickAttachmentAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var owner = ownerProvider();
@@ -41,12 +41,21 @@ public sealed class PasswordAttachmentFileService(
             return null;
         }
 
-        await using var source = await file.OpenReadAsync();
-        using var buffer = new MemoryStream();
-        await source.CopyToAsync(buffer, cancellationToken);
-        var content = buffer.ToArray();
+        var properties = await file.GetBasicPropertiesAsync();
+        long? declaredLength = null;
+        if (properties.Size is { } reportedSize)
+        {
+            declaredLength = reportedSize > long.MaxValue ? long.MaxValue : (long)reportedSize;
+        }
 
-        return await StoreAttachmentAsync(file.Name, content, InferContentType(file.Name), cancellationToken);
+        await using var source = await file.OpenReadAsync();
+        var content = await AttachmentContentReader.ReadAsync(source, declaredLength, cancellationToken);
+        return new PasswordAttachmentFileDraft(
+            file.Name,
+            "",
+            content.LongLength,
+            InferContentType(file.Name),
+            content);
     }
 
     public async Task<PasswordAttachmentFileDraft> StoreAttachmentAsync(string fileName, byte[] content, string contentType = "", CancellationToken cancellationToken = default)

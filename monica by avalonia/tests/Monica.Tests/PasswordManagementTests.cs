@@ -3406,7 +3406,49 @@ public sealed partial class PasswordManagementTests
         var added = Assert.Single(await harness.Repository.GetAttachmentsAsync("PASSWORD", entry.Id));
         Assert.Equal("picked.txt", added.FileName);
         Assert.Equal("secure_attachments/picked.enc", added.StoragePath);
+        Assert.Equal(1, harness.Attachments.BridgeWriteCount);
         Assert.True(harness.ViewModel.Passwords.Single().HasAttachments);
+    }
+
+    [Fact]
+    public async Task Password_attachment_picker_skips_bridge_storage_for_embedded_repository()
+    {
+        EmbeddedAttachmentRepositoryProxy? embedded = null;
+        var harness = CreateHarness(repositoryDecorator: inner =>
+        {
+            embedded = EmbeddedAttachmentRepositoryProxy.Create(inner, out var repository);
+            return repository;
+        });
+        var entry = new PasswordEntry { Title = "GitHub", Username = "dev", Password = "one" };
+        await harness.Repository.SavePasswordAsync(entry);
+        await harness.ViewModel.LoadAsync();
+
+        await harness.ViewModel.AddPasswordAttachmentCommand.ExecuteAsync(harness.ViewModel.Passwords.Single());
+
+        var added = Assert.Single(await harness.Repository.GetAttachmentsAsync("PASSWORD", entry.Id));
+        Assert.Equal(0, harness.Attachments.BridgeWriteCount);
+        Assert.StartsWith("mdbx:", added.StoragePath, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("picked attachment"u8.ToArray(), embedded!.SavedContent);
+    }
+
+    [Fact]
+    public async Task Password_attachment_picker_surfaces_desktop_size_limit()
+    {
+        var harness = CreateHarness();
+        var entry = new PasswordEntry { Title = "GitHub", Username = "dev", Password = "one" };
+        await harness.Repository.SavePasswordAsync(entry);
+        await harness.ViewModel.LoadAsync();
+        harness.Attachments.PickFailure = new AttachmentTooLargeException(
+            AttachmentContentReader.MaximumAttachmentBytes,
+            AttachmentContentReader.MaximumAttachmentBytes + (1024 * 1024));
+
+        await harness.ViewModel.AddPasswordAttachmentCommand.ExecuteAsync(harness.ViewModel.Passwords.Single());
+
+        Assert.Empty(await harness.Repository.GetAttachmentsAsync("PASSWORD", entry.Id));
+        Assert.Equal(0, harness.Attachments.BridgeWriteCount);
+        Assert.Equal(
+            harness.ViewModel.L.Format("AttachmentTooLargeFormat", "257 MB", "256 MB"),
+            harness.ViewModel.StatusMessage);
     }
 
     [Fact]
@@ -4322,14 +4364,15 @@ public sealed partial class PasswordManagementTests
         IExportAuthorizationService? exportAuthorizationService = null,
         IPasswordGeneratorService? passwordGeneratorService = null,
         IImportExportService? importExportService = null,
-        IMonicaRepository? repositoryOverride = null)
+        IMonicaRepository? repositoryOverride = null,
+        Func<IMonicaRepository, IMonicaRepository>? repositoryDecorator = null)
     {
         var databasePath = GetTempDatabasePath();
         var factory = new SqliteConnectionFactory(databasePath);
         var migrator = new DatabaseMigrator(factory);
         var attachmentFileService = new FakePasswordAttachmentFileService();
-        var repository = repositoryOverride ??
-            new MonicaRepository(factory, migrator, attachmentContentStore: attachmentFileService);
+        var innerRepository = new MonicaRepository(factory, migrator, attachmentContentStore: attachmentFileService);
+        var repository = repositoryOverride ?? repositoryDecorator?.Invoke(innerRepository) ?? innerRepository;
         var crypto = new CryptoService();
         var localization = new LocalizationService();
         var generator = passwordGeneratorService ?? new PasswordGeneratorService();
@@ -4517,6 +4560,7 @@ public sealed partial class PasswordManagementTests
     {
         private readonly Dictionary<string, byte[]> _content = new(StringComparer.OrdinalIgnoreCase);
         private int _nextAttachmentId;
+        public int BridgeWriteCount { get; private set; }
 
         public void Put(string storagePath, byte[] content)
         {
@@ -4528,13 +4572,19 @@ public sealed partial class PasswordManagementTests
             return _content.TryGetValue(storagePath, out var content) ? content.ToArray() : null;
         }
 
-        public Task<PasswordAttachmentFileDraft?> PickAndStoreAttachmentAsync(PasswordEntry entry, CancellationToken cancellationToken = default)
+        public Exception? PickFailure { get; set; }
+
+        public Task<PasswordAttachmentFileDraft?> PickAttachmentAsync(CancellationToken cancellationToken = default)
         {
+            if (PickFailure is not null)
+            {
+                return Task.FromException<PasswordAttachmentFileDraft?>(PickFailure);
+            }
+
             var content = "picked attachment"u8.ToArray();
-            _content["secure_attachments/picked.enc"] = content;
             return Task.FromResult<PasswordAttachmentFileDraft?>(new PasswordAttachmentFileDraft(
                 "picked.txt",
-                "secure_attachments/picked.enc",
+                "",
                 content.LongLength,
                 "text/plain",
                 content));
@@ -4542,7 +4592,10 @@ public sealed partial class PasswordManagementTests
 
         public Task<PasswordAttachmentFileDraft> StoreAttachmentAsync(string fileName, byte[] content, string contentType = "", CancellationToken cancellationToken = default)
         {
-            var storagePath = $"secure_attachments/imported-{++_nextAttachmentId}.enc";
+            BridgeWriteCount++;
+            var storagePath = fileName == "picked.txt"
+                ? "secure_attachments/picked.enc"
+                : $"secure_attachments/imported-{++_nextAttachmentId}.enc";
             _content[storagePath] = content.ToArray();
             return Task.FromResult(new PasswordAttachmentFileDraft(
                 fileName,
@@ -4621,6 +4674,41 @@ public sealed partial class PasswordManagementTests
         {
             DeletedPaths.Add(relativePath);
             return Task.CompletedTask;
+        }
+    }
+
+    private class EmbeddedAttachmentRepositoryProxy : DispatchProxy
+    {
+        private IMonicaRepository _inner = null!;
+        public byte[]? SavedContent { get; private set; }
+
+        public static EmbeddedAttachmentRepositoryProxy Create(
+            IMonicaRepository inner,
+            out IMonicaRepository repository)
+        {
+            repository = DispatchProxy.Create<IMonicaRepository, EmbeddedAttachmentRepositoryProxy>();
+            var proxy = (EmbeddedAttachmentRepositoryProxy)(object)repository;
+            proxy._inner = inner;
+            return proxy;
+        }
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod?.Name == "get_PersistsAttachmentContent")
+            {
+                return true;
+            }
+
+            if (targetMethod?.Name == nameof(IMonicaRepository.SaveAttachmentAsync) &&
+                args is { Length: >= 2 } &&
+                args[0] is Attachment attachment &&
+                args[1] is byte[] content)
+            {
+                SavedContent = content.ToArray();
+                attachment.StoragePath = $"mdbx:{Guid.NewGuid():N}";
+            }
+
+            return targetMethod?.Invoke(_inner, args);
         }
     }
 

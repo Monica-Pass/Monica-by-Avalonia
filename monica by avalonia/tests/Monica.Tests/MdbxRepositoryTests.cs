@@ -10,6 +10,14 @@ namespace Monica.Tests;
 
 public sealed class MdbxRepositoryTests
 {
+    [Fact]
+    public void Canonical_repository_reports_embedded_attachment_persistence()
+    {
+        var repository = CreateRepository(out _);
+
+        Assert.True(repository.PersistsAttachmentContent);
+    }
+
     private static readonly JsonSerializerOptions MdbxPayloadJsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase

@@ -10,6 +10,7 @@ public sealed record PasswordMetadataSearchResult(
 
 public interface IMonicaRepository
 {
+    bool PersistsAttachmentContent => false;
     Task<IReadOnlyList<PasswordEntry>> GetPasswordsAsync(bool includeDeleted = false, bool includeArchived = false, CancellationToken cancellationToken = default);
     Task<long> SavePasswordAsync(PasswordEntry entry, CancellationToken cancellationToken = default);
     Task SoftDeletePasswordAsync(long id, CancellationToken cancellationToken = default);
