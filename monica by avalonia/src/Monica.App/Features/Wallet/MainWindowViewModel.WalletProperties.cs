@@ -32,6 +32,8 @@ public sealed partial class MainWindowViewModel
     public bool HasSelectedWalletItem => SelectedWalletItem is not null;
     public bool HasWalletItems => WalletItems.Count > 0;
     public bool HasWalletSearchText => !string.IsNullOrWhiteSpace(WalletSearchText);
+    public string ClearWalletSearchText => _localization.Get("ClearWalletSearch");
+    public string WalletSearchHelpText => _localization.Get("WalletSearchHelp");
     public IReadOnlyList<SecureItem> FilteredWalletItems => BuildFilteredWalletItems();
     public bool HasFilteredWalletItems => FilteredWalletItems.Count > 0;
     public string WalletFilteredStatusText => _localization.Format(

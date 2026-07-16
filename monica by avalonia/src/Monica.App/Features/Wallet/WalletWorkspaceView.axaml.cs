@@ -38,6 +38,8 @@ public partial class WalletWorkspaceView : UserControl
         WalletSearchBox.SelectAll();
     }
 
+    public bool IsSearchFocused => WalletSearchBox.IsFocused;
+
     public void FocusItemList() => Dispatcher.UIThread.Post(() => WalletItemList.Focus());
 
     public void FocusWorkbench() => WalletWorkbenchRegion.Focus();

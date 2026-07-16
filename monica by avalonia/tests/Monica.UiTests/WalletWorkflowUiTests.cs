@@ -1,5 +1,12 @@
+using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
+using Microsoft.Extensions.DependencyInjection;
 using Monica.App.Features.Wallet;
+using Monica.App.Services;
+using Monica.App.ViewModels;
 
 namespace Monica.UiTests;
 
@@ -23,6 +30,90 @@ public sealed class WalletWorkflowUiTests
         Assert.NotNull(view.FindControl<Button>("EmptyWalletAddButton"));
         Assert.NotNull(view.FindControl<Button>("EmptyWalletClearSearchButton"));
         Assert.NotNull(view.FindControl<Button>("WalletMoreActionsButton"));
+    }
+
+    [Fact]
+    public void Wallet_search_controls_describe_exact_actions_and_announce_results()
+    {
+        var view = new WalletWorkspaceView();
+        var xaml = File.ReadAllText(FindWalletFeatureFile("WalletWorkspaceView.axaml"));
+
+        Assert.NotNull(view.FindControl<Button>("WalletSearchClearButton"));
+        Assert.Contains(
+            "AutomationProperties.Name=\"{Binding ClearWalletSearchText}\"",
+            xaml,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "AutomationProperties.HelpText=\"{Binding WalletSearchHelpText}\"",
+            xaml,
+            StringComparison.Ordinal);
+        var status = view.FindControl<TextBlock>("WalletFilteredStatusText");
+        Assert.NotNull(status);
+        Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting(status));
+    }
+
+    [Fact]
+    public void Wallet_search_actions_are_localized_for_english_and_chinese()
+    {
+        var localization = new LocalizationService();
+
+        Assert.Equal("Clear wallet search", localization.Get("ClearWalletSearch"));
+        Assert.Contains("Ctrl+F", localization.Get("WalletSearchHelp"), StringComparison.Ordinal);
+
+        localization.SetLanguage("zh-CN");
+
+        Assert.Equal("清除卡包搜索", localization.Get("ClearWalletSearch"));
+        Assert.Contains("Ctrl+F", localization.Get("WalletSearchHelp"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Wallet_search_escape_is_scoped_to_the_focused_search_box()
+    {
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        window.Show();
+        try
+        {
+            window.DataContext = viewModel;
+            viewModel.IsUnlocked = true;
+            viewModel.SelectSectionCommand.Execute("Cards");
+            Dispatcher.UIThread.RunJobs();
+            var workspace = Assert.Single(window.GetVisualDescendants().OfType<WalletWorkspaceView>());
+            var searchBox = workspace.FindControl<TextBox>("WalletSearchBox")!;
+            var workbench = workspace.FindControl<Border>("WalletWorkbenchRegion")!;
+            viewModel.WalletSearchText = "visa";
+            searchBox.Focus();
+            var searchArgs = new KeyEventArgs
+            {
+                RoutedEvent = InputElement.KeyDownEvent,
+                Source = searchBox,
+                Key = Key.Escape
+            };
+
+            window.HandleWalletWorkspaceShortcut(viewModel, searchArgs);
+
+            Assert.True(searchArgs.Handled);
+            Assert.Empty(viewModel.WalletSearchText);
+
+            viewModel.WalletSearchText = "passport";
+            workbench.Focus();
+            var workbenchArgs = new KeyEventArgs
+            {
+                RoutedEvent = InputElement.KeyDownEvent,
+                Source = workbench,
+                Key = Key.Escape
+            };
+
+            window.HandleWalletWorkspaceShortcut(viewModel, workbenchArgs);
+
+            Assert.False(workbenchArgs.Handled);
+            Assert.Equal("passport", viewModel.WalletSearchText);
+        }
+        finally
+        {
+            window.Close();
+        }
     }
 
     [Fact]
@@ -69,5 +160,25 @@ public sealed class WalletWorkflowUiTests
         Assert.NotNull(editor.FindControl<Button>("ToggleCardNumberVisibilityButton"));
         Assert.NotNull(editor.FindControl<TextBox>("CardCvvInput"));
         Assert.NotNull(editor.FindControl<Button>("ToggleCardCvvVisibilityButton"));
+    }
+
+    private static string FindWalletFeatureFile(string fileName)
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            var candidate = Path.Combine(
+                directory.FullName,
+                "src",
+                "Monica.App",
+                "Features",
+                "Wallet",
+                fileName);
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        throw new FileNotFoundException($"Could not locate {fileName} from the test output directory.");
     }
 }

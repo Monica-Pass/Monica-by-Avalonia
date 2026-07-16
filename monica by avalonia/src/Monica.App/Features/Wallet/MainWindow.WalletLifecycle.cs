@@ -9,7 +9,7 @@ public partial class MainWindow
     private WalletWorkspaceView WalletWorkspaceView =>
         WorkspaceHost.GetOrCreate<WalletWorkspaceView>("Cards");
 
-    private void HandleWalletWorkspaceShortcut(MainWindowViewModel viewModel, KeyEventArgs e)
+    internal void HandleWalletWorkspaceShortcut(MainWindowViewModel viewModel, KeyEventArgs e)
     {
         if (TryReturnToWalletList(viewModel, e) || TryHandleWalletControlShortcut(viewModel, e))
         {
@@ -47,7 +47,9 @@ public partial class MainWindow
             return true;
         }
 
-        if (e.Key == Key.Escape && viewModel.HasWalletSearchText)
+        if (e.Key == Key.Escape &&
+            WalletWorkspaceView.IsSearchFocused &&
+            viewModel.HasWalletSearchText)
         {
             viewModel.ClearWalletSearchCommand.Execute(null);
             e.Handled = true;

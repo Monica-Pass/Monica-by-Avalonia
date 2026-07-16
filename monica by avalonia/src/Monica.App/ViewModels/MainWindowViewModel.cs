@@ -523,6 +523,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             SelectedWalletDetails = new WalletItemDetailsViewModel(_localization, SelectedWalletItem);
         }
+        OnPropertyChanged(nameof(ClearWalletSearchText));
+        OnPropertyChanged(nameof(WalletSearchHelpText));
         RaiseAllCountState();
         OnPropertyChanged(nameof(SecurityIssueCountText));
         InvalidateNoteEditorProjections();
