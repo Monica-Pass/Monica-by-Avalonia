@@ -1,4 +1,5 @@
 using Monica.Core.Services;
+using Monica.Data.Repositories;
 
 namespace Monica.App.ViewModels;
 
@@ -31,6 +32,7 @@ public sealed partial class MainWindowViewModel
         ReleaseTransientBackgroundSecrets();
         SuspendPasswordSearchProjectionUpdates();
         SuspendSecurityAnalysis();
+        ReleaseRepositoryVaultItemSnapshots();
         (_pwnedPasswordService as ITransientPwnedPasswordCache)?.ClearCachedRanges();
         CancelNoteImagePreviewRefresh();
         Interlocked.Increment(ref _noteImagePreviewVersion);
@@ -131,4 +133,7 @@ public sealed partial class MainWindowViewModel
         SelectedSecurityIssue = null;
         _isSecurityAnalysisDirty = true;
     }
+
+    private void ReleaseRepositoryVaultItemSnapshots() =>
+        (_repository as ITransientVaultReadCache)?.ReleaseVaultItemSnapshots();
 }

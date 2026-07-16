@@ -485,6 +485,39 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
+    public async Task Repository_releases_transient_vault_item_snapshots_on_demand()
+    {
+        var repository = CreateRepository(out var bridge);
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        await repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "Transient password snapshot",
+            Password = "secret"
+        });
+        await repository.SaveSecureItemAsync(new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = "Transient secure-item snapshot",
+            Notes = "secret note"
+        });
+
+        await repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true);
+        await repository.GetSecureItemsAsync(includeDeleted: true);
+        bridge.OpenedPaths.Clear();
+
+        await repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true);
+        await repository.GetSecureItemsAsync(includeDeleted: true);
+        Assert.Empty(bridge.OpenedPaths);
+
+        Assert.IsAssignableFrom<ITransientVaultReadCache>(repository)
+            .ReleaseVaultItemSnapshots();
+
+        await repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true);
+        await repository.GetSecureItemsAsync(includeDeleted: true);
+        Assert.Equal(2, bridge.OpenedPaths.Count);
+    }
+
+    [Fact]
     public async Task Repository_cascades_password_delete_restore_to_mdbx_bound_totps_when_sqlite_cache_is_missing()
     {
         var repository = CreateRepository(out var bridge, out var sqliteRepository);

@@ -256,6 +256,7 @@ public sealed partial class MainWindowViewModel
 
     private void ClearSensitiveCaches()
     {
+        ReleaseRepositoryVaultItemSnapshots();
         _passwordCustomFields = new Dictionary<long, IReadOnlyList<CustomField>>();
         _passwordCustomFieldSearchMatches = new HashSet<long>();
         _passwordCustomFieldSearchQuery = "";
