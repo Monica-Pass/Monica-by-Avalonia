@@ -84,6 +84,47 @@ public sealed class SecurityBaselineTests
         Assert.Null(adapter.Text);
     }
 
+    [Fact]
+    public async Task Security_baseline_inflight_cleanup_survives_concurrent_disposal()
+    {
+        var adapter = new BlockingClipboardAdapter();
+        var clipboard = new SecureClipboardService(adapter);
+        await clipboard.SetSensitiveTextAsync("owned-secret");
+
+        var cleanup = clipboard.ClearOwnedContentAsync();
+        await adapter.GetTextStarted.WaitAsync(TimeSpan.FromSeconds(2));
+
+        clipboard.Dispose();
+        adapter.ReleaseGetText();
+
+        await cleanup;
+        Assert.Null(adapter.Text);
+    }
+
+    [Fact]
+    public async Task Security_baseline_cleanup_after_disposal_is_safe_noop()
+    {
+        var adapter = new MemoryClipboardAdapter { Text = "external-content" };
+        var clipboard = new SecureClipboardService(adapter);
+
+        clipboard.Dispose();
+        clipboard.Dispose();
+        await clipboard.ClearOwnedContentAsync();
+
+        Assert.Equal("external-content", adapter.Text);
+        Assert.Equal(0, adapter.GetTextCallCount);
+    }
+
+    [Fact]
+    public async Task Security_baseline_write_after_disposal_is_rejected()
+    {
+        var clipboard = new SecureClipboardService(new MemoryClipboardAdapter());
+        clipboard.Dispose();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => clipboard.SetTextAsync("late-write"));
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => clipboard.SetSensitiveTextAsync("late-secret"));
+    }
+
     private static async Task WaitUntilAsync(Func<bool> predicate)
     {
         for (var attempt = 0; attempt < 100; attempt++)
@@ -131,6 +172,38 @@ public sealed class SecurityBaselineTests
             Text = null;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class BlockingClipboardAdapter : IClipboardAdapter
+    {
+        private readonly TaskCompletionSource _getTextStarted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _releaseGetText =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public string? Text { get; private set; }
+        public Task GetTextStarted => _getTextStarted.Task;
+
+        public async Task<string?> GetTextAsync(CancellationToken cancellationToken = default)
+        {
+            _getTextStarted.TrySetResult();
+            await _releaseGetText.Task.WaitAsync(cancellationToken);
+            return Text;
+        }
+
+        public Task SetTextAsync(string text, CancellationToken cancellationToken = default)
+        {
+            Text = text;
+            return Task.CompletedTask;
+        }
+
+        public Task ClearAsync(CancellationToken cancellationToken = default)
+        {
+            Text = null;
+            return Task.CompletedTask;
+        }
+
+        public void ReleaseGetText() => _releaseGetText.TrySetResult();
     }
 
     private sealed class ManualClipboardExpiryScheduler : IClipboardExpiryScheduler

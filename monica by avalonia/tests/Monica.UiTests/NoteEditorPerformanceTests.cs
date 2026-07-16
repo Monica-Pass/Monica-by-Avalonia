@@ -130,7 +130,7 @@ public sealed class NoteEditorPerformanceTests
     }
 
     [Fact]
-    public void Note_image_preview_refresh_is_cancelled_when_vault_locks()
+    public async Task Note_image_preview_refresh_is_cancelled_when_vault_locks()
     {
         var repository = DispatchProxy.Create<IMonicaRepository, AttachmentReadRepositoryProxy>();
         var probe = (AttachmentReadRepositoryProxy)(object)repository;
@@ -145,7 +145,7 @@ public sealed class NoteEditorPerformanceTests
             probe.FirstReadStarted.Wait(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken),
             "The blocking image preview read did not start.");
 
-        viewModel.LockCommand.Execute(null);
+        await viewModel.LockCommand.ExecuteAsync(null);
 
         Assert.True(
             probe.ReadCancellationObserved.Wait(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken),

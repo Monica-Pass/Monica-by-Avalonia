@@ -17,6 +17,7 @@ public sealed class SecureClipboardService(
     private TimeSpan? _sensitiveLifetime = TimeSpan.FromSeconds(30);
     private string? _ownedText;
     private long _ownershipVersion;
+    private int _disposeState;
 
     public Task SetTextAsync(string text, CancellationToken cancellationToken = default) =>
         ReplaceTextAsync(text, isSensitive: false, cancellationToken);
@@ -26,6 +27,7 @@ public sealed class SecureClipboardService(
 
     public void ConfigureSensitiveClear(TimeSpan? lifetime)
     {
+        ThrowIfDisposed();
         if (lifetime is { } value && value <= TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(nameof(lifetime));
@@ -36,13 +38,22 @@ public sealed class SecureClipboardService(
 
     public async Task ClearOwnedContentAsync(CancellationToken cancellationToken = default)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            var expectedText = _ownedText;
-            CancelExpiryUnsafe();
-            _ownedText = null;
-            _ownershipVersion++;
+            if (IsDisposed)
+            {
+                return;
+            }
+
+            var expectedText = Interlocked.Exchange(ref _ownedText, null);
+            CancelExpiry();
+            Interlocked.Increment(ref _ownershipVersion);
             if (expectedText is not null)
             {
                 await ClearAdapterIfMatchingAsync(expectedText, cancellationToken);
@@ -56,8 +67,17 @@ public sealed class SecureClipboardService(
 
     public void Dispose()
     {
-        CancelExpiryUnsafe();
-        _gate.Dispose();
+        if (Interlocked.Exchange(ref _disposeState, 1) != 0)
+        {
+            return;
+        }
+
+        CancelExpiry();
+        Interlocked.Exchange(ref _ownedText, null);
+        Interlocked.Increment(ref _ownershipVersion);
+
+        // Do not dispose the gate: an asynchronous cleanup may still own it while
+        // the dependency injection container is tearing down this singleton.
     }
 
     private async Task ReplaceTextAsync(
@@ -66,16 +86,18 @@ public sealed class SecureClipboardService(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(text);
+        ThrowIfDisposed();
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            CancelExpiryUnsafe();
-            _ownedText = null;
-            var version = ++_ownershipVersion;
+            ThrowIfDisposed();
+            CancelExpiry();
+            Interlocked.Exchange(ref _ownedText, null);
+            var version = Interlocked.Increment(ref _ownershipVersion);
             await _adapter.SetTextAsync(text, cancellationToken);
             if (isSensitive && _sensitiveLifetime is { } lifetime)
             {
-                ScheduleExpiryUnsafe(text, version, lifetime);
+                ScheduleExpiry(text, version, lifetime);
             }
         }
         finally
@@ -84,17 +106,33 @@ public sealed class SecureClipboardService(
         }
     }
 
-    private void ScheduleExpiryUnsafe(string text, long version, TimeSpan lifetime)
+    private void ScheduleExpiry(string text, long version, TimeSpan lifetime)
     {
-        _ownedText = text;
-        _expiryCancellation = new CancellationTokenSource();
-        _ = ClearAfterDelayAsync(text, version, lifetime, _expiryCancellation.Token);
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        var expiryCancellation = new CancellationTokenSource();
+        var cancellationToken = expiryCancellation.Token;
+        Interlocked.Exchange(ref _ownedText, text);
+        CancelAndDispose(Interlocked.Exchange(ref _expiryCancellation, expiryCancellation));
+
+        if (IsDisposed)
+        {
+            Interlocked.Exchange(ref _ownedText, null);
+            CancelExpiry();
+            return;
+        }
+
+        _ = ClearAfterDelayAsync(text, version, lifetime, expiryCancellation, cancellationToken);
     }
 
     private async Task ClearAfterDelayAsync(
         string expectedText,
         long version,
         TimeSpan lifetime,
+        CancellationTokenSource expiryCancellation,
         CancellationToken cancellationToken)
     {
         try
@@ -105,6 +143,10 @@ public sealed class SecureClipboardService(
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
+        finally
+        {
+            DisposeExpiryIfCurrent(expiryCancellation);
+        }
     }
 
     private async Task ClearIfCurrentOwnerAsync(
@@ -112,18 +154,23 @@ public sealed class SecureClipboardService(
         long version,
         CancellationToken cancellationToken)
     {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            if (version != _ownershipVersion || !string.Equals(_ownedText, expectedText, StringComparison.Ordinal))
+            if (IsDisposed
+                || version != Interlocked.Read(ref _ownershipVersion)
+                || !string.Equals(Volatile.Read(ref _ownedText), expectedText, StringComparison.Ordinal))
             {
                 return;
             }
 
             await ClearAdapterIfMatchingAsync(expectedText, cancellationToken);
-            _ownedText = null;
-            _expiryCancellation?.Dispose();
-            _expiryCancellation = null;
+            Interlocked.Exchange(ref _ownedText, null);
         }
         finally
         {
@@ -152,10 +199,43 @@ public sealed class SecureClipboardService(
         await _adapter.ClearAsync(cancellationToken);
     }
 
-    private void CancelExpiryUnsafe()
+    private bool IsDisposed => Volatile.Read(ref _disposeState) != 0;
+
+    private void ThrowIfDisposed()
     {
-        _expiryCancellation?.Cancel();
-        _expiryCancellation?.Dispose();
-        _expiryCancellation = null;
+        if (IsDisposed)
+        {
+            throw new ObjectDisposedException(nameof(SecureClipboardService));
+        }
+    }
+
+    private void CancelExpiry() =>
+        CancelAndDispose(Interlocked.Exchange(ref _expiryCancellation, null));
+
+    private void DisposeExpiryIfCurrent(CancellationTokenSource expected)
+    {
+        if (ReferenceEquals(
+            Interlocked.CompareExchange(ref _expiryCancellation, null, expected),
+            expected))
+        {
+            expected.Dispose();
+        }
+    }
+
+    private static void CancelAndDispose(CancellationTokenSource? cancellation)
+    {
+        if (cancellation is null)
+        {
+            return;
+        }
+
+        try
+        {
+            cancellation.Cancel();
+        }
+        finally
+        {
+            cancellation.Dispose();
+        }
     }
 }
