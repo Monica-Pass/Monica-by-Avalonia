@@ -188,5 +188,8 @@ public sealed partial class AppSettingsTests
 
         public Task<string?> SaveTextFileAsync(string title, string suggestedFileName, string content, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
             Task.FromResult<string?>(null);
+
+        public Task<string?> SaveBinaryFileAsync(string title, string suggestedFileName, ReadOnlyMemory<byte> content, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
+            Task.FromResult<string?>(null);
     }
 }

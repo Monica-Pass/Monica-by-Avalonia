@@ -11,6 +11,7 @@ public sealed partial class PasswordDetailViewModel : ObservableObject, IDisposa
 {
     private readonly IClipboardService _clipboardService;
     private Func<PasswordEntry, Task>? _addAttachment;
+    private Func<Attachment, Task<PasswordAttachmentSaveResult>>? _saveAttachment;
     private Func<Attachment, Task<bool>>? _deleteAttachment;
     private Func<PasswordHistoryEntry, Task<bool>>? _deletePasswordHistory;
     private Func<long, Task<bool>>? _clearPasswordHistory;
@@ -28,6 +29,7 @@ public sealed partial class PasswordDetailViewModel : ObservableObject, IDisposa
         IReadOnlyList<CustomField> customFields,
         IReadOnlyList<PasswordHistoryDisplayItem>? passwordHistory = null,
         Func<PasswordEntry, Task>? addAttachment = null,
+        Func<Attachment, Task<PasswordAttachmentSaveResult>>? saveAttachment = null,
         Func<Attachment, Task<bool>>? deleteAttachment = null,
         Func<PasswordHistoryEntry, Task<bool>>? deletePasswordHistory = null,
         Func<long, Task<bool>>? clearPasswordHistory = null)
@@ -35,6 +37,7 @@ public sealed partial class PasswordDetailViewModel : ObservableObject, IDisposa
         L = localization;
         _clipboardService = clipboardService;
         _addAttachment = addAttachment;
+        _saveAttachment = saveAttachment;
         _deleteAttachment = deleteAttachment;
         _deletePasswordHistory = deletePasswordHistory;
         _clearPasswordHistory = clearPasswordHistory;
@@ -77,6 +80,7 @@ public sealed partial class PasswordDetailViewModel : ObservableObject, IDisposa
     public string Subtitle { get; private set; }
     public string Initial { get; private set; }
     public string CopyLabel => L.Get("Copy");
+    public string SaveAttachmentLabel => L.Get("SaveAttachment");
     public string DeleteLabel => L.Get("Delete");
     public string PasswordHistoryTitle => L.Get("PasswordHistory");
     public string PasswordHistoryDescription { get; }
@@ -134,6 +138,7 @@ public sealed partial class PasswordDetailViewModel : ObservableObject, IDisposa
         Initial = "";
         StatusText = "";
         _addAttachment = null;
+        _saveAttachment = null;
         _deleteAttachment = null;
         _deletePasswordHistory = null;
         _clearPasswordHistory = null;

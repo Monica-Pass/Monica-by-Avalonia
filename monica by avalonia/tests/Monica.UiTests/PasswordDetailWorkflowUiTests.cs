@@ -14,7 +14,7 @@ public sealed class PasswordDetailWorkflowUiTests
             2,
             CountOccurrences(xaml, "AutomationProperties.Name=\"{Binding VisibilityActionLabel}\""));
         Assert.Equal(
-            3,
+            2,
             CountOccurrences(xaml, "AutomationProperties.Name=\"{Binding #Root.DataContext.CopyLabel}\""));
         Assert.Equal(
             2,
@@ -27,6 +27,13 @@ public sealed class PasswordDetailWorkflowUiTests
             "AutomationProperties.Name=\"{Binding L.AddAttachment}\"",
             xaml,
             StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"PasswordAttachmentSaveButton\"", xaml, StringComparison.Ordinal);
+        Assert.Contains(
+            "AutomationProperties.Name=\"{Binding #Root.DataContext.SaveAttachmentLabel}\"",
+            xaml,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("x:Name=\"PasswordAttachmentCopyButton\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("CopyAttachmentPathCommand", xaml, StringComparison.Ordinal);
     }
 
     private static int CountOccurrences(string value, string fragment) =>

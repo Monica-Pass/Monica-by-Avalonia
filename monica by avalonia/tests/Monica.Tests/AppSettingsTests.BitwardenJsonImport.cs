@@ -234,6 +234,13 @@ public sealed partial class AppSettingsTests
             string content,
             IReadOnlyList<PlatformFilePickerFileType> fileTypes,
             CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
+
+        public Task<string?> SaveBinaryFileAsync(
+            string title,
+            string suggestedFileName,
+            ReadOnlyMemory<byte> content,
+            IReadOnlyList<PlatformFilePickerFileType> fileTypes,
+            CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
     }
 
     private sealed class RecordingConfirmationDialogService(bool result) : IConfirmationDialogService

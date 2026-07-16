@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
@@ -80,13 +81,7 @@ public sealed class AvaloniaFileSystemPickerService(
         EnsureUsable();
 
         var owner = ownerProvider();
-        var file = await owner.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-        {
-            Title = title,
-            SuggestedFileName = suggestedFileName,
-            DefaultExtension = InferDefaultExtension(fileTypes),
-            FileTypeChoices = ToAvaloniaFileTypes(fileTypes)
-        });
+        var file = await owner.StorageProvider.SaveFilePickerAsync(CreateSaveOptions(title, suggestedFileName, fileTypes));
 
         if (file is null)
         {
@@ -96,7 +91,42 @@ public sealed class AvaloniaFileSystemPickerService(
         cancellationToken.ThrowIfCancellationRequested();
         await using var stream = await file.OpenWriteAsync();
         var bytes = Encoding.UTF8.GetBytes(content);
-        await stream.WriteAsync(bytes, cancellationToken);
+        try
+        {
+            PrepareOutputStream(stream);
+            await stream.WriteAsync(bytes, cancellationToken);
+            await stream.FlushAsync(cancellationToken);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(bytes);
+        }
+
+        return file.Name;
+    }
+
+    public async Task<string?> SaveBinaryFileAsync(
+        string title,
+        string suggestedFileName,
+        ReadOnlyMemory<byte> content,
+        IReadOnlyList<PlatformFilePickerFileType> fileTypes,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        EnsureUsable();
+
+        var owner = ownerProvider();
+        var file = await owner.StorageProvider.SaveFilePickerAsync(CreateSaveOptions(title, suggestedFileName, fileTypes));
+        if (file is null)
+        {
+            return null;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        await using var stream = await file.OpenWriteAsync();
+        PrepareOutputStream(stream);
+        await stream.WriteAsync(content, cancellationToken);
+        await stream.FlushAsync(cancellationToken);
         return file.Name;
     }
 
@@ -130,5 +160,25 @@ public sealed class AvaloniaFileSystemPickerService(
             .FirstOrDefault(item => item.StartsWith("*.", StringComparison.Ordinal));
 
         return pattern is null ? null : pattern[2..];
+    }
+
+    private static FilePickerSaveOptions CreateSaveOptions(
+        string title,
+        string suggestedFileName,
+        IReadOnlyList<PlatformFilePickerFileType> fileTypes) =>
+        new()
+        {
+            Title = title,
+            SuggestedFileName = suggestedFileName,
+            DefaultExtension = InferDefaultExtension(fileTypes),
+            FileTypeChoices = ToAvaloniaFileTypes(fileTypes)
+        };
+
+    private static void PrepareOutputStream(Stream stream)
+    {
+        if (stream.CanSeek)
+        {
+            stream.SetLength(0);
+        }
     }
 }

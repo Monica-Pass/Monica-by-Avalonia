@@ -359,9 +359,12 @@ public sealed partial class PlatformServiceTests
             service.OpenTextFileAsync("Open", [new PlatformFilePickerFileType("JSON", ["*.json"])]));
         var saveError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.SaveTextFileAsync("Save", "monica.json", "{}", [new PlatformFilePickerFileType("JSON", ["*.json"])]));
+        var binarySaveError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.SaveBinaryFileAsync("Save", "attachment.bin", new byte[] { 1, 2, 3 }, [new PlatformFilePickerFileType("Binary", ["*.bin"])]));
 
         Assert.Contains("No picker", openError.Message);
         Assert.Contains("No picker", saveError.Message);
+        Assert.Contains("No picker", binarySaveError.Message);
     }
 
     [Fact]

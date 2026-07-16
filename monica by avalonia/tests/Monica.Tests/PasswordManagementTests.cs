@@ -3341,10 +3341,7 @@ public sealed partial class PasswordManagementTests
             var details = Assert.IsType<PasswordDetailViewModel>(harness.DetailDialog.LastDetails);
             var attachmentItem = Assert.Single(details.Attachments, item => item.FileName == "passport-scan.pdf");
             Assert.Contains("4 KB", attachmentItem.DisplayValue, StringComparison.Ordinal);
-
-            details.CopyAttachmentPathCommand.ExecuteAsync(attachmentItem).GetAwaiter().GetResult();
-
-            Assert.Equal("secure_attachments/passport-scan.enc", harness.Clipboard.Text);
+            Assert.DoesNotContain("secure_attachments", attachmentItem.DisplayValue, StringComparison.OrdinalIgnoreCase);
         });
     }
 
@@ -3391,9 +3388,6 @@ public sealed partial class PasswordManagementTests
         await harness.ViewModel.ShowPasswordDetailsCommand.ExecuteAsync(harness.ViewModel.Passwords.Single());
         var details = Assert.IsType<PasswordDetailViewModel>(harness.DetailDialog.LastDetails);
         var displayedAttachment = Assert.Single(details.Attachments);
-
-        await details.CopyAttachmentPathCommand.ExecuteAsync(displayedAttachment);
-        Assert.Equal("secure_attachments/old.enc", harness.Clipboard.Text);
 
         await details.DeleteAttachmentCommand.ExecuteAsync(displayedAttachment);
         Assert.Empty(await harness.Repository.GetAttachmentsAsync("PASSWORD", entry.Id));
@@ -3481,12 +3475,108 @@ public sealed partial class PasswordManagementTests
 
         var attachment = Assert.Single(details.Attachments);
 
-        Assert.False(attachment.CanCopy);
         Assert.DoesNotContain("mdbx:", attachment.DisplayValue, StringComparison.OrdinalIgnoreCase);
+    }
 
-        await details.CopyAttachmentPathCommand.ExecuteAsync(attachment);
+    [Theory]
+    [InlineData("secure_attachments/recovery.enc")]
+    [InlineData("mdbx:attachment-1")]
+    public async Task Password_details_save_attachments_after_export_authorization_and_zero_plaintext(string storagePath)
+    {
+        var picker = new FakeFileSystemPickerService();
+        var authorization = new CountingExportAuthorizationService();
+        var harness = CreateHarness(fileSystemPickerService: picker, exportAuthorizationService: authorization);
+        var entry = new PasswordEntry { Title = "GitHub", Username = "dev", Password = "one" };
+        await harness.Repository.SavePasswordAsync(entry);
+        var attachment = new Attachment
+        {
+            OwnerType = "PASSWORD",
+            OwnerId = entry.Id,
+            FileName = "recovery.txt",
+            ContentType = "text/plain",
+            StoragePath = storagePath,
+            SizeBytes = 17
+        };
+        await harness.Repository.SaveAttachmentAsync(attachment);
+        var expectedContent = "recovery material"u8.ToArray();
+        harness.Attachments.Put(storagePath, expectedContent);
+        await harness.ViewModel.LoadAsync();
 
-        Assert.Equal("", clipboard.Text);
+        await harness.ViewModel.ShowPasswordDetailsCommand.ExecuteAsync(harness.ViewModel.Passwords.Single());
+        var details = Assert.IsType<PasswordDetailViewModel>(harness.DetailDialog.LastDetails);
+        await details.SaveAttachmentCommand.ExecuteAsync(Assert.Single(details.Attachments));
+
+        Assert.Equal(1, authorization.RequestCount);
+        Assert.Equal(1, harness.Attachments.ReadCount);
+        Assert.Equal(1, picker.BinarySaveCallCount);
+        Assert.Equal("recovery.txt", picker.SuggestedFileName);
+        Assert.Equal(expectedContent, picker.SavedBinaryContent);
+        Assert.All(picker.SavedBinaryBuffer.ToArray(), value => Assert.Equal(0, value));
+        Assert.Equal(harness.ViewModel.L.Format("SavedAttachmentFormat", "recovery.txt"), details.StatusText);
+    }
+
+    [Fact]
+    public async Task Password_attachment_save_stops_before_reading_when_authorization_fails()
+    {
+        var picker = new FakeFileSystemPickerService();
+        var authorization = new CountingExportAuthorizationService { Result = false };
+        var harness = CreateHarness(fileSystemPickerService: picker, exportAuthorizationService: authorization);
+        var details = await CreateAttachmentDetailsAsync(harness, includeContent: true);
+
+        await details.SaveAttachmentCommand.ExecuteAsync(Assert.Single(details.Attachments));
+
+        Assert.Equal(1, authorization.RequestCount);
+        Assert.Equal(0, harness.Attachments.ReadCount);
+        Assert.Equal(0, picker.BinarySaveCallCount);
+        Assert.Equal(harness.ViewModel.L.Get("AttachmentSaveAuthorizationFailed"), details.StatusText);
+    }
+
+    [Fact]
+    public async Task Password_attachment_save_cancel_is_silent_and_zeroes_plaintext()
+    {
+        var picker = new FakeFileSystemPickerService { CancelBinarySave = true };
+        var harness = CreateHarness(
+            fileSystemPickerService: picker,
+            exportAuthorizationService: new CountingExportAuthorizationService());
+        var details = await CreateAttachmentDetailsAsync(harness, includeContent: true);
+        details.StatusText = "Keep this status";
+
+        await details.SaveAttachmentCommand.ExecuteAsync(Assert.Single(details.Attachments));
+
+        Assert.Equal("Keep this status", details.StatusText);
+        Assert.Equal(1, picker.BinarySaveCallCount);
+        Assert.All(picker.SavedBinaryBuffer.ToArray(), value => Assert.Equal(0, value));
+    }
+
+    [Fact]
+    public async Task Password_attachment_save_reports_missing_content_without_opening_picker()
+    {
+        var picker = new FakeFileSystemPickerService();
+        var harness = CreateHarness(
+            fileSystemPickerService: picker,
+            exportAuthorizationService: new CountingExportAuthorizationService());
+        var details = await CreateAttachmentDetailsAsync(harness, includeContent: false);
+
+        await details.SaveAttachmentCommand.ExecuteAsync(Assert.Single(details.Attachments));
+
+        Assert.Equal(1, harness.Attachments.ReadCount);
+        Assert.Equal(0, picker.BinarySaveCallCount);
+        Assert.Equal(harness.ViewModel.L.Format("AttachmentContentUnavailableFormat", "recovery.txt"), details.StatusText);
+    }
+
+    [Fact]
+    public async Task Password_attachment_save_reports_picker_failure_and_zeroes_plaintext()
+    {
+        var picker = new FakeFileSystemPickerService { BinarySaveFailure = new IOException("Simulated write failure") };
+        var harness = CreateHarness(
+            fileSystemPickerService: picker,
+            exportAuthorizationService: new CountingExportAuthorizationService());
+        var details = await CreateAttachmentDetailsAsync(harness, includeContent: true);
+
+        await details.SaveAttachmentCommand.ExecuteAsync(Assert.Single(details.Attachments));
+
+        Assert.Equal(harness.ViewModel.L.Format("AttachmentSaveFailedFormat", "recovery.txt"), details.StatusText);
+        Assert.All(picker.SavedBinaryBuffer.ToArray(), value => Assert.Equal(0, value));
     }
 
     [Fact]
@@ -4411,6 +4501,30 @@ public sealed partial class PasswordManagementTests
         return new PasswordHarness(viewModel, repository, crypto, dialog, detailDialog, categoryPicker, totpDialog, walletDialog, clipboard, attachmentFileService, confirmationDialogService, databasePath);
     }
 
+    private static async Task<PasswordDetailViewModel> CreateAttachmentDetailsAsync(PasswordHarness harness, bool includeContent)
+    {
+        var entry = new PasswordEntry { Title = "GitHub", Username = "dev", Password = "one" };
+        await harness.Repository.SavePasswordAsync(entry);
+        const string storagePath = "secure_attachments/recovery.enc";
+        await harness.Repository.SaveAttachmentAsync(new Attachment
+        {
+            OwnerType = "PASSWORD",
+            OwnerId = entry.Id,
+            FileName = "recovery.txt",
+            ContentType = "text/plain",
+            StoragePath = storagePath,
+            SizeBytes = 17
+        });
+        if (includeContent)
+        {
+            harness.Attachments.Put(storagePath, "recovery material"u8.ToArray());
+        }
+
+        await harness.ViewModel.LoadAsync();
+        await harness.ViewModel.ShowPasswordDetailsCommand.ExecuteAsync(harness.ViewModel.Passwords.Single());
+        return Assert.IsType<PasswordDetailViewModel>(harness.DetailDialog.LastDetails);
+    }
+
     private static async Task SetPasswordUpdatedAtAsync(string databasePath, long id, DateTimeOffset updatedAt)
     {
         await using var connection = new SqliteConnection($"Data Source={databasePath}");
@@ -4561,6 +4675,7 @@ public sealed partial class PasswordManagementTests
         private readonly Dictionary<string, byte[]> _content = new(StringComparer.OrdinalIgnoreCase);
         private int _nextAttachmentId;
         public int BridgeWriteCount { get; private set; }
+        public int ReadCount { get; private set; }
 
         public void Put(string storagePath, byte[] content)
         {
@@ -4613,6 +4728,7 @@ public sealed partial class PasswordManagementTests
 
         public Task<byte[]?> TryReadAttachmentContentAsync(Attachment attachment, CancellationToken cancellationToken = default)
         {
+            ReadCount++;
             return Task.FromResult(
                 _content.TryGetValue(attachment.StoragePath, out var content)
                     ? content.ToArray()
@@ -4751,6 +4867,11 @@ public sealed partial class PasswordManagementTests
             "Test file picker");
         public string SuggestedFileName { get; private set; } = "";
         public string SavedContent { get; private set; } = "";
+        public byte[] SavedBinaryContent { get; private set; } = [];
+        public ReadOnlyMemory<byte> SavedBinaryBuffer { get; private set; }
+        public int BinarySaveCallCount { get; private set; }
+        public bool CancelBinarySave { get; set; }
+        public Exception? BinarySaveFailure { get; set; }
         public PickedTextFile? TextFileToOpen { get; init; }
 
         public Task<PickedTextFile?> OpenTextFileAsync(string title, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
@@ -4764,6 +4885,20 @@ public sealed partial class PasswordManagementTests
             SuggestedFileName = suggestedFileName;
             SavedContent = content;
             return Task.FromResult<string?>(suggestedFileName);
+        }
+
+        public Task<string?> SaveBinaryFileAsync(string title, string suggestedFileName, ReadOnlyMemory<byte> content, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default)
+        {
+            BinarySaveCallCount++;
+            if (BinarySaveFailure is not null)
+            {
+                return Task.FromException<string?>(BinarySaveFailure);
+            }
+
+            SuggestedFileName = suggestedFileName;
+            SavedBinaryBuffer = content;
+            SavedBinaryContent = content.ToArray();
+            return Task.FromResult(CancelBinarySave ? null : suggestedFileName);
         }
     }
 
@@ -4817,11 +4952,12 @@ public sealed partial class PasswordManagementTests
     private sealed class CountingExportAuthorizationService : IExportAuthorizationService
     {
         public int RequestCount { get; private set; }
+        public bool Result { get; set; } = true;
 
         public Task<bool> AuthorizeAsync(bool requireMasterPassword, CancellationToken cancellationToken = default)
         {
             RequestCount++;
-            return Task.FromResult(true);
+            return Task.FromResult(Result);
         }
     }
 
@@ -5021,6 +5157,7 @@ public sealed partial class PasswordManagementTests
             IReadOnlyList<CustomField> customFields,
             IReadOnlyList<PasswordHistoryDisplayItem> passwordHistory,
             Func<PasswordEntry, Task>? addAttachment,
+            Func<Attachment, Task<PasswordAttachmentSaveResult>>? saveAttachment,
             Func<Attachment, Task<bool>>? deleteAttachment,
             Func<PasswordHistoryEntry, Task<bool>>? deletePasswordHistory,
             Func<long, Task<bool>>? clearPasswordHistory,
@@ -5045,6 +5182,7 @@ public sealed partial class PasswordManagementTests
                 customFields,
                 passwordHistory,
                 addAttachment,
+                saveAttachment,
                 deleteAttachment,
                 deletePasswordHistory,
                 clearPasswordHistory);

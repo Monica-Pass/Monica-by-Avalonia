@@ -125,9 +125,6 @@ public sealed partial class MainWindowViewModel
         return true;
     }
 
-
-
-
     [RelayCommand]
     private void TogglePasswordFolderExpansion(PasswordFolderFilterChoice? item)
     {

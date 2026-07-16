@@ -1376,6 +1376,14 @@ public sealed partial class AppSettingsTests
             SaveFileTypes = fileTypes;
             return Task.FromResult(savedFileName);
         }
+
+        public Task<string?> SaveBinaryFileAsync(string title, string suggestedFileName, ReadOnlyMemory<byte> content, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default)
+        {
+            SuggestedFileName = suggestedFileName;
+            SavedContent = Convert.ToBase64String(content.Span);
+            SaveFileTypes = fileTypes;
+            return Task.FromResult(savedFileName);
+        }
     }
 
     private sealed class CapturingWebDavBackupService(IReadOnlyList<RemoteFileEntry> entries) : IWebDavBackupService
@@ -1551,6 +1559,7 @@ public sealed partial class AppSettingsTests
             IReadOnlyList<CustomField> customFields,
             IReadOnlyList<PasswordHistoryDisplayItem> passwordHistory,
             Func<PasswordEntry, Task>? addAttachment,
+            Func<Attachment, Task<PasswordAttachmentSaveResult>>? saveAttachment,
             Func<Attachment, Task<bool>>? deleteAttachment,
             Func<PasswordHistoryEntry, Task<bool>>? deletePasswordHistory,
             Func<long, Task<bool>>? clearPasswordHistory,

@@ -4,6 +4,17 @@ using Monica.Core.Models;
 
 namespace Monica.App.ViewModels;
 
+public enum PasswordAttachmentSaveOutcome
+{
+    Saved,
+    Cancelled,
+    AuthorizationFailed,
+    ContentUnavailable,
+    Failed
+}
+
+public readonly record struct PasswordAttachmentSaveResult(PasswordAttachmentSaveOutcome Outcome);
+
 public sealed partial class PasswordDetailGroup : ObservableObject
 {
     public PasswordDetailGroup(string title, bool isExpanded, IReadOnlyList<PasswordDetailField> fields)
@@ -83,8 +94,6 @@ public sealed class PasswordAttachmentItem(ILocalizationService localization, At
     public Attachment Attachment { get; private set; } = attachment;
     public string FileName => Attachment.FileName;
     public string DisplayValue => BuildAttachmentDisplayValue(localization, Attachment);
-    public string StoragePath => Attachment.StoragePath;
-    public bool CanCopy => !string.IsNullOrWhiteSpace(StoragePath) && !IsMdbxAttachment(StoragePath);
 
     internal void ClearSensitiveState() => Attachment = new Attachment();
 
@@ -93,14 +102,10 @@ public sealed class PasswordAttachmentItem(ILocalizationService localization, At
         var values = new[]
         {
             FormatAttachmentSize(attachment.SizeBytes),
-            attachment.ContentType,
-            IsMdbxAttachment(attachment.StoragePath) ? "" : attachment.StoragePath
+            attachment.ContentType
         }.Where(value => !string.IsNullOrWhiteSpace(value));
         return string.Join(" - ", values);
     }
-
-    private static bool IsMdbxAttachment(string storagePath) =>
-        storagePath.StartsWith("mdbx:", StringComparison.OrdinalIgnoreCase);
 
     private static string FormatAttachmentSize(long sizeBytes)
     {

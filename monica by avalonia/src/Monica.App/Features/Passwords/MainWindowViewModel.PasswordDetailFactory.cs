@@ -44,6 +44,7 @@ public sealed partial class MainWindowViewModel
             customFields,
             history,
             AddPasswordAttachmentAsync,
+            SavePasswordAttachmentAsync,
             DeletePasswordAttachmentAsync,
             DeletePasswordHistoryAsync,
             ClearPasswordHistoryAsync);
@@ -103,6 +104,7 @@ public sealed partial class MainWindowViewModel
             snapshot.CustomFields,
             snapshot.History,
             AddPasswordAttachmentAsync,
+            SavePasswordAttachmentAsync,
             DeletePasswordAttachmentAsync,
             DeletePasswordHistoryAsync,
             ClearPasswordHistoryAsync);

@@ -40,6 +40,7 @@ public sealed partial class MainWindowViewModel
             customFields,
             history,
             AddPasswordAttachmentAsync,
+            SavePasswordAttachmentAsync,
             DeletePasswordAttachmentAsync,
             DeletePasswordHistoryAsync,
             ClearPasswordHistoryAsync);

@@ -40,15 +40,23 @@ public sealed partial class PasswordDetailViewModel
     }
 
     [RelayCommand]
-    private async Task CopyAttachmentPathAsync(PasswordAttachmentItem? item)
+    private async Task SaveAttachmentAsync(PasswordAttachmentItem? item)
     {
-        if (IsSensitiveStateCleared || item is null || !item.CanCopy)
+        if (IsSensitiveStateCleared || item is null || _saveAttachment is null)
         {
             return;
         }
 
-        await _clipboardService.SetSensitiveTextAsync(item.StoragePath);
-        StatusText = L.Format("CopiedFieldFormat", item.FileName);
+        var fileName = item.FileName;
+        var result = await _saveAttachment(item.Attachment);
+        StatusText = result.Outcome switch
+        {
+            PasswordAttachmentSaveOutcome.Saved => L.Format("SavedAttachmentFormat", fileName),
+            PasswordAttachmentSaveOutcome.AuthorizationFailed => L.Get("AttachmentSaveAuthorizationFailed"),
+            PasswordAttachmentSaveOutcome.ContentUnavailable => L.Format("AttachmentContentUnavailableFormat", fileName),
+            PasswordAttachmentSaveOutcome.Failed => L.Format("AttachmentSaveFailedFormat", fileName),
+            _ => StatusText
+        };
     }
 
     [RelayCommand]

@@ -18,6 +18,7 @@ public interface IPasswordDetailDialogService
         IReadOnlyList<CustomField> customFields,
         IReadOnlyList<PasswordHistoryDisplayItem> passwordHistory,
         Func<PasswordEntry, Task>? addAttachment,
+        Func<Attachment, Task<PasswordAttachmentSaveResult>>? saveAttachment,
         Func<Attachment, Task<bool>>? deleteAttachment,
         Func<PasswordHistoryEntry, Task<bool>>? deletePasswordHistory,
         Func<long, Task<bool>>? clearPasswordHistory,
@@ -40,6 +41,7 @@ public sealed class PasswordDetailDialogService(
         IReadOnlyList<CustomField> customFields,
         IReadOnlyList<PasswordHistoryDisplayItem> passwordHistory,
         Func<PasswordEntry, Task>? addAttachment,
+        Func<Attachment, Task<PasswordAttachmentSaveResult>>? saveAttachment,
         Func<Attachment, Task<bool>>? deleteAttachment,
         Func<PasswordHistoryEntry, Task<bool>>? deletePasswordHistory,
         Func<long, Task<bool>>? clearPasswordHistory,
@@ -59,6 +61,7 @@ public sealed class PasswordDetailDialogService(
             customFields,
             passwordHistory,
             addAttachment,
+            saveAttachment,
             deleteAttachment,
             deletePasswordHistory,
             clearPasswordHistory);

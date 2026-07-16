@@ -8,6 +8,25 @@ namespace Monica.Tests;
 
 public sealed class PasswordDetailViewModelTests
 {
+    [Theory]
+    [InlineData("secure_attachments/recovery.enc")]
+    [InlineData("mdbx:attachment-1")]
+    public void Password_attachment_display_never_exposes_internal_storage_location(string storagePath)
+    {
+        var item = new PasswordAttachmentItem(
+            new LocalizationService(),
+            new Attachment
+            {
+                FileName = "recovery.txt",
+                ContentType = "text/plain",
+                StoragePath = storagePath,
+                SizeBytes = 128
+            });
+
+        Assert.Equal("128 B - text/plain", item.DisplayValue);
+        Assert.DoesNotContain(storagePath, item.DisplayValue, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void Password_detail_clear_sensitive_state_releases_decrypted_presentation_values()
     {
@@ -66,6 +85,43 @@ public sealed class PasswordDetailViewModelTests
         Assert.Empty(history.Password);
         Assert.False(history.CanCopy);
         Assert.False(history.IsVisible);
+    }
+
+    [Fact]
+    public async Task Password_detail_cannot_save_attachment_after_sensitive_state_is_cleared()
+    {
+        var saveCalls = 0;
+        var details = new PasswordDetailViewModel(
+            new LocalizationService(),
+            new CapturingClipboardService(),
+            CreateUnlockedCrypto(),
+            new TotpService(),
+            new PasswordEntry { Id = 42, Title = "Private account" },
+            [],
+            category: null,
+            boundNote: null,
+            attachments:
+            [
+                new Attachment
+                {
+                    Id = 7,
+                    FileName = "recovery.txt",
+                    StoragePath = "mdbx:attachment-7"
+                }
+            ],
+            customFields: [],
+            saveAttachment: _ =>
+            {
+                saveCalls++;
+                return Task.FromResult(new PasswordAttachmentSaveResult(PasswordAttachmentSaveOutcome.Saved));
+            });
+        var attachment = Assert.Single(details.Attachments);
+
+        details.ClearSensitiveState();
+        await details.SaveAttachmentCommand.ExecuteAsync(attachment);
+
+        Assert.Equal(0, saveCalls);
+        Assert.Empty(details.StatusText);
     }
 
     private static CryptoService CreateUnlockedCrypto()

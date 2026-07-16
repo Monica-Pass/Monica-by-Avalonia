@@ -275,6 +275,7 @@ public sealed class SecureNoteTests
             IReadOnlyList<CustomField> customFields,
             IReadOnlyList<PasswordHistoryDisplayItem> passwordHistory,
             Func<PasswordEntry, Task>? addAttachment,
+            Func<Attachment, Task<PasswordAttachmentSaveResult>>? saveAttachment,
             Func<Attachment, Task<bool>>? deleteAttachment,
             Func<PasswordHistoryEntry, Task<bool>>? deletePasswordHistory,
             Func<long, Task<bool>>? clearPasswordHistory,
@@ -332,6 +333,9 @@ public sealed class SecureNoteTests
         }
 
         public Task<string?> SaveTextFileAsync(string title, string suggestedFileName, string content, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
+            Task.FromResult<string?>(null);
+
+        public Task<string?> SaveBinaryFileAsync(string title, string suggestedFileName, ReadOnlyMemory<byte> content, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
             Task.FromResult<string?>(null);
     }
 
