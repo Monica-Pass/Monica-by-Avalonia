@@ -50,6 +50,8 @@ public sealed partial class MainWindowViewModel
         (SelectedPasswordFolderFilter is not null &&
             !string.Equals(SelectedPasswordFolderFilter.SelectionKey, "system:all", StringComparison.OrdinalIgnoreCase));
     public string ClearPasswordFiltersText => _localization.Get("ClearPasswordFilters");
+    public string ClearPasswordSearchText => _localization.Get("ClearPasswordSearch");
+    public string PasswordSearchHelpText => _localization.Get("PasswordSearchHelp");
     public string PasswordFilterSummaryText
     {
         get
