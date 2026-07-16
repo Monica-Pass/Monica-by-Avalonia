@@ -1165,7 +1165,8 @@ public sealed partial class AppSettingsTests
         IConfirmationDialogService? confirmationDialogService = null,
         IOneDriveBackupService? oneDriveBackupService = null,
         IKeePassVaultService? keePassVaultService = null,
-        IImportExportService? importExportService = null)
+        IImportExportService? importExportService = null,
+        IAppSettingsService? settingsService = null)
     {
         var databasePath = TestTempPaths.CreateFilePath(".db");
         var factory = new SqliteConnectionFactory(databasePath);
@@ -1190,7 +1191,7 @@ public sealed partial class AppSettingsTests
             new NoopPasswordDetailDialogService(),
             new NoopCategoryPickerDialogService(),
             new LegacyVaultDetector(factory),
-            new AppSettingsService(settingsPath),
+            settingsService ?? new AppSettingsService(settingsPath),
             new LocalizationService(),
             masterPasswordMaintenanceService: masterPasswordMaintenanceService,
             externalLinkService: externalLinkService,

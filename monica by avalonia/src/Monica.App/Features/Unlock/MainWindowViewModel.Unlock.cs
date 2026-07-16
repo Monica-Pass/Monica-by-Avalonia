@@ -203,6 +203,7 @@ public sealed partial class MainWindowViewModel
     {
         await _settingsService.LoadAsync();
         ApplySettings(_settingsService.Current);
+        ResumeSettingsSave();
     }
 
     private bool CanUnlockVault() =>

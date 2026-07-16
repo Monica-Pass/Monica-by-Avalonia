@@ -78,10 +78,12 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private async Task LockAsync()
     {
+        var settingsSaveCompletion = SuspendSettingsSaveAsync();
         _vaultSessionService.MarkLocked();
         _cryptoService.Lock();
         IsUnlocked = false;
         ClearSensitiveSessionState();
+        await settingsSaveCompletion;
         await ClearSettingsSensitiveCacheAsync();
         await ClearOwnedClipboardAsync();
         StatusMessage = _localization.Get("VaultLocked");

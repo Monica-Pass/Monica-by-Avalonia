@@ -17,6 +17,9 @@ public sealed partial class MainWindowViewModel
     private readonly object _settingsSaveSync = new();
     private bool _isSavingSettings;
     private bool _hasPendingSettingsSave;
+    private bool _settingsSaveSuspended;
+    private CancellationTokenSource? _settingsSaveCancellation;
+    private Task _settingsSaveTask = Task.CompletedTask;
 
     public ObservableCollection<SettingsChoice> LanguageOptions { get; } = [];
     public ObservableCollection<SettingsChoice> ThemeOptions { get; } = [];

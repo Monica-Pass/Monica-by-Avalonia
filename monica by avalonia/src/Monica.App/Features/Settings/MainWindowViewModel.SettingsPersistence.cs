@@ -106,58 +106,108 @@ public sealed partial class MainWindowViewModel
 
     private void QueueSaveSettings()
     {
-        var shouldStartSave = false;
         lock (_settingsSaveSync)
         {
-            _hasPendingSettingsSave = true;
-            if (!_isSavingSettings)
+            if (_settingsSaveSuspended)
             {
-                _isSavingSettings = true;
-                shouldStartSave = true;
+                return;
             }
-        }
 
-        if (shouldStartSave)
-        {
-            _ = SaveSettingsAsync();
+            _hasPendingSettingsSave = true;
+            if (_isSavingSettings)
+            {
+                return;
+            }
+
+            StartSettingsSaveWorkerUnsafe();
         }
     }
 
-    private async Task SaveSettingsAsync()
+    private void StartSettingsSaveWorkerUnsafe()
     {
+        _isSavingSettings = true;
+        _settingsSaveCancellation = new CancellationTokenSource();
+        _settingsSaveTask = SaveSettingsAsync(_settingsSaveCancellation);
+    }
+
+    private async Task SaveSettingsAsync(CancellationTokenSource saveCancellation)
+    {
+        var cancellationToken = saveCancellation.Token;
         var statusBeforeSave = StatusMessage;
         try
         {
             while (true)
             {
-                await Task.Delay(SettingsSaveDebounce);
+                await Task.Delay(SettingsSaveDebounce, cancellationToken);
                 lock (_settingsSaveSync)
                 {
-                    if (!_hasPendingSettingsSave)
+                    if (_settingsSaveSuspended || !_hasPendingSettingsSave)
                     {
-                        _isSavingSettings = false;
                         return;
                     }
 
                     _hasPendingSettingsSave = false;
                 }
 
+                // Once file persistence begins, let it finish atomically before a
+                // Vault lock clears sensitive settings from the in-memory cache.
                 await _settingsService.SaveAsync();
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
         catch (Exception ex)
         {
-            lock (_settingsSaveSync)
-            {
-                _isSavingSettings = false;
-                _hasPendingSettingsSave = false;
-            }
-
             AppDiagnostics.Error("Settings save failed", ex);
             if (string.Equals(StatusMessage, statusBeforeSave, StringComparison.Ordinal))
             {
                 StatusMessage = _localization.Format("SettingsSaveFailedFormat", ex.Message);
             }
+        }
+        finally
+        {
+            lock (_settingsSaveSync)
+            {
+                if (ReferenceEquals(_settingsSaveCancellation, saveCancellation))
+                {
+                    _settingsSaveCancellation = null;
+                    if (!_settingsSaveSuspended && _hasPendingSettingsSave)
+                    {
+                        StartSettingsSaveWorkerUnsafe();
+                    }
+                    else
+                    {
+                        _settingsSaveTask = Task.CompletedTask;
+                        _isSavingSettings = false;
+                        _hasPendingSettingsSave = false;
+                    }
+                }
+            }
+
+            saveCancellation.Dispose();
+        }
+    }
+
+    private async Task SuspendSettingsSaveAsync()
+    {
+        Task saveTask;
+        lock (_settingsSaveSync)
+        {
+            _settingsSaveSuspended = true;
+            _hasPendingSettingsSave = false;
+            _settingsSaveCancellation?.Cancel();
+            saveTask = _settingsSaveTask;
+        }
+
+        await saveTask;
+    }
+
+    private void ResumeSettingsSave()
+    {
+        lock (_settingsSaveSync)
+        {
+            _settingsSaveSuspended = false;
         }
     }
 }
