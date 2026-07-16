@@ -75,14 +75,18 @@ public sealed partial class AppSettingsService
     private async Task SaveCoreAsync(CancellationToken cancellationToken)
     {
         Normalize(Current);
-        Directory.CreateDirectory(Path.GetDirectoryName(_settingsPath)!);
         var settingsToSave = Clone(Current);
         await ProtectSecretsAsync(settingsToSave, cancellationToken);
-        await using var stream = File.Create(_settingsPath);
-        await JsonSerializer.SerializeAsync(
-            stream,
-            settingsToSave,
-            AppSettingsJsonContext.Default.DesktopAppSettings,
+        await AtomicFileWriter.WriteAsync(
+            _settingsPath,
+            async (stream, token) =>
+            {
+                await JsonSerializer.SerializeAsync(
+                    stream,
+                    settingsToSave,
+                    AppSettingsJsonContext.Default.DesktopAppSettings,
+                    token);
+            },
             cancellationToken);
     }
 
