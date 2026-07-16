@@ -9,7 +9,7 @@ public partial class MainWindow
     private AuthenticatorWorkspaceView AuthenticatorWorkspaceView =>
         WorkspaceHost.GetOrCreate<AuthenticatorWorkspaceView>("Totp");
 
-    private void HandleAuthenticatorWorkspaceShortcut(MainWindowViewModel viewModel, KeyEventArgs e)
+    internal void HandleAuthenticatorWorkspaceShortcut(MainWindowViewModel viewModel, KeyEventArgs e)
     {
         if (TryReturnToAuthenticatorList(viewModel, e) || TryHandleAuthenticatorControlShortcut(viewModel, e))
         {
@@ -43,6 +43,15 @@ public partial class MainWindow
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.F)
         {
             AuthenticatorWorkspaceView.FocusSearch();
+            e.Handled = true;
+            return true;
+        }
+
+        if (e.Key == Key.Escape &&
+            AuthenticatorWorkspaceView.IsSearchFocused &&
+            viewModel.HasTotpSearchText)
+        {
+            viewModel.ClearTotpSearchCommand.Execute(null);
             e.Handled = true;
             return true;
         }

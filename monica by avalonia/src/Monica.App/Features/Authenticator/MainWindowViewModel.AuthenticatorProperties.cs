@@ -49,6 +49,8 @@ public sealed partial class MainWindowViewModel
         ? _localization.Get("TotpNoFilteredResults")
         : _localization.Get("TotpEmptyHint");
     public string ClearTotpFiltersText => _localization.Get("ClearTotpFilters");
+    public string ClearTotpSearchText => _localization.Get("ClearTotpSearch");
+    public string TotpSearchHelpText => _localization.Get("TotpSearchHelp");
     public string TotpShowHiddenText => _localization.Get("ShowHidden");
     public string TotpHelpText => _localization.Get("Help");
     public int SelectedTotpCount => TotpItems.Count(item => item.IsSelected);

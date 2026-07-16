@@ -25,14 +25,15 @@
                 <TextBox x:Name="AuthenticatorSearchBox"
                          PlaceholderText="{Binding L.Search}"
                          AutomationProperties.Name="{Binding L.Search}"
+                         AutomationProperties.HelpText="{Binding TotpSearchHelpText}"
                          Text="{Binding TotpSearchText}" />
                 <Button x:Name="AuthenticatorSearchClearButton"
                         Grid.Column="1"
                         Classes="workspaceCommand"
                         Command="{Binding ClearTotpSearchCommand}"
                         IsVisible="{Binding HasTotpSearchText}"
-                        ToolTip.Tip="{Binding L[Clear]}"
-                        AutomationProperties.Name="{Binding L[Clear]}"
+                        ToolTip.Tip="{Binding ClearTotpSearchText}"
+                        AutomationProperties.Name="{Binding ClearTotpSearchText}"
                         Width="36"
                         Height="36"
                         Padding="0">
@@ -114,7 +115,14 @@
             <Grid Margin="14,12,14,8" ColumnDefinitions="*,Auto" ColumnSpacing="8">
                 <StackPanel Spacing="3">
                     <TextBlock Classes="workspaceSectionLabel" Text="{Binding TotpFilterTitleText}" />
-                    <TextBlock Text="{Binding TotpFilteredStatusText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" TextWrapping="Wrap" MaxLines="2" />
+                    <TextBlock x:Name="TotpFilteredStatusText"
+                               Text="{Binding TotpFilteredStatusText}"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               MaxLines="2"
+                               AutomationProperties.Name="{Binding TotpFilteredStatusText}"
+                               AutomationProperties.LiveSetting="Polite" />
                 </StackPanel>
                 <Button Grid.Column="1" Classes="workspaceCommand" Command="{Binding AddTotpCommand}" ToolTip.Tip="{Binding L.AddAuthenticator}" AutomationProperties.Name="{Binding L.AddAuthenticator}" Width="34" Height="34" Padding="0">
                     <ic:FluentIcon Icon="Add" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />

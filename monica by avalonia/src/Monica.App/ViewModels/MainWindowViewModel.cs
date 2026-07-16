@@ -511,6 +511,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(TotpNoFilteredResultsText));
         OnPropertyChanged(nameof(TotpEmptyStateText));
         OnPropertyChanged(nameof(ClearTotpFiltersText));
+        OnPropertyChanged(nameof(ClearTotpSearchText));
+        OnPropertyChanged(nameof(TotpSearchHelpText));
         OnPropertyChanged(nameof(TotpShowHiddenText));
         OnPropertyChanged(nameof(TotpHelpText));
         if (SelectedTotpItem is not null)

@@ -38,6 +38,8 @@ public partial class AuthenticatorWorkspaceView : UserControl
         AuthenticatorSearchBox.SelectAll();
     }
 
+    public bool IsSearchFocused => AuthenticatorSearchBox.IsFocused;
+
     public void FocusAccountList() => Dispatcher.UIThread.Post(() => AuthenticatorAccountList.Focus());
 
     public void FocusCodeRegion() => AuthenticatorCodeRegion.Focus();
