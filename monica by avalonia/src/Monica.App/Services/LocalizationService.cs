@@ -15,6 +15,9 @@ public interface ILocalizationService : INotifyPropertyChanged
     void SetLanguage(string language);
 
     string Passwords { get; }
+    string VaultNavigationGroup { get; }
+    string ToolsNavigationGroup { get; }
+    string StorageNavigationGroup { get; }
     string SecureNotes { get; }
     string Totp { get; }
     string Cards { get; }
@@ -503,6 +506,9 @@ public sealed class LocalizationService : ILocalizationService
     }
 
     public string Passwords => Text();
+    public string VaultNavigationGroup => Text();
+    public string ToolsNavigationGroup => Text();
+    public string StorageNavigationGroup => Text();
     public string SecureNotes => Text();
     public string Totp => Text();
     public string Cards => Text();
@@ -975,6 +981,9 @@ public sealed class LocalizationService : ILocalizationService
     private static readonly Dictionary<string, string> English = new()
     {
         ["Passwords"] = "Passwords",
+        ["VaultNavigationGroup"] = "Vault",
+        ["ToolsNavigationGroup"] = "Tools",
+        ["StorageNavigationGroup"] = "Storage",
         ["SecureNotes"] = "Secure Notes",
         ["Totp"] = "TOTP",
         ["Cards"] = "Cards",
@@ -2141,6 +2150,9 @@ public sealed class LocalizationService : ILocalizationService
     private static readonly Dictionary<string, string> Chinese = new()
     {
         ["Passwords"] = "密码",
+        ["VaultNavigationGroup"] = "保险库",
+        ["ToolsNavigationGroup"] = "工具",
+        ["StorageNavigationGroup"] = "存储",
         ["SecureNotes"] = "安全笔记",
         ["Totp"] = "动态口令",
         ["Cards"] = "卡包",

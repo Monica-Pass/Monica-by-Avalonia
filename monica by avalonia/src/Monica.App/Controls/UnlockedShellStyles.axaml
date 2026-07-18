@@ -1,7 +1,7 @@
 <Styles xmlns="https://github.com/avaloniaui">
     <Style Selector="Button.workspaceCommand">
-        <Setter Property="MinWidth" Value="36" />
-        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="MinWidth" Value="40" />
+        <Setter Property="MinHeight" Value="40" />
         <Setter Property="Padding" Value="10,6" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />

@@ -10,17 +10,20 @@
         <StyleInclude Source="/Controls/UnlockedShellStyles.axaml" />
     </UserControl.Styles>
 
-    <Grid RowDefinitions="*,24">
+    <Grid RowDefinitions="*,32">
         <fa:FANavigationView x:Name="VaultNavigationView"
                              Grid.Row="0"
-                             PaneDisplayMode="Left"
+                             PaneDisplayMode="LeftCompact"
                              IsPaneOpen="False"
                              IsBackButtonVisible="False"
                              IsSettingsVisible="False"
+                             CompactPaneLength="48"
                              OpenPaneLength="240"
                              Background="{DynamicResource LayerFillColorDefaultBrush}"
-                             SelectionChanged="NavigationView_OnSelectionChanged">
+                             SelectionChanged="NavigationView_OnSelectionChanged"
+                             ItemInvoked="NavigationView_OnItemInvoked">
             <fa:FANavigationView.MenuItems>
+                <fa:FANavigationViewItemHeader Content="{Binding L.VaultNavigationGroup}" Tag="Vault" />
                 <fa:FANavigationViewItem Content="{Binding L.Passwords}" Tag="Passwords">
                     <fa:FANavigationViewItem.IconSource>
                         <fa:FASymbolIconSource Symbol="Permissions" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
@@ -28,29 +31,8 @@
                 </fa:FANavigationViewItem>
             </fa:FANavigationView.MenuItems>
 
-            <Grid Margin="18" RowDefinitions="Auto,Auto,*" Background="{DynamicResource LayerFillColorDefaultBrush}">
-                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,18" IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsContentHeaderVisible}}">
-                    <StackPanel>
-                        <TextBlock Text="{Binding SelectedSectionTitle}" FontSize="24" FontWeight="SemiBold" />
-                        <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                        <Button Classes="IconButton"
-                                Command="{Binding LockCommand}"
-                                ToolTip.Tip="{Binding LockVaultText}"
-                                AutomationProperties.Name="{Binding LockVaultText}">
-                            <ic:FluentIcon Icon="LockClosed" FontSize="20" />
-                        </Button>
-                        <Button Classes="IconButton" Command="{Binding LoadCommand}" ToolTip.Tip="{Binding L.Refresh}">
-                            <ic:FluentIcon Icon="ArrowClockwise" FontSize="20" />
-                        </Button>
-                        <Button Classes="IconButton" Command="{Binding ExportDataCommand}" ToolTip.Tip="{Binding L.Export}">
-                            <ic:FluentIcon Icon="ArrowDownload" FontSize="20" />
-                        </Button>
-                    </StackPanel>
-                </Grid>
-
-                <Border Grid.Row="1" Classes="workspaceRecoverableStatus" IsVisible="{Binding HasRecoverableStatusMessage}">
+            <Grid x:Name="WorkspaceContentGrid" Margin="20" RowDefinitions="Auto,*" Background="{DynamicResource LayerFillColorDefaultBrush}">
+                <Border Grid.Row="0" Classes="workspaceRecoverableStatus" IsVisible="{Binding HasRecoverableStatusMessage}">
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
                         <ic:FluentIcon Icon="Warning" FontSize="18" Foreground="{DynamicResource SystemFillColorCautionBrush}" VerticalAlignment="Top" Margin="0,2,0,0" />
                         <TextBlock Grid.Column="1" Text="{Binding StatusMessage}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
@@ -63,7 +45,7 @@
                     </Grid>
                 </Border>
 
-                <ContentControl x:Name="WorkspaceHostSlot" Grid.Row="2" />
+                <ContentControl x:Name="WorkspaceHostSlot" Grid.Row="1" />
             </Grid>
         </fa:FANavigationView>
 
@@ -71,42 +53,31 @@
                 Background="{DynamicResource LayerFillColorDefaultBrush}"
                 BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
                 BorderThickness="0,1,0,0">
-            <Border Padding="10,0" ClipToBounds="True">
-                <Grid ColumnSpacing="14">
+            <Border Padding="12,0" ClipToBounds="True">
+                <Grid ColumnSpacing="16">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE895;" FontFamily="Segoe Fluent Icons" FontSize="12" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                        <TextBlock Text="Monica" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
                         <TextBlock Text="&#xE777;" FontFamily="Segoe Fluent Icons" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         <TextBlock Text="{Binding ShellVaultText}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
 
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
                         <TextBlock Text="&#xE7BA;" FontFamily="Segoe Fluent Icons" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         <TextBlock Text="{Binding ShellSyncText}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
 
-                    <TextBlock Grid.Column="3"
+                    <TextBlock Grid.Column="2"
                                Text="{Binding ShellPageText}"
                                FontSize="12"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center" />
 
-                    <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding ShellPlatformText}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                        <TextBlock Text="&#xE713;" FontFamily="Segoe Fluent Icons" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    </StackPanel>
                 </Grid>
             </Border>
         </Border>

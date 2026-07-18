@@ -91,6 +91,11 @@ public sealed class UiArchitectureTests
             Assert.Equal(["Passwords"], workspaceHost.CreatedSections);
 
             var navigation = Assert.Single(window.GetVisualDescendants().OfType<FANavigationView>());
+            var navigationGroups = navigation.MenuItems
+                .OfType<FANavigationViewItemHeader>()
+                .Select(item => item.Tag?.ToString() ?? "")
+                .ToArray();
+            Assert.Equal(["Vault", "Tools", "Storage"], navigationGroups);
             var navigationTags = navigation.MenuItems
                 .Concat(navigation.FooterMenuItems)
                 .OfType<FANavigationViewItem>()
@@ -98,11 +103,18 @@ public sealed class UiArchitectureTests
                 .ToArray();
             Assert.Equal(
                 [
-                    "Passwords", "Notes", "Totp", "Cards", "Generator", "Archive",
-                    "RecycleBin", "SecurityAnalysis", "Timeline", "Mdbx",
-                    "DatabaseManagement", "Sync", "Settings"
+                    "Passwords", "Notes", "Totp", "Cards", "Generator", "SecurityAnalysis",
+                    "Timeline", "Archive", "RecycleBin", "Mdbx",
+                    "DatabaseManagement", "Sync", "Settings", "Lock"
                 ],
                 navigationTags);
+            var lockItem = navigation.FooterMenuItems
+                .OfType<FANavigationViewItem>()
+                .Single(item => string.Equals(item.Tag?.ToString(), "Lock", StringComparison.Ordinal));
+            Assert.False(lockItem.SelectsOnInvoked);
+            Assert.DoesNotContain(
+                window.GetVisualDescendants().OfType<Button>(),
+                button => ReferenceEquals(button.Command, viewModel.ExportDataCommand));
             var notesItem = navigation.MenuItems
                 .OfType<FANavigationViewItem>()
                 .Single(item => string.Equals(item.Tag?.ToString(), "Notes", StringComparison.Ordinal));
@@ -112,8 +124,10 @@ public sealed class UiArchitectureTests
             Assert.Equal("Notes", viewModel.SelectedSection);
             Assert.IsType<NoteWorkspaceView>(workspaceHost.CurrentWorkspace);
 
-            viewModel.IsUnlocked = false;
+            var shell = Assert.Single(window.GetVisualDescendants().OfType<Monica.App.Features.UnlockedShellView>());
+            shell.ActivateNavigationTag("Lock");
             Dispatcher.UIThread.RunJobs();
+            Assert.False(viewModel.IsUnlocked);
             Assert.Null(shellHost.Content);
             Assert.DoesNotContain(window.GetVisualDescendants(), control => control is WorkspaceHostView);
         }

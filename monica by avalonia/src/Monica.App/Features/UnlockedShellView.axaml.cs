@@ -11,16 +11,26 @@ namespace Monica.App.Features;
 
 public partial class UnlockedShellView : UserControl
 {
-    private static readonly DeferredNavigationItem[] DeferredMenuItems =
+    private const double CompactContentBreakpoint = 920;
+
+    private static readonly DeferredNavigationItem[] DeferredVaultItems =
     [
         new("L.SecureNotes", "Notes", FASymbol.ProtectedDocument),
         new("L.Totp", "Totp", FASymbol.Clock),
-        new("L.Cards", "Cards", FASymbol.ContactInfo),
+        new("L.Cards", "Cards", FASymbol.ContactInfo)
+    ];
+
+    private static readonly DeferredNavigationItem[] DeferredToolItems =
+    [
         new("L.Generator", "Generator", FASymbol.Edit),
+        new("L.SecurityAnalysis", "SecurityAnalysis", FASymbol.Permissions),
+        new("L.Timeline", "Timeline", FASymbol.Clock)
+    ];
+
+    private static readonly DeferredNavigationItem[] DeferredStorageItems =
+    [
         new("L.Archive", "Archive", FASymbol.Library),
         new("L.RecycleBin", "RecycleBin", FASymbol.Delete),
-        new("L.SecurityAnalysis", "SecurityAnalysis", FASymbol.Permissions),
-        new("L.Timeline", "Timeline", FASymbol.Clock),
         new("L.MdbxVaults", "Mdbx", FASymbol.Folder)
     ];
 
@@ -44,6 +54,7 @@ public partial class UnlockedShellView : UserControl
             WorkspaceHostView.SectionProperty,
             new Binding(nameof(MainWindowViewModel.SelectedSection)));
         _workspaceHost.SizeChanged += WorkspaceHost_OnSizeChanged;
+        SizeChanged += Shell_OnSizeChanged;
         Content = CreateLoadingPlaceholder();
         Dispatcher.UIThread.Post(InitializeWorkspaceScaffold, DispatcherPriority.Background);
     }
@@ -73,6 +84,7 @@ public partial class UnlockedShellView : UserControl
         _workspaceScaffold?.Children.Remove(_workspaceHost);
         _workspaceScaffold = null;
         InitializeComponent();
+        UpdateShellLayout(Bounds.Width);
         WorkspaceHostSlot.Content = _workspaceHost;
         Dispatcher.UIThread.Post(InitializeDeferredNavigation, DispatcherPriority.SystemIdle);
     }
@@ -85,10 +97,11 @@ public partial class UnlockedShellView : UserControl
         }
 
         _deferredNavigationInitialized = true;
-        foreach (var item in DeferredMenuItems)
-        {
-            VaultNavigationView.MenuItems.Add(CreateNavigationItem(item));
-        }
+        AddNavigationItems(DeferredVaultItems);
+        VaultNavigationView.MenuItems.Add(CreateNavigationHeader("L.ToolsNavigationGroup", "Tools"));
+        AddNavigationItems(DeferredToolItems);
+        VaultNavigationView.MenuItems.Add(CreateNavigationHeader("L.StorageNavigationGroup", "Storage"));
+        AddNavigationItems(DeferredStorageItems);
 
         for (var index = 0; index < DeferredFooterItems.Length; index++)
         {
@@ -96,6 +109,27 @@ public partial class UnlockedShellView : UserControl
                 index,
                 CreateNavigationItem(DeferredFooterItems[index]));
         }
+
+        VaultNavigationView.FooterMenuItems.Add(new FANavigationViewItemSeparator());
+        var lockItem = CreateNavigationItem(new DeferredNavigationItem("LockVaultText", "Lock", FASymbol.Admin));
+        lockItem.Name = "LockVaultNavigationItem";
+        lockItem.SelectsOnInvoked = false;
+        VaultNavigationView.FooterMenuItems.Add(lockItem);
+    }
+
+    private void AddNavigationItems(IEnumerable<DeferredNavigationItem> items)
+    {
+        foreach (var item in items)
+        {
+            VaultNavigationView.MenuItems.Add(CreateNavigationItem(item));
+        }
+    }
+
+    private static FANavigationViewItemHeader CreateNavigationHeader(string labelPath, string tag)
+    {
+        var header = new FANavigationViewItemHeader { Tag = tag };
+        header.Bind(ContentControl.ContentProperty, new Binding(labelPath));
+        return header;
     }
 
     private static FANavigationViewItem CreateNavigationItem(DeferredNavigationItem source)
@@ -142,14 +176,55 @@ public partial class UnlockedShellView : UserControl
 
     private void NavigationView_OnSelectionChanged(object? sender, FANavigationViewSelectionChangedEventArgs e)
     {
-        if (DataContext is not MainWindowViewModel viewModel)
+        var tag = (e.SelectedItem as Control)?.Tag?.ToString()
+            ?? (e.SelectedItemContainer as Control)?.Tag?.ToString();
+        ActivateNavigationTag(tag);
+    }
+
+    private void NavigationView_OnItemInvoked(object? sender, FANavigationViewItemInvokedEventArgs e)
+    {
+        var tag = (e.InvokedItemContainer as Control)?.Tag?.ToString();
+        if (!string.Equals(tag, "Lock", StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
 
-        var tag = (e.SelectedItem as Control)?.Tag?.ToString()
-            ?? (e.SelectedItemContainer as Control)?.Tag?.ToString();
+        ActivateNavigationTag(tag);
+    }
+
+    internal void ActivateNavigationTag(string? tag)
+    {
+        if (DataContext is not MainWindowViewModel viewModel || string.IsNullOrWhiteSpace(tag))
+        {
+            return;
+        }
+
+        if (string.Equals(tag, "Lock", StringComparison.OrdinalIgnoreCase))
+        {
+            if (viewModel.LockCommand.CanExecute(null))
+            {
+                viewModel.LockCommand.Execute(null);
+            }
+
+            return;
+        }
+
         viewModel.SelectSectionCommand.Execute(tag);
+    }
+
+    private void Shell_OnSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (_shellChromeInitialized)
+        {
+            UpdateShellLayout(e.NewSize.Width);
+        }
+    }
+
+    private void UpdateShellLayout(double width)
+    {
+        WorkspaceContentGrid.Margin = width > 0 && width < CompactContentBreakpoint
+            ? new Thickness(12)
+            : new Thickness(20);
     }
 
     private void WorkspaceHost_OnSizeChanged(object? sender, SizeChangedEventArgs e)
