@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:local="using:Monica.App"
+             xmlns:notes="using:Monica.App.Features.Notes"
              xmlns:vm="using:Monica.App.ViewModels"
              x:Class="Monica.App.Features.Notes.NoteInspectorView"
              x:Name="Root"
@@ -10,100 +11,150 @@
             BorderBrush="{DynamicResource CardBorderBrush}"
             BorderThickness="1,0,0,0"
             Background="{DynamicResource LayerFillColorDefaultBrush}">
-        <Grid RowDefinitions="Auto,Auto,Auto,*,*" Margin="14,16" RowSpacing="14">
-            <StackPanel Spacing="8">
-                <TextBlock Text="{Binding L[NoteView]}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="Auto,*" RowSpacing="8" ColumnSpacing="12">
-                    <TextBlock Text="{Binding L[NoteFormat]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
-                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding NoteIsMarkdown}" OffContent="{Binding L.PlainText}" OnContent="Markdown" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                    <TextBlock Grid.Row="1" Text="{Binding L[NoteMode]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
-                    <ToggleSwitch Grid.Row="1" Grid.Column="1" IsChecked="{Binding NotePreviewMode}" OffContent="{Binding L.Edit}" OnContent="{Binding L.Preview}" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                    <TextBlock Grid.Row="2" Text="{Binding L[NoteLayout]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
-                    <ToggleSwitch Grid.Row="2" Grid.Column="1" IsChecked="{Binding NoteSplitPreviewMode}" OffContent="{Binding L[NoteSinglePane]}" OnContent="{Binding L[NoteSplitPane]}" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                </Grid>
-            </StackPanel>
+        <ScrollViewer x:Name="NoteInspectorScrollViewer"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="16" Spacing="14">
+                <notes:NotePropertiesPanelView />
 
-            <StackPanel Grid.Row="1" Spacing="8">
-                <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
-                <TextBlock Text="{Binding L[NoteInformation]}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="Auto,*" RowSpacing="6" ColumnSpacing="10">
-                    <TextBlock Text="{Binding L[NoteLineCountLabel]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="1" Text="{Binding NoteLineCount}" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                    <TextBlock Grid.Row="1" Text="{Binding L[NoteWordCountLabel]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
-                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding NoteWordCount}" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                    <TextBlock Grid.Row="2" Text="{Binding L[NoteCharacterCountLabel]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
-                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding NoteCharacterCount}" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                </Grid>
-                <TextBlock Text="{Binding NoteEditorStatusText}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-            </StackPanel>
+                <StackPanel Spacing="8">
+                    <TextBlock Text="{Binding L[NoteInformation]}"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="Auto,*" RowSpacing="6" ColumnSpacing="10">
+                        <TextBlock Text="{Binding L[NoteLineCountLabel]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Grid.Column="1" Text="{Binding NoteLineCount}" HorizontalAlignment="Right" />
+                        <TextBlock Grid.Row="1" Text="{Binding L[NoteWordCountLabel]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding NoteWordCount}" HorizontalAlignment="Right" />
+                        <TextBlock Grid.Row="2" Text="{Binding L[NoteCharacterCountLabel]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding NoteCharacterCount}" HorizontalAlignment="Right" />
+                    </Grid>
+                    <TextBlock Text="{Binding NoteEditorStatusText}"
+                               FontSize="11"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
 
-            <StackPanel Grid.Row="2" Spacing="8">
-                <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
-                <TextBlock Text="{Binding L[NoteProperties]}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                <TextBlock Text="{Binding L[NoteTagsLabel]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                <TextBox Text="{Binding NoteTagsText}" PlaceholderText="{Binding L.NoteTagsWatermark}" AutomationProperties.Name="{Binding L[NoteTagsLabel]}" />
-                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                    <TextBlock Text="{Binding L[NoteFormat]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="1" Text="{Binding NoteFormatText}" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                </Grid>
-            </StackPanel>
+                <Separator />
 
-            <Grid Grid.Row="3" RowDefinitions="Auto,*">
-                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
-                    <TextBlock Text="{Binding L[NoteOutline]}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    <TextBlock Grid.Column="1" Text="{Binding NoteOutlineCount}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                </Grid>
-                <Grid Grid.Row="1">
-                    <TextBlock Text="{Binding L[NoteNoOutline]}" IsVisible="{Binding HasNoteOutlineItems, Converter={x:Static local:BoolConverters.Not}}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                    <ScrollViewer IsVisible="{Binding HasNoteOutlineItems}">
-                        <ItemsControl ItemsSource="{Binding NoteOutlineItems}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:NoteOutlineItem">
-                                    <Button Click="NoteOutlineItem_OnClick" Padding="0" Margin="{Binding Indent}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" ToolTip.Tip="{Binding Title}">
-                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                                            <TextBlock Text="{Binding LineNumber}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
-                                            <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                        </Grid>
-                                    </Button>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </Grid>
-            </Grid>
-
-            <Grid Grid.Row="4" RowDefinitions="Auto,*">
-                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
-                    <TextBlock Text="{Binding L[NoteReferences]}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    <TextBlock Grid.Column="1" Text="{Binding NoteReferenceCount}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                </Grid>
-                <Grid Grid.Row="1">
-                    <TextBlock Text="{Binding L[NoteNoReferences]}" IsVisible="{Binding HasNoteReferenceItems, Converter={x:Static local:BoolConverters.Not}}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                    <ScrollViewer IsVisible="{Binding HasNoteReferenceItems}">
-                        <ItemsControl ItemsSource="{Binding NoteReferenceItems}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:NoteReferenceItem">
-                                    <Grid RowDefinitions="Auto,Auto" Margin="0,0,0,8">
-                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="7">
-                                            <ic:FluentIcon Icon="Link" FontSize="12" VerticalAlignment="Center" IsVisible="{Binding IsImage, Converter={x:Static local:BoolConverters.Not}}" />
-                                            <ic:FluentIcon Icon="Image" FontSize="12" VerticalAlignment="Center" IsVisible="{Binding IsImage}" />
-                                            <TextBlock Grid.Column="1" Text="{Binding Label}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                            <TextBlock Grid.Column="2" Text="{Binding LineNumber}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
-                                            <Button Grid.Column="3" Command="{Binding #Root.DataContext.OpenNoteReferenceCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding #Root.DataContext.L.Open}" AutomationProperties.Name="{Binding #Root.DataContext.L.Open}" Width="24" Height="24" Padding="0">
-                                                <ic:FluentIcon Icon="Open" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            </Button>
-                                            <Button Grid.Column="4" Command="{Binding #Root.DataContext.CopyNoteReferenceCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding #Root.DataContext.L.Copy}" AutomationProperties.Name="{Binding #Root.DataContext.L.Copy}" Width="24" Height="24" Padding="0">
-                                                <ic:FluentIcon Icon="Copy" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            </Button>
-                                        </Grid>
-                                        <TextBlock Grid.Row="1" Text="{Binding Target}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="20,1,0,0" />
+                <StackPanel Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="{Binding L[NoteOutline]}"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding NoteOutlineCount}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </Grid>
+                    <TextBlock Text="{Binding L[NoteNoOutline]}"
+                               IsVisible="{Binding HasNoteOutlineItems, Converter={x:Static local:BoolConverters.Not}}"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               TextWrapping="Wrap" />
+                    <ItemsControl ItemsSource="{Binding NoteOutlineItems}" IsVisible="{Binding HasNoteOutlineItems}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:NoteOutlineItem">
+                                <Button Click="NoteOutlineItem_OnClick"
+                                        Padding="4,6"
+                                        Margin="{Binding Indent}"
+                                        MinHeight="36"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Stretch"
+                                        ToolTip.Tip="{Binding Title}"
+                                        AutomationProperties.Name="{Binding Title}">
+                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                        <TextBlock Text="{Binding LineNumber}"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding Title}"
+                                                   FontSize="12"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center" />
                                     </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </Grid>
-            </Grid>
-        </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <Separator />
+
+                <StackPanel Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="{Binding L[NoteReferences]}"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding NoteReferenceCount}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </Grid>
+                    <TextBlock Text="{Binding L[NoteNoReferences]}"
+                               IsVisible="{Binding HasNoteReferenceItems, Converter={x:Static local:BoolConverters.Not}}"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               TextWrapping="Wrap" />
+                    <ItemsControl ItemsSource="{Binding NoteReferenceItems}" IsVisible="{Binding HasNoteReferenceItems}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:NoteReferenceItem">
+                                <Grid RowDefinitions="Auto,Auto" Margin="0,0,0,8">
+                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="7">
+                                        <ic:FluentIcon Icon="Link"
+                                                       FontSize="12"
+                                                       VerticalAlignment="Center"
+                                                       IsVisible="{Binding IsImage, Converter={x:Static local:BoolConverters.Not}}" />
+                                        <ic:FluentIcon Icon="Image"
+                                                       FontSize="12"
+                                                       VerticalAlignment="Center"
+                                                       IsVisible="{Binding IsImage}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding Label}"
+                                                   FontSize="12"
+                                                   FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{Binding LineNumber}"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                   VerticalAlignment="Center" />
+                                        <Button Grid.Column="3"
+                                                Command="{Binding #Root.DataContext.OpenNoteReferenceCommand}"
+                                                CommandParameter="{Binding}"
+                                                ToolTip.Tip="{Binding #Root.DataContext.L.Open}"
+                                                AutomationProperties.Name="{Binding #Root.DataContext.L.Open}"
+                                                Width="36"
+                                                Height="36"
+                                                Padding="0">
+                                            <ic:FluentIcon Icon="Open" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Button>
+                                        <Button Grid.Column="4"
+                                                Command="{Binding #Root.DataContext.CopyNoteReferenceCommand}"
+                                                CommandParameter="{Binding}"
+                                                ToolTip.Tip="{Binding #Root.DataContext.L.Copy}"
+                                                AutomationProperties.Name="{Binding #Root.DataContext.L.Copy}"
+                                                Width="36"
+                                                Height="36"
+                                                Padding="0">
+                                            <ic:FluentIcon Icon="Copy" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Button>
+                                    </Grid>
+                                    <TextBlock Grid.Row="1"
+                                               Text="{Binding Target}"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               Margin="20,1,0,0" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
     </Border>
 </UserControl>

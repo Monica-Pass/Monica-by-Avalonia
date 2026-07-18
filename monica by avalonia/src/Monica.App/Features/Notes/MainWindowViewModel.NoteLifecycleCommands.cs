@@ -56,24 +56,31 @@ public sealed partial class MainWindowViewModel
     }
 
     [RelayCommand]
-    private async Task ToggleNoteFavoriteAsync()
+    private async Task ToggleNoteFavoriteAsync(SecureItem? item)
     {
-        NoteIsFavorite = !NoteIsFavorite;
-        if (SelectedNote is null)
+        item ??= SelectedNote;
+        if (item is null)
         {
+            NoteIsFavorite = !NoteIsFavorite;
             MarkSelectedNoteTabDirty();
             return;
         }
 
-        SelectedNote.IsFavorite = NoteIsFavorite;
-        await _repository.SaveSecureItemAsync(SelectedNote);
-        if (SelectedNoteTab is not null)
+        var next = !item.IsFavorite;
+        item.IsFavorite = next;
+        if (SelectedNote?.Id == item.Id)
+        {
+            NoteIsFavorite = next;
+        }
+
+        await _repository.SaveSecureItemAsync(item);
+        if (SelectedNoteTab?.Source?.Id == item.Id)
         {
             CaptureNoteEditorState(SelectedNoteTab, markDirty: false);
         }
 
         RaiseNoteTreeState();
-        StatusMessage = _localization.Format("SavedNoteFormat", SelectedNote.Title);
+        StatusMessage = _localization.Format("SavedNoteFormat", item.Title);
     }
 
     [RelayCommand]

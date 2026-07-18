@@ -1,0 +1,59 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Notes.NotePropertiesPanelView"
+             x:DataType="vm:MainWindowViewModel">
+    <StackPanel Spacing="14">
+        <StackPanel Spacing="10">
+            <TextBlock Text="{Binding L[NoteView]}"
+                       FontSize="13"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Grid RowDefinitions="Auto,Auto"
+                  ColumnDefinitions="Auto,*"
+                  RowSpacing="10"
+                  ColumnSpacing="12">
+                <TextBlock Text="{Binding L[NoteFormat]}"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           VerticalAlignment="Center" />
+                <ToggleSwitch Grid.Column="1"
+                              IsChecked="{Binding NoteIsMarkdown}"
+                              OffContent="{Binding L.PlainText}"
+                              OnContent="Markdown"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Center" />
+                <TextBlock Grid.Row="1"
+                           Text="{Binding L[NoteMode]}"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           VerticalAlignment="Center" />
+                <ComboBox Grid.Row="1"
+                          Grid.Column="1"
+                          SelectedIndex="{Binding NoteViewModeIndex}"
+                          MinWidth="132"
+                          HorizontalAlignment="Right"
+                          AutomationProperties.Name="{Binding L[NoteMode]}">
+                    <ComboBoxItem Content="{Binding L.Edit}" />
+                    <ComboBoxItem Content="{Binding L.Preview}" />
+                    <ComboBoxItem Content="{Binding L[NoteSplitPane]}" />
+                </ComboBox>
+            </Grid>
+        </StackPanel>
+
+        <Separator />
+
+        <StackPanel Spacing="8">
+            <TextBlock Text="{Binding L[NoteProperties]}"
+                       FontSize="13"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <TextBlock Text="{Binding L[NoteTagsLabel]}"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <TextBox Text="{Binding NoteTagsText}"
+                     PlaceholderText="{Binding L.NoteTagsWatermark}"
+                     AutomationProperties.Name="{Binding L[NoteTagsLabel]}" />
+            <CheckBox Content="{Binding L.Favorite}"
+                      IsChecked="{Binding NoteIsFavorite}"
+                      AutomationProperties.Name="{Binding L.Favorite}" />
+        </StackPanel>
+    </StackPanel>
+</UserControl>

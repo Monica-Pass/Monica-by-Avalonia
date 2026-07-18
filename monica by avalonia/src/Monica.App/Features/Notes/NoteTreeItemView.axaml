@@ -6,50 +6,67 @@
              x:Class="Monica.App.Features.Notes.NoteTreeItemView"
              x:Name="Root"
              x:DataType="models:SecureItem">
-    <Border Padding="0"
-            CornerRadius="6"
-            MinHeight="48"
-            HorizontalAlignment="Stretch"
-            Background="Transparent">
-        <Grid ColumnDefinitions="*,Auto" MinHeight="48" HorizontalAlignment="Stretch">
-            <Button Classes="noteTreeItemButton"
-                    Grid.ColumnSpan="2"
-                    Command="{Binding #Root.ViewModel.OpenNoteCommand}"
-                    CommandParameter="{Binding}"
-                    AutomationProperties.Name="{Binding Title}"
-                    MinHeight="48" />
-            <Grid Margin="10,7"
-                  ColumnDefinitions="Auto,*"
-                  ColumnSpacing="8"
-                  HorizontalAlignment="Stretch"
-                  IsHitTestVisible="False">
-                <ic:FluentIcon Icon="Document" FontSize="15" VerticalAlignment="Top" Margin="0,2,0,0" />
-                <StackPanel Grid.Column="1" Spacing="2" MinWidth="0">
-                    <StackPanel Orientation="Horizontal" Spacing="5" MinWidth="0">
-                        <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MinWidth="0" />
-                        <TextBlock Text=".md" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                        <ic:FluentIcon Icon="Star" FontSize="12" IsVisible="{Binding IsFavorite}" />
-                    </StackPanel>
-                    <TextBlock Text="{Binding Notes}"
-                               FontSize="12"
-                               TextWrapping="Wrap"
+    <Grid ColumnDefinitions="*,Auto"
+          MinHeight="56"
+          HorizontalAlignment="Stretch">
+        <Button Classes="noteTreeItemButton"
+                Grid.ColumnSpan="2"
+                Command="{Binding #Root.ViewModel.OpenNoteCommand}"
+                CommandParameter="{Binding}"
+                AutomationProperties.Name="{Binding Title}"
+                MinHeight="56" />
+
+        <Grid Margin="12,8,46,8"
+              ColumnDefinitions="Auto,*"
+              ColumnSpacing="9"
+              HorizontalAlignment="Stretch"
+              IsHitTestVisible="False">
+            <ic:FluentIcon Icon="Document" FontSize="16" VerticalAlignment="Top" Margin="0,2,0,0" />
+            <StackPanel Grid.Column="1" Spacing="2" MinWidth="0">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                    <TextBlock Text="{Binding Title}"
+                               FontSize="13"
+                               FontWeight="SemiBold"
                                TextTrimming="CharacterEllipsis"
-                               MaxLines="2"
-                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                </StackPanel>
-            </Grid>
-            <Button Grid.Column="1"
-                    Command="{Binding #Root.ViewModel.DeleteNoteCommand}"
-                    CommandParameter="{Binding}"
-                    ToolTip.Tip="{Binding #Root.ViewModel.L.MoveToRecycleBin}"
-                    AutomationProperties.Name="{Binding #Root.ViewModel.L.MoveToRecycleBin}"
-                    Width="28"
-                    Height="28"
-                    Padding="0"
-                    Margin="6,4,6,0"
-                    VerticalAlignment="Top">
-                <ic:FluentIcon Icon="Delete" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
-            </Button>
+                               MinWidth="0" />
+                    <ic:FluentIcon Grid.Column="1"
+                                   Icon="Star"
+                                   FontSize="12"
+                                   IsVisible="{Binding IsFavorite}"
+                                   VerticalAlignment="Center" />
+                </Grid>
+                <TextBlock Text="{Binding Notes}"
+                           FontSize="12"
+                           TextTrimming="CharacterEllipsis"
+                           MaxLines="1"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
         </Grid>
-    </Border>
+
+        <Button x:Name="NoteItemMoreButton"
+                Grid.Column="1"
+                ToolTip.Tip="{Binding #Root.ViewModel.L.MoreOptions}"
+                AutomationProperties.Name="{Binding #Root.ViewModel.L.MoreOptions}"
+                Width="40"
+                Height="40"
+                Padding="0"
+                Margin="2,4,4,0"
+                VerticalAlignment="Top">
+            <ic:FluentIcon Icon="MoreHorizontal" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <Button.Flyout>
+                <MenuFlyout>
+                    <MenuItem Header="{Binding #Root.ViewModel.L.Open}"
+                              Command="{Binding #Root.ViewModel.OpenNoteCommand}"
+                              CommandParameter="{Binding}" />
+                    <MenuItem Header="{Binding #Root.ViewModel.L[ToggleFavorite]}"
+                              Command="{Binding #Root.ViewModel.ToggleNoteFavoriteCommand}"
+                              CommandParameter="{Binding}" />
+                    <Separator />
+                    <MenuItem Header="{Binding #Root.ViewModel.L.MoveToRecycleBin}"
+                              Command="{Binding #Root.ViewModel.DeleteNoteCommand}"
+                              CommandParameter="{Binding}" />
+                </MenuFlyout>
+            </Button.Flyout>
+        </Button>
+    </Grid>
 </UserControl>

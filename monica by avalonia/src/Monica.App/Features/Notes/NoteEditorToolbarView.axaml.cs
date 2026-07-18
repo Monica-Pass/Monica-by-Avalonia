@@ -19,7 +19,7 @@ public partial class NoteEditorToolbarView : UserControl
 
     private void ToolbarButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (sender is Button { Tag: string action })
+        if (sender is Control { Tag: string action })
         {
             ActionRequested?.Invoke(this, new NoteEditorActionRequestedEventArgs(action));
         }

@@ -1,60 +1,148 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:fa="using:FluentAvalonia.UI.Controls"
              xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:notes="using:Monica.App.Features.Notes"
              xmlns:vm="using:Monica.App.ViewModels"
              x:Class="Monica.App.Features.Notes.NoteEditorToolbarView"
+             x:Name="Root"
              x:DataType="vm:MainWindowViewModel">
     <Border Classes="noteToolbar"
             BorderBrush="{DynamicResource CardBorderBrush}"
             BorderThickness="0,0,0,1"
-            Padding="0,0,0,10"
+            Padding="0,0,0,8"
             Margin="0,0,0,12">
-        <WrapPanel Orientation="Horizontal" MinWidth="0" MaxWidth="680" HorizontalAlignment="Left">
-            <Button Tag="undo" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarUndo]}" AutomationProperties.Name="{Binding L[NoteToolbarUndo]}" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="ArrowUndo" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-            <Button Tag="redo" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarRedo]}" AutomationProperties.Name="{Binding L[NoteToolbarRedo]}" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="ArrowRedo" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-            <Border Width="1" Height="20" Background="{DynamicResource CardBorderBrush}" Margin="4,0,6,0" VerticalAlignment="Center" />
-            <Button Tag="find" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteFind]}" AutomationProperties.Name="{Binding L[NoteFind]}" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="Search" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-            <Button Tag="replace" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarFindReplace]}" AutomationProperties.Name="{Binding L[NoteToolbarFindReplace]}" Width="32" Height="32" Padding="0"><TextBlock Text="↔" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-            <Border Width="1" Height="20" Background="{DynamicResource CardBorderBrush}" Margin="4,0,6,0" VerticalAlignment="Center" />
-            <Button Tag="h1" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarHeading1]}" AutomationProperties.Name="{Binding L[NoteToolbarHeading1]}" Width="32" Height="32" Padding="0"><TextBlock Text="H1" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-            <Button Tag="h2" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarHeading2]}" AutomationProperties.Name="{Binding L[NoteToolbarHeading2]}" Width="32" Height="32" Padding="0"><TextBlock Text="H2" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-            <Button Tag="h3" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarHeading3]}" AutomationProperties.Name="{Binding L[NoteToolbarHeading3]}" Width="32" Height="32" Padding="0"><TextBlock Text="H3" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-            <Button Tag="bold" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarBold]}" AutomationProperties.Name="{Binding L[NoteToolbarBold]}" Width="32" Height="32" Padding="0"><TextBlock Text="B" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-            <Button Tag="italic" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarItalic]}" AutomationProperties.Name="{Binding L[NoteToolbarItalic]}" Width="32" Height="32" Padding="0"><TextBlock Text="I" FontStyle="Italic" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-            <Button Tag="strike" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarStrikethrough]}" AutomationProperties.Name="{Binding L[NoteToolbarStrikethrough]}" Width="32" Height="32" Padding="0"><TextBlock Text="S" TextDecorations="Strikethrough" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-            <Button Tag="inlinecode" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarInlineCode]}" AutomationProperties.Name="{Binding L[NoteToolbarInlineCode]}" Width="32" Height="32" Padding="0"><TextBlock Text="`" FontFamily="Consolas" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-            <Button Tag="quote" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarQuote]}" AutomationProperties.Name="{Binding L[NoteToolbarQuote]}" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="TextQuote" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-            <Button Tag="code" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarCodeBlock]}" AutomationProperties.Name="{Binding L[NoteToolbarCodeBlock]}" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="Code" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-            <Button Tag="ul" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarUnorderedList]}" AutomationProperties.Name="{Binding L[NoteToolbarUnorderedList]}" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="TextBulletList" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-            <Button Tag="ol" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarOrderedList]}" AutomationProperties.Name="{Binding L[NoteToolbarOrderedList]}" Width="32" Height="32" Padding="0"><TextBlock Text="1." FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-            <Button Tag="todo" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarTaskList]}" AutomationProperties.Name="{Binding L[NoteToolbarTaskList]}" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="CheckboxChecked" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-            <Button Tag="table" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarTable]}" AutomationProperties.Name="{Binding L[NoteToolbarTable]}" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="Table" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-            <Button Tag="link" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarLink]}" AutomationProperties.Name="{Binding L[NoteToolbarLink]}" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="Link" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-            <Button Tag="hr" Click="ToolbarButton_OnClick" ToolTip.Tip="{Binding L[NoteToolbarHorizontalRule]}" AutomationProperties.Name="{Binding L[NoteToolbarHorizontalRule]}" Width="32" Height="32" Padding="0"><ic:FluentIcon Icon="Subtract" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-            <Button x:Name="InsertNoteImageButton"
-                    Tag="image"
-                    Click="ToolbarButton_OnClick"
-                    IsEnabled="{Binding CanInsertNoteImage}"
-                    ToolTip.Tip="{Binding InsertNoteImageActionLabel}"
-                    AutomationProperties.Name="{Binding InsertNoteImageActionLabel}"
-                    Width="32"
-                    Height="32"
-                    Padding="0">
-                <Grid>
-                    <ProgressBar x:Name="InsertNoteImageProgress"
-                                 Width="18"
-                                 Height="4"
-                                 IsIndeterminate="True"
-                                 IsVisible="{Binding IsInsertingNoteImage}"
-                                 HorizontalAlignment="Center"
-                                 VerticalAlignment="Center" />
-                    <ic:FluentIcon Icon="Image"
-                                   FontSize="16"
-                                   IsVisible="{Binding !IsInsertingNoteImage}"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center" />
-                </Grid>
-            </Button>
-        </WrapPanel>
+        <fa:FACommandBar x:Name="NoteEditorCommandBar"
+                         DefaultLabelPosition="Collapsed"
+                         ClosedDisplayMode="Compact"
+                         IsDynamicOverflowEnabled="True"
+                         ItemsAlignment="Left"
+                         Background="Transparent"
+                         HorizontalAlignment="Stretch">
+            <fa:FACommandBar.PrimaryCommands>
+                <fa:FACommandBarButton Tag="undo"
+                                       Click="ToolbarButton_OnClick"
+                                       IconSource="Undo"
+                                       Label="{Binding L[NoteToolbarUndo]}"
+                                       ToolTip.Tip="{Binding L[NoteToolbarUndo]}"
+                                       AutomationProperties.Name="{Binding L[NoteToolbarUndo]}" />
+                <fa:FACommandBarButton Tag="redo"
+                                       Click="ToolbarButton_OnClick"
+                                       IconSource="Redo"
+                                       Label="{Binding L[NoteToolbarRedo]}"
+                                       ToolTip.Tip="{Binding L[NoteToolbarRedo]}"
+                                       AutomationProperties.Name="{Binding L[NoteToolbarRedo]}" />
+                <fa:FACommandBarButton Tag="find"
+                                       Click="ToolbarButton_OnClick"
+                                       IconSource="Find"
+                                       Label="{Binding L[NoteFind]}"
+                                       ToolTip.Tip="{Binding L[NoteFind]}"
+                                       AutomationProperties.Name="{Binding L[NoteFind]}" />
+                <fa:FACommandBarSeparator />
+
+                <fa:FACommandBarElementContainer>
+                    <Button x:Name="NoteHeadingMenuButton"
+                            ToolTip.Tip="{Binding L[NoteFormat]}"
+                            AutomationProperties.Name="{Binding L[NoteFormat]}"
+                            Width="40"
+                            Height="40"
+                            Padding="0">
+                        <TextBlock Text="H" FontSize="16" FontWeight="SemiBold" />
+                        <Button.Flyout>
+                            <MenuFlyout>
+                                <MenuItem Tag="h1" Click="ToolbarButton_OnClick" Header="{Binding L[NoteToolbarHeading1]}" />
+                                <MenuItem Tag="h2" Click="ToolbarButton_OnClick" Header="{Binding L[NoteToolbarHeading2]}" />
+                                <MenuItem Tag="h3" Click="ToolbarButton_OnClick" Header="{Binding L[NoteToolbarHeading3]}" />
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
+                </fa:FACommandBarElementContainer>
+
+                <fa:FACommandBarButton Tag="bold"
+                                       Click="ToolbarButton_OnClick"
+                                       IconSource="Bold"
+                                       Label="{Binding L[NoteToolbarBold]}"
+                                       ToolTip.Tip="{Binding L[NoteToolbarBold]}"
+                                       AutomationProperties.Name="{Binding L[NoteToolbarBold]}" />
+                <fa:FACommandBarButton Tag="italic"
+                                       Click="ToolbarButton_OnClick"
+                                       IconSource="Italic"
+                                       Label="{Binding L[NoteToolbarItalic]}"
+                                       ToolTip.Tip="{Binding L[NoteToolbarItalic]}"
+                                       AutomationProperties.Name="{Binding L[NoteToolbarItalic]}" />
+                <fa:FACommandBarButton Tag="ul"
+                                       Click="ToolbarButton_OnClick"
+                                       IconSource="Bullets"
+                                       Label="{Binding L[NoteToolbarUnorderedList]}"
+                                       ToolTip.Tip="{Binding L[NoteToolbarUnorderedList]}"
+                                       AutomationProperties.Name="{Binding L[NoteToolbarUnorderedList]}" />
+                <fa:FACommandBarButton Tag="link"
+                                       Click="ToolbarButton_OnClick"
+                                       IconSource="Link"
+                                       Label="{Binding L[NoteToolbarLink]}"
+                                       ToolTip.Tip="{Binding L[NoteToolbarLink]}"
+                                       AutomationProperties.Name="{Binding L[NoteToolbarLink]}" />
+
+                <fa:FACommandBarElementContainer>
+                    <Button x:Name="InsertNoteImageButton"
+                            Tag="image"
+                            Click="ToolbarButton_OnClick"
+                            IsEnabled="{Binding CanInsertNoteImage}"
+                            ToolTip.Tip="{Binding InsertNoteImageActionLabel}"
+                            AutomationProperties.Name="{Binding InsertNoteImageActionLabel}"
+                            Width="40"
+                            Height="40"
+                            Padding="0">
+                        <Grid>
+                            <ProgressBar x:Name="InsertNoteImageProgress"
+                                         Width="20"
+                                         Height="4"
+                                         IsIndeterminate="True"
+                                         IsVisible="{Binding IsInsertingNoteImage}"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Center" />
+                            <ic:FluentIcon Icon="Image"
+                                           FontSize="16"
+                                           IsVisible="{Binding !IsInsertingNoteImage}"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center" />
+                        </Grid>
+                    </Button>
+                </fa:FACommandBarElementContainer>
+                <fa:FACommandBarElementContainer IsVisible="{Binding !IsNoteInspectorPaneVisible}">
+                    <Button x:Name="CompactNotePropertiesButton"
+                            IsVisible="{Binding !IsNoteInspectorPaneVisible}"
+                            ToolTip.Tip="{Binding L[NoteProperties]}"
+                            AutomationProperties.Name="{Binding L[NoteProperties]}"
+                            Width="40"
+                            Height="40"
+                            Padding="0">
+                        <ic:FluentIcon Icon="Info"
+                                       FontSize="16"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        <Button.Flyout>
+                            <Flyout Placement="BottomEdgeAlignedRight">
+                                <Border Width="320" Padding="16">
+                                    <notes:NotePropertiesPanelView DataContext="{Binding #Root.DataContext}" />
+                                </Border>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
+                </fa:FACommandBarElementContainer>
+            </fa:FACommandBar.PrimaryCommands>
+
+            <fa:FACommandBar.SecondaryCommands>
+                <fa:FACommandBarButton Tag="replace" Click="ToolbarButton_OnClick" IconSource="Find" Label="{Binding L[NoteToolbarFindReplace]}" AutomationProperties.Name="{Binding L[NoteToolbarFindReplace]}" />
+                <fa:FACommandBarButton Tag="strike" Click="ToolbarButton_OnClick" IconSource="Font" Label="{Binding L[NoteToolbarStrikethrough]}" AutomationProperties.Name="{Binding L[NoteToolbarStrikethrough]}" />
+                <fa:FACommandBarButton Tag="inlinecode" Click="ToolbarButton_OnClick" IconSource="Code" Label="{Binding L[NoteToolbarInlineCode]}" AutomationProperties.Name="{Binding L[NoteToolbarInlineCode]}" />
+                <fa:FACommandBarButton Tag="quote" Click="ToolbarButton_OnClick" IconSource="Comment" Label="{Binding L[NoteToolbarQuote]}" AutomationProperties.Name="{Binding L[NoteToolbarQuote]}" />
+                <fa:FACommandBarButton Tag="code" Click="ToolbarButton_OnClick" IconSource="Code" Label="{Binding L[NoteToolbarCodeBlock]}" AutomationProperties.Name="{Binding L[NoteToolbarCodeBlock]}" />
+                <fa:FACommandBarButton Tag="ol" Click="ToolbarButton_OnClick" IconSource="List" Label="{Binding L[NoteToolbarOrderedList]}" AutomationProperties.Name="{Binding L[NoteToolbarOrderedList]}" />
+                <fa:FACommandBarButton Tag="todo" Click="ToolbarButton_OnClick" IconSource="Checkmark" Label="{Binding L[NoteToolbarTaskList]}" AutomationProperties.Name="{Binding L[NoteToolbarTaskList]}" />
+                <fa:FACommandBarButton Tag="table" Click="ToolbarButton_OnClick" IconSource="ViewAll" Label="{Binding L[NoteToolbarTable]}" AutomationProperties.Name="{Binding L[NoteToolbarTable]}" />
+                <fa:FACommandBarButton Tag="hr" Click="ToolbarButton_OnClick" IconSource="Remove" Label="{Binding L[NoteToolbarHorizontalRule]}" AutomationProperties.Name="{Binding L[NoteToolbarHorizontalRule]}" />
+            </fa:FACommandBar.SecondaryCommands>
+        </fa:FACommandBar>
     </Border>
 </UserControl>

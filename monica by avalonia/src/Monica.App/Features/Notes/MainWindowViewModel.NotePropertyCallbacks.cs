@@ -30,6 +30,8 @@ public sealed partial class MainWindowViewModel
 
     partial void OnNoteTagsTextChanged(string value) => MarkSelectedNoteTabDirty();
 
+    partial void OnNoteIsFavoriteChanged(bool value) => MarkSelectedNoteTabDirty();
+
     partial void OnNoteIsMarkdownChanged(bool value)
     {
         InvalidateNotePreviewProjection();
@@ -47,6 +49,7 @@ public sealed partial class MainWindowViewModel
         }
 
         RaiseNoteEditorLayoutState();
+        OnPropertyChanged(nameof(NoteViewModeIndex));
         CaptureSelectedNoteTabViewState();
     }
 
@@ -58,6 +61,7 @@ public sealed partial class MainWindowViewModel
         }
 
         RaiseNoteEditorLayoutState();
+        OnPropertyChanged(nameof(NoteViewModeIndex));
         CaptureSelectedNoteTabViewState();
     }
 

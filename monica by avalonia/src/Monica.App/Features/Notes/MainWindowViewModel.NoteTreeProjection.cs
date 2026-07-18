@@ -1,3 +1,4 @@
+using Avalonia;
 using Monica.Core.Models;
 
 namespace Monica.App.ViewModels;
@@ -43,8 +44,32 @@ public sealed partial class MainWindowViewModel
             .Select(note => note.Item)
             .ToArray();
         _noteTreeGroups = BuildNoteTreeGroups(orderedNotes);
+        _noteTreeEntries = BuildNoteTreeEntries(_favoriteNoteItems, _noteTreeGroups);
         _favoriteNoteCount = favoriteCount;
         _noteTreeProjectionDirty = false;
+    }
+
+    private IReadOnlyList<NoteTreeEntry> BuildNoteTreeEntries(
+        IReadOnlyList<SecureItem> favorites,
+        IReadOnlyList<NoteTreeGroup> groups)
+    {
+        var entries = new List<NoteTreeEntry>(
+            favorites.Count + groups.Sum(group => group.Items.Count + 1) + 1);
+        if (favorites.Count > 0)
+        {
+            entries.Add(new NoteTreeEntry(_localization.Favorite, favorites.Count, null, default, IsFavoriteGroup: true));
+            entries.AddRange(favorites.Select(item =>
+                new NoteTreeEntry(item.Title, 0, item, new Thickness(8, 0, 0, 4), IsFavoriteGroup: false)));
+        }
+
+        foreach (var group in groups)
+        {
+            entries.Add(new NoteTreeEntry(group.Name, group.Count, null, default, IsFavoriteGroup: false));
+            entries.AddRange(group.Items.Select(item =>
+                new NoteTreeEntry(item.Title, 0, item, new Thickness(12, 0, 0, 4), IsFavoriteGroup: false)));
+        }
+
+        return entries;
     }
 
     private IReadOnlyList<NoteTreeGroup> BuildNoteTreeGroups(IReadOnlyList<NoteTreeProjectionItem> notes)

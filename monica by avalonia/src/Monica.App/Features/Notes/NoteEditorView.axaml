@@ -10,7 +10,7 @@
         <Grid x:Name="NoteEditorContent"
               IsVisible="{Binding HasOpenNoteTabs}"
               RowDefinitions="Auto,Auto,Auto,*"
-              Margin="36,24,36,20"
+              Margin="{Binding NoteEditorContentMargin}"
               MaxWidth="920"
               MinWidth="0"
               ClipToBounds="True"
@@ -66,8 +66,8 @@
                 <ColumnDefinition Width="{Binding NotePreviewColumnWidth}" />
             </Grid.ColumnDefinitions>
 
-            <Grid Grid.Column="0" IsVisible="{Binding IsNoteEditorPaneVisible}" ColumnDefinitions="44,*">
-                <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,1,0" Padding="0,0,8,0" Margin="-48,0,12,0">
+            <Grid Grid.Column="0" IsVisible="{Binding IsNoteEditorPaneVisible}" ColumnDefinitions="48,*">
+                <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,1,0" Padding="0,0,8,0" Margin="0,0,12,0">
                     <TextBlock Text="{Binding NoteLineNumbersText}" FontFamily="Consolas" FontSize="16" LineHeight="24" TextAlignment="Right" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Opacity="0.65" />
                 </Border>
                 <TextBox x:Name="NoteContentEditor"

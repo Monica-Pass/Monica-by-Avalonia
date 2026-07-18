@@ -26,6 +26,7 @@ public sealed class BackgroundMemoryUiTests
     [Fact]
     public async Task Background_memory_minimize_releases_unlocked_shell_and_prepared_editors()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var window = new Monica.App.MainWindow();
         using var services = Monica.App.App.ConfigureServices(window);
         var viewModel = services.GetRequiredService<MainWindowViewModel>();
@@ -60,7 +61,7 @@ public sealed class BackgroundMemoryUiTests
 
             Assert.Null(shellHost.Content);
             Assert.DoesNotContain(window.GetVisualDescendants(), control => control is WorkspaceHostView);
-            await AssertEventuallyCollectedAsync([workspaceHostReference, activeWorkspaceReference]);
+            await AssertEventuallyCollectedAsync([workspaceHostReference, activeWorkspaceReference], cancellationToken);
             Assert.False(VaultEditorDialogWarmup.IsPasswordWarmed);
             Assert.False(VaultEditorDialogWarmup.IsTotpWarmed);
             Assert.False(VaultEditorDialogWarmup.IsWalletWarmed);
@@ -89,6 +90,7 @@ public sealed class BackgroundMemoryUiTests
     public async Task Background_memory_minimize_releases_rebuildable_view_model_caches()
     {
         const int itemCount = 256;
+        var cancellationToken = TestContext.Current.CancellationToken;
         var window = new Monica.App.MainWindow();
         using var services = Monica.App.App.ConfigureServices(window);
         var viewModel = services.GetRequiredService<MainWindowViewModel>();
@@ -98,7 +100,7 @@ public sealed class BackgroundMemoryUiTests
         viewModel.WalletSearchText = "Memory";
         viewModel.NoteSearchText = "Memory";
         viewModel.NoteContent = $"# Unsaved memory draft\n\n{new string('x', 256 * 1024)}";
-        await Task.Delay(350, TestContext.Current.CancellationToken);
+        await Task.Delay(350, cancellationToken);
         Dispatcher.UIThread.RunJobs();
 
         var (cacheReferences, initialBuilds) = CaptureRebuildableCacheReferences(viewModel);
@@ -112,7 +114,7 @@ public sealed class BackgroundMemoryUiTests
             window.WindowState = WindowState.Minimized;
             Dispatcher.UIThread.RunJobs();
 
-            await AssertEventuallyCollectedAsync(cacheReferences);
+            await AssertEventuallyCollectedAsync(cacheReferences, cancellationToken);
             Assert.Empty(viewModel.NoteImagePreviewItems);
             Assert.Empty(viewModel.SecuritySummaryItems);
             Assert.Empty(viewModel.SecurityIssueItems);
@@ -342,7 +344,9 @@ public sealed class BackgroundMemoryUiTests
         GC.Collect();
     }
 
-    private static async Task AssertEventuallyCollectedAsync(IReadOnlyList<WeakReference> references)
+    private static async Task AssertEventuallyCollectedAsync(
+        IReadOnlyList<WeakReference> references,
+        CancellationToken cancellationToken)
     {
         for (var attempt = 0; attempt < 5 && references.Any(reference => reference.IsAlive); attempt++)
         {
@@ -350,7 +354,7 @@ public sealed class BackgroundMemoryUiTests
             ForceFullCollection();
             if (references.Any(reference => reference.IsAlive))
             {
-                await Task.Delay(20, TestContext.Current.CancellationToken);
+                await Task.Delay(20, cancellationToken);
             }
         }
 

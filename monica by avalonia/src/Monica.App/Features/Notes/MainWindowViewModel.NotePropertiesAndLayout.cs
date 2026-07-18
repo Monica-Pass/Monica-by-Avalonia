@@ -17,6 +17,7 @@ public sealed partial class MainWindowViewModel
     private IReadOnlyList<SecureItem> _filteredNoteItems = [];
     private IReadOnlyList<SecureItem> _favoriteNoteItems = [];
     private IReadOnlyList<NoteTreeGroup> _noteTreeGroups = [];
+    private IReadOnlyList<NoteTreeEntry> _noteTreeEntries = [];
     private int _favoriteNoteCount;
     private bool _noteTreeProjectionDirty = true;
 
@@ -113,6 +114,15 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    public IReadOnlyList<NoteTreeEntry> NoteTreeEntries
+    {
+        get
+        {
+            EnsureNoteTreeProjection();
+            return _noteTreeEntries;
+        }
+    }
+
     public int FavoriteNoteCount
     {
         get
@@ -124,6 +134,7 @@ public sealed partial class MainWindowViewModel
     public bool HasFavoriteNoteItems => FavoriteNoteItems.Count > 0;
     public bool HasFilteredNoteItems => FilteredNoteItems.Count > 0;
     public bool HasNoteTreeGroups => NoteTreeGroups.Count > 0;
+    public bool HasNoteTreeEntries => NoteTreeEntries.Count > 0;
     public bool HasNoteSearchText => !string.IsNullOrWhiteSpace(NoteSearchText);
     public bool ShowAddNoteInEmptyTree => NoteItems.Count == 0;
     public bool ShowClearNoteSearchInEmptyTree => NoteItems.Count > 0 && HasNoteSearchText && !HasNoteTreeGroups;
@@ -158,6 +169,9 @@ public sealed partial class MainWindowViewModel
     public bool ShowBackToNoteList =>
         IsNoteWorkspaceNarrow &&
         !NoteNarrowShowsTree;
+    public bool ShowAddNoteInTreeHeader =>
+        IsNoteWorkspaceNarrow &&
+        NoteNarrowShowsTree;
     public GridLength NoteTreeColumnWidth => IsNoteTreePaneVisible
         ? IsNoteWorkspaceNarrow
             ? new GridLength(1, GridUnitType.Star)
@@ -167,10 +181,23 @@ public sealed partial class MainWindowViewModel
         ? new GridLength(1, GridUnitType.Star)
         : new GridLength(0);
     public bool IsNoteInspectorPaneVisible =>
-        NoteWorkspaceViewportWidth <= 0 || NoteWorkspaceViewportWidth >= 780;
+        !NoteSplitPreviewMode &&
+        NoteWorkspaceViewportWidth >= 1180;
     public GridLength NoteInspectorColumnWidth => IsNoteInspectorPaneVisible
-        ? new GridLength(260)
+        ? new GridLength(280)
         : new GridLength(0);
+    public Thickness NoteEditorContentMargin => IsNoteWorkspaceNarrow
+        ? new Thickness(16, 20, 16, 16)
+        : new Thickness(28, 24, 28, 20);
+    public int NoteViewModeIndex
+    {
+        get => NoteSplitPreviewMode ? 2 : NotePreviewMode ? 1 : 0;
+        set
+        {
+            NotePreviewMode = value == 1;
+            NoteSplitPreviewMode = value == 2;
+        }
+    }
     public string NoteEditorStatusText =>
         NoteSelectedCharacterCount > 0
             ? _localization.Format(
@@ -190,24 +217,6 @@ public sealed partial class MainWindowViewModel
                 NoteCharacterCount);
     public bool HasOpenNoteTabs => OpenNoteTabs.Count > 0;
     public double NoteTabWidth => CalculateNoteTabWidth(OpenNoteTabs.Count, NoteTabRailViewportWidth);
-    public double NoteTabStripWidth
-    {
-        get
-        {
-            const double fallbackWidth = 720;
-            const double minWidth = 260;
-            const double maxWidth = 680;
-            var viewportWidth = NoteWorkspaceViewportWidth;
-            if (viewportWidth <= 0 || double.IsNaN(viewportWidth))
-            {
-                return Math.Min(fallbackWidth, maxWidth);
-            }
-
-            var treeWidth = IsNoteTreePaneVisible ? 280 : 0;
-            return Math.Clamp(viewportWidth - treeWidth, minWidth, maxWidth);
-        }
-    }
-
     private double _noteTabRailViewportWidth;
     private double _noteWorkspaceViewportWidth;
 

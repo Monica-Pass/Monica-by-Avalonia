@@ -122,9 +122,10 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(IsNoteTreePaneVisible));
         OnPropertyChanged(nameof(IsNoteEditorWorkspaceVisible));
         OnPropertyChanged(nameof(ShowBackToNoteList));
+        OnPropertyChanged(nameof(ShowAddNoteInTreeHeader));
         OnPropertyChanged(nameof(NoteTreeColumnWidth));
         OnPropertyChanged(nameof(NoteWorkspaceEditorColumnWidth));
-        OnPropertyChanged(nameof(NoteTabStripWidth));
+        OnPropertyChanged(nameof(NoteEditorContentMargin));
         OnPropertyChanged(nameof(IsNoteInspectorPaneVisible));
         OnPropertyChanged(nameof(NoteInspectorColumnWidth));
     }
@@ -149,10 +150,12 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(FavoriteNoteItems));
         OnPropertyChanged(nameof(FilteredNoteItems));
         OnPropertyChanged(nameof(NoteTreeGroups));
+        OnPropertyChanged(nameof(NoteTreeEntries));
         OnPropertyChanged(nameof(FavoriteNoteCount));
         OnPropertyChanged(nameof(HasFavoriteNoteItems));
         OnPropertyChanged(nameof(HasFilteredNoteItems));
         OnPropertyChanged(nameof(HasNoteTreeGroups));
+        OnPropertyChanged(nameof(HasNoteTreeEntries));
         OnPropertyChanged(nameof(HasNoteSearchText));
         OnPropertyChanged(nameof(ShowAddNoteInEmptyTree));
         OnPropertyChanged(nameof(ShowClearNoteSearchInEmptyTree));
