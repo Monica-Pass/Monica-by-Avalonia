@@ -10,6 +10,7 @@ namespace Monica.App.Features.Passwords;
 public partial class PasswordVaultView : UserControl
 {
     public const double NarrowLayoutBreakpoint = 760;
+    public const double WideLayoutBreakpoint = 1180;
 
     private MainWindowViewModel? _observedViewModel;
     private PasswordDetailPaneView? _passwordDetailPane;
@@ -23,6 +24,8 @@ public partial class PasswordVaultView : UserControl
     }
 
     public bool IsNarrowLayout { get; private set; }
+
+    public bool IsWideLayout { get; private set; }
 
     public bool IsSearchBox(object? source) => PasswordVaultToolbar.IsSearchBox(source);
 
@@ -70,6 +73,7 @@ public partial class PasswordVaultView : UserControl
     public void UpdateResponsiveLayoutForWidth(double width)
     {
         IsNarrowLayout = width > 0 && width < NarrowLayoutBreakpoint;
+        IsWideLayout = width >= WideLayoutBreakpoint;
         ApplyResponsiveLayout();
     }
 
@@ -117,7 +121,7 @@ public partial class PasswordVaultView : UserControl
 
     private void ApplyResponsiveLayout()
     {
-        if (PasswordMasterDetailGrid.ColumnDefinitions.Count < 2)
+        if (PasswordMasterDetailGrid.ColumnDefinitions.Count < 3)
         {
             return;
         }
@@ -125,20 +129,21 @@ public partial class PasswordVaultView : UserControl
         var hasSelection = _observedViewModel?.SelectedPassword is not null;
         var detailPane = hasSelection ? EnsurePasswordDetailPane() : _passwordDetailPane;
         var columns = PasswordMasterDetailGrid.ColumnDefinitions;
-        columns[0].Width = IsNarrowLayout
-            ? new GridLength(1, GridUnitType.Star)
-            : new GridLength(300);
-        columns[1].Width = IsNarrowLayout
-            ? new GridLength(0)
-            : new GridLength(1, GridUnitType.Star);
+        PasswordFolderFilters.ShowCompactFolderPicker = !IsWideLayout;
 
         if (IsNarrowLayout)
         {
+            columns[0].Width = new GridLength(1, GridUnitType.Star);
+            columns[1].Width = new GridLength(0);
+            columns[2].Width = new GridLength(0);
+            Grid.SetColumn(PasswordFolderNavigationRegion, 0);
             Grid.SetColumn(PasswordListRegion, 0);
             Grid.SetColumn(PasswordDetailRegion, 0);
+            PasswordListRegion.Margin = new Thickness(0);
+            PasswordDetailRegion.Margin = new Thickness(0);
+            PasswordFolderNavigationRegion.IsVisible = false;
             PasswordListRegion.IsVisible = !hasSelection;
             PasswordDetailRegion.IsVisible = hasSelection;
-            PasswordDetailRegion.Margin = new Thickness(0);
             if (detailPane is not null)
             {
                 detailPane.ShowBackButton = hasSelection;
@@ -151,11 +156,21 @@ public partial class PasswordVaultView : UserControl
             return;
         }
 
-        Grid.SetColumn(PasswordListRegion, 0);
-        Grid.SetColumn(PasswordDetailRegion, 1);
+        columns[0].Width = new GridLength(IsWideLayout ? 220 : 320);
+        columns[1].Width = IsWideLayout
+            ? new GridLength(332)
+            : new GridLength(1, GridUnitType.Star);
+        columns[2].Width = IsWideLayout
+            ? new GridLength(1, GridUnitType.Star)
+            : new GridLength(0);
+        Grid.SetColumn(PasswordFolderNavigationRegion, 0);
+        Grid.SetColumn(PasswordListRegion, IsWideLayout ? 1 : 0);
+        Grid.SetColumn(PasswordDetailRegion, IsWideLayout ? 2 : 1);
+        PasswordListRegion.Margin = IsWideLayout ? new Thickness(12, 0, 0, 0) : new Thickness(0);
+        PasswordDetailRegion.Margin = new Thickness(12, 0, 0, 0);
+        PasswordFolderNavigationRegion.IsVisible = IsWideLayout;
         PasswordListRegion.IsVisible = true;
         PasswordDetailRegion.IsVisible = true;
-        PasswordDetailRegion.Margin = new Thickness(12, 0, 0, 0);
         if (detailPane is not null)
         {
             detailPane.ShowBackButton = false;

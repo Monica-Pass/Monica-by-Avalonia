@@ -8,4 +8,10 @@ public partial class PasswordFolderFilterView : UserControl
     {
         InitializeComponent();
     }
+
+    public bool ShowCompactFolderPicker
+    {
+        get => CompactFolderCommands.IsVisible;
+        set => CompactFolderCommands.IsVisible = value;
+    }
 }
