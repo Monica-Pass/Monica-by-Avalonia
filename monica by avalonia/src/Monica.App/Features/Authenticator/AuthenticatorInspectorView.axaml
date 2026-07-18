@@ -31,13 +31,13 @@
                 <Border Classes="totpRiskZone" Padding="14">
                     <StackPanel Spacing="10">
                         <StackPanel Spacing="3">
-                            <TextBlock Text="{Binding L.Delete}" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding L.TotpPageDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" FontSize="12" />
+                            <TextBlock Text="{Binding L.MoveToRecycleBin}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding L[TotpDeleteDescription]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" FontSize="12" />
                         </StackPanel>
                         <Button Classes="workspaceCommand" Command="{Binding DeleteTotpCommand}" CommandParameter="{Binding SelectedTotpItem}" ToolTip.Tip="{Binding L.Delete}" AutomationProperties.Name="{Binding L.Delete}" HorizontalAlignment="Left">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <ic:FluentIcon Icon="Delete" FontSize="16" />
-                                <TextBlock Text="{Binding L.Delete}" />
+                                <TextBlock Text="{Binding L.MoveToRecycleBin}" />
                             </StackPanel>
                         </Button>
                     </StackPanel>

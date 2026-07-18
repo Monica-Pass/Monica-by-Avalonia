@@ -32,7 +32,7 @@
                         </StackPanel>
                         <TextBlock Text="{Binding SelectedTotpDetails.Account}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
-                    <TextBlock Grid.Column="2" Text="{Binding SelectedTotpItem.TotpTimeRemaining}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="{Binding SelectedTotpItem.TotpTimeRemaining}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" IsVisible="{Binding !SelectedTotpDetails.IsCounterBased}" />
                 </Grid>
 
                 <StackPanel Grid.Row="1" Margin="0,28,0,0" Spacing="14" HorizontalAlignment="Center" MaxWidth="520">
@@ -46,12 +46,18 @@
                                FontWeight="Bold"
                                Foreground="{DynamicResource AccentFillColorDefaultBrush}"
                                HorizontalAlignment="Center" />
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" MaxWidth="360" HorizontalAlignment="Stretch">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" MaxWidth="360" HorizontalAlignment="Stretch" IsVisible="{Binding !SelectedTotpDetails.IsCounterBased}">
                         <ProgressBar Maximum="100" Value="{Binding SelectedTotpItem.TotpProgress}" Height="6" VerticalAlignment="Center" />
                         <Border Grid.Column="1" Classes="workspaceStatusChip">
                             <TextBlock Text="{Binding SelectedTotpItem.TotpTimeRemaining}" FontSize="12" FontWeight="SemiBold" />
                         </Border>
                     </Grid>
+                    <Border Classes="workspaceStatusChip" IsVisible="{Binding SelectedTotpDetails.IsCounterBased}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="{Binding L[TotpCounter]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Text="{Binding SelectedTotpDetails.CounterText}" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
 
                 <WrapPanel Grid.Row="2" Orientation="Horizontal" Margin="0,18,0,8" HorizontalAlignment="Center">
@@ -67,7 +73,13 @@
                             <TextBlock Text="{Binding L.Edit}" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
-                    <Button Classes="workspaceCommand" Command="{Binding ToggleTotpFavoriteCommand}" CommandParameter="{Binding SelectedTotpItem}" ToolTip.Tip="{Binding L.Favorite}" AutomationProperties.Name="{Binding L.Favorite}" Width="36" Height="36" Padding="0" Margin="0,0,0,8">
+                    <Button x:Name="AdvanceTotpButton" Classes="workspaceCommand" Command="{Binding AdvanceTotpCommand}" CommandParameter="{Binding SelectedTotpItem}" IsVisible="{Binding SelectedTotpDetails.IsCounterBased}" ToolTip.Tip="{Binding L[GenerateNextTotp]}" AutomationProperties.Name="{Binding L[GenerateNextTotp]}" Margin="0,0,8,8">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:FluentIcon Icon="ArrowSync" FontSize="16" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding L[GenerateNextTotp]}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="workspaceCommand" Command="{Binding ToggleTotpFavoriteCommand}" CommandParameter="{Binding SelectedTotpItem}" ToolTip.Tip="{Binding L.Favorite}" AutomationProperties.Name="{Binding L.Favorite}" Width="40" Height="40" Padding="0" Margin="0,0,0,8">
                         <ic:FluentIcon Icon="Star" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Button>
                 </WrapPanel>

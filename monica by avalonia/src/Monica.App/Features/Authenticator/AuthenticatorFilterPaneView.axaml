@@ -1,0 +1,46 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Authenticator.AuthenticatorFilterPaneView"
+             x:Name="Root"
+             x:DataType="vm:MainWindowViewModel">
+    <Grid RowDefinitions="Auto,*">
+        <StackPanel Margin="14,12,14,8" Spacing="3">
+            <TextBlock Classes="workspaceSectionLabel" Text="{Binding TotpFilterTitleText}" />
+            <TextBlock x:Name="TotpFilteredStatusText"
+                       Text="{Binding TotpFilteredStatusText}"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       FontSize="12"
+                       TextWrapping="Wrap"
+                       MaxLines="2"
+                       AutomationProperties.Name="{Binding TotpFilteredStatusText}"
+                       AutomationProperties.LiveSetting="Polite" />
+        </StackPanel>
+
+        <ScrollViewer x:Name="AuthenticatorFilterScrollViewer"
+                      Grid.Row="1"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      MaxHeight="176"
+                      Margin="8,0,8,8">
+            <ItemsControl ItemsSource="{Binding TotpFilterChoices}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:TotpFilterChoice">
+                        <Button Classes="totpFilterButton"
+                                Command="{Binding #Root.DataContext.SelectTotpFilterCommand}"
+                                CommandParameter="{Binding Key}"
+                                AutomationProperties.Name="{Binding Label}"
+                                ToolTip.Tip="{Binding Label}">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" MinWidth="0" Margin="{Binding Indent}">
+                                <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                <Border Grid.Column="1" Classes="workspaceStatusChip">
+                                    <TextBlock Text="{Binding Count}" FontSize="12" />
+                                </Border>
+                            </Grid>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

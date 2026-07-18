@@ -17,6 +17,13 @@ internal static class TotpPresentationState
         }
 
         item.TotpCode = totpService.GenerateCode(data.Secret, data.Period, data.Digits, data.OtpType, data.Counter);
+        if (string.Equals(data.OtpType, "HOTP", StringComparison.OrdinalIgnoreCase))
+        {
+            item.TotpTimeRemaining = "";
+            item.TotpProgress = 100;
+            return;
+        }
+
         item.TotpTimeRemaining = $"{totpService.GetRemainingSeconds(data.Period)}s";
         item.TotpProgress = totpService.GetProgress(data.Period);
     }

@@ -1188,7 +1188,8 @@ public sealed partial class AppSettingsTests
         IImportExportService? importExportService = null,
         IAppSettingsService? settingsService = null,
         IClipboardService? clipboardService = null,
-        IWindowPrivacyService? windowPrivacyService = null)
+        IWindowPrivacyService? windowPrivacyService = null,
+        ITotpEditorDialogService? totpEditorDialogService = null)
     {
         var databasePath = TestTempPaths.CreateFilePath(".db");
         var factory = new SqliteConnectionFactory(databasePath);
@@ -1219,6 +1220,7 @@ public sealed partial class AppSettingsTests
             externalLinkService: externalLinkService,
             fileSystemPickerService: fileSystemPickerService,
             confirmationDialogService: confirmationDialogService,
+            totpEditorDialogService: totpEditorDialogService,
             exportAuthorizationService: new ApprovingExportAuthorizationService(),
             windowPrivacyService: windowPrivacyService,
             oneDriveBackupService: oneDriveBackupService,
@@ -1371,7 +1373,8 @@ public sealed partial class AppSettingsTests
     private sealed class CapturingFileSystemPickerService(
         IPlatformIntegrationService platformIntegrationService,
         PickedTextFile? openFile,
-        string? savedFileName = null) : IFileSystemPickerService
+        string? savedFileName = null,
+        PickedBinaryFile? openBinaryFile = null) : IFileSystemPickerService
     {
         public IReadOnlyList<PlatformFilePickerFileType> OpenFileTypes { get; private set; } = [];
         public IReadOnlyList<PlatformFilePickerFileType> SaveFileTypes { get; private set; } = [];
@@ -1388,7 +1391,7 @@ public sealed partial class AppSettingsTests
         public Task<PickedBinaryFile?> OpenBinaryFileAsync(string title, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default)
         {
             OpenFileTypes = fileTypes;
-            return Task.FromResult<PickedBinaryFile?>(null);
+            return Task.FromResult(openBinaryFile);
         }
 
         public Task<string?> SaveTextFileAsync(string title, string suggestedFileName, string content, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default)

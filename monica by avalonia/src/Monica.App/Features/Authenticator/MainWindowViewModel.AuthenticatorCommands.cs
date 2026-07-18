@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.Input;
 using Monica.Core.Models;
+using Monica.Core.Services;
 
 namespace Monica.App.ViewModels;
 
@@ -45,30 +46,7 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var item = editor.ApplyTo();
-        RefreshTotpDisplay(item);
-        await _repository.SaveSecureItemAsync(item);
-        await LogOperationAsync(new OperationLog
-        {
-            ItemType = "TOTP",
-            ItemId = item.Id,
-            ItemTitle = item.Title,
-            OperationType = "CREATE",
-            DeviceName = Environment.MachineName
-        });
-        TrackTotpSelection(item);
-        TotpItems.Insert(0, item);
-        SelectedTotpItem = item;
-        TotpNarrowShowsList = false;
-        RaiseTotpCountState(reconcileSelection: false);
-        StatusMessage = _localization.Format("SavedTotpFormat", item.Title);
-    }
-
-    [RelayCommand]
-    private async Task ScanTotpQrAsync()
-    {
-        StatusMessage = _localization.Get("TotpScanQrFallback");
-        await AddTotpAsync();
+        await CompleteTotpCreateAsync(editor);
     }
 
     [RelayCommand]
@@ -82,6 +60,37 @@ public sealed partial class MainWindowViewModel
         RefreshTotpDisplay(item);
         await _clipboardService.SetSensitiveTextAsync(item.TotpCode);
         StatusMessage = _localization.Format("CopiedTotpFormat", item.Title);
+    }
+
+    private static bool CanAdvanceTotp(SecureItem? item)
+    {
+        if (item is null || item.BoundPasswordId is not null)
+        {
+            return false;
+        }
+
+        return TotpDataResolver.ParseStoredItemData(item.ItemData, item.Title, item.Notes) is { OtpType: "HOTP" };
+    }
+
+    [RelayCommand(CanExecute = nameof(CanAdvanceTotp))]
+    private async Task AdvanceTotpAsync(SecureItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        var data = TotpDataResolver.ParseStoredItemData(item.ItemData, item.Title, item.Notes);
+        if (data is null || !string.Equals(data.OtpType, "HOTP", StringComparison.OrdinalIgnoreCase) || item.BoundPasswordId is not null)
+        {
+            return;
+        }
+
+        item.ItemData = TotpDataResolver.ToItemData(data with { Counter = data.Counter + 1 });
+        RefreshTotpDisplay(item);
+        await _repository.SaveSecureItemAsync(item);
+        SelectedTotpDetails = new TotpItemDetailsViewModel(_localization, item);
+        StatusMessage = _localization.Format("GeneratedNextTotpFormat", item.Title);
     }
 
     [RelayCommand]

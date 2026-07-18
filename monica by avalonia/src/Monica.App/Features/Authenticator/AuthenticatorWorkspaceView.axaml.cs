@@ -40,7 +40,7 @@ public partial class AuthenticatorWorkspaceView : UserControl
 
     public bool IsSearchFocused => AuthenticatorSearchBox.IsFocused;
 
-    public void FocusAccountList() => Dispatcher.UIThread.Post(() => AuthenticatorAccountList.Focus());
+    public void FocusAccountList() => Dispatcher.UIThread.Post(() => AuthenticatorAccountListView.AccountList.Focus());
 
     public void FocusCodeRegion() => AuthenticatorCodeRegion.Focus();
 
@@ -59,7 +59,7 @@ public partial class AuthenticatorWorkspaceView : UserControl
             ? (delta > 0 ? 0 : visibleItems.Count - 1)
             : Math.Clamp(currentIndex + delta, 0, visibleItems.Count - 1);
         viewModel.SelectedTotpItem = visibleItems[nextIndex];
-        AuthenticatorAccountList.ScrollIntoView(visibleItems[nextIndex]);
+        AuthenticatorAccountListView.AccountList.ScrollIntoView(visibleItems[nextIndex]);
     }
 
     public void UpdateResponsiveLayoutForWidth(double width)

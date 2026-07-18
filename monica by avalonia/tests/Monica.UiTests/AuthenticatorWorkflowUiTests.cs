@@ -24,7 +24,9 @@ public sealed class AuthenticatorWorkflowUiTests
 
         Assert.NotNull(view.FindControl<TextBox>("AuthenticatorSearchBox"));
         Assert.NotNull(view.FindControl<Button>("AuthenticatorSearchClearButton"));
-        Assert.NotNull(view.FindControl<ListBox>("AuthenticatorAccountList"));
+        var accountListView = Assert.IsType<AuthenticatorAccountListView>(
+            view.FindControl<AuthenticatorAccountListView>("AuthenticatorAccountListView"));
+        Assert.NotNull(accountListView.AccountList);
         Assert.NotNull(view.FindControl<StackPanel>("AuthenticatorEmptyState"));
         Assert.NotNull(view.FindControl<Button>("EmptyAuthenticatorAddButton"));
         Assert.NotNull(view.FindControl<Button>("EmptyAuthenticatorClearFiltersButton"));
@@ -32,6 +34,7 @@ public sealed class AuthenticatorWorkflowUiTests
             view.FindControl<AuthenticatorCodeConsoleView>("AuthenticatorCodeConsole"));
         Assert.NotNull(console.FindControl<TextBlock>("AuthenticatorCurrentCode"));
         Assert.NotNull(console.FindControl<Button>("CopyAuthenticatorCodeButton"));
+        Assert.NotNull(console.FindControl<Button>("AdvanceTotpButton"));
     }
 
     [Fact]
@@ -49,9 +52,72 @@ public sealed class AuthenticatorWorkflowUiTests
             "AutomationProperties.HelpText=\"{Binding TotpSearchHelpText}\"",
             xaml,
             StringComparison.Ordinal);
-        var status = view.FindControl<TextBlock>("TotpFilteredStatusText");
+        var filterPane = Assert.IsType<AuthenticatorFilterPaneView>(
+            view.FindControl<AuthenticatorFilterPaneView>("AuthenticatorFilterPane"));
+        var status = filterPane.FindControl<TextBlock>("TotpFilteredStatusText");
         Assert.NotNull(status);
         Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting(status));
+    }
+
+    [Fact]
+    public void Authenticator_header_owns_primary_add_and_single_scan_action()
+    {
+        var xaml = File.ReadAllText(FindAuthenticatorFeatureFile("AuthenticatorWorkspaceView.axaml"));
+
+        Assert.Equal(2, CountOccurrences(xaml, "Command=\"{Binding AddTotpCommand}\""));
+        Assert.Equal(1, CountOccurrences(xaml, "Command=\"{Binding ScanTotpQrCommand}\""));
+        Assert.Contains("IconSource=\"QrCode\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Icon=\"Document\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Authenticator_more_menu_contains_only_executable_actions()
+    {
+        var xaml = File.ReadAllText(FindAuthenticatorFeatureFile("AuthenticatorWorkspaceView.axaml"));
+
+        Assert.DoesNotContain("TotpShowHiddenText", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("SortTitleText", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("TotpHelpText", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Authenticator_code_console_preserves_hotp_counter_semantics()
+    {
+        var xaml = File.ReadAllText(FindAuthenticatorFeatureFile("AuthenticatorCodeConsoleView.axaml"));
+
+        Assert.Contains("Command=\"{Binding AdvanceTotpCommand}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("SelectedTotpDetails.IsCounterBased", xaml, StringComparison.Ordinal);
+        Assert.Contains("L[TotpCounter]", xaml, StringComparison.Ordinal);
+        Assert.Contains("SelectedTotpDetails.CounterText", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Authenticator_batch_commands_use_desktop_targets_and_named_automation()
+    {
+        var view = new AuthenticatorWorkspaceView();
+        var xaml = File.ReadAllText(FindAuthenticatorFeatureFile("AuthenticatorWorkspaceView.axaml"));
+
+        Assert.NotNull(view.FindControl<Button>("FavoriteSelectedTotpButton"));
+        Assert.NotNull(view.FindControl<Button>("DeleteSelectedTotpButton"));
+        Assert.NotNull(view.FindControl<Button>("ClearTotpSelectionButton"));
+        Assert.Contains("x:Name=\"FavoriteSelectedTotpButton\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"DeleteSelectedTotpButton\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ClearTotpSelectionButton\"", xaml, StringComparison.Ordinal);
+        Assert.Equal(3, CountOccurrences(xaml, "Width=\"40\" Height=\"40\""));
+    }
+
+    [Fact]
+    public void Authenticator_workspace_separates_filter_and_account_scroll_ownership()
+    {
+        var view = new AuthenticatorWorkspaceView();
+        var xaml = File.ReadAllText(FindAuthenticatorFeatureFile("AuthenticatorWorkspaceView.axaml"));
+        var accountListXaml = File.ReadAllText(FindAuthenticatorFeatureFile("AuthenticatorAccountListView.axaml"));
+
+        Assert.Contains("<views:AuthenticatorFilterPaneView x:Name=\"AuthenticatorFilterPane\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<views:AuthenticatorAccountListView x:Name=\"AuthenticatorAccountListView\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"AuthenticatorAccountListScrollViewer\"", accountListXaml, StringComparison.Ordinal);
+        Assert.NotNull(view.FindControl<Control>("AuthenticatorFilterPane"));
+        Assert.NotNull(view.FindControl<Control>("AuthenticatorAccountListView"));
     }
 
     [Fact]
@@ -142,5 +208,18 @@ public sealed class AuthenticatorWorkflowUiTests
         }
 
         throw new FileNotFoundException($"Could not locate {fileName} from the test output directory.");
+    }
+
+    private static int CountOccurrences(string text, string value)
+    {
+        var count = 0;
+        var offset = 0;
+        while ((offset = text.IndexOf(value, offset, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            offset += value.Length;
+        }
+
+        return count;
     }
 }

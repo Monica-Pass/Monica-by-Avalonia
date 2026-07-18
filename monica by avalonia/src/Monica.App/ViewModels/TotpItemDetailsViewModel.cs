@@ -20,6 +20,9 @@ public sealed class TotpItemDetailsViewModel
         OtpType = data?.OtpType ?? "TOTP";
         PeriodText = data is null ? "" : $"{data.Period}s";
         DigitsText = data is null ? "" : data.Digits.ToString(CultureInfo.InvariantCulture);
+        CounterText = data is null || !string.Equals(data.OtpType, "HOTP", StringComparison.OrdinalIgnoreCase)
+            ? ""
+            : data.Counter.ToString(CultureInfo.InvariantCulture);
         Algorithm = data?.Algorithm ?? "";
         CreatedAtText = item.CreatedAt.ToLocalTime().ToString("g", localization.Culture);
         UpdatedAtText = item.UpdatedAt.ToLocalTime().ToString("g", localization.Culture);
@@ -32,6 +35,7 @@ public sealed class TotpItemDetailsViewModel
             new(localization.Get("TotpPeriod"), PeriodText),
             new(localization.Get("TotpDigits"), DigitsText),
             new(localization.Get("TotpAlgorithm"), Algorithm),
+            new(localization.Get("TotpCounter"), CounterText),
             new(localization.CreatedAt, CreatedAtText),
             new(localization.UpdatedAt, UpdatedAtText)
         ];
@@ -49,6 +53,8 @@ public sealed class TotpItemDetailsViewModel
     public string OtpType { get; }
     public string PeriodText { get; }
     public string DigitsText { get; }
+    public string CounterText { get; }
+    public bool IsCounterBased => string.Equals(OtpType, "HOTP", StringComparison.OrdinalIgnoreCase);
     public string Algorithm { get; }
     public string CreatedAtText { get; }
     public string UpdatedAtText { get; }
