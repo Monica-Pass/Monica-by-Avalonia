@@ -16,6 +16,7 @@ public sealed class DesktopAppSettings
     public bool ClearClipboardEnabled { get; set; } = true;
     public int ClipboardClearSeconds { get; set; } = 30;
     public bool RequirePasswordBeforeExport { get; set; } = true;
+    public bool WindowCaptureProtectionEnabled { get; set; } = true;
     public SecurityRecoverySettings SecurityRecovery { get; set; } = new();
     public bool MinimizeToTray { get; set; }
     public bool QuickSearchEnabled { get; set; } = true;

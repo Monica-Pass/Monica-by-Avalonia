@@ -138,6 +138,7 @@ public sealed partial class AppSettingsService
         ClearClipboardEnabled = source.ClearClipboardEnabled,
         ClipboardClearSeconds = source.ClipboardClearSeconds,
         RequirePasswordBeforeExport = source.RequirePasswordBeforeExport,
+        WindowCaptureProtectionEnabled = source.WindowCaptureProtectionEnabled,
         SecurityRecovery = source.SecurityRecovery,
         MinimizeToTray = source.MinimizeToTray,
         QuickSearchEnabled = source.QuickSearchEnabled,

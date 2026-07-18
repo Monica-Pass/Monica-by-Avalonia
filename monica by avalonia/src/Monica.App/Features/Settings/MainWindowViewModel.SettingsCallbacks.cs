@@ -84,6 +84,12 @@ public sealed partial class MainWindowViewModel
     }
     partial void OnRequirePasswordBeforeExportChanged(bool value) => UpdateSettings(settings => settings.RequirePasswordBeforeExport = value);
 
+    partial void OnWindowCaptureProtectionEnabledChanged(bool value)
+    {
+        _windowPrivacyService.SetCaptureProtection(value);
+        UpdateSettings(settings => settings.WindowCaptureProtectionEnabled = value);
+    }
+
     partial void OnSecurityRecoveryEnabledChanged(bool value)
     {
         UpdateSettings(settings => settings.SecurityRecovery.IsEnabled = value);

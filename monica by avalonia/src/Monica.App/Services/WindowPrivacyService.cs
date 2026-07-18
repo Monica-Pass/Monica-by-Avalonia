@@ -5,15 +5,16 @@ namespace Monica.App.Services;
 
 public interface IWindowPrivacyService
 {
-    bool EnableCaptureProtection();
+    bool SetCaptureProtection(bool enabled);
 }
 
 public sealed class WindowPrivacyService(Func<Window?> windowProvider) : IWindowPrivacyService
 {
+    private const uint NoAffinity = 0x00000000;
     private const uint MonitorOnlyAffinity = 0x00000001;
     private const uint ExcludeFromCaptureAffinity = 0x00000011;
 
-    public bool EnableCaptureProtection()
+    public bool SetCaptureProtection(bool enabled)
     {
         if (!OperatingSystem.IsWindows())
         {
@@ -26,8 +27,13 @@ public sealed class WindowPrivacyService(Func<Window?> windowProvider) : IWindow
             return false;
         }
 
+        if (!enabled)
+        {
+            return SetWindowDisplayAffinity(handle, NoAffinity);
+        }
+
         return SetWindowDisplayAffinity(handle, ExcludeFromCaptureAffinity) ||
-            SetWindowDisplayAffinity(handle, MonitorOnlyAffinity);
+               SetWindowDisplayAffinity(handle, MonitorOnlyAffinity);
     }
 
     [DllImport("user32.dll", SetLastError = true)]
@@ -37,5 +43,5 @@ public sealed class WindowPrivacyService(Func<Window?> windowProvider) : IWindow
 
 internal sealed class DisabledWindowPrivacyService : IWindowPrivacyService
 {
-    public bool EnableCaptureProtection() => false;
+    public bool SetCaptureProtection(bool enabled) => false;
 }

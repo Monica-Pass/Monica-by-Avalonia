@@ -16,8 +16,8 @@ public sealed partial class MainWindowViewModel
 
     public string LockVaultText => _localization.Get("LockVault");
 
-    public bool EnableWindowCaptureProtection() =>
-        _windowPrivacyService.EnableCaptureProtection();
+    public bool ApplyWindowCapturePolicy() =>
+        _windowPrivacyService.SetCaptureProtection(WindowCaptureProtectionEnabled);
 
     public void RecordUserActivity()
     {

@@ -141,6 +141,9 @@ public sealed partial class MainWindowViewModel
     private bool _requirePasswordBeforeExport = true;
 
     [ObservableProperty]
+    private bool _windowCaptureProtectionEnabled = true;
+
+    [ObservableProperty]
     private bool _securityRecoveryEnabled;
 
     [ObservableProperty]

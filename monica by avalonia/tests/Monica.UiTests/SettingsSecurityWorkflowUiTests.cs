@@ -45,6 +45,14 @@ public sealed class SettingsSecurityWorkflowUiTests
     }
 
     [Fact]
+    public void Settings_security_exposes_optional_window_capture_protection()
+    {
+        var security = new SettingsSecurityView();
+
+        Assert.NotNull(security.FindControl<ToggleSwitch>("WindowCaptureProtectionToggle"));
+    }
+
+    [Fact]
     public void Security_analysis_exposes_search_cancel_and_single_pane_layout()
     {
         var view = new SecurityAnalysisWorkspaceView();

@@ -345,6 +345,8 @@ public interface ILocalizationService : INotifyPropertyChanged
     string SecuritySettingsDescription { get; }
     string AutoLock { get; }
     string AutoLockDescription { get; }
+    string WindowCaptureProtection { get; }
+    string WindowCaptureProtectionDescription { get; }
     string AutoLockAfter { get; }
     string AutoLockAfterDescription { get; }
     string ClearClipboard { get; }
@@ -831,6 +833,8 @@ public sealed class LocalizationService : ILocalizationService
     public string SecuritySettingsDescription => Text();
     public string AutoLock => Text();
     public string AutoLockDescription => Text();
+    public string WindowCaptureProtection => Text();
+    public string WindowCaptureProtectionDescription => Text();
     public string AutoLockAfter => Text();
     public string AutoLockAfterDescription => Text();
     public string ClearClipboard => Text();
@@ -1581,6 +1585,8 @@ public sealed class LocalizationService : ILocalizationService
         ["SecuritySettingsDescription"] = "Locking, clipboard, and export confirmation controls.",
         ["AutoLock"] = "Auto lock",
         ["AutoLockDescription"] = "Lock the vault after a period of desktop inactivity.",
+        ["WindowCaptureProtection"] = "Screenshot protection",
+        ["WindowCaptureProtectionDescription"] = "Prevent screenshots and screen recordings from capturing Monica on supported Windows versions.",
         ["AutoLockAfter"] = "Auto-lock after",
         ["AutoLockAfterDescription"] = "Set how long Monica waits before locking an inactive vault.",
         ["ClearClipboard"] = "Clear clipboard",
@@ -2783,6 +2789,8 @@ public sealed class LocalizationService : ILocalizationService
         ["SecuritySettingsDescription"] = "锁定、剪贴板和导出确认相关控制。",
         ["AutoLock"] = "自动锁定",
         ["AutoLockDescription"] = "桌面端空闲一段时间后锁定保险库。",
+        ["WindowCaptureProtection"] = "截图保护",
+        ["WindowCaptureProtectionDescription"] = "在受支持的 Windows 版本中阻止截图和录屏捕获 Monica 窗口。",
         ["AutoLockAfter"] = "自动锁定时间",
         ["AutoLockAfterDescription"] = "设置 Monica 在空闲多久后自动锁定保险库。",
         ["ClearClipboard"] = "清空剪贴板",

@@ -23,6 +23,7 @@ public sealed partial class MainWindowViewModel
             ClearClipboardEnabled = settings.ClearClipboardEnabled;
             ClipboardClearSeconds = settings.ClipboardClearSeconds;
             RequirePasswordBeforeExport = settings.RequirePasswordBeforeExport;
+            WindowCaptureProtectionEnabled = settings.WindowCaptureProtectionEnabled;
             ApplySecurityRecoverySettings(settings.SecurityRecovery);
             MinimizeToTray = settings.MinimizeToTray && CanUseTrayIntegration;
             QuickSearchEnabled = settings.QuickSearchEnabled;
