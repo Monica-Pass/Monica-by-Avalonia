@@ -32,22 +32,15 @@
     <Setter Property="HorizontalAlignment" Value="Stretch" />
     <Setter Property="Background" Value="Transparent" />
 </Style>
-<Style Selector="Border.recycleRiskPanel">
-    <Setter Property="CornerRadius" Value="8" />
-    <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
-</Style>
-<Style Selector="Border.recycleFilterRail">
-    <Setter Property="CornerRadius" Value="8" />
-    <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
+<Style Selector="Border.recycleInspector">
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Background" Value="{DynamicResource LayerFillColorDefaultBrush}" />
 </Style>
-<Style Selector="Border.recycleDangerZone">
-    <Setter Property="CornerRadius" Value="8" />
-    <Setter Property="BorderBrush" Value="{DynamicResource SystemFillColorCriticalBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
+<Style Selector="Border.recycleFilterRail">
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,1,0" />
     <Setter Property="Background" Value="{DynamicResource LayerFillColorSubtleBrush}" />
 </Style>
 </Styles>

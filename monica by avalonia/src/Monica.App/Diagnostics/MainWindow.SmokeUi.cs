@@ -203,11 +203,11 @@ public partial class MainWindow
             new SmokePageLayoutCheck(
                 "Archive",
                 ["archiveRecoveryList"],
-                ["archiveFilterRail", "archiveRecoveryPanel"]),
+                ["archiveFilterRail", "archiveInspector"]),
             new SmokePageLayoutCheck(
                 "RecycleBin",
                 ["recycleQueueList"],
-                ["recycleFilterRail", "recycleRiskPanel"]),
+                ["recycleFilterRail", "recycleInspector"]),
             new SmokePageLayoutCheck(
                 "Timeline",
                 ["timelineEventStream"],

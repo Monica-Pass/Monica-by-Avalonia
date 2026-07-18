@@ -24,23 +24,34 @@
                 </Button>
             </Grid>
             <StackPanel x:Name="RecycleBinHeaderCommands" Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <Button Classes="workspacePrimaryCommand" Command="{Binding RestorePasswordCommand}" CommandParameter="{Binding SelectedDeletedPassword}" IsEnabled="{Binding HasSelectedDeletedPassword}" ToolTip.Tip="{Binding L.RestorePassword}" AutomationProperties.Name="{Binding L.RestorePassword}">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <ic:FluentIcon Icon="ArrowUndo" FontSize="18" />
-                        <TextBlock Text="{Binding L.RestorePassword}" />
-                    </StackPanel>
-                </Button>
-                <Button Classes="workspaceCommand" Command="{Binding SelectSectionCommand}" CommandParameter="Archive" ToolTip.Tip="{Binding L.Archive}" AutomationProperties.Name="{Binding L.Archive}">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <ic:FluentIcon Icon="Archive" FontSize="16" />
-                        <TextBlock Text="{Binding L.Archive}" />
-                    </StackPanel>
+                <Button x:Name="RecycleBinPageMenuButton"
+                        Classes="workspaceCommand"
+                        ToolTip.Tip="{Binding L.MoreOptions}"
+                        AutomationProperties.Name="{Binding L.MoreOptions}"
+                        Width="40"
+                        Height="40"
+                        Padding="0">
+                    <ic:FluentIcon Icon="MoreHorizontal" FontSize="18" />
+                    <Button.Flyout>
+                        <MenuFlyout>
+                            <MenuItem x:Name="OpenPasswordsFromRecycleBinMenuItem" Header="{Binding L.Passwords}" Command="{Binding SelectSectionCommand}" CommandParameter="Passwords">
+                                <MenuItem.Icon><ic:FluentIcon Icon="Key" FontSize="16" /></MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem x:Name="OpenArchiveFromRecycleBinMenuItem" Header="{Binding L.Archive}" Command="{Binding SelectSectionCommand}" CommandParameter="Archive">
+                                <MenuItem.Icon><ic:FluentIcon Icon="Archive" FontSize="16" /></MenuItem.Icon>
+                            </MenuItem>
+                            <Separator />
+                            <MenuItem x:Name="EmptyRecycleBinMenuItem" Header="{Binding L.EmptyRecycleBin}" Command="{Binding EmptyRecycleBinCommand}" IsEnabled="{Binding HasDeletedPasswords}">
+                                <MenuItem.Icon><ic:FluentIcon Icon="DeleteDismiss" FontSize="16" /></MenuItem.Icon>
+                            </MenuItem>
+                        </MenuFlyout>
+                    </Button.Flyout>
                 </Button>
             </StackPanel>
         </Grid>
     </Border>
 
-    <Grid x:Name="RecycleBinMasterDetailGrid" Grid.Row="1" ColumnDefinitions="300,*" ColumnSpacing="14" MinWidth="0">
+    <Grid x:Name="RecycleBinMasterDetailGrid" Grid.Row="1" ColumnDefinitions="300,*" MinWidth="0">
         <Border x:Name="RecycleBinListRegion" Classes="recycleFilterRail" ClipToBounds="True">
             <Grid RowDefinitions="Auto,Auto,*">
                 <Grid Margin="14,12,14,8" ColumnDefinitions="*,Auto" ColumnSpacing="8">
@@ -59,12 +70,12 @@
                 <Border x:Name="RecycleBinSelectionBar"
                         Grid.Row="1"
                         IsVisible="{Binding HasSelectedDeletedPasswords}"
-                        Margin="8,0,8,8"
-                        Padding="10,7"
-                        CornerRadius="7"
+                        Margin="0"
+                        Padding="14,8"
+                        CornerRadius="0"
                         Background="{DynamicResource LayerFillColorSubtleBrush}"
-                        BorderBrush="{DynamicResource CardBorderBrush}"
-                        BorderThickness="1">
+                        BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
+                        BorderThickness="0,0,0,1">
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                         <TextBlock Text="{Binding SelectedDeletedPasswordCountText}" FontWeight="SemiBold" VerticalAlignment="Center" />
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
@@ -127,8 +138,8 @@
                                                 ToolTip.Tip="{Binding Title}"
                                                 AutomationProperties.Name="{Binding Title}">
                                             <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="2">
-                                                <Border Grid.RowSpan="3" Width="38" Height="38" CornerRadius="19" Background="#737373" VerticalAlignment="Top">
-                                                    <TextBlock Text="{Binding AvatarText}" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                <Border Grid.RowSpan="3" Width="38" Height="38" CornerRadius="19" Background="{DynamicResource AccentFillColorSecondaryBrush}" VerticalAlignment="Top">
+                                                    <TextBlock Text="{Binding AvatarText}" Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                 </Border>
                                                 <TextBlock Grid.Column="1" Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                                 <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Username}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" />
@@ -150,7 +161,7 @@
             </Grid>
         </Border>
 
-        <Border x:Name="RecycleBinDetailRegion" Grid.Column="1" Classes="recycleRiskPanel" Padding="24" MinWidth="0" Focusable="True">
+        <Border x:Name="RecycleBinDetailRegion" Grid.Column="1" Classes="recycleInspector" Padding="24" MinWidth="0" Focusable="True">
             <Grid>
                 <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasSelectedDeletedPassword}">
                 <StackPanel Spacing="18">
@@ -158,8 +169,8 @@
                         <StackPanel Orientation="Horizontal" Spacing="6"><ic:FluentIcon Icon="ArrowLeft" FontSize="16" /><TextBlock Text="{Binding L[Back]}" /></StackPanel>
                     </Button>
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
-                        <Border Width="54" Height="54" CornerRadius="27" Background="#737373">
-                            <TextBlock Text="{Binding SelectedDeletedPassword.AvatarText}" Foreground="White" FontWeight="SemiBold" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Border Width="54" Height="54" CornerRadius="27" Background="{DynamicResource AccentFillColorSecondaryBrush}">
+                            <TextBlock Text="{Binding SelectedDeletedPassword.AvatarText}" Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}" FontWeight="SemiBold" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <StackPanel Grid.Column="1" MinWidth="0" VerticalAlignment="Center">
                             <TextBlock Text="{Binding SelectedDeletedPassword.Title}" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
@@ -167,17 +178,30 @@
                         </StackPanel>
                     </Grid>
                     <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
-                        <Button Classes="workspacePrimaryCommand" Command="{Binding RestorePasswordCommand}" CommandParameter="{Binding SelectedDeletedPassword}" ToolTip.Tip="{Binding L.RestorePassword}">
+                        <Button x:Name="RecycleBinDetailPrimaryActionButton" Classes="workspacePrimaryCommand" Command="{Binding RestorePasswordCommand}" CommandParameter="{Binding SelectedDeletedPassword}" ToolTip.Tip="{Binding L.RestorePassword}" AutomationProperties.Name="{Binding L.RestorePassword}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <ic:FluentIcon Icon="ArrowUndo" FontSize="18" />
                                 <TextBlock Text="{Binding L.RestorePassword}" />
                             </StackPanel>
                         </Button>
-                        <Button Classes="workspaceCommand" Command="{Binding ShowPasswordDetailsCommand}" CommandParameter="{Binding SelectedDeletedPassword}" ToolTip.Tip="{Binding L.PasswordDetails}">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <ic:FluentIcon Icon="Info" FontSize="16" VerticalAlignment="Center" />
-                                <TextBlock Text="{Binding L.PasswordDetails}" VerticalAlignment="Center" />
-                            </StackPanel>
+                        <Button x:Name="RecycleBinDetailMenuButton"
+                                Classes="workspaceCommand"
+                                ToolTip.Tip="{Binding L.MoreOptions}"
+                                AutomationProperties.Name="{Binding L.MoreOptions}"
+                                Width="40"
+                                Height="40"
+                                Padding="0">
+                            <ic:FluentIcon Icon="MoreHorizontal" FontSize="18" />
+                            <Button.Flyout>
+                                <MenuFlyout>
+                                    <MenuItem x:Name="OpenDeletedPasswordDetailsMenuItem" Header="{Binding L.PasswordDetails}" Command="{Binding ShowPasswordDetailsCommand}" CommandParameter="{Binding SelectedDeletedPassword}">
+                                        <MenuItem.Icon><ic:FluentIcon Icon="Info" FontSize="16" /></MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem x:Name="DeletePasswordPermanentlyMenuItem" Header="{Binding L.DeletePermanently}" Command="{Binding DeletePasswordPermanentlyCommand}" CommandParameter="{Binding SelectedDeletedPassword}">
+                                        <MenuItem.Icon><ic:FluentIcon Icon="DeleteDismiss" FontSize="16" /></MenuItem.Icon>
+                                    </MenuItem>
+                                </MenuFlyout>
+                            </Button.Flyout>
                         </Button>
                     </StackPanel>
                     <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="14">
@@ -192,31 +216,6 @@
                         <TextBlock Grid.Row="4" Classes="workspaceDetailLabel" Text="{Binding L.RecycleBin}" />
                         <TextBlock Grid.Row="4" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedDeletedPassword.DeletedAt, StringFormat='{}{0:g}'}" />
                     </Grid>
-                    <Border Classes="recycleDangerZone" Padding="14">
-                        <StackPanel Spacing="10">
-                            <StackPanel Spacing="3">
-                                <TextBlock Text="{Binding L.DeletePermanently}" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding DeletedPasswordCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" FontSize="12" />
-                            </StackPanel>
-                            <Button Classes="workspaceCommand" Command="{Binding DeletePasswordPermanentlyCommand}" CommandParameter="{Binding SelectedDeletedPassword}" ToolTip.Tip="{Binding L.DeletePermanently}" HorizontalAlignment="Left">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <ic:FluentIcon Icon="DeleteDismiss" FontSize="16" />
-                                    <TextBlock Text="{Binding L.DeletePermanently}" />
-                                </StackPanel>
-                            </Button>
-                            <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
-                            <Button Classes="workspaceCommand"
-                                    Command="{Binding EmptyRecycleBinCommand}"
-                                    IsEnabled="{Binding HasDeletedPasswords}"
-                                    ToolTip.Tip="{Binding L.EmptyRecycleBin}"
-                                    HorizontalAlignment="Left">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <ic:FluentIcon Icon="DeleteDismiss" FontSize="16" />
-                                    <TextBlock Text="{Binding L.EmptyRecycleBin}" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                    </Border>
                 </StackPanel>
                 </ScrollViewer>
                 <StackPanel IsVisible="{Binding !HasSelectedDeletedPassword}" Spacing="10" Width="260" Margin="24" HorizontalAlignment="Left" VerticalAlignment="Top">

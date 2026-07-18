@@ -32,16 +32,15 @@
     <Setter Property="HorizontalAlignment" Value="Stretch" />
     <Setter Property="Background" Value="Transparent" />
 </Style>
-<Style Selector="Border.archiveRecoveryPanel">
-    <Setter Property="CornerRadius" Value="8" />
-    <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+<Style Selector="Border.archiveInspector">
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Background" Value="{DynamicResource LayerFillColorDefaultBrush}" />
 </Style>
 <Style Selector="Border.archiveFilterRail">
-    <Setter Property="CornerRadius" Value="8" />
-    <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="Background" Value="{DynamicResource LayerFillColorDefaultBrush}" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,1,0" />
+    <Setter Property="Background" Value="{DynamicResource LayerFillColorSubtleBrush}" />
 </Style>
 </Styles>

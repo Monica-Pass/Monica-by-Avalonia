@@ -49,6 +49,59 @@ public sealed class LifecycleWorkflowUiTests
     }
 
     [Fact]
+    public void Password_lifecycle_commands_use_page_and_item_overflow_ownership()
+    {
+        var archive = new ArchiveWorkspaceView();
+        var recycleBin = new RecycleBinWorkspaceView();
+
+        var archivePageMenu = archive.FindControl<Button>("ArchivePageMenuButton");
+        var archiveDetailPrimary = archive.FindControl<Button>("ArchiveDetailPrimaryActionButton");
+        var archiveDetailMenu = archive.FindControl<Button>("ArchiveDetailMenuButton");
+        Assert.NotNull(archivePageMenu);
+        Assert.NotNull(archiveDetailPrimary);
+        Assert.NotNull(archiveDetailMenu);
+        Assert.Single(archive.FindControl<StackPanel>("ArchiveHeaderCommands")!.Children.OfType<Button>());
+        Assert.Equal(
+            ["OpenPasswordsFromArchiveMenuItem", "OpenRecycleBinFromArchiveMenuItem"],
+            MenuItemNames(Assert.IsType<MenuFlyout>(archivePageMenu.Flyout)));
+        Assert.Equal(
+            ["OpenArchivedPasswordDetailsMenuItem", "MoveArchivedPasswordToRecycleBinMenuItem"],
+            MenuItemNames(Assert.IsType<MenuFlyout>(archiveDetailMenu.Flyout)));
+
+        var recyclePageMenu = recycleBin.FindControl<Button>("RecycleBinPageMenuButton");
+        var recycleDetailPrimary = recycleBin.FindControl<Button>("RecycleBinDetailPrimaryActionButton");
+        var recycleDetailMenu = recycleBin.FindControl<Button>("RecycleBinDetailMenuButton");
+        Assert.NotNull(recyclePageMenu);
+        Assert.NotNull(recycleDetailPrimary);
+        Assert.NotNull(recycleDetailMenu);
+        Assert.Single(recycleBin.FindControl<StackPanel>("RecycleBinHeaderCommands")!.Children.OfType<Button>());
+        Assert.Equal(
+            ["OpenPasswordsFromRecycleBinMenuItem", "OpenArchiveFromRecycleBinMenuItem", "EmptyRecycleBinMenuItem"],
+            MenuItemNames(Assert.IsType<MenuFlyout>(recyclePageMenu.Flyout)));
+        Assert.Equal(
+            ["OpenDeletedPasswordDetailsMenuItem", "DeletePasswordPermanentlyMenuItem"],
+            MenuItemNames(Assert.IsType<MenuFlyout>(recycleDetailMenu.Flyout)));
+    }
+
+    [Fact]
+    public void Password_lifecycle_selection_and_detail_surfaces_are_integrated_not_nested_cards()
+    {
+        var archive = new ArchiveWorkspaceView();
+        var recycleBin = new RecycleBinWorkspaceView();
+
+        var archiveSelection = archive.FindControl<Border>("ArchiveSelectionBar")!;
+        var recycleSelection = recycleBin.FindControl<Border>("RecycleBinSelectionBar")!;
+        Assert.Equal(0, archiveSelection.CornerRadius.TopLeft);
+        Assert.Equal(1, archiveSelection.BorderThickness.Bottom);
+        Assert.Equal(0, archiveSelection.Margin.Left);
+        Assert.Equal(0, recycleSelection.CornerRadius.TopLeft);
+        Assert.Equal(1, recycleSelection.BorderThickness.Bottom);
+        Assert.Equal(0, recycleSelection.Margin.Left);
+        Assert.Contains("archiveInspector", archive.FindControl<Border>("ArchiveDetailRegion")!.Classes);
+        Assert.Contains("recycleInspector", recycleBin.FindControl<Border>("RecycleBinDetailRegion")!.Classes);
+    }
+
+    [Fact]
     public void Lifecycle_workspaces_switch_to_single_pane_at_narrow_width()
     {
         var archive = new ArchiveWorkspaceView();
@@ -76,6 +129,23 @@ public sealed class LifecycleWorkflowUiTests
         Assert.True(archive.FindControl<Border>("ArchiveDetailRegion")!.IsVisible);
         Assert.True(recycleBin.FindControl<Border>("RecycleBinDetailRegion")!.IsVisible);
         Assert.True(timeline.FindControl<Border>("TimelineDetailRegion")!.IsVisible);
+    }
+
+    [Fact]
+    public void Password_lifecycle_workspaces_use_medium_list_width_and_reflowed_header()
+    {
+        var archive = new ArchiveWorkspaceView();
+        var recycleBin = new RecycleBinWorkspaceView();
+
+        archive.UpdateResponsiveLayoutForWidth(900);
+        recycleBin.UpdateResponsiveLayoutForWidth(900);
+
+        Assert.True(archive.IsMediumLayout);
+        Assert.True(recycleBin.IsMediumLayout);
+        Assert.Equal(280, archive.FindControl<Grid>("ArchiveMasterDetailGrid")!.ColumnDefinitions[0].Width.Value);
+        Assert.Equal(280, recycleBin.FindControl<Grid>("RecycleBinMasterDetailGrid")!.ColumnDefinitions[0].Width.Value);
+        Assert.Equal(1, Grid.GetRow(archive.FindControl<Grid>("ArchiveSearchRegion")!));
+        Assert.Equal(1, Grid.GetRow(recycleBin.FindControl<Grid>("RecycleBinSearchRegion")!));
     }
 
     [Fact]
@@ -128,4 +198,10 @@ public sealed class LifecycleWorkflowUiTests
         window.TryHandleLifecycleWorkspaceShortcut(viewModel, args);
         return args;
     }
+
+    private static string[] MenuItemNames(MenuFlyout menu) =>
+        menu.Items
+            .OfType<MenuItem>()
+            .Select(item => item.Name ?? "")
+            .ToArray();
 }
