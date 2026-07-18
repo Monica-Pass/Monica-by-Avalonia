@@ -386,10 +386,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 QueuePasswordSearchQuery(PasswordSearchText);
             }
             EndPasswordProjectionNotificationDeferral();
-            StatusMessage = _localization.Get(
-                HasPendingLegacyBusinessData
-                    ? "VaultUnlockedLegacyBusinessDataPending"
-                    : "VaultUnlocked");
+            StatusMessage = _localization.Get("VaultUnlocked");
             VaultLoadStageText = "保险库已就绪";
             _ = LoadTimelineDeferredAsync();
             if (deferSecurityAnalysis)

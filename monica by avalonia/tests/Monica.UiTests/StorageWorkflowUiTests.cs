@@ -102,6 +102,7 @@ public sealed class StorageWorkflowUiTests
         Assert.NotNull(import.FindControl<Button>("CancelBitwardenImportButton"));
 
         var databaseWorkbench = new DatabaseWorkbenchView();
+        Assert.NotNull(databaseWorkbench.FindControl<FAInfoBar>("LegacyBusinessDataNotice"));
         Assert.NotNull(databaseWorkbench.FindControl<Button>("OpenKeePassImportButton"));
         Assert.NotNull(databaseWorkbench.FindControl<Button>("OpenBitwardenImportButton"));
 

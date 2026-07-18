@@ -41,7 +41,6 @@ public sealed partial class MainWindowViewModel
     private bool _isConfirmMasterPasswordVisible;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasRecoverableStatusMessage))]
     private bool _hasPendingLegacyBusinessData;
 
     public string LoginTitle => IsVaultAccessInitializing

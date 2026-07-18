@@ -1228,6 +1228,19 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
+    public void ViewModel_legacy_data_notice_is_not_a_global_recoverable_status()
+    {
+        var harness = CreateHarness();
+
+        harness.ViewModel.IsUnlocked = true;
+        harness.ViewModel.IsLoadingVault = false;
+        harness.ViewModel.HasPendingLegacyBusinessData = true;
+        harness.ViewModel.StatusMessage = harness.ViewModel.L.Get("VaultUnlockedLegacyBusinessDataPending");
+
+        Assert.False(harness.ViewModel.HasRecoverableStatusMessage);
+    }
+
+    [Fact]
     public async Task ViewModel_archives_unarchives_and_deletes_password_group()
     {
         var harness = CreateHarness();
