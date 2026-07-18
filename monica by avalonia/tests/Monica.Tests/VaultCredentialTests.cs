@@ -403,6 +403,46 @@ public sealed partial class VaultCredentialTests
     }
 
     [Fact]
+    public async Task Legacy_business_data_notice_respects_acknowledged_state_signature()
+    {
+        const string acknowledgedSignature = "legacy-sqlite-v1:1:0:0:0:0:0";
+        const string changedSignature = "legacy-sqlite-v1:2:0:0:0:0:0";
+        var settingsPath = GetTempSettingsPath();
+        var settings = new AppSettingsService(settingsPath);
+        await settings.LoadAsync();
+        settings.Current.LegacyBusinessDataNoticeAcknowledgedSignature = acknowledgedSignature;
+        await settings.SaveAsync();
+
+        var acknowledged = CreateViewModel(
+            GetTempDatabasePath(),
+            settingsService: settings,
+            vaultUnlockCoordinator: new FixedVaultUnlockCoordinator(acknowledgedSignature));
+        await acknowledged.InitializeAsync();
+        acknowledged.MasterPassword = "correct password";
+
+        await acknowledged.UnlockCommand.ExecuteAsync(null);
+
+        Assert.False(acknowledged.HasPendingLegacyBusinessData);
+
+        var changedSettings = new AppSettingsService(settingsPath);
+        var changed = CreateViewModel(
+            GetTempDatabasePath(),
+            settingsService: changedSettings,
+            vaultUnlockCoordinator: new FixedVaultUnlockCoordinator(changedSignature));
+        await changed.InitializeAsync();
+        changed.MasterPassword = "correct password";
+
+        await changed.UnlockCommand.ExecuteAsync(null);
+
+        Assert.True(changed.HasPendingLegacyBusinessData);
+        changed.DismissLegacyBusinessDataNoticeCommand.Execute(null);
+        Assert.False(changed.HasPendingLegacyBusinessData);
+        Assert.Equal(
+            changedSignature,
+            changedSettings.Current.LegacyBusinessDataNoticeAcknowledgedSignature);
+    }
+
+    [Fact]
     public async Task ViewModel_creates_vault_then_rejects_wrong_password()
     {
         var path = GetTempDatabasePath();
@@ -583,6 +623,24 @@ public sealed partial class VaultCredentialTests
         }
 
         public void Complete(VaultUnlockResult result) => _completion.TrySetResult(result);
+    }
+
+    private sealed class FixedVaultUnlockCoordinator(string legacyBusinessDataSignature) : IVaultUnlockCoordinator
+    {
+        public Task<VaultInitializationState> InitializeAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new VaultInitializationState(LegacyVaultDetection.Empty, true));
+
+        public Task<VaultUnlockResult> UnlockOrCreateAsync(
+            string masterPassword,
+            string confirmMasterPassword,
+            LegacyVaultDetection legacyVaultDetection,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new VaultUnlockResult(
+                VaultUnlockStatus.Unlocked,
+                true,
+                "VaultUnlockedLegacyBusinessDataPending",
+                LegacyBusinessDataPending: true,
+                LegacyBusinessDataSignature: legacyBusinessDataSignature));
     }
 
     private sealed class BlockingStartupSettingsService(Task release) : IAppSettingsService

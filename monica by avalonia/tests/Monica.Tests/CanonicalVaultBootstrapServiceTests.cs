@@ -10,6 +10,18 @@ namespace Monica.Tests;
 public sealed class CanonicalVaultBootstrapServiceTests
 {
     [Fact]
+    public void Legacy_business_data_notice_signature_is_stable_and_count_sensitive()
+    {
+        var first = new LegacyBusinessDataInspection(1, 2, 3, 4, 5, 6);
+        var same = new LegacyBusinessDataInspection(1, 2, 3, 4, 5, 6);
+        var changed = new LegacyBusinessDataInspection(2, 2, 3, 4, 5, 6);
+
+        Assert.Equal(first.NoticeSignature, same.NoticeSignature);
+        Assert.NotEqual(first.NoticeSignature, changed.NoticeSignature);
+        Assert.Empty(LegacyBusinessDataInspection.Empty.NoticeSignature);
+    }
+
+    [Fact]
     public async Task Canonical_repository_bootstrap_creates_and_registers_default_mdbx()
     {
         var context = CreateContext();

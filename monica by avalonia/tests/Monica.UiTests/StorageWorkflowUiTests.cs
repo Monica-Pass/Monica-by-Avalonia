@@ -1,5 +1,7 @@
 using Avalonia.Controls;
+using Avalonia.Threading;
 using FluentAvalonia.UI.Controls;
+using Microsoft.Extensions.DependencyInjection;
 using Monica.App.Features.DatabaseManagement;
 using Monica.App.Features.Mdbx;
 using Monica.App.Features.Sync;
@@ -110,6 +112,23 @@ public sealed class StorageWorkflowUiTests
         var delete = backup.FindControl<Button>("DeleteSelectedBackupButton");
         Assert.NotNull(restore);
         Assert.NotNull(delete);
+    }
+
+    [Fact]
+    public void Legacy_business_data_notice_is_closable_and_bound_to_dismiss_command()
+    {
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<Monica.App.ViewModels.MainWindowViewModel>();
+        viewModel.HasPendingLegacyBusinessData = true;
+        var workbench = new DatabaseWorkbenchView { DataContext = viewModel };
+
+        Dispatcher.UIThread.RunJobs();
+
+        var notice = workbench.FindControl<FAInfoBar>("LegacyBusinessDataNotice");
+        Assert.NotNull(notice);
+        Assert.True(notice.IsClosable);
+        Assert.Same(viewModel.DismissLegacyBusinessDataNoticeCommand, notice.CloseButtonCommand);
     }
 
     [Fact]

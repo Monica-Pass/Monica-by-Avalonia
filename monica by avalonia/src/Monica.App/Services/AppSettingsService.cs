@@ -17,6 +17,7 @@ public sealed class DesktopAppSettings
     public int ClipboardClearSeconds { get; set; } = 30;
     public bool RequirePasswordBeforeExport { get; set; } = true;
     public bool WindowCaptureProtectionEnabled { get; set; } = true;
+    public string LegacyBusinessDataNoticeAcknowledgedSignature { get; set; } = "";
     public SecurityRecoverySettings SecurityRecovery { get; set; } = new();
     public bool MinimizeToTray { get; set; }
     public bool QuickSearchEnabled { get; set; } = true;
@@ -116,6 +117,7 @@ public sealed partial class AppSettingsService : IAppSettingsService
         settings.ClipboardClearSeconds = Clamp(settings.ClipboardClearSeconds, 10, 600);
         settings.BrowserIntegrationPort = Clamp(settings.BrowserIntegrationPort, 1024, 65535);
         settings.WebDavBackupEncryptionEnabled = true;
+        settings.LegacyBusinessDataNoticeAcknowledgedSignature ??= "";
         settings.SecurityRecovery ??= new SecurityRecoverySettings();
         NormalizeSecurityRecovery(settings.SecurityRecovery);
 

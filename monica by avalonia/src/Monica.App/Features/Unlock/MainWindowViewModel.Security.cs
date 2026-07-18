@@ -284,6 +284,8 @@ public sealed partial class MainWindowViewModel
         _compromisedPasswordResults = new Dictionary<long, CompromisedPasswordResult>();
         _hasCompromisedPasswordCheckResults = false;
         _exportPreviewAuthorizationExpiresAt = null;
+        HasPendingLegacyBusinessData = false;
+        _pendingLegacyBusinessDataSignature = "";
         SelectedSecurityIssue = null;
         VaultLoadStageText = "";
         _vaultLoadVersion++;

@@ -53,6 +53,24 @@ public sealed partial class AppSettingsTests
     }
 
     [Fact]
+    public async Task App_settings_roundtrip_legacy_business_data_notice_acknowledgement()
+    {
+        var path = GetTempPath();
+        var first = new AppSettingsService(path);
+        await first.LoadAsync();
+        first.Current.LegacyBusinessDataNoticeAcknowledgedSignature = "legacy-sqlite-v1:1:2:3:4:5:6";
+
+        await first.SaveAsync();
+
+        var second = new AppSettingsService(path);
+        await second.LoadAsync();
+
+        Assert.Equal(
+            "legacy-sqlite-v1:1:2:3:4:5:6",
+            second.Current.LegacyBusinessDataNoticeAcknowledgedSignature);
+    }
+
+    [Fact]
     public async Task App_settings_protects_persisted_secret_values()
     {
         var path = GetTempPath();

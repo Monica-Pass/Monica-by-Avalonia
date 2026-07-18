@@ -19,6 +19,7 @@ public sealed partial class MainWindowViewModel
         try
         {
             HasPendingLegacyBusinessData = false;
+            _pendingLegacyBusinessDataSignature = "";
             AppDiagnostics.Info(
                 $"Unlock requested. initialized={IsVaultInitialized}, " +
                 $"legacyImportRequired={_legacyVaultDetection.RequiresImport}");
@@ -63,11 +64,12 @@ public sealed partial class MainWindowViewModel
                     IsVaultInitialized = result.IsVaultInitialized;
                     await ReloadSettingsAfterUnlockAsync();
                     IsUnlocked = true;
-                    HasPendingLegacyBusinessData = result.LegacyBusinessDataPending;
+                    _pendingLegacyBusinessDataSignature = result.LegacyBusinessDataSignature;
+                    HasPendingLegacyBusinessData = ShouldShowLegacyBusinessDataNotice(result);
                     ClearVaultAccessSecrets();
                     StatusMessage = _localization.Format(
                         "VaultUnlockedLoadingFormat",
-                        _localization.Get(result.MessageKey));
+                        _localization.Get(HasPendingLegacyBusinessData ? result.MessageKey : "VaultUnlocked"));
                     _ = LoadAfterUnlockAsync();
                     return;
                 default:
@@ -97,6 +99,20 @@ public sealed partial class MainWindowViewModel
         await _settingsService.LoadAsync();
         ApplySettings(_settingsService.Current);
         ResumeSettingsSave();
+    }
+
+    private bool ShouldShowLegacyBusinessDataNotice(VaultUnlockResult result)
+    {
+        if (!result.LegacyBusinessDataPending)
+        {
+            return false;
+        }
+
+        return string.IsNullOrWhiteSpace(result.LegacyBusinessDataSignature) ||
+               !string.Equals(
+                   result.LegacyBusinessDataSignature,
+                   _settingsService.Current.LegacyBusinessDataNoticeAcknowledgedSignature,
+                   StringComparison.Ordinal);
     }
 
     private bool CanUnlockVault() =>

@@ -12,6 +12,10 @@ public sealed record LegacyBusinessDataInspection(
 
     public bool HasData => TotalCount > 0;
     public int TotalCount => PasswordCount + SecureItemCount + CategoryCount + CustomFieldCount + PasswordHistoryCount + AttachmentCount;
+    public string NoticeSignature => HasData
+        ? FormattableString.Invariant(
+            $"legacy-sqlite-v1:{PasswordCount}:{SecureItemCount}:{CategoryCount}:{CustomFieldCount}:{PasswordHistoryCount}:{AttachmentCount}")
+        : "";
 }
 
 public interface ILegacyBusinessDataInspector

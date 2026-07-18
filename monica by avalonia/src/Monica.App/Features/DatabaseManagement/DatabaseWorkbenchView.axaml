@@ -43,6 +43,8 @@
                 <TextBlock Text="{Binding L.LocalDatabase}" FontSize="20" FontWeight="SemiBold" />
                 <fa:FAInfoBar x:Name="LegacyBusinessDataNotice"
                               IsOpen="{Binding HasPendingLegacyBusinessData}"
+                              IsClosable="True"
+                              CloseButtonCommand="{Binding DismissLegacyBusinessDataNoticeCommand}"
                               Severity="Warning"
                               Message="{Binding L[VaultUnlockedLegacyBusinessDataPending]}" />
                 <Border Padding="16" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource LayerFillColorDefaultBrush}">

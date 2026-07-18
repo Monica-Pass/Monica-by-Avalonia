@@ -20,7 +20,8 @@ public sealed record VaultUnlockResult(
     bool IsVaultInitialized,
     string MessageKey,
     Exception? Error = null,
-    bool LegacyBusinessDataPending = false);
+    bool LegacyBusinessDataPending = false,
+    string LegacyBusinessDataSignature = "");
 
 public enum VaultUnlockStatus
 {
@@ -103,7 +104,8 @@ public sealed class VaultUnlockCoordinator(
                 created ? VaultUnlockStatus.CreatedAndUnlocked : VaultUnlockStatus.Unlocked,
                 true,
                 legacyBusinessDataPending ? "VaultUnlockedLegacyBusinessDataPending" : "VaultUnlocked",
-                LegacyBusinessDataPending: legacyBusinessDataPending);
+                LegacyBusinessDataPending: legacyBusinessDataPending,
+                LegacyBusinessDataSignature: bootstrap?.LegacyBusinessData.NoticeSignature ?? "");
         }
         catch (Exception ex)
         {

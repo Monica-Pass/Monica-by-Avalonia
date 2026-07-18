@@ -10,6 +10,7 @@ public sealed partial class MainWindowViewModel
 {
     private readonly IVaultUnlockCoordinator _vaultUnlockCoordinator;
     private LegacyVaultDetection _legacyVaultDetection = LegacyVaultDetection.Empty;
+    private string _pendingLegacyBusinessDataSignature = "";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasRecoverableStatusMessage))]
@@ -121,6 +122,24 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private void ToggleConfirmMasterPasswordVisibility() =>
         IsConfirmMasterPasswordVisible = !IsConfirmMasterPasswordVisible;
+
+    [RelayCommand]
+    private void DismissLegacyBusinessDataNotice()
+    {
+        if (!HasPendingLegacyBusinessData)
+        {
+            return;
+        }
+
+        HasPendingLegacyBusinessData = false;
+        if (string.IsNullOrWhiteSpace(_pendingLegacyBusinessDataSignature))
+        {
+            return;
+        }
+
+        UpdateSettings(settings =>
+            settings.LegacyBusinessDataNoticeAcknowledgedSignature = _pendingLegacyBusinessDataSignature);
+    }
 
     private void SetUnlockError(string message)
     {
