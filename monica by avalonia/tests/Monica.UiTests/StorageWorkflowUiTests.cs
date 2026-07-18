@@ -115,20 +115,44 @@ public sealed class StorageWorkflowUiTests
     }
 
     [Fact]
-    public void Legacy_business_data_notice_is_closable_and_bound_to_dismiss_command()
+    public void Legacy_business_data_notice_exposes_a_visible_persistent_dismiss_action()
     {
         var window = new Monica.App.MainWindow();
         using var services = Monica.App.App.ConfigureServices(window);
         var viewModel = services.GetRequiredService<Monica.App.ViewModels.MainWindowViewModel>();
         viewModel.HasPendingLegacyBusinessData = true;
+        viewModel.SelectedDatabaseManagementPage = "Overview";
         var workbench = new DatabaseWorkbenchView { DataContext = viewModel };
+        var host = new Window
+        {
+            Width = 1200,
+            Height = 800,
+            Content = workbench
+        };
+        host.Show();
 
-        Dispatcher.UIThread.RunJobs();
+        try
+        {
+            Dispatcher.UIThread.RunJobs();
 
-        var notice = workbench.FindControl<FAInfoBar>("LegacyBusinessDataNotice");
-        Assert.NotNull(notice);
-        Assert.True(notice.IsClosable);
-        Assert.Same(viewModel.DismissLegacyBusinessDataNoticeCommand, notice.CloseButtonCommand);
+            var notice = workbench.FindControl<FAInfoBar>("LegacyBusinessDataNotice");
+            var dismiss = workbench.FindControl<Button>("DismissLegacyBusinessDataNoticeButton");
+            Assert.NotNull(notice);
+            Assert.NotNull(dismiss);
+            Assert.False(notice.IsClosable);
+            Assert.Same(dismiss, notice.ActionButton);
+            Assert.Same(viewModel.DismissLegacyBusinessDataNoticeCommand, dismiss.Command);
+            Assert.True(dismiss.Bounds.Width > 0);
+            Assert.True(dismiss.Bounds.Height > 0);
+
+            dismiss.Command!.Execute(dismiss.CommandParameter);
+
+            Assert.False(viewModel.HasPendingLegacyBusinessData);
+        }
+        finally
+        {
+            host.Close();
+        }
     }
 
     [Fact]

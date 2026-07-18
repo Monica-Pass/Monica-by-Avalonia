@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.DatabaseManagement.DatabaseWorkbenchView" x:DataType="vm:MainWindowViewModel">
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.DatabaseManagement.DatabaseWorkbenchView" x:Name="Root" x:DataType="vm:MainWindowViewModel">
     <StackPanel Spacing="14">
         <Border Classes="databaseWorkbench" Padding="20" IsVisible="{Binding IsDatabaseSourceSelected}">
             <Grid>
@@ -43,10 +43,21 @@
                 <TextBlock Text="{Binding L.LocalDatabase}" FontSize="20" FontWeight="SemiBold" />
                 <fa:FAInfoBar x:Name="LegacyBusinessDataNotice"
                               IsOpen="{Binding HasPendingLegacyBusinessData}"
-                              IsClosable="True"
-                              CloseButtonCommand="{Binding DismissLegacyBusinessDataNoticeCommand}"
+                              IsClosable="False"
                               Severity="Warning"
-                              Message="{Binding L[VaultUnlockedLegacyBusinessDataPending]}" />
+                              Message="{Binding L[VaultUnlockedLegacyBusinessDataPending]}">
+                    <fa:FAInfoBar.ActionButton>
+                        <Button x:Name="DismissLegacyBusinessDataNoticeButton"
+                                Classes="workspaceCommand"
+                                Command="{Binding #Root.DataContext.DismissLegacyBusinessDataNoticeCommand}"
+                                AutomationProperties.Name="{Binding #Root.DataContext.L[DoNotShowAgain]}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="Dismiss" FontSize="14" />
+                                <TextBlock Text="{Binding #Root.DataContext.L[DoNotShowAgain]}" />
+                            </StackPanel>
+                        </Button>
+                    </fa:FAInfoBar.ActionButton>
+                </fa:FAInfoBar>
                 <Border Padding="16" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource LayerFillColorDefaultBrush}">
                     <StackPanel Spacing="10">
                         <TextBlock Text="{Binding LocalDatabaseSummaryText}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />

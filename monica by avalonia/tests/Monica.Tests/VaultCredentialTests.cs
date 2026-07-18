@@ -440,6 +440,25 @@ public sealed partial class VaultCredentialTests
         Assert.Equal(
             changedSignature,
             changedSettings.Current.LegacyBusinessDataNoticeAcknowledgedSignature);
+
+        await changed.PrepareForShutdownAsync();
+
+        var persistedSettings = new AppSettingsService(settingsPath);
+        await persistedSettings.LoadAsync();
+        Assert.Equal(
+            changedSignature,
+            persistedSettings.Current.LegacyBusinessDataNoticeAcknowledgedSignature);
+
+        var reopened = CreateViewModel(
+            GetTempDatabasePath(),
+            settingsService: persistedSettings,
+            vaultUnlockCoordinator: new FixedVaultUnlockCoordinator(changedSignature));
+        await reopened.InitializeAsync();
+        reopened.MasterPassword = "correct password";
+
+        await reopened.UnlockCommand.ExecuteAsync(null);
+
+        Assert.False(reopened.HasPendingLegacyBusinessData);
     }
 
     [Fact]
