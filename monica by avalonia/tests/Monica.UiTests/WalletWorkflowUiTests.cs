@@ -25,11 +25,13 @@ public sealed class WalletWorkflowUiTests
 
         Assert.NotNull(view.FindControl<TextBox>("WalletSearchBox"));
         Assert.NotNull(view.FindControl<Button>("WalletSearchClearButton"));
-        Assert.NotNull(view.FindControl<ListBox>("WalletItemList"));
+        var itemListView = Assert.IsType<WalletItemListView>(
+            view.FindControl<WalletItemListView>("WalletItemListView"));
+        Assert.NotNull(itemListView.ItemList);
         Assert.NotNull(view.FindControl<StackPanel>("WalletEmptyState"));
         Assert.NotNull(view.FindControl<Button>("EmptyWalletAddButton"));
         Assert.NotNull(view.FindControl<Button>("EmptyWalletClearSearchButton"));
-        Assert.NotNull(view.FindControl<Button>("WalletMoreActionsButton"));
+        Assert.NotNull(view.FindControl<FluentAvalonia.UI.Controls.FACommandBar>("WalletCommandBar"));
     }
 
     [Fact]
@@ -50,6 +52,24 @@ public sealed class WalletWorkflowUiTests
         var status = view.FindControl<TextBlock>("WalletFilteredStatusText");
         Assert.NotNull(status);
         Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting(status));
+    }
+
+    [Fact]
+    public void Wallet_command_ownership_and_component_boundaries_follow_desktop_logic()
+    {
+        var view = new WalletWorkspaceView();
+        var xaml = File.ReadAllText(FindWalletFeatureFile("WalletWorkspaceView.axaml"));
+        var listXaml = File.ReadAllText(FindWalletFeatureFile("WalletItemListView.axaml"));
+
+        Assert.Equal(2, CountOccurrences(xaml, "Command=\"{Binding AddWalletItemCommand}\""));
+        Assert.DoesNotContain("WalletMoreActionsButton", xaml, StringComparison.Ordinal);
+        Assert.Contains("<views:WalletItemListView x:Name=\"WalletItemListView\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<ScrollViewer", listXaml, StringComparison.Ordinal);
+        Assert.Contains("ScrollViewer.VerticalScrollBarVisibility=\"Auto\"", listXaml, StringComparison.Ordinal);
+        Assert.NotNull(view.FindControl<WalletItemListView>("WalletItemListView"));
+        Assert.NotNull(view.FindControl<Button>("DeleteSelectedWalletItemsButton"));
+        Assert.NotNull(view.FindControl<Button>("ClearWalletSelectionButton"));
+        Assert.Equal(2, CountOccurrences(xaml, "Width=\"40\" Height=\"40\""));
     }
 
     [Fact]
@@ -180,5 +200,18 @@ public sealed class WalletWorkflowUiTests
         }
 
         throw new FileNotFoundException($"Could not locate {fileName} from the test output directory.");
+    }
+
+    private static int CountOccurrences(string text, string value)
+    {
+        var count = 0;
+        var offset = 0;
+        while ((offset = text.IndexOf(value, offset, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            offset += value.Length;
+        }
+
+        return count;
     }
 }

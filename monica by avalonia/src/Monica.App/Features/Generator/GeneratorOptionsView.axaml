@@ -1,0 +1,76 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Generator.GeneratorOptionsView"
+             x:DataType="vm:MainWindowViewModel">
+    <Border x:Name="GeneratorOptionsRegion" Classes="generatorOptionsPanel" Padding="{Binding GeneratorOptionsPanelPadding}" MinWidth="0">
+        <ScrollViewer x:Name="GeneratorOptionsScrollViewer"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="{Binding GeneratorOptionsSpacing}">
+                <StackPanel Spacing="4">
+                    <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.GeneratorTemplate}" />
+                    <ComboBox ItemsSource="{Binding GeneratorTemplateOptions}"
+                              SelectedItem="{Binding SelectedGeneratorTemplateOption}"
+                              AutomationProperties.Name="{Binding L.GeneratorTemplate}"
+                              HorizontalAlignment="Stretch">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SettingsChoice">
+                                <TextBlock Text="{Binding Label}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
+                <StackPanel Spacing="4">
+                    <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.GeneratorMode}" />
+                    <ComboBox ItemsSource="{Binding GeneratorModeOptions}"
+                              SelectedItem="{Binding SelectedGeneratorModeOption}"
+                              AutomationProperties.Name="{Binding L.GeneratorMode}"
+                              HorizontalAlignment="Stretch">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SettingsChoice">
+                                <TextBlock Text="{Binding Label}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
+                <StackPanel Spacing="4" IsVisible="{Binding ShowGeneratorLengthOptions}">
+                    <TextBlock Text="{Binding GeneratorLengthText}" FontWeight="SemiBold" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <Slider Minimum="{Binding GeneratorLengthMinimum}" Maximum="{Binding GeneratorLengthMaximum}" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding GeneratorLength}" AutomationProperties.Name="{Binding GeneratorLengthText}" VerticalAlignment="Center" />
+                        <NumericUpDown Grid.Column="1" Width="104" Height="36" Minimum="{Binding GeneratorLengthMinimum}" Maximum="{Binding GeneratorLengthMaximum}" Value="{Binding GeneratorLength}" AutomationProperties.Name="{Binding GeneratorLengthText}" />
+                    </Grid>
+                </StackPanel>
+                <StackPanel Spacing="4" IsVisible="{Binding ShowGeneratorWordCountOptions}">
+                    <TextBlock Text="{Binding GeneratorWordCountText}" FontWeight="SemiBold" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <Slider Minimum="1" Maximum="20" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding GeneratorWordCount}" AutomationProperties.Name="{Binding GeneratorWordCountText}" VerticalAlignment="Center" />
+                        <NumericUpDown Grid.Column="1" Width="104" Height="36" Minimum="1" Maximum="20" Value="{Binding GeneratorWordCount}" AutomationProperties.Name="{Binding GeneratorWordCountText}" />
+                    </Grid>
+                </StackPanel>
+                <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
+                <StackPanel Spacing="{Binding GeneratorCheckboxSpacing}" IsVisible="{Binding ShowGeneratorCharacterOptions}">
+                    <TextBlock Classes="workspaceSectionLabel" Text="{Binding L[GeneratorCharacterTypes]}" />
+                    <CheckBox Content="{Binding L.IncludeUppercase}" IsChecked="{Binding GeneratorIncludeUppercase}" />
+                    <CheckBox Content="{Binding L.IncludeLowercase}" IsChecked="{Binding GeneratorIncludeLowercase}" />
+                    <CheckBox Content="{Binding L.IncludeNumbers}" IsChecked="{Binding GeneratorIncludeNumbers}" />
+                    <CheckBox Content="{Binding L.IncludeSymbols}" IsChecked="{Binding GeneratorIncludeSymbols}" />
+                    <CheckBox Content="{Binding L.ExcludeSimilarCharacters}" IsChecked="{Binding GeneratorExcludeSimilarCharacters}" />
+                </StackPanel>
+                <StackPanel Spacing="{Binding GeneratorCheckboxSpacing}" IsVisible="{Binding ShowGeneratorUsernameOptions}">
+                    <TextBlock Classes="workspaceSectionLabel" Text="{Binding L[GeneratorUsernameOptions]}" />
+                    <CheckBox Content="{Binding L.IncludeNumbers}" IsChecked="{Binding GeneratorIncludeNumbers}" />
+                </StackPanel>
+                <StackPanel Spacing="{Binding GeneratorCheckboxSpacing}" IsVisible="{Binding IsGeneratorPassphraseMode}">
+                    <TextBlock Classes="workspaceSectionLabel" Text="{Binding L[GeneratorPassphraseOptions]}" />
+                    <CheckBox Content="{Binding L.IncludeNumbers}" IsChecked="{Binding GeneratorIncludeNumbers}" />
+                    <CheckBox Content="{Binding L.IncludeSymbols}" IsChecked="{Binding GeneratorIncludeSymbols}" />
+                </StackPanel>
+                <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
+                <Border Padding="12" CornerRadius="8" Background="{DynamicResource LayerFillColorSubtleBrush}" IsVisible="{Binding ShowGeneratorStrengthSummaryCard}">
+                    <TextBlock Text="{Binding GeneratedPasswordStrengthText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Border>
+</UserControl>

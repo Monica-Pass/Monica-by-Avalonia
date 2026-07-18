@@ -65,14 +65,14 @@
                                         <TextBlock Text="{Binding Label}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                         <TextBlock Grid.Column="1" Text="{Binding DisplayValue}" TextWrapping="Wrap" AutomationProperties.Name="{Binding DisplayValue}" />
                                         <Panel Grid.Column="2" IsVisible="{Binding IsSensitive}">
-                                            <Button Classes="workspaceCommand" Command="{Binding ToggleVisibilityCommand}" ToolTip.Tip="{Binding #WalletWorkbenchRoot.DataContext.L[ShowSensitiveField]}" AutomationProperties.Name="{Binding #WalletWorkbenchRoot.DataContext.L[ShowSensitiveField]}" IsVisible="{Binding !IsRevealed}" Width="32" Height="32" Padding="0" VerticalAlignment="Top">
+                                            <Button Classes="workspaceCommand" Command="{Binding ToggleVisibilityCommand}" ToolTip.Tip="{Binding #WalletWorkbenchRoot.DataContext.L[ShowSensitiveField]}" AutomationProperties.Name="{Binding #WalletWorkbenchRoot.DataContext.L[ShowSensitiveField]}" IsVisible="{Binding !IsRevealed}" Width="40" Height="40" Padding="0" VerticalAlignment="Top">
                                                 <ic:FluentIcon Icon="Eye" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                             </Button>
-                                            <Button Classes="workspaceCommand" Command="{Binding ToggleVisibilityCommand}" ToolTip.Tip="{Binding #WalletWorkbenchRoot.DataContext.L[HideSensitiveField]}" AutomationProperties.Name="{Binding #WalletWorkbenchRoot.DataContext.L[HideSensitiveField]}" IsVisible="{Binding IsRevealed}" Width="32" Height="32" Padding="0" VerticalAlignment="Top">
+                                            <Button Classes="workspaceCommand" Command="{Binding ToggleVisibilityCommand}" ToolTip.Tip="{Binding #WalletWorkbenchRoot.DataContext.L[HideSensitiveField]}" AutomationProperties.Name="{Binding #WalletWorkbenchRoot.DataContext.L[HideSensitiveField]}" IsVisible="{Binding IsRevealed}" Width="40" Height="40" Padding="0" VerticalAlignment="Top">
                                                 <ic:FluentIcon Icon="Eye" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                             </Button>
                                         </Panel>
-                                        <Button Grid.Column="3" Classes="workspaceCommand" Command="{Binding #WalletWorkbenchRoot.DataContext.CopyWalletFieldCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding #WalletWorkbenchRoot.DataContext.L.Copy}" AutomationProperties.Name="{Binding #WalletWorkbenchRoot.DataContext.L.Copy}" Width="32" Height="32" Padding="0" VerticalAlignment="Top">
+                                        <Button Grid.Column="3" Classes="workspaceCommand" Command="{Binding #WalletWorkbenchRoot.DataContext.CopyWalletFieldCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding #WalletWorkbenchRoot.DataContext.L.Copy}" AutomationProperties.Name="{Binding #WalletWorkbenchRoot.DataContext.L.Copy}" Width="40" Height="40" Padding="0" VerticalAlignment="Top">
                                             <ic:FluentIcon Icon="Copy" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         </Button>
                                     </Grid>
@@ -110,12 +110,6 @@
             <StackPanel IsVisible="{Binding !HasSelectedWalletItem}" Spacing="10" Width="260" Margin="24" HorizontalAlignment="Left" VerticalAlignment="Top">
                 <ic:FluentIcon Icon="WalletCreditCard" FontSize="34" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
                 <TextBlock Text="{Binding L.WalletPageDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" />
-                <Button Classes="workspacePrimaryCommand" Command="{Binding AddWalletItemCommand}" ToolTip.Tip="{Binding L.AddItem}" AutomationProperties.Name="{Binding L.AddItem}" HorizontalAlignment="Center">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <ic:FluentIcon Icon="Add" FontSize="18" />
-                        <TextBlock Text="{Binding L.AddItem}" />
-                    </StackPanel>
-                </Button>
             </StackPanel>
         </Grid>
     </Grid>

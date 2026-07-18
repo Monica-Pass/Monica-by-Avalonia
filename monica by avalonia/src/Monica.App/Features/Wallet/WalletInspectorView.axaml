@@ -31,11 +31,14 @@
 
                 <Border Classes="walletRiskZone" Padding="14">
                     <StackPanel Spacing="10">
-                        <TextBlock Text="{Binding L.Delete}" FontWeight="SemiBold" />
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="{Binding L.MoveToRecycleBin}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding L[WalletDeleteDescription]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" FontSize="12" />
+                        </StackPanel>
                         <Button Classes="workspaceCommand" Command="{Binding DeleteWalletItemCommand}" CommandParameter="{Binding SelectedWalletItem}" ToolTip.Tip="{Binding L.Delete}" AutomationProperties.Name="{Binding L.Delete}" HorizontalAlignment="Left">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <ic:FluentIcon Icon="Delete" FontSize="16" />
-                                <TextBlock Text="{Binding L.Delete}" />
+                                <TextBlock Text="{Binding L.MoveToRecycleBin}" />
                             </StackPanel>
                         </Button>
                     </StackPanel>

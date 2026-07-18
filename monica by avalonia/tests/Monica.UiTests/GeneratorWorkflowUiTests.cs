@@ -19,13 +19,15 @@ public sealed class GeneratorWorkflowUiTests
 
         Assert.NotNull(view.FindControl<Grid>("GeneratorHeaderGrid"));
         Assert.NotNull(view.FindControl<Grid>("GeneratorContentGrid"));
-        Assert.NotNull(view.FindControl<Border>("GeneratorResultRegion"));
-        Assert.NotNull(view.FindControl<Border>("GeneratorOptionsRegion"));
-        Assert.NotNull(view.FindControl<TextBox>("GeneratedPasswordBox"));
-        Assert.NotNull(view.FindControl<TextBlock>("GeneratorValidationMessage"));
-        Assert.NotNull(view.FindControl<Button>("GeneratePasswordButton"));
-        Assert.NotNull(view.FindControl<Button>("CopyGeneratedPasswordButton"));
-        Assert.NotNull(view.FindControl<Button>("ClearGeneratorHistoryButton"));
+        var resultView = Assert.IsType<GeneratorResultView>(
+            view.FindControl<GeneratorResultView>("GeneratorResultView"));
+        Assert.NotNull(resultView.FindControl<Border>("GeneratorResultRegion"));
+        Assert.NotNull(view.FindControl<GeneratorOptionsView>("GeneratorOptionsView"));
+        Assert.NotNull(resultView.GeneratedPasswordBox);
+        Assert.NotNull(resultView.FindControl<TextBlock>("GeneratorValidationMessage"));
+        Assert.NotNull(resultView.FindControl<Button>("GeneratePasswordButton"));
+        Assert.NotNull(resultView.FindControl<Button>("CopyGeneratedPasswordButton"));
+        Assert.NotNull(resultView.FindControl<Button>("ClearGeneratorHistoryButton"));
     }
 
     [Fact]
@@ -52,7 +54,7 @@ public sealed class GeneratorWorkflowUiTests
     [Fact]
     public void Generator_history_ui_uses_masked_display_and_accessible_reveal_controls()
     {
-        var xaml = File.ReadAllText(FindGeneratorFeatureFile("GeneratorWorkspaceView.axaml"));
+        var xaml = File.ReadAllText(FindGeneratorFeatureFile("GeneratorResultView.axaml"));
 
         Assert.Contains("Text=\"{Binding DisplayValue}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"ShowGeneratorHistorySecretButton\"", xaml, StringComparison.Ordinal);
@@ -68,12 +70,29 @@ public sealed class GeneratorWorkflowUiTests
     }
 
     [Fact]
+    public void Generator_command_surface_is_singular_and_scroll_ownership_is_explicit()
+    {
+        var xaml = File.ReadAllText(FindGeneratorFeatureFile("GeneratorWorkspaceView.axaml"));
+        var resultXaml = File.ReadAllText(FindGeneratorFeatureFile("GeneratorResultView.axaml"));
+        var optionsXaml = File.ReadAllText(FindGeneratorFeatureFile("GeneratorOptionsView.axaml"));
+
+        Assert.Contains("<views:GeneratorResultView x:Name=\"GeneratorResultView\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<views:GeneratorOptionsView x:Name=\"GeneratorOptionsView\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("HeaderGeneratePasswordButton", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("HeaderCopyGeneratedPasswordButton", xaml, StringComparison.Ordinal);
+        Assert.Contains("<fa:FACommandBar", resultXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"GeneratorHistoryScrollViewer\"", resultXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"GeneratorOptionsScrollViewer\"", optionsXaml, StringComparison.Ordinal);
+        Assert.Equal(5, CountOccurrences(resultXaml, "Width=\"40\" Height=\"40\""));
+    }
+
+    [Fact]
     public void Generator_workspace_reflows_for_wide_medium_and_narrow_widths()
     {
         var view = new GeneratorWorkspaceView();
         var content = view.FindControl<Grid>("GeneratorContentGrid")!;
-        var result = view.FindControl<Border>("GeneratorResultRegion")!;
-        var options = view.FindControl<Border>("GeneratorOptionsRegion")!;
+        var result = view.FindControl<GeneratorResultView>("GeneratorResultView")!;
+        var options = view.FindControl<GeneratorOptionsView>("GeneratorOptionsView")!;
 
         view.UpdateResponsiveLayoutForWidth(680);
         Assert.True(view.IsNarrowLayout);
@@ -81,11 +100,13 @@ public sealed class GeneratorWorkflowUiTests
         Assert.Equal(0, Grid.GetColumn(options));
         Assert.Equal(1, Grid.GetRow(options));
         Assert.Single(content.ColumnDefinitions);
+        Assert.All(content.RowDefinitions, row => Assert.True(row.Height.IsStar));
 
         view.UpdateResponsiveLayoutForWidth(900);
         Assert.True(view.IsMediumLayout);
         Assert.Equal(1, Grid.GetColumn(options));
         Assert.Equal(2, content.ColumnDefinitions.Count);
+        Assert.True(Assert.Single(content.RowDefinitions).Height.IsStar);
 
         view.UpdateResponsiveLayoutForWidth(1200);
         Assert.False(view.IsNarrowLayout);
@@ -111,5 +132,18 @@ public sealed class GeneratorWorkflowUiTests
         }
 
         throw new FileNotFoundException($"Could not locate {fileName} from the test output directory.");
+    }
+
+    private static int CountOccurrences(string text, string value)
+    {
+        var count = 0;
+        var offset = 0;
+        while ((offset = text.IndexOf(value, offset, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            offset += value.Length;
+        }
+
+        return count;
     }
 }

@@ -40,7 +40,7 @@ public partial class WalletWorkspaceView : UserControl
 
     public bool IsSearchFocused => WalletSearchBox.IsFocused;
 
-    public void FocusItemList() => Dispatcher.UIThread.Post(() => WalletItemList.Focus());
+    public void FocusItemList() => Dispatcher.UIThread.Post(() => WalletItemListView.ItemList.Focus());
 
     public void FocusWorkbench() => WalletWorkbenchRegion.Focus();
 
@@ -59,7 +59,7 @@ public partial class WalletWorkspaceView : UserControl
             ? (delta > 0 ? 0 : visibleItems.Count - 1)
             : Math.Clamp(currentIndex + delta, 0, visibleItems.Count - 1);
         viewModel.SelectedWalletItem = visibleItems[nextIndex];
-        WalletItemList.ScrollIntoView(visibleItems[nextIndex]);
+        WalletItemListView.ItemList.ScrollIntoView(visibleItems[nextIndex]);
     }
 
     public void UpdateResponsiveLayoutForWidth(double width)

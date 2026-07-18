@@ -1,0 +1,151 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:fa="using:FluentAvalonia.UI.Controls"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Generator.GeneratorResultView"
+             x:Name="GeneratorWorkspaceRoot"
+             x:DataType="vm:MainWindowViewModel">
+    <Border x:Name="GeneratorResultRegion" Classes="generatorResultPanel" Padding="{Binding GeneratorResultPanelPadding}" MinWidth="0">
+        <ScrollViewer x:Name="GeneratorResultScrollViewer"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+            <Grid RowDefinitions="Auto,*,Auto,Auto" RowSpacing="14">
+                <StackPanel Spacing="4">
+                    <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.GeneratedPasswordLabel}" />
+                    <TextBlock Text="{Binding GeneratorStrategySummaryText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                    <TextBlock x:Name="GeneratorValidationMessage"
+                               Text="{Binding GeneratorValidationMessage}"
+                               Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                               AutomationProperties.LiveSetting="Assertive"
+                               IsVisible="{Binding HasGeneratorValidationError}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+
+                <TextBox x:Name="GeneratedPasswordInput"
+                         Grid.Row="1"
+                         Classes="generatorPasswordBox"
+                         MinHeight="{Binding GeneratorPasswordBoxMinHeight}"
+                         Text="{Binding GeneratedPassword}"
+                         IsReadOnly="True"
+                         AutomationProperties.Name="{Binding L.GeneratedPasswordLabel}"
+                         PlaceholderText="{Binding L.GeneratedPasswordPlaceholder}">
+                    <TextBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="{Binding L.CopyPassword}" Command="{Binding CopyGeneratedPasswordCommand}">
+                                <MenuItem.Icon>
+                                    <ic:FluentIcon Icon="Copy" FontSize="16" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </TextBox.ContextMenu>
+                </TextBox>
+
+                <fa:FACommandBar x:Name="GeneratorCommandBar"
+                                 Grid.Row="2"
+                                 DefaultLabelPosition="Right"
+                                 ClosedDisplayMode="Compact"
+                                 IsDynamicOverflowEnabled="True"
+                                 ItemsAlignment="Left"
+                                 Background="Transparent"
+                                 HorizontalAlignment="Stretch">
+                    <fa:FACommandBar.PrimaryCommands>
+                        <fa:FACommandBarButton x:Name="GeneratePasswordButton"
+                                               Command="{Binding GeneratePasswordCommand}"
+                                               IconSource="Sparkle"
+                                               Label="{Binding L.Generate}"
+                                               ToolTip.Tip="{Binding L.Generate}"
+                                               AutomationProperties.Name="{Binding L.Generate}" />
+                        <fa:FACommandBarButton x:Name="CopyGeneratedPasswordButton"
+                                               Command="{Binding CopyGeneratedPasswordCommand}"
+                                               IconSource="Copy"
+                                               Label="{Binding L.CopyPassword}"
+                                               ToolTip.Tip="{Binding L.CopyPassword}"
+                                               AutomationProperties.Name="{Binding L.CopyPassword}" />
+                        <fa:FACommandBarButton x:Name="SaveGeneratedPasswordButton"
+                                               Command="{Binding AddPasswordCommand}"
+                                               IsEnabled="{Binding CanCopyGeneratedPassword}"
+                                               IconSource="Key"
+                                               Label="{Binding L.SaveAsLogin}"
+                                               ToolTip.Tip="{Binding L.SaveAsLogin}"
+                                               AutomationProperties.Name="{Binding L.SaveAsLogin}" />
+                    </fa:FACommandBar.PrimaryCommands>
+                    <fa:FACommandBar.SecondaryCommands>
+                        <fa:FACommandBarButton Command="{Binding ResetGeneratorCommand}"
+                                               IconSource="ArrowCounterclockwise"
+                                               Label="{Binding L.Reset}"
+                                               AutomationProperties.Name="{Binding L.Reset}" />
+                    </fa:FACommandBar.SecondaryCommands>
+                </fa:FACommandBar>
+
+                <Border Grid.Row="3" Padding="12" CornerRadius="8" Background="{DynamicResource LayerFillColorSubtleBrush}">
+                    <Grid RowDefinitions="Auto,Auto">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.RecentGeneratedPasswords}" VerticalAlignment="Center" />
+                            <Button x:Name="ClearGeneratorHistoryButton"
+                                    Grid.Column="1"
+                                    Classes="workspaceCommand"
+                                    Command="{Binding ClearGeneratedPasswordHistoryCommand}"
+                                    IsVisible="{Binding HasGeneratedPasswordHistory}"
+                                    ToolTip.Tip="{Binding L[ClearGeneratedPasswordHistory]}"
+                                    AutomationProperties.Name="{Binding L[ClearGeneratedPasswordHistory]}"
+                                    Width="40" Height="40" Padding="0">
+                                <ic:FluentIcon Icon="Delete" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Button>
+                        </Grid>
+                        <TextBlock Grid.Row="1"
+                                   Text="{Binding L.NoGeneratedPasswordHistory}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   IsVisible="{Binding !HasGeneratedPasswordHistory}" />
+                        <ScrollViewer x:Name="GeneratorHistoryScrollViewer"
+                                      Grid.Row="1"
+                                      MaxHeight="{Binding GeneratorHistoryPanelMaxHeight}"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      VerticalScrollBarVisibility="Auto"
+                                      IsVisible="{Binding HasGeneratedPasswordHistory}">
+                            <ItemsControl ItemsSource="{Binding GeneratedPasswordHistory}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:GeneratorHistoryItem">
+                                        <Grid ColumnDefinitions="*,Auto,Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" Margin="0,8,0,0" MinWidth="0">
+                                            <TextBlock Text="{Binding DisplayValue}" FontFamily="Consolas" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Row="1" Text="{Binding ModeLabel}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                            <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding StrengthText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                            <TextBlock Grid.Row="1" Grid.Column="3" Text="{Binding CreatedAtText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                            <Panel Grid.Column="1">
+                                                <Button x:Name="ShowGeneratorHistorySecretButton"
+                                                        Classes="workspaceCommand"
+                                                        Command="{Binding ToggleVisibilityCommand}"
+                                                        IsVisible="{Binding !IsRevealed}"
+                                                        ToolTip.Tip="{Binding #GeneratorWorkspaceRoot.DataContext.L[ShowSensitiveField]}"
+                                                        AutomationProperties.Name="{Binding #GeneratorWorkspaceRoot.DataContext.L[ShowSensitiveField]}"
+                                                        Width="40" Height="40" Padding="0">
+                                                    <ic:FluentIcon Icon="Eye" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Button>
+                                                <Button x:Name="HideGeneratorHistorySecretButton"
+                                                        Classes="workspaceCommand"
+                                                        Command="{Binding ToggleVisibilityCommand}"
+                                                        IsVisible="{Binding IsRevealed}"
+                                                        ToolTip.Tip="{Binding #GeneratorWorkspaceRoot.DataContext.L[HideSensitiveField]}"
+                                                        AutomationProperties.Name="{Binding #GeneratorWorkspaceRoot.DataContext.L[HideSensitiveField]}"
+                                                        Width="40" Height="40" Padding="0">
+                                                    <ic:FluentIcon Icon="EyeOff" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Button>
+                                            </Panel>
+                                            <Button Grid.Column="2" Classes="workspaceCommand" Command="{Binding #GeneratorWorkspaceRoot.DataContext.UseGeneratedPasswordHistoryItemCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding #GeneratorWorkspaceRoot.DataContext.L.UsePassword}" AutomationProperties.Name="{Binding #GeneratorWorkspaceRoot.DataContext.L.UsePassword}" Width="40" Height="40" Padding="0">
+                                                <ic:FluentIcon Icon="ArrowUpload" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Button>
+                                            <Button Grid.Column="3" Classes="workspaceCommand" Command="{Binding #GeneratorWorkspaceRoot.DataContext.CopyGeneratedPasswordHistoryItemCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding #GeneratorWorkspaceRoot.DataContext.L.CopyPassword}" AutomationProperties.Name="{Binding #GeneratorWorkspaceRoot.DataContext.L.CopyPassword}" Width="40" Height="40" Padding="0">
+                                                <ic:FluentIcon Icon="Copy" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+    </Border>
+</UserControl>

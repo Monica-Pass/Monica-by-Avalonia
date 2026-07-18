@@ -9,8 +9,6 @@ public partial class GeneratorWorkspaceView : UserControl
 {
     public const double NarrowLayoutBreakpoint = 760;
     public const double WideLayoutBreakpoint = 1100;
-    public const double WideHeaderBreakpoint = 850;
-
     public GeneratorWorkspaceView()
     {
         InitializeComponent();
@@ -22,13 +20,13 @@ public partial class GeneratorWorkspaceView : UserControl
     public bool IsMediumLayout { get; private set; }
 
     public bool IsGeneratedPasswordSource(object? source) =>
-        ReferenceEquals(source, GeneratedPasswordBox) ||
-        source is Control control && control.GetVisualAncestors().Contains(GeneratedPasswordBox);
+        ReferenceEquals(source, GeneratorResultView.GeneratedPasswordBox) ||
+        source is Control control && control.GetVisualAncestors().Contains(GeneratorResultView.GeneratedPasswordBox);
 
     public void FocusGeneratedPassword() => Dispatcher.UIThread.Post(() =>
     {
-        GeneratedPasswordBox.Focus();
-        GeneratedPasswordBox.SelectAll();
+        GeneratorResultView.GeneratedPasswordBox.Focus();
+        GeneratorResultView.GeneratedPasswordBox.SelectAll();
     });
 
     public void UpdateResponsiveLayoutForWidth(double width)
@@ -36,7 +34,6 @@ public partial class GeneratorWorkspaceView : UserControl
         IsNarrowLayout = width > 0 && width < NarrowLayoutBreakpoint;
         IsMediumLayout = width >= NarrowLayoutBreakpoint && width < WideLayoutBreakpoint;
         ApplyContentLayout();
-        ApplyHeaderLayout(width);
     }
 
     private void ApplyContentLayout()
@@ -46,29 +43,21 @@ public partial class GeneratorWorkspaceView : UserControl
         if (IsNarrowLayout)
         {
             GeneratorContentGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
-            GeneratorContentGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-            GeneratorContentGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-            Grid.SetColumn(GeneratorOptionsRegion, 0);
-            Grid.SetRow(GeneratorOptionsRegion, 1);
+            GeneratorContentGrid.RowDefinitions.Add(new RowDefinition(new GridLength(3, GridUnitType.Star)));
+            GeneratorContentGrid.RowDefinitions.Add(new RowDefinition(new GridLength(2, GridUnitType.Star)));
+            Grid.SetColumn(GeneratorResultView, 0);
+            Grid.SetRow(GeneratorResultView, 0);
+            Grid.SetColumn(GeneratorOptionsView, 0);
+            Grid.SetRow(GeneratorOptionsView, 1);
             return;
         }
 
         GeneratorContentGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
         GeneratorContentGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(IsMediumLayout ? 300 : 340)));
-        GeneratorContentGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-        Grid.SetColumn(GeneratorOptionsRegion, 1);
-        Grid.SetRow(GeneratorOptionsRegion, 0);
-    }
-
-    private void ApplyHeaderLayout(double width)
-    {
-        var compact = width > 0 && width < WideHeaderBreakpoint;
-        Grid.SetRow(GeneratorHeaderCommands, compact ? 1 : 0);
-        Grid.SetColumn(GeneratorHeaderCommands, compact ? 0 : 1);
-        Grid.SetColumnSpan(GeneratorHeaderCommands, compact ? 2 : 1);
-        GeneratorHeaderCommands.Margin = compact ? new Thickness(0, 8, 0, 0) : new Thickness(0);
-        GeneratorHeaderCommands.HorizontalAlignment = compact
-            ? Avalonia.Layout.HorizontalAlignment.Left
-            : Avalonia.Layout.HorizontalAlignment.Right;
+        GeneratorContentGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
+        Grid.SetColumn(GeneratorResultView, 0);
+        Grid.SetRow(GeneratorResultView, 0);
+        Grid.SetColumn(GeneratorOptionsView, 1);
+        Grid.SetRow(GeneratorOptionsView, 0);
     }
 }

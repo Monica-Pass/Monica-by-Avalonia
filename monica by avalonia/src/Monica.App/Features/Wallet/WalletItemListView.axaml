@@ -1,0 +1,85 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:local="using:Monica.App"
+             xmlns:models="using:Monica.Core.Models"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Wallet.WalletItemListView"
+             x:Name="Root"
+             x:DataType="vm:MainWindowViewModel">
+    <ListBox x:Name="WalletItemList"
+             Classes="walletItemList"
+             AutomationProperties.Name="{Binding L.Wallet}"
+             ItemsSource="{Binding FilteredWalletItems}"
+             SelectedItem="{Binding SelectedWalletItem}"
+             SelectionMode="Single"
+             IsVisible="{Binding HasWalletItems}"
+             ScrollViewer.VerticalScrollBarVisibility="Auto"
+             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+             Margin="8,0,8,8">
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="models:SecureItem">
+                    <Border Classes="walletItemRow">
+                        <Border.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="{Binding #Root.DataContext.L.Details}" Command="{Binding #Root.DataContext.ShowWalletDetailsCommand}" CommandParameter="{Binding}">
+                                    <MenuItem.Icon>
+                                        <ic:FluentIcon Icon="Info" FontSize="16" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{Binding #Root.DataContext.L.Edit}" Command="{Binding #Root.DataContext.EditWalletItemCommand}" CommandParameter="{Binding}">
+                                    <MenuItem.Icon>
+                                        <ic:FluentIcon Icon="Edit" FontSize="16" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{Binding #Root.DataContext.L.Select}" Command="{Binding #Root.DataContext.ToggleWalletSelectionCommand}" CommandParameter="{Binding}">
+                                    <MenuItem.Icon>
+                                        <ic:FluentIcon Icon="CheckmarkCircle" FontSize="16" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <Separator />
+                                <MenuItem Header="{Binding #Root.DataContext.L.Delete}" Command="{Binding #Root.DataContext.DeleteWalletItemCommand}" CommandParameter="{Binding}">
+                                    <MenuItem.Icon>
+                                        <ic:FluentIcon Icon="Delete" FontSize="16" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                            </ContextMenu>
+                        </Border.ContextMenu>
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                            <CheckBox IsChecked="{Binding IsSelected}"
+                                      AutomationProperties.Name="{Binding Title}"
+                                      AutomationProperties.HelpText="{Binding #Root.DataContext.L.Select}"
+                                      ToolTip.Tip="{Binding #Root.DataContext.L.Select}"
+                                      VerticalAlignment="Top"
+                                      Margin="2,14,0,0" />
+                            <Button Grid.Column="1"
+                                    Classes="walletItemButton"
+                                    Command="{Binding #Root.DataContext.ShowWalletDetailsCommand}"
+                                    CommandParameter="{Binding}"
+                                    AutomationProperties.Name="{Binding Title}"
+                                    ToolTip.Tip="{Binding Title}">
+                                <Grid ColumnDefinitions="Auto,*" MinHeight="62" ColumnSpacing="10">
+                                    <Border Width="44" Height="44" CornerRadius="8" Background="{DynamicResource AccentFillColorDefaultBrush}" VerticalAlignment="Top">
+                                        <Grid>
+                                            <ic:FluentIcon Icon="WalletCreditCard" FontSize="18" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsBankCard}}" />
+                                            <ic:FluentIcon Icon="Document" FontSize="18" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsDocument}}" />
+                                        </Grid>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" MinWidth="0" Spacing="3">
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Notes}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                        <Border Classes="workspaceStatusChip" HorizontalAlignment="Left">
+                                            <Grid>
+                                                <TextBlock Text="{Binding #Root.DataContext.L.BankCard}" FontSize="12" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsBankCard}}" />
+                                                <TextBlock Text="{Binding #Root.DataContext.L.Document}" FontSize="12" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsDocument}}" />
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+    </ListBox>
+</UserControl>
