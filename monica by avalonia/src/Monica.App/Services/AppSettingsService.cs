@@ -8,6 +8,7 @@ namespace Monica.App.Services;
 
 public sealed class DesktopAppSettings
 {
+    public int SettingsSchemaVersion { get; set; }
     public string Language { get; set; } = "system";
     public string Theme { get; set; } = "system";
     public string StartupSection { get; set; } = "Passwords";
@@ -16,7 +17,7 @@ public sealed class DesktopAppSettings
     public bool ClearClipboardEnabled { get; set; } = true;
     public int ClipboardClearSeconds { get; set; } = 30;
     public bool RequirePasswordBeforeExport { get; set; } = true;
-    public bool WindowCaptureProtectionEnabled { get; set; } = true;
+    public bool WindowCaptureProtectionEnabled { get; set; }
     public int RecycleBinRetentionDays { get; set; } = 30;
     public string LegacyBusinessDataNoticeAcknowledgedSignature { get; set; } = "";
     public SecurityRecoverySettings SecurityRecovery { get; set; } = new();
@@ -62,6 +63,7 @@ public interface IAppSettingsService
 
 public sealed partial class AppSettingsService : IAppSettingsService
 {
+    private const int CurrentSettingsSchemaVersion = 1;
     private const string ProtectedSettingPrefix = "secret:v1:";
 
     private static readonly IReadOnlyDictionary<string, bool> DefaultFeatureToggles =
@@ -79,6 +81,7 @@ public sealed partial class AppSettingsService : IAppSettingsService
     {
         _settingsPath = settingsPath ?? GetDefaultSettingsPath();
         _secretProtector = secretProtector;
+        Migrate(Current);
         Normalize(Current);
     }
 
@@ -136,6 +139,22 @@ public sealed partial class AppSettingsService : IAppSettingsService
         }
 
         NormalizeFeatureToggles(settings);
+    }
+
+    private static void Migrate(DesktopAppSettings settings)
+    {
+        if (settings.SettingsSchemaVersion < 1)
+        {
+            // Screenshot protection was introduced enabled by default. Treat
+            // that legacy value as an unset preference so upgrades do not
+            // silently hide the app from the desktop capture surface.
+            settings.WindowCaptureProtectionEnabled = false;
+        }
+
+        if (settings.SettingsSchemaVersion < CurrentSettingsSchemaVersion)
+        {
+            settings.SettingsSchemaVersion = CurrentSettingsSchemaVersion;
+        }
     }
 
     private static void NormalizeSecurityRecovery(SecurityRecoverySettings settings)

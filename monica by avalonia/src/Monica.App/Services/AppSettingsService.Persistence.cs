@@ -59,6 +59,7 @@ public sealed partial class AppSettingsService
         if (!File.Exists(_settingsPath))
         {
             Current = new DesktopAppSettings();
+            Migrate(Current);
             Normalize(Current);
             return;
         }
@@ -68,12 +69,14 @@ public sealed partial class AppSettingsService
             stream,
             AppSettingsJsonContext.Default.DesktopAppSettings,
             cancellationToken) ?? new DesktopAppSettings();
+        Migrate(Current);
         Normalize(Current);
         await UnprotectSecretsAsync(Current, cancellationToken);
     }
 
     private async Task SaveCoreAsync(CancellationToken cancellationToken)
     {
+        Migrate(Current);
         Normalize(Current);
         var settingsToSave = Clone(Current);
         await ProtectSecretsAsync(settingsToSave, cancellationToken);
@@ -130,6 +133,7 @@ public sealed partial class AppSettingsService
 
     private static DesktopAppSettings Clone(DesktopAppSettings source) => new()
     {
+        SettingsSchemaVersion = source.SettingsSchemaVersion,
         Language = source.Language,
         Theme = source.Theme,
         StartupSection = source.StartupSection,
