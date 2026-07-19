@@ -1,5 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsSecurityView" x:DataType="vm:MainWindowViewModel">
-    <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsSecuritySelected}">
+    <StackPanel IsVisible="{Binding IsSettingsSecuritySelected}">
+    <TextBlock x:Name="SettingsSecurityPageTitle" Classes="settingsPageTitle" Text="{Binding L.Security}" />
+    <Border Classes="settingsFlatGroup">
         <StackPanel>
             <fa:FASettingsExpanderItem Content="{Binding L.WindowCaptureProtection}" Description="{Binding L.WindowCaptureProtectionDescription}">
                 <fa:FASettingsExpanderItem.Footer>
@@ -65,4 +67,5 @@
             </fa:FASettingsExpanderItem>
         </StackPanel>
     </Border>
+    </StackPanel>
 </UserControl>

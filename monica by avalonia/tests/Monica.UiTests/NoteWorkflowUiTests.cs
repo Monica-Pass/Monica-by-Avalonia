@@ -24,6 +24,7 @@ public sealed class NoteWorkflowUiTests
         Assert.NotNull(view.FindControl<Grid>("NoteWorkspaceGrid"));
         Assert.NotNull(view.FindControl<NoteTreeView>("NoteTreeRegion"));
         Assert.NotNull(view.FindControl<NoteEditorView>("NoteEditorRegion"));
+        Assert.NotNull(view.FindControl<NoteInspectorView>("NoteInspectorRegion"));
     }
 
     [Fact]
@@ -93,6 +94,7 @@ public sealed class NoteWorkflowUiTests
         Assert.NotNull(tabs.FindControl<Grid>("NoteTabRail"));
         Assert.NotNull(tabs.FindControl<StackPanel>("NoteTabCommandRegion"));
         Assert.NotNull(tabs.FindControl<Border>("NoteInspectorHeader"));
+        Assert.NotNull(tabs.FindControl<Border>("NoteDocumentCommandSurface"));
 
         var tabCommands = new[]
         {

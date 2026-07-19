@@ -32,7 +32,7 @@ public partial class SettingsWorkspaceView : UserControl
             return;
         }
 
-        SettingsWorkspaceLayoutGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(IsMediumLayout ? 220 : 260)));
+        SettingsWorkspaceLayoutGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(IsMediumLayout ? 216 : 248)));
         SettingsWorkspaceLayoutGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
         SettingsWorkspaceLayoutGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
         Grid.SetColumn(SettingsContentRegion, 1);

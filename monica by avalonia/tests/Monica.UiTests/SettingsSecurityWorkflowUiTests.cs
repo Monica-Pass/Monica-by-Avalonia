@@ -94,6 +94,19 @@ public sealed class SettingsSecurityWorkflowUiTests
     }
 
     [Fact]
+    public void Settings_categories_own_localized_page_titles()
+    {
+        Assert.NotNull(new SettingsGeneralView().FindControl<TextBlock>("SettingsGeneralPageTitle"));
+        Assert.NotNull(new SettingsSecurityView().FindControl<TextBlock>("SettingsSecurityPageTitle"));
+        Assert.NotNull(new SettingsRecoveryView().FindControl<TextBlock>("SettingsRecoveryPageTitle"));
+        Assert.NotNull(new SettingsDataView().FindControl<TextBlock>("SettingsDataPageTitle"));
+        Assert.NotNull(new SettingsDesktopView().FindControl<TextBlock>("SettingsDesktopPageTitle"));
+        Assert.NotNull(new SettingsIntegrationsView().FindControl<TextBlock>("SettingsIntegrationsPageTitle"));
+        Assert.NotNull(new SettingsAboutView().FindControl<TextBlock>("SettingsAboutPageTitle"));
+        Assert.NotNull(new SettingsDangerView().FindControl<TextBlock>("SettingsDangerPageTitle"));
+    }
+
+    [Fact]
     public void Settings_security_exposes_optional_window_capture_protection()
     {
         var security = new SettingsSecurityView();

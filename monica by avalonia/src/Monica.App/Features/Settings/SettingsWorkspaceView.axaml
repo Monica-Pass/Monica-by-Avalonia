@@ -2,15 +2,9 @@
     <UserControl.Styles>
         <StyleInclude Source="/Features/Settings/SettingsStyles.axaml" />
     </UserControl.Styles>
-    <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsSettings}}" RowDefinitions="Auto,*" MaxWidth="1080" HorizontalAlignment="Stretch" ClipToBounds="True">
-        <Border Classes="workspacePageHeader">
-            <StackPanel Spacing="3">
-                <TextBlock Classes="workspacePageTitle" Text="{Binding L.Settings}" />
-                <TextBlock Classes="workspacePageSubtitle" Text="{Binding L.SettingsSubtitle}" TextWrapping="Wrap" />
-            </StackPanel>
-        </Border>
-        <Grid x:Name="SettingsWorkspaceLayoutGrid" Grid.Row="1" ColumnDefinitions="260,*" RowDefinitions="*" ColumnSpacing="16" RowSpacing="12" MinWidth="0">
-            <Border x:Name="SettingsSidebarRegion" Classes="workspaceSidebar" Padding="14" ClipToBounds="True">
+    <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsSettings}}" RowDefinitions="*" HorizontalAlignment="Stretch" ClipToBounds="True">
+        <Grid x:Name="SettingsWorkspaceLayoutGrid" ColumnDefinitions="248,*" RowDefinitions="*" MinWidth="0">
+            <Border x:Name="SettingsSidebarRegion" Classes="workspaceSidebar" Padding="14" ClipToBounds="True" CornerRadius="0" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,1,0" Background="Transparent">
                 <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="8">
                         <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.Settings}" Margin="2,0,0,4" />
@@ -56,6 +50,7 @@
                                 <TextBlock Text="{Binding AboutTitle}" />
                             </StackPanel>
                         </Button>
+                        <Separator Margin="4,4" />
                         <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsDangerSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Danger" AutomationProperties.Name="{Binding DangerZoneTitle}">
                             <StackPanel Orientation="Horizontal" Spacing="10">
                                 <ic:FluentIcon Icon="Delete" FontSize="17" />
@@ -66,7 +61,7 @@
                 </ScrollViewer>
             </Border>
             <ScrollViewer x:Name="SettingsContentRegion" Grid.Column="1" HorizontalScrollBarVisibility="Disabled" ClipToBounds="True">
-                <settings:SettingsPageHostView x:Name="SettingsPageHost" MaxWidth="760" HorizontalAlignment="Stretch" />
+                <settings:SettingsPageHostView x:Name="SettingsPageHost" MaxWidth="800" HorizontalAlignment="Stretch" Margin="32,24,24,32" />
             </ScrollViewer>
         </Grid>
     </Grid>

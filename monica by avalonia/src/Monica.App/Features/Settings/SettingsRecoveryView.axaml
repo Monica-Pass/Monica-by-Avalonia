@@ -1,5 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsRecoveryView" x:DataType="vm:MainWindowViewModel">
-    <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsSecurityRecoverySelected}">
+    <StackPanel IsVisible="{Binding IsSettingsSecurityRecoverySelected}">
+    <TextBlock x:Name="SettingsRecoveryPageTitle" Classes="settingsPageTitle" Text="{Binding SecurityRecoveryTitle}" />
+    <Border Classes="settingsFlatGroup">
         <StackPanel>
             <fa:FASettingsExpanderItem Content="{Binding SecurityRecoveryEnabledText}" Description="{Binding SecurityRecoveryStatusText}">
                 <fa:FASettingsExpanderItem.Footer>
@@ -67,4 +69,5 @@
             </fa:FASettingsExpanderItem>
         </StackPanel>
     </Border>
+    </StackPanel>
 </UserControl>

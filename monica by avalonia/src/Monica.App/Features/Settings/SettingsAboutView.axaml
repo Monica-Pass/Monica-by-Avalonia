@@ -1,5 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsAboutView" x:DataType="vm:MainWindowViewModel">
-    <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsAboutSelected}">
+    <StackPanel IsVisible="{Binding IsSettingsAboutSelected}">
+    <TextBlock x:Name="SettingsAboutPageTitle" Classes="settingsPageTitle" Text="{Binding AboutTitle}" />
+    <Border Classes="settingsFlatGroup">
         <StackPanel>
             <fa:FASettingsExpanderItem Content="Monica" Description="{Binding AppVersionText}">
                 <fa:FASettingsExpanderItem.Footer>
@@ -27,4 +29,5 @@
             </fa:FASettingsExpanderItem>
         </StackPanel>
     </Border>
+    </StackPanel>
 </UserControl>

@@ -11,7 +11,7 @@
     <Grid Classes="notesWorkspace"
           IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsNotes}}"
           RowDefinitions="48,*"
-          Background="{DynamicResource LayerFillColorDefaultBrush}">
+          Background="Transparent">
         <notes:NoteTabStripView x:Name="TabStrip" TabClosed="TabStrip_OnTabClosed" />
         <Grid x:Name="NoteWorkspaceGrid" Grid.Row="1" SizeChanged="WorkspaceGrid_OnSizeChanged">
             <Grid.ColumnDefinitions>
@@ -21,7 +21,7 @@
             </Grid.ColumnDefinitions>
             <notes:NoteTreeView x:Name="NoteTreeRegion" />
             <notes:NoteEditorView x:Name="NoteEditorRegion" Grid.Column="1" IsVisible="{Binding IsNoteEditorWorkspaceVisible}" CloseRequested="Editor_OnCloseRequested" />
-            <notes:NoteInspectorView Grid.Column="2" LineRequested="Inspector_OnLineRequested" />
+            <notes:NoteInspectorView x:Name="NoteInspectorRegion" Grid.Column="2" LineRequested="Inspector_OnLineRequested" />
         </Grid>
     </Grid>
 </UserControl>

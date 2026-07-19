@@ -1,5 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsDangerView" x:DataType="vm:MainWindowViewModel">
-    <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsDangerSelected}">
+    <StackPanel IsVisible="{Binding IsSettingsDangerSelected}">
+    <TextBlock x:Name="SettingsDangerPageTitle" Classes="settingsPageTitle" Text="{Binding DangerZoneTitle}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
+    <Border Classes="settingsFlatGroup">
         <StackPanel>
             <fa:FASettingsExpanderItem Content="{Binding ClearVaultDataTitle}" Description="{Binding ClearVaultDataDescription}">
                 <fa:FASettingsExpanderItem.Footer>
@@ -25,4 +27,5 @@
             </fa:FASettingsExpanderItem>
         </StackPanel>
     </Border>
+    </StackPanel>
 </UserControl>

@@ -8,7 +8,7 @@
              x:Name="Root"
              x:DataType="vm:MainWindowViewModel">
     <Border IsVisible="{Binding IsNoteTreePaneVisible}"
-            BorderBrush="{DynamicResource CardBorderBrush}"
+            BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
             BorderThickness="0,0,1,0"
             Background="{DynamicResource LayerFillColorDefaultBrush}">
         <Grid RowDefinitions="Auto,*" Margin="12">

@@ -1,5 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsDesktopView" x:DataType="vm:MainWindowViewModel">
-    <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsDesktopSelected}">
+    <StackPanel IsVisible="{Binding IsSettingsDesktopSelected}">
+    <TextBlock x:Name="SettingsDesktopPageTitle" Classes="settingsPageTitle" Text="{Binding L.Desktop}" />
+    <Border Classes="settingsFlatGroup">
         <StackPanel>
             <fa:FASettingsExpanderItem Content="{Binding L.MinimizeToTray}" Description="{Binding L.MinimizeToTrayDescription}">
                 <fa:FASettingsExpanderItem.Footer>
@@ -42,4 +44,5 @@
             </fa:FASettingsExpanderItem>
         </StackPanel>
     </Border>
+    </StackPanel>
 </UserControl>

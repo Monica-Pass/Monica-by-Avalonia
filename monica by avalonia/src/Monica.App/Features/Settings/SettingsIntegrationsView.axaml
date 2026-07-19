@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsIntegrationsView" x:DataType="vm:MainWindowViewModel" IsVisible="{Binding IsSettingsIntegrationsSelected}">
     <StackPanel Spacing="14">
+        <TextBlock x:Name="SettingsIntegrationsPageTitle" Classes="settingsPageTitle" Text="{Binding PlatformIntegrationsTitle}" Margin="0,0,0,2" />
         <ItemsControl Classes="settingsFlatGroup" ItemsSource="{Binding PlatformIntegrationCapabilities}">
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:LocalizedPlatformIntegrationCapability">

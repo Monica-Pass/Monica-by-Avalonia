@@ -5,7 +5,8 @@
              x:Class="Monica.App.Features.Notes.NoteTabStripView"
              x:Name="Root"
              x:DataType="vm:MainWindowViewModel">
-    <Border BorderBrush="{DynamicResource CardBorderBrush}"
+    <Border x:Name="NoteDocumentCommandSurface"
+            BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
             BorderThickness="0,0,0,1"
             Background="{DynamicResource LayerFillColorDefaultBrush}">
         <Grid Height="48">
@@ -17,7 +18,7 @@
 
             <Border IsVisible="{Binding IsNoteTreePaneVisible}"
                     Padding="12,0"
-                    BorderBrush="{DynamicResource CardBorderBrush}"
+                    BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
                     BorderThickness="0,0,1,0">
                 <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
                     <ic:FluentIcon Icon="Folder" FontSize="17" VerticalAlignment="Center" />
@@ -209,7 +210,7 @@
                     Grid.Column="2"
                     IsVisible="{Binding IsNoteInspectorPaneVisible}"
                     Padding="14,0"
-                    BorderBrush="{DynamicResource CardBorderBrush}"
+                    BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
                     BorderThickness="1,0,0,0">
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
                     <ic:FluentIcon Icon="Info" FontSize="16" VerticalAlignment="Center" />

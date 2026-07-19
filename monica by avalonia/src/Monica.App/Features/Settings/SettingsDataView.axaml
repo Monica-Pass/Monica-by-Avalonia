@@ -1,5 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsDataView" x:DataType="vm:MainWindowViewModel">
-    <Border Classes="settingsFlatGroup" IsVisible="{Binding IsSettingsDataSelected}">
+    <StackPanel IsVisible="{Binding IsSettingsDataSelected}">
+    <TextBlock x:Name="SettingsDataPageTitle" Classes="settingsPageTitle" Text="{Binding L.DataManagement}" />
+    <Border Classes="settingsFlatGroup">
         <StackPanel>
             <fa:FASettingsExpanderItem Content="{Binding L.ImportData}" Description="{Binding L.ImportDataDescription}">
                 <fa:FASettingsExpanderItem.Footer>
@@ -33,4 +35,5 @@
             </fa:FASettingsExpanderItem>
         </StackPanel>
     </Border>
+    </StackPanel>
 </UserControl>
