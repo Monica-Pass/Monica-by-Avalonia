@@ -11,6 +11,7 @@ public partial class SecurityAnalysisWorkspaceView : UserControl
 {
     private const double NarrowBreakpoint = 760;
     private const double WideBreakpoint = 1040;
+    private const double HeaderBreakpoint = 900;
     private MainWindowViewModel? _viewModel;
 
     public SecurityAnalysisWorkspaceView()
@@ -28,6 +29,7 @@ public partial class SecurityAnalysisWorkspaceView : UserControl
     {
         IsNarrowLayout = width > 0 && width < NarrowBreakpoint;
         IsMediumLayout = width >= NarrowBreakpoint && width < WideBreakpoint;
+        ApplyHeaderLayout(width);
         SecurityAnalysisLayoutGrid.ColumnDefinitions.Clear();
         SecurityAnalysisLayoutGrid.RowDefinitions.Clear();
         if (IsNarrowLayout)
@@ -44,6 +46,18 @@ public partial class SecurityAnalysisWorkspaceView : UserControl
         SecurityAnalysisLayoutGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
         Grid.SetColumn(SecurityIssueDetailRegion, 1);
         ApplyPaneVisibility();
+    }
+
+    private void ApplyHeaderLayout(double width)
+    {
+        var compact = width > 0 && width < HeaderBreakpoint;
+        Grid.SetRow(SecurityAnalysisCommandBar, compact ? 1 : 0);
+        Grid.SetColumn(SecurityAnalysisCommandBar, compact ? 0 : 1);
+        Grid.SetColumnSpan(SecurityAnalysisCommandBar, compact ? 2 : 1);
+        SecurityAnalysisCommandBar.Margin = compact
+            ? new Avalonia.Thickness(0, 4, 0, 0)
+            : new Avalonia.Thickness(0);
+        Grid.SetRow(SecuritySummaryRegion, compact ? 2 : 1);
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -75,7 +89,7 @@ public partial class SecurityAnalysisWorkspaceView : UserControl
         var showList = !IsNarrowLayout || _viewModel?.SecurityAnalysisNarrowShowsList != false || _viewModel.SelectedSecurityIssue is null;
         SecurityIssueListRegion.IsVisible = showList;
         SecurityIssueDetailRegion.IsVisible = !IsNarrowLayout || !showList;
-        BackToSecurityIssueListButton.IsVisible = IsNarrowLayout && !showList;
+        SecurityAnalysisInspectorView.BackButton.IsVisible = IsNarrowLayout && !showList;
     }
 
     private void OnWorkspaceKeyDown(object? sender, KeyEventArgs e)
@@ -89,8 +103,9 @@ public partial class SecurityAnalysisWorkspaceView : UserControl
         var isEditingSearch = control is TextBox;
         if (e.Key == Key.F && e.KeyModifiers.HasFlag(KeyModifiers.Control))
         {
-            SecurityIssueSearchBox.Focus();
-            SecurityIssueSearchBox.SelectAll();
+            var searchBox = SecurityAnalysisFilterPane.SearchBox;
+            searchBox.Focus();
+            searchBox.SelectAll();
             e.Handled = true;
         }
         else if (e.Key == Key.R && e.KeyModifiers.HasFlag(KeyModifiers.Control))
@@ -132,6 +147,6 @@ public partial class SecurityAnalysisWorkspaceView : UserControl
         var index = _viewModel.SelectedSecurityIssue is null ? -1 : items.IndexOf(_viewModel.SelectedSecurityIssue);
         var next = index < 0 ? (delta > 0 ? 0 : items.Count - 1) : Math.Clamp(index + delta, 0, items.Count - 1);
         _viewModel.SelectedSecurityIssue = items[next];
-        SecurityIssueList.ScrollIntoView(items[next]);
+        SecurityAnalysisIssueListView.IssueList.ScrollIntoView(items[next]);
     }
 }

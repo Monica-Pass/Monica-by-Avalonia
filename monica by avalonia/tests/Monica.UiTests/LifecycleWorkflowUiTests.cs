@@ -44,8 +44,10 @@ public sealed class LifecycleWorkflowUiTests
         Assert.NotNull(recycleBin.FindControl<Button>("EmptyRecycleBinClearSearchButton"));
         Assert.NotNull(timeline.FindControl<TextBox>("TimelineSearchBox"));
         Assert.NotNull(timeline.FindControl<Button>("TimelineSearchClearButton"));
-        Assert.NotNull(timeline.FindControl<ListBox>("TimelineEntryList"));
-        Assert.NotNull(timeline.FindControl<Button>("EmptyTimelineClearSearchButton"));
+        var timelineList = Assert.IsType<TimelineEntryListView>(
+            timeline.FindControl<TimelineEntryListView>("TimelineEntryListView"));
+        Assert.NotNull(timelineList.EntryList);
+        Assert.NotNull(timelineList.FindControl<Button>("EmptyTimelineClearSearchButton"));
     }
 
     [Fact]

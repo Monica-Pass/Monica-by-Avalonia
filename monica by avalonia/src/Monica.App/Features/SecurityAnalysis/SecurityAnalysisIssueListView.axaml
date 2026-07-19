@@ -1,0 +1,50 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.SecurityAnalysis.SecurityAnalysisIssueListView"
+             x:Name="Root"
+             x:DataType="vm:MainWindowViewModel">
+    <Grid>
+        <StackPanel IsVisible="{Binding !HasFilteredSecurityIssues}"
+                    Spacing="10"
+                    Margin="24"
+                    Width="240"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top">
+            <ic:FluentIcon Icon="Shield" FontSize="32" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
+            <TextBlock Text="{Binding SecurityIssueSearchResultText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap" />
+            <Button x:Name="EmptySecurityIssueClearFiltersButton" Command="{Binding ClearSecurityIssueFiltersCommand}" IsVisible="{Binding HasSecurityIssueFilters}" ToolTip.Tip="{Binding L[ClearSecurityIssueFilters]}" AutomationProperties.Name="{Binding L[ClearSecurityIssueFilters]}" HorizontalAlignment="Center">
+                <TextBlock Text="{Binding L[ClearSecurityIssueFilters]}" />
+            </Button>
+        </StackPanel>
+        <ListBox x:Name="SecurityIssueList"
+                 Classes="workspaceList"
+                 ItemsSource="{Binding FilteredSecurityIssueItems}"
+                 SelectedItem="{Binding SelectedSecurityIssue}"
+                 IsVisible="{Binding HasFilteredSecurityIssues}"
+                 SelectionMode="Single"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 AutomationProperties.Name="{Binding L.SecurityAnalysis}"
+                 Margin="8,0,8,8">
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:SecurityIssueItem">
+                    <Border Classes="workspaceListRow">
+                        <Button Classes="workspaceListRowButton" Command="{Binding #Root.DataContext.ShowSecurityIssueDetailsCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding Title}" AutomationProperties.Name="{Binding Title}">
+                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="3">
+                                <ic:FluentIcon Grid.RowSpan="3" Icon="Shield" FontSize="20" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Grid.Column="1" Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Subtitle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" />
+                                <WrapPanel Grid.Row="2" Grid.Column="1">
+                                    <Border Classes="workspaceStatusChip" Margin="0,0,6,4"><TextBlock Text="{Binding Category}" FontSize="12" FontWeight="SemiBold" /></Border>
+                                    <Border Classes="workspaceStatusChip" Margin="0,0,6,4"><TextBlock Text="{Binding Severity}" FontSize="12" /></Border>
+                                </WrapPanel>
+                            </Grid>
+                        </Button>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </Grid>
+</UserControl>

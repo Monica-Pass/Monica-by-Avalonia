@@ -1,0 +1,56 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:fa="using:FluentAvalonia.UI.Controls"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.SecurityAnalysis.SecurityAnalysisCommandBarView"
+             x:DataType="vm:MainWindowViewModel">
+    <StackPanel Spacing="8">
+        <fa:FACommandBar x:Name="SecurityAnalysisCommandBar"
+                         DefaultLabelPosition="Right"
+                         ClosedDisplayMode="Compact"
+                         IsDynamicOverflowEnabled="True"
+                         ItemsAlignment="Left"
+                         Background="Transparent"
+                         HorizontalAlignment="Stretch">
+            <fa:FACommandBar.PrimaryCommands>
+                <fa:FACommandBarButton Command="{Binding CheckCompromisedPasswordsCommand}"
+                                       IsEnabled="{Binding !IsSecurityAnalysisBusy}"
+                                       IconSource="Shield"
+                                       Label="{Binding L.CheckCompromisedPasswords}"
+                                       ToolTip.Tip="{Binding L.CheckCompromisedPasswords}"
+                                       AutomationProperties.Name="{Binding L.CheckCompromisedPasswords}" />
+            </fa:FACommandBar.PrimaryCommands>
+            <fa:FACommandBar.SecondaryCommands>
+                <fa:FACommandBarButton Command="{Binding RefreshSecurityAnalysisCommand}"
+                                       IsEnabled="{Binding !IsSecurityAnalysisBusy}"
+                                       IconSource="ArrowClockwise"
+                                       Label="{Binding L[RefreshSecurityAnalysis]}"
+                                       AutomationProperties.Name="{Binding L[RefreshSecurityAnalysis]}" />
+                <fa:FACommandBarButton x:Name="CancelCompromisedCheckButton"
+                                       Command="{Binding CheckCompromisedPasswordsCancelCommand}"
+                                       IsVisible="{Binding IsCheckingCompromisedPasswords}"
+                                       IconSource="Dismiss"
+                                       Label="{Binding L[CancelSecurityCheck]}"
+                                       AutomationProperties.Name="{Binding L[CancelSecurityCheck]}" />
+                <fa:FACommandBarButton x:Name="CancelSecurityAnalysisRefreshButton"
+                                       Command="{Binding RefreshSecurityAnalysisCancelCommand}"
+                                       IsVisible="{Binding IsRefreshingSecurityAnalysis}"
+                                       IconSource="Dismiss"
+                                       Label="{Binding L[CancelSecurityCheck]}"
+                                       AutomationProperties.Name="{Binding L[CancelSecurityCheck]}" />
+            </fa:FACommandBar.SecondaryCommands>
+        </fa:FACommandBar>
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" MinHeight="24">
+            <ProgressBar Width="120"
+                         IsIndeterminate="True"
+                         IsVisible="{Binding IsSecurityAnalysisBusy}"
+                         VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1"
+                       Text="{Binding CompromisedPasswordStatus}"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       TextWrapping="Wrap"
+                       VerticalAlignment="Center"
+                       AutomationProperties.LiveSetting="Polite" />
+        </Grid>
+    </StackPanel>
+</UserControl>

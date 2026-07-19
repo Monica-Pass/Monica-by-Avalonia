@@ -1,219 +1,54 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ic="using:FluentIcons.Avalonia" xmlns:local="using:Monica.App" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.SecurityAnalysis.SecurityAnalysisWorkspaceView" x:Name="SecurityAnalysisRoot" x:DataType="vm:MainWindowViewModel">
-    <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsSecurityAnalysis}}" RowDefinitions="Auto,*" MaxWidth="1120" HorizontalAlignment="Stretch" ClipToBounds="True">
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Monica.App"
+             xmlns:views="using:Monica.App.Features.SecurityAnalysis"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.SecurityAnalysis.SecurityAnalysisWorkspaceView"
+             x:DataType="vm:MainWindowViewModel">
+    <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsSecurityAnalysis}}"
+          RowDefinitions="Auto,*"
+          HorizontalAlignment="Stretch"
+          ClipToBounds="True">
         <Border Classes="workspacePageHeader">
-            <StackPanel Spacing="8">
-                <TextBlock Classes="workspacePageTitle" Text="{Binding L.SecurityAnalysis}" />
-                <TextBlock Classes="workspacePageSubtitle" Text="{Binding L.SecurityAnalysisSubtitle}" MaxWidth="760" TextWrapping="Wrap" />
-                <WrapPanel>
-                    <Button Classes="workspaceCommand" Command="{Binding RefreshSecurityAnalysisCommand}" IsEnabled="{Binding !IsSecurityAnalysisBusy}" ToolTip.Tip="{Binding L[RefreshSecurityAnalysis]}" AutomationProperties.Name="{Binding L[RefreshSecurityAnalysis]}" Margin="0,0,8,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="ArrowClockwise" FontSize="18" />
-                            <TextBlock Text="{Binding L[RefreshSecurityAnalysis]}" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="workspacePrimaryCommand" Command="{Binding CheckCompromisedPasswordsCommand}" IsEnabled="{Binding !IsSecurityAnalysisBusy}" ToolTip.Tip="{Binding L.CheckCompromisedPasswords}" Margin="0,0,8,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="Shield" FontSize="18" />
-                            <TextBlock Text="{Binding L.CheckCompromisedPasswords}" />
-                        </StackPanel>
-                    </Button>
-                    <Button x:Name="CancelCompromisedCheckButton" Classes="workspaceCommand" Command="{Binding CheckCompromisedPasswordsCancelCommand}" IsVisible="{Binding IsCheckingCompromisedPasswords}" ToolTip.Tip="{Binding L[CancelSecurityCheck]}" AutomationProperties.Name="{Binding L[CancelSecurityCheck]}" Margin="0,0,8,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="Dismiss" FontSize="18" />
-                            <TextBlock Text="{Binding L[CancelSecurityCheck]}" />
-                        </StackPanel>
-                    </Button>
-                    <Button x:Name="CancelSecurityAnalysisRefreshButton" Classes="workspaceCommand" Command="{Binding RefreshSecurityAnalysisCancelCommand}" IsVisible="{Binding IsRefreshingSecurityAnalysis}" ToolTip.Tip="{Binding L[CancelSecurityCheck]}" AutomationProperties.Name="{Binding L[CancelSecurityCheck]}" Margin="0,0,8,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="Dismiss" FontSize="18" />
-                            <TextBlock Text="{Binding L[CancelSecurityCheck]}" />
-                        </StackPanel>
-                    </Button>
-                    <ProgressBar Width="120" IsIndeterminate="True" IsVisible="{Binding IsSecurityAnalysisBusy}" VerticalAlignment="Center" Margin="0,0,8,8" />
-                    <TextBlock Text="{Binding CompromisedPasswordStatus}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,0,8" MaxWidth="460" />
-                </WrapPanel>
-                <ItemsControl ItemsSource="{Binding SecuritySummaryItems}" HorizontalAlignment="Left">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:SecuritySummaryItem">
-                            <Border Width="138" MinHeight="80" Margin="0,0,8,8" Padding="10" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource LayerFillColorDefaultBrush}">
-                                <StackPanel Spacing="3">
-                                    <TextBlock Text="{Binding Label}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" />
-                                    <TextBlock Text="{Binding Value}" FontSize="20" FontWeight="SemiBold" />
-                                    <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" FontSize="12" MaxLines="2" />
-                                </StackPanel>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </StackPanel>
+            <Grid x:Name="SecurityHeaderGrid" RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto" ColumnSpacing="12" RowSpacing="10">
+                <StackPanel MinWidth="0" VerticalAlignment="Top">
+                    <TextBlock Classes="workspacePageTitle" Text="{Binding L.SecurityAnalysis}" />
+                    <TextBlock Classes="workspacePageSubtitle"
+                               Text="{Binding L.SecurityAnalysisSubtitle}"
+                               MaxWidth="760"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+                <views:SecurityAnalysisCommandBarView x:Name="SecurityAnalysisCommandBar" Grid.Column="1" MinWidth="280" />
+                <ScrollViewer x:Name="SecuritySummaryRegion" Grid.Row="1" Grid.ColumnSpan="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding SecuritySummaryItems}" HorizontalAlignment="Left">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SecuritySummaryItem">
+                                <Border Width="148" MinHeight="82" Margin="0,0,8,0" Padding="10" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource LayerFillColorDefaultBrush}">
+                                    <StackPanel Spacing="3">
+                                        <TextBlock Text="{Binding Label}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" />
+                                        <TextBlock Text="{Binding Value}" FontSize="20" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" FontSize="12" MaxLines="2" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
         </Border>
-        <Grid x:Name="SecurityAnalysisLayoutGrid" Grid.Row="1" ColumnDefinitions="360,*" RowDefinitions="*" ColumnSpacing="16" RowSpacing="12" MinWidth="0">
+
+        <Grid x:Name="SecurityAnalysisLayoutGrid" Grid.Row="1" ColumnDefinitions="360,*" RowDefinitions="*" ColumnSpacing="16" MinWidth="0">
             <Border x:Name="SecurityIssueListRegion" Classes="workspaceSidebar" ClipToBounds="True">
                 <Grid RowDefinitions="Auto,*">
-                    <StackPanel Margin="14,12,14,8" Spacing="8">
-                        <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.SecurityAnalysis}" />
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                            <TextBox x:Name="SecurityIssueSearchBox" Text="{Binding SecurityIssueSearchText}" PlaceholderText="{Binding L[SecurityIssueSearchPlaceholder]}" AutomationProperties.Name="{Binding L[SecurityIssueSearchPlaceholder]}" />
-                            <Button x:Name="SecurityIssueSearchClearButton" Grid.Column="1" Classes="workspaceCommand" Command="{Binding ClearSecurityIssueSearchCommand}" IsEnabled="{Binding HasSecurityIssueSearchText}" Width="34" Height="34" Padding="0" ToolTip.Tip="{Binding L[Clear]}" AutomationProperties.Name="{Binding L[Clear]}">
-                                <ic:FluentIcon Icon="Dismiss" FontSize="15" />
-                            </Button>
-                        </Grid>
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="{Binding L[SecurityIssueSeverityFilter]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
-                            <WrapPanel>
-                                <Button x:Name="SecurityIssueSeverityAllButton"
-                                        Classes="workspaceCommand"
-                                        Classes.accent="{Binding IsAllSecurityIssueSeveritySelected}"
-                                        Command="{Binding SelectSecurityIssueSeverityFilterCommand}"
-                                        CommandParameter="All"
-                                        ToolTip.Tip="{Binding L[SecurityIssueSeverityAll]}"
-                                        AutomationProperties.Name="{Binding L[SecurityIssueSeverityAll]}"
-                                        Padding="8,4"
-                                        Margin="0,0,6,6">
-                                    <TextBlock Text="{Binding L[SecurityIssueSeverityAll]}" />
-                                </Button>
-                                <Button x:Name="SecurityIssueSeverityHighButton"
-                                        Classes="workspaceCommand"
-                                        Classes.accent="{Binding IsHighSecurityIssueSeveritySelected}"
-                                        Command="{Binding SelectSecurityIssueSeverityFilterCommand}"
-                                        CommandParameter="High"
-                                        ToolTip.Tip="{Binding L[HighSeverity]}"
-                                        AutomationProperties.Name="{Binding L[HighSeverity]}"
-                                        Padding="8,4"
-                                        Margin="0,0,6,6">
-                                    <TextBlock Text="{Binding L[HighSeverity]}" />
-                                </Button>
-                                <Button x:Name="SecurityIssueSeverityMediumButton"
-                                        Classes="workspaceCommand"
-                                        Classes.accent="{Binding IsMediumSecurityIssueSeveritySelected}"
-                                        Command="{Binding SelectSecurityIssueSeverityFilterCommand}"
-                                        CommandParameter="Medium"
-                                        ToolTip.Tip="{Binding L[MediumSeverity]}"
-                                        AutomationProperties.Name="{Binding L[MediumSeverity]}"
-                                        Padding="8,4"
-                                        Margin="0,0,6,6">
-                                    <TextBlock Text="{Binding L[MediumSeverity]}" />
-                                </Button>
-                                <Button x:Name="SecurityIssueSeverityLowButton"
-                                        Classes="workspaceCommand"
-                                        Classes.accent="{Binding IsLowSecurityIssueSeveritySelected}"
-                                        Command="{Binding SelectSecurityIssueSeverityFilterCommand}"
-                                        CommandParameter="Low"
-                                        ToolTip.Tip="{Binding L[LowSeverity]}"
-                                        AutomationProperties.Name="{Binding L[LowSeverity]}"
-                                        Padding="8,4"
-                                        Margin="0,0,6,6">
-                                    <TextBlock Text="{Binding L[LowSeverity]}" />
-                                </Button>
-                                <Button x:Name="ClearSecurityIssueFiltersButton"
-                                        Classes="workspaceCommand"
-                                        Command="{Binding ClearSecurityIssueFiltersCommand}"
-                                        IsVisible="{Binding HasSecurityIssueFilters}"
-                                        ToolTip.Tip="{Binding L[ClearSecurityIssueFilters]}"
-                                        AutomationProperties.Name="{Binding L[ClearSecurityIssueFilters]}"
-                                        Padding="8,4"
-                                        Margin="0,0,0,6">
-                                    <StackPanel Orientation="Horizontal" Spacing="5">
-                                        <ic:FluentIcon Icon="Dismiss" FontSize="14" />
-                                        <TextBlock Text="{Binding L[ClearSecurityIssueFilters]}" />
-                                    </StackPanel>
-                                </Button>
-                            </WrapPanel>
-                        </StackPanel>
-                        <TextBlock Text="{Binding SecurityIssueSearchResultText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
-                    </StackPanel>
-                    <Grid Grid.Row="1">
-                        <StackPanel IsVisible="{Binding !HasFilteredSecurityIssues}" Spacing="10" Margin="24" Width="240" HorizontalAlignment="Left" VerticalAlignment="Top">
-                            <ic:FluentIcon Icon="Shield" FontSize="32" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
-                            <TextBlock Text="{Binding SecurityIssueSearchResultText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap" />
-                            <Button x:Name="EmptySecurityIssueClearFiltersButton"
-                                    Command="{Binding ClearSecurityIssueFiltersCommand}"
-                                    IsVisible="{Binding HasSecurityIssueFilters}"
-                                    ToolTip.Tip="{Binding L[ClearSecurityIssueFilters]}"
-                                    AutomationProperties.Name="{Binding L[ClearSecurityIssueFilters]}"
-                                    HorizontalAlignment="Center">
-                                <TextBlock Text="{Binding L[ClearSecurityIssueFilters]}" />
-                            </Button>
-                        </StackPanel>
-                        <ListBox x:Name="SecurityIssueList" Classes="workspaceList" ItemsSource="{Binding FilteredSecurityIssueItems}" SelectedItem="{Binding SelectedSecurityIssue}" IsVisible="{Binding HasFilteredSecurityIssues}" SelectionMode="Single" Margin="8,0,8,8">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:SecurityIssueItem">
-                                    <Border Classes="workspaceListRow">
-                                        <Button Classes="workspaceListRowButton" Command="{Binding #SecurityAnalysisRoot.DataContext.ShowSecurityIssueDetailsCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding Title}">
-                                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="3">
-                                                <ic:FluentIcon Grid.RowSpan="3" Icon="Key" FontSize="20" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                <TextBlock Grid.Column="1" Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Subtitle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" />
-                                                <WrapPanel Grid.Row="2" Grid.Column="1">
-                                                    <Border Classes="workspaceStatusChip" Margin="0,0,6,4">
-                                                        <TextBlock Text="{Binding Category}" FontSize="12" FontWeight="SemiBold" />
-                                                    </Border>
-                                                    <Border Classes="workspaceStatusChip" Margin="0,0,6,4">
-                                                        <TextBlock Text="{Binding Severity}" FontSize="12" />
-                                                    </Border>
-                                                </WrapPanel>
-                                            </Grid>
-                                        </Button>
-                                    </Border>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </Grid>
+                    <views:SecurityAnalysisFilterPaneView x:Name="SecurityAnalysisFilterPane" />
+                    <views:SecurityAnalysisIssueListView x:Name="SecurityAnalysisIssueListView" Grid.Row="1" />
                 </Grid>
             </Border>
             <Border x:Name="SecurityIssueDetailRegion" Grid.Column="1" Classes="workspacePane" Padding="20" MinWidth="0" Focusable="True">
-                <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                    <Grid>
-                        <StackPanel IsVisible="{Binding HasSelectedSecurityIssue}" Spacing="18">
-                            <Button x:Name="BackToSecurityIssueListButton" Command="{Binding ShowSecurityIssueListCommand}" HorizontalAlignment="Left" ToolTip.Tip="{Binding L[BackToSecurityIssues]}" AutomationProperties.Name="{Binding L[BackToSecurityIssues]}">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <ic:FluentIcon Icon="ArrowLeft" FontSize="18" />
-                                    <TextBlock Text="{Binding L[BackToSecurityIssues]}" />
-                                </StackPanel>
-                            </Button>
-                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
-                                <Border Width="54" Height="54" CornerRadius="27" Background="{DynamicResource ControlFillColorDefaultBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
-                                    <ic:FluentIcon Icon="Shield" FontSize="24" Foreground="{DynamicResource AccentFillColorDefaultBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding SelectedSecurityIssue.Title}" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="{Binding SelectedSecurityIssue.Subtitle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                                </StackPanel>
-                            </Grid>
-                            <WrapPanel>
-                                <Border Classes="workspaceStatusChip" Margin="0,0,8,8">
-                                    <TextBlock Text="{Binding SelectedSecurityIssue.Category}" FontSize="12" FontWeight="SemiBold" />
-                                </Border>
-                                <Border Classes="workspaceStatusChip" Margin="0,0,8,8">
-                                    <TextBlock Text="{Binding SelectedSecurityIssue.Severity}" FontSize="12" />
-                                </Border>
-                            </WrapPanel>
-                            <WrapPanel>
-                                <Button Classes="workspacePrimaryCommand" Command="{Binding ShowPasswordDetailsCommand}" CommandParameter="{Binding SelectedSecurityIssue.Entry}" Margin="0,0,8,8">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <ic:FluentIcon Icon="Info" FontSize="18" />
-                                        <TextBlock Text="{Binding L.PasswordDetails}" />
-                                    </StackPanel>
-                                </Button>
-                                <Button Classes="workspaceCommand" Command="{Binding EditPasswordCommand}" CommandParameter="{Binding SelectedSecurityIssue.Entry}" Margin="0,0,0,8">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <ic:FluentIcon Icon="Edit" FontSize="18" />
-                                        <TextBlock Text="{Binding L.EditPassword}" />
-                                    </StackPanel>
-                                </Button>
-                            </WrapPanel>
-                        </StackPanel>
-                        <StackPanel IsVisible="{Binding !HasSelectedSecurityIssue}" Spacing="10" Margin="24" Width="260" HorizontalAlignment="Left">
-                            <ic:FluentIcon Icon="Shield" FontSize="34" HorizontalAlignment="Center" />
-                            <TextBlock Text="{Binding SecurityIssueSearchResultText}" TextAlignment="Center" TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Grid>
-                </ScrollViewer>
+                <views:SecurityAnalysisInspectorView x:Name="SecurityAnalysisInspectorView" />
             </Border>
         </Grid>
     </Grid>

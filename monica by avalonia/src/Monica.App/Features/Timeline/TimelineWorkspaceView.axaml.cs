@@ -26,7 +26,7 @@ public partial class TimelineWorkspaceView : UserControl
         TimelineSearchBox.SelectAll();
     }
 
-    public void FocusList() => Dispatcher.UIThread.Post(() => TimelineEntryList.Focus());
+    public void FocusList() => Dispatcher.UIThread.Post(() => TimelineEntryListView.EntryList.Focus());
     public void FocusDetails() => TimelineDetailRegion.Focus();
 
     public void SelectAdjacent(MainWindowViewModel viewModel, int delta)
@@ -36,7 +36,7 @@ public partial class TimelineWorkspaceView : UserControl
         var index = viewModel.SelectedTimelineEntry is null ? -1 : items.IndexOf(viewModel.SelectedTimelineEntry);
         var next = index < 0 ? (delta > 0 ? 0 : items.Count - 1) : Math.Clamp(index + delta, 0, items.Count - 1);
         viewModel.SelectedTimelineEntry = items[next];
-        TimelineEntryList.ScrollIntoView(items[next]);
+        TimelineEntryListView.EntryList.ScrollIntoView(items[next]);
     }
 
     public void UpdateResponsiveLayoutForWidth(double width)
@@ -65,7 +65,7 @@ public partial class TimelineWorkspaceView : UserControl
     private void ApplyResponsiveLayout(double width)
     {
         var showDetails = IsNarrowLayout && _observedViewModel?.TimelineNarrowShowsList == false && _observedViewModel.SelectedTimelineEntry is not null;
-        LifecycleWorkspaceLayout.ApplyContent(TimelineMasterDetailGrid, TimelineListRegion, TimelineDetailRegion, BackToTimelineListButton, IsNarrowLayout, showDetails, IsMediumLayout ? 340 : 420);
-        LifecycleWorkspaceLayout.ApplyHeader(TimelineSearchRegion, TimelineHeaderCommands, width > 0 && width < LifecycleWorkspaceLayout.WideHeaderBreakpoint);
+        LifecycleWorkspaceLayout.ApplyContent(TimelineMasterDetailGrid, TimelineListRegion, TimelineDetailRegion, TimelineInspectorView.BackButton, IsNarrowLayout, showDetails, IsMediumLayout ? 340 : 420);
+        LifecycleWorkspaceLayout.ApplyHeader(TimelineSearchRegion, TimelineCommandBar, width > 0 && width < LifecycleWorkspaceLayout.WideHeaderBreakpoint);
     }
 }

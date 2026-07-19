@@ -56,17 +56,23 @@ public sealed class SettingsSecurityWorkflowUiTests
     public void Security_analysis_exposes_search_cancel_and_single_pane_layout()
     {
         var view = new SecurityAnalysisWorkspaceView();
+        var commands = Assert.IsType<SecurityAnalysisCommandBarView>(
+            view.FindControl<SecurityAnalysisCommandBarView>("SecurityAnalysisCommandBar"));
+        var filter = Assert.IsType<SecurityAnalysisFilterPaneView>(
+            view.FindControl<SecurityAnalysisFilterPaneView>("SecurityAnalysisFilterPane"));
+        var list = Assert.IsType<SecurityAnalysisIssueListView>(
+            view.FindControl<SecurityAnalysisIssueListView>("SecurityAnalysisIssueListView"));
 
-        Assert.NotNull(view.FindControl<TextBox>("SecurityIssueSearchBox"));
-        Assert.NotNull(view.FindControl<Button>("SecurityIssueSearchClearButton"));
-        Assert.NotNull(view.FindControl<Button>("CancelCompromisedCheckButton"));
-        Assert.NotNull(view.FindControl<Button>("CancelSecurityAnalysisRefreshButton"));
-        Assert.NotNull(view.FindControl<ListBox>("SecurityIssueList"));
-        Assert.NotNull(view.FindControl<Button>("SecurityIssueSeverityAllButton"));
-        Assert.NotNull(view.FindControl<Button>("SecurityIssueSeverityHighButton"));
-        Assert.NotNull(view.FindControl<Button>("SecurityIssueSeverityMediumButton"));
-        Assert.NotNull(view.FindControl<Button>("SecurityIssueSeverityLowButton"));
-        Assert.NotNull(view.FindControl<Button>("ClearSecurityIssueFiltersButton"));
+        Assert.NotNull(filter.SearchBox);
+        Assert.NotNull(filter.FindControl<Button>("SecurityIssueSearchClearButton"));
+        Assert.NotNull(commands.FindControl<Control>("CancelCompromisedCheckButton"));
+        Assert.NotNull(commands.FindControl<Control>("CancelSecurityAnalysisRefreshButton"));
+        Assert.NotNull(list.IssueList);
+        Assert.NotNull(filter.FindControl<Button>("SecurityIssueSeverityAllButton"));
+        Assert.NotNull(filter.FindControl<Button>("SecurityIssueSeverityHighButton"));
+        Assert.NotNull(filter.FindControl<Button>("SecurityIssueSeverityMediumButton"));
+        Assert.NotNull(filter.FindControl<Button>("SecurityIssueSeverityLowButton"));
+        Assert.NotNull(filter.FindControl<Button>("ClearSecurityIssueFiltersButton"));
 
         view.UpdateResponsiveLayoutForWidth(680);
 

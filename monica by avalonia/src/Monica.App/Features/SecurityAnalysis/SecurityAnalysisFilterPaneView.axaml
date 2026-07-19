@@ -1,0 +1,59 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.SecurityAnalysis.SecurityAnalysisFilterPaneView"
+             x:Name="Root"
+             x:DataType="vm:MainWindowViewModel">
+    <StackPanel Margin="14,12,14,8" Spacing="8">
+        <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.SecurityAnalysis}" />
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+            <TextBox x:Name="SecurityIssueSearchBox"
+                     Text="{Binding SecurityIssueSearchText}"
+                     PlaceholderText="{Binding L[SecurityIssueSearchPlaceholder]}"
+                     AutomationProperties.Name="{Binding L[SecurityIssueSearchPlaceholder]}" />
+            <Button x:Name="SecurityIssueSearchClearButton"
+                    Grid.Column="1"
+                    Classes="workspaceCommand"
+                    Command="{Binding ClearSecurityIssueSearchCommand}"
+                    IsEnabled="{Binding HasSecurityIssueSearchText}"
+                    Width="40"
+                    Height="40"
+                    Padding="0"
+                    ToolTip.Tip="{Binding L[Clear]}"
+                    AutomationProperties.Name="{Binding L[Clear]}">
+                <ic:FluentIcon Icon="Dismiss" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Button>
+        </Grid>
+        <StackPanel Spacing="6">
+            <TextBlock Text="{Binding L[SecurityIssueSeverityFilter]}"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       FontSize="12" />
+            <WrapPanel>
+                <Button x:Name="SecurityIssueSeverityAllButton" Classes="workspaceCommand" Classes.accent="{Binding IsAllSecurityIssueSeveritySelected}" Command="{Binding SelectSecurityIssueSeverityFilterCommand}" CommandParameter="All" ToolTip.Tip="{Binding L[SecurityIssueSeverityAll]}" AutomationProperties.Name="{Binding L[SecurityIssueSeverityAll]}" MinHeight="40" Padding="8,4" Margin="0,0,6,6">
+                    <TextBlock Text="{Binding L[SecurityIssueSeverityAll]}" />
+                </Button>
+                <Button x:Name="SecurityIssueSeverityHighButton" Classes="workspaceCommand" Classes.accent="{Binding IsHighSecurityIssueSeveritySelected}" Command="{Binding SelectSecurityIssueSeverityFilterCommand}" CommandParameter="High" ToolTip.Tip="{Binding L[HighSeverity]}" AutomationProperties.Name="{Binding L[HighSeverity]}" MinHeight="40" Padding="8,4" Margin="0,0,6,6">
+                    <TextBlock Text="{Binding L[HighSeverity]}" />
+                </Button>
+                <Button x:Name="SecurityIssueSeverityMediumButton" Classes="workspaceCommand" Classes.accent="{Binding IsMediumSecurityIssueSeveritySelected}" Command="{Binding SelectSecurityIssueSeverityFilterCommand}" CommandParameter="Medium" ToolTip.Tip="{Binding L[MediumSeverity]}" AutomationProperties.Name="{Binding L[MediumSeverity]}" MinHeight="40" Padding="8,4" Margin="0,0,6,6">
+                    <TextBlock Text="{Binding L[MediumSeverity]}" />
+                </Button>
+                <Button x:Name="SecurityIssueSeverityLowButton" Classes="workspaceCommand" Classes.accent="{Binding IsLowSecurityIssueSeveritySelected}" Command="{Binding SelectSecurityIssueSeverityFilterCommand}" CommandParameter="Low" ToolTip.Tip="{Binding L[LowSeverity]}" AutomationProperties.Name="{Binding L[LowSeverity]}" MinHeight="40" Padding="8,4" Margin="0,0,6,6">
+                    <TextBlock Text="{Binding L[LowSeverity]}" />
+                </Button>
+                <Button x:Name="ClearSecurityIssueFiltersButton" Classes="workspaceCommand" Command="{Binding ClearSecurityIssueFiltersCommand}" IsVisible="{Binding HasSecurityIssueFilters}" ToolTip.Tip="{Binding L[ClearSecurityIssueFilters]}" AutomationProperties.Name="{Binding L[ClearSecurityIssueFilters]}" MinHeight="40" Padding="8,4" Margin="0,0,0,6">
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                        <ic:FluentIcon Icon="Dismiss" FontSize="14" />
+                        <TextBlock Text="{Binding L[ClearSecurityIssueFilters]}" />
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+        </StackPanel>
+        <TextBlock x:Name="SecurityIssueSearchResultText"
+                   Text="{Binding SecurityIssueSearchResultText}"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                   FontSize="12"
+                   AutomationProperties.LiveSetting="Polite" />
+    </StackPanel>
+</UserControl>

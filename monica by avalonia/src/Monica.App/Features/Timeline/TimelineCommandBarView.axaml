@@ -1,0 +1,30 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:fa="using:FluentAvalonia.UI.Controls"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Timeline.TimelineCommandBarView"
+             x:DataType="vm:MainWindowViewModel">
+    <fa:FACommandBar x:Name="TimelineCommandBar"
+                     DefaultLabelPosition="Right"
+                     ClosedDisplayMode="Compact"
+                     IsDynamicOverflowEnabled="True"
+                     ItemsAlignment="Left"
+                     Background="Transparent"
+                     HorizontalAlignment="Stretch">
+        <fa:FACommandBar.PrimaryCommands>
+            <fa:FACommandBarButton Command="{Binding LoadCommand}"
+                                   IconSource="ArrowClockwise"
+                                   Label="{Binding L.Refresh}"
+                                   ToolTip.Tip="{Binding L.Refresh}"
+                                   AutomationProperties.Name="{Binding L.Refresh}" />
+        </fa:FACommandBar.PrimaryCommands>
+        <fa:FACommandBar.SecondaryCommands>
+            <fa:FACommandBarButton Command="{Binding SaveTimelineExportCommand}"
+                                   IsEnabled="{Binding CanUseFilePicker}"
+                                   IconSource="ArrowDownload"
+                                   Label="{Binding L.Export}"
+                                   ToolTip.Tip="{Binding L.Export}"
+                                   AutomationProperties.Name="{Binding L.Export}" />
+        </fa:FACommandBar.SecondaryCommands>
+    </fa:FACommandBar>
+</UserControl>
