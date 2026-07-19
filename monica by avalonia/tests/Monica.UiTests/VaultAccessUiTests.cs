@@ -19,8 +19,10 @@ public sealed class VaultAccessUiTests
     {
         var view = new UnlockView();
 
+        Assert.NotNull(view.FindControl<Grid>("VaultAccessSurface"));
         Assert.NotNull(view.FindControl<StackPanel>("VaultAccessInitializingPanel"));
         Assert.NotNull(view.FindControl<StackPanel>("VaultAccessForm"));
+        Assert.NotNull(view.FindControl<StackPanel>("VaultAccessPrimaryForm"));
         Assert.NotNull(view.FindControl<TextBlock>("MasterPasswordLabel"));
         Assert.NotNull(view.FindControl<TextBox>("MasterPasswordInput"));
         Assert.NotNull(view.FindControl<Button>("ToggleMasterPasswordVisibilityButton"));
@@ -38,6 +40,10 @@ public sealed class VaultAccessUiTests
         var submit = view.FindControl<Button>("UnlockButton");
         Assert.NotNull(submit);
         Assert.True(submit.IsDefault);
+
+        var xaml = File.ReadAllText(FindUnlockFeatureFile("UnlockView.axaml"));
+        Assert.Contains("<Setter Property=\"MinHeight\" Value=\"44\" />", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"Width\" Value=\"44\" />", xaml, StringComparison.Ordinal);
     }
 
     [Fact]

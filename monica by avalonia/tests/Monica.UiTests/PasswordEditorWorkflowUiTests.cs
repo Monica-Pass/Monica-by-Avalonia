@@ -22,6 +22,12 @@ public sealed class PasswordEditorWorkflowUiTests
         var view = new Monica.App.PasswordEditorDialog { DataContext = editor };
         var window = new Window { Content = view };
 
+        Assert.NotNull(view.FindControl<ScrollViewer>("PasswordEditorFormScrollViewer"));
+        Assert.NotNull(view.FindControl<Border>("PasswordIdentitySection"));
+        Assert.NotNull(view.FindControl<Border>("PasswordCredentialSection"));
+        Assert.NotNull(view.FindControl<Expander>("PasswordGeneratorOptionsExpander"));
+        Assert.NotNull(view.FindControl<Border>("PasswordNotesSection"));
+
         window.Show();
         try
         {
