@@ -41,6 +41,6 @@
     <Setter Property="CornerRadius" Value="0" />
     <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
     <Setter Property="BorderThickness" Value="0,0,1,0" />
-    <Setter Property="Background" Value="{DynamicResource LayerFillColorSubtleBrush}" />
+    <Setter Property="Background" Value="Transparent" />
 </Style>
 </Styles>

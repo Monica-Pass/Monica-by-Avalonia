@@ -33,6 +33,7 @@ public sealed class LifecycleWorkflowUiTests
         Assert.NotNull(archive.FindControl<Button>("UnarchiveSelectedPasswordsButton"));
         Assert.NotNull(archive.FindControl<Button>("ClearArchiveSelectionButton"));
         Assert.NotNull(archive.FindControl<Button>("EmptyArchiveClearSearchButton"));
+        Assert.NotNull(archive.FindControl<Border>("ArchiveRecoveryCommandSurface"));
         Assert.NotNull(recycleBin.FindControl<TextBox>("RecycleBinSearchBox"));
         Assert.NotNull(recycleBin.FindControl<Button>("RecycleBinSearchClearButton"));
         Assert.NotNull(recycleBin.FindControl<ListBox>("RecycleBinPasswordList"));
@@ -42,6 +43,8 @@ public sealed class LifecycleWorkflowUiTests
         Assert.NotNull(recycleBin.FindControl<Button>("DeleteSelectedPasswordsPermanentlyButton"));
         Assert.NotNull(recycleBin.FindControl<Button>("ClearRecycleBinSelectionButton"));
         Assert.NotNull(recycleBin.FindControl<Button>("EmptyRecycleBinClearSearchButton"));
+        Assert.NotNull(recycleBin.FindControl<Border>("RecycleBinLifecycleCommandSurface"));
+        Assert.NotNull(recycleBin.FindControl<Border>("RecycleBinRetentionStatus"));
         Assert.NotNull(timeline.FindControl<TextBox>("TimelineSearchBox"));
         Assert.NotNull(timeline.FindControl<Button>("TimelineSearchClearButton"));
         var timelineList = Assert.IsType<TimelineEntryListView>(
@@ -101,6 +104,13 @@ public sealed class LifecycleWorkflowUiTests
         Assert.Equal(0, recycleSelection.Margin.Left);
         Assert.Contains("archiveInspector", archive.FindControl<Border>("ArchiveDetailRegion")!.Classes);
         Assert.Contains("recycleInspector", recycleBin.FindControl<Border>("RecycleBinDetailRegion")!.Classes);
+
+        var archiveXaml = File.ReadAllText(FindFeatureFile("Archive", "ArchiveWorkspaceView.axaml"));
+        var recycleXaml = File.ReadAllText(FindFeatureFile("RecycleBin", "RecycleBinWorkspaceView.axaml"));
+        Assert.Contains("Archived item recovery queue", archiveXaml, StringComparison.Ordinal);
+        Assert.Contains("Archive restore workbench", archiveXaml, StringComparison.Ordinal);
+        Assert.Contains("Deletion lifecycle queue", recycleXaml, StringComparison.Ordinal);
+        Assert.Contains("Restore and retention inspector", recycleXaml, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -206,4 +216,15 @@ public sealed class LifecycleWorkflowUiTests
             .OfType<MenuItem>()
             .Select(item => item.Name ?? "")
             .ToArray();
+
+    private static string FindFeatureFile(string feature, string fileName)
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            var candidate = Path.Combine(directory.FullName, "src", "Monica.App", "Features", feature, fileName);
+            if (File.Exists(candidate)) return candidate;
+        }
+
+        throw new FileNotFoundException($"Could not locate {feature}/{fileName} from the test output directory.");
+    }
 }

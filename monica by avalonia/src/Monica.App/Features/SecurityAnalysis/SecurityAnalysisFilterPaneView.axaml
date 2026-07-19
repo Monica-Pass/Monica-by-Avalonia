@@ -6,7 +6,7 @@
              x:Name="Root"
              x:DataType="vm:MainWindowViewModel">
     <StackPanel Margin="14,12,14,8" Spacing="8">
-        <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.SecurityAnalysis}" />
+        <TextBlock Classes="workspaceSectionLabel" Text="{Binding L[SecurityIssueSeverityFilter]}" />
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
             <TextBox x:Name="SecurityIssueSearchBox"
                      Text="{Binding SecurityIssueSearchText}"

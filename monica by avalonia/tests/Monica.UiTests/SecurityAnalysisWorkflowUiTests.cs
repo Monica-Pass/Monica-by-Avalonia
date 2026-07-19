@@ -20,6 +20,8 @@ public sealed class SecurityAnalysisWorkflowUiTests
         Assert.IsType<SecurityAnalysisFilterPaneView>(view.FindControl<SecurityAnalysisFilterPaneView>("SecurityAnalysisFilterPane"));
         Assert.IsType<SecurityAnalysisIssueListView>(view.FindControl<SecurityAnalysisIssueListView>("SecurityAnalysisIssueListView"));
         Assert.IsType<SecurityAnalysisInspectorView>(view.FindControl<SecurityAnalysisInspectorView>("SecurityAnalysisInspectorView"));
+        Assert.NotNull(view.FindControl<Border>("SecurityTriageCommandSurface"));
+        Assert.Equal(0, view.FindControl<Border>("SecurityIssueDetailRegion")!.CornerRadius.TopLeft);
     }
 
     [Fact]
@@ -35,6 +37,8 @@ public sealed class SecurityAnalysisWorkflowUiTests
         Assert.Contains("RefreshSecurityAnalysisCommand", commandXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("<ScrollViewer", listXaml, StringComparison.Ordinal);
         Assert.Contains("ScrollViewer.VerticalScrollBarVisibility=\"Auto\"", listXaml, StringComparison.Ordinal);
+        Assert.Contains("Prioritized security issue queue", workspaceXaml, StringComparison.Ordinal);
+        Assert.Contains("Security remediation workbench", workspaceXaml, StringComparison.Ordinal);
     }
 
     [Fact]

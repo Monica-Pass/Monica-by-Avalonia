@@ -19,6 +19,7 @@ public sealed class TimelineWorkflowUiTests
         Assert.IsType<TimelineCommandBarView>(view.FindControl<TimelineCommandBarView>("TimelineCommandBar"));
         Assert.IsType<TimelineEntryListView>(view.FindControl<TimelineEntryListView>("TimelineEntryListView"));
         Assert.IsType<TimelineInspectorView>(view.FindControl<TimelineInspectorView>("TimelineInspectorView"));
+        Assert.NotNull(view.FindControl<Border>("TimelineQueryCommandSurface"));
     }
 
     [Fact]
@@ -35,6 +36,8 @@ public sealed class TimelineWorkflowUiTests
         Assert.DoesNotContain("<ScrollViewer", listXaml, StringComparison.Ordinal);
         Assert.Contains("ScrollViewer.VerticalScrollBarVisibility=\"Auto\"", listXaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"TimelineDetailScrollViewer\"", File.ReadAllText(FindFeatureFile("TimelineInspectorView.axaml")), StringComparison.Ordinal);
+        Assert.Contains("Continuous audit event stream", workspaceXaml, StringComparison.Ordinal);
+        Assert.Contains("Audit event evidence inspector", workspaceXaml, StringComparison.Ordinal);
     }
 
     [Fact]

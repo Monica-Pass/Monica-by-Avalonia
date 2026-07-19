@@ -13,7 +13,7 @@
           RowDefinitions="Auto,*"
           HorizontalAlignment="Stretch"
           ClipToBounds="True">
-        <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
+        <Border x:Name="TimelineQueryCommandSurface" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,8">
             <Grid x:Name="TimelineHeaderGrid" ColumnDefinitions="*,320,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" MinHeight="56">
                 <StackPanel MinWidth="0" VerticalAlignment="Center">
                     <TextBlock Classes="workspacePageTitle" Text="{Binding L.Timeline}" />
@@ -29,8 +29,8 @@
             </Grid>
         </Border>
 
-        <Grid x:Name="TimelineMasterDetailGrid" Grid.Row="1" ColumnDefinitions="420,*" ColumnSpacing="14" MinWidth="0">
-            <Border x:Name="TimelineListRegion" Classes="timelineFilterRail" ClipToBounds="True">
+        <Grid x:Name="TimelineMasterDetailGrid" Grid.Row="1" ColumnDefinitions="440,*" MinWidth="0">
+            <Border x:Name="TimelineListRegion" Classes="timelineFilterRail" ClipToBounds="True" AutomationProperties.Name="Continuous audit event stream">
                 <Grid RowDefinitions="Auto,*">
                     <StackPanel Margin="14,12,14,8" Spacing="3">
                         <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.Timeline}" />
@@ -39,7 +39,7 @@
                     <views:TimelineEntryListView x:Name="TimelineEntryListView" Grid.Row="1" />
                 </Grid>
             </Border>
-            <Border x:Name="TimelineDetailRegion" Grid.Column="1" Classes="timelineInspector" Padding="24" MinWidth="0" Focusable="True">
+            <Border x:Name="TimelineDetailRegion" Grid.Column="1" Classes="timelineInspector" Padding="28,22" MinWidth="0" Focusable="True" AutomationProperties.Name="Audit event evidence inspector">
                 <views:TimelineInspectorView x:Name="TimelineInspectorView" />
             </Border>
         </Grid>

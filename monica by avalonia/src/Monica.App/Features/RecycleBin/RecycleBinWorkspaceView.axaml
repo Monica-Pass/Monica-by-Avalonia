@@ -11,7 +11,7 @@
     <StyleInclude Source="/Features/RecycleBin/RecycleBinStyles.axaml" />
 </UserControl.Styles>
 <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsRecycleBin}}" RowDefinitions="Auto,*" HorizontalAlignment="Stretch" ClipToBounds="True">
-    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
+    <Border x:Name="RecycleBinLifecycleCommandSurface" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,8">
         <Grid x:Name="RecycleBinHeaderGrid" ColumnDefinitions="*,320,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" MinHeight="56">
             <StackPanel MinWidth="0" VerticalAlignment="Center">
                 <TextBlock Classes="workspacePageTitle" Text="{Binding L.RecycleBin}" />
@@ -24,6 +24,12 @@
                 </Button>
             </Grid>
             <StackPanel x:Name="RecycleBinHeaderCommands" Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Border x:Name="RecycleBinRetentionStatus" Classes="workspaceStatusChip" Padding="10,6" VerticalAlignment="Center" AutomationProperties.Name="{Binding RecycleBinRetentionText}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:FluentIcon Icon="Clock" FontSize="15" />
+                        <TextBlock Text="{Binding RecycleBinRetentionText}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
                 <Button x:Name="RecycleBinPageMenuButton"
                         Classes="workspaceCommand"
                         ToolTip.Tip="{Binding L.MoreOptions}"
@@ -59,7 +65,7 @@
     </Border>
 
     <Grid x:Name="RecycleBinMasterDetailGrid" Grid.Row="1" ColumnDefinitions="300,*" MinWidth="0">
-        <Border x:Name="RecycleBinListRegion" Classes="recycleFilterRail" ClipToBounds="True">
+        <Border x:Name="RecycleBinListRegion" Classes="recycleFilterRail" ClipToBounds="True" AutomationProperties.Name="Deletion lifecycle queue">
             <Grid RowDefinitions="Auto,Auto,*">
                 <Grid Margin="14,12,14,8" ColumnDefinitions="*,Auto" ColumnSpacing="8">
                     <StackPanel Spacing="3">
@@ -178,7 +184,7 @@
             </Grid>
         </Border>
 
-        <Border x:Name="RecycleBinDetailRegion" Grid.Column="1" Classes="recycleInspector" Padding="24" MinWidth="0" Focusable="True">
+        <Border x:Name="RecycleBinDetailRegion" Grid.Column="1" Classes="recycleInspector" Padding="28,22" MinWidth="0" Focusable="True" AutomationProperties.Name="Restore and retention inspector">
             <Grid>
                 <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasSelectedDeletedPassword}">
                 <StackPanel Spacing="18">
