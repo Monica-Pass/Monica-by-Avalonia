@@ -64,6 +64,12 @@ public sealed class WalletWorkflowUiTests
         Assert.Equal(2, CountOccurrences(xaml, "Command=\"{Binding AddWalletItemCommand}\""));
         Assert.DoesNotContain("WalletMoreActionsButton", xaml, StringComparison.Ordinal);
         Assert.Contains("<views:WalletItemListView x:Name=\"WalletItemListView\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"walletCollectionRail\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Classes=\"workspaceSidebar\"", xaml, StringComparison.Ordinal);
+        Assert.Contains(
+            "Classes=\"walletIdentitySurface\"",
+            File.ReadAllText(FindWalletFeatureFile("WalletWorkbenchView.axaml")),
+            StringComparison.Ordinal);
         Assert.DoesNotContain("<ScrollViewer", listXaml, StringComparison.Ordinal);
         Assert.Contains("ScrollViewer.VerticalScrollBarVisibility=\"Auto\"", listXaml, StringComparison.Ordinal);
         Assert.NotNull(view.FindControl<WalletItemListView>("WalletItemListView"));

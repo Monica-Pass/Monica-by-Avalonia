@@ -78,9 +78,14 @@ public sealed class GeneratorWorkflowUiTests
 
         Assert.Contains("<views:GeneratorResultView x:Name=\"GeneratorResultView\"", xaml, StringComparison.Ordinal);
         Assert.Contains("<views:GeneratorOptionsView x:Name=\"GeneratorOptionsView\"", xaml, StringComparison.Ordinal);
+        Assert.True(
+            xaml.IndexOf("GeneratorOptionsView", StringComparison.Ordinal) <
+            xaml.IndexOf("GeneratorResultView", StringComparison.Ordinal));
         Assert.DoesNotContain("HeaderGeneratePasswordButton", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("HeaderCopyGeneratedPasswordButton", xaml, StringComparison.Ordinal);
         Assert.Contains("<fa:FACommandBar", resultXaml, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"generatorOutputSurface\"", resultXaml, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"generatorHistorySurface\"", resultXaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"GeneratorHistoryScrollViewer\"", resultXaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"GeneratorOptionsScrollViewer\"", optionsXaml, StringComparison.Ordinal);
         Assert.Equal(5, CountOccurrences(resultXaml, "Width=\"40\" Height=\"40\""));
@@ -104,14 +109,16 @@ public sealed class GeneratorWorkflowUiTests
 
         view.UpdateResponsiveLayoutForWidth(900);
         Assert.True(view.IsMediumLayout);
-        Assert.Equal(1, Grid.GetColumn(options));
+        Assert.Equal(0, Grid.GetColumn(options));
+        Assert.Equal(1, Grid.GetColumn(result));
         Assert.Equal(2, content.ColumnDefinitions.Count);
         Assert.True(Assert.Single(content.RowDefinitions).Height.IsStar);
 
         view.UpdateResponsiveLayoutForWidth(1200);
         Assert.False(view.IsNarrowLayout);
         Assert.False(view.IsMediumLayout);
-        Assert.Equal(340, content.ColumnDefinitions[1].Width.Value);
+        Assert.Equal(340, content.ColumnDefinitions[0].Width.Value);
+        Assert.True(content.ColumnDefinitions[1].Width.IsStar);
     }
 
     private static string FindGeneratorFeatureFile(string fileName)

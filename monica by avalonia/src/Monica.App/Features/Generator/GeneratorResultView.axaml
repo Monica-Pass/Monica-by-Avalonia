@@ -10,39 +10,45 @@
         <ScrollViewer x:Name="GeneratorResultScrollViewer"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto">
-            <Grid RowDefinitions="Auto,*,Auto,Auto" RowSpacing="14">
-                <StackPanel Spacing="4">
-                    <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.GeneratedPasswordLabel}" />
-                    <TextBlock Text="{Binding GeneratorStrategySummaryText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                    <TextBlock x:Name="GeneratorValidationMessage"
-                               Text="{Binding GeneratorValidationMessage}"
-                               Foreground="{DynamicResource SystemFillColorCriticalBrush}"
-                               AutomationProperties.LiveSetting="Assertive"
-                               IsVisible="{Binding HasGeneratorValidationError}"
-                               TextWrapping="Wrap" />
-                </StackPanel>
+            <Grid RowDefinitions="Auto,Auto,*" RowSpacing="12">
+                <Border Classes="generatorOutputSurface">
+                    <Grid RowDefinitions="Auto,*" RowSpacing="14">
+                        <StackPanel Spacing="4">
+                            <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.GeneratedPasswordLabel}" />
+                            <TextBlock Text="{Binding GeneratorStrategySummaryText}"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock x:Name="GeneratorValidationMessage"
+                                       Text="{Binding GeneratorValidationMessage}"
+                                       Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                                       AutomationProperties.LiveSetting="Assertive"
+                                       IsVisible="{Binding HasGeneratorValidationError}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
 
-                <TextBox x:Name="GeneratedPasswordInput"
-                         Grid.Row="1"
-                         Classes="generatorPasswordBox"
-                         MinHeight="{Binding GeneratorPasswordBoxMinHeight}"
-                         Text="{Binding GeneratedPassword}"
-                         IsReadOnly="True"
-                         AutomationProperties.Name="{Binding L.GeneratedPasswordLabel}"
-                         PlaceholderText="{Binding L.GeneratedPasswordPlaceholder}">
-                    <TextBox.ContextMenu>
-                        <ContextMenu>
-                            <MenuItem Header="{Binding L.CopyPassword}" Command="{Binding CopyGeneratedPasswordCommand}">
-                                <MenuItem.Icon>
-                                    <ic:FluentIcon Icon="Copy" FontSize="16" />
-                                </MenuItem.Icon>
-                            </MenuItem>
-                        </ContextMenu>
-                    </TextBox.ContextMenu>
-                </TextBox>
+                        <TextBox x:Name="GeneratedPasswordInput"
+                                 Grid.Row="1"
+                                 Classes="generatorPasswordBox"
+                                 MinHeight="{Binding GeneratorPasswordBoxMinHeight}"
+                                 Text="{Binding GeneratedPassword}"
+                                 IsReadOnly="True"
+                                 AutomationProperties.Name="{Binding L.GeneratedPasswordLabel}"
+                                 PlaceholderText="{Binding L.GeneratedPasswordPlaceholder}">
+                            <TextBox.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="{Binding L.CopyPassword}" Command="{Binding CopyGeneratedPasswordCommand}">
+                                        <MenuItem.Icon>
+                                            <ic:FluentIcon Icon="Copy" FontSize="16" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                </ContextMenu>
+                            </TextBox.ContextMenu>
+                        </TextBox>
+                    </Grid>
+                </Border>
 
                 <fa:FACommandBar x:Name="GeneratorCommandBar"
-                                 Grid.Row="2"
+                                 Grid.Row="1"
                                  DefaultLabelPosition="Right"
                                  ClosedDisplayMode="Compact"
                                  IsDynamicOverflowEnabled="True"
@@ -78,7 +84,7 @@
                     </fa:FACommandBar.SecondaryCommands>
                 </fa:FACommandBar>
 
-                <Border Grid.Row="3" Padding="12" CornerRadius="8" Background="{DynamicResource LayerFillColorSubtleBrush}">
+                <Border Grid.Row="2" Classes="generatorHistorySurface">
                     <Grid RowDefinitions="Auto,Auto">
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                             <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.RecentGeneratedPasswords}" VerticalAlignment="Center" />

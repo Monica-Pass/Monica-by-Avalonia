@@ -47,7 +47,7 @@
 
                 <ScrollViewer Grid.Row="2" Margin="0,18,0,0" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="16">
-                        <Border Padding="20" CornerRadius="12" Background="{DynamicResource ControlFillColorDefaultBrush}" BorderBrush="{DynamicResource AccentFillColorDefaultBrush}" BorderThickness="1" MaxWidth="420" HorizontalAlignment="Left">
+                        <Border Classes="walletIdentitySurface" MaxWidth="460" HorizontalAlignment="Stretch">
                             <Grid RowDefinitions="Auto,*,Auto" MinHeight="170">
                                 <TextBlock Text="{Binding SelectedWalletDetails.KindText}" FontWeight="SemiBold" />
                                 <StackPanel Grid.Row="1" VerticalAlignment="Center" Spacing="4">

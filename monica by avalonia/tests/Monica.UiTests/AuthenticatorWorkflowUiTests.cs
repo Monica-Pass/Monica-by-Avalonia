@@ -115,6 +115,12 @@ public sealed class AuthenticatorWorkflowUiTests
 
         Assert.Contains("<views:AuthenticatorFilterPaneView x:Name=\"AuthenticatorFilterPane\"", xaml, StringComparison.Ordinal);
         Assert.Contains("<views:AuthenticatorAccountListView x:Name=\"AuthenticatorAccountListView\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"totpAccountRail\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Classes=\"workspaceSidebar\"", xaml, StringComparison.Ordinal);
+        Assert.Contains(
+            "Classes=\"totpCodeSurface\"",
+            File.ReadAllText(FindAuthenticatorFeatureFile("AuthenticatorCodeConsoleView.axaml")),
+            StringComparison.Ordinal);
         Assert.Contains("x:Name=\"AuthenticatorAccountListScrollViewer\"", accountListXaml, StringComparison.Ordinal);
         Assert.NotNull(view.FindControl<Control>("AuthenticatorFilterPane"));
         Assert.NotNull(view.FindControl<Control>("AuthenticatorAccountListView"));

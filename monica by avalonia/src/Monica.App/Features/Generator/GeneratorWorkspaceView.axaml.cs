@@ -53,11 +53,13 @@ public partial class GeneratorWorkspaceView : UserControl
         }
 
         GeneratorContentGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
-        GeneratorContentGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(IsMediumLayout ? 300 : 340)));
+        GeneratorContentGrid.ColumnDefinitions.Insert(
+            0,
+            new ColumnDefinition(new GridLength(IsMediumLayout ? 300 : 340)));
         GeneratorContentGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
-        Grid.SetColumn(GeneratorResultView, 0);
-        Grid.SetRow(GeneratorResultView, 0);
-        Grid.SetColumn(GeneratorOptionsView, 1);
+        Grid.SetColumn(GeneratorOptionsView, 0);
         Grid.SetRow(GeneratorOptionsView, 0);
+        Grid.SetColumn(GeneratorResultView, 1);
+        Grid.SetRow(GeneratorResultView, 0);
     }
 }

@@ -14,29 +14,32 @@
           RowDefinitions="Auto,*"
           HorizontalAlignment="Stretch"
           ClipToBounds="True">
-        <Border BorderBrush="{DynamicResource CardBorderBrush}"
-                BorderThickness="0,0,0,1"
-                Padding="0,0,0,12"
-                Margin="0,0,0,12">
-            <Grid x:Name="GeneratorHeaderGrid" ColumnDefinitions="*" MinHeight="56">
+        <Border Classes="generatorPageHeader">
+            <Grid x:Name="GeneratorHeaderGrid" ColumnDefinitions="*,Auto" ColumnSpacing="16" MinHeight="56">
                 <StackPanel x:Name="GeneratorHeaderTitle" MinWidth="0" VerticalAlignment="Center">
                     <TextBlock Classes="workspacePageTitle" Text="{Binding L.PasswordGenerator}" />
-                    <TextBlock Text="{Binding GeneratedPasswordStrengthText}"
+                    <TextBlock Text="{Binding GeneratorStrategySummaryText}"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                               TextTrimming="CharacterEllipsis" />
+                               TextWrapping="Wrap"
+                               MaxLines="2" />
                 </StackPanel>
+                <Border Grid.Column="1" Classes="generatorStatusChip" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding GeneratedPasswordStrengthText}"
+                               FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis" />
+                </Border>
             </Grid>
         </Border>
 
         <Grid x:Name="GeneratorContentGrid"
               Grid.Row="1"
-              ColumnDefinitions="*,340"
+              ColumnDefinitions="340,*"
               RowDefinitions="*"
               ColumnSpacing="14"
               RowSpacing="14"
               MinWidth="0">
-            <views:GeneratorResultView x:Name="GeneratorResultView" />
-            <views:GeneratorOptionsView x:Name="GeneratorOptionsView" Grid.Column="1" />
+            <views:GeneratorOptionsView x:Name="GeneratorOptionsView" />
+            <views:GeneratorResultView x:Name="GeneratorResultView" Grid.Column="1" />
         </Grid>
     </Grid>
 </UserControl>

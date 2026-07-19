@@ -1,5 +1,11 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+<Style Selector="Border.totpPageHeader">
+    <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Padding" Value="0,0,0,14" />
+    <Setter Property="Margin" Value="0,0,0,14" />
+</Style>
 <Style Selector="Button.totpAccountButton">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderBrush" Value="Transparent" />
@@ -52,16 +58,33 @@
     <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
 </Style>
 <Style Selector="Border.totpCodeConsole">
-    <Setter Property="CornerRadius" Value="8" />
-    <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Background" Value="{DynamicResource LayerFillColorDefaultBrush}" />
 </Style>
 <Style Selector="Border.totpInspector">
-    <Setter Property="CornerRadius" Value="8" />
-    <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
+    <Setter Property="BorderThickness" Value="1,0,0,0" />
     <Setter Property="Background" Value="{DynamicResource LayerFillColorDefaultBrush}" />
+</Style>
+<Style Selector="Border.totpAccountRail">
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,1,0" />
+    <Setter Property="Background" Value="{DynamicResource LayerFillColorSubtleBrush}" />
+</Style>
+<Style Selector="Border.totpSelectionBar">
+    <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
+    <Setter Property="BorderThickness" Value="0,1,0,0" />
+    <Setter Property="Background" Value="{DynamicResource LayerFillColorDefaultBrush}" />
+</Style>
+<Style Selector="Border.totpCodeSurface">
+    <Setter Property="Padding" Value="24" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
 </Style>
 <Style Selector="Border.totpRiskZone">
     <Setter Property="CornerRadius" Value="8" />
