@@ -166,8 +166,8 @@ public partial class PasswordVaultView : UserControl
         Grid.SetColumn(PasswordFolderNavigationRegion, 0);
         Grid.SetColumn(PasswordListRegion, IsWideLayout ? 1 : 0);
         Grid.SetColumn(PasswordDetailRegion, IsWideLayout ? 2 : 1);
-        PasswordListRegion.Margin = IsWideLayout ? new Thickness(12, 0, 0, 0) : new Thickness(0);
-        PasswordDetailRegion.Margin = new Thickness(12, 0, 0, 0);
+        PasswordListRegion.Margin = new Thickness(0);
+        PasswordDetailRegion.Margin = new Thickness(0);
         PasswordFolderNavigationRegion.IsVisible = IsWideLayout;
         PasswordListRegion.IsVisible = true;
         PasswordDetailRegion.IsVisible = true;

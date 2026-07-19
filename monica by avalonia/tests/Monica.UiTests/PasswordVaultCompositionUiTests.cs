@@ -36,6 +36,7 @@ public sealed class PasswordVaultCompositionUiTests
         var details = new PasswordDetailPaneView();
 
         Assert.NotNull(toolbar.FindControl<TextBox>("PasswordSearchBox"));
+        Assert.NotNull(toolbar.FindControl<Border>("PasswordVaultCommandSurface"));
         Assert.NotNull(toolbar.FindControl<Button>("PasswordSearchClearButton"));
         Assert.NotNull(list.FindControl<ListBox>("PasswordListBox"));
         Assert.NotNull(list.FindControl<CheckBox>("SelectAllVisiblePasswordsCheckBox"));
@@ -83,6 +84,8 @@ public sealed class PasswordVaultCompositionUiTests
         Assert.True(folderNavigation.IsVisible);
         Assert.True(view.FindControl<Border>("PasswordListRegion")!.IsVisible);
         Assert.True(view.FindControl<Border>("PasswordDetailRegion")!.IsVisible);
+        Assert.Equal(0, view.FindControl<Border>("PasswordListRegion")!.Margin.Left);
+        Assert.Equal(0, view.FindControl<Border>("PasswordDetailRegion")!.Margin.Left);
     }
 
     [Fact]
@@ -139,6 +142,7 @@ public sealed class PasswordVaultCompositionUiTests
         Assert.Contains("Header=\"{Binding L.ImportPasswordCsv}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Header=\"{Binding L.ExportPasswordCsv}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Header=\"{Binding L.DeletedPasswords}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"PasswordVaultCommandSurface\"", xaml, StringComparison.Ordinal);
         Assert.Contains("<local:PasswordFolderNavigationView", File.ReadAllText(FindPasswordFeatureFile("PasswordVaultView.axaml")), StringComparison.Ordinal);
         Assert.DoesNotContain("passwordFolderBar", File.ReadAllText(FindPasswordFeatureFile("PasswordFolderFilterView.axaml")), StringComparison.Ordinal);
     }

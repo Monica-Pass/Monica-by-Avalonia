@@ -112,6 +112,13 @@ public sealed class StorageWorkflowUiTests
         Assert.NotNull(import.FindControl<Button>("ImportBitwardenJsonVaultButton"));
         Assert.NotNull(import.FindControl<Button>("CancelBitwardenImportButton"));
 
+        var importXaml = ReadSyncFeatureFile("SyncImportView.axaml");
+        var exportXaml = ReadSyncFeatureFile("SyncExportView.axaml");
+        Assert.True(CountOccurrences(importXaml, "<fa:FASettingsExpander Header=") >= 5);
+        Assert.True(CountOccurrences(exportXaml, "<fa:FASettingsExpander Header=") >= 5);
+        Assert.Contains("IsExpanded=\"False\"", importXaml, StringComparison.Ordinal);
+        Assert.Contains("IsExpanded=\"False\"", exportXaml, StringComparison.Ordinal);
+
         var databaseWorkbench = new DatabaseWorkbenchView();
         Assert.NotNull(databaseWorkbench.FindControl<FAInfoBar>("LegacyBusinessDataNotice"));
         Assert.NotNull(databaseWorkbench.FindControl<Button>("OpenKeePassImportButton"));
@@ -183,5 +190,19 @@ public sealed class StorageWorkflowUiTests
         Assert.NotNull(sync.FindControl<Border>("WebDavOperationProgressRegion"));
         Assert.True(sync.FindControl<ProgressBar>("WebDavOperationProgressBar")!.IsIndeterminate);
         Assert.NotNull(sync.FindControl<TextBlock>("WebDavOperationStageText"));
+    }
+
+    private static int CountOccurrences(string value, string fragment) =>
+        value.Split(fragment, StringSplitOptions.None).Length - 1;
+
+    private static string ReadSyncFeatureFile(string fileName)
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            var candidate = Path.Combine(directory.FullName, "src", "Monica.App", "Features", "Sync", fileName);
+            if (File.Exists(candidate)) return File.ReadAllText(candidate);
+        }
+
+        throw new FileNotFoundException($"Could not locate Sync/{fileName} from the test output directory.");
     }
 }

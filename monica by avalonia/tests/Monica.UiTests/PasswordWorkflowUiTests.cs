@@ -30,6 +30,7 @@ public sealed class PasswordWorkflowUiTests
         Assert.NotNull(list.FindControl<StackPanel>("PasswordListEmptyState"));
         Assert.NotNull(list.FindControl<Button>("EmptyStateAddPasswordButton"));
         Assert.NotNull(list.FindControl<Button>("EmptyStateClearFiltersButton"));
+        Assert.True(toolbar.FindControl<TextBox>("PasswordSearchBox")!.Height >= 40);
     }
 
     [Fact]

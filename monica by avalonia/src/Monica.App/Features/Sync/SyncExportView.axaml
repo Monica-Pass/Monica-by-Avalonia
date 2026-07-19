@@ -9,7 +9,8 @@
                          IsVisible="{Binding IsImportExportBusy}"
                          AutomationProperties.Name="{Binding StatusMessage}" />
             <StackPanel x:Name="ExportOperationContent" Spacing="14" IsEnabled="{Binding IsImportExportIdle}">
-            <TextBlock Text="{Binding L.ExportPreview}" FontWeight="SemiBold" />
+            <fa:FASettingsExpander Header="{Binding L.ExportPreview}" Description="{Binding L.ExportDataDescription}" IsExpanded="True">
+            <StackPanel Spacing="8">
             <WrapPanel>
                 <Button Classes="workspaceCommand" Command="{Binding ExportDataCommand}" Margin="0,0,8,8">
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -25,8 +26,10 @@
                 </Button>
             </WrapPanel>
             <TextBox x:Name="JsonExportPreviewBox" Text="{Binding ExportPreview, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" MinHeight="150" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ExportPreview}" />
-            <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
-            <TextBlock Text="{Binding L.ExportCsvPreview}" FontWeight="SemiBold" />
+            </StackPanel>
+            </fa:FASettingsExpander>
+            <fa:FASettingsExpander Header="{Binding L.ExportCsvPreview}" IsExpanded="False">
+            <StackPanel Spacing="8">
             <WrapPanel>
                 <Button Classes="workspaceCommand" Command="{Binding ExportPasswordCsvCommand}" Margin="0,0,8,8">
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -42,8 +45,10 @@
                 </Button>
             </WrapPanel>
             <TextBox Text="{Binding ExportCsvPreview, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" MinHeight="150" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ExportCsvPreview}" />
-            <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
-            <TextBlock Text="{Binding L.ExportTotpCsvPreview}" FontWeight="SemiBold" />
+            </StackPanel>
+            </fa:FASettingsExpander>
+            <fa:FASettingsExpander Header="{Binding L.ExportTotpCsvPreview}" IsExpanded="False">
+            <StackPanel Spacing="8">
             <WrapPanel>
                 <Button Classes="workspaceCommand" Command="{Binding ExportTotpCsvCommand}" Margin="0,0,8,8">
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -59,8 +64,10 @@
                 </Button>
             </WrapPanel>
             <TextBox Text="{Binding ExportTotpCsvPreview, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" MinHeight="150" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ExportTotpCsvPreview}" />
-            <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
-            <TextBlock Text="{Binding L.ExportNoteCsvPreview}" FontWeight="SemiBold" />
+            </StackPanel>
+            </fa:FASettingsExpander>
+            <fa:FASettingsExpander Header="{Binding L.ExportNoteCsvPreview}" IsExpanded="False">
+            <StackPanel Spacing="8">
             <WrapPanel>
                 <Button Classes="workspaceCommand" Command="{Binding ExportNoteCsvCommand}" Margin="0,0,8,8">
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -76,8 +83,10 @@
                 </Button>
             </WrapPanel>
             <TextBox Text="{Binding ExportNoteCsvPreview, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" MinHeight="150" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ExportNoteCsvPreview}" />
-            <Border Height="1" Background="{DynamicResource CardBorderBrush}" />
-            <TextBlock Text="{Binding L.ExportAegisPreview}" FontWeight="SemiBold" />
+            </StackPanel>
+            </fa:FASettingsExpander>
+            <fa:FASettingsExpander Header="{Binding L.ExportAegisPreview}" IsExpanded="False">
+            <StackPanel Spacing="8">
             <WrapPanel>
                 <Button Classes="workspaceCommand" Command="{Binding ExportAegisJsonCommand}" Margin="0,0,8,8">
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -93,6 +102,8 @@
                 </Button>
             </WrapPanel>
             <TextBox Text="{Binding ExportAegisPreview, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" MinHeight="150" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ExportAegisPreview}" />
+            </StackPanel>
+            </fa:FASettingsExpander>
             </StackPanel>
         </StackPanel>
     </fa:FASettingsExpander>
