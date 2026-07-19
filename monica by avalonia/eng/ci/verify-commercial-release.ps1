@@ -59,6 +59,8 @@ function Assert-FocusedFeatureFileSizes {
         'src/Monica.App/Features/Mdbx',
         'src/Monica.App/Features/DatabaseManagement',
         'src/Monica.App/Features/RecycleBin',
+        'src/Monica.App/Features/Settings',
+        'src/Monica.App/Features/Unlock',
         'src/Monica.App/Features/ImportExport',
         'src/Monica.Core/ImportExport'
     )

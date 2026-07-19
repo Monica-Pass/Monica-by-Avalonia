@@ -14,49 +14,49 @@
                 <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="8">
                         <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.Settings}" Margin="2,0,0,4" />
-                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsGeneralSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="General">
+                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsGeneralSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="General" AutomationProperties.Name="{Binding L.General}">
                             <StackPanel Orientation="Horizontal" Spacing="10">
                                 <ic:FluentIcon Icon="Settings" FontSize="17" />
                                 <TextBlock Text="{Binding L.General}" />
                             </StackPanel>
                         </Button>
-                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsSecuritySelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Security">
+                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsSecuritySelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Security" AutomationProperties.Name="{Binding L.Security}">
                             <StackPanel Orientation="Horizontal" Spacing="10">
                                 <ic:FluentIcon Icon="Shield" FontSize="17" />
                                 <TextBlock Text="{Binding L.Security}" />
                             </StackPanel>
                         </Button>
-                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsSecurityRecoverySelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="SecurityRecovery">
+                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsSecurityRecoverySelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="SecurityRecovery" AutomationProperties.Name="{Binding SecurityRecoveryTitle}">
                             <StackPanel Orientation="Horizontal" Spacing="10">
                                 <ic:FluentIcon Icon="Key" FontSize="17" />
                                 <TextBlock Text="{Binding SecurityRecoveryTitle}" />
                             </StackPanel>
                         </Button>
-                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsDataSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Data">
+                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsDataSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Data" AutomationProperties.Name="{Binding L.DataManagement}">
                             <StackPanel Orientation="Horizontal" Spacing="10">
                                 <ic:FluentIcon Icon="Save" FontSize="17" />
                                 <TextBlock Text="{Binding L.DataManagement}" />
                             </StackPanel>
                         </Button>
-                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsDesktopSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Desktop">
+                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsDesktopSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Desktop" AutomationProperties.Name="{Binding L.Desktop}">
                             <StackPanel Orientation="Horizontal" Spacing="10">
                                 <ic:FluentIcon Icon="Desktop" FontSize="17" />
                                 <TextBlock Text="{Binding L.Desktop}" />
                             </StackPanel>
                         </Button>
-                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsIntegrationsSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Integrations">
+                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsIntegrationsSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Integrations" AutomationProperties.Name="{Binding PlatformIntegrationsTitle}">
                             <StackPanel Orientation="Horizontal" Spacing="10">
                                 <ic:FluentIcon Icon="Link" FontSize="17" />
                                 <TextBlock Text="{Binding PlatformIntegrationsTitle}" />
                             </StackPanel>
                         </Button>
-                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsAboutSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="About">
+                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsAboutSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="About" AutomationProperties.Name="{Binding AboutTitle}">
                             <StackPanel Orientation="Horizontal" Spacing="10">
                                 <ic:FluentIcon Icon="Info" FontSize="17" />
                                 <TextBlock Text="{Binding AboutTitle}" />
                             </StackPanel>
                         </Button>
-                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsDangerSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Danger">
+                        <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSettingsDangerSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Danger" AutomationProperties.Name="{Binding DangerZoneTitle}">
                             <StackPanel Orientation="Horizontal" Spacing="10">
                                 <ic:FluentIcon Icon="Delete" FontSize="17" />
                                 <TextBlock Text="{Binding DangerZoneTitle}" />
@@ -66,16 +66,7 @@
                 </ScrollViewer>
             </Border>
             <ScrollViewer x:Name="SettingsContentRegion" Grid.Column="1" HorizontalScrollBarVisibility="Disabled" ClipToBounds="True">
-                <StackPanel Spacing="14" MaxWidth="760" HorizontalAlignment="Stretch">
-                    <settings:SettingsGeneralView />
-                    <settings:SettingsSecurityView />
-                    <settings:SettingsRecoveryView />
-                    <settings:SettingsDataView />
-                    <settings:SettingsDesktopView />
-                    <settings:SettingsIntegrationsView />
-                    <settings:SettingsAboutView />
-                    <settings:SettingsDangerView />
-                </StackPanel>
+                <settings:SettingsPageHostView x:Name="SettingsPageHost" MaxWidth="760" HorizontalAlignment="Stretch" />
             </ScrollViewer>
         </Grid>
     </Grid>

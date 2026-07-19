@@ -14,9 +14,20 @@ public partial class UnlockView : UserControl, IDisposable
     public UnlockView()
     {
         InitializeComponent();
+        SizeChanged += (_, e) => UpdateResponsiveLayoutForWidth(e.NewSize.Width);
         DataContextChanged += OnDataContextChanged;
         AttachedToVisualTree += OnAttachedToVisualTree;
         DetachedFromVisualTree += OnDetachedFromVisualTree;
+    }
+
+    public bool IsCompactLayout { get; private set; }
+
+    public void UpdateResponsiveLayoutForWidth(double width)
+    {
+        IsCompactLayout = width > 0 && width < 560;
+        VaultAccessPanel.Margin = IsCompactLayout
+            ? new Thickness(20, 16)
+            : new Thickness(32, 24);
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e) =>

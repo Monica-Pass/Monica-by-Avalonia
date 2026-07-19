@@ -1,4 +1,5 @@
 using Avalonia.Automation;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Monica.App.Features.Unlock;
@@ -50,5 +51,21 @@ public sealed class VaultAccessUiTests
 
         Assert.True(view.FindControl<TextBox>("MasterPasswordInput")!.IsFocused);
         window.Close();
+    }
+
+    [Fact]
+    public void Vault_access_uses_stable_compact_form_margins_at_narrow_width()
+    {
+        var view = new UnlockView();
+
+        view.UpdateResponsiveLayoutForWidth(480);
+
+        Assert.True(view.IsCompactLayout);
+        Assert.Equal(new Thickness(20, 16), view.FindControl<StackPanel>("VaultAccessPanel")!.Margin);
+
+        view.UpdateResponsiveLayoutForWidth(900);
+
+        Assert.False(view.IsCompactLayout);
+        Assert.Equal(new Thickness(32, 24), view.FindControl<StackPanel>("VaultAccessPanel")!.Margin);
     }
 }

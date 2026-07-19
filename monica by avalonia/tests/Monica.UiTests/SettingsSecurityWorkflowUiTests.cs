@@ -1,4 +1,6 @@
 using Avalonia.Controls;
+using Avalonia.Threading;
+using Microsoft.Extensions.DependencyInjection;
 using Monica.App.Features.SecurityAnalysis;
 using Monica.App.Features.Settings;
 
@@ -27,6 +29,53 @@ public sealed class SettingsSecurityWorkflowUiTests
 
         Assert.False(view.IsNarrowLayout);
         Assert.Equal(2, view.FindControl<Grid>("SettingsWorkspaceLayoutGrid")!.ColumnDefinitions.Count);
+    }
+
+    [Fact]
+    public void Settings_page_host_constructs_only_the_selected_page()
+    {
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<Monica.App.ViewModels.MainWindowViewModel>();
+        var host = new SettingsPageHostView { DataContext = viewModel };
+        var content = host.FindControl<ContentControl>("SettingsPageContent")!;
+
+        Assert.IsType<SettingsGeneralView>(content.Content);
+
+        viewModel.SelectedSettingsPage = "Danger";
+        Assert.IsType<SettingsDangerView>(content.Content);
+
+        host.DataContext = null;
+        Assert.Null(content.Content);
+
+        host.DataContext = viewModel;
+        Assert.IsType<SettingsDangerView>(content.Content);
+    }
+
+    [Fact]
+    public void Settings_page_host_releases_cached_pages_when_detached()
+    {
+        var appWindow = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(appWindow);
+        var viewModel = services.GetRequiredService<Monica.App.ViewModels.MainWindowViewModel>();
+        var host = new SettingsPageHostView { DataContext = viewModel };
+        var window = new Window { Content = host };
+
+        window.Show();
+        viewModel.SelectedSettingsPage = "Security";
+        Assert.IsType<SettingsSecurityView>(host.FindControl<ContentControl>("SettingsPageContent")!.Content);
+
+        window.Close();
+        window.Content = null;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Null(host.FindControl<ContentControl>("SettingsPageContent")!.Content);
+
+        var restoredWindow = new Window { Content = host };
+        restoredWindow.Show();
+
+        Assert.IsType<SettingsSecurityView>(host.FindControl<ContentControl>("SettingsPageContent")!.Content);
+        restoredWindow.Close();
     }
 
     [Fact]

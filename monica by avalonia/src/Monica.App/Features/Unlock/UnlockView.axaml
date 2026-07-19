@@ -87,7 +87,8 @@
     <Grid Classes="unlockSurface"
           Background="{DynamicResource LayerFillColorDefaultBrush}"
           ClipToBounds="True">
-        <StackPanel MaxWidth="440"
+        <StackPanel x:Name="VaultAccessPanel"
+                    MaxWidth="440"
                     Margin="32,24"
                     Spacing="16"
                     HorizontalAlignment="Center"
