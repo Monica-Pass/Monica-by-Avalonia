@@ -44,10 +44,10 @@
             <Border x:Name="SecurityIssueListRegion" Classes="workspaceSidebar" ClipToBounds="True" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,1,0" CornerRadius="0">
                 <Grid RowDefinitions="Auto,*">
                     <views:SecurityAnalysisFilterPaneView x:Name="SecurityAnalysisFilterPane" />
-                    <views:SecurityAnalysisIssueListView x:Name="SecurityAnalysisIssueListView" Grid.Row="1" AutomationProperties.Name="Prioritized security issue queue" />
+                    <views:SecurityAnalysisIssueListView x:Name="SecurityAnalysisIssueListView" Grid.Row="1" />
                 </Grid>
             </Border>
-            <Border x:Name="SecurityIssueDetailRegion" Grid.Column="1" Classes="workspacePane" Padding="28,22" MinWidth="0" Focusable="True" CornerRadius="0" BorderThickness="0" Background="{DynamicResource LayerFillColorDefaultBrush}" AutomationProperties.Name="Security remediation workbench">
+            <Border x:Name="SecurityIssueDetailRegion" Grid.Column="1" Classes="workspacePane" Padding="28,22" MinWidth="0" Focusable="True" CornerRadius="0" BorderThickness="0" Background="{DynamicResource LayerFillColorDefaultBrush}">
                 <views:SecurityAnalysisInspectorView x:Name="SecurityAnalysisInspectorView" />
             </Border>
         </Grid>

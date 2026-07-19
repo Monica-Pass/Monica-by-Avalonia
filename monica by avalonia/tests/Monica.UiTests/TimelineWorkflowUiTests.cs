@@ -36,8 +36,7 @@ public sealed class TimelineWorkflowUiTests
         Assert.DoesNotContain("<ScrollViewer", listXaml, StringComparison.Ordinal);
         Assert.Contains("ScrollViewer.VerticalScrollBarVisibility=\"Auto\"", listXaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"TimelineDetailScrollViewer\"", File.ReadAllText(FindFeatureFile("TimelineInspectorView.axaml")), StringComparison.Ordinal);
-        Assert.Contains("Continuous audit event stream", workspaceXaml, StringComparison.Ordinal);
-        Assert.Contains("Audit event evidence inspector", workspaceXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"TimelineQueryCommandSurface\"", workspaceXaml, StringComparison.Ordinal);
     }
 
     [Fact]

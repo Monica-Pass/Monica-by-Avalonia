@@ -37,8 +37,7 @@ public sealed class SecurityAnalysisWorkflowUiTests
         Assert.Contains("RefreshSecurityAnalysisCommand", commandXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("<ScrollViewer", listXaml, StringComparison.Ordinal);
         Assert.Contains("ScrollViewer.VerticalScrollBarVisibility=\"Auto\"", listXaml, StringComparison.Ordinal);
-        Assert.Contains("Prioritized security issue queue", workspaceXaml, StringComparison.Ordinal);
-        Assert.Contains("Security remediation workbench", workspaceXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"SecurityTriageCommandSurface\"", workspaceXaml, StringComparison.Ordinal);
     }
 
     [Fact]

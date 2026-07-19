@@ -37,6 +37,9 @@ public sealed class StoragePlatformWorkflowUiTests
         var mdbxListXaml = ReadFeatureFile("Mdbx", "MdbxDatabaseListView.axaml");
         var databaseCommandXaml = ReadFeatureFile("DatabaseManagement", "DatabaseCommandBarView.axaml");
         var databaseListXaml = ReadFeatureFile("DatabaseManagement", "DatabaseSourceListView.axaml");
+        var databaseWorkspaceXaml = ReadFeatureFile("DatabaseManagement", "DatabaseManagementWorkspaceView.axaml");
+        var mdbxWorkspaceXaml = ReadFeatureFile("Mdbx", "MdbxWorkspaceView.axaml");
+        var syncWorkspaceXaml = ReadFeatureFile("Sync", "SyncWorkspaceView.axaml");
 
         Assert.Contains("<fa:FACommandBar", syncCommandXaml, StringComparison.Ordinal);
         Assert.Contains("TestWebDavConnectionCommand", syncCommandXaml, StringComparison.Ordinal);
@@ -54,6 +57,10 @@ public sealed class StoragePlatformWorkflowUiTests
         Assert.DoesNotContain("LoadCommand", databaseListXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("<ScrollViewer", databaseListXaml, StringComparison.Ordinal);
         Assert.Contains("ScrollViewer.VerticalScrollBarVisibility=\"Auto\"", databaseListXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Command=\"{Binding LoadCommand}\"", databaseWorkspaceXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"DatabaseOperationsCommandSurface\"", databaseWorkspaceXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"MdbxEngineCommandSurface\"", mdbxWorkspaceXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"SyncHealthStatusRegion\"", syncWorkspaceXaml, StringComparison.Ordinal);
     }
 
     [Fact]

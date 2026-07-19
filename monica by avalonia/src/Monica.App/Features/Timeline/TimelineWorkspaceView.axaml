@@ -30,7 +30,7 @@
         </Border>
 
         <Grid x:Name="TimelineMasterDetailGrid" Grid.Row="1" ColumnDefinitions="440,*" MinWidth="0">
-            <Border x:Name="TimelineListRegion" Classes="timelineFilterRail" ClipToBounds="True" AutomationProperties.Name="Continuous audit event stream">
+            <Border x:Name="TimelineListRegion" Classes="timelineFilterRail" ClipToBounds="True">
                 <Grid RowDefinitions="Auto,*">
                     <StackPanel Margin="14,12,14,8" Spacing="3">
                         <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.Timeline}" />
@@ -39,7 +39,7 @@
                     <views:TimelineEntryListView x:Name="TimelineEntryListView" Grid.Row="1" />
                 </Grid>
             </Border>
-            <Border x:Name="TimelineDetailRegion" Grid.Column="1" Classes="timelineInspector" Padding="28,22" MinWidth="0" Focusable="True" AutomationProperties.Name="Audit event evidence inspector">
+            <Border x:Name="TimelineDetailRegion" Grid.Column="1" Classes="timelineInspector" Padding="28,22" MinWidth="0" Focusable="True">
                 <views:TimelineInspectorView x:Name="TimelineInspectorView" />
             </Border>
         </Grid>

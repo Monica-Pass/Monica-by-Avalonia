@@ -31,14 +31,34 @@ public partial class MdbxWorkspaceView : UserControl
             MdbxWorkspaceLayoutGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
             Grid.SetColumn(MdbxContentRegion, 0);
             Grid.SetRow(MdbxContentRegion, 1);
+            MdbxWorkbenchLayoutGrid.ColumnDefinitions.Clear();
+            MdbxWorkbenchLayoutGrid.RowDefinitions.Clear();
+            MdbxWorkbenchLayoutGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+            MdbxWorkbenchLayoutGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            MdbxWorkbenchLayoutGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            Grid.SetColumn(MdbxSectionNavigator, 0);
+            Grid.SetRow(MdbxSectionNavigator, 0);
+            var workbench = MdbxWorkbenchLayoutGrid.Children.OfType<MdbxWorkbenchView>().Single();
+            Grid.SetColumn(workbench, 0);
+            Grid.SetRow(workbench, 1);
             return;
         }
 
-        MdbxWorkspaceLayoutGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(IsMediumLayout ? 280 : 360)));
+        MdbxWorkspaceLayoutGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(IsMediumLayout ? 280 : 340)));
         MdbxWorkspaceLayoutGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
         MdbxWorkspaceLayoutGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
         Grid.SetColumn(MdbxContentRegion, 1);
         Grid.SetRow(MdbxContentRegion, 0);
+        MdbxWorkbenchLayoutGrid.ColumnDefinitions.Clear();
+        MdbxWorkbenchLayoutGrid.RowDefinitions.Clear();
+        MdbxWorkbenchLayoutGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(176)));
+        MdbxWorkbenchLayoutGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+        MdbxWorkbenchLayoutGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        Grid.SetColumn(MdbxSectionNavigator, 0);
+        Grid.SetRow(MdbxSectionNavigator, 0);
+        var desktopWorkbench = MdbxWorkbenchLayoutGrid.Children.OfType<MdbxWorkbenchView>().Single();
+        Grid.SetColumn(desktopWorkbench, 1);
+        Grid.SetRow(desktopWorkbench, 0);
     }
 
     private void ApplyHeaderLayout(double width)

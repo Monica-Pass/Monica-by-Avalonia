@@ -2,9 +2,9 @@
     <UserControl.Styles>
         <StyleInclude Source="/Features/Sync/SyncStyles.axaml" />
     </UserControl.Styles>
-    <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsSync}}" RowDefinitions="Auto,*" MaxWidth="1080" HorizontalAlignment="Stretch" ClipToBounds="True">
-        <Border Classes="workspacePageHeader">
-            <Grid x:Name="SyncHeaderGrid" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+    <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsSync}}" RowDefinitions="Auto,*" HorizontalAlignment="Stretch" ClipToBounds="True">
+        <Border x:Name="SyncOperationsCommandSurface" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,14" Margin="0,0,0,8">
+            <Grid x:Name="SyncHeaderGrid" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
                 <TextBlock Classes="workspacePageTitle" Text="{Binding L.SyncAndBackup}" />
                 <TextBlock Grid.Row="1" Classes="workspacePageSubtitle" Text="{Binding L.SyncSubtitle}" MaxWidth="620" HorizontalAlignment="Left" />
                 <sync:SyncCommandBarView x:Name="SyncCommandBar" Grid.Column="1" Grid.RowSpan="2" />
@@ -31,34 +31,33 @@
                                    AutomationProperties.LiveSetting="Polite" />
                     </Grid>
                 </Border>
+                <ScrollViewer x:Name="SyncHealthStatusRegion" Grid.Row="3" Grid.ColumnSpan="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                    <StackPanel>
+                        <ItemsControl ItemsSource="{Binding SyncHealthItems}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SyncHealthDisplayItem">
+                                    <Border Width="180" MinHeight="64" Margin="0,0,8,0" Padding="12,8" CornerRadius="4" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,1,0" Background="Transparent">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="{Binding Label}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Value}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Detail}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="{Binding SyncRecoverySummaryText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,6,0,0" />
+                    </StackPanel>
+                </ScrollViewer>
             </Grid>
         </Border>
-        <Grid x:Name="SyncWorkspaceLayoutGrid" Grid.Row="1" ColumnDefinitions="320,*" RowDefinitions="*" ColumnSpacing="16" RowSpacing="12" MinWidth="0">
-            <Border x:Name="SyncSidebarRegion" Classes="workspaceSidebar" Padding="14" ClipToBounds="True">
+        <Grid x:Name="SyncWorkspaceLayoutGrid" Grid.Row="1" ColumnDefinitions="260,*" RowDefinitions="*" MinWidth="0">
+            <Border x:Name="SyncSidebarRegion" Classes="workspaceSidebar" Padding="14" ClipToBounds="True" CornerRadius="0" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,1,0" Background="Transparent">
                 <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="14">
-                        <StackPanel x:Name="SyncSidebarOverview" Spacing="12">
-                            <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.SyncOverview}" />
-                            <ItemsControl ItemsSource="{Binding SyncHealthItems}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel Orientation="Horizontal" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:SyncHealthDisplayItem">
-                                        <Border Width="130" MinHeight="96" Margin="0,0,8,8" Padding="10" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}">
-                                            <StackPanel Spacing="4">
-                                                <TextBlock Text="{Binding Label}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                                                <TextBlock Text="{Binding Value}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" MaxLines="2" />
-                                                <TextBlock Text="{Binding Detail}" FontSize="12" TextWrapping="Wrap" MaxLines="2" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <TextBlock Text="{Binding SyncRecoverySummaryText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                        </StackPanel>
                         <StackPanel Spacing="8">
                             <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.SyncAndBackup}" />
                             <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSyncConfigurationSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Configuration">
@@ -96,7 +95,7 @@
                 </ScrollViewer>
             </Border>
             <ScrollViewer x:Name="SyncContentRegion" Grid.Column="1" HorizontalScrollBarVisibility="Disabled" ClipToBounds="True">
-                <StackPanel Spacing="14" MaxWidth="720" HorizontalAlignment="Stretch">
+                <StackPanel Spacing="14" MaxWidth="760" HorizontalAlignment="Stretch" Margin="28,18,20,20">
                     <sync:SyncPageHostView x:Name="SyncPageHost" />
                 </StackPanel>
             </ScrollViewer>

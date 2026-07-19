@@ -33,16 +33,16 @@
     <Setter Property="Background" Value="Transparent" />
 </Style>
 <Style Selector="Border.mdbxSourceRail">
-    <Setter Property="CornerRadius" Value="8" />
-    <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="Background" Value="{DynamicResource LayerFillColorDefaultBrush}" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,1,0" />
+    <Setter Property="Background" Value="Transparent" />
 </Style>
 <Style Selector="Border.mdbxWorkbench">
-    <Setter Property="CornerRadius" Value="8" />
-    <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Background" Value="Transparent" />
 </Style>
 <Style Selector="Border.mdbxDiagnosticTile">
     <Setter Property="CornerRadius" Value="8" />
@@ -51,7 +51,7 @@
     <Setter Property="Background" Value="{DynamicResource LayerFillColorDefaultBrush}" />
 </Style>
 <Style Selector="Button.mdbxPivotButton">
-    <Setter Property="MinHeight" Value="38" />
+    <Setter Property="MinHeight" Value="40" />
     <Setter Property="Padding" Value="12,8" />
     <Setter Property="HorizontalAlignment" Value="Stretch" />
     <Setter Property="HorizontalContentAlignment" Value="Left" />
@@ -61,6 +61,6 @@
 <Style Selector="Button.mdbxPivotButton.accent">
     <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
     <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
-    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="BorderThickness" Value="2,0,0,0" />
 </Style>
 </Styles>

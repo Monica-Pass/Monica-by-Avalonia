@@ -28,9 +28,14 @@ public sealed class StorageWorkflowUiTests
         Assert.NotNull(sync.FindControl<Grid>("SyncWorkspaceLayoutGrid"));
         Assert.NotNull(sync.FindControl<Border>("SyncSidebarRegion"));
         Assert.NotNull(sync.FindControl<ScrollViewer>("SyncContentRegion"));
+        Assert.NotNull(sync.FindControl<Border>("SyncOperationsCommandSurface"));
+        Assert.NotNull(sync.FindControl<ScrollViewer>("SyncHealthStatusRegion"));
         Assert.NotNull(mdbx.FindControl<Grid>("MdbxWorkspaceLayoutGrid"));
         Assert.NotNull(mdbx.FindControl<Border>("MdbxListRegion"));
         Assert.NotNull(mdbx.FindControl<ScrollViewer>("MdbxContentRegion"));
+        Assert.NotNull(mdbx.FindControl<Border>("MdbxEngineCommandSurface"));
+        Assert.NotNull(mdbx.FindControl<Grid>("MdbxWorkbenchLayoutGrid"));
+        Assert.NotNull(mdbx.FindControl<StackPanel>("MdbxSectionNavigator"));
         Assert.NotNull(mdbxWorkbench.FindControl<Button>("SyncMdbxDatabaseButton"));
         Assert.NotNull(mdbxWorkbench.FindControl<Button>("KeepLocalRemoteMdbxButton"));
         Assert.NotNull(mdbxWorkbench.FindControl<Button>("UseRemoteMdbxButton"));
@@ -41,6 +46,8 @@ public sealed class StorageWorkflowUiTests
         Assert.NotNull(databases.FindControl<Grid>("DatabaseWorkspaceLayoutGrid"));
         Assert.NotNull(databases.FindControl<Border>("DatabaseListRegion"));
         Assert.NotNull(databases.FindControl<ScrollViewer>("DatabaseContentRegion"));
+        Assert.NotNull(databases.FindControl<Border>("DatabaseOperationsCommandSurface"));
+        Assert.NotNull(databases.FindControl<Grid>("DatabaseOperationNavigator"));
     }
 
     [Fact]
@@ -60,7 +67,8 @@ public sealed class StorageWorkflowUiTests
         Assert.Single(sync.FindControl<Grid>("SyncWorkspaceLayoutGrid")!.ColumnDefinitions);
         Assert.Single(mdbx.FindControl<Grid>("MdbxWorkspaceLayoutGrid")!.ColumnDefinitions);
         Assert.Single(databases.FindControl<Grid>("DatabaseWorkspaceLayoutGrid")!.ColumnDefinitions);
-        Assert.False(sync.FindControl<StackPanel>("SyncSidebarOverview")!.IsVisible);
+        Assert.Equal(4, Grid.GetRow(sync.FindControl<ScrollViewer>("SyncHealthStatusRegion")!));
+        Assert.Single(mdbx.FindControl<Grid>("MdbxWorkbenchLayoutGrid")!.ColumnDefinitions);
 
         sync.UpdateResponsiveLayoutForWidth(1100);
         mdbx.UpdateResponsiveLayoutForWidth(1100);
@@ -72,6 +80,7 @@ public sealed class StorageWorkflowUiTests
         Assert.Equal(2, sync.FindControl<Grid>("SyncWorkspaceLayoutGrid")!.ColumnDefinitions.Count);
         Assert.Equal(2, mdbx.FindControl<Grid>("MdbxWorkspaceLayoutGrid")!.ColumnDefinitions.Count);
         Assert.Equal(2, databases.FindControl<Grid>("DatabaseWorkspaceLayoutGrid")!.ColumnDefinitions.Count);
+        Assert.Equal(2, mdbx.FindControl<Grid>("MdbxWorkbenchLayoutGrid")!.ColumnDefinitions.Count);
     }
 
     [Fact]

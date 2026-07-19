@@ -3,14 +3,14 @@
         <StyleInclude Source="/Features/Mdbx/MdbxStyles.axaml" />
     </UserControl.Styles>
     <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsMdbx}}" RowDefinitions="Auto,*" ClipToBounds="True">
-        <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
+        <Border x:Name="MdbxEngineCommandSurface" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,8">
             <Grid x:Name="MdbxHeaderGrid" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
                 <TextBlock Classes="workspacePageTitle" Text="{Binding L.MdbxVaults}" />
                 <TextBlock Grid.Row="1" Classes="workspacePageSubtitle" Text="{Binding MdbxWorkingCopySummaryText}" MaxWidth="720" HorizontalAlignment="Left" />
                 <mdbx:MdbxCommandBarView x:Name="MdbxCommandBar" Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Center" />
             </Grid>
         </Border>
-        <Grid x:Name="MdbxWorkspaceLayoutGrid" Grid.Row="1" ColumnDefinitions="360,*" RowDefinitions="*" ColumnSpacing="14" RowSpacing="12" MinWidth="0">
+        <Grid x:Name="MdbxWorkspaceLayoutGrid" Grid.Row="1" ColumnDefinitions="340,*" RowDefinitions="*" MinWidth="0">
             <Border x:Name="MdbxListRegion" Classes="mdbxSourceRail" ClipToBounds="True">
                 <Grid RowDefinitions="Auto,*">
                     <Grid Margin="14,12,14,8" ColumnDefinitions="*" ColumnSpacing="8">
@@ -23,23 +23,24 @@
                 </Grid>
             </Border>
             <ScrollViewer x:Name="MdbxContentRegion" Grid.Column="1" HorizontalScrollBarVisibility="Disabled" ClipToBounds="True">
-                <StackPanel Spacing="14">
-                    <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
+                <Grid x:Name="MdbxWorkbenchLayoutGrid" ColumnDefinitions="176,*" RowDefinitions="Auto" Margin="16,16,20,20" ColumnSpacing="20">
+                    <StackPanel x:Name="MdbxSectionNavigator" Spacing="4">
+                        <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.MdbxDiagnostics}" Margin="12,0,0,6" />
                         <Button Classes="mdbxPivotButton" Classes.accent="{Binding IsMdbxHealthSelected}" Command="{Binding SelectMdbxWorkspacePageCommand}" CommandParameter="Health">
                             <TextBlock Text="{Binding L.MdbxHealthSection}" TextTrimming="CharacterEllipsis" />
                         </Button>
-                        <Button Grid.Column="1" Classes="mdbxPivotButton" Classes.accent="{Binding IsMdbxDetailsSelected}" Command="{Binding SelectMdbxWorkspacePageCommand}" CommandParameter="Details">
+                        <Button Classes="mdbxPivotButton" Classes.accent="{Binding IsMdbxDetailsSelected}" Command="{Binding SelectMdbxWorkspacePageCommand}" CommandParameter="Details">
                             <TextBlock Text="{Binding L.Details}" TextTrimming="CharacterEllipsis" />
                         </Button>
-                        <Button Grid.Column="2" Classes="mdbxPivotButton" Classes.accent="{Binding IsMdbxSourcesSelected}" Command="{Binding SelectMdbxWorkspacePageCommand}" CommandParameter="Sources">
+                        <Button Classes="mdbxPivotButton" Classes.accent="{Binding IsMdbxSourcesSelected}" Command="{Binding SelectMdbxWorkspacePageCommand}" CommandParameter="Sources">
                             <TextBlock Text="{Binding L.MdbxSourcesSection}" TextTrimming="CharacterEllipsis" />
                         </Button>
-                        <Button Grid.Column="3" Classes="mdbxPivotButton" Classes.accent="{Binding IsMdbxRuntimeSelected}" Command="{Binding SelectMdbxWorkspacePageCommand}" CommandParameter="Runtime">
+                        <Button Classes="mdbxPivotButton" Classes.accent="{Binding IsMdbxRuntimeSelected}" Command="{Binding SelectMdbxWorkspacePageCommand}" CommandParameter="Runtime">
                             <TextBlock Text="{Binding L.MdbxRuntime}" TextTrimming="CharacterEllipsis" />
                         </Button>
-                    </Grid>
-                    <mdbx:MdbxWorkbenchView />
-                </StackPanel>
+                    </StackPanel>
+                    <mdbx:MdbxWorkbenchView Grid.Column="1" />
+                </Grid>
             </ScrollViewer>
         </Grid>
     </Grid>

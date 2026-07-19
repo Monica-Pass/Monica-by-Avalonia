@@ -33,17 +33,15 @@ public partial class SyncWorkspaceView : UserControl
             Grid.SetColumn(SyncContentRegion, 0);
             Grid.SetRow(SyncContentRegion, 1);
             SyncSidebarRegion.MaxHeight = 264;
-            SyncSidebarOverview.IsVisible = false;
             return;
         }
 
-        SyncWorkspaceLayoutGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(IsMediumLayout ? 280 : 320)));
+        SyncWorkspaceLayoutGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(IsMediumLayout ? 240 : 260)));
         SyncWorkspaceLayoutGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
         SyncWorkspaceLayoutGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
         Grid.SetColumn(SyncContentRegion, 1);
         Grid.SetRow(SyncContentRegion, 0);
         SyncSidebarRegion.MaxHeight = double.PositiveInfinity;
-        SyncSidebarOverview.IsVisible = true;
     }
 
     private void ApplyHeaderLayout(double width)
@@ -57,5 +55,6 @@ public partial class SyncWorkspaceView : UserControl
             ? new Avalonia.Thickness(0, 4, 0, 0)
             : new Avalonia.Thickness(0);
         Grid.SetRow(WebDavOperationProgressRegion, compact ? 3 : 2);
+        Grid.SetRow(SyncHealthStatusRegion, compact ? 4 : 3);
     }
 }

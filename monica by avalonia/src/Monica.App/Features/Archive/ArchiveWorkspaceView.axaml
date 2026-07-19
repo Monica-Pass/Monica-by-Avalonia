@@ -48,7 +48,7 @@
     </Border>
 
     <Grid x:Name="ArchiveMasterDetailGrid" Grid.Row="1" ColumnDefinitions="300,*" MinWidth="0">
-        <Border x:Name="ArchiveListRegion" Classes="archiveFilterRail" ClipToBounds="True" AutomationProperties.Name="Archived item recovery queue">
+        <Border x:Name="ArchiveListRegion" Classes="archiveFilterRail" ClipToBounds="True">
             <Grid RowDefinitions="Auto,Auto,*">
                 <Grid Margin="14,12,14,8" ColumnDefinitions="*,Auto" ColumnSpacing="8">
                     <StackPanel Spacing="3">
@@ -149,7 +149,7 @@
             </Grid>
         </Border>
 
-        <Border x:Name="ArchiveDetailRegion" Grid.Column="1" Classes="archiveInspector" Padding="28,22" MinWidth="0" Focusable="True" AutomationProperties.Name="Archive restore workbench">
+        <Border x:Name="ArchiveDetailRegion" Grid.Column="1" Classes="archiveInspector" Padding="28,22" MinWidth="0" Focusable="True">
             <Grid>
                 <ScrollViewer IsVisible="{Binding HasSelectedArchivedPassword}" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Spacing="18">

@@ -39,7 +39,7 @@ public partial class DatabaseManagementWorkspaceView : UserControl
             return;
         }
 
-        DatabaseWorkspaceLayoutGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(IsMediumLayout ? 280 : 360)));
+        DatabaseWorkspaceLayoutGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(IsMediumLayout ? 280 : 340)));
         DatabaseWorkspaceLayoutGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
         DatabaseWorkspaceLayoutGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
         Grid.SetColumn(DatabaseContentRegion, 1);

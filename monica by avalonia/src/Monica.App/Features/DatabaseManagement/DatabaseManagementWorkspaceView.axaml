@@ -3,31 +3,30 @@
         <StyleInclude Source="/Features/DatabaseManagement/DatabaseManagementStyles.axaml" />
     </UserControl.Styles>
     <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsDatabaseManagement}}" RowDefinitions="Auto,*" ClipToBounds="True">
-        <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
+        <Border x:Name="DatabaseOperationsCommandSurface" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,8">
             <Grid x:Name="DatabaseHeaderGrid" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
                 <TextBlock Classes="workspacePageTitle" Text="{Binding L.DatabaseManagement}" />
                 <TextBlock Grid.Row="1" Classes="workspacePageSubtitle" Text="{Binding VaultSourceCountText}" MaxWidth="720" HorizontalAlignment="Left" />
                 <db:DatabaseCommandBarView x:Name="DatabaseCommandBar" Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Center" />
             </Grid>
         </Border>
-        <Grid x:Name="DatabaseWorkspaceLayoutGrid" Grid.Row="1" ColumnDefinitions="360,*" RowDefinitions="*" ColumnSpacing="14" RowSpacing="12" MinWidth="0">
+        <Grid x:Name="DatabaseWorkspaceLayoutGrid" Grid.Row="1" ColumnDefinitions="340,*" RowDefinitions="*" MinWidth="0">
             <Border x:Name="DatabaseListRegion" Classes="databaseSourceRail" ClipToBounds="True">
                 <Grid RowDefinitions="Auto,*">
-                    <Grid Margin="14,12,14,8" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <Grid Margin="14,12,14,8" ColumnDefinitions="*">
                         <StackPanel Spacing="3">
                             <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.RegisteredDatabases}" />
                             <TextBlock Text="{Binding VaultSourceCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
                         </StackPanel>
-                        <Button Grid.Column="1" Classes="workspaceCommand" Command="{Binding LoadCommand}" ToolTip.Tip="{Binding L.Refresh}" AutomationProperties.Name="{Binding L.Refresh}" Width="34" Height="34" Padding="0">
-                            <ic:FluentIcon Icon="ArrowClockwise" FontSize="16" />
-                        </Button>
                     </Grid>
                     <db:DatabaseSourceListView x:Name="DatabaseSourceListView" Grid.Row="1" />
                 </Grid>
             </Border>
             <ScrollViewer x:Name="DatabaseContentRegion" Grid.Column="1" HorizontalScrollBarVisibility="Disabled" ClipToBounds="True">
-                <StackPanel Spacing="14">
-                    <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
+                <StackPanel Spacing="14" Margin="24,16,20,20">
+                    <StackPanel Spacing="6">
+                        <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.DatabaseManagement}" />
+                        <Grid x:Name="DatabaseOperationNavigator" ColumnDefinitions="*,*,*,*" ColumnSpacing="4">
                         <Button Classes="databasePivotButton" Classes.accent="{Binding IsDatabaseSourceSelected}" Command="{Binding SelectDatabaseManagementPageCommand}" CommandParameter="Source">
                             <TextBlock Text="{Binding L.RegisteredDatabases}" TextTrimming="CharacterEllipsis" />
                         </Button>
@@ -40,7 +39,8 @@
                         <Button Grid.Column="3" Classes="databasePivotButton" Classes.accent="{Binding IsDatabaseCapabilitiesSelected}" Command="{Binding SelectDatabaseManagementPageCommand}" CommandParameter="Capabilities">
                             <TextBlock Text="{Binding L.FeatureParityMap}" TextTrimming="CharacterEllipsis" />
                         </Button>
-                    </Grid>
+                        </Grid>
+                    </StackPanel>
                     <db:DatabaseWorkbenchView />
                 </StackPanel>
             </ScrollViewer>

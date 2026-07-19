@@ -107,10 +107,8 @@ public sealed class LifecycleWorkflowUiTests
 
         var archiveXaml = File.ReadAllText(FindFeatureFile("Archive", "ArchiveWorkspaceView.axaml"));
         var recycleXaml = File.ReadAllText(FindFeatureFile("RecycleBin", "RecycleBinWorkspaceView.axaml"));
-        Assert.Contains("Archived item recovery queue", archiveXaml, StringComparison.Ordinal);
-        Assert.Contains("Archive restore workbench", archiveXaml, StringComparison.Ordinal);
-        Assert.Contains("Deletion lifecycle queue", recycleXaml, StringComparison.Ordinal);
-        Assert.Contains("Restore and retention inspector", recycleXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ArchiveRecoveryCommandSurface\"", archiveXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"RecycleBinLifecycleCommandSurface\"", recycleXaml, StringComparison.Ordinal);
     }
 
     [Fact]
