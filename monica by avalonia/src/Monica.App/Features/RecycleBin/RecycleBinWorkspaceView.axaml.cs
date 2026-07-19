@@ -31,13 +31,13 @@ public partial class RecycleBinWorkspaceView : UserControl
 
     public void SelectAdjacent(MainWindowViewModel viewModel, int delta)
     {
-        var items = viewModel.FilteredDeletedPasswords.ToList();
+        var items = viewModel.FilteredRecycleBinItems.ToList();
         if (items.Count == 0) return;
-        var index = viewModel.SelectedDeletedPassword is null
+        var index = viewModel.SelectedRecycleBinItem is null
             ? -1
-            : items.FindIndex(item => item.Id == viewModel.SelectedDeletedPassword.Id);
+            : items.FindIndex(item => item.Key == viewModel.SelectedRecycleBinItem?.Key);
         var next = index < 0 ? (delta > 0 ? 0 : items.Count - 1) : Math.Clamp(index + delta, 0, items.Count - 1);
-        viewModel.SelectedDeletedPassword = items[next];
+        viewModel.SelectedRecycleBinItem = items[next];
         RecycleBinPasswordList.ScrollIntoView(items[next]);
     }
 
@@ -58,7 +58,7 @@ public partial class RecycleBinWorkspaceView : UserControl
 
     private void ViewModelOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(MainWindowViewModel.RecycleBinNarrowShowsList) or nameof(MainWindowViewModel.SelectedDeletedPassword))
+        if (e.PropertyName is nameof(MainWindowViewModel.RecycleBinNarrowShowsList) or nameof(MainWindowViewModel.SelectedRecycleBinItem))
         {
             Dispatcher.UIThread.Post(() => ApplyResponsiveLayout(Bounds.Width));
         }
@@ -66,7 +66,7 @@ public partial class RecycleBinWorkspaceView : UserControl
 
     private void ApplyResponsiveLayout(double width)
     {
-        var showDetails = IsNarrowLayout && _observedViewModel?.RecycleBinNarrowShowsList == false && _observedViewModel.SelectedDeletedPassword is not null;
+        var showDetails = IsNarrowLayout && _observedViewModel?.RecycleBinNarrowShowsList == false && _observedViewModel.SelectedRecycleBinItem is not null;
         LifecycleWorkspaceLayout.ApplyContent(RecycleBinMasterDetailGrid, RecycleBinListRegion, RecycleBinDetailRegion, BackToRecycleBinListButton, IsNarrowLayout, showDetails, IsMediumLayout ? 280 : 300);
         LifecycleWorkspaceLayout.ApplyHeader(RecycleBinSearchRegion, RecycleBinHeaderCommands, width > 0 && width < LifecycleWorkspaceLayout.WideHeaderBreakpoint);
     }

@@ -76,17 +76,22 @@ public sealed partial class MdbxBackedMonicaRepository(
         if (entry is not null)
         {
             await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
-            await mdbxVaultStore.SoftDeletePasswordAsync(database, entry, cancellationToken);
+            var deletedAt = DateTimeOffset.UtcNow;
             entry.IsDeleted = true;
-            entry.DeletedAt = DateTimeOffset.UtcNow;
+            entry.DeletedAt = deletedAt;
             entry.IsArchived = false;
             entry.ArchivedAt = null;
+            entry.UpdatedAt = deletedAt;
+            await SavePasswordAggregateAsync(database, categories, entry, cancellationToken: cancellationToken);
+            await mdbxVaultStore.SoftDeletePasswordAsync(database, entry, cancellationToken);
             var boundTotps = await GetMdbxBoundTotpsByPasswordIdAsync(database, id, includeDeleted: true, cancellationToken);
             foreach (var item in boundTotps)
             {
-                await mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken);
                 item.IsDeleted = true;
-                item.DeletedAt = entry.DeletedAt;
+                item.DeletedAt = deletedAt;
+                item.UpdatedAt = deletedAt;
+                await mdbxVaultStore.SaveSecureItemAsync(database, item, categories.ToDictionary(category => category.Id), cancellationToken);
+                await mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken);
             }
         }
         ClearPasswordReadSnapshot();
@@ -98,18 +103,27 @@ public sealed partial class MdbxBackedMonicaRepository(
         var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
         var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
         var entry = await FindPasswordForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
-        if (entry is not null)
+        if (entry is not null && entry.DeletedAt != DateTimeOffset.UnixEpoch)
         {
             await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
             await mdbxVaultStore.RestorePasswordAsync(database, entry, cancellationToken);
             entry.IsDeleted = false;
             entry.DeletedAt = null;
+            entry.UpdatedAt = DateTimeOffset.UtcNow;
+            await SavePasswordAggregateAsync(database, categories, entry, cancellationToken: cancellationToken);
             var boundTotps = await GetMdbxBoundTotpsByPasswordIdAsync(database, id, includeDeleted: true, cancellationToken);
             foreach (var item in boundTotps)
             {
+                if (item.DeletedAt == DateTimeOffset.UnixEpoch)
+                {
+                    continue;
+                }
+
                 await mdbxVaultStore.RestoreSecureItemAsync(database, item, cancellationToken);
                 item.IsDeleted = false;
                 item.DeletedAt = null;
+                item.UpdatedAt = entry.UpdatedAt;
+                await mdbxVaultStore.SaveSecureItemAsync(database, item, categories.ToDictionary(category => category.Id), cancellationToken);
             }
         }
         ClearPasswordReadSnapshot();
@@ -129,11 +143,33 @@ public sealed partial class MdbxBackedMonicaRepository(
                 await mdbxVaultStore.DeleteAttachmentAsync(database, attachment, cancellationToken);
             }
 
-            await mdbxVaultStore.SoftDeletePasswordAsync(database, entry, cancellationToken);
+            if (entry.IsDeleted)
+            {
+                await mdbxVaultStore.RestorePasswordAsync(database, entry, cancellationToken);
+            }
+
+            var tombstoneAt = DateTimeOffset.UtcNow;
+            var passwordTombstone = CreatePasswordTombstone(entry, tombstoneAt);
+            await SavePasswordAggregateAsync(
+                database,
+                categories,
+                passwordTombstone,
+                customFields: [],
+                passwordHistory: [],
+                attachments: [],
+                cancellationToken: cancellationToken);
+            await mdbxVaultStore.SoftDeletePasswordAsync(database, passwordTombstone, cancellationToken);
             var boundTotps = await GetMdbxBoundTotpsByPasswordIdAsync(database, id, includeDeleted: true, cancellationToken);
             foreach (var item in boundTotps)
             {
-                await mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken);
+                if (item.IsDeleted)
+                {
+                    await mdbxVaultStore.RestoreSecureItemAsync(database, item, cancellationToken);
+                }
+
+                var secureItemTombstone = CreateSecureItemTombstone(item, tombstoneAt);
+                await mdbxVaultStore.SaveSecureItemAsync(database, secureItemTombstone, categories.ToDictionary(category => category.Id), cancellationToken);
+                await mdbxVaultStore.SoftDeleteSecureItemAsync(database, secureItemTombstone, cancellationToken);
             }
         }
 
@@ -593,9 +629,44 @@ public sealed partial class MdbxBackedMonicaRepository(
         if (item is not null)
         {
             await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
-            await mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken);
             item.IsDeleted = true;
             item.DeletedAt = DateTimeOffset.UtcNow;
+            item.UpdatedAt = DateTimeOffset.UtcNow;
+            await mdbxVaultStore.SaveSecureItemAsync(database, item, categories.ToDictionary(category => category.Id), cancellationToken);
+            await mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken);
+        }
+        ClearSecureItemReadSnapshot();
+    }
+
+    public async Task RestoreSecureItemAsync(long id, CancellationToken cancellationToken = default)
+    {
+        var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var item = await FindSecureItemForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
+        if (item is not null && item.DeletedAt > DateTimeOffset.UnixEpoch)
+        {
+            await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
+            await mdbxVaultStore.RestoreSecureItemAsync(database, item, cancellationToken);
+            item.IsDeleted = false;
+            item.DeletedAt = null;
+            item.UpdatedAt = DateTimeOffset.UtcNow;
+            await mdbxVaultStore.SaveSecureItemAsync(database, item, categories.ToDictionary(category => category.Id), cancellationToken);
+        }
+        ClearSecureItemReadSnapshot();
+    }
+
+    public async Task DeleteSecureItemPermanentlyAsync(long id, CancellationToken cancellationToken = default)
+    {
+        var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
+        var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
+        var item = await FindSecureItemForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
+        if (item is not null)
+        {
+            await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
+            await mdbxVaultStore.RestoreSecureItemAsync(database, item, cancellationToken);
+            var tombstone = CreateSecureItemTombstone(item, DateTimeOffset.UtcNow);
+            await mdbxVaultStore.SaveSecureItemAsync(database, tombstone, categories.ToDictionary(category => category.Id), cancellationToken);
+            await mdbxVaultStore.SoftDeleteSecureItemAsync(database, tombstone, cancellationToken);
         }
         ClearSecureItemReadSnapshot();
     }
@@ -1233,4 +1304,25 @@ public sealed partial class MdbxBackedMonicaRepository(
 
     private static bool IsSecureItemOwnerType(string ownerType) =>
         string.Equals(ownerType, "SECURE_ITEM", StringComparison.OrdinalIgnoreCase);
+
+    private static PasswordEntry CreatePasswordTombstone(PasswordEntry entry, DateTimeOffset updatedAt) => new()
+    {
+        Id = entry.Id,
+        MdbxDatabaseId = entry.MdbxDatabaseId,
+        MdbxFolderId = entry.MdbxFolderId,
+        IsDeleted = true,
+        DeletedAt = DateTimeOffset.UnixEpoch,
+        UpdatedAt = updatedAt
+    };
+
+    private static SecureItem CreateSecureItemTombstone(SecureItem item, DateTimeOffset updatedAt) => new()
+    {
+        Id = item.Id,
+        ItemType = item.ItemType,
+        MdbxDatabaseId = item.MdbxDatabaseId,
+        MdbxFolderId = item.MdbxFolderId,
+        IsDeleted = true,
+        DeletedAt = DateTimeOffset.UnixEpoch,
+        UpdatedAt = updatedAt
+    };
 }

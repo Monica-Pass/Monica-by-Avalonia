@@ -55,6 +55,10 @@ function Assert-FocusedFeatureFileSizes {
         'src/Monica.App/Features/Generator',
         'src/Monica.App/Features/SecurityAnalysis',
         'src/Monica.App/Features/Timeline',
+        'src/Monica.App/Features/Sync',
+        'src/Monica.App/Features/Mdbx',
+        'src/Monica.App/Features/DatabaseManagement',
+        'src/Monica.App/Features/RecycleBin',
         'src/Monica.App/Features/ImportExport',
         'src/Monica.Core/ImportExport'
     )
@@ -76,7 +80,7 @@ function Assert-FocusedFeatureFileSizes {
         throw "Focused feature files exceed $maximumLines lines:`n$($oversizedFiles -join "`n")"
     }
 
-    Write-Host "Focused Password Vault, Secure Notes, Authenticator, Wallet, Generator, Security Analysis, Timeline, and import/export files are within $maximumLines lines."
+    Write-Host "Focused vault, security, storage, recycle bin, and import/export files are within $maximumLines lines."
 }
 
 function Get-VulnerabilityCount {

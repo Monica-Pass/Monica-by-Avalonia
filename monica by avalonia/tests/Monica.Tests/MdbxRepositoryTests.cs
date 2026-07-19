@@ -2451,6 +2451,91 @@ public sealed class MdbxRepositoryTests
     }
 
     [Fact]
+    public async Task Repository_persists_password_recycle_metadata_and_keeps_permanent_tombstone_after_snapshot_reload()
+    {
+        var repository = CreateRepository(out var bridge);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "Lifecycle metadata",
+            Username = "deleted-user",
+            Password = "deleted-password-secret",
+            Notes = "deleted-password-notes"
+        };
+        await repository.SavePasswordAsync(password);
+        await repository.ReplaceCustomFieldsAsync(password.Id,
+        [
+            new CustomField { EntryId = password.Id, Title = "deleted-field", Value = "deleted-field-secret", IsProtected = true }
+        ]);
+        await repository.SavePasswordHistoryAsync(new PasswordHistoryEntry
+        {
+            EntryId = password.Id,
+            Password = "deleted-history-secret"
+        });
+
+        await repository.SoftDeletePasswordAsync(password.Id);
+        (repository as ITransientVaultReadCache)?.ReleaseVaultItemSnapshots();
+
+        var deleted = Assert.Single(await repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
+        Assert.True(deleted.IsDeleted);
+        Assert.True(deleted.DeletedAt > DateTimeOffset.UnixEpoch);
+
+        await repository.DeletePasswordPermanentlyAsync(password.Id);
+        (repository as ITransientVaultReadCache)?.ReleaseVaultItemSnapshots();
+
+        var tombstone = Assert.Single(await repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
+        Assert.True(tombstone.IsDeleted);
+        Assert.Equal(DateTimeOffset.UnixEpoch, tombstone.DeletedAt);
+        var tombstonePayload = bridge.GetEntryPayloadJson(database.WorkingCopyPath!, password.MdbxFolderId!);
+        Assert.NotNull(tombstonePayload);
+        Assert.DoesNotContain("deleted-user", tombstonePayload, StringComparison.Ordinal);
+        Assert.DoesNotContain("deleted-password-secret", tombstonePayload, StringComparison.Ordinal);
+        Assert.DoesNotContain("deleted-password-notes", tombstonePayload, StringComparison.Ordinal);
+        Assert.DoesNotContain("deleted-field-secret", tombstonePayload, StringComparison.Ordinal);
+        Assert.DoesNotContain("deleted-history-secret", tombstonePayload, StringComparison.Ordinal);
+
+        await repository.RestorePasswordAsync(password.Id);
+        Assert.Empty(await repository.GetPasswordsAsync());
+    }
+
+    [Fact]
+    public async Task Repository_persists_secure_item_recycle_metadata_and_scrubs_permanent_tombstone()
+    {
+        var repository = CreateRepository(out var bridge);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        var note = new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = "Deleted private note",
+            Notes = "deleted-note-metadata",
+            ItemData = "deleted-note-secret"
+        };
+        await repository.SaveSecureItemAsync(note);
+
+        await repository.SoftDeleteSecureItemAsync(note.Id);
+        (repository as ITransientVaultReadCache)?.ReleaseVaultItemSnapshots();
+
+        var deleted = Assert.Single(await repository.GetSecureItemsAsync(includeDeleted: true));
+        Assert.True(deleted.IsDeleted);
+        Assert.True(deleted.DeletedAt > DateTimeOffset.UnixEpoch);
+
+        await repository.DeleteSecureItemPermanentlyAsync(note.Id);
+        (repository as ITransientVaultReadCache)?.ReleaseVaultItemSnapshots();
+
+        var tombstone = Assert.Single(await repository.GetSecureItemsAsync(includeDeleted: true));
+        Assert.True(tombstone.IsDeleted);
+        Assert.Equal(DateTimeOffset.UnixEpoch, tombstone.DeletedAt);
+        var tombstonePayload = bridge.GetEntryPayloadJson(database.WorkingCopyPath!, note.MdbxFolderId!);
+        Assert.NotNull(tombstonePayload);
+        Assert.DoesNotContain("Deleted private note", tombstonePayload, StringComparison.Ordinal);
+        Assert.DoesNotContain("deleted-note-metadata", tombstonePayload, StringComparison.Ordinal);
+        Assert.DoesNotContain("deleted-note-secret", tombstonePayload, StringComparison.Ordinal);
+
+        await repository.RestoreSecureItemAsync(note.Id);
+        Assert.Empty(await repository.GetSecureItemsAsync());
+    }
+
+    [Fact]
     public async Task Repository_uses_mdbx_password_payload_when_sqlite_password_cache_is_missing()
     {
         var repository = CreateRepository(out _, out var sqliteRepository);

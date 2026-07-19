@@ -90,6 +90,13 @@ public sealed partial class MainWindowViewModel
         UpdateSettings(settings => settings.WindowCaptureProtectionEnabled = value);
     }
 
+    partial void OnRecycleBinRetentionDaysChanged(int value)
+    {
+        UpdateSettings(settings => settings.RecycleBinRetentionDays = value);
+        RefreshRecycleBinCountState();
+        OnPropertyChanged(nameof(RecycleBinRetentionText));
+    }
+
     partial void OnSecurityRecoveryEnabledChanged(bool value)
     {
         UpdateSettings(settings => settings.SecurityRecovery.IsEnabled = value);

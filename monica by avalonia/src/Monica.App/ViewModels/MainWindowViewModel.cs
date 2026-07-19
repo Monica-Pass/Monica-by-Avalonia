@@ -217,6 +217,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             EnsureGeneratedPassword();
         }
+
+        if (string.Equals(value, "RecycleBin", StringComparison.OrdinalIgnoreCase))
+        {
+            QueueExpiredRecycleBinCleanup();
+        }
     }
 
     partial void OnStatusMessageChanged(string value)
@@ -350,6 +355,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             AppDiagnostics.Measure("Replace secure item collections", () =>
             {
                 ReplaceItems(NoteItems, snapshot.NoteItems);
+                ReplaceItems(DeletedSecureItems, snapshot.DeletedSecureItems);
 
                 foreach (var item in snapshot.WalletItems)
                 {

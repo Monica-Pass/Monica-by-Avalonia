@@ -11,6 +11,7 @@ internal sealed record VaultLoadSnapshot(
     IReadOnlyList<SecureItem> NoteItems,
     IReadOnlyList<SecureItem> WalletItems,
     IReadOnlyList<SecureItem> StoredTotps,
+    IReadOnlyList<SecureItem> DeletedSecureItems,
     IReadOnlyList<Category> Categories,
     IReadOnlyDictionary<long, PasswordQuickAccessRecord> PasswordQuickAccessRecords,
     IReadOnlyList<LocalMdbxDatabase> MdbxDatabases)
@@ -45,13 +46,15 @@ internal static class VaultSnapshotLoader
             .ToArray();
         var activePasswords = allPasswordItems.Where(item => !item.IsDeleted && !item.IsArchived).ToArray();
         var archivedPasswords = allPasswordItems.Where(item => !item.IsDeleted && item.IsArchived).ToArray();
-        var deletedPasswords = allPasswordItems.Where(item => item.IsDeleted).ToArray();
+        var deletedPasswords = allPasswordItems
+            .Where(item => item.IsDeleted && item.DeletedAt != DateTimeOffset.UnixEpoch)
+            .ToArray();
         var attachmentOwnerIdsTask = AppDiagnostics.MeasureAsync(
             "Load password attachment owner IDs",
             () => repository.GetAttachmentOwnerIdsAsync("PASSWORD"));
         var secureItemsTask = AppDiagnostics.MeasureAsync(
             "Load secure items",
-            () => repository.GetSecureItemsAsync());
+            () => repository.GetSecureItemsAsync(includeDeleted: true));
         var categoriesTask = AppDiagnostics.MeasureAsync(
             "Load categories",
             () => repository.GetCategoriesAsync());
@@ -73,13 +76,19 @@ internal static class VaultSnapshotLoader
         var secureItems = (await secureItemsTask)
             .Select(static item => item.CreateDetachedCopy())
             .ToArray();
-        var noteItems = secureItems
+        var activeSecureItems = secureItems
+            .Where(item => !item.IsDeleted && item.DeletedAt != DateTimeOffset.UnixEpoch)
+            .ToArray();
+        var deletedSecureItems = secureItems
+            .Where(item => item.IsDeleted && item.DeletedAt != DateTimeOffset.UnixEpoch)
+            .ToArray();
+        var noteItems = activeSecureItems
             .Where(item => item.ItemType == VaultItemType.Note)
             .ToArray();
-        var walletItems = secureItems
+        var walletItems = activeSecureItems
             .Where(item => item.ItemType is VaultItemType.BankCard or VaultItemType.Document)
             .ToArray();
-        var storedTotps = secureItems
+        var storedTotps = activeSecureItems
             .Where(item => item.ItemType == VaultItemType.Totp)
             .ToArray();
 
@@ -95,6 +104,7 @@ internal static class VaultSnapshotLoader
             noteItems,
             walletItems,
             storedTotps,
+            deletedSecureItems,
             categories,
             quickAccessRecords,
             databases);

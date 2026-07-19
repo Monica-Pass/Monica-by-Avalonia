@@ -103,7 +103,7 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private async Task EmptyRecycleBinAsync()
     {
-        var items = DeletedPasswords.ToArray();
+        var items = RecycleBinItems.ToArray();
         if (items.Length == 0)
         {
             return;
@@ -116,19 +116,13 @@ public sealed partial class MainWindowViewModel
 
         foreach (var item in items)
         {
-            await _repository.DeletePasswordPermanentlyAsync(item.Id);
-            await LogOperationAsync(new OperationLog
-            {
-                ItemType = "PASSWORD",
-                ItemId = item.Id,
-                ItemTitle = item.Title,
-                OperationType = "PURGE",
-                DeviceName = Environment.MachineName
-            });
+            await DeleteRecycleBinItemPermanentlyCoreAsync(item);
         }
 
         DeletedPasswords.Clear();
-        RefreshBoundTotpPresentation(items);
+        DeletedSecureItems.Clear();
+        RecycleBinItems.Clear();
+        RefreshBoundTotpPresentation(items.Where(item => item.Password is not null).Select(item => item.Password!).ToArray());
         RaisePasswordCountState();
         InvalidateSecurityAnalysis();
         StatusMessage = _localization.Format("EmptiedRecycleBinFormat", items.Length);

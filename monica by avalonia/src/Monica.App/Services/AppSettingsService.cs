@@ -17,6 +17,7 @@ public sealed class DesktopAppSettings
     public int ClipboardClearSeconds { get; set; } = 30;
     public bool RequirePasswordBeforeExport { get; set; } = true;
     public bool WindowCaptureProtectionEnabled { get; set; } = true;
+    public int RecycleBinRetentionDays { get; set; } = 30;
     public string LegacyBusinessDataNoticeAcknowledgedSignature { get; set; } = "";
     public SecurityRecoverySettings SecurityRecovery { get; set; } = new();
     public bool MinimizeToTray { get; set; }
@@ -115,6 +116,9 @@ public sealed partial class AppSettingsService : IAppSettingsService
         settings.PasswordSortOrder = NormalizeChoice(settings.PasswordSortOrder, "updated-desc", "updated-desc", "title-asc", "website-asc", "username-asc", "created-desc", "favorites-first");
         settings.AutoLockMinutes = Clamp(settings.AutoLockMinutes, 1, 120);
         settings.ClipboardClearSeconds = Clamp(settings.ClipboardClearSeconds, 10, 600);
+        settings.RecycleBinRetentionDays = settings.RecycleBinRetentionDays is 7 or 30 or 90 or 365
+            ? settings.RecycleBinRetentionDays
+            : 30;
         settings.BrowserIntegrationPort = Clamp(settings.BrowserIntegrationPort, 1024, 65535);
         settings.WebDavBackupEncryptionEnabled = true;
         settings.LegacyBusinessDataNoticeAcknowledgedSignature ??= "";

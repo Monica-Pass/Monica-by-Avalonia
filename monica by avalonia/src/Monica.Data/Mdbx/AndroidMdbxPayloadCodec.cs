@@ -39,6 +39,7 @@ public static class AndroidMdbxPayloadCodec
             writer.WriteString("notes", entry.Notes ?? "");
             WriteNullableNumber(writer, "category_id", entry.CategoryId);
             WriteMdbxFolderId(writer, entry.MdbxFolderId);
+            WriteNullableUnixMilliseconds(writer, "deleted_at", entry.DeletedAt);
             WriteNullableNumber(writer, "bound_note_room_id", entry.BoundNoteId);
             WriteNullableString(writer, "bound_note_entry_id", boundNoteEntryId);
             writer.WriteString("login_type", ToAndroidLoginType(entry.LoginType));
@@ -110,6 +111,7 @@ public static class AndroidMdbxPayloadCodec
                 Notes = GetString(root, "notes"),
                 CategoryId = GetInt64(root, "category_id", "categoryId"),
                 MdbxFolderId = NormalizeMdbxFolderId(GetNullableString(root, "mdbx_folder_id", "mdbxFolderId")),
+                DeletedAt = GetDateTimeOffset(root, "deleted_at", "deletedAt"),
                 BoundNoteId = GetInt64(root, "bound_note_room_id", "boundNoteRoomId"),
                 LoginType = ParseLoginType(GetString(root, "login_type", "loginType")),
                 AuthenticatorKey = GetString(root, "authenticator_key", "authenticatorKey"),
@@ -148,6 +150,7 @@ public static class AndroidMdbxPayloadCodec
             writer.WriteString("image_paths", item.ImagePaths ?? "[]");
             WriteNullableNumber(writer, "category_id", item.CategoryId);
             WriteMdbxFolderId(writer, item.MdbxFolderId);
+            WriteNullableUnixMilliseconds(writer, "deleted_at", item.DeletedAt);
             WriteNullableString(writer, "bound_password_entry_id", boundPasswordEntryId);
             writer.WriteBoolean("bitwarden_mode", item.BitwardenVaultId is not null);
             writer.WriteBoolean("keepass_mode", item.KeepassDatabaseId is not null);
@@ -192,7 +195,8 @@ public static class AndroidMdbxPayloadCodec
                 ItemData = GetString(root, "item_data", "itemData"),
                 ImagePaths = GetPreferredString(root, "image_paths", "imagePaths", "[]"),
                 CategoryId = GetInt64(root, "category_id", "categoryId"),
-                MdbxFolderId = NormalizeMdbxFolderId(GetNullableString(root, "mdbx_folder_id", "mdbxFolderId"))
+                MdbxFolderId = NormalizeMdbxFolderId(GetNullableString(root, "mdbx_folder_id", "mdbxFolderId")),
+                DeletedAt = GetDateTimeOffset(root, "deleted_at", "deletedAt")
             };
 
             return new AndroidMdbxSecureItemPayload(
@@ -319,6 +323,18 @@ public static class AndroidMdbxPayloadCodec
         }
     }
 
+    private static void WriteNullableUnixMilliseconds(Utf8JsonWriter writer, string propertyName, DateTimeOffset? value)
+    {
+        if (value is null)
+        {
+            writer.WriteNull(propertyName);
+        }
+        else
+        {
+            writer.WriteNumber(propertyName, value.Value.ToUnixTimeMilliseconds());
+        }
+    }
+
     private static string GetPreferredString(JsonElement element, string primary, string fallback, string defaultValue = "")
     {
         var primaryValue = GetNullableString(element, primary);
@@ -362,6 +378,25 @@ public static class AndroidMdbxPayloadCodec
         }
 
         return long.TryParse(value.ToString(), out number) ? number : null;
+    }
+
+    private static DateTimeOffset? GetDateTimeOffset(JsonElement element, params string[] names)
+    {
+        var milliseconds = GetInt64(element, names);
+        if (milliseconds is not null)
+        {
+            try
+            {
+                return DateTimeOffset.FromUnixTimeMilliseconds(milliseconds.Value);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return null;
+            }
+        }
+
+        var value = GetNullableString(element, names);
+        return DateTimeOffset.TryParse(value, out var parsed) ? parsed : null;
     }
 
     private static bool GetBoolean(JsonElement element, params string[] names)

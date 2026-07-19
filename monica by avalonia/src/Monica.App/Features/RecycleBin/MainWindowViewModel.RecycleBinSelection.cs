@@ -5,23 +5,23 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
-    public int SelectedDeletedPasswordCount => DeletedPasswords.Count(item => item.IsSelected);
+    public int SelectedDeletedPasswordCount => RecycleBinItems.Count(item => item.IsSelected);
     public bool HasSelectedDeletedPasswords => SelectedDeletedPasswordCount > 0;
     public string SelectedDeletedPasswordCountText =>
-        _localization.Format("SelectedPasswordCountFormat", SelectedDeletedPasswordCount);
+        _localization.Format("SelectedRecycleBinItemCountFormat", SelectedDeletedPasswordCount);
 
     public bool AreAllFilteredDeletedPasswordsSelected
     {
         get
         {
-            var visible = FilteredDeletedPasswords;
+            var visible = FilteredRecycleBinItems;
             return visible.Count > 0 && visible.All(item => item.IsSelected);
         }
         set
         {
             UpdatePasswordSelectionsInBatch(() =>
             {
-                foreach (var item in FilteredDeletedPasswords)
+                foreach (var item in FilteredRecycleBinItems)
                 {
                     item.IsSelected = value;
                 }
@@ -43,7 +43,7 @@ public sealed partial class MainWindowViewModel
     {
         UpdatePasswordSelectionsInBatch(() =>
         {
-            foreach (var item in DeletedPasswords.Where(item => item.IsSelected))
+            foreach (var item in RecycleBinItems.Where(item => item.IsSelected))
             {
                 item.IsSelected = false;
             }

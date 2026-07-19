@@ -8,39 +8,6 @@ namespace Monica.App.ViewModels;
 public sealed partial class MainWindowViewModel
 {
     [RelayCommand]
-    private void SelectSyncPage(string? page)
-    {
-        SelectedSyncPage = NormalizeSyncPage(page);
-    }
-
-    [RelayCommand]
-    private void OpenSyncWorkspacePage(string? page)
-    {
-        SelectedSyncPage = NormalizeSyncPage(page);
-        SelectedSection = "Sync";
-    }
-
-    private static string NormalizeSyncPage(string? page) =>
-        page?.Trim().ToLowerInvariant() switch
-        {
-            "backup" or "backups" or "history" => "Backup",
-            "sources" or "vaults" or "database" => "Sources",
-            "import" => "Import",
-            "export" => "Export",
-            _ => "Configuration"
-        };
-
-
-    [RelayCommand]
-    private void ShowWebDavBackupDetails(WebDavBackupHistoryItem? item)
-    {
-        if (item is not null)
-        {
-            SelectedWebDavBackupHistoryItem = item;
-        }
-    }
-
-    [RelayCommand]
     private async Task LoadWebDavBackupsAsync()
     {
         if (!TryCreateWebDavProfile(out var profile))

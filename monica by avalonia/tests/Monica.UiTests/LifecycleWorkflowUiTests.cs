@@ -78,7 +78,7 @@ public sealed class LifecycleWorkflowUiTests
         Assert.NotNull(recycleDetailMenu);
         Assert.Single(recycleBin.FindControl<StackPanel>("RecycleBinHeaderCommands")!.Children.OfType<Button>());
         Assert.Equal(
-            ["OpenPasswordsFromRecycleBinMenuItem", "OpenArchiveFromRecycleBinMenuItem", "EmptyRecycleBinMenuItem"],
+            ["OpenPasswordsFromRecycleBinMenuItem", "OpenArchiveFromRecycleBinMenuItem", "RecycleBinRetentionMenuItem", "EmptyRecycleBinMenuItem"],
             MenuItemNames(Assert.IsType<MenuFlyout>(recyclePageMenu.Flyout)));
         Assert.Equal(
             ["OpenDeletedPasswordDetailsMenuItem", "DeletePasswordPermanentlyMenuItem"],

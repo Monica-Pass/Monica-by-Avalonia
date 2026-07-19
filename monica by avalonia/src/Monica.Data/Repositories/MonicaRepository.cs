@@ -41,6 +41,8 @@ public interface IMonicaRepository
     Task<IReadOnlyList<SecureItem>> GetSecureItemsByBoundPasswordIdAsync(long passwordId, bool includeDeleted = false, CancellationToken cancellationToken = default);
     Task<long> SaveSecureItemAsync(SecureItem item, CancellationToken cancellationToken = default);
     Task SoftDeleteSecureItemAsync(long id, CancellationToken cancellationToken = default);
+    Task RestoreSecureItemAsync(long id, CancellationToken cancellationToken = default);
+    Task DeleteSecureItemPermanentlyAsync(long id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken cancellationToken = default);
     Task<long> SaveCategoryAsync(Category category, CancellationToken cancellationToken = default);
     Task DeleteCategoryAsync(long id, CancellationToken cancellationToken = default);
@@ -701,6 +703,29 @@ public sealed partial class MonicaRepository(
         await connection.ExecuteAsync(
             "UPDATE secure_items SET is_deleted = 1, deleted_at = @DeletedAt, updated_at = @DeletedAt WHERE id = @Id",
             new { Id = id, DeletedAt = ToUnixMilliseconds(DateTimeOffset.UtcNow) });
+    }
+
+    public async Task RestoreSecureItemAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await migrator.MigrateAsync(cancellationToken);
+        await using var connection = connectionFactory.CreateConnection();
+        await connection.ExecuteAsync(
+            "UPDATE secure_items SET is_deleted = 0, deleted_at = NULL, updated_at = @UpdatedAt WHERE id = @Id",
+            new { Id = id, UpdatedAt = ToUnixMilliseconds(DateTimeOffset.UtcNow) });
+    }
+
+    public async Task DeleteSecureItemPermanentlyAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await migrator.MigrateAsync(cancellationToken);
+        await using var connection = connectionFactory.CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await connection.ExecuteAsync(
+            "DELETE FROM attachments WHERE owner_type = 'SECURE_ITEM' AND owner_id = @Id",
+            new { Id = id },
+            transaction);
+        await connection.ExecuteAsync("DELETE FROM secure_items WHERE id = @Id", new { Id = id }, transaction);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken cancellationToken = default)

@@ -183,6 +183,7 @@ public sealed partial class MainWindowViewModel
         ClearItems(DeletedPasswords);
         ClearItems(PasswordFolderFilters);
         ClearItems(NoteItems);
+        ClearItems(DeletedSecureItems);
         ClearItems(TotpItems);
         ClearItems(TotpFilterChoices);
         ClearItems(WalletItems);
