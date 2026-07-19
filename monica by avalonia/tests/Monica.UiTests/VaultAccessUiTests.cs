@@ -68,4 +68,34 @@ public sealed class VaultAccessUiTests
         Assert.False(view.IsCompactLayout);
         Assert.Equal(new Thickness(32, 24), view.FindControl<StackPanel>("VaultAccessPanel")!.Margin);
     }
+
+    [Fact]
+    public void Disabled_unlock_submit_declares_readable_semantic_tokens()
+    {
+        var xaml = File.ReadAllText(FindUnlockFeatureFile("UnlockView.axaml"));
+
+        Assert.Contains("Button.unlockPrimaryCommand:disabled TextBlock", xaml, StringComparison.Ordinal);
+        Assert.Contains("ControlFillColorSecondaryBrush", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Setter Property=\"Opacity\" Value=\"0.72\" />", xaml, StringComparison.Ordinal);
+    }
+
+    private static string FindUnlockFeatureFile(string fileName)
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            var candidate = Path.Combine(
+                directory.FullName,
+                "src",
+                "Monica.App",
+                "Features",
+                "Unlock",
+                fileName);
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        throw new FileNotFoundException($"Could not locate {fileName} from the test output directory.");
+    }
 }

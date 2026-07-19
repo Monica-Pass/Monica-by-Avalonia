@@ -54,8 +54,18 @@
             <Setter Property="Background" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource LayerFillColorAltBrush}" />
         </Style>
+        <Style Selector="Button.unlockPrimaryCommand TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource LayerFillColorAltBrush}" />
+        </Style>
         <Style Selector="Button.unlockPrimaryCommand:disabled">
-            <Setter Property="Opacity" Value="0.72" />
+            <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Button.unlockPrimaryCommand:disabled TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
         </Style>
         <Style Selector="Border.unlockFeedback">
             <Setter Property="Padding" Value="12,10" />
@@ -213,7 +223,7 @@
                         HorizontalContentAlignment="Center"
                         AutomationProperties.Name="{Binding LoginButtonText}">
                     <TextBlock Text="{Binding LoginButtonText}"
-                               Foreground="{DynamicResource LayerFillColorAltBrush}" />
+                               />
                 </Button>
                 <ProgressBar x:Name="UnlockProgress"
                              IsVisible="{Binding IsUnlocking}"
