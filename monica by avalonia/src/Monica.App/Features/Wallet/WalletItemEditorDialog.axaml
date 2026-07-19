@@ -9,8 +9,12 @@
              mc:Ignorable="d"
              d:DesignWidth="560"
              d:DesignHeight="640">
-    <ScrollViewer MaxHeight="640">
-        <StackPanel Width="520" Spacing="12">
+    <UserControl.Styles>
+        <Style Selector="TextBox"><Setter Property="MinHeight" Value="40" /></Style>
+        <Style Selector="ComboBox"><Setter Property="MinHeight" Value="40" /></Style>
+    </UserControl.Styles>
+    <ScrollViewer x:Name="WalletEditorFormScrollViewer" MaxHeight="640">
+        <StackPanel x:Name="WalletEditorPrimaryForm" Width="520" Spacing="12">
             <ComboBox ItemsSource="{Binding WalletTypeOptions}"
                       SelectedItem="{Binding SelectedWalletType}"
                       HorizontalAlignment="Stretch">
@@ -47,8 +51,8 @@
                                 Command="{Binding ToggleDocumentNumberVisibilityCommand}"
                                 ToolTip.Tip="{Binding DocumentNumberVisibilityLabel}"
                                 AutomationProperties.Name="{Binding DocumentNumberVisibilityLabel}"
-                                Width="36"
-                                Height="36"
+                                Width="40"
+                                Height="40"
                                 Padding="0">
                             <ic:FluentIcon Icon="Eye" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Button>
@@ -84,8 +88,8 @@
                             Command="{Binding ToggleCardNumberVisibilityCommand}"
                             ToolTip.Tip="{Binding CardNumberVisibilityLabel}"
                             AutomationProperties.Name="{Binding CardNumberVisibilityLabel}"
-                            Width="36"
-                            Height="36"
+                            Width="40"
+                            Height="40"
                             Padding="0">
                         <ic:FluentIcon Icon="Eye" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Button>
@@ -107,8 +111,8 @@
                                 Command="{Binding ToggleCvvVisibilityCommand}"
                                 ToolTip.Tip="{Binding CvvVisibilityLabel}"
                                 AutomationProperties.Name="{Binding CvvVisibilityLabel}"
-                                Width="36"
-                                Height="36"
+                                Width="40"
+                                Height="40"
                                 Padding="0">
                             <ic:FluentIcon Icon="Eye" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Button>

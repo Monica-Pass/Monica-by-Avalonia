@@ -1,3 +1,5 @@
+using Avalonia.Controls;
+
 namespace Monica.UiTests;
 
 [Collection(AvaloniaUiTestCollection.Name)]
@@ -7,6 +9,11 @@ public sealed class PasswordDetailWorkflowUiTests
     public void Password_detail_actions_bind_accessible_names_to_their_desktop_commands()
     {
         var xaml = File.ReadAllText(FindPasswordDetailXaml());
+
+        var view = new Monica.App.PasswordDetailDialog();
+        Assert.NotNull(view.FindControl<ScrollViewer>("PasswordDetailScrollViewer"));
+        Assert.NotNull(view.FindControl<Border>("PasswordAttachmentsRegion"));
+        Assert.NotNull(view.FindControl<Border>("PasswordHistoryRegion"));
 
         Assert.Contains("x:Name=\"PasswordDetailFieldRevealButton\"", xaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"PasswordHistoryRevealButton\"", xaml, StringComparison.Ordinal);
@@ -38,6 +45,8 @@ public sealed class PasswordDetailWorkflowUiTests
             StringComparison.Ordinal);
         Assert.DoesNotContain("x:Name=\"PasswordAttachmentCopyButton\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("CopyAttachmentPathCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("DividerStrokeColorDefaultBrush", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Background=\"{DynamicResource CardBackgroundBrush}\"", xaml, StringComparison.Ordinal);
     }
 
     private static int CountOccurrences(string value, string fragment) =>

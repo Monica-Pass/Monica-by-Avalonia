@@ -8,10 +8,12 @@
              mc:Ignorable="d"
              d:DesignWidth="420"
              d:DesignHeight="180">
-    <StackPanel Width="380" Spacing="10">
+    <StackPanel x:Name="CategoryPickerForm" Width="380" Spacing="10">
         <TextBlock Text="{Binding L.MoveSelectedPasswordsDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-        <ComboBox ItemsSource="{Binding CategoryOptions}"
+        <TextBlock Text="{Binding L.Category}" FontSize="12" FontWeight="SemiBold" />
+        <ComboBox x:Name="CategoryPickerComboBox" ItemsSource="{Binding CategoryOptions}"
                   SelectedItem="{Binding SelectedCategory}"
+                  MinHeight="40"
                   HorizontalAlignment="Stretch">
             <ComboBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:PasswordCategoryChoice">

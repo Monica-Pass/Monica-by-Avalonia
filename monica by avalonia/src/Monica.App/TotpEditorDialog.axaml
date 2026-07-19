@@ -8,10 +8,15 @@
              mc:Ignorable="d"
              d:DesignWidth="480"
              d:DesignHeight="560">
-    <ScrollViewer MaxHeight="560">
-        <StackPanel Width="440" Spacing="12">
-            <TextBox Text="{Binding Title}" PlaceholderText="{Binding L.PasswordTitle}" />
-            <TextBox Text="{Binding Secret}" PlaceholderText="{Binding L.TotpSecret}" />
+    <UserControl.Styles>
+        <Style Selector="TextBox"><Setter Property="MinHeight" Value="40" /></Style>
+        <Style Selector="ComboBox"><Setter Property="MinHeight" Value="40" /></Style>
+        <Style Selector="TextBlock.totpEditorLabel"><Setter Property="FontSize" Value="12" /><Setter Property="FontWeight" Value="SemiBold" /><Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" /></Style>
+    </UserControl.Styles>
+    <ScrollViewer x:Name="TotpEditorFormScrollViewer" MaxHeight="560">
+        <StackPanel x:Name="TotpEditorPrimaryForm" Width="440" Spacing="12">
+            <StackPanel Spacing="6"><TextBlock Classes="totpEditorLabel" Text="{Binding L.PasswordTitle}" /><TextBox Text="{Binding Title}" PlaceholderText="{Binding L.PasswordTitle}" /></StackPanel>
+            <StackPanel Spacing="6"><TextBlock Classes="totpEditorLabel" Text="{Binding L.TotpSecret}" /><TextBox x:Name="TotpSecretInput" Text="{Binding Secret}" PlaceholderText="{Binding L.TotpSecret}" /></StackPanel>
             <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                 <TextBox Text="{Binding Issuer}" PlaceholderText="{Binding L.Issuer}" />
                 <TextBox Grid.Column="1" Text="{Binding AccountName}" PlaceholderText="{Binding L.Account}" />
@@ -19,7 +24,7 @@
             <TextBox Text="{Binding Notes}" PlaceholderText="{Binding L.Notes}" AcceptsReturn="True" MinHeight="74" TextWrapping="Wrap" />
             <CheckBox Content="{Binding L.Favorite}" IsChecked="{Binding IsFavorite}" />
 
-            <Expander Header="{Binding L.AdvancedTotpOptions}" IsExpanded="True">
+            <Expander x:Name="TotpAdvancedOptionsExpander" Header="{Binding L.AdvancedTotpOptions}" IsExpanded="False">
                 <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="10" Margin="0,10,0,0">
                     <ComboBox ItemsSource="{Binding OtpTypeOptions}"
                               SelectedItem="{Binding SelectedOtpType}"

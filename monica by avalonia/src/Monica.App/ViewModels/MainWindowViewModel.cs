@@ -288,18 +288,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var loadVersion = ++_vaultLoadVersion;
         BeginPasswordProjectionNotificationDeferral();
         IsLoadingVault = true;
-        VaultLoadStageText = "准备加载保险库...";
+        VaultLoadStageText = _localization.Get("VaultLoadPreparing");
         var loadStopwatch = Stopwatch.StartNew();
         AppDiagnostics.Info("Vault load started");
         try
         {
-            StatusMessage = "正在加载保险库数据...";
+            StatusMessage = _localization.Get("VaultLoadTitle");
             SelectedPassword = null;
             SelectedPasswordDetails = null;
             _selectedPasswordCount = 0;
 
-            StatusMessage = "正在后台读取保险库数据...";
-            VaultLoadStageText = "正在读取密码、笔记和分类...";
+            StatusMessage = _localization.Get("VaultLoadReadingData");
+            VaultLoadStageText = _localization.Get("VaultLoadReadingCoreItems");
             if (SmokeVaultLoadDelayMilliseconds > 0)
             {
                 var delay = Math.Clamp(SmokeVaultLoadDelayMilliseconds, 0, 30000);
@@ -322,7 +322,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 return loadedSnapshot with { PreparedTotpItems = preparedTotpItems };
             }, sessionCancellationToken);
             sessionCancellationToken.ThrowIfCancellationRequested();
-            VaultLoadStageText = "正在整理密码列表...";
+            VaultLoadStageText = _localization.Get("VaultLoadProjectingPasswords");
             await YieldVaultLoadUiAsync();
             _passwordCustomFields = new Dictionary<long, IReadOnlyList<CustomField>>();
             _passwordCustomFieldSearchMatches = new HashSet<long>();
@@ -350,7 +350,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             });
             await YieldVaultLoadUiAsync();
 
-            VaultLoadStageText = "正在加载笔记和安全项目...";
+            VaultLoadStageText = _localization.Get("VaultLoadSecureItems");
             await YieldVaultLoadUiAsync();
             AppDiagnostics.Measure("Replace secure item collections", () =>
             {
@@ -367,7 +367,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             });
             await YieldVaultLoadUiAsync();
 
-            VaultLoadStageText = "正在加载文件夹和保险库源...";
+            VaultLoadStageText = _localization.Get("VaultLoadSources");
             await YieldVaultLoadUiAsync();
             AppDiagnostics.Measure("Replace folder and source collections", () =>
             {
@@ -378,7 +378,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 RefreshVaultSources();
             });
             await YieldVaultLoadUiAsync();
-            VaultLoadStageText = "正在加载验证码...";
+            VaultLoadStageText = _localization.Get("VaultLoadAuthenticators");
             await YieldVaultLoadUiAsync();
             AppDiagnostics.Measure("Apply TOTP collections", () => ApplyPreparedTotpItems(snapshot.PreparedTotpItems));
             AppDiagnostics.Measure("Finalize vault load UI state", () =>
@@ -393,7 +393,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
             EndPasswordProjectionNotificationDeferral();
             StatusMessage = _localization.Get("VaultUnlocked");
-            VaultLoadStageText = "保险库已就绪";
+            VaultLoadStageText = _localization.Get("VaultLoadReady");
             _ = LoadTimelineDeferredAsync();
             if (deferSecurityAnalysis)
             {
@@ -421,7 +421,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             IsUnlocked = false;
             ClearSensitiveSessionState();
             EndPasswordProjectionNotificationDeferral();
-            VaultLoadStageText = "保险库加载失败";
+            VaultLoadStageText = _localization.Get("VaultLoadFailed");
             StatusMessage = _localization.Get("VaultLoadFailed");
         }
         finally

@@ -180,12 +180,15 @@ public sealed class WalletWorkflowUiTests
     {
         var editor = new WalletItemEditorDialog();
 
+        Assert.NotNull(editor.FindControl<ScrollViewer>("WalletEditorFormScrollViewer"));
+        Assert.NotNull(editor.FindControl<StackPanel>("WalletEditorPrimaryForm"));
         Assert.NotNull(editor.FindControl<TextBox>("DocumentNumberInput"));
         Assert.NotNull(editor.FindControl<Button>("ToggleDocumentNumberVisibilityButton"));
         Assert.NotNull(editor.FindControl<TextBox>("CardNumberInput"));
         Assert.NotNull(editor.FindControl<Button>("ToggleCardNumberVisibilityButton"));
         Assert.NotNull(editor.FindControl<TextBox>("CardCvvInput"));
         Assert.NotNull(editor.FindControl<Button>("ToggleCardCvvVisibilityButton"));
+        Assert.Equal(40, editor.FindControl<Button>("ToggleCardCvvVisibilityButton")!.Width);
     }
 
     private static string FindWalletFeatureFile(string fileName)

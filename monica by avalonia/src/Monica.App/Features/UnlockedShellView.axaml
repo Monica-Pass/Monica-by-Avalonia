@@ -94,20 +94,20 @@
                         Spacing="12"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center">
-                <TextBlock Text="正在加载保险库"
+                <TextBlock Text="{Binding L[VaultLoadTitle]}"
                            FontSize="22"
                            FontWeight="SemiBold"
-                           Foreground="White"
+                           Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
                            HorizontalAlignment="Center"
                            TextAlignment="Center" />
                 <TextBlock Text="{Binding VaultLoadStageText}"
-                           Foreground="#DDFFFFFF"
+                           Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
                            TextWrapping="Wrap"
                            TextAlignment="Center" />
                 <ProgressBar IsIndeterminate="True" Height="4" />
                 <TextBlock Text="{Binding StatusMessage}"
                            FontSize="12"
-                           Foreground="#C8FFFFFF"
+                           Foreground="{DynamicResource TextOnAccentFillColorSecondaryBrush}"
                            TextWrapping="Wrap"
                            TextAlignment="Center" />
             </StackPanel>
