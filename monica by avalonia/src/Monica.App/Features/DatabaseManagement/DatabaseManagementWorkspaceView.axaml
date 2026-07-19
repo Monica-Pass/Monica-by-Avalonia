@@ -4,23 +4,10 @@
     </UserControl.Styles>
     <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsDatabaseManagement}}" RowDefinitions="Auto,*" ClipToBounds="True">
         <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
-            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+            <Grid x:Name="DatabaseHeaderGrid" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
                 <TextBlock Classes="workspacePageTitle" Text="{Binding L.DatabaseManagement}" />
                 <TextBlock Grid.Row="1" Classes="workspacePageSubtitle" Text="{Binding VaultSourceCountText}" MaxWidth="720" HorizontalAlignment="Left" />
-                <WrapPanel Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Center">
-                    <Button Classes="workspaceCommand" Command="{Binding LoadCommand}" Margin="0,0,8,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="ArrowClockwise" FontSize="18" />
-                            <TextBlock Text="{Binding L.Refresh}" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="workspacePrimaryCommand" Command="{Binding SelectSectionCommand}" CommandParameter="Mdbx" Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="Database" FontSize="18" />
-                            <TextBlock Text="{Binding L.MdbxVaults}" />
-                        </StackPanel>
-                    </Button>
-                </WrapPanel>
+                <db:DatabaseCommandBarView x:Name="DatabaseCommandBar" Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Center" />
             </Grid>
         </Border>
         <Grid x:Name="DatabaseWorkspaceLayoutGrid" Grid.Row="1" ColumnDefinitions="360,*" RowDefinitions="*" ColumnSpacing="14" RowSpacing="12" MinWidth="0">
@@ -35,30 +22,7 @@
                             <ic:FluentIcon Icon="ArrowClockwise" FontSize="16" />
                         </Button>
                     </Grid>
-                    <Grid Grid.Row="1">
-                        <StackPanel IsVisible="{Binding !HasVaultSources}" Spacing="10" Margin="24" Width="240" HorizontalAlignment="Left" VerticalAlignment="Top">
-                            <ic:FluentIcon Icon="Database" FontSize="32" HorizontalAlignment="Center" />
-                            <TextBlock Text="{Binding L.DatabaseSourcesEmptyHint}" TextAlignment="Center" TextWrapping="Wrap" />
-                        </StackPanel>
-                        <ListBox x:Name="DatabaseSourceList" Classes="databaseSourceList" ItemsSource="{Binding VaultSources}" SelectedItem="{Binding SelectedVaultSource}" IsVisible="{Binding HasVaultSources}" SelectionMode="Single" Margin="8,0,8,8">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:VaultSourceDisplayItem">
-                                    <Border Classes="databaseSourceRow">
-                                        <Button Classes="databaseSourceButton" Command="{Binding #DatabaseManagementRoot.DataContext.ShowVaultSourceDetailsCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding DisplayName}">
-                                            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="3">
-                                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                <Border Grid.Column="1" Grid.RowSpan="2" Classes="workspaceStatusChip">
-                                                    <TextBlock Text="{Binding Kind}" FontSize="12" />
-                                                </Border>
-                                                <TextBlock Grid.Row="1" Text="{Binding LocalPath}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" />
-                                                <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding SyncStatus}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" />
-                                            </Grid>
-                                        </Button>
-                                    </Border>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </Grid>
+                    <db:DatabaseSourceListView x:Name="DatabaseSourceListView" Grid.Row="1" />
                 </Grid>
             </Border>
             <ScrollViewer x:Name="DatabaseContentRegion" Grid.Column="1" HorizontalScrollBarVisibility="Disabled" ClipToBounds="True">

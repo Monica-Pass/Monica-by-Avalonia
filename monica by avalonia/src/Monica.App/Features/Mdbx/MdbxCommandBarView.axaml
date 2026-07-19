@@ -1,0 +1,35 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:fa="using:FluentAvalonia.UI.Controls"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Mdbx.MdbxCommandBarView"
+             x:DataType="vm:MainWindowViewModel">
+    <fa:FACommandBar x:Name="MdbxCommandBar"
+                     DefaultLabelPosition="Right"
+                     ClosedDisplayMode="Compact"
+                     IsDynamicOverflowEnabled="True"
+                     ItemsAlignment="Left"
+                     Background="Transparent"
+                     HorizontalAlignment="Stretch">
+        <fa:FACommandBar.PrimaryCommands>
+            <fa:FACommandBarButton Command="{Binding CreateMdbxVaultCommand}"
+                                   IsEnabled="{Binding !IsMdbxBusy}"
+                                   IconSource="Database"
+                                   Label="{Binding L.CreateLocalMdbxVault}"
+                                   ToolTip.Tip="{Binding L.CreateLocalMdbxVault}"
+                                   AutomationProperties.Name="{Binding L.CreateLocalMdbxVault}" />
+        </fa:FACommandBar.PrimaryCommands>
+        <fa:FACommandBar.SecondaryCommands>
+            <fa:FACommandBarButton Command="{Binding RefreshMdbxVaultsCommand}"
+                                   IsEnabled="{Binding !IsMdbxBusy}"
+                                   IconSource="ArrowClockwise"
+                                   Label="{Binding L.Refresh}"
+                                   ToolTip.Tip="{Binding L.Refresh}"
+                                   AutomationProperties.Name="{Binding L.Refresh}" />
+            <fa:FACommandBarButton Command="{Binding ConfigureMdbxRemoteSourcesCommand}"
+                                   IconSource="Settings"
+                                   Label="{Binding L.Configure}"
+                                   AutomationProperties.Name="{Binding L.Configure}" />
+        </fa:FACommandBar.SecondaryCommands>
+    </fa:FACommandBar>
+</UserControl>

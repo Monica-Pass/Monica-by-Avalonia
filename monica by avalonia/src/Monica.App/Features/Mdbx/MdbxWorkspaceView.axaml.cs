@@ -6,6 +6,7 @@ public partial class MdbxWorkspaceView : UserControl
 {
     private const double NarrowBreakpoint = 760;
     private const double WideBreakpoint = 1040;
+    private const double HeaderBreakpoint = 900;
 
     public MdbxWorkspaceView()
     {
@@ -20,6 +21,7 @@ public partial class MdbxWorkspaceView : UserControl
     {
         IsNarrowLayout = width > 0 && width < NarrowBreakpoint;
         IsMediumLayout = width >= NarrowBreakpoint && width < WideBreakpoint;
+        ApplyHeaderLayout(width);
         MdbxWorkspaceLayoutGrid.ColumnDefinitions.Clear();
         MdbxWorkspaceLayoutGrid.RowDefinitions.Clear();
         if (IsNarrowLayout)
@@ -37,5 +39,17 @@ public partial class MdbxWorkspaceView : UserControl
         MdbxWorkspaceLayoutGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
         Grid.SetColumn(MdbxContentRegion, 1);
         Grid.SetRow(MdbxContentRegion, 0);
+    }
+
+    private void ApplyHeaderLayout(double width)
+    {
+        var compact = width > 0 && width < HeaderBreakpoint;
+        Grid.SetRow(MdbxCommandBar, compact ? 2 : 0);
+        Grid.SetColumn(MdbxCommandBar, compact ? 0 : 1);
+        Grid.SetColumnSpan(MdbxCommandBar, compact ? 2 : 1);
+        Grid.SetRowSpan(MdbxCommandBar, compact ? 1 : 2);
+        MdbxCommandBar.Margin = compact
+            ? new Avalonia.Thickness(0, 4, 0, 0)
+            : new Avalonia.Thickness(0);
     }
 }

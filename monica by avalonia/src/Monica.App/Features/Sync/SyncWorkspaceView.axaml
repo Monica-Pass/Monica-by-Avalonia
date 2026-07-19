@@ -4,27 +4,31 @@
     </UserControl.Styles>
     <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsSync}}" RowDefinitions="Auto,*" MaxWidth="1080" HorizontalAlignment="Stretch" ClipToBounds="True">
         <Border Classes="workspacePageHeader">
-            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+            <Grid x:Name="SyncHeaderGrid" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
                 <TextBlock Classes="workspacePageTitle" Text="{Binding L.SyncAndBackup}" />
                 <TextBlock Grid.Row="1" Classes="workspacePageSubtitle" Text="{Binding L.SyncSubtitle}" MaxWidth="620" HorizontalAlignment="Left" />
-                <WrapPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal">
-                    <Button Classes="workspaceCommand" Command="{Binding TestWebDavConnectionCommand}" IsEnabled="{Binding !IsWebDavBusy}" Margin="0,0,8,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="ArrowSync" FontSize="18" />
-                            <TextBlock Text="{Binding L.TestConnection}" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="workspacePrimaryCommand" Command="{Binding CreateWebDavBackupCommand}" IsEnabled="{Binding !IsWebDavBusy}" Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
-                            <TextBlock Text="{Binding L.BackupNow}" />
-                        </StackPanel>
-                    </Button>
-                </WrapPanel>
-                <Border x:Name="WebDavOperationProgressRegion" Grid.Row="3" Grid.ColumnSpan="2" Padding="12,9" CornerRadius="7" BorderBrush="{DynamicResource AccentFillColorSecondaryBrush}" BorderThickness="1" Background="{DynamicResource LayerFillColorSubtleBrush}" IsVisible="{Binding IsWebDavBusy}" AutomationProperties.Name="{Binding WebDavOperationStageText}">
+                <sync:SyncCommandBarView x:Name="SyncCommandBar" Grid.Column="1" Grid.RowSpan="2" />
+                <Border x:Name="WebDavOperationProgressRegion"
+                        Grid.Row="2"
+                        Grid.ColumnSpan="2"
+                        Padding="12,9"
+                        CornerRadius="7"
+                        BorderBrush="{DynamicResource AccentFillColorSecondaryBrush}"
+                        BorderThickness="1"
+                        Background="{DynamicResource LayerFillColorSubtleBrush}"
+                        IsVisible="{Binding IsWebDavBusy}"
+                        AutomationProperties.Name="{Binding WebDavOperationStageText}">
                     <Grid ColumnDefinitions="160,*" ColumnSpacing="12">
-                        <ProgressBar x:Name="WebDavOperationProgressBar" IsIndeterminate="True" VerticalAlignment="Center" AutomationProperties.Name="{Binding WebDavOperationStageText}" />
-                        <TextBlock x:Name="WebDavOperationStageText" Grid.Column="1" Text="{Binding WebDavOperationStageText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        <ProgressBar x:Name="WebDavOperationProgressBar"
+                                     IsIndeterminate="True"
+                                     VerticalAlignment="Center"
+                                     AutomationProperties.Name="{Binding WebDavOperationStageText}" />
+                        <TextBlock x:Name="WebDavOperationStageText"
+                                   Grid.Column="1"
+                                   Text="{Binding WebDavOperationStageText}"
+                                   TextWrapping="Wrap"
+                                   VerticalAlignment="Center"
+                                   AutomationProperties.LiveSetting="Polite" />
                     </Grid>
                 </Border>
             </Grid>
@@ -93,11 +97,7 @@
             </Border>
             <ScrollViewer x:Name="SyncContentRegion" Grid.Column="1" HorizontalScrollBarVisibility="Disabled" ClipToBounds="True">
                 <StackPanel Spacing="14" MaxWidth="720" HorizontalAlignment="Stretch">
-                    <sync:SyncConfigurationView />
-                    <sync:SyncBackupView />
-                    <sync:SyncSourcesView />
-                    <sync:SyncImportView />
-                    <sync:SyncExportView />
+                    <sync:SyncPageHostView x:Name="SyncPageHost" />
                 </StackPanel>
             </ScrollViewer>
         </Grid>

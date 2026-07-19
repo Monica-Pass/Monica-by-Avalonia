@@ -1,0 +1,31 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:fa="using:FluentAvalonia.UI.Controls"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Sync.SyncCommandBarView"
+             x:DataType="vm:MainWindowViewModel">
+    <fa:FACommandBar x:Name="SyncCommandBar"
+                         DefaultLabelPosition="Right"
+                         ClosedDisplayMode="Compact"
+                         IsDynamicOverflowEnabled="True"
+                         ItemsAlignment="Left"
+                         Background="Transparent"
+                         HorizontalAlignment="Stretch">
+            <fa:FACommandBar.PrimaryCommands>
+                <fa:FACommandBarButton Command="{Binding CreateWebDavBackupCommand}"
+                                       IsEnabled="{Binding !IsWebDavBusy}"
+                                       IconSource="ArrowUpload"
+                                       Label="{Binding L.BackupNow}"
+                                       ToolTip.Tip="{Binding L.BackupNow}"
+                                       AutomationProperties.Name="{Binding L.BackupNow}" />
+            </fa:FACommandBar.PrimaryCommands>
+            <fa:FACommandBar.SecondaryCommands>
+                <fa:FACommandBarButton Command="{Binding TestWebDavConnectionCommand}"
+                                       IsEnabled="{Binding !IsWebDavBusy}"
+                                       IconSource="ArrowSync"
+                                       Label="{Binding L.TestConnection}"
+                                       ToolTip.Tip="{Binding L.TestConnection}"
+                                       AutomationProperties.Name="{Binding L.TestConnection}" />
+            </fa:FACommandBar.SecondaryCommands>
+        </fa:FACommandBar>
+</UserControl>

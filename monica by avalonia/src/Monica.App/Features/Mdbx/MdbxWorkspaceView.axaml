@@ -4,75 +4,22 @@
     </UserControl.Styles>
     <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsMdbx}}" RowDefinitions="Auto,*" ClipToBounds="True">
         <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
-            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+            <Grid x:Name="MdbxHeaderGrid" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
                 <TextBlock Classes="workspacePageTitle" Text="{Binding L.MdbxVaults}" />
                 <TextBlock Grid.Row="1" Classes="workspacePageSubtitle" Text="{Binding MdbxWorkingCopySummaryText}" MaxWidth="720" HorizontalAlignment="Left" />
-                <WrapPanel Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Center">
-                    <Button Classes="workspacePrimaryCommand" Command="{Binding CreateMdbxVaultCommand}" IsEnabled="{Binding !IsMdbxBusy}" Margin="0,0,8,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="Database" FontSize="18" />
-                            <TextBlock Text="{Binding L.CreateLocalMdbxVault}" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="workspaceCommand" Command="{Binding RefreshMdbxVaultsCommand}" IsEnabled="{Binding !IsMdbxBusy}" Margin="0,0,8,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="ArrowClockwise" FontSize="18" />
-                            <TextBlock Text="{Binding L.Refresh}" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="workspaceCommand" ToolTip.Tip="{Binding L.MoreOptions}" AutomationProperties.Name="{Binding L.MoreOptions}" Width="36" Height="36" Padding="0" Margin="0,0,0,8">
-                        <ic:FluentIcon Icon="MoreHorizontal" FontSize="17" />
-                        <Button.Flyout>
-                            <MenuFlyout>
-                                <MenuItem Header="{Binding L.Configure}" Command="{Binding ConfigureMdbxRemoteSourcesCommand}" />
-                            </MenuFlyout>
-                        </Button.Flyout>
-                    </Button>
-                </WrapPanel>
+                <mdbx:MdbxCommandBarView x:Name="MdbxCommandBar" Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Center" />
             </Grid>
         </Border>
         <Grid x:Name="MdbxWorkspaceLayoutGrid" Grid.Row="1" ColumnDefinitions="360,*" RowDefinitions="*" ColumnSpacing="14" RowSpacing="12" MinWidth="0">
             <Border x:Name="MdbxListRegion" Classes="mdbxSourceRail" ClipToBounds="True">
                 <Grid RowDefinitions="Auto,*">
-                    <Grid Margin="14,12,14,8" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                    <Grid Margin="14,12,14,8" ColumnDefinitions="*" ColumnSpacing="8">
                         <StackPanel Spacing="3">
                             <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.MdbxWorkingCopiesSection}" />
                             <TextBlock Text="{Binding MdbxWorkingCopySummaryText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" MaxLines="2" />
                         </StackPanel>
-                        <Button Grid.Column="1" Classes="workspaceCommand" Command="{Binding CreateMdbxVaultCommand}" IsEnabled="{Binding !IsMdbxBusy}" ToolTip.Tip="{Binding L.CreateLocalMdbxVault}" AutomationProperties.Name="{Binding L.CreateLocalMdbxVault}" Width="34" Height="34" Padding="0">
-                            <ic:FluentIcon Icon="Add" FontSize="16" />
-                        </Button>
-                        <Button Grid.Column="2" Classes="workspaceCommand" Command="{Binding RefreshMdbxVaultsCommand}" IsEnabled="{Binding !IsMdbxBusy}" ToolTip.Tip="{Binding L.Refresh}" AutomationProperties.Name="{Binding L.Refresh}" Width="34" Height="34" Padding="0">
-                            <ic:FluentIcon Icon="ArrowClockwise" FontSize="16" />
-                        </Button>
                     </Grid>
-                    <Grid Grid.Row="1">
-                        <StackPanel IsVisible="{Binding !HasMdbxDatabases}" Spacing="10" Margin="24" Width="240" HorizontalAlignment="Left" VerticalAlignment="Top">
-                            <ic:FluentIcon Icon="Database" FontSize="32" HorizontalAlignment="Center" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                            <TextBlock Text="{Binding L.NoMdbxVaults}" TextAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                            <Button Classes="workspacePrimaryCommand" Command="{Binding CreateMdbxVaultCommand}" IsEnabled="{Binding !IsMdbxBusy}" HorizontalAlignment="Center">
-                                <TextBlock Text="{Binding L.CreateLocalMdbxVault}" />
-                            </Button>
-                        </StackPanel>
-                        <ListBox x:Name="MdbxDatabaseList" Classes="mdbxWorkingCopyList" ItemsSource="{Binding MdbxDatabaseItems}" SelectedItem="{Binding SelectedMdbxDatabaseItem}" IsVisible="{Binding HasMdbxDatabases}" SelectionMode="Single" Margin="8,0,8,8">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:MdbxDatabaseDisplayItem">
-                                    <Border Classes="mdbxWorkingCopyRow">
-                                        <Button Classes="mdbxWorkingCopyButton" Command="{Binding #MdbxWorkspaceRoot.DataContext.ShowMdbxDatabaseDetailsCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
-                                            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="3" ColumnSpacing="10">
-                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                <Border Grid.Column="1" Grid.RowSpan="2" Classes="workspaceStatusChip">
-                                                    <TextBlock Text="{Binding Source}" FontSize="12" />
-                                                </Border>
-                                                <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding LocalPath}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
-                                                <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding SyncStatus}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
-                                            </Grid>
-                                        </Button>
-                                    </Border>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </Grid>
+                    <mdbx:MdbxDatabaseListView x:Name="MdbxDatabaseListView" Grid.Row="1" />
                 </Grid>
             </Border>
             <ScrollViewer x:Name="MdbxContentRegion" Grid.Column="1" HorizontalScrollBarVisibility="Disabled" ClipToBounds="True">

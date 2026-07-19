@@ -1,0 +1,49 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.DatabaseManagement.DatabaseSourceListView"
+             x:Name="DatabaseSourceListRoot"
+             x:DataType="vm:MainWindowViewModel">
+    <Grid>
+        <StackPanel IsVisible="{Binding !HasVaultSources}"
+                    Spacing="10"
+                    Margin="24"
+                    Width="240"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top">
+            <ic:FluentIcon Icon="Database" FontSize="32" HorizontalAlignment="Center" />
+            <TextBlock Text="{Binding L.DatabaseSourcesEmptyHint}" TextAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        </StackPanel>
+        <ListBox x:Name="DatabaseSourceList"
+                 Classes="databaseSourceList"
+                 ItemsSource="{Binding VaultSources}"
+                 SelectedItem="{Binding SelectedVaultSource}"
+                 IsVisible="{Binding HasVaultSources}"
+                 SelectionMode="Single"
+                 Margin="8,0,8,8"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:VaultSourceDisplayItem">
+                    <Border Classes="databaseSourceRow">
+                        <Button Classes="databaseSourceButton"
+                                Command="{Binding #DatabaseSourceListRoot.DataContext.ShowVaultSourceDetailsCommand}"
+                                CommandParameter="{Binding}"
+                                ToolTip.Tip="{Binding DisplayName}"
+                                AutomationProperties.Name="{Binding DisplayName}">
+                            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="3">
+                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                <Border Grid.Column="1" Grid.RowSpan="2" Classes="workspaceStatusChip">
+                                    <TextBlock Text="{Binding Kind}" FontSize="12" />
+                                </Border>
+                                <TextBlock Grid.Row="1" Text="{Binding LocalPath}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" />
+                                <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding SyncStatus}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" />
+                            </Grid>
+                        </Button>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </Grid>
+</UserControl>

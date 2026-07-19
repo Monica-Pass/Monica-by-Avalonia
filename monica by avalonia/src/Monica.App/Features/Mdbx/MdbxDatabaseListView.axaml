@@ -1,0 +1,55 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Mdbx.MdbxDatabaseListView"
+             x:Name="MdbxDatabaseListRoot"
+             x:DataType="vm:MainWindowViewModel">
+    <Grid>
+        <StackPanel IsVisible="{Binding !HasMdbxDatabases}"
+                    Spacing="10"
+                    Margin="24"
+                    Width="240"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top">
+            <ic:FluentIcon Icon="Database" FontSize="32" HorizontalAlignment="Center" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+            <TextBlock Text="{Binding L.NoMdbxVaults}" TextAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Button Classes="workspacePrimaryCommand"
+                    Command="{Binding CreateMdbxVaultCommand}"
+                    IsEnabled="{Binding !IsMdbxBusy}"
+                    HorizontalAlignment="Center">
+                <TextBlock Text="{Binding L.CreateLocalMdbxVault}" />
+            </Button>
+        </StackPanel>
+        <ListBox x:Name="MdbxDatabaseList"
+                 Classes="mdbxWorkingCopyList"
+                 ItemsSource="{Binding MdbxDatabaseItems}"
+                 SelectedItem="{Binding SelectedMdbxDatabaseItem}"
+                 IsVisible="{Binding HasMdbxDatabases}"
+                 SelectionMode="Single"
+                 Margin="8,0,8,8"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:MdbxDatabaseDisplayItem">
+                    <Border Classes="mdbxWorkingCopyRow">
+                        <Button Classes="mdbxWorkingCopyButton"
+                                Command="{Binding #MdbxDatabaseListRoot.DataContext.ShowMdbxDatabaseDetailsCommand}"
+                                CommandParameter="{Binding}"
+                                ToolTip.Tip="{Binding Name}"
+                                AutomationProperties.Name="{Binding Name}">
+                            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="3" ColumnSpacing="10">
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                <Border Grid.Column="1" Grid.RowSpan="2" Classes="workspaceStatusChip">
+                                    <TextBlock Text="{Binding Source}" FontSize="12" />
+                                </Border>
+                                <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding LocalPath}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding SyncStatus}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
+                            </Grid>
+                        </Button>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </Grid>
+</UserControl>

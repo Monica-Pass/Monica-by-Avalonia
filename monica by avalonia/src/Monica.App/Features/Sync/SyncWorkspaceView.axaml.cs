@@ -6,6 +6,7 @@ public partial class SyncWorkspaceView : UserControl
 {
     private const double NarrowBreakpoint = 760;
     private const double WideBreakpoint = 1040;
+    private const double HeaderBreakpoint = 900;
 
     public SyncWorkspaceView()
     {
@@ -20,6 +21,7 @@ public partial class SyncWorkspaceView : UserControl
     {
         IsNarrowLayout = width > 0 && width < NarrowBreakpoint;
         IsMediumLayout = width >= NarrowBreakpoint && width < WideBreakpoint;
+        ApplyHeaderLayout(width);
 
         SyncWorkspaceLayoutGrid.ColumnDefinitions.Clear();
         SyncWorkspaceLayoutGrid.RowDefinitions.Clear();
@@ -42,5 +44,18 @@ public partial class SyncWorkspaceView : UserControl
         Grid.SetRow(SyncContentRegion, 0);
         SyncSidebarRegion.MaxHeight = double.PositiveInfinity;
         SyncSidebarOverview.IsVisible = true;
+    }
+
+    private void ApplyHeaderLayout(double width)
+    {
+        var compact = width > 0 && width < HeaderBreakpoint;
+        Grid.SetRow(SyncCommandBar, compact ? 2 : 0);
+        Grid.SetColumn(SyncCommandBar, compact ? 0 : 1);
+        Grid.SetColumnSpan(SyncCommandBar, compact ? 2 : 1);
+        Grid.SetRowSpan(SyncCommandBar, compact ? 1 : 2);
+        SyncCommandBar.Margin = compact
+            ? new Avalonia.Thickness(0, 4, 0, 0)
+            : new Avalonia.Thickness(0);
+        Grid.SetRow(WebDavOperationProgressRegion, compact ? 3 : 2);
     }
 }

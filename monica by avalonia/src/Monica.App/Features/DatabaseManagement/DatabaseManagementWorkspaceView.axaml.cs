@@ -10,6 +10,7 @@ public partial class DatabaseManagementWorkspaceView : UserControl
 {
     private const double NarrowBreakpoint = 760;
     private const double WideBreakpoint = 1040;
+    private const double HeaderBreakpoint = 900;
     private MainWindowViewModel? _viewModel;
 
     public DatabaseManagementWorkspaceView()
@@ -25,6 +26,7 @@ public partial class DatabaseManagementWorkspaceView : UserControl
     {
         IsNarrowLayout = width > 0 && width < NarrowBreakpoint;
         IsMediumLayout = width >= NarrowBreakpoint && width < WideBreakpoint;
+        ApplyHeaderLayout(width);
         DatabaseWorkspaceLayoutGrid.ColumnDefinitions.Clear();
         DatabaseWorkspaceLayoutGrid.RowDefinitions.Clear();
         if (IsNarrowLayout)
@@ -42,6 +44,18 @@ public partial class DatabaseManagementWorkspaceView : UserControl
         DatabaseWorkspaceLayoutGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
         Grid.SetColumn(DatabaseContentRegion, 1);
         Grid.SetRow(DatabaseContentRegion, 0);
+    }
+
+    private void ApplyHeaderLayout(double width)
+    {
+        var compact = width > 0 && width < HeaderBreakpoint;
+        Grid.SetRow(DatabaseCommandBar, compact ? 2 : 0);
+        Grid.SetColumn(DatabaseCommandBar, compact ? 0 : 1);
+        Grid.SetColumnSpan(DatabaseCommandBar, compact ? 2 : 1);
+        Grid.SetRowSpan(DatabaseCommandBar, compact ? 1 : 2);
+        DatabaseCommandBar.Margin = compact
+            ? new Thickness(0, 4, 0, 0)
+            : new Thickness(0);
     }
 
     protected override void OnDataContextChanged(EventArgs e)
