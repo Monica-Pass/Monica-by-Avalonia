@@ -1,5 +1,8 @@
 using Avalonia.Controls;
 using Monica.App.Features;
+using Monica.App.Services;
+using Monica.App.ViewModels;
+using Monica.Core.Models;
 
 namespace Monica.UiTests;
 
@@ -21,8 +24,32 @@ public sealed class RemainingDialogsWorkflowUiTests
         Assert.NotNull(totp.FindControl<StackPanel>("TotpEditorPrimaryForm"));
         Assert.NotNull(totp.FindControl<TextBox>("TotpSecretInput"));
         Assert.False(totp.FindControl<Expander>("TotpAdvancedOptionsExpander")!.IsExpanded);
-        Assert.NotNull(category.FindControl<StackPanel>("CategoryPickerForm"));
-        Assert.Equal(40, category.FindControl<ComboBox>("CategoryPickerComboBox")!.MinHeight);
+        Assert.NotNull(category.FindControl<Grid>("CategoryPickerForm"));
+        Assert.Equal(40, category.FindControl<TextBox>("CategoryPickerSearchBox")!.MinHeight);
+        Assert.NotNull(category.FindControl<ListBox>("CategoryPickerList"));
+    }
+
+    [Fact]
+    public void Category_picker_projects_and_searches_nested_folder_paths()
+    {
+        var viewModel = new CategoryPickerViewModel(
+            new LocalizationService(),
+            [
+                new Category { Id = 1, Name = "Work/Production", SortOrder = 2 },
+                new Category { Id = 2, Name = "Work/Development/Cloud", SortOrder = 1 }
+            ],
+            selectedCategoryId: 2);
+
+        Assert.Equal(
+            ["Work/Development/Cloud", "Work/Production"],
+            viewModel.CategoryOptions.Skip(1).Select(option => option.FullPath));
+        Assert.Equal("Cloud", viewModel.SelectedCategory?.FolderDisplayName);
+        Assert.Equal(2, viewModel.SelectedCategory?.Level);
+
+        viewModel.SearchText = "production";
+
+        Assert.Single(viewModel.FilteredCategoryOptions);
+        Assert.Equal("Work/Production", viewModel.FilteredCategoryOptions[0].FullPath);
     }
 
     [Fact]

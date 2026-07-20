@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.Input;
+using Monica.Core.Categories;
 using Monica.Core.Models;
 
 namespace Monica.App.ViewModels;
@@ -51,7 +52,7 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private async Task CreatePasswordFolderAsync()
     {
-        var name = NewFolderName.Trim();
+        var name = LocalCategoryPath.Build(GetSelectedPasswordFolderPath(), NewFolderName);
         if (string.IsNullOrWhiteSpace(name))
         {
             StatusMessage = _localization.Get("FolderNameRequired");
@@ -83,7 +84,7 @@ public sealed partial class MainWindowViewModel
     private async Task RenameSelectedPasswordFolderAsync()
     {
         var category = GetSelectedPasswordFolderCategory();
-        var name = NewFolderName.Trim();
+        var name = LocalCategoryPath.LeafName(NewFolderName);
         if (category is null)
         {
             StatusMessage = _localization.Get("SelectFolderToManage");
@@ -96,18 +97,20 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var duplicate = Categories.FirstOrDefault(item =>
-            item.Id != category.Id &&
-            item.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-        if (duplicate is not null)
+        var renamePlan = LocalCategoryPath.PlanSubtreeRename(Categories, category, name);
+        if (renamePlan.HasConflict)
         {
-            StatusMessage = _localization.Format("FolderAlreadyExistsFormat", duplicate.Name);
+            StatusMessage = _localization.Format("FolderAlreadyExistsFormat", renamePlan.ConflictPath ?? name);
             return;
         }
 
         var oldName = category.Name;
-        category.Name = name;
-        await _repository.SaveCategoryAsync(category);
+        foreach (var updatedCategory in Categories.Where(item => renamePlan.UpdatedPaths.ContainsKey(item.Id)))
+        {
+            updatedCategory.Name = renamePlan.UpdatedPaths[updatedCategory.Id];
+            await _repository.SaveCategoryAsync(updatedCategory);
+        }
+
         RefreshPasswordFolderFilters(category.Id);
         NewFolderName = "";
         await LogOperationAsync(new OperationLog
@@ -118,7 +121,7 @@ public sealed partial class MainWindowViewModel
             OperationType = "UPDATE",
             DeviceName = Environment.MachineName
         });
-        StatusMessage = _localization.Format("RenamedFolderFormat", oldName, category.Name);
+        StatusMessage = _localization.Format("RenamedFolderFormat", oldName, renamePlan.DestinationPath);
     }
 
     [RelayCommand]

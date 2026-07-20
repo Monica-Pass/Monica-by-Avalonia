@@ -6,7 +6,6 @@ using Monica.Core.Services;
 
 namespace Monica.App.ViewModels;
 
-public sealed record PasswordCategoryChoice(long? Id, string Name);
 public sealed record PasswordLoginTypeChoice(PasswordLoginType Value, string Label);
 public sealed record BoundNoteChoice(long? Id, string Title);
 public sealed record CustomIconTypeChoice(string Value, string Label);
@@ -30,10 +29,9 @@ public sealed partial class PasswordEditorViewModel : ObservableObject, IDisposa
         Source = source;
         IsNew = source is null;
 
-        CategoryOptions.Add(new PasswordCategoryChoice(null, localization.Get("NoFolder")));
-        foreach (var category in categories.OrderBy(item => item.SortOrder).ThenBy(item => item.Name))
+        foreach (var category in PasswordCategoryChoice.BuildOptions(categories, localization.Get("NoFolder")))
         {
-            CategoryOptions.Add(new PasswordCategoryChoice(category.Id, category.Name));
+            CategoryOptions.Add(category);
         }
 
         SelectedCategory = CategoryOptions.FirstOrDefault(item => item.Id == source?.CategoryId) ?? CategoryOptions[0];

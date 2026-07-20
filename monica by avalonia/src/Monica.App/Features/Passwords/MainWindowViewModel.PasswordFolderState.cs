@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;
 using Monica.App;
+using Monica.Core.Categories;
 using Monica.Core.Models;
 
 namespace Monica.App.ViewModels;
@@ -14,6 +15,14 @@ public sealed partial class MainWindowViewModel
         var selectedId = SelectedPasswordFolderFilter?.Id;
         return selectedId is > 0
             ? Categories.FirstOrDefault(item => item.Id == selectedId.Value)
+            : null;
+    }
+
+    private string? GetSelectedPasswordFolderPath()
+    {
+        var selected = SelectedPasswordFolderFilter;
+        return selected is { IsSystemNode: false } && !string.IsNullOrWhiteSpace(selected.PathPrefix)
+            ? LocalCategoryPath.Normalize(selected.PathPrefix)
             : null;
     }
 
@@ -192,6 +201,7 @@ public sealed partial class MainWindowViewModel
     }
 
     private static string[] SplitFolderPath(string value) =>
-        value.Split(['/', '\\'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        LocalCategoryPath.Normalize(value)
+            .Split('/', StringSplitOptions.RemoveEmptyEntries);
 
 }

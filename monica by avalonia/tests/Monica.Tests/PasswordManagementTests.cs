@@ -2692,6 +2692,8 @@ public sealed partial class PasswordManagementTests
         Assert.Empty(harness.ViewModel.NewFolderName);
         Assert.Equal(harness.ViewModel.L.Format("CreatedFolderFormat", "Finance"), harness.ViewModel.StatusMessage);
 
+        harness.ViewModel.SelectedPasswordFolderFilter =
+            harness.ViewModel.PasswordFolderFilters.Single(item => item.SelectionKey == "system:all");
         harness.ViewModel.NewFolderName = "work";
         await harness.ViewModel.CreatePasswordFolderCommand.ExecuteAsync(null);
 
@@ -2750,6 +2752,27 @@ public sealed partial class PasswordManagementTests
         Assert.Equal(1, prodNode.Count);
         Assert.Equal(1, personalNode.Count);
         Assert.Equal(2, harness.ViewModel.PasswordFolderFilters.Single(item => item.SelectionKey == "system:all").Count);
+    }
+
+    [Fact]
+    public async Task ViewModel_creates_child_folder_under_current_nested_selection()
+    {
+        var harness = CreateHarness();
+        var work = new Category { Name = "Work", SortOrder = 1 };
+        await harness.Repository.SaveCategoryAsync(work);
+        await harness.ViewModel.LoadAsync();
+
+        harness.ViewModel.SelectedPasswordFolderFilter =
+            harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == work.Id);
+        harness.ViewModel.NewFolderName = "Production/Secrets";
+
+        await harness.ViewModel.CreatePasswordFolderCommand.ExecuteAsync(null);
+
+        var child = Assert.Single(
+            await harness.Repository.GetCategoriesAsync(),
+            item => item.Name == "Work/Production/Secrets");
+        Assert.Equal(child.Id, harness.ViewModel.SelectedPasswordFolderFilter?.Id);
+        Assert.Equal(2, harness.ViewModel.SelectedPasswordFolderFilter?.Level);
     }
 
     [Fact]
@@ -3084,6 +3107,33 @@ public sealed partial class PasswordManagementTests
         Assert.Empty(harness.ViewModel.NewFolderName);
         Assert.Contains(harness.ViewModel.TimelineEntries, item => item.OperationType == "UPDATE" && item.ItemType == "CATEGORY");
         Assert.Equal(harness.ViewModel.L.Format("RenamedFolderFormat", "Work", "Engineering"), harness.ViewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task ViewModel_renames_selected_password_folder_and_its_descendants()
+    {
+        var harness = CreateHarness();
+        var work = new Category { Name = "Work", SortOrder = 1 };
+        var production = new Category { Name = "Work/Production", SortOrder = 2 };
+        var secrets = new Category { Name = "Work/Production/Secrets", SortOrder = 3 };
+        await harness.Repository.SaveCategoryAsync(work);
+        await harness.Repository.SaveCategoryAsync(production);
+        await harness.Repository.SaveCategoryAsync(secrets);
+        await harness.ViewModel.LoadAsync();
+
+        harness.ViewModel.SelectedPasswordFolderFilter =
+            harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == work.Id);
+        harness.ViewModel.NewFolderName = "Engineering";
+
+        await harness.ViewModel.RenameSelectedPasswordFolderCommand.ExecuteAsync(null);
+
+        var categories = await harness.Repository.GetCategoriesAsync();
+        Assert.Contains(categories, item => item.Id == work.Id && item.Name == "Engineering");
+        Assert.Contains(categories, item => item.Id == production.Id && item.Name == "Engineering/Production");
+        Assert.Contains(categories, item => item.Id == secrets.Id && item.Name == "Engineering/Production/Secrets");
+        Assert.Contains(
+            harness.ViewModel.PasswordFolderFilters,
+            item => item.Id == secrets.Id && item.Level == 2);
     }
 
     [Fact]
