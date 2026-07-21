@@ -1,88 +1,51 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Sync.SyncImportView" x:DataType="vm:MainWindowViewModel">
-    <fa:FASettingsExpander Header="{Binding L.ImportData}" Description="{Binding L.ImportDataDescription}" IsExpanded="True" IsVisible="{Binding IsSyncImportSelected}">
-        <fa:FASettingsExpander.IconSource>
-            <fa:FASymbolIconSource Symbol="Folder" />
-        </fa:FASettingsExpander.IconSource>
-        <StackPanel Spacing="16">
-            <ProgressBar x:Name="ImportBusyIndicator"
-                         IsIndeterminate="True"
-                         IsVisible="{Binding IsImportExportBusy}"
-                         AutomationProperties.Name="{Binding StatusMessage}" />
-            <Border x:Name="BitwardenImportCard"
-                    Padding="16"
-                    CornerRadius="8"
-                    BorderBrush="{DynamicResource CardBorderBrush}"
-                    BorderThickness="1"
-                    Background="{DynamicResource LayerFillColorDefaultBrush}">
-                <StackPanel Spacing="12">
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="{Binding L.BitwardenImportTitle}" FontSize="18" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding L.BitwardenImportDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Sync.SyncImportView" x:DataType="vm:MainWindowViewModel">
+    <Grid IsVisible="{Binding IsSyncImportSelected}" RowDefinitions="Auto,*" MinWidth="0">
+        <ProgressBar x:Name="ImportBusyIndicator" IsIndeterminate="True" IsVisible="{Binding IsImportExportBusy}" AutomationProperties.Name="{Binding StatusMessage}" Margin="0,0,0,10" />
+        <TabControl x:Name="ImportSourceTabs" Grid.Row="1" TabStripPlacement="Left" AutomationProperties.Name="{Binding L.ImportData}">
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="9">
+                        <ic:FluentIcon Icon="LockClosed" FontSize="16" />
+                        <TextBlock Text="{Binding L.BitwardenImportTitle}" />
+                    </StackPanel>
+                </TabItem.Header>
+                <StackPanel x:Name="BitwardenImportCard" Spacing="14" Margin="20,4,4,4">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{Binding L.BitwardenImportTitle}" FontSize="20" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding L.BitwardenImportDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                    <Button x:Name="SelectBitwardenJsonFileButton" Classes="workspaceCommand" Command="{Binding SelectBitwardenJsonFileCommand}" IsEnabled="{Binding IsBitwardenImportIdle}" HorizontalAlignment="Left" AutomationProperties.Name="{Binding L.SelectBitwardenJsonFile}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="Folder" FontSize="18" />
+                            <TextBlock Text="{Binding L.SelectBitwardenJsonFile}" />
                         </StackPanel>
-                        <Button x:Name="SelectBitwardenJsonFileButton"
-                                Grid.Column="1"
-                                Classes="workspaceCommand"
-                                Command="{Binding SelectBitwardenJsonFileCommand}"
-                                IsEnabled="{Binding IsBitwardenImportIdle}"
-                                AutomationProperties.Name="{Binding L.SelectBitwardenJsonFile}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <ic:FluentIcon Icon="Folder" FontSize="18" />
-                                <TextBlock Text="{Binding L.SelectBitwardenJsonFile}" />
-                            </StackPanel>
-                        </Button>
-                    </Grid>
-                    <TextBlock x:Name="BitwardenSelectedFileText"
-                               Text="{Binding BitwardenSelectedFileName}"
-                               IsVisible="{Binding HasBitwardenSelectedFile}"
-                               FontWeight="SemiBold"
-                               TextTrimming="CharacterEllipsis" />
+                    </Button>
+                    <Border Padding="12,9" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,1" IsVisible="{Binding HasBitwardenSelectedFile}">
+                        <TextBlock x:Name="BitwardenSelectedFileText" Text="{Binding BitwardenSelectedFileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    </Border>
                     <WrapPanel IsVisible="{Binding HasBitwardenSelectedFile}" IsEnabled="{Binding IsBitwardenImportIdle}">
-                        <Button x:Name="PreviewBitwardenJsonImportButton"
-                                Classes="workspacePrimaryCommand"
-                                Command="{Binding PreviewBitwardenJsonImportCommand}"
-                                AutomationProperties.Name="{Binding L.BitwardenInspect}"
-                                Margin="0,0,8,8">
+                        <Button x:Name="PreviewBitwardenJsonImportButton" Classes="workspacePrimaryCommand" Command="{Binding PreviewBitwardenJsonImportCommand}" AutomationProperties.Name="{Binding L.BitwardenInspect}" Margin="0,0,8,8">
                             <TextBlock Text="{Binding L.BitwardenInspect}" />
                         </Button>
                         <Button Classes="workspaceCommand" Command="{Binding ResetBitwardenImportCommand}" Margin="0,0,0,8">
                             <TextBlock Text="{Binding L.BitwardenChooseDifferentFile}" />
                         </Button>
                     </WrapPanel>
-                    <StackPanel Spacing="6" IsVisible="{Binding IsBitwardenImportBusy}">
-                        <ProgressBar x:Name="BitwardenImportProgress"
-                                     IsIndeterminate="{Binding IsBitwardenImportProgressIndeterminate}"
-                                     Minimum="0"
-                                     Maximum="{Binding BitwardenImportProgressMaximum}"
-                                     Value="{Binding BitwardenImportProgress}"
-                                     AutomationProperties.Name="{Binding BitwardenImportProgressText}" />
+                    <StackPanel Spacing="7" IsVisible="{Binding IsBitwardenImportBusy}">
+                        <ProgressBar x:Name="BitwardenImportProgress" IsIndeterminate="{Binding IsBitwardenImportProgressIndeterminate}" Maximum="{Binding BitwardenImportProgressMaximum}" Value="{Binding BitwardenImportProgress}" AutomationProperties.Name="{Binding BitwardenImportProgressText}" />
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
                             <TextBlock Text="{Binding BitwardenImportProgressText}" VerticalAlignment="Center" />
-                            <Button x:Name="CancelBitwardenImportButton"
-                                    Grid.Column="1"
-                                    Classes="workspaceCommand"
-                                    Command="{Binding CancelBitwardenImportCommand}">
+                            <Button x:Name="CancelBitwardenImportButton" Grid.Column="1" Classes="workspaceCommand" Command="{Binding CancelBitwardenImportCommand}">
                                 <TextBlock Text="{Binding L.Cancel}" />
                             </Button>
                         </Grid>
                     </StackPanel>
-                    <Border x:Name="BitwardenPreviewCard"
-                            Padding="14"
-                            CornerRadius="6"
-                            BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
-                            BorderThickness="1"
-                            IsVisible="{Binding HasBitwardenImportPreview}">
+                    <Border x:Name="BitwardenPreviewCard" Padding="14,12" BorderBrush="{DynamicResource AccentFillColorSecondaryBrush}" BorderThickness="0,1,0,0" IsVisible="{Binding HasBitwardenImportPreview}">
                         <StackPanel Spacing="10">
                             <TextBlock Text="{Binding BitwardenPreviewSummaryText}" TextWrapping="Wrap" />
-                            <TextBlock Text="{Binding BitwardenAttachmentNoticeText}"
-                                       IsVisible="{Binding HasBitwardenAttachmentMetadata}"
-                                       TextWrapping="Wrap"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Text="{Binding BitwardenAttachmentNoticeText}" IsVisible="{Binding HasBitwardenAttachmentMetadata}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                             <WrapPanel IsEnabled="{Binding IsBitwardenImportIdle}">
-                                <Button x:Name="ImportBitwardenJsonVaultButton"
-                                        Classes="workspacePrimaryCommand"
-                                        Command="{Binding ImportBitwardenJsonVaultCommand}"
-                                        Margin="0,0,8,8">
+                                <Button x:Name="ImportBitwardenJsonVaultButton" Classes="workspacePrimaryCommand" Command="{Binding ImportBitwardenJsonVaultCommand}" Margin="0,0,8,8">
                                     <TextBlock Text="{Binding L.BitwardenImportNow}" />
                                 </Button>
                                 <Button Classes="workspaceCommand" Command="{Binding ResetBitwardenImportCommand}" Margin="0,0,0,8">
@@ -92,82 +55,47 @@
                         </StackPanel>
                     </Border>
                 </StackPanel>
-            </Border>
-            <Border x:Name="KeePassImportCard"
-                    Padding="16"
-                    CornerRadius="8"
-                    BorderBrush="{DynamicResource CardBorderBrush}"
-                    BorderThickness="1"
-                    Background="{DynamicResource LayerFillColorDefaultBrush}">
-                <StackPanel Spacing="12">
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="{Binding L.KeePassImportTitle}" FontSize="18" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding L.KeePassImportDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </TabItem>
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="9">
+                        <ic:FluentIcon Icon="Database" FontSize="16" />
+                        <TextBlock Text="{Binding L.KeePassImportTitle}" />
+                    </StackPanel>
+                </TabItem.Header>
+                <StackPanel x:Name="KeePassImportCard" Spacing="14" Margin="20,4,4,4">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{Binding L.KeePassImportTitle}" FontSize="20" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding L.KeePassImportDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                    <Button x:Name="SelectKeePassFileButton" Classes="workspaceCommand" Command="{Binding SelectKeePassFileCommand}" IsEnabled="{Binding IsKeePassImportIdle}" HorizontalAlignment="Left" AutomationProperties.Name="{Binding L.SelectKeePassFile}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:FluentIcon Icon="Folder" FontSize="18" />
+                            <TextBlock Text="{Binding L.SelectKeePassFile}" />
                         </StackPanel>
-                        <Button x:Name="SelectKeePassFileButton"
-                                Grid.Column="1"
-                                Classes="workspaceCommand"
-                                Command="{Binding SelectKeePassFileCommand}"
-                                IsEnabled="{Binding IsKeePassImportIdle}"
-                                AutomationProperties.Name="{Binding L.SelectKeePassFile}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <ic:FluentIcon Icon="Folder" FontSize="18" />
-                                <TextBlock Text="{Binding L.SelectKeePassFile}" />
-                            </StackPanel>
-                        </Button>
-                    </Grid>
-                    <TextBlock x:Name="KeePassSelectedFileText"
-                               Text="{Binding KeePassSelectedFileName}"
-                               IsVisible="{Binding HasKeePassSelectedFile}"
-                               FontWeight="SemiBold"
-                               TextTrimming="CharacterEllipsis" />
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" IsVisible="{Binding HasKeePassSelectedFile}" IsEnabled="{Binding IsKeePassImportIdle}">
-                        <TextBox x:Name="KeePassImportPasswordBox"
-                                 MaxWidth="360"
-                                 HorizontalAlignment="Stretch"
-                                 PasswordChar="*"
-                                 Text="{Binding KeePassImportPassword}"
-                                 PlaceholderText="{Binding L.KeePassMasterPassword}"
-                                 AutomationProperties.Name="{Binding L.KeePassMasterPassword}" />
-                        <Button x:Name="PreviewKeePassImportButton"
-                                Grid.Column="1"
-                                Classes="workspacePrimaryCommand"
-                                Command="{Binding PreviewKeePassImportCommand}"
-                                AutomationProperties.Name="{Binding L.KeePassInspect}">
+                    </Button>
+                    <TextBlock x:Name="KeePassSelectedFileText" Text="{Binding KeePassSelectedFileName}" IsVisible="{Binding HasKeePassSelectedFile}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <StackPanel Spacing="8" IsVisible="{Binding HasKeePassSelectedFile}" IsEnabled="{Binding IsKeePassImportIdle}">
+                        <TextBlock Text="{Binding L.KeePassMasterPassword}" FontSize="12" FontWeight="SemiBold" />
+                        <TextBox x:Name="KeePassImportPasswordBox" MaxWidth="420" HorizontalAlignment="Left" PasswordChar="*" Text="{Binding KeePassImportPassword}" AutomationProperties.Name="{Binding L.KeePassMasterPassword}" />
+                        <Button x:Name="PreviewKeePassImportButton" Classes="workspacePrimaryCommand" Command="{Binding PreviewKeePassImportCommand}" HorizontalAlignment="Left" AutomationProperties.Name="{Binding L.KeePassInspect}">
                             <TextBlock Text="{Binding L.KeePassInspect}" />
                         </Button>
-                    </Grid>
-                    <StackPanel Spacing="6" IsVisible="{Binding IsKeePassImportBusy}">
-                        <ProgressBar x:Name="KeePassImportProgress"
-                                     IsIndeterminate="{Binding IsKeePassImportProgressIndeterminate}"
-                                     Minimum="0"
-                                     Maximum="{Binding KeePassImportProgressMaximum}"
-                                     Value="{Binding KeePassImportProgress}"
-                                     AutomationProperties.Name="{Binding KeePassImportProgressText}" />
+                    </StackPanel>
+                    <StackPanel Spacing="7" IsVisible="{Binding IsKeePassImportBusy}">
+                        <ProgressBar x:Name="KeePassImportProgress" IsIndeterminate="{Binding IsKeePassImportProgressIndeterminate}" Maximum="{Binding KeePassImportProgressMaximum}" Value="{Binding KeePassImportProgress}" AutomationProperties.Name="{Binding KeePassImportProgressText}" />
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
                             <TextBlock Text="{Binding KeePassImportProgressText}" VerticalAlignment="Center" />
-                            <Button x:Name="CancelKeePassImportButton"
-                                    Grid.Column="1"
-                                    Classes="workspaceCommand"
-                                    Command="{Binding CancelKeePassImportCommand}">
+                            <Button x:Name="CancelKeePassImportButton" Grid.Column="1" Classes="workspaceCommand" Command="{Binding CancelKeePassImportCommand}">
                                 <TextBlock Text="{Binding L.Cancel}" />
                             </Button>
                         </Grid>
                     </StackPanel>
-                    <Border x:Name="KeePassPreviewCard"
-                            Padding="14"
-                            CornerRadius="6"
-                            BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
-                            BorderThickness="1"
-                            IsVisible="{Binding HasKeePassImportPreview}">
+                    <Border x:Name="KeePassPreviewCard" Padding="14,12" BorderBrush="{DynamicResource AccentFillColorSecondaryBrush}" BorderThickness="0,1,0,0" IsVisible="{Binding HasKeePassImportPreview}">
                         <StackPanel Spacing="10">
                             <TextBlock Text="{Binding KeePassPreviewSummaryText}" TextWrapping="Wrap" />
                             <WrapPanel IsEnabled="{Binding IsKeePassImportIdle}">
-                                <Button x:Name="ImportKeePassVaultButton"
-                                        Classes="workspacePrimaryCommand"
-                                        Command="{Binding ImportKeePassVaultCommand}"
-                                        Margin="0,0,8,8">
+                                <Button x:Name="ImportKeePassVaultButton" Classes="workspacePrimaryCommand" Command="{Binding ImportKeePassVaultCommand}" Margin="0,0,8,8">
                                     <TextBlock Text="{Binding L.KeePassImportNow}" />
                                 </Button>
                                 <Button Classes="workspaceCommand" Command="{Binding ResetKeePassImportCommand}" Margin="0,0,0,8">
@@ -177,114 +105,93 @@
                         </StackPanel>
                     </Border>
                 </StackPanel>
-            </Border>
-            <StackPanel x:Name="ImportOperationContent" Spacing="8" IsEnabled="{Binding IsImportWorkspaceIdle}">
-            <fa:FASettingsExpander Header="{Binding L.ImportMonicaJson}" Description="{Binding L.ImportMonicaJsonDescription}" IsExpanded="False">
-            <StackPanel Spacing="8">
-                <TextBox Text="{Binding ImportJsonText}" PlaceholderText="{Binding L.ImportJsonWatermark}" AcceptsReturn="True" MinHeight="120" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ImportMonicaJson}" />
-                <WrapPanel>
-                    <Button Classes="workspaceCommand" Command="{Binding ImportMonicaJsonFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="Folder" FontSize="18" />
-                            <TextBlock Text="{Binding L.ImportFromFile}" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="workspaceCommand" Command="{Binding ImportDataCommand}" Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
+            </TabItem>
+            <TabItem Header="{Binding L.ImportMonicaJson}">
+                <StackPanel x:Name="ImportOperationContent" Spacing="12" Margin="20,4,4,4" IsEnabled="{Binding IsImportWorkspaceIdle}">
+                    <TextBlock Text="{Binding L.ImportMonicaJson}" FontSize="20" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding L.ImportMonicaJsonDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <TextBox Text="{Binding ImportJsonText}" PlaceholderText="{Binding L.ImportJsonWatermark}" AcceptsReturn="True" MinHeight="220" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ImportMonicaJson}" />
+                    <WrapPanel>
+                        <Button Classes="workspaceCommand" Command="{Binding ImportMonicaJsonFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="Folder" FontSize="18" />
+                                <TextBlock Text="{Binding L.ImportFromFile}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="workspacePrimaryCommand" Command="{Binding ImportDataCommand}" Margin="0,0,0,8">
                             <TextBlock Text="{Binding L.Import}" />
-                        </StackPanel>
-                    </Button>
-                </WrapPanel>
-            </StackPanel>
-            </fa:FASettingsExpander>
-            <fa:FASettingsExpander Header="{Binding L.ImportAegisJson}" Description="{Binding L.ImportAegisJsonDescription}" IsExpanded="False">
-            <StackPanel Spacing="8">
-                <TextBox Text="{Binding ImportAegisJsonText}" PlaceholderText="{Binding L.ImportAegisJsonWatermark}" AcceptsReturn="True" MinHeight="120" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ImportAegisJson}" />
-                <StackPanel Spacing="5" IsVisible="{Binding IsAegisImportPasswordRequired}">
-                    <TextBlock Text="{Binding L.AegisImportPassword}" FontWeight="SemiBold" />
-                    <TextBlock Text="{Binding L.AegisImportPasswordDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    <TextBox x:Name="AegisImportPasswordBox"
-                             MaxWidth="360"
-                             HorizontalAlignment="Left"
-                             PasswordChar="*"
-                             Text="{Binding AegisImportPassword}"
-                             AutomationProperties.Name="{Binding L.AegisImportPassword}" />
+                        </Button>
+                    </WrapPanel>
                 </StackPanel>
-                <WrapPanel>
-                    <Button Classes="workspaceCommand" Command="{Binding ImportAegisJsonFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="Folder" FontSize="18" />
-                            <TextBlock Text="{Binding L.ImportFromFile}" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="workspaceCommand" Command="{Binding ImportAegisJsonCommand}" Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
+            </TabItem>
+            <TabItem Header="{Binding L.ImportAegisJson}">
+                <StackPanel Spacing="12" Margin="20,4,4,4" IsEnabled="{Binding IsImportWorkspaceIdle}">
+                    <TextBlock Text="{Binding L.ImportAegisJson}" FontSize="20" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding L.ImportAegisJsonDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <TextBox Text="{Binding ImportAegisJsonText}" PlaceholderText="{Binding L.ImportAegisJsonWatermark}" AcceptsReturn="True" MinHeight="200" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ImportAegisJson}" />
+                    <StackPanel Spacing="5" IsVisible="{Binding IsAegisImportPasswordRequired}">
+                        <TextBlock Text="{Binding L.AegisImportPassword}" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding L.AegisImportPasswordDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBox x:Name="AegisImportPasswordBox" MaxWidth="420" HorizontalAlignment="Left" PasswordChar="*" Text="{Binding AegisImportPassword}" AutomationProperties.Name="{Binding L.AegisImportPassword}" />
+                    </StackPanel>
+                    <WrapPanel>
+                        <Button Classes="workspaceCommand" Command="{Binding ImportAegisJsonFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="Folder" FontSize="18" />
+                                <TextBlock Text="{Binding L.ImportFromFile}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="workspacePrimaryCommand" Command="{Binding ImportAegisJsonCommand}" Margin="0,0,0,8">
                             <TextBlock Text="{Binding L.ImportAegisJson}" />
-                        </StackPanel>
-                    </Button>
-                </WrapPanel>
-            </StackPanel>
-            </fa:FASettingsExpander>
-            <fa:FASettingsExpander Header="{Binding L.ImportTotpCsv}" Description="{Binding L.ImportTotpCsvDescription}" IsExpanded="False">
-            <StackPanel Spacing="8">
-                <TextBox Text="{Binding ImportTotpCsvText}" PlaceholderText="{Binding L.ImportTotpCsvWatermark}" AcceptsReturn="True" MinHeight="120" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ImportTotpCsv}" />
-                <WrapPanel>
-                    <Button Classes="workspaceCommand" Command="{Binding ImportTotpCsvFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="Folder" FontSize="18" />
+                        </Button>
+                    </WrapPanel>
+                </StackPanel>
+            </TabItem>
+            <TabItem Header="{Binding L.ImportPasswordCsv}">
+                <StackPanel Spacing="12" Margin="20,4,4,4" IsEnabled="{Binding IsImportWorkspaceIdle}">
+                    <TextBlock Text="{Binding L.ImportPasswordCsv}" FontSize="20" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding L.ImportPasswordCsvDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <TextBox Text="{Binding ImportCsvText}" PlaceholderText="{Binding L.ImportCsvWatermark}" AcceptsReturn="True" MinHeight="220" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ImportPasswordCsv}" />
+                    <WrapPanel>
+                        <Button Classes="workspaceCommand" Command="{Binding ImportPasswordCsvFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
                             <TextBlock Text="{Binding L.ImportFromFile}" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="workspaceCommand" Command="{Binding ImportTotpCsvCommand}" Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
-                            <TextBlock Text="{Binding L.ImportTotpCsv}" />
-                        </StackPanel>
-                    </Button>
-                </WrapPanel>
-            </StackPanel>
-            </fa:FASettingsExpander>
-            <fa:FASettingsExpander Header="{Binding L.ImportNoteCsv}" Description="{Binding L.ImportNoteCsvDescription}" IsExpanded="False">
-            <StackPanel Spacing="8">
-                <TextBox Text="{Binding ImportNoteCsvText}" PlaceholderText="{Binding L.ImportNoteCsvWatermark}" AcceptsReturn="True" MinHeight="120" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ImportNoteCsv}" />
-                <WrapPanel>
-                    <Button Classes="workspaceCommand" Command="{Binding ImportNoteCsvFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="Folder" FontSize="18" />
-                            <TextBlock Text="{Binding L.ImportFromFile}" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="workspaceCommand" Command="{Binding ImportNoteCsvCommand}" Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
-                            <TextBlock Text="{Binding L.ImportNoteCsv}" />
-                        </StackPanel>
-                    </Button>
-                </WrapPanel>
-            </StackPanel>
-            </fa:FASettingsExpander>
-            <fa:FASettingsExpander Header="{Binding L.ImportPasswordCsv}" Description="{Binding L.ImportPasswordCsvDescription}" IsExpanded="False">
-            <StackPanel Spacing="8">
-                <TextBox Text="{Binding ImportCsvText}" PlaceholderText="{Binding L.ImportCsvWatermark}" AcceptsReturn="True" MinHeight="120" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ImportPasswordCsv}" />
-                <WrapPanel>
-                    <Button Classes="workspaceCommand" Command="{Binding ImportPasswordCsvFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="Folder" FontSize="18" />
-                            <TextBlock Text="{Binding L.ImportFromFile}" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="workspaceCommand" Command="{Binding ImportPasswordCsvCommand}" Margin="0,0,0,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="ArrowUpload" FontSize="18" />
+                        </Button>
+                        <Button Classes="workspacePrimaryCommand" Command="{Binding ImportPasswordCsvCommand}">
                             <TextBlock Text="{Binding L.ImportPasswordCsv}" />
-                        </StackPanel>
-                    </Button>
-                </WrapPanel>
-            </StackPanel>
-            </fa:FASettingsExpander>
-            </StackPanel>
-        </StackPanel>
-    </fa:FASettingsExpander>
+                        </Button>
+                    </WrapPanel>
+                </StackPanel>
+            </TabItem>
+            <TabItem Header="{Binding L.ImportTotpCsv}">
+                <StackPanel Spacing="12" Margin="20,4,4,4" IsEnabled="{Binding IsImportWorkspaceIdle}">
+                    <TextBlock Text="{Binding L.ImportTotpCsv}" FontSize="20" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding L.ImportTotpCsvDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <TextBox Text="{Binding ImportTotpCsvText}" PlaceholderText="{Binding L.ImportTotpCsvWatermark}" AcceptsReturn="True" MinHeight="220" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ImportTotpCsv}" />
+                    <WrapPanel>
+                        <Button Classes="workspaceCommand" Command="{Binding ImportTotpCsvFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
+                            <TextBlock Text="{Binding L.ImportFromFile}" />
+                        </Button>
+                        <Button Classes="workspacePrimaryCommand" Command="{Binding ImportTotpCsvCommand}">
+                            <TextBlock Text="{Binding L.ImportTotpCsv}" />
+                        </Button>
+                    </WrapPanel>
+                </StackPanel>
+            </TabItem>
+            <TabItem Header="{Binding L.ImportNoteCsv}">
+                <StackPanel Spacing="12" Margin="20,4,4,4" IsEnabled="{Binding IsImportWorkspaceIdle}">
+                    <TextBlock Text="{Binding L.ImportNoteCsv}" FontSize="20" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding L.ImportNoteCsvDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <TextBox Text="{Binding ImportNoteCsvText}" PlaceholderText="{Binding L.ImportNoteCsvWatermark}" AcceptsReturn="True" MinHeight="220" TextWrapping="Wrap" AutomationProperties.Name="{Binding L.ImportNoteCsv}" />
+                    <WrapPanel>
+                        <Button Classes="workspaceCommand" Command="{Binding ImportNoteCsvFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="{Binding FilePickerIntegrationStatusText}" Margin="0,0,8,8">
+                            <TextBlock Text="{Binding L.ImportFromFile}" />
+                        </Button>
+                        <Button Classes="workspacePrimaryCommand" Command="{Binding ImportNoteCsvCommand}">
+                            <TextBlock Text="{Binding L.ImportNoteCsv}" />
+                        </Button>
+                    </WrapPanel>
+                </StackPanel>
+            </TabItem>
+        </TabControl>
+    </Grid>
 </UserControl>

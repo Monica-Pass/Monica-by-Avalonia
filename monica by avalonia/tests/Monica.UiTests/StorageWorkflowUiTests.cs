@@ -100,24 +100,41 @@ public sealed class StorageWorkflowUiTests
         Assert.True(import.FindControl<ProgressBar>("ImportBusyIndicator")!.IsIndeterminate);
         Assert.NotNull(import.FindControl<StackPanel>("ImportOperationContent"));
         Assert.Equal('*', import.FindControl<TextBox>("AegisImportPasswordBox")!.PasswordChar);
-        Assert.NotNull(import.FindControl<Border>("KeePassImportCard"));
+        Assert.NotNull(import.FindControl<StackPanel>("KeePassImportCard"));
         Assert.Equal('*', import.FindControl<TextBox>("KeePassImportPasswordBox")!.PasswordChar);
         Assert.NotNull(import.FindControl<Button>("SelectKeePassFileButton"));
         Assert.NotNull(import.FindControl<Button>("PreviewKeePassImportButton"));
         Assert.NotNull(import.FindControl<Button>("ImportKeePassVaultButton"));
         Assert.NotNull(import.FindControl<Button>("CancelKeePassImportButton"));
-        Assert.NotNull(import.FindControl<Border>("BitwardenImportCard"));
+        Assert.NotNull(import.FindControl<StackPanel>("BitwardenImportCard"));
         Assert.NotNull(import.FindControl<Button>("SelectBitwardenJsonFileButton"));
         Assert.NotNull(import.FindControl<Button>("PreviewBitwardenJsonImportButton"));
         Assert.NotNull(import.FindControl<Button>("ImportBitwardenJsonVaultButton"));
         Assert.NotNull(import.FindControl<Button>("CancelBitwardenImportButton"));
 
+        var importTabs = import.FindControl<TabControl>("ImportSourceTabs");
+        var exportTabs = export.FindControl<TabControl>("ExportFormatTabs");
+        Assert.NotNull(importTabs);
+        Assert.NotNull(exportTabs);
+        Assert.Equal(7, importTabs.ItemCount);
+        Assert.Equal(5, exportTabs.ItemCount);
+
+        import.UpdateResponsiveLayoutForWidth(680);
+        export.UpdateResponsiveLayoutForWidth(680);
+        Assert.True(import.IsNarrowLayout);
+        Assert.True(export.IsNarrowLayout);
+        Assert.Equal(Dock.Top, importTabs.TabStripPlacement);
+        Assert.Equal(Dock.Top, exportTabs.TabStripPlacement);
+
+        import.UpdateResponsiveLayoutForWidth(900);
+        export.UpdateResponsiveLayoutForWidth(900);
+        Assert.Equal(Dock.Left, importTabs.TabStripPlacement);
+        Assert.Equal(Dock.Left, exportTabs.TabStripPlacement);
+
         var importXaml = ReadSyncFeatureFile("SyncImportView.axaml");
         var exportXaml = ReadSyncFeatureFile("SyncExportView.axaml");
-        Assert.True(CountOccurrences(importXaml, "<fa:FASettingsExpander Header=") >= 5);
-        Assert.True(CountOccurrences(exportXaml, "<fa:FASettingsExpander Header=") >= 5);
-        Assert.Contains("IsExpanded=\"False\"", importXaml, StringComparison.Ordinal);
-        Assert.Contains("IsExpanded=\"False\"", exportXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("FASettingsExpander", importXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("FASettingsExpander", exportXaml, StringComparison.Ordinal);
 
         var databaseWorkbench = new DatabaseWorkbenchView();
         Assert.NotNull(databaseWorkbench.FindControl<FAInfoBar>("LegacyBusinessDataNotice"));
@@ -191,9 +208,6 @@ public sealed class StorageWorkflowUiTests
         Assert.True(sync.FindControl<ProgressBar>("WebDavOperationProgressBar")!.IsIndeterminate);
         Assert.NotNull(sync.FindControl<TextBlock>("WebDavOperationStageText"));
     }
-
-    private static int CountOccurrences(string value, string fragment) =>
-        value.Split(fragment, StringSplitOptions.None).Length - 1;
 
     private static string ReadSyncFeatureFile(string fileName)
     {
