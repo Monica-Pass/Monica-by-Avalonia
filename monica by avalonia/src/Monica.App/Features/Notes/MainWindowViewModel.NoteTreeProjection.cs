@@ -1,4 +1,5 @@
 using Avalonia;
+using CommunityToolkit.Mvvm.Input;
 using Monica.Core.Models;
 
 namespace Monica.App.ViewModels;
@@ -44,32 +45,69 @@ public sealed partial class MainWindowViewModel
             .Select(note => note.Item)
             .ToArray();
         _noteTreeGroups = BuildNoteTreeGroups(orderedNotes);
-        _noteTreeEntries = BuildNoteTreeEntries(_favoriteNoteItems, _noteTreeGroups);
+        _noteTreeEntries = IsNoteFolderNavigation
+            ? BuildNoteFolderEntries(orderedNotes, terms.Length > 0)
+            : BuildNoteTagEntries(_noteTreeGroups, terms.Length > 0);
         _favoriteNoteCount = favoriteCount;
         _noteTreeProjectionDirty = false;
     }
 
-    private IReadOnlyList<NoteTreeEntry> BuildNoteTreeEntries(
-        IReadOnlyList<SecureItem> favorites,
-        IReadOnlyList<NoteTreeGroup> groups)
+    private IReadOnlyList<NoteTreeEntry> BuildNoteTagEntries(
+        IReadOnlyList<NoteTreeGroup> groups,
+        bool revealMatches)
     {
-        var entries = new List<NoteTreeEntry>(
-            favorites.Count + groups.Sum(group => group.Items.Count + 1) + 1);
-        if (favorites.Count > 0)
-        {
-            entries.Add(new NoteTreeEntry(_localization.Favorite, favorites.Count, null, default, IsFavoriteGroup: true));
-            entries.AddRange(favorites.Select(item =>
-                new NoteTreeEntry(item.Title, 0, item, new Thickness(8, 0, 0, 4), IsFavoriteGroup: false)));
-        }
-
+        var entries = new List<NoteTreeEntry>(groups.Sum(group => group.Items.Count + 1));
         foreach (var group in groups)
         {
-            entries.Add(new NoteTreeEntry(group.Name, group.Count, null, default, IsFavoriteGroup: false));
-            entries.AddRange(group.Items.Select(item =>
-                new NoteTreeEntry(item.Title, 0, item, new Thickness(12, 0, 0, 4), IsFavoriteGroup: false)));
+            var key = $"tag:{group.Name}";
+            var expanded = revealMatches || !_collapsedNoteTagKeys.Contains(key);
+            entries.Add(new NoteTreeEntry(
+                group.Name,
+                group.Count,
+                null,
+                default,
+                NoteTreeEntryKind.Tag,
+                key,
+                HasChildren: group.Items.Count > 0,
+                IsExpanded: expanded));
+            if (expanded)
+            {
+                entries.AddRange(group.Items.Select(note => CreateNoteEntry(note, level: 1)));
+            }
         }
 
         return entries;
+    }
+
+    private static NoteTreeEntry CreateNoteEntry(SecureItem note, int level) =>
+        new(
+            note.Title,
+            0,
+            note,
+            new Thickness(level * 14, 0, 0, 4),
+            NoteTreeEntryKind.Note);
+
+    [RelayCommand]
+    private void SelectNoteNavigationMode(string? mode)
+    {
+        NoteNavigationMode = string.Equals(mode, "Tags", StringComparison.Ordinal) ? "Tags" : "Folders";
+    }
+
+    [RelayCommand]
+    private void ToggleNoteTreeGroup(NoteTreeEntry? entry)
+    {
+        if (entry is null || !entry.IsGroup || !entry.HasChildren || string.IsNullOrWhiteSpace(entry.Key))
+        {
+            return;
+        }
+
+        var collapsedKeys = entry.IsTagGroup ? _collapsedNoteTagKeys : _collapsedNoteFolderKeys;
+        if (!collapsedKeys.Add(entry.Key))
+        {
+            collapsedKeys.Remove(entry.Key);
+        }
+
+        RaiseNoteTreeState();
     }
 
     private IReadOnlyList<NoteTreeGroup> BuildNoteTreeGroups(IReadOnlyList<NoteTreeProjectionItem> notes)
@@ -164,4 +202,5 @@ public sealed partial class MainWindowViewModel
         source.Contains(value, StringComparison.OrdinalIgnoreCase);
 
     private sealed record NoteTreeProjectionItem(SecureItem Item, IReadOnlyList<string> Tags);
+
 }

@@ -374,6 +374,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 ReplaceItems(Categories, snapshot.Categories);
                 RefreshPasswordFolderFilters();
                 RefreshNoteCategoryOptions();
+                RaiseNoteTreeState();
                 ReplaceItems(MdbxDatabases, snapshot.MdbxDatabases);
                 RefreshMdbxVaultState();
                 RefreshVaultSources();

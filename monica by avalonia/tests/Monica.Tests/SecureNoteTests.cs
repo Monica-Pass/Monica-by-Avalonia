@@ -115,6 +115,84 @@ public sealed class SecureNoteTests
     }
 
     [Fact]
+    public async Task Note_folder_navigation_builds_virtual_parents_and_lists_each_note_once()
+    {
+        var repository = CreateRepository();
+        var work = new Category { Name = "Work", SortOrder = 1 };
+        var production = new Category { Name = "Work/Infrastructure/Production", SortOrder = 2 };
+        await repository.SaveCategoryAsync(work);
+        await repository.SaveCategoryAsync(production);
+        await SaveNoteAsync(repository, "Work overview", "ops, shared", work.Id);
+        await SaveNoteAsync(repository, "Production runbook", "ops", production.Id);
+        await SaveNoteAsync(repository, "Personal memo", "personal", null);
+        var viewModel = CreateViewModel(repository: repository);
+
+        await viewModel.LoadAsync();
+
+        Assert.True(viewModel.IsNoteFolderNavigation);
+        var entries = viewModel.NoteTreeEntries;
+        Assert.Equal(3, entries.Count(entry => entry.IsNote));
+        Assert.Equal(3, entries.Where(entry => entry.IsNote).Select(entry => entry.Item?.Id).Distinct().Count());
+        var workEntry = entries.Single(entry => entry.Key == "folder:Work");
+        var virtualInfrastructure = entries.Single(entry => entry.Key == "folder:Work/Infrastructure");
+        var productionEntry = entries.Single(entry => entry.Key == "folder:Work/Infrastructure/Production");
+        Assert.Equal(2, workEntry.Count);
+        Assert.Equal(1, virtualInfrastructure.Count);
+        Assert.Equal(1, productionEntry.Count);
+        Assert.Equal(14, virtualInfrastructure.Indent.Left);
+        Assert.Contains(entries, entry => entry.IsNoFolderGroup && entry.Count == 1);
+    }
+
+    [Fact]
+    public async Task Note_navigation_preserves_collapse_state_and_search_reveals_matching_folder_branch()
+    {
+        var repository = CreateRepository();
+        var category = new Category { Name = "Work/Production", SortOrder = 1 };
+        await repository.SaveCategoryAsync(category);
+        await SaveNoteAsync(repository, "Deployment runbook", "ops", category.Id);
+        await SaveNoteAsync(repository, "Loose memo", "personal", null);
+        var viewModel = CreateViewModel(repository: repository);
+        await viewModel.LoadAsync();
+        var work = viewModel.NoteTreeEntries.Single(entry => entry.Key == "folder:Work");
+
+        viewModel.ToggleNoteTreeGroupCommand.Execute(work);
+
+        Assert.DoesNotContain(viewModel.NoteTreeEntries, entry => entry.Key == "folder:Work/Production");
+        Assert.DoesNotContain(viewModel.NoteTreeEntries, entry => entry.Item?.Title == "Deployment runbook");
+
+        viewModel.NoteSearchText = "deployment";
+
+        Assert.Contains(viewModel.NoteTreeEntries, entry => entry.Key == "folder:Work/Production");
+        Assert.Contains(viewModel.NoteTreeEntries, entry => entry.Item?.Title == "Deployment runbook");
+
+        viewModel.NoteSearchText = "";
+
+        Assert.DoesNotContain(viewModel.NoteTreeEntries, entry => entry.Key == "folder:Work/Production");
+    }
+
+    [Fact]
+    public async Task Note_tag_navigation_remains_an_expandable_secondary_view()
+    {
+        var repository = CreateRepository();
+        await SaveNoteAsync(repository, "First", "ops, shared", null);
+        await SaveNoteAsync(repository, "Second", "ops", null);
+        var viewModel = CreateViewModel(repository: repository);
+        await viewModel.LoadAsync();
+
+        viewModel.SelectNoteNavigationModeCommand.Execute("Tags");
+
+        Assert.True(viewModel.IsNoteTagNavigation);
+        Assert.Equal(["ops", "shared"], viewModel.NoteTreeEntries.Where(entry => entry.IsTagGroup).Select(entry => entry.Name));
+        Assert.Equal(3, viewModel.NoteTreeEntries.Count(entry => entry.IsNote));
+        var ops = viewModel.NoteTreeEntries.Single(entry => entry.Key == "tag:ops");
+
+        viewModel.ToggleNoteTreeGroupCommand.Execute(ops);
+
+        Assert.DoesNotContain(viewModel.NoteTreeEntries, entry => entry.IsNote && entry.Item?.Title == "Second");
+        Assert.Contains(viewModel.NoteTreeEntries, entry => entry.IsNote && entry.Item?.Title == "First");
+    }
+
+    [Fact]
     public void Note_image_insert_status_is_localized_for_simplified_chinese()
     {
         var localization = new LocalizationService();
@@ -446,6 +524,23 @@ public sealed class SecureNoteTests
     {
         var factory = new SqliteConnectionFactory(GetTempDatabasePath());
         return new MonicaRepository(factory, new DatabaseMigrator(factory));
+    }
+
+    private static async Task SaveNoteAsync(
+        IMonicaRepository repository,
+        string title,
+        string tags,
+        long? categoryId)
+    {
+        var payload = NoteContentCodec.BuildSavePayload(title, $"# {title}", tags, true);
+        await repository.SaveSecureItemAsync(new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = payload.Title,
+            Notes = payload.NotesCache,
+            ItemData = payload.ItemData,
+            CategoryId = categoryId
+        });
     }
 
     private static string GetTempDatabasePath()

@@ -11,7 +11,7 @@
             BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
             BorderThickness="0,0,1,0"
             Background="{DynamicResource LayerFillColorDefaultBrush}">
-        <Grid RowDefinitions="Auto,*" Margin="12">
+        <Grid RowDefinitions="Auto,Auto,*" Margin="12">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4" Margin="0,0,0,10">
                 <TextBox x:Name="NoteSearchBox"
                          Text="{Binding NoteSearchText}"
@@ -31,14 +31,52 @@
                 </Button>
             </Grid>
 
+            <Border Grid.Row="1"
+                    Classes="noteNavigationPivot"
+                    Margin="0,0,0,10"
+                    Padding="2">
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="2">
+                    <Button x:Name="NoteFolderNavigationButton"
+                            Classes="noteNavigationPivotButton"
+                            Classes.accent="{Binding IsNoteFolderNavigation}"
+                            Command="{Binding SelectNoteNavigationModeCommand}"
+                            CommandParameter="Folders"
+                            AutomationProperties.Name="{Binding L.Folders}"
+                            HorizontalAlignment="Stretch">
+                        <StackPanel Orientation="Horizontal" Spacing="7" HorizontalAlignment="Center">
+                            <ic:FluentIcon Icon="Folder" FontSize="14" />
+                            <TextBlock Text="{Binding L.Folders}" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="NoteTagNavigationButton"
+                            Grid.Column="1"
+                            Classes="noteNavigationPivotButton"
+                            Classes.accent="{Binding IsNoteTagNavigation}"
+                            Command="{Binding SelectNoteNavigationModeCommand}"
+                            CommandParameter="Tags"
+                            AutomationProperties.Name="{Binding L[NoteTagsLabel]}"
+                            HorizontalAlignment="Stretch">
+                        <StackPanel Orientation="Horizontal" Spacing="7" HorizontalAlignment="Center">
+                            <ic:FluentIcon Icon="Tag" FontSize="14" />
+                            <TextBlock Text="{Binding L[NoteTagsLabel]}" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+
             <ListBox x:Name="NoteTreeList"
-                     Grid.Row="1"
+                     Grid.Row="2"
                      ItemsSource="{Binding NoteTreeEntries}"
                      IsVisible="{Binding HasNoteTreeEntries}"
                      SelectionMode="Single"
                      Background="Transparent"
                      BorderThickness="0"
                      Padding="0">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel Orientation="Vertical" />
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
                 <ListBox.Styles>
                     <Style Selector="ListBoxItem">
                         <Setter Property="Padding" Value="0" />
@@ -59,31 +97,39 @@
                     <DataTemplate x:DataType="vm:NoteTreeEntry">
                         <Grid>
                             <Grid IsVisible="{Binding IsGroup}"
-                                  ColumnDefinitions="Auto,*,Auto"
-                                  ColumnSpacing="7"
-                                  MinHeight="32"
-                                  Margin="2,6,2,4"
-                                  IsHitTestVisible="False">
-                                <ic:FluentIcon Icon="Star"
-                                               FontSize="14"
-                                               IsVisible="{Binding IsFavoriteGroup}"
-                                               VerticalAlignment="Center" />
-                                <ic:FluentIcon Icon="FolderOpen"
-                                               FontSize="14"
-                                               IsVisible="{Binding IsFavoriteGroup, Converter={x:Static local:BoolConverters.Not}}"
+                                  Margin="{Binding Indent}">
+                                <Button Classes="noteTreeGroupButton"
+                                        Command="{Binding #Root.DataContext.ToggleNoteTreeGroupCommand}"
+                                        CommandParameter="{Binding}"
+                                        AutomationProperties.Name="{Binding Name}"
+                                        HorizontalAlignment="Stretch"
+                                        MinHeight="34" />
+                                <Grid ColumnDefinitions="24,Auto,*,Auto"
+                                      ColumnSpacing="6"
+                                      Margin="6,0,10,0"
+                                      MinHeight="34"
+                                      IsHitTestVisible="False">
+                                    <Panel Width="20" Height="20" VerticalAlignment="Center">
+                                        <ic:FluentIcon Icon="ChevronDown" FontSize="11" IsVisible="{Binding IsExpanded}" />
+                                        <ic:FluentIcon Icon="ChevronRight" FontSize="11" IsVisible="{Binding IsCollapsed}" />
+                                    </Panel>
+                                    <Panel Grid.Column="1" Width="17" Height="17" VerticalAlignment="Center">
+                                        <ic:FluentIcon Icon="FolderOpen" FontSize="14" IsVisible="{Binding IsFolderGroup}" />
+                                        <ic:FluentIcon Icon="Tag" FontSize="14" IsVisible="{Binding IsTagGroup}" />
+                                    </Panel>
+                                    <TextBlock Grid.Column="2"
+                                               Text="{Binding Name}"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center"
+                                               ToolTip.Tip="{Binding Name}" />
+                                    <TextBlock Grid.Column="3"
+                                               Text="{Binding Count}"
+                                               FontSize="11"
                                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                                VerticalAlignment="Center" />
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding Name}"
-                                           FontSize="12"
-                                           FontWeight="SemiBold"
-                                           TextTrimming="CharacterEllipsis"
-                                           VerticalAlignment="Center" />
-                                <TextBlock Grid.Column="2"
-                                           Text="{Binding Count}"
-                                           FontSize="11"
-                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                           VerticalAlignment="Center" />
+                                </Grid>
                             </Grid>
                             <Grid IsVisible="{Binding IsNote}"
                                   Margin="{Binding Indent}">
@@ -96,7 +142,7 @@
             </ListBox>
 
             <StackPanel x:Name="NoteTreeEmptyState"
-                        Grid.Row="1"
+                        Grid.Row="2"
                         IsVisible="{Binding HasNoteTreeEntries, Converter={x:Static local:BoolConverters.Not}}"
                         Spacing="10"
                         Margin="20"

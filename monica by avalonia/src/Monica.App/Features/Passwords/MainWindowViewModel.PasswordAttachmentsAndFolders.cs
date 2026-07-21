@@ -77,6 +77,7 @@ public sealed partial class MainWindowViewModel
         Categories.Add(category);
         RefreshPasswordFolderFilters(category.Id);
         RefreshNoteCategoryOptions();
+        RaiseNoteTreeState();
         NewFolderName = "";
         StatusMessage = _localization.Format("CreatedFolderFormat", category.Name);
     }
@@ -114,6 +115,7 @@ public sealed partial class MainWindowViewModel
 
         RefreshPasswordFolderFilters(category.Id);
         RefreshNoteCategoryOptions();
+        RaiseNoteTreeState();
         NewFolderName = "";
         await LogOperationAsync(new OperationLog
         {
@@ -175,6 +177,7 @@ public sealed partial class MainWindowViewModel
         });
         RefreshPasswordFolderFilters(-1);
         RefreshNoteCategoryOptions();
+        RaiseNoteTreeState();
         StatusMessage = _localization.Format("DeletedFolderFormat", name, movedPasswords);
     }
 
