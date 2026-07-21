@@ -16,6 +16,22 @@
     <ScrollViewer x:Name="TotpEditorFormScrollViewer" MaxHeight="560">
         <StackPanel x:Name="TotpEditorPrimaryForm" Width="440" Spacing="12">
             <StackPanel Spacing="6"><TextBlock Classes="totpEditorLabel" Text="{Binding L.PasswordTitle}" /><TextBox Text="{Binding Title}" PlaceholderText="{Binding L.PasswordTitle}" /></StackPanel>
+            <StackPanel Spacing="6">
+                <TextBlock Classes="totpEditorLabel" Text="{Binding L.Category}" />
+                <ComboBox x:Name="TotpCategoryPicker"
+                          ItemsSource="{Binding CategoryOptions}"
+                          SelectedItem="{Binding SelectedCategory}"
+                          AutomationProperties.Name="{Binding L.Category}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PasswordCategoryChoice">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="{Binding Indent}" ToolTip.Tip="{Binding FullPath}">
+                                <TextBlock Text="{Binding FolderDisplayName}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Column="1" Text="{Binding ParentPath}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" MaxWidth="170" />
+                            </Grid>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
             <StackPanel Spacing="6"><TextBlock Classes="totpEditorLabel" Text="{Binding L.TotpSecret}" /><TextBox x:Name="TotpSecretInput" Text="{Binding Secret}" PlaceholderText="{Binding L.TotpSecret}" /></StackPanel>
             <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                 <TextBox Text="{Binding Issuer}" PlaceholderText="{Binding L.Issuer}" />

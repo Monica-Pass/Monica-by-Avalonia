@@ -5,6 +5,7 @@ using Monica.App.Features;
 using Monica.App.Features.Wallet;
 using Monica.App.ViewModels;
 using Monica.Core.Models;
+using Monica.Data.Repositories;
 
 namespace Monica.App.Services;
 
@@ -15,13 +16,15 @@ public interface IWalletItemEditorDialogService
 
 public sealed class WalletItemEditorDialogService(
     Func<Window> ownerProvider,
-    ILocalizationService localization) : IWalletItemEditorDialogService
+    ILocalizationService localization,
+    IMonicaRepository repository) : IWalletItemEditorDialogService
 {
     public async Task<WalletItemEditorViewModel?> ShowAsync(SecureItem? item, VaultItemType? newItemType = null, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var editor = new WalletItemEditorViewModel(localization, item, newItemType);
+        var categories = await repository.GetCategoriesAsync(cancellationToken);
+        var editor = new WalletItemEditorViewModel(localization, item, newItemType, categories);
         var editorView = VaultEditorDialogWarmup.TakeWalletEditorView();
         editorView.DataContext = editor;
         var dialog = new FAContentDialog

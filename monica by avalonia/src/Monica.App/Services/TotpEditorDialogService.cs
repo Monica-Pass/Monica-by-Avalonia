@@ -4,6 +4,7 @@ using FluentAvalonia.UI.Controls;
 using Monica.App.Features;
 using Monica.App.ViewModels;
 using Monica.Core.Models;
+using Monica.Data.Repositories;
 
 namespace Monica.App.Services;
 
@@ -14,13 +15,15 @@ public interface ITotpEditorDialogService
 
 public sealed class TotpEditorDialogService(
     Func<Window> ownerProvider,
-    ILocalizationService localization) : ITotpEditorDialogService
+    ILocalizationService localization,
+    IMonicaRepository repository) : ITotpEditorDialogService
 {
     public async Task<TotpEditorViewModel?> ShowAsync(SecureItem? item, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var editor = new TotpEditorViewModel(localization, item);
+        var categories = await repository.GetCategoriesAsync(cancellationToken);
+        var editor = new TotpEditorViewModel(localization, item, categories);
         var editorView = VaultEditorDialogWarmup.TakeTotpEditorView();
         editorView.DataContext = editor;
         var dialog = new FAContentDialog

@@ -11,11 +11,16 @@ public sealed record TotpChoice(string Value, string Label);
 public sealed partial class TotpEditorViewModel : ObservableObject
 {
     private readonly SecureItem? _source;
+    private readonly bool _canEditCategory;
 
-    public TotpEditorViewModel(ILocalizationService localization, SecureItem? source)
+    public TotpEditorViewModel(
+        ILocalizationService localization,
+        SecureItem? source,
+        IEnumerable<Category>? categories = null)
     {
         L = localization;
         _source = source;
+        _canEditCategory = categories is not null;
 
         OtpTypeOptions.Add(new("TOTP", localization.Get("TotpTypeTotp")));
         OtpTypeOptions.Add(new("HOTP", localization.Get("TotpTypeHotp")));
@@ -23,6 +28,12 @@ public sealed partial class TotpEditorViewModel : ObservableObject
         AlgorithmOptions.Add(new("SHA1", "SHA1"));
         AlgorithmOptions.Add(new("SHA256", "SHA256"));
         AlgorithmOptions.Add(new("SHA512", "SHA512"));
+        foreach (var category in PasswordCategoryChoice.BuildOptions(categories ?? [], localization.Get("NoFolder")))
+        {
+            CategoryOptions.Add(category);
+        }
+
+        SelectedCategory = CategoryOptions.FirstOrDefault(option => option.Id == source?.CategoryId) ?? CategoryOptions[0];
 
         Title = source?.Title ?? "";
         Notes = source?.Notes ?? "";
@@ -45,6 +56,7 @@ public sealed partial class TotpEditorViewModel : ObservableObject
     public ILocalizationService L { get; }
     public ObservableCollection<TotpChoice> OtpTypeOptions { get; } = [];
     public ObservableCollection<TotpChoice> AlgorithmOptions { get; } = [];
+    public ObservableCollection<PasswordCategoryChoice> CategoryOptions { get; } = [];
     public string DialogTitle => _source is null ? L.Get("AddAuthenticator") : L.Get("EditAuthenticator");
     public bool IsTimeBased => SelectedOtpType.Value != "HOTP";
     public bool IsCounterBased => SelectedOtpType.Value == "HOTP";
@@ -82,6 +94,9 @@ public sealed partial class TotpEditorViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isFavorite;
+
+    [ObservableProperty]
+    private PasswordCategoryChoice? _selectedCategory;
 
     [ObservableProperty]
     private string _validationMessage = "";
@@ -134,6 +149,11 @@ public sealed partial class TotpEditorViewModel : ObservableObject
         item.Title = Title.Trim();
         item.Notes = Notes.Trim();
         item.IsFavorite = IsFavorite;
+        if (_canEditCategory)
+        {
+            item.CategoryId = SelectedCategory?.Id;
+        }
+
         item.ItemData = TotpDataResolver.ToItemData(BuildData());
         item.IsDeleted = false;
         item.DeletedAt = null;

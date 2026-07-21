@@ -221,10 +221,12 @@ public partial class App : Application
             _.GetRequiredService<ILocalizationService>()));
         services.AddSingleton<ITotpEditorDialogService>(_ => new TotpEditorDialogService(
             () => mainWindow,
-            _.GetRequiredService<ILocalizationService>()));
+            _.GetRequiredService<ILocalizationService>(),
+            _.GetRequiredService<IMonicaRepository>()));
         services.AddSingleton<IWalletItemEditorDialogService>(_ => new WalletItemEditorDialogService(
             () => mainWindow,
-            _.GetRequiredService<ILocalizationService>()));
+            _.GetRequiredService<ILocalizationService>(),
+            _.GetRequiredService<IMonicaRepository>()));
         services.AddSingleton<IAppSettingsService, AppSettingsService>();
         services.AddSingleton<ILocalizationService, LocalizationService>();
         services.AddSingleton<IVaultUnlockCoordinator, VaultUnlockCoordinator>();

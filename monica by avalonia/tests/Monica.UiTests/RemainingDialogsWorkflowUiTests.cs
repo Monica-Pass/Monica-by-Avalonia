@@ -23,10 +23,13 @@ public sealed class RemainingDialogsWorkflowUiTests
         Assert.NotNull(totp.FindControl<ScrollViewer>("TotpEditorFormScrollViewer"));
         Assert.NotNull(totp.FindControl<StackPanel>("TotpEditorPrimaryForm"));
         Assert.NotNull(totp.FindControl<TextBox>("TotpSecretInput"));
+        Assert.NotNull(totp.FindControl<ComboBox>("TotpCategoryPicker"));
         Assert.False(totp.FindControl<Expander>("TotpAdvancedOptionsExpander")!.IsExpanded);
         Assert.NotNull(category.FindControl<Grid>("CategoryPickerForm"));
         Assert.Equal(40, category.FindControl<TextBox>("CategoryPickerSearchBox")!.MinHeight);
         Assert.NotNull(category.FindControl<ListBox>("CategoryPickerList"));
+        Assert.NotNull(new Monica.App.Features.Wallet.WalletItemEditorDialog()
+            .FindControl<ComboBox>("WalletCategoryPicker"));
     }
 
     [Fact]

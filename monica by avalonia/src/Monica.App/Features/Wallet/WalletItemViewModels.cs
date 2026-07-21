@@ -10,12 +10,18 @@ public sealed record WalletChoice(string Value, string Label);
 public sealed partial class WalletItemEditorViewModel : ObservableObject
 {
     private readonly SecureItem? _source;
+    private readonly bool _canEditCategory;
     private IReadOnlyList<string> _hiddenMdbxImagePaths = [];
 
-    public WalletItemEditorViewModel(ILocalizationService localization, SecureItem? source, VaultItemType? newItemType = null)
+    public WalletItemEditorViewModel(
+        ILocalizationService localization,
+        SecureItem? source,
+        VaultItemType? newItemType = null,
+        IEnumerable<Category>? categories = null)
     {
         L = localization;
         _source = source;
+        _canEditCategory = categories is not null;
         ItemType = source?.ItemType ?? newItemType ?? VaultItemType.Document;
 
         WalletTypeOptions.Add(new(VaultItemType.Document, localization.Get("Document")));
@@ -28,6 +34,12 @@ public sealed partial class WalletItemEditorViewModel : ObservableObject
         CardTypeOptions.Add(new("DEBIT", localization.Get("CardTypeDebit")));
         CardTypeOptions.Add(new("CREDIT", localization.Get("CardTypeCredit")));
         CardTypeOptions.Add(new("PREPAID", localization.Get("CardTypePrepaid")));
+        foreach (var category in PasswordCategoryChoice.BuildOptions(categories ?? [], localization.Get("NoFolder")))
+        {
+            CategoryOptions.Add(category);
+        }
+
+        SelectedCategory = CategoryOptions.FirstOrDefault(option => option.Id == source?.CategoryId) ?? CategoryOptions[0];
 
         SelectedWalletType = WalletTypeOptions.First(item => item.Value == ItemType);
         if (source is null)
@@ -77,6 +89,7 @@ public sealed partial class WalletItemEditorViewModel : ObservableObject
     public ObservableCollection<WalletTypeChoice> WalletTypeOptions { get; } = [];
     public ObservableCollection<WalletChoice> DocumentTypeOptions { get; } = [];
     public ObservableCollection<WalletChoice> CardTypeOptions { get; } = [];
+    public ObservableCollection<PasswordCategoryChoice> CategoryOptions { get; } = [];
     public string DialogTitle => _source is null ? L.Get("AddWalletItem") : L.Get("EditWalletItem");
     public bool IsDocument => SelectedWalletType.Value == VaultItemType.Document;
     public bool IsBankCard => SelectedWalletType.Value == VaultItemType.BankCard;
@@ -99,6 +112,9 @@ public sealed partial class WalletItemEditorViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isFavorite;
+
+    [ObservableProperty]
+    private PasswordCategoryChoice? _selectedCategory;
 
     [ObservableProperty]
     private string _documentNumber = "";
@@ -186,6 +202,11 @@ public sealed partial class WalletItemEditorViewModel : ObservableObject
         item.Title = ResolveTitle();
         item.Notes = Notes.Trim();
         item.IsFavorite = IsFavorite;
+        if (_canEditCategory)
+        {
+            item.CategoryId = SelectedCategory?.Id;
+        }
+
         item.IsDeleted = false;
         item.DeletedAt = null;
         item.SyncStatus = item.BitwardenVaultId is null ? SyncStatus.None : SyncStatus.Pending;
