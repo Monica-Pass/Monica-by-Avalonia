@@ -94,8 +94,12 @@
                     </StackPanel>
                 </ScrollViewer>
             </Border>
-            <ScrollViewer x:Name="SyncContentRegion" Grid.Column="1" HorizontalScrollBarVisibility="Disabled" ClipToBounds="True">
-                <StackPanel Spacing="14" MaxWidth="760" HorizontalAlignment="Stretch" Margin="28,18,20,20">
+            <ScrollViewer x:Name="SyncContentRegion"
+                          Grid.Column="1"
+                          HorizontalScrollBarVisibility="Disabled"
+                          HorizontalContentAlignment="Stretch"
+                          ClipToBounds="True">
+                <StackPanel x:Name="SyncPageContainer" Spacing="14" MaxWidth="1100" HorizontalAlignment="Stretch" Margin="28,18,20,20">
                     <sync:SyncPageHostView x:Name="SyncPageHost" />
                 </StackPanel>
             </ScrollViewer>

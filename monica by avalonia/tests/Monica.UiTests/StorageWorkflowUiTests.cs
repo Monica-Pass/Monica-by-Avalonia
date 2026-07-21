@@ -23,6 +23,7 @@ public sealed class StorageWorkflowUiTests
         var mdbx = new MdbxWorkspaceView();
         var mdbxWorkbench = new MdbxWorkbenchView();
         var syncSources = new SyncSourcesView();
+        var syncBackup = new SyncBackupView();
         var databases = new DatabaseManagementWorkspaceView();
 
         Assert.NotNull(sync.FindControl<Grid>("SyncWorkspaceLayoutGrid"));
@@ -30,6 +31,10 @@ public sealed class StorageWorkflowUiTests
         Assert.NotNull(sync.FindControl<ScrollViewer>("SyncContentRegion"));
         Assert.NotNull(sync.FindControl<Border>("SyncOperationsCommandSurface"));
         Assert.NotNull(sync.FindControl<ScrollViewer>("SyncHealthStatusRegion"));
+        Assert.Equal(1100, sync.FindControl<StackPanel>("SyncPageContainer")!.MaxWidth);
+        Assert.NotNull(syncBackup.FindControl<Grid>("BackupWorkspaceLayoutGrid"));
+        Assert.NotNull(syncBackup.FindControl<Border>("BackupOptionsRegion"));
+        Assert.NotNull(syncBackup.FindControl<Border>("BackupHistoryRegion"));
         Assert.NotNull(mdbx.FindControl<Grid>("MdbxWorkspaceLayoutGrid"));
         Assert.NotNull(mdbx.FindControl<Border>("MdbxListRegion"));
         Assert.NotNull(mdbx.FindControl<ScrollViewer>("MdbxContentRegion"));
@@ -54,32 +59,41 @@ public sealed class StorageWorkflowUiTests
     public void Storage_workspaces_reflow_to_single_column_at_narrow_width()
     {
         var sync = new SyncWorkspaceView();
+        var backup = new SyncBackupView();
         var mdbx = new MdbxWorkspaceView();
         var databases = new DatabaseManagementWorkspaceView();
 
         sync.UpdateResponsiveLayoutForWidth(680);
         mdbx.UpdateResponsiveLayoutForWidth(680);
         databases.UpdateResponsiveLayoutForWidth(680);
+        backup.UpdateResponsiveLayoutForWidth(680);
 
         Assert.True(sync.IsNarrowLayout);
         Assert.True(mdbx.IsNarrowLayout);
         Assert.True(databases.IsNarrowLayout);
+        Assert.True(backup.IsNarrowLayout);
         Assert.Single(sync.FindControl<Grid>("SyncWorkspaceLayoutGrid")!.ColumnDefinitions);
         Assert.Single(mdbx.FindControl<Grid>("MdbxWorkspaceLayoutGrid")!.ColumnDefinitions);
         Assert.Single(databases.FindControl<Grid>("DatabaseWorkspaceLayoutGrid")!.ColumnDefinitions);
+        Assert.Single(backup.FindControl<Grid>("BackupWorkspaceLayoutGrid")!.ColumnDefinitions);
+        Assert.Equal(1, Grid.GetRow(backup.FindControl<Border>("BackupHistoryRegion")!));
         Assert.Equal(4, Grid.GetRow(sync.FindControl<ScrollViewer>("SyncHealthStatusRegion")!));
         Assert.Single(mdbx.FindControl<Grid>("MdbxWorkbenchLayoutGrid")!.ColumnDefinitions);
 
         sync.UpdateResponsiveLayoutForWidth(1100);
         mdbx.UpdateResponsiveLayoutForWidth(1100);
         databases.UpdateResponsiveLayoutForWidth(1100);
+        backup.UpdateResponsiveLayoutForWidth(1100);
 
         Assert.False(sync.IsNarrowLayout);
         Assert.False(mdbx.IsNarrowLayout);
         Assert.False(databases.IsNarrowLayout);
+        Assert.False(backup.IsNarrowLayout);
         Assert.Equal(2, sync.FindControl<Grid>("SyncWorkspaceLayoutGrid")!.ColumnDefinitions.Count);
         Assert.Equal(2, mdbx.FindControl<Grid>("MdbxWorkspaceLayoutGrid")!.ColumnDefinitions.Count);
         Assert.Equal(2, databases.FindControl<Grid>("DatabaseWorkspaceLayoutGrid")!.ColumnDefinitions.Count);
+        Assert.Equal(2, backup.FindControl<Grid>("BackupWorkspaceLayoutGrid")!.ColumnDefinitions.Count);
+        Assert.Equal(1, Grid.GetColumn(backup.FindControl<Border>("BackupHistoryRegion")!));
         Assert.Equal(2, mdbx.FindControl<Grid>("MdbxWorkbenchLayoutGrid")!.ColumnDefinitions.Count);
     }
 
