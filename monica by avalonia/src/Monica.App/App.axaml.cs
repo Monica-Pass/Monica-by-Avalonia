@@ -37,6 +37,7 @@ public partial class App : Application
             _services = ConfigureServices(_mainWindow);
             var viewModel = _services.GetRequiredService<MainWindowViewModel>();
             _mainWindow.DataContext = viewModel;
+            _services.GetRequiredService<DesktopIntegrationCoordinator>().Initialize(viewModel);
             _mainWindow.ShutdownRequestedAsync = () => EnsureShutdownAsync(viewModel);
             desktop.MainWindow = _mainWindow;
             desktop.Exit += OnDesktopExit;
@@ -175,8 +176,14 @@ public partial class App : Application
             _.GetRequiredService<IPlatformIntegrationService>()));
         services.AddSingleton<IBrowserBridgeService, CapabilityOnlyBrowserBridgeService>();
         services.AddSingleton<INativePasskeyService, CapabilityOnlyNativePasskeyService>();
-        services.AddSingleton<ITrayService, CapabilityOnlyTrayService>();
-        services.AddSingleton<IGlobalHotkeyService, CapabilityOnlyGlobalHotkeyService>();
+        services.AddSingleton<ITrayService>(provider => OperatingSystem.IsWindows()
+            ? new AvaloniaTrayService(
+                provider.GetRequiredService<IPlatformIntegrationService>(),
+                provider.GetRequiredService<ILocalizationService>())
+            : new CapabilityOnlyTrayService(provider.GetRequiredService<IPlatformIntegrationService>()));
+        services.AddSingleton<IGlobalHotkeyService>(provider => OperatingSystem.IsWindows()
+            ? new WindowsGlobalHotkeyService(provider.GetRequiredService<IPlatformIntegrationService>())
+            : new CapabilityOnlyGlobalHotkeyService(provider.GetRequiredService<IPlatformIntegrationService>()));
         services.AddSingleton<IExternalLinkService, SystemExternalLinkService>();
         services.AddSingleton<IWebDavBackupService, WebDavBackupService>();
         services.AddSingleton<IWebDavBackupCryptoService, WebDavBackupCryptoService>();
@@ -231,6 +238,10 @@ public partial class App : Application
         services.AddSingleton<ILocalizationService, LocalizationService>();
         services.AddSingleton<IVaultUnlockCoordinator, VaultUnlockCoordinator>();
         services.AddSingleton<MainWindowViewModel>();
+        services.AddSingleton(provider => new DesktopIntegrationCoordinator(
+            mainWindow,
+            provider.GetRequiredService<ITrayService>(),
+            provider.GetRequiredService<IGlobalHotkeyService>()));
         configureOverrides?.Invoke(services);
         return services.BuildServiceProvider();
     }

@@ -13,7 +13,7 @@
             </fa:FASettingsExpanderItem>
             <fa:FASettingsExpanderItem Content="{Binding L.QuickSearch}" Description="{Binding L.QuickSearchDescription}">
                 <fa:FASettingsExpanderItem.Footer>
-                    <ToggleSwitch IsChecked="{Binding QuickSearchEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
+                    <ToggleSwitch IsChecked="{Binding QuickSearchEnabled}" IsEnabled="{Binding CanUseGlobalHotkeyIntegration}" ToolTip.Tip="{Binding GlobalHotkeyIntegrationStatusText}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
                 </fa:FASettingsExpanderItem.Footer>
             </fa:FASettingsExpanderItem>
             <fa:FASettingsExpanderItem Content="{Binding L.QuickSearchHotkey}" Description="{Binding L.QuickSearchHotkeyDescription}">

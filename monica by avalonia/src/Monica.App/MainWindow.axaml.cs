@@ -15,6 +15,13 @@ public partial class MainWindow : Window
         Opened += OnOpened;
         Closing += OnClosing;
         Closed += OnClosed;
+        PropertyChanged += (_, args) =>
+        {
+            if (args.Property == WindowStateProperty)
+            {
+                OnWindowStateChanged(this, EventArgs.Empty);
+            }
+        };
         DataContextChanged += OnDataContextChanged;
         InitializeSecurityLifecycle();
         InitializeBackgroundMemoryLifecycle();

@@ -84,6 +84,13 @@ public partial class MainWindow
         }
 
         var viewModel = DataContext as MainWindowViewModel;
+        if (!_isExplicitExitRequested && viewModel?.MinimizeToTray == true)
+        {
+            e.Cancel = true;
+            Hide();
+            return;
+        }
+
         var dirtyCount = viewModel?.OpenNoteTabs.Count(tab => tab.IsDirty) ?? 0;
         var shutdownRequested = ShutdownRequestedAsync;
         if (dirtyCount == 0 && shutdownRequested is null)

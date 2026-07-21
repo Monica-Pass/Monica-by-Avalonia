@@ -16,7 +16,16 @@ public sealed partial class MainWindowViewModel
         UpdateSettings(settings => settings.MinimizeToTray = value);
     }
 
-    partial void OnQuickSearchEnabledChanged(bool value) => UpdateSettings(settings => settings.QuickSearchEnabled = value);
+    partial void OnQuickSearchEnabledChanged(bool value)
+    {
+        if (value && !CanUseGlobalHotkeyIntegration)
+        {
+            QuickSearchEnabled = false;
+            return;
+        }
+
+        UpdateSettings(settings => settings.QuickSearchEnabled = value);
+    }
     partial void OnQuickSearchHotkeyChanged(string value) => UpdateSettings(settings => settings.QuickSearchHotkey = value);
 
     partial void OnBrowserIntegrationEnabledChanged(bool value)
@@ -132,9 +141,13 @@ public sealed partial class MainWindowViewModel
     {
         var capability = GetPlatformIntegration(key);
         var status = LocalizeFeatureStatus(capability.Status);
-        return string.IsNullOrWhiteSpace(capability.UnsupportedReason)
+        var baseStatus = string.IsNullOrWhiteSpace(capability.UnsupportedReason)
             ? status
             : $"{status}: {capability.UnsupportedReason}";
+        return string.Equals(key, PlatformFeatureKeys.GlobalHotkey, StringComparison.OrdinalIgnoreCase) &&
+               !string.IsNullOrWhiteSpace(GlobalHotkeyRegistrationError)
+            ? $"{baseStatus} — {GlobalHotkeyRegistrationError}"
+            : baseStatus;
     }
 
     private PlatformIntegrationCapability GetPlatformIntegration(string key) =>

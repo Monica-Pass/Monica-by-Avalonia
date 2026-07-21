@@ -27,7 +27,7 @@ public sealed partial class MainWindowViewModel
             RecycleBinRetentionDays = settings.RecycleBinRetentionDays;
             ApplySecurityRecoverySettings(settings.SecurityRecovery);
             MinimizeToTray = settings.MinimizeToTray && CanUseTrayIntegration;
-            QuickSearchEnabled = settings.QuickSearchEnabled;
+            QuickSearchEnabled = settings.QuickSearchEnabled && CanUseGlobalHotkeyIntegration;
             QuickSearchHotkey = settings.QuickSearchHotkey;
             BrowserIntegrationEnabled = settings.BrowserIntegrationEnabled && CanUseBrowserBridgeIntegration;
             BrowserIntegrationPort = settings.BrowserIntegrationPort;

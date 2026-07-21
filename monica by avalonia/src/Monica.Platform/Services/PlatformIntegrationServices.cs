@@ -63,14 +63,22 @@ public interface INativePasskeyService
     PlatformIntegrationCapability Capability { get; }
 }
 
-public interface ITrayService
+public interface ITrayService : IDisposable
 {
     PlatformIntegrationCapability Capability { get; }
+    bool IsVisible { get; }
+    void Initialize(Action showWindow, Action lockVault, Action exitApplication);
+    void SetVisible(bool isVisible);
 }
 
-public interface IGlobalHotkeyService
+public interface IGlobalHotkeyService : IDisposable
 {
     PlatformIntegrationCapability Capability { get; }
+    bool IsRegistered { get; }
+    string RegisteredGesture { get; }
+    string LastError { get; }
+    bool TryRegister(string gesture, Action activated);
+    void Unregister();
 }
 
 public interface IExternalLinkService
@@ -134,7 +142,7 @@ public sealed class PlatformIntegrationService : IPlatformIntegrationService
                 Available(PlatformFeatureKeys.SecretProtection, "Windows secret protection will use a DPAPI-backed adapter."),
                 Available(PlatformFeatureKeys.Tray, "Windows tray integration is available for desktop builds."),
                 Available(PlatformFeatureKeys.GlobalHotkey, "Windows global hotkeys can be registered by a platform adapter."),
-                DesktopEquivalent(PlatformFeatureKeys.BrowserBridge, "Browser integration is provided through a local desktop bridge."),
+                PlatformLimited(PlatformFeatureKeys.BrowserBridge, "The authenticated local browser bridge adapter is not implemented yet."),
                 Available(PlatformFeatureKeys.ExternalLinks, "External links can be opened through the Windows shell."),
                 PlatformLimited(PlatformFeatureKeys.NativePasskey, "Full Windows credential-provider integration requires a dedicated native adapter."),
                 DesktopEquivalent(PlatformFeatureKeys.NativeNotification, "Desktop notifications can replace Android notification features."),
@@ -150,7 +158,7 @@ public sealed class PlatformIntegrationService : IPlatformIntegrationService
                 PlatformLimited(PlatformFeatureKeys.SecretProtection, "Keychain-backed secret protection needs a macOS adapter."),
                 PlatformLimited(PlatformFeatureKeys.Tray, "Menu bar integration needs a macOS adapter."),
                 PlatformLimited(PlatformFeatureKeys.GlobalHotkey, "Global hotkeys require a macOS accessibility-aware adapter."),
-                DesktopEquivalent(PlatformFeatureKeys.BrowserBridge, "Browser integration is provided through a local desktop bridge."),
+                PlatformLimited(PlatformFeatureKeys.BrowserBridge, "The authenticated local browser bridge adapter is not implemented yet."),
                 Available(PlatformFeatureKeys.ExternalLinks, "External links can be opened through the macOS desktop shell."),
                 Unsupported(PlatformFeatureKeys.NativePasskey, "Android Credential Provider behavior is not available on macOS."),
                 DesktopEquivalent(PlatformFeatureKeys.NativeNotification, "Desktop notifications can replace Android notification features."),
@@ -166,7 +174,7 @@ public sealed class PlatformIntegrationService : IPlatformIntegrationService
                 PlatformLimited(PlatformFeatureKeys.SecretProtection, "Secret Service or keyring support needs a Linux adapter."),
                 PlatformLimited(PlatformFeatureKeys.Tray, "Tray behavior depends on the active Linux desktop environment."),
                 PlatformLimited(PlatformFeatureKeys.GlobalHotkey, "Global hotkeys depend on the compositor and desktop environment."),
-                DesktopEquivalent(PlatformFeatureKeys.BrowserBridge, "Browser integration is provided through a local desktop bridge."),
+                PlatformLimited(PlatformFeatureKeys.BrowserBridge, "The authenticated local browser bridge adapter is not implemented yet."),
                 Available(PlatformFeatureKeys.ExternalLinks, "External links can be opened through the Linux desktop shell."),
                 Unsupported(PlatformFeatureKeys.NativePasskey, "Android Credential Provider behavior is not available on Linux."),
                 DesktopEquivalent(PlatformFeatureKeys.NativeNotification, "Desktop notifications can replace Android notification features."),
@@ -180,7 +188,7 @@ public sealed class PlatformIntegrationService : IPlatformIntegrationService
             Unsupported(PlatformFeatureKeys.SecretProtection, "No secret protection adapter is available for this platform."),
             Unsupported(PlatformFeatureKeys.Tray, "No tray adapter is available for this platform."),
             Unsupported(PlatformFeatureKeys.GlobalHotkey, "No global hotkey adapter is available for this platform."),
-            DesktopEquivalent(PlatformFeatureKeys.BrowserBridge, "Browser integration is provided through a local desktop bridge."),
+            PlatformLimited(PlatformFeatureKeys.BrowserBridge, "The authenticated local browser bridge adapter is not implemented yet."),
             PlatformLimited(PlatformFeatureKeys.ExternalLinks, "External link launching depends on the current desktop shell."),
             Unsupported(PlatformFeatureKeys.NativePasskey, "Native passkey integration is not available for this platform."),
             Unsupported(PlatformFeatureKeys.NativeNotification, "No notification adapter is available for this platform."),
@@ -249,11 +257,21 @@ public sealed class CapabilityOnlyNativePasskeyService(IPlatformIntegrationServi
 public sealed class CapabilityOnlyTrayService(IPlatformIntegrationService platformIntegrationService) : ITrayService
 {
     public PlatformIntegrationCapability Capability => platformIntegrationService.GetCapability(PlatformFeatureKeys.Tray);
+    public bool IsVisible => false;
+    public void Initialize(Action showWindow, Action lockVault, Action exitApplication) { }
+    public void SetVisible(bool isVisible) { }
+    public void Dispose() { }
 }
 
 public sealed class CapabilityOnlyGlobalHotkeyService(IPlatformIntegrationService platformIntegrationService) : IGlobalHotkeyService
 {
     public PlatformIntegrationCapability Capability => platformIntegrationService.GetCapability(PlatformFeatureKeys.GlobalHotkey);
+    public bool IsRegistered => false;
+    public string RegisteredGesture => "";
+    public string LastError => Capability.UnsupportedReason ?? "Global hotkeys are unavailable.";
+    public bool TryRegister(string gesture, Action activated) => false;
+    public void Unregister() { }
+    public void Dispose() { }
 }
 
 public sealed class SystemExternalLinkService(IPlatformIntegrationService platformIntegrationService) : IExternalLinkService

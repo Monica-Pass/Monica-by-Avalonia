@@ -47,4 +47,10 @@ public sealed partial class MainWindowViewModel
 
     [ObservableProperty]
     private int _browserIntegrationPort = 49152;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(GlobalHotkeyIntegrationStatusText))]
+    private string _globalHotkeyRegistrationError = "";
+
+    internal void SetGlobalHotkeyRegistrationError(string error) => GlobalHotkeyRegistrationError = error;
 }

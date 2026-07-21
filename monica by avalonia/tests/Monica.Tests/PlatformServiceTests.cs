@@ -314,6 +314,69 @@ public sealed partial class PlatformServiceTests
         Assert.Equal(PlatformFeatureStatus.Unsupported, service.GetCapability("unknown").Status);
     }
 
+    [Theory]
+    [InlineData("Ctrl+Shift+Space", 0x4006u, 0x20u, "Ctrl+Shift+Space")]
+    [InlineData("Alt+F12", 0x4001u, 0x7Bu, "Alt+F12")]
+    [InlineData("Win+K", 0x4008u, 0x4Bu, "Win+K")]
+    public void Windows_global_hotkey_parser_accepts_desktop_gestures(
+        string gesture,
+        uint expectedModifiers,
+        uint expectedVirtualKey,
+        string expectedNormalized)
+    {
+        var result = WindowsGlobalHotkeyService.TryParseGesture(
+            gesture,
+            out var modifiers,
+            out var virtualKey,
+            out var normalized,
+            out var error);
+
+        Assert.True(result, error);
+        Assert.Equal(expectedModifiers, modifiers);
+        Assert.Equal(expectedVirtualKey, virtualKey);
+        Assert.Equal(expectedNormalized, normalized);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("Space")]
+    [InlineData("Ctrl+Mouse1")]
+    [InlineData("Hyper+K")]
+    public void Windows_global_hotkey_parser_rejects_unsupported_gestures(string gesture)
+    {
+        var result = WindowsGlobalHotkeyService.TryParseGesture(
+            gesture,
+            out _,
+            out _,
+            out _,
+            out var error);
+
+        Assert.False(result);
+        Assert.False(string.IsNullOrWhiteSpace(error));
+    }
+
+    [Fact]
+    public void Windows_global_hotkey_service_registers_and_releases_native_hotkey()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var integration = new PlatformIntegrationService();
+        using var service = new WindowsGlobalHotkeyService(integration);
+
+        var registered = service.TryRegister("Ctrl+Shift+F24", () => { });
+
+        Assert.True(registered, service.LastError);
+        Assert.True(service.IsRegistered);
+        Assert.Equal("Ctrl+Shift+F24", service.RegisteredGesture);
+
+        service.Unregister();
+
+        Assert.False(service.IsRegistered);
+    }
+
     [Fact]
     public void Platform_capability_service_maps_native_passkey_status()
     {
