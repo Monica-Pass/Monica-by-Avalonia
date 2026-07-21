@@ -73,6 +73,8 @@ public sealed partial class MainWindowViewModel
 
     partial void OnNoteNavigationModeChanged(string value) => RaiseNoteTreeState();
 
+    partial void OnSelectedNoteFolderKeyChanged(string value) => RaiseNoteTreeState();
+
     partial void OnNoteNarrowShowsTreeChanged(bool value) => RaiseNoteWorkspaceLayoutState();
 
     partial void OnSelectedNoteChanged(SecureItem? value)

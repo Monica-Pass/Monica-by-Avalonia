@@ -67,6 +67,19 @@
     <Style Selector="Button.noteTreeGroupButton:pointerover">
         <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundPointerOver}" />
     </Style>
+    <Style Selector="Button.noteTreeGroupButton.selected">
+        <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="2,0,0,0" />
+    </Style>
+    <Style Selector="Button.noteTreeExpandButton, Button.noteFolderManagementButton">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Button.noteTreeExpandButton:pointerover, Button.noteFolderManagementButton:pointerover">
+        <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+    </Style>
     <Style Selector="Grid.notesWorkspace Button">
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
     </Style>

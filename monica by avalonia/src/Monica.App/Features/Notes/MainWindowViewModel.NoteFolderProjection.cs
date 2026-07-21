@@ -83,7 +83,8 @@ public sealed partial class MainWindowViewModel
             NoteTreeEntryKind.NoFolder,
             key,
             HasChildren: true,
-            IsExpanded: expanded));
+            IsExpanded: expanded,
+            IsSelected: key.Equals(SelectedNoteFolderKey, StringComparison.OrdinalIgnoreCase)));
         if (expanded)
         {
             foreach (var note in notes)
@@ -109,7 +110,8 @@ public sealed partial class MainWindowViewModel
             NoteTreeEntryKind.Folder,
             key,
             hasChildren,
-            expanded));
+            expanded,
+            IsSelected: key.Equals(SelectedNoteFolderKey, StringComparison.OrdinalIgnoreCase)));
 
         if (!expanded)
         {

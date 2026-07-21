@@ -25,7 +25,8 @@ public sealed record NoteTreeEntry(
     NoteTreeEntryKind Kind,
     string Key = "",
     bool HasChildren = false,
-    bool IsExpanded = false)
+    bool IsExpanded = false,
+    bool IsSelected = false)
 {
     public bool IsGroup => Item is null;
     public bool IsNote => Item is not null;

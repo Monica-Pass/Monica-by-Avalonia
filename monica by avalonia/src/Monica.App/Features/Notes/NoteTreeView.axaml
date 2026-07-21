@@ -11,7 +11,7 @@
             BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
             BorderThickness="0,0,1,0"
             Background="{DynamicResource LayerFillColorDefaultBrush}">
-        <Grid RowDefinitions="Auto,Auto,*" Margin="12">
+        <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="12">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4" Margin="0,0,0,10">
                 <TextBox x:Name="NoteSearchBox"
                          Text="{Binding NoteSearchText}"
@@ -99,7 +99,8 @@
                             <Grid IsVisible="{Binding IsGroup}"
                                   Margin="{Binding Indent}">
                                 <Button Classes="noteTreeGroupButton"
-                                        Command="{Binding #Root.DataContext.ToggleNoteTreeGroupCommand}"
+                                        Classes.selected="{Binding IsSelected}"
+                                        Command="{Binding #Root.DataContext.SelectNoteTreeGroupCommand}"
                                         CommandParameter="{Binding}"
                                         AutomationProperties.Name="{Binding Name}"
                                         HorizontalAlignment="Stretch"
@@ -109,10 +110,6 @@
                                       Margin="6,0,10,0"
                                       MinHeight="34"
                                       IsHitTestVisible="False">
-                                    <Panel Width="20" Height="20" VerticalAlignment="Center">
-                                        <ic:FluentIcon Icon="ChevronDown" FontSize="11" IsVisible="{Binding IsExpanded}" />
-                                        <ic:FluentIcon Icon="ChevronRight" FontSize="11" IsVisible="{Binding IsCollapsed}" />
-                                    </Panel>
                                     <Panel Grid.Column="1" Width="17" Height="17" VerticalAlignment="Center">
                                         <ic:FluentIcon Icon="FolderOpen" FontSize="14" IsVisible="{Binding IsFolderGroup}" />
                                         <ic:FluentIcon Icon="Tag" FontSize="14" IsVisible="{Binding IsTagGroup}" />
@@ -130,6 +127,22 @@
                                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                                VerticalAlignment="Center" />
                                 </Grid>
+                                <Button Classes="noteTreeExpandButton"
+                                        Command="{Binding #Root.DataContext.ToggleNoteTreeGroupCommand}"
+                                        CommandParameter="{Binding}"
+                                        IsVisible="{Binding HasChildren}"
+                                        ToolTip.Tip="{Binding Name}"
+                                        AutomationProperties.Name="{Binding Name}"
+                                        Width="24"
+                                        Height="24"
+                                        Padding="0"
+                                        Margin="4,5,0,5"
+                                        HorizontalAlignment="Left">
+                                    <Panel>
+                                        <ic:FluentIcon Icon="ChevronDown" FontSize="11" IsVisible="{Binding IsExpanded}" />
+                                        <ic:FluentIcon Icon="ChevronRight" FontSize="11" IsVisible="{Binding IsCollapsed}" />
+                                    </Panel>
+                                </Button>
                             </Grid>
                             <Grid IsVisible="{Binding IsNote}"
                                   Margin="{Binding Indent}">
@@ -173,6 +186,57 @@
                         Content="{Binding L[ClearNoteSearch]}"
                         HorizontalAlignment="Center" />
             </StackPanel>
+
+            <Border Grid.Row="3"
+                    IsVisible="{Binding IsNoteFolderNavigation}"
+                    BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
+                    BorderThickness="0,1,0,0"
+                    Padding="0,10,0,0"
+                    Margin="0,8,0,0">
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="4">
+                    <TextBox x:Name="NewNoteFolderNameBox"
+                             Text="{Binding NewNoteFolderName}"
+                             PlaceholderText="{Binding L.NewFolder}"
+                             AutomationProperties.Name="{Binding L.NewFolder}"
+                             Height="32"
+                             MinWidth="0" />
+                    <Button x:Name="CreateNoteFolderButton"
+                            Grid.Column="1"
+                            Classes="noteFolderManagementButton"
+                            Command="{Binding CreateNoteFolderCommand}"
+                            ToolTip.Tip="{Binding L.CreateFolder}"
+                            AutomationProperties.Name="{Binding L.CreateFolder}"
+                            Width="32"
+                            Height="32"
+                            Padding="0">
+                        <ic:FluentIcon Icon="FolderAdd" FontSize="14" />
+                    </Button>
+                    <Button x:Name="RenameNoteFolderButton"
+                            Grid.Column="2"
+                            Classes="noteFolderManagementButton"
+                            Command="{Binding RenameSelectedNoteFolderCommand}"
+                            IsEnabled="{Binding CanManageSelectedNoteFolder}"
+                            ToolTip.Tip="{Binding L.RenameFolder}"
+                            AutomationProperties.Name="{Binding L.RenameFolder}"
+                            Width="32"
+                            Height="32"
+                            Padding="0">
+                        <ic:FluentIcon Icon="Edit" FontSize="14" />
+                    </Button>
+                    <Button x:Name="DeleteNoteFolderButton"
+                            Grid.Column="3"
+                            Classes="noteFolderManagementButton"
+                            Command="{Binding DeleteSelectedNoteFolderCommand}"
+                            IsEnabled="{Binding CanManageSelectedNoteFolder}"
+                            ToolTip.Tip="{Binding L.DeleteFolder}"
+                            AutomationProperties.Name="{Binding L.DeleteFolder}"
+                            Width="32"
+                            Height="32"
+                            Padding="0">
+                        <ic:FluentIcon Icon="Delete" FontSize="14" />
+                    </Button>
+                </Grid>
+            </Border>
         </Grid>
     </Border>
 </UserControl>

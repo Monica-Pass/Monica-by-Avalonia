@@ -42,6 +42,10 @@ public sealed class NoteWorkflowUiTests
         Assert.NotNull(editor.FindControl<Button>("BackToNoteListButton"));
         Assert.NotNull(tree.FindControl<Button>("NoteFolderNavigationButton"));
         Assert.NotNull(tree.FindControl<Button>("NoteTagNavigationButton"));
+        Assert.NotNull(tree.FindControl<TextBox>("NewNoteFolderNameBox"));
+        Assert.NotNull(tree.FindControl<Button>("CreateNoteFolderButton"));
+        Assert.NotNull(tree.FindControl<Button>("RenameNoteFolderButton"));
+        Assert.NotNull(tree.FindControl<Button>("DeleteNoteFolderButton"));
     }
 
     [Fact]
@@ -257,6 +261,9 @@ public sealed class NoteWorkflowUiTests
         Assert.Contains("x:Name=\"NoteTreeList\"", treeXaml, StringComparison.Ordinal);
         Assert.Contains("Classes.accent=\"{Binding IsNoteFolderNavigation}\"", treeXaml, StringComparison.Ordinal);
         Assert.Contains("ToggleNoteTreeGroupCommand", treeXaml, StringComparison.Ordinal);
+        Assert.Contains("SelectNoteTreeGroupCommand", treeXaml, StringComparison.Ordinal);
+        Assert.Contains("Classes.selected=\"{Binding IsSelected}\"", treeXaml, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding IsNoteFolderNavigation}\"", treeXaml, StringComparison.Ordinal);
         Assert.Contains("VirtualizingStackPanel", treeXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Command=\"{Binding LoadCommand}\"", treeXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("L[NoteHome]", treeXaml, StringComparison.Ordinal);

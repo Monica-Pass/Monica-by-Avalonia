@@ -1,5 +1,4 @@
 using CommunityToolkit.Mvvm.Input;
-using Monica.Core.Categories;
 using Monica.Core.Models;
 
 namespace Monica.App.ViewModels;
@@ -52,133 +51,40 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private async Task CreatePasswordFolderAsync()
     {
-        var name = LocalCategoryPath.Build(GetSelectedPasswordFolderPath(), NewFolderName);
-        if (string.IsNullOrWhiteSpace(name))
+        var result = await CreateLocalCategoryAsync(GetSelectedPasswordFolderPath(), NewFolderName);
+        if (result is null)
         {
-            StatusMessage = _localization.Get("FolderNameRequired");
             return;
         }
 
-        var existing = Categories.FirstOrDefault(item => item.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-        if (existing is not null)
-        {
-            SelectedPasswordFolderFilter = PasswordFolderFilters.FirstOrDefault(item => item.Id == existing.Id);
-            NewFolderName = "";
-            StatusMessage = _localization.Format("SelectedFolderFormat", existing.Name);
-            return;
-        }
-
-        var category = new Category
-        {
-            Name = name,
-            SortOrder = Categories.Count == 0 ? 1 : Categories.Max(item => item.SortOrder) + 1
-        };
-        await _repository.SaveCategoryAsync(category);
-        Categories.Add(category);
-        RefreshPasswordFolderFilters(category.Id);
-        RefreshNoteCategoryOptions();
-        RaiseNoteTreeState();
+        RefreshPasswordFolderFilters(result.Category.Id);
         NewFolderName = "";
-        StatusMessage = _localization.Format("CreatedFolderFormat", category.Name);
     }
 
     [RelayCommand]
     private async Task RenameSelectedPasswordFolderAsync()
     {
         var category = GetSelectedPasswordFolderCategory();
-        var name = LocalCategoryPath.LeafName(NewFolderName);
-        if (category is null)
+        var result = await RenameLocalCategoryAsync(category, NewFolderName);
+        if (result is null)
         {
-            StatusMessage = _localization.Get("SelectFolderToManage");
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            StatusMessage = _localization.Get("FolderNameRequired");
-            return;
-        }
-
-        var renamePlan = LocalCategoryPath.PlanSubtreeRename(Categories, category, name);
-        if (renamePlan.HasConflict)
-        {
-            StatusMessage = _localization.Format("FolderAlreadyExistsFormat", renamePlan.ConflictPath ?? name);
-            return;
-        }
-
-        var oldName = category.Name;
-        foreach (var updatedCategory in Categories.Where(item => renamePlan.UpdatedPaths.ContainsKey(item.Id)))
-        {
-            updatedCategory.Name = renamePlan.UpdatedPaths[updatedCategory.Id];
-            await _repository.SaveCategoryAsync(updatedCategory);
-        }
-
-        RefreshPasswordFolderFilters(category.Id);
-        RefreshNoteCategoryOptions();
-        RaiseNoteTreeState();
+        RefreshPasswordFolderFilters(result.Category.Id);
         NewFolderName = "";
-        await LogOperationAsync(new OperationLog
-        {
-            ItemType = "CATEGORY",
-            ItemId = category.Id,
-            ItemTitle = category.Name,
-            OperationType = "UPDATE",
-            DeviceName = Environment.MachineName
-        });
-        StatusMessage = _localization.Format("RenamedFolderFormat", oldName, renamePlan.DestinationPath);
     }
 
     [RelayCommand]
     private async Task DeleteSelectedPasswordFolderAsync()
     {
         var category = GetSelectedPasswordFolderCategory();
-        if (category is null)
+        var result = await DeleteLocalCategoryAsync(category);
+        if (result is not null)
         {
-            StatusMessage = _localization.Get("SelectFolderToManage");
-            return;
+            RefreshPasswordFolderFilters(-1);
+            StatusMessage = _localization.Format("DeletedFolderFormat", result.Name, result.PasswordCount);
         }
-
-        var movedPasswords = Passwords.Count(item => item.CategoryId == category.Id);
-        var name = category.Name;
-        if (!await ConfirmDeleteFolderAsync(name, movedPasswords))
-        {
-            return;
-        }
-
-        await _repository.DeleteCategoryAsync(category.Id);
-        Categories.Remove(category);
-        foreach (var password in Passwords.Where(item => item.CategoryId == category.Id))
-        {
-            password.CategoryId = null;
-        }
-
-        foreach (var item in TotpItems.Where(item => item.CategoryId == category.Id))
-        {
-            item.CategoryId = null;
-        }
-
-        foreach (var item in NoteItems.Where(item => item.CategoryId == category.Id))
-        {
-            item.CategoryId = null;
-        }
-
-        foreach (var item in WalletItems.Where(item => item.CategoryId == category.Id))
-        {
-            item.CategoryId = null;
-        }
-
-        await LogOperationAsync(new OperationLog
-        {
-            ItemType = "CATEGORY",
-            ItemId = category.Id,
-            ItemTitle = name,
-            OperationType = "DELETE",
-            DeviceName = Environment.MachineName
-        });
-        RefreshPasswordFolderFilters(-1);
-        RefreshNoteCategoryOptions();
-        RaiseNoteTreeState();
-        StatusMessage = _localization.Format("DeletedFolderFormat", name, movedPasswords);
     }
 
 }

@@ -70,10 +70,10 @@ public sealed partial class MainWindowViewModel
             _localization.Get("MoveToRecycleBin"),
             _localization.Cancel);
 
-    private Task<bool> ConfirmDeleteFolderAsync(string name, int affectedPasswordCount) =>
+    private Task<bool> ConfirmDeleteFolderAsync(string name, int affectedItemCount) =>
         _confirmationDialogService.ConfirmAsync(
             _localization.Get("DeleteFolderConfirmationTitle"),
-            _localization.Format("DeleteFolderConfirmationMessageFormat", name, affectedPasswordCount),
+            _localization.Format("DeleteFolderItemsConfirmationMessageFormat", name, affectedItemCount),
             _localization.Get("DeleteFolder"),
             _localization.Cancel);
 

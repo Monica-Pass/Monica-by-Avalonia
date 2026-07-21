@@ -110,6 +110,23 @@ public sealed partial class MainWindowViewModel
         RaiseNoteTreeState();
     }
 
+    [RelayCommand]
+    private void SelectNoteTreeGroup(NoteTreeEntry? entry)
+    {
+        if (entry is null || !entry.IsGroup)
+        {
+            return;
+        }
+
+        if (entry.IsTagGroup)
+        {
+            ToggleNoteTreeGroup(entry);
+            return;
+        }
+
+        SelectedNoteFolderKey = entry.Key;
+    }
+
     private IReadOnlyList<NoteTreeGroup> BuildNoteTreeGroups(IReadOnlyList<NoteTreeProjectionItem> notes)
     {
         NoteTreeGroupProjectionBuildCount++;

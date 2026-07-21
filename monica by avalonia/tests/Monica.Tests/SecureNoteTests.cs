@@ -193,6 +193,80 @@ public sealed class SecureNoteTests
     }
 
     [Fact]
+    public async Task Note_folder_management_creates_children_under_virtual_parents()
+    {
+        var repository = CreateRepository();
+        await repository.SaveCategoryAsync(new Category { Name = "Work/Infrastructure/Production", SortOrder = 1 });
+        var viewModel = CreateViewModel(repository: repository);
+        await viewModel.LoadAsync();
+        var virtualParent = viewModel.NoteTreeEntries.Single(entry => entry.Key == "folder:Work/Infrastructure");
+
+        viewModel.SelectNoteTreeGroupCommand.Execute(virtualParent);
+        viewModel.NewNoteFolderName = "Secrets";
+        await viewModel.CreateNoteFolderCommand.ExecuteAsync(null);
+
+        var created = (await repository.GetCategoriesAsync()).Single(category => category.Name == "Work/Infrastructure/Secrets");
+        Assert.Equal($"folder:{created.Name}", viewModel.SelectedNoteFolderKey);
+        Assert.Equal("", viewModel.NewNoteFolderName);
+        Assert.True(viewModel.CanManageSelectedNoteFolder);
+        Assert.Contains(viewModel.NoteTreeEntries, entry => entry.Key == $"folder:{created.Name}" && entry.IsSelected);
+    }
+
+    [Fact]
+    public async Task Note_folder_management_renames_subtree_and_preserves_note_category_ids()
+    {
+        var repository = CreateRepository();
+        var work = new Category { Name = "Work", SortOrder = 1 };
+        var child = new Category { Name = "Work/Production", SortOrder = 2 };
+        await repository.SaveCategoryAsync(work);
+        await repository.SaveCategoryAsync(child);
+        await SaveNoteAsync(repository, "Runbook", "ops", child.Id);
+        var viewModel = CreateViewModel(repository: repository);
+        await viewModel.LoadAsync();
+        viewModel.OpenNoteCommand.Execute(Assert.Single(viewModel.NoteItems));
+        var tab = Assert.IsType<NoteEditorTab>(viewModel.SelectedNoteTab);
+        viewModel.SelectNoteTreeGroupCommand.Execute(viewModel.NoteTreeEntries.Single(entry => entry.Key == "folder:Work"));
+        viewModel.NewNoteFolderName = "Engineering";
+
+        await viewModel.RenameSelectedNoteFolderCommand.ExecuteAsync(null);
+
+        Assert.Equal("folder:Engineering", viewModel.SelectedNoteFolderKey);
+        Assert.Equal(child.Id, tab.DraftCategoryId);
+        Assert.Equal(child.Id, viewModel.SelectedNote?.CategoryId);
+        Assert.Equal(
+            ["Engineering", "Engineering/Production"],
+            (await repository.GetCategoriesAsync()).OrderBy(category => category.SortOrder).Select(category => category.Name));
+    }
+
+    [Fact]
+    public async Task Note_folder_management_delete_clears_all_consumers_and_open_drafts()
+    {
+        var confirmation = new RecordingConfirmationDialogService();
+        var repository = CreateRepository();
+        var category = new Category { Name = "Work", SortOrder = 1 };
+        await repository.SaveCategoryAsync(category);
+        await repository.SavePasswordAsync(new PasswordEntry { Title = "Portal", Password = "secret", CategoryId = category.Id });
+        await SaveNoteAsync(repository, "Runbook", "ops", category.Id);
+        var viewModel = CreateViewModel(repository: repository, confirmationDialogService: confirmation);
+        await viewModel.LoadAsync();
+        viewModel.OpenNoteCommand.Execute(Assert.Single(viewModel.NoteItems));
+        var tab = Assert.IsType<NoteEditorTab>(viewModel.SelectedNoteTab);
+        tab.IsDirty = false;
+        viewModel.SelectNoteTreeGroupCommand.Execute(viewModel.NoteTreeEntries.Single(entry => entry.Key == "folder:Work"));
+
+        await viewModel.DeleteSelectedNoteFolderCommand.ExecuteAsync(null);
+
+        Assert.Empty(await repository.GetCategoriesAsync());
+        Assert.Null(Assert.Single(viewModel.Passwords).CategoryId);
+        Assert.Null(Assert.Single(viewModel.NoteItems).CategoryId);
+        Assert.Null(tab.DraftCategoryId);
+        Assert.True(tab.IsDirty);
+        Assert.False(viewModel.CanManageSelectedNoteFolder);
+        Assert.Contains("2", confirmation.Message, StringComparison.Ordinal);
+        Assert.Equal(viewModel.L.Format("DeletedFolderItemsFormat", "Work", 2), viewModel.StatusMessage);
+    }
+
+    [Fact]
     public void Note_image_insert_status_is_localized_for_simplified_chinese()
     {
         var localization = new LocalizationService();
@@ -493,7 +567,8 @@ public sealed class SecureNoteTests
     private static MainWindowViewModel CreateViewModel(
         IFileSystemPickerService? fileSystemPickerService = null,
         IPasswordAttachmentFileService? passwordAttachmentFileService = null,
-        IMonicaRepository? repository = null)
+        IMonicaRepository? repository = null,
+        IConfirmationDialogService? confirmationDialogService = null)
     {
         var databasePath = GetTempDatabasePath();
         var factory = new SqliteConnectionFactory(databasePath);
@@ -517,6 +592,7 @@ public sealed class SecureNoteTests
             new LegacyVaultDetector(factory),
             new AppSettingsService(GetTempSettingsPath()),
             new LocalizationService(),
+            confirmationDialogService: confirmationDialogService,
             fileSystemPickerService: fileSystemPickerService);
     }
 
@@ -695,5 +771,31 @@ public sealed class SecureNoteTests
             long? selectedCategoryId = null,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<PasswordCategoryChoice?>(null);
+    }
+
+    private sealed class RecordingConfirmationDialogService : IConfirmationDialogService
+    {
+        public string Message { get; private set; } = "";
+
+        public Task<bool> ConfirmAsync(
+            string title,
+            string message,
+            string primaryButtonText,
+            string? closeButtonText = null,
+            CancellationToken cancellationToken = default)
+        {
+            Message = message;
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> ConfirmTypedAsync(
+            string title,
+            string message,
+            string requiredPhrase,
+            string instruction,
+            string primaryButtonText,
+            string? closeButtonText = null,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(true);
     }
 }
