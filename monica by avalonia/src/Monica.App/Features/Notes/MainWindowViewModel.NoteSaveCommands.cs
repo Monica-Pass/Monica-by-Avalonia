@@ -51,6 +51,7 @@ public sealed partial class MainWindowViewModel
         item.Notes = payload.NotesCache;
         item.ItemData = payload.ItemData;
         item.ImagePaths = payload.ImagePaths;
+        item.CategoryId = SelectedNoteCategory?.Id;
         item.IsFavorite = NoteIsFavorite;
         item.ItemType = VaultItemType.Note;
         item.SyncStatus = item.BitwardenVaultId is null ? SyncStatus.None : SyncStatus.Pending;

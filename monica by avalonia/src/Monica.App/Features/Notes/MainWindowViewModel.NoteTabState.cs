@@ -32,6 +32,7 @@ public sealed partial class MainWindowViewModel
         NoteTitle = item.Title;
         NoteContent = decoded.Content;
         NoteTagsText = string.Join(", ", decoded.Tags);
+        SelectedNoteCategory = FindNoteCategoryChoice(item.CategoryId);
         NoteIsMarkdown = decoded.IsMarkdown;
         NoteIsFavorite = item.IsFavorite;
         NotePreviewMode = decoded.IsMarkdown;
@@ -86,6 +87,7 @@ public sealed partial class MainWindowViewModel
             tab.DraftTitle = tab.Title;
             tab.DraftContent = "";
             tab.DraftTagsText = "";
+            tab.DraftCategoryId = null;
             tab.DraftIsMarkdown = true;
             tab.DraftIsFavorite = false;
             tab.DraftPreviewMode = false;
@@ -98,6 +100,7 @@ public sealed partial class MainWindowViewModel
         tab.DraftTitle = tab.Source.Title;
         tab.DraftContent = decoded.Content;
         tab.DraftTagsText = string.Join(", ", decoded.Tags);
+        tab.DraftCategoryId = tab.Source.CategoryId;
         tab.DraftIsMarkdown = decoded.IsMarkdown;
         tab.DraftIsFavorite = tab.Source.IsFavorite;
         tab.DraftPreviewMode = decoded.IsMarkdown;
@@ -112,6 +115,7 @@ public sealed partial class MainWindowViewModel
         NoteTitle = tab.DraftTitle;
         NoteContent = tab.DraftContent;
         NoteTagsText = tab.DraftTagsText;
+        SelectedNoteCategory = FindNoteCategoryChoice(tab.DraftCategoryId);
         NoteIsMarkdown = tab.DraftIsMarkdown;
         NoteIsFavorite = tab.DraftIsFavorite;
         NotePreviewMode = tab.DraftPreviewMode;
@@ -136,6 +140,7 @@ public sealed partial class MainWindowViewModel
         tab.DraftTitle = NoteTitle;
         tab.DraftContent = NoteContent;
         tab.DraftTagsText = NoteTagsText;
+        tab.DraftCategoryId = SelectedNoteCategory?.Id;
         tab.DraftIsMarkdown = NoteIsMarkdown;
         tab.DraftIsFavorite = NoteIsFavorite;
         tab.DraftPreviewMode = NotePreviewMode;

@@ -32,6 +32,8 @@ public sealed partial class MainWindowViewModel
 
     partial void OnNoteIsFavoriteChanged(bool value) => MarkSelectedNoteTabDirty();
 
+    partial void OnSelectedNoteCategoryChanged(PasswordCategoryChoice? value) => MarkSelectedNoteTabDirty();
+
     partial void OnNoteIsMarkdownChanged(bool value)
     {
         InvalidateNotePreviewProjection();

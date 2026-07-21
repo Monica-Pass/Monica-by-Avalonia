@@ -31,6 +31,7 @@ public sealed partial class NoteEditorTab : ObservableObject
     public string DraftTitle { get; set; } = "";
     public string DraftContent { get; set; } = "";
     public string DraftTagsText { get; set; } = "";
+    public long? DraftCategoryId { get; set; }
     public bool DraftIsMarkdown { get; set; } = true;
     public bool DraftIsFavorite { get; set; }
     public bool DraftPreviewMode { get; set; }

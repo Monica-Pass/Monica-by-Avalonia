@@ -51,6 +51,31 @@
             <TextBox Text="{Binding NoteTagsText}"
                      PlaceholderText="{Binding L.NoteTagsWatermark}"
                      AutomationProperties.Name="{Binding L[NoteTagsLabel]}" />
+            <TextBlock Text="{Binding L.Category}"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <ComboBox x:Name="NoteCategoryPicker"
+                      ItemsSource="{Binding NoteCategoryOptions}"
+                      SelectedItem="{Binding SelectedNoteCategory}"
+                      HorizontalAlignment="Stretch"
+                      AutomationProperties.Name="{Binding L.Category}">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PasswordCategoryChoice">
+                        <Grid ColumnDefinitions="*,Auto"
+                              ColumnSpacing="8"
+                              Margin="{Binding Indent}"
+                              ToolTip.Tip="{Binding FullPath}">
+                            <TextBlock Text="{Binding FolderDisplayName}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding ParentPath}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextTrimming="CharacterEllipsis"
+                                       MaxWidth="112" />
+                        </Grid>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
             <CheckBox Content="{Binding L.Favorite}"
                       IsChecked="{Binding NoteIsFavorite}"
                       AutomationProperties.Name="{Binding L.Favorite}" />

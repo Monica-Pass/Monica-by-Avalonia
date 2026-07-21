@@ -30,6 +30,7 @@ public sealed partial class MainWindowViewModel
     public ObservableCollection<SecureItem> NoteItems { get; } = new ObservableRangeCollection<SecureItem>();
     public ObservableCollection<NoteEditorTab> OpenNoteTabs { get; } = [];
     public ObservableCollection<NoteImagePreviewItem> NoteImagePreviewItems { get; } = [];
+    public ObservableCollection<PasswordCategoryChoice> NoteCategoryOptions { get; } = [];
 
     [ObservableProperty]
     private SecureItem? _selectedNote;
@@ -60,6 +61,9 @@ public sealed partial class MainWindowViewModel
 
     [ObservableProperty]
     private bool _noteIsFavorite;
+
+    [ObservableProperty]
+    private PasswordCategoryChoice? _selectedNoteCategory;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanInsertNoteImage))]

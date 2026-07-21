@@ -173,6 +173,21 @@ public sealed class NoteWorkflowUiTests
     }
 
     [Fact]
+    public void Note_properties_expose_nested_category_picker()
+    {
+        var panel = new NotePropertiesPanelView();
+        var picker = panel.FindControl<ComboBox>("NoteCategoryPicker");
+
+        Assert.NotNull(picker);
+        var xaml = File.ReadAllText(FindSourceFile("NotePropertiesPanelView.axaml"));
+        Assert.Contains("ItemsSource=\"{Binding NoteCategoryOptions}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("SelectedItem=\"{Binding SelectedNoteCategory}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"{Binding Indent}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding ParentPath}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"{Binding FullPath}\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Note_tree_row_overflow_binds_commands_to_the_workspace_view_model()
     {
         var window = new Monica.App.MainWindow();

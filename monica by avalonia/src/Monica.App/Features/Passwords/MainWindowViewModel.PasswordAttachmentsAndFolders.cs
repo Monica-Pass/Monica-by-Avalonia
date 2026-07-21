@@ -76,6 +76,7 @@ public sealed partial class MainWindowViewModel
         await _repository.SaveCategoryAsync(category);
         Categories.Add(category);
         RefreshPasswordFolderFilters(category.Id);
+        RefreshNoteCategoryOptions();
         NewFolderName = "";
         StatusMessage = _localization.Format("CreatedFolderFormat", category.Name);
     }
@@ -112,6 +113,7 @@ public sealed partial class MainWindowViewModel
         }
 
         RefreshPasswordFolderFilters(category.Id);
+        RefreshNoteCategoryOptions();
         NewFolderName = "";
         await LogOperationAsync(new OperationLog
         {
@@ -172,6 +174,7 @@ public sealed partial class MainWindowViewModel
             DeviceName = Environment.MachineName
         });
         RefreshPasswordFolderFilters(-1);
+        RefreshNoteCategoryOptions();
         StatusMessage = _localization.Format("DeletedFolderFormat", name, movedPasswords);
     }
 

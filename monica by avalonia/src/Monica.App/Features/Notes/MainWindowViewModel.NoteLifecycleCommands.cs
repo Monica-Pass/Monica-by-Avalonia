@@ -28,6 +28,7 @@ public sealed partial class MainWindowViewModel
         item.Notes = payload.NotesCache;
         item.ItemData = payload.ItemData;
         item.ImagePaths = payload.ImagePaths;
+        item.CategoryId = tab.DraftCategoryId;
         item.IsFavorite = tab.DraftIsFavorite;
         item.ItemType = VaultItemType.Note;
         item.SyncStatus = item.BitwardenVaultId is null ? SyncStatus.None : SyncStatus.Pending;
@@ -50,6 +51,7 @@ public sealed partial class MainWindowViewModel
         tab.Source = item;
         tab.Title = item.Title;
         tab.DraftTitle = item.Title;
+        tab.DraftCategoryId = item.CategoryId;
         tab.DraftIsFavorite = item.IsFavorite;
         tab.IsDirty = false;
         return item;

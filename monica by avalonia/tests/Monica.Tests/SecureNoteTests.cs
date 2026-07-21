@@ -13,6 +13,108 @@ namespace Monica.Tests;
 public sealed class SecureNoteTests
 {
     [Fact]
+    public async Task Note_category_options_follow_nested_folder_order_and_load_existing_selection()
+    {
+        var repository = CreateRepository();
+        var root = new Category { Name = "Work", SortOrder = 1 };
+        var child = new Category { Name = "Work/Production", SortOrder = 2 };
+        await repository.SaveCategoryAsync(root);
+        await repository.SaveCategoryAsync(child);
+        var note = new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = "Deployment",
+            CategoryId = child.Id
+        };
+        await repository.SaveSecureItemAsync(note);
+        var viewModel = CreateViewModel(repository: repository);
+
+        await viewModel.LoadAsync();
+        viewModel.OpenNoteCommand.Execute(Assert.Single(viewModel.NoteItems));
+
+        Assert.Equal([null, root.Id, child.Id], viewModel.NoteCategoryOptions.Select(option => option.Id));
+        Assert.Equal([0, 0, 1], viewModel.NoteCategoryOptions.Select(option => option.Level));
+        Assert.Equal(child.Id, viewModel.SelectedNoteCategory?.Id);
+        Assert.Equal("Work", viewModel.SelectedNoteCategory?.ParentPath);
+    }
+
+    [Fact]
+    public async Task Note_tabs_keep_category_drafts_isolated_and_mark_only_the_selected_tab_dirty()
+    {
+        var repository = CreateRepository();
+        var work = new Category { Name = "Work", SortOrder = 1 };
+        var personal = new Category { Name = "Personal", SortOrder = 2 };
+        await repository.SaveCategoryAsync(work);
+        await repository.SaveCategoryAsync(personal);
+        var viewModel = CreateViewModel(repository: repository);
+        await viewModel.LoadAsync();
+
+        viewModel.AddNoteCommand.Execute(null);
+        var first = Assert.IsType<NoteEditorTab>(viewModel.SelectedNoteTab);
+        viewModel.NoteTitle = "First";
+        viewModel.SelectedNoteCategory = viewModel.NoteCategoryOptions.Single(option => option.Id == work.Id);
+        Assert.True(first.IsDirty);
+
+        viewModel.AddNoteCommand.Execute(null);
+        var second = Assert.IsType<NoteEditorTab>(viewModel.SelectedNoteTab);
+        viewModel.NoteTitle = "Second";
+        viewModel.SelectedNoteCategory = viewModel.NoteCategoryOptions.Single(option => option.Id == personal.Id);
+        second.IsDirty = false;
+        first.IsDirty = false;
+
+        viewModel.SelectNoteTabCommand.Execute(first);
+
+        Assert.Equal(work.Id, viewModel.SelectedNoteCategory?.Id);
+        Assert.False(first.IsDirty);
+        Assert.False(second.IsDirty);
+
+        viewModel.SelectedNoteCategory = viewModel.NoteCategoryOptions.Single(option => option.Id == personal.Id);
+
+        Assert.True(first.IsDirty);
+        Assert.False(second.IsDirty);
+        viewModel.SelectNoteTabCommand.Execute(second);
+        Assert.Equal(personal.Id, viewModel.SelectedNoteCategory?.Id);
+        viewModel.SelectNoteTabCommand.Execute(first);
+        Assert.Equal(personal.Id, viewModel.SelectedNoteCategory?.Id);
+    }
+
+    [Fact]
+    public async Task Note_single_and_save_all_commands_persist_each_draft_category()
+    {
+        var repository = CreateRepository();
+        var root = new Category { Name = "Projects", SortOrder = 1 };
+        var child = new Category { Name = "Projects/Monica", SortOrder = 2 };
+        await repository.SaveCategoryAsync(root);
+        await repository.SaveCategoryAsync(child);
+        var viewModel = CreateViewModel(repository: repository);
+        await viewModel.LoadAsync();
+
+        viewModel.AddNoteCommand.Execute(null);
+        var first = Assert.IsType<NoteEditorTab>(viewModel.SelectedNoteTab);
+        viewModel.NoteTitle = "Architecture";
+        viewModel.NoteContent = "draft one";
+        viewModel.SelectedNoteCategory = viewModel.NoteCategoryOptions.Single(option => option.Id == root.Id);
+        await viewModel.SaveNoteCommand.ExecuteAsync(null);
+        Assert.Equal(root.Id, first.Source?.CategoryId);
+
+        viewModel.AddNoteCommand.Execute(null);
+        var second = Assert.IsType<NoteEditorTab>(viewModel.SelectedNoteTab);
+        viewModel.NoteTitle = "Desktop design";
+        viewModel.NoteContent = "draft two";
+        viewModel.SelectedNoteCategory = viewModel.NoteCategoryOptions.Single(option => option.Id == child.Id);
+        viewModel.SelectNoteTabCommand.Execute(first);
+        viewModel.SelectedNoteCategory = viewModel.NoteCategoryOptions.Single(option => option.Id == child.Id);
+
+        await viewModel.SaveAllNoteTabsCommand.ExecuteAsync(null);
+
+        var saved = await repository.GetSecureItemsAsync(VaultItemType.Note);
+        Assert.Equal(child.Id, saved.Single(note => note.Title == "Architecture").CategoryId);
+        Assert.Equal(child.Id, saved.Single(note => note.Title == "Desktop design").CategoryId);
+        Assert.False(first.IsDirty);
+        Assert.False(second.IsDirty);
+    }
+
+    [Fact]
     public void Note_image_insert_status_is_localized_for_simplified_chinese()
     {
         var localization = new LocalizationService();
@@ -312,13 +414,14 @@ public sealed class SecureNoteTests
 
     private static MainWindowViewModel CreateViewModel(
         IFileSystemPickerService? fileSystemPickerService = null,
-        IPasswordAttachmentFileService? passwordAttachmentFileService = null)
+        IPasswordAttachmentFileService? passwordAttachmentFileService = null,
+        IMonicaRepository? repository = null)
     {
         var databasePath = GetTempDatabasePath();
         var factory = new SqliteConnectionFactory(databasePath);
         var migrator = new DatabaseMigrator(factory);
         return new MainWindowViewModel(
-            new MonicaRepository(factory, migrator),
+            repository ?? new MonicaRepository(factory, migrator),
             new VaultCredentialStore(factory, migrator),
             new CryptoService(),
             new TotpService(),
@@ -337,6 +440,12 @@ public sealed class SecureNoteTests
             new AppSettingsService(GetTempSettingsPath()),
             new LocalizationService(),
             fileSystemPickerService: fileSystemPickerService);
+    }
+
+    private static MonicaRepository CreateRepository()
+    {
+        var factory = new SqliteConnectionFactory(GetTempDatabasePath());
+        return new MonicaRepository(factory, new DatabaseMigrator(factory));
     }
 
     private static string GetTempDatabasePath()

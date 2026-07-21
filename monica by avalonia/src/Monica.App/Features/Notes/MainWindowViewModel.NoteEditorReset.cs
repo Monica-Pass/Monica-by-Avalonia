@@ -16,6 +16,7 @@ public sealed partial class MainWindowViewModel
         NoteTitle = "";
         NoteContent = "";
         NoteTagsText = "";
+        SelectedNoteCategory = FindNoteCategoryChoice(null);
         NoteIsMarkdown = true;
         NotePreviewMode = false;
         NoteSplitPreviewMode = false;

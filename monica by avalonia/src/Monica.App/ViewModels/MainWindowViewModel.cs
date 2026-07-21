@@ -373,6 +373,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             {
                 ReplaceItems(Categories, snapshot.Categories);
                 RefreshPasswordFolderFilters();
+                RefreshNoteCategoryOptions();
                 ReplaceItems(MdbxDatabases, snapshot.MdbxDatabases);
                 RefreshMdbxVaultState();
                 RefreshVaultSources();
@@ -497,6 +498,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RaiseWebDavBackupHistoryState();
         RaisePasswordQuickAccessState();
         RaisePasswordFilterState();
+        RefreshNoteCategoryOptions();
         OnPropertyChanged(nameof(ClearPasswordFiltersText));
         OnPropertyChanged(nameof(ClearPasswordSearchText));
         OnPropertyChanged(nameof(PasswordSearchHelpText));
