@@ -71,7 +71,7 @@ public sealed partial class DataRepositoryTests
         }
 
         Assert.Contains("remote_account_id", names);
-        Assert.Equal(72, await ReadUserVersionAsync(migrated));
+        Assert.Equal(DatabaseMigrator.CurrentSchemaVersion, await ReadUserVersionAsync(migrated));
     }
 
     [Fact]

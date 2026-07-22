@@ -1,16 +1,18 @@
 namespace Monica.Core.Bitwarden;
 
-public sealed record BitwardenEndpointSet(Uri WebVault, Uri Identity, Uri Api)
+public sealed record BitwardenEndpointSet(Uri WebVault, Uri Identity, Uri Api, Uri? Notifications = null)
 {
     public static BitwardenEndpointSet UnitedStates { get; } = new(
         new Uri("https://vault.bitwarden.com/"),
         new Uri("https://identity.bitwarden.com/"),
-        new Uri("https://api.bitwarden.com/"));
+        new Uri("https://api.bitwarden.com/"),
+        new Uri("https://notifications.bitwarden.com/"));
 
     public static BitwardenEndpointSet Europe { get; } = new(
         new Uri("https://vault.bitwarden.eu/"),
         new Uri("https://identity.bitwarden.eu/"),
-        new Uri("https://api.bitwarden.eu/"));
+        new Uri("https://api.bitwarden.eu/"),
+        new Uri("https://notifications.bitwarden.eu/"));
 }
 
 public static class BitwardenEndpointPolicy
@@ -20,7 +22,8 @@ public static class BitwardenEndpointPolicy
     public static BitwardenEndpointSet CreateSelfHosted(
         string serverUrl,
         string? identityUrl = null,
-        string? apiUrl = null)
+        string? apiUrl = null,
+        string? notificationsUrl = null)
     {
         var webVault = ValidateBaseAddress(serverUrl, nameof(serverUrl));
         var identity = string.IsNullOrWhiteSpace(identityUrl)
@@ -29,8 +32,11 @@ public static class BitwardenEndpointPolicy
         var api = string.IsNullOrWhiteSpace(apiUrl)
             ? AppendPath(webVault, "api/")
             : ValidateBaseAddress(apiUrl, nameof(apiUrl));
+        var notifications = string.IsNullOrWhiteSpace(notificationsUrl)
+            ? AppendPath(webVault, "notifications/")
+            : ValidateBaseAddress(notificationsUrl, nameof(notificationsUrl));
 
-        return new BitwardenEndpointSet(webVault, identity, api);
+        return new BitwardenEndpointSet(webVault, identity, api, notifications);
     }
 
     public static BitwardenEndpointSet Validate(BitwardenEndpointSet endpoints)
@@ -39,7 +45,10 @@ public static class BitwardenEndpointPolicy
         return new BitwardenEndpointSet(
             ValidateBaseAddress(endpoints.WebVault, nameof(endpoints.WebVault)),
             ValidateBaseAddress(endpoints.Identity, nameof(endpoints.Identity)),
-            ValidateBaseAddress(endpoints.Api, nameof(endpoints.Api)));
+            ValidateBaseAddress(endpoints.Api, nameof(endpoints.Api)),
+            endpoints.Notifications is null
+                ? null
+                : ValidateBaseAddress(endpoints.Notifications, nameof(endpoints.Notifications)));
     }
 
     public static Uri ValidateBaseAddress(string value, string parameterName)

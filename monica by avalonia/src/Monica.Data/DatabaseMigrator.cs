@@ -9,7 +9,7 @@ public interface IDatabaseMigrator
 
 public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory) : IDatabaseMigrator
 {
-    public const int CurrentSchemaVersion = 72;
+    public const int CurrentSchemaVersion = 73;
 
     public async Task MigrateAsync(CancellationToken cancellationToken = default)
     {
@@ -39,6 +39,14 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
         await EnsureColumnAsync(connection, "local_mdbx_databases", "remote_etag", "TEXT DEFAULT NULL", cancellationToken);
         await EnsureColumnAsync(connection, "local_mdbx_databases", "remote_last_modified_at", "INTEGER DEFAULT NULL", cancellationToken);
         await EnsureColumnAsync(connection, "local_mdbx_databases", "remote_account_id", "TEXT DEFAULT NULL", cancellationToken);
+        await EnsureColumnAsync(connection, "bitwarden_vaults", "events_url", "TEXT DEFAULT NULL", cancellationToken);
+        await EnsureColumnAsync(connection, "bitwarden_vaults", "last_full_sync_at", "INTEGER DEFAULT NULL", cancellationToken);
+        await EnsureColumnAsync(connection, "bitwarden_vaults", "last_sync_status", "TEXT NOT NULL DEFAULT 'never'", cancellationToken);
+        await EnsureColumnAsync(connection, "bitwarden_vaults", "last_sync_error", "TEXT DEFAULT NULL", cancellationToken);
+        await EnsureColumnAsync(connection, "bitwarden_vaults", "tls_mode", "TEXT NOT NULL DEFAULT 'system'", cancellationToken);
+        await EnsureColumnAsync(connection, "bitwarden_vaults", "custom_ca_certificate_path", "TEXT DEFAULT NULL", cancellationToken);
+        await EnsureColumnAsync(connection, "bitwarden_vaults", "client_certificate_path", "TEXT DEFAULT NULL", cancellationToken);
+        await EnsureColumnAsync(connection, "bitwarden_vaults", "encrypted_client_certificate_password", "TEXT DEFAULT NULL", cancellationToken);
         await ExecuteAsync(connection, "CREATE INDEX IF NOT EXISTS index_secure_items_bound_password_id ON secure_items(bound_password_id);", cancellationToken);
         await ExecuteAsync(connection, $"PRAGMA user_version={CurrentSchemaVersion};", cancellationToken);
     }
@@ -411,6 +419,7 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
             server_url TEXT NOT NULL DEFAULT 'https://vault.bitwarden.com',
             identity_url TEXT NOT NULL DEFAULT 'https://identity.bitwarden.com',
             api_url TEXT NOT NULL DEFAULT 'https://api.bitwarden.com',
+            events_url TEXT DEFAULT NULL,
             encrypted_access_token TEXT DEFAULT NULL,
             encrypted_refresh_token TEXT DEFAULT NULL,
             access_token_expires_at INTEGER DEFAULT NULL,
@@ -422,7 +431,14 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
             kdf_memory INTEGER DEFAULT NULL,
             kdf_parallelism INTEGER DEFAULT NULL,
             last_sync_at INTEGER DEFAULT NULL,
+            last_full_sync_at INTEGER DEFAULT NULL,
             revision_date TEXT DEFAULT NULL,
+            last_sync_status TEXT NOT NULL DEFAULT 'never',
+            last_sync_error TEXT DEFAULT NULL,
+            tls_mode TEXT NOT NULL DEFAULT 'system',
+            custom_ca_certificate_path TEXT DEFAULT NULL,
+            client_certificate_path TEXT DEFAULT NULL,
+            encrypted_client_certificate_password TEXT DEFAULT NULL,
             is_default INTEGER NOT NULL DEFAULT 0,
             is_locked INTEGER NOT NULL DEFAULT 1,
             is_connected INTEGER NOT NULL DEFAULT 0,

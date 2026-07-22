@@ -4,11 +4,11 @@ Monica's desktop Bitwarden integration follows the Android product behavior whil
 
 ## Layer ownership
 
-`Monica.Core/Bitwarden` owns protocol constants, endpoint validation, KDF policy, key derivation, and CipherString cryptography. It has no HTTP, database, or UI dependencies.
+`Monica.Core/Bitwarden` owns protocol constants, endpoint validation, KDF policy, key derivation, CipherString cryptography, secret containers, and the lock-aware in-memory session lifecycle. It has no HTTP, database, or UI dependencies.
 
-`Monica.Data/Bitwarden` will own encrypted account records, remote folder metadata, pending operations, and conflict backups. Secret columns use Monica's unlocked-vault AEAD envelope with the `vault:v1:` prefix.
+`Monica.Data/Bitwarden` owns encrypted account records. It will also own remote folder metadata, pending operations, and conflict backups. Account PII, tokens, Bitwarden keys, synchronization errors, certificate paths, and certificate passwords use Monica's unlocked-vault AEAD envelope with the `vault:v1:` prefix. Lookup indexes use one-way SHA-256 identifiers instead of plaintext email addresses.
 
-`Monica.Platform/Bitwarden` will own HTTPS requests, certificate policy, token refresh, and the in-memory account session. Locking the Monica vault clears all Bitwarden session keys and tokens.
+`Monica.Platform/Bitwarden` will own HTTPS requests, certificate policy, and token refresh. It consumes short-lived leases from the Core session manager. Locking the Monica vault clears the manager's account copy and every outstanding lease.
 
 `Monica.App/Features/Sync/Bitwarden` will own the WinUI-style account, sign-in, synchronization status, and conflict views. View models depend on service interfaces and never implement protocol cryptography.
 

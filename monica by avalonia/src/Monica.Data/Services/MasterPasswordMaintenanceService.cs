@@ -106,11 +106,18 @@ public sealed class MasterPasswordMaintenanceService(
         new("operation_logs", "id", "changes_json", SecretBucket.OperationLogs, true),
         new("mdbx_remote_sources", "id", "username_encrypted", SecretBucket.RemoteSources, false),
         new("mdbx_remote_sources", "id", "password_encrypted", SecretBucket.RemoteSources, false),
+        new("bitwarden_vaults", "id", "email", SecretBucket.Bitwarden, true),
+        new("bitwarden_vaults", "id", "user_id", SecretBucket.Bitwarden, true),
+        new("bitwarden_vaults", "id", "display_name", SecretBucket.Bitwarden, true),
+        new("bitwarden_vaults", "id", "last_sync_error", SecretBucket.Bitwarden, true),
+        new("bitwarden_vaults", "id", "custom_ca_certificate_path", SecretBucket.Bitwarden, true),
+        new("bitwarden_vaults", "id", "client_certificate_path", SecretBucket.Bitwarden, true),
         new("bitwarden_vaults", "id", "encrypted_access_token", SecretBucket.Bitwarden, false),
         new("bitwarden_vaults", "id", "encrypted_refresh_token", SecretBucket.Bitwarden, false),
         new("bitwarden_vaults", "id", "encrypted_master_key", SecretBucket.Bitwarden, false),
         new("bitwarden_vaults", "id", "encrypted_enc_key", SecretBucket.Bitwarden, false),
-        new("bitwarden_vaults", "id", "encrypted_mac_key", SecretBucket.Bitwarden, false)
+        new("bitwarden_vaults", "id", "encrypted_mac_key", SecretBucket.Bitwarden, false),
+        new("bitwarden_vaults", "id", "encrypted_client_certificate_password", SecretBucket.Bitwarden, false)
     ];
 
     public async Task<MasterPasswordMaintenanceResult> ChangeMasterPasswordAsync(

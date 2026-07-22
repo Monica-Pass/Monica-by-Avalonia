@@ -50,8 +50,8 @@ public sealed class MasterPasswordMaintenanceTests
         Assert.Equal(1, result.PasswordHistoryEntriesReencrypted);
         Assert.Equal(1, result.MdbxSecretsReencrypted);
         Assert.Equal(2, result.RemoteSourceSecretsReencrypted);
-        Assert.Equal(5, result.BitwardenSecretsReencrypted);
-        Assert.Equal(11, result.TotalSecretsReencrypted);
+        Assert.Equal(6, result.BitwardenSecretsReencrypted);
+        Assert.Equal(12, result.TotalSecretsReencrypted);
 
         var loadedCredential = await harness.CredentialStore.GetAsync();
         Assert.NotNull(loadedCredential);
@@ -285,9 +285,9 @@ public sealed class MasterPasswordMaintenanceTests
                 """
                 SELECT encrypted_access_token, encrypted_refresh_token, encrypted_master_key, encrypted_enc_key, encrypted_mac_key
                 FROM bitwarden_vaults
-                WHERE email = $email
+                WHERE account_key = $account_key
                 """;
-            command.Parameters.AddWithValue("$email", "dev@example.com");
+            command.Parameters.AddWithValue("$account_key", "dev@example.com|https://vault.bitwarden.com");
             await using var reader = await command.ExecuteReaderAsync();
             Assert.True(await reader.ReadAsync());
             return new SyncSecrets(
