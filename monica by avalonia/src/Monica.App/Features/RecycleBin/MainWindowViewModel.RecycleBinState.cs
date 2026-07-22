@@ -115,6 +115,8 @@ public sealed partial class MainWindowViewModel
         VaultItemType.Totp => _localization.Totp,
         VaultItemType.BankCard => _localization.BankCard,
         VaultItemType.Document => _localization.Document,
+        VaultItemType.BillingAddress => _localization.BillingAddress,
+        VaultItemType.PaymentAccount => _localization.PaymentAccount,
         VaultItemType.Note => _localization.SecureNotes,
         _ => _localization.Get("SecureItem")
     };

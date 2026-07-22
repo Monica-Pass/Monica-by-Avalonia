@@ -26,6 +26,8 @@ public sealed partial class WalletItemEditorViewModel : ObservableObject
 
         WalletTypeOptions.Add(new(VaultItemType.Document, localization.Get("Document")));
         WalletTypeOptions.Add(new(VaultItemType.BankCard, localization.Get("BankCard")));
+        WalletTypeOptions.Add(new(VaultItemType.BillingAddress, localization.Get("BillingAddress")));
+        WalletTypeOptions.Add(new(VaultItemType.PaymentAccount, localization.Get("PaymentAccount")));
         DocumentTypeOptions.Add(new("ID_CARD", localization.Get("DocumentTypeIdCard")));
         DocumentTypeOptions.Add(new("PASSPORT", localization.Get("DocumentTypePassport")));
         DocumentTypeOptions.Add(new("DRIVER_LICENSE", localization.Get("DocumentTypeDriverLicense")));
@@ -34,6 +36,7 @@ public sealed partial class WalletItemEditorViewModel : ObservableObject
         CardTypeOptions.Add(new("DEBIT", localization.Get("CardTypeDebit")));
         CardTypeOptions.Add(new("CREDIT", localization.Get("CardTypeCredit")));
         CardTypeOptions.Add(new("PREPAID", localization.Get("CardTypePrepaid")));
+        BuildExtendedWalletOptions(localization);
         foreach (var category in PasswordCategoryChoice.BuildOptions(categories ?? [], localization.Get("NoFolder")))
         {
             CategoryOptions.Add(category);
@@ -52,6 +55,14 @@ public sealed partial class WalletItemEditorViewModel : ObservableObject
         Title = source.Title;
         Notes = source.Notes;
         IsFavorite = source.IsFavorite;
+        if (source.ItemType is VaultItemType.BillingAddress or VaultItemType.PaymentAccount)
+        {
+            LoadExtendedWalletSource(source);
+            SelectedCardType = CardTypeOptions[0];
+            SelectedDocumentType = DocumentTypeOptions[0];
+            return;
+        }
+
         if (source.ItemType == VaultItemType.BankCard)
         {
             var data = WalletItemDataCodec.DecodeBankCard(source);
@@ -93,6 +104,8 @@ public sealed partial class WalletItemEditorViewModel : ObservableObject
     public string DialogTitle => _source is null ? L.Get("AddWalletItem") : L.Get("EditWalletItem");
     public bool IsDocument => SelectedWalletType.Value == VaultItemType.Document;
     public bool IsBankCard => SelectedWalletType.Value == VaultItemType.BankCard;
+    public bool IsBillingAddress => SelectedWalletType.Value == VaultItemType.BillingAddress;
+    public bool IsPaymentAccount => SelectedWalletType.Value == VaultItemType.PaymentAccount;
     public VaultItemType ItemType { get; private set; }
 
     [ObservableProperty]
@@ -172,6 +185,8 @@ public sealed partial class WalletItemEditorViewModel : ObservableObject
         ItemType = value.Value;
         OnPropertyChanged(nameof(IsDocument));
         OnPropertyChanged(nameof(IsBankCard));
+        OnPropertyChanged(nameof(IsBillingAddress));
+        OnPropertyChanged(nameof(IsPaymentAccount));
     }
 
     public bool Validate()
@@ -185,6 +200,18 @@ public sealed partial class WalletItemEditorViewModel : ObservableObject
         if (IsBankCard && string.IsNullOrWhiteSpace(CardNumber))
         {
             ValidationMessage = L.Get("CardNumberRequired");
+            return false;
+        }
+
+        if (IsBillingAddress && string.IsNullOrWhiteSpace(StreetAddress))
+        {
+            ValidationMessage = L.Get("StreetAddressRequired");
+            return false;
+        }
+
+        if (IsPaymentAccount && string.IsNullOrWhiteSpace(PaymentProvider))
+        {
+            ValidationMessage = L.Get("PaymentProviderRequired");
             return false;
         }
 
@@ -211,7 +238,11 @@ public sealed partial class WalletItemEditorViewModel : ObservableObject
         item.DeletedAt = null;
         item.SyncStatus = item.BitwardenVaultId is null ? SyncStatus.None : SyncStatus.Pending;
 
-        if (ItemType == VaultItemType.BankCard)
+        if (ItemType is VaultItemType.BillingAddress or VaultItemType.PaymentAccount)
+        {
+            ApplyExtendedWalletData(item);
+        }
+        else if (ItemType == VaultItemType.BankCard)
         {
             var data = new BankCardWalletData
             {
@@ -250,49 +281,6 @@ public sealed partial class WalletItemEditorViewModel : ObservableObject
         return item;
     }
 
-    private string ResolveTitle()
-    {
-        if (!string.IsNullOrWhiteSpace(Title))
-        {
-            return Title.Trim();
-        }
-
-        return ItemType == VaultItemType.BankCard
-            ? string.IsNullOrWhiteSpace(BankName) ? L.Get("BankCard") : BankName.Trim()
-            : SelectedDocumentType.Label;
-    }
-
-    private IReadOnlyList<string> GetImagePaths()
-    {
-        var result = new List<string>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var path in ImagePathsText
-                     .Split(["\r\n", "\n", "\r"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                     .Concat(_hiddenMdbxImagePaths))
-        {
-            if (!string.IsNullOrWhiteSpace(path) && seen.Add(path))
-            {
-                result.Add(path);
-            }
-        }
-
-        return result;
-    }
-
-    private static IReadOnlyList<string> FilterEditableImagePaths(IEnumerable<string> imagePaths) =>
-        imagePaths
-            .Where(path => !string.IsNullOrWhiteSpace(path))
-            .Where(path => !IsMdbxImagePath(path))
-            .ToArray();
-
-    private static IReadOnlyList<string> GetMdbxImagePaths(IEnumerable<string> imagePaths) =>
-        imagePaths
-            .Where(path => !string.IsNullOrWhiteSpace(path))
-            .Where(IsMdbxImagePath)
-            .ToArray();
-
-    private static bool IsMdbxImagePath(string path) =>
-        path.StartsWith("mdbx:", StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed record WalletTypeChoice(VaultItemType Value, string Label);

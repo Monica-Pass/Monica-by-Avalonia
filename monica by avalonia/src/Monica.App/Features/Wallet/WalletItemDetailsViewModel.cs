@@ -84,10 +84,21 @@ public sealed partial class WalletItemDetailsViewModel : ObservableObject, IDisp
         Item = item;
         Title = item.Title;
         Notes = item.Notes;
-        KindText = item.ItemType == VaultItemType.BankCard ? localization.Get("BankCard") : localization.Get("Document");
-        Fields = item.ItemType == VaultItemType.BankCard
-            ? BuildBankCardDetails(localization, item)
-            : BuildDocumentDetails(localization, item);
+        KindText = localization.Get(item.ItemType switch
+        {
+            VaultItemType.BankCard => "BankCard",
+            VaultItemType.Document => "Document",
+            VaultItemType.BillingAddress => "BillingAddress",
+            VaultItemType.PaymentAccount => "PaymentAccount",
+            _ => "Document"
+        });
+        Fields = item.ItemType switch
+        {
+            VaultItemType.BankCard => BuildBankCardDetails(localization, item),
+            VaultItemType.BillingAddress => BuildBillingAddressDetails(localization, item),
+            VaultItemType.PaymentAccount => BuildPaymentAccountDetails(localization, item),
+            _ => BuildDocumentDetails(localization, item)
+        };
         HasImages = ImagePaths.Count > 0;
         FrontImagePath = ImagePaths.Count > 0 ? ImagePaths[0] : "";
         BackImagePath = ImagePaths.Count > 1 ? ImagePaths[1] : "";

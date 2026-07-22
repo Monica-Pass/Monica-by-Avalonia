@@ -4,7 +4,9 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class PasswordEditorViewModel
 {
-    public IReadOnlyList<string> GetPasswordRows() => NormalizePasswordRows(SplitRows(PasswordLines));
+    public IReadOnlyList<string> GetPasswordRows() => IsBarcode
+        ? string.IsNullOrWhiteSpace(PasswordLines) ? [] : [PasswordLines.Trim()]
+        : NormalizePasswordRows(SplitRows(PasswordLines));
 
     public IReadOnlyList<CustomField> GetCustomFields()
     {

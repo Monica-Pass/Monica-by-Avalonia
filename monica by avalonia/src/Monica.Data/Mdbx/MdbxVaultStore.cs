@@ -1390,6 +1390,8 @@ public sealed partial class MdbxVaultStore(IMdbxNativeBridge nativeBridge, ICryp
         VaultItemType.Totp => "totp",
         VaultItemType.BankCard => "card",
         VaultItemType.Document => "document-ref",
+        VaultItemType.BillingAddress => "billing-address",
+        VaultItemType.PaymentAccount => "payment-account",
         _ => "note"
     };
 
@@ -1397,6 +1399,8 @@ public sealed partial class MdbxVaultStore(IMdbxNativeBridge nativeBridge, ICryp
     {
         VaultItemType.Document => WalletItemDataCodec.DecodeDocument(item).ImagePaths,
         VaultItemType.BankCard => WalletItemDataCodec.DecodeBankCard(item).ImagePaths,
+        VaultItemType.BillingAddress => WalletItemDataCodec.DecodeBillingAddress(item).ImagePaths,
+        VaultItemType.PaymentAccount => WalletItemDataCodec.DecodePaymentAccount(item).ImagePaths,
         VaultItemType.Note => NoteContentCodec.DecodeImagePaths(item.ImagePaths),
         _ => WalletItemDataCodec.DecodeImagePaths(item.ImagePaths)
     };

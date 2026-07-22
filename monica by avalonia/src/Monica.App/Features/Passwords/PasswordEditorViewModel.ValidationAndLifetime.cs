@@ -95,7 +95,12 @@ public sealed partial class PasswordEditorViewModel
         }
     }
 
-    partial void OnSelectedLoginTypeChanged(PasswordLoginTypeChoice? value) => ClearCorrectedPasswordValidation();
+    partial void OnSelectedLoginTypeChanged(PasswordLoginTypeChoice? value)
+    {
+        ClearCorrectedPasswordValidation();
+        OnPropertyChanged(nameof(IsBarcode));
+        OnPropertyChanged(nameof(PasswordFieldLabel));
+    }
 
     private void ClearCorrectedPasswordValidation()
     {

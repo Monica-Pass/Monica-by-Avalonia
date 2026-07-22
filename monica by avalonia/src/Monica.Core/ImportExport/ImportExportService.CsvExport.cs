@@ -96,7 +96,8 @@ public sealed partial class ImportExportService
         using var writer = new StringWriter(CultureInfo.InvariantCulture);
         using var csv = new CsvWriter(writer, CreateCsvConfiguration());
         WriteSecureItemHeaders(csv);
-        foreach (var item in secureItems.Where(item => item.ItemType is VaultItemType.BankCard or VaultItemType.Document))
+        foreach (var item in secureItems.Where(item => item.ItemType is VaultItemType.BankCard or VaultItemType.Document or
+                     VaultItemType.BillingAddress or VaultItemType.PaymentAccount))
         {
             var (type, data, imagePaths) = CreateWalletCsvPayload(item);
             WriteSecureItemRow(csv, item, type, data, imagePaths);
@@ -144,6 +145,22 @@ public sealed partial class ImportExportService
             var imagePaths = WalletItemDataCodec.EncodeImagePaths(FilterPortableImagePaths(data.ImagePaths));
             data.ImagePaths.Clear();
             return ("BANK_CARD", WalletItemDataCodec.EncodeBankCard(data), imagePaths);
+        }
+
+        if (item.ItemType == VaultItemType.BillingAddress)
+        {
+            var address = WalletItemDataCodec.DecodeBillingAddress(item);
+            var imagePaths = WalletItemDataCodec.EncodeImagePaths(FilterPortableImagePaths(address.ImagePaths));
+            address.ImagePaths.Clear();
+            return ("BILLING_ADDRESS", WalletItemDataCodec.EncodeBillingAddress(address), imagePaths);
+        }
+
+        if (item.ItemType == VaultItemType.PaymentAccount)
+        {
+            var payment = WalletItemDataCodec.DecodePaymentAccount(item);
+            var imagePaths = WalletItemDataCodec.EncodeImagePaths(FilterPortableImagePaths(payment.ImagePaths));
+            payment.ImagePaths.Clear();
+            return ("PAYMENT_ACCOUNT", WalletItemDataCodec.EncodePaymentAccount(payment), imagePaths);
         }
 
         var document = WalletItemDataCodec.DecodeDocument(item);

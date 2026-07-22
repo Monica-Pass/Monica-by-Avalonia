@@ -9,6 +9,8 @@ public sealed partial class MainWindowViewModel
     {
         VaultItemType.Document => WalletItemDataCodec.DecodeDocument(item).ImagePaths,
         VaultItemType.BankCard => WalletItemDataCodec.DecodeBankCard(item).ImagePaths,
+        VaultItemType.BillingAddress => WalletItemDataCodec.DecodeBillingAddress(item).ImagePaths,
+        VaultItemType.PaymentAccount => WalletItemDataCodec.DecodePaymentAccount(item).ImagePaths,
         VaultItemType.Note => NoteContentCodec.DecodeImagePaths(item.ImagePaths),
         _ => WalletItemDataCodec.DecodeImagePaths(item.ImagePaths)
     };
@@ -40,6 +42,8 @@ public sealed partial class MainWindowViewModel
         {
             VaultItemType.BankCard => "card-image",
             VaultItemType.Document => "document-image",
+            VaultItemType.BillingAddress => "address-image",
+            VaultItemType.PaymentAccount => "payment-image",
             VaultItemType.Note => "note-image",
             _ => "secure-item-image"
         };
@@ -90,6 +94,22 @@ public sealed partial class MainWindowViewModel
             var data = WalletItemDataCodec.DecodeBankCard(item);
             data.ImagePaths = imagePaths.ToList();
             item.ItemData = WalletItemDataCodec.EncodeBankCard(data);
+            return;
+        }
+
+        if (item.ItemType == VaultItemType.BillingAddress)
+        {
+            var data = WalletItemDataCodec.DecodeBillingAddress(item);
+            data.ImagePaths = imagePaths.ToList();
+            item.ItemData = WalletItemDataCodec.EncodeBillingAddress(data);
+            return;
+        }
+
+        if (item.ItemType == VaultItemType.PaymentAccount)
+        {
+            var data = WalletItemDataCodec.DecodePaymentAccount(item);
+            data.ImagePaths = imagePaths.ToList();
+            item.ItemData = WalletItemDataCodec.EncodePaymentAccount(data);
         }
     }
 }

@@ -27,7 +27,7 @@ public sealed partial class MainWindowViewModel
             .Where(_ => includeTotp)
             .Concat(secureItems.Where(item => includeNotes && item.ItemType == VaultItemType.Note))
             .Concat(secureItems.Where(item =>
-                (item.ItemType == VaultItemType.BankCard && includeCards) ||
+                (item.ItemType is VaultItemType.BankCard or VaultItemType.BillingAddress or VaultItemType.PaymentAccount && includeCards) ||
                 (item.ItemType == VaultItemType.Document && includeDocuments)))
             .Where(item => item.Id > 0)
             .Select(item => CloneSecureItemForExport(item, includeCategories, includeImages))

@@ -263,6 +263,7 @@ public static class AndroidMdbxPayloadCodec
         "SSO" => PasswordLoginType.Sso,
         "WIFI" => PasswordLoginType.Wifi,
         "SSH_KEY" or "SSH-KEY" => PasswordLoginType.SshKey,
+        "BARCODE" => PasswordLoginType.Barcode,
         _ => PasswordLoginType.Password
     };
 
@@ -271,6 +272,7 @@ public static class AndroidMdbxPayloadCodec
         PasswordLoginType.Sso => "SSO",
         PasswordLoginType.Wifi => "WIFI",
         PasswordLoginType.SshKey => "SSH_KEY",
+        PasswordLoginType.Barcode => "BARCODE",
         _ => "PASSWORD"
     };
 
@@ -279,6 +281,8 @@ public static class AndroidMdbxPayloadCodec
         VaultItemType.Totp => "totp",
         VaultItemType.BankCard => "bank_card",
         VaultItemType.Document => "document",
+        VaultItemType.BillingAddress => "billing_address",
+        VaultItemType.PaymentAccount => "payment_account",
         _ => "note"
     };
 
@@ -288,6 +292,8 @@ public static class AndroidMdbxPayloadCodec
         "totp" => VaultItemType.Totp,
         "card" => VaultItemType.BankCard,
         "document-ref" => VaultItemType.Document,
+        "billing-address" => VaultItemType.BillingAddress,
+        "payment-account" => VaultItemType.PaymentAccount,
         _ => null
     };
 

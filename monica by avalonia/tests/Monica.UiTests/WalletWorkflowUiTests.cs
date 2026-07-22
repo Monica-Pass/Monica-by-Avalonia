@@ -191,6 +191,21 @@ public sealed class WalletWorkflowUiTests
         Assert.Equal(40, editor.FindControl<Button>("ToggleCardCvvVisibilityButton")!.Width);
     }
 
+    [Fact]
+    public void Wallet_editor_exposes_android_extended_types_as_desktop_panels()
+    {
+        var editor = new WalletItemEditorDialog();
+        var xaml = File.ReadAllText(FindWalletFeatureFile("WalletItemEditorDialog.axaml"));
+        var listXaml = File.ReadAllText(FindWalletFeatureFile("WalletItemListView.axaml"));
+
+        Assert.NotNull(editor.FindControl<StackPanel>("BillingAddressEditorPanel"));
+        Assert.NotNull(editor.FindControl<StackPanel>("PaymentAccountEditorPanel"));
+        Assert.Contains("IsVisible=\"{Binding IsBillingAddress}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding IsPaymentAccount}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("StringConverters.IsBillingAddress", listXaml, StringComparison.Ordinal);
+        Assert.Contains("StringConverters.IsPaymentAccount", listXaml, StringComparison.Ordinal);
+    }
+
     private static string FindWalletFeatureFile(string fileName)
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)

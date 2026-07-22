@@ -48,6 +48,8 @@ public sealed partial class PasswordDetailViewModel : ObservableObject, IDisposa
         Initial = entry.AvatarText;
         PasswordHistoryDescription = localization.Get("PasswordHistoryDescription");
 
+        InitializeBarcodePreview(cryptoService, entry);
+
         foreach (var group in BuildGroups(
             localization,
             cryptoService,
@@ -89,6 +91,19 @@ public sealed partial class PasswordDetailViewModel : ObservableObject, IDisposa
     public string ClearPasswordHistoryLabel => L.Get("ClearPasswordHistory");
     public bool HasPasswordHistory => PasswordHistory.Count > 0;
     public bool HasAttachments => Attachments.Count > 0;
+    public bool IsBarcode => Entry.LoginType == PasswordLoginType.Barcode;
+    public string BarcodePayload { get; private set; } = "";
+    public bool HasBarcodePayload => IsBarcode && !string.IsNullOrWhiteSpace(BarcodePayload);
+    public bool HasBarcodePreview => BarcodeImage is not null;
+    public bool IsQrBarcodeMode => BarcodeMode == BarcodePreviewMode.QrCode;
+    public bool IsCode128BarcodeMode => BarcodeMode == BarcodePreviewMode.Code128;
+    public string BarcodeModeLabel => L.Get("BarcodeRenderMode");
+    public string BarcodeQrLabel => L.Get("BarcodeRenderQr");
+    public string BarcodeCode128Label => L.Get("BarcodeRenderCode128");
+    public string BarcodePayloadLabel => L.Get("BarcodePayload");
+    public string BarcodeRenderFailedLabel => L.Get("BarcodeRenderFailed");
+    public Avalonia.Media.Imaging.Bitmap? BarcodeImage { get; private set; }
+    public BarcodePreviewMode BarcodeMode { get; private set; } = BarcodePreviewMode.QrCode;
     public bool IsSensitiveStateCleared { get; private set; }
     public ObservableCollection<PasswordDetailGroup> Groups { get; } = [];
     public ObservableCollection<PasswordAttachmentItem> Attachments { get; } = [];
@@ -145,6 +160,9 @@ public sealed partial class PasswordDetailViewModel : ObservableObject, IDisposa
         Subtitle = "";
         Initial = "";
         StatusText = "";
+        BarcodePayload = "";
+        BarcodeImage?.Dispose();
+        BarcodeImage = null;
         _addAttachment = null;
         IsAddingAttachment = false;
         _saveAttachment = null;
@@ -158,6 +176,11 @@ public sealed partial class PasswordDetailViewModel : ObservableObject, IDisposa
         OnPropertyChanged(nameof(Initial));
         OnPropertyChanged(nameof(IsSensitiveStateCleared));
         OnPropertyChanged(nameof(HasAttachments));
+        OnPropertyChanged(nameof(IsBarcode));
+        OnPropertyChanged(nameof(BarcodePayload));
+        OnPropertyChanged(nameof(HasBarcodePayload));
+        OnPropertyChanged(nameof(HasBarcodePreview));
+        OnPropertyChanged(nameof(BarcodeImage));
         AddAttachmentCommand.NotifyCanExecuteChanged();
     }
 

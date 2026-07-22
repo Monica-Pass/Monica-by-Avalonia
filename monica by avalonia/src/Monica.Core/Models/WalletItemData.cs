@@ -69,7 +69,7 @@ public sealed class BankCardWalletData
     public string Nickname { get; set; } = "";
 }
 
-public static class WalletItemDataCodec
+public static partial class WalletItemDataCodec
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {

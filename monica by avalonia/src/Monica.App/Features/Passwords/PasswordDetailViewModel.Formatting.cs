@@ -67,6 +67,7 @@ public sealed partial class PasswordDetailViewModel
             PasswordLoginType.Sso => localization.Get("LoginTypeSso"),
             PasswordLoginType.Wifi => localization.Get("LoginTypeWifi"),
             PasswordLoginType.SshKey => localization.Get("LoginTypeSshKey"),
+            PasswordLoginType.Barcode => localization.Get("LoginTypeBarcode"),
             _ => localization.Get("LoginTypePassword")
         };
     }

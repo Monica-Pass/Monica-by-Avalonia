@@ -6,6 +6,8 @@ public enum VaultItemType
     Totp,
     BankCard,
     Document,
+    BillingAddress,
+    PaymentAccount,
     Note
 }
 
@@ -14,7 +16,8 @@ public enum PasswordLoginType
     Password,
     Sso,
     Wifi,
-    SshKey
+    SshKey,
+    Barcode
 }
 
 public enum SyncStatus

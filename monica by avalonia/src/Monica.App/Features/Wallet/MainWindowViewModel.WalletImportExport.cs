@@ -9,7 +9,7 @@ public sealed partial class MainWindowViewModel
 {
     private static readonly PlatformFilePickerFileType[] WalletCsvFileTypes =
     [
-        new("Cards and Documents CSV", ["*.csv"])
+        new("Wallet CSV", ["*.csv"])
     ];
 
     [ObservableProperty]
@@ -38,7 +38,7 @@ public sealed partial class MainWindowViewModel
         ExportWalletCsvPreview = await BuildWalletCsvExportAsync();
         await SaveExportTextAsync(
             _localization.Get("ExportWalletCsv"),
-            $"monica_cards_documents_{DateTimeOffset.Now:yyyyMMdd_HHmmss}.csv",
+            $"monica_wallet_{DateTimeOffset.Now:yyyyMMdd_HHmmss}.csv",
             ExportWalletCsvPreview,
             WalletCsvFileTypes);
     }
@@ -46,7 +46,8 @@ public sealed partial class MainWindowViewModel
     private async Task<string> BuildWalletCsvExportAsync()
     {
         var exportWalletItems = (await _repository.GetSecureItemsAsync())
-            .Where(item => item.ItemType is VaultItemType.BankCard or VaultItemType.Document)
+            .Where(item => item.ItemType is VaultItemType.BankCard or VaultItemType.Document or
+                VaultItemType.BillingAddress or VaultItemType.PaymentAccount)
             .Select(item => CloneSecureItemForExport(item))
             .ToArray();
 

@@ -8,6 +8,58 @@ namespace Monica.Tests;
 
 public sealed class PasswordDetailViewModelTests
 {
+    [Theory]
+    [InlineData(BarcodePreviewMode.QrCode, 900, 900)]
+    [InlineData(BarcodePreviewMode.Code128, 1100, 360)]
+    public void Barcode_preview_encoder_returns_expected_dimensions(BarcodePreviewMode mode, int width, int height)
+    {
+        var pixels = BarcodePreviewRenderer.Encode("desktop-barcode-payload", mode);
+
+        Assert.NotNull(pixels);
+        Assert.Equal(width, pixels!.Width);
+        Assert.Equal(height, pixels.Height);
+        Assert.Contains(pixels.Pixels, pixel => pixel != 0);
+    }
+
+    [Fact]
+    public void Barcode_detail_keeps_payload_copyable_and_releases_preview_on_clear()
+    {
+        var crypto = CreateUnlockedCrypto();
+        var entry = new PasswordEntry
+        {
+            Id = 8,
+            Title = "Recovery barcode",
+            LoginType = PasswordLoginType.Barcode,
+            Password = crypto.EncryptString("line-one\nline-two")
+        };
+        var details = new PasswordDetailViewModel(
+            new LocalizationService(),
+            new CapturingClipboardService(),
+            crypto,
+            new TotpService(),
+            entry,
+            [entry],
+            category: null,
+            boundNote: null,
+            attachments: [],
+            customFields: []);
+
+        Assert.True(details.IsBarcode);
+        Assert.True(details.HasBarcodePayload);
+        Assert.Equal("line-one\nline-two", details.BarcodePayload);
+        Assert.False(details.HasBarcodePreview);
+
+        details.SelectBarcodeModeCommand.Execute(BarcodePreviewMode.Code128);
+        Assert.Equal(BarcodePreviewMode.Code128, details.BarcodeMode);
+        Assert.False(details.HasBarcodePreview);
+
+        details.ClearSensitiveState();
+
+        Assert.Empty(details.BarcodePayload);
+        Assert.False(details.HasBarcodePreview);
+        Assert.True(details.IsSensitiveStateCleared);
+    }
+
     [Fact]
     public void Password_attachment_add_status_is_localized_for_simplified_chinese()
     {

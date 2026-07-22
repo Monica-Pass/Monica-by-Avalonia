@@ -1206,6 +1206,8 @@ public sealed partial class MdbxBackedMonicaRepository(
     {
         VaultItemType.Document => WalletItemDataCodec.DecodeDocument(item).ImagePaths,
         VaultItemType.BankCard => WalletItemDataCodec.DecodeBankCard(item).ImagePaths,
+        VaultItemType.BillingAddress => WalletItemDataCodec.DecodeBillingAddress(item).ImagePaths,
+        VaultItemType.PaymentAccount => WalletItemDataCodec.DecodePaymentAccount(item).ImagePaths,
         VaultItemType.Note => NoteContentCodec.DecodeImagePaths(item.ImagePaths),
         _ => WalletItemDataCodec.DecodeImagePaths(item.ImagePaths)
     };
@@ -1239,6 +1241,22 @@ public sealed partial class MdbxBackedMonicaRepository(
             var data = WalletItemDataCodec.DecodeBankCard(item);
             data.ImagePaths = imagePaths.ToList();
             item.ItemData = WalletItemDataCodec.EncodeBankCard(data);
+            return;
+        }
+
+        if (item.ItemType == VaultItemType.BillingAddress)
+        {
+            var data = WalletItemDataCodec.DecodeBillingAddress(item);
+            data.ImagePaths = imagePaths.ToList();
+            item.ItemData = WalletItemDataCodec.EncodeBillingAddress(data);
+            return;
+        }
+
+        if (item.ItemType == VaultItemType.PaymentAccount)
+        {
+            var data = WalletItemDataCodec.DecodePaymentAccount(item);
+            data.ImagePaths = imagePaths.ToList();
+            item.ItemData = WalletItemDataCodec.EncodePaymentAccount(data);
         }
     }
 
@@ -1247,7 +1265,13 @@ public sealed partial class MdbxBackedMonicaRepository(
         var fileName = Path.GetFileName(imagePath.Replace('\\', Path.DirectorySeparatorChar));
         if (string.IsNullOrWhiteSpace(fileName))
         {
-            fileName = item.ItemType == VaultItemType.BankCard ? "card-image" : "secure-item-image";
+            fileName = item.ItemType switch
+            {
+                VaultItemType.BankCard => "card-image",
+                VaultItemType.BillingAddress => "address-image",
+                VaultItemType.PaymentAccount => "payment-image",
+                _ => "secure-item-image"
+            };
         }
 
         return new Attachment

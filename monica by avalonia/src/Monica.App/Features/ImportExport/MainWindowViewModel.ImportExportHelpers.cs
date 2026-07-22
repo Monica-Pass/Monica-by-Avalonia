@@ -132,6 +132,22 @@ public sealed partial class MainWindowViewModel
             var data = WalletItemDataCodec.DecodeBankCard(item);
             data.ImagePaths.Clear();
             item.ItemData = WalletItemDataCodec.EncodeBankCard(data);
+            return;
+        }
+
+        if (item.ItemType == VaultItemType.BillingAddress)
+        {
+            var data = WalletItemDataCodec.DecodeBillingAddress(item);
+            data.ImagePaths.Clear();
+            item.ItemData = WalletItemDataCodec.EncodeBillingAddress(data);
+            return;
+        }
+
+        if (item.ItemType == VaultItemType.PaymentAccount)
+        {
+            var data = WalletItemDataCodec.DecodePaymentAccount(item);
+            data.ImagePaths.Clear();
+            item.ItemData = WalletItemDataCodec.EncodePaymentAccount(data);
         }
     }
 

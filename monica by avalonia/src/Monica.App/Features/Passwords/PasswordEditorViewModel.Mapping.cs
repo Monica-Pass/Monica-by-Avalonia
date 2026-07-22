@@ -33,6 +33,10 @@ public sealed partial class PasswordEditorViewModel
         entry.SsoProvider = SsoProvider.Trim();
         entry.WifiMetadata = WifiMetadata.Trim();
         entry.LoginType = SelectedLoginType?.Value ?? PasswordLoginType.Password;
+        if (entry.LoginType == PasswordLoginType.Barcode)
+        {
+            ClearBarcodeInapplicableFields(entry);
+        }
         entry.CategoryId = SelectedCategory?.Id;
         entry.BoundNoteId = SelectedBoundNote?.Id;
         var customIconType = NormalizeCustomIconType(SelectedCustomIconType?.Value);
@@ -79,6 +83,18 @@ public sealed partial class PasswordEditorViewModel
     {
         return !string.Equals(source?.CustomIconType ?? "NONE", entry.CustomIconType, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(source?.CustomIconValue ?? "", entry.CustomIconValue ?? "", StringComparison.Ordinal);
+    }
+
+    private static void ClearBarcodeInapplicableFields(PasswordEntry entry)
+    {
+        entry.Website = "";
+        entry.Username = "";
+        entry.AuthenticatorKey = "";
+        entry.PasskeyBindings = "";
+        entry.SsoProvider = "";
+        entry.SsoRefEntryId = null;
+        entry.WifiMetadata = "";
+        entry.SshKeyData = "";
     }
 
     private static PasswordEntry Clone(PasswordEntry source) => source.CreateDetachedCopy();

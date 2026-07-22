@@ -199,6 +199,18 @@ public sealed partial class ImportExportService : IImportExportService
             data.ImagePaths.Clear();
             item.ItemData = WalletItemDataCodec.EncodeBankCard(data);
         }
+        else if (item.ItemType == VaultItemType.BillingAddress)
+        {
+            var data = WalletItemDataCodec.DecodeBillingAddress(item);
+            data.ImagePaths.Clear();
+            item.ItemData = WalletItemDataCodec.EncodeBillingAddress(data);
+        }
+        else if (item.ItemType == VaultItemType.PaymentAccount)
+        {
+            var data = WalletItemDataCodec.DecodePaymentAccount(item);
+            data.ImagePaths.Clear();
+            item.ItemData = WalletItemDataCodec.EncodePaymentAccount(data);
+        }
 
         dto.ItemData = item.ItemData;
         dto.ImagePaths = item.ImagePaths;

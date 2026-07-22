@@ -1,11 +1,40 @@
 using Monica.App.Services;
 using Monica.App.ViewModels;
+using Monica.Core.Models;
 using Monica.Core.Services;
 
 namespace Monica.Tests;
 
 public sealed class PasswordEditorViewModelTests
 {
+    [Fact]
+    public void Barcode_editor_preserves_multiline_payload_as_one_entry_and_clears_login_fields()
+    {
+        var editor = CreateEditor();
+        editor.Title = "Recovery barcode";
+        editor.SelectedLoginType = editor.LoginTypeOptions.Single(option => option.Value == PasswordLoginType.Barcode);
+        editor.PasswordLines = "line-one\nline-two";
+        editor.WebsiteLines = "https://example.test";
+        editor.Username = "user";
+        editor.AuthenticatorKey = "totp-secret";
+        editor.PasskeyBindings = "passkey";
+        editor.WifiMetadata = "wifi";
+        editor.SshKeyData = "ssh";
+
+        var payloads = editor.GetPasswordRows();
+        var entry = Assert.Single(editor.BuildEntries(payloads));
+
+        Assert.Equal("line-one\nline-two", Assert.Single(payloads));
+        Assert.Equal(PasswordLoginType.Barcode, entry.LoginType);
+        Assert.Equal("line-one\nline-two", entry.Password);
+        Assert.Empty(entry.Website);
+        Assert.Empty(entry.Username);
+        Assert.Empty(entry.AuthenticatorKey);
+        Assert.Empty(entry.PasskeyBindings);
+        Assert.Empty(entry.WifiMetadata);
+        Assert.Empty(entry.SshKeyData);
+    }
+
     [Fact]
     public void Password_editor_validation_targets_the_first_invalid_field_and_clears_when_corrected()
     {

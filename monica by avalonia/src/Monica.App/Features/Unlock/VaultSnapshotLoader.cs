@@ -86,7 +86,8 @@ internal static class VaultSnapshotLoader
             .Where(item => item.ItemType == VaultItemType.Note)
             .ToArray();
         var walletItems = activeSecureItems
-            .Where(item => item.ItemType is VaultItemType.BankCard or VaultItemType.Document)
+            .Where(item => item.ItemType is VaultItemType.BankCard or VaultItemType.Document or
+                VaultItemType.BillingAddress or VaultItemType.PaymentAccount)
             .ToArray();
         var storedTotps = activeSecureItems
             .Where(item => item.ItemType == VaultItemType.Totp)

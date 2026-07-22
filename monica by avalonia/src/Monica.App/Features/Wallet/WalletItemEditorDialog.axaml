@@ -138,6 +138,52 @@
                 <TextBox Text="{Binding BillingAddress}" PlaceholderText="{Binding L.BillingAddress}" AcceptsReturn="True" MinHeight="64" TextWrapping="Wrap" />
             </StackPanel>
 
+            <StackPanel x:Name="BillingAddressEditorPanel" Spacing="10" IsVisible="{Binding IsBillingAddress}">
+                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="10">
+                    <TextBox Text="{Binding AddressFullName}" PlaceholderText="{Binding L.FullName}" />
+                    <TextBox Grid.Column="1" Text="{Binding AddressCompany}" PlaceholderText="{Binding L[Company]}" />
+                    <TextBox Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding StreetAddress}" PlaceholderText="{Binding L[StreetAddress]}" />
+                    <TextBox Grid.Row="2" Text="{Binding AddressApartment}" PlaceholderText="{Binding L[Apartment]}" />
+                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding AddressCity}" PlaceholderText="{Binding L.City}" />
+                </Grid>
+                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="10">
+                    <TextBox Text="{Binding AddressStateProvince}" PlaceholderText="{Binding L[StateProvince]}" />
+                    <TextBox Grid.Column="1" Text="{Binding AddressPostalCode}" PlaceholderText="{Binding L[PostalCode]}" />
+                    <TextBox Grid.Row="1" Text="{Binding AddressCountry}" PlaceholderText="{Binding L.Country}" />
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding AddressPhone}" PlaceholderText="{Binding L.Phone}" />
+                    <TextBox Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding AddressEmail}" PlaceholderText="{Binding L.Email}" />
+                </Grid>
+                <CheckBox Content="{Binding L[DefaultPaymentAddress]}" IsChecked="{Binding AddressIsDefault}" />
+            </StackPanel>
+
+            <StackPanel x:Name="PaymentAccountEditorPanel" Spacing="10" IsVisible="{Binding IsPaymentAccount}">
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <ComboBox ItemsSource="{Binding PaymentTypeOptions}" SelectedItem="{Binding SelectedPaymentType}">
+                        <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:WalletChoice"><TextBlock Text="{Binding Label}" /></DataTemplate></ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <TextBox Grid.Column="1" Text="{Binding PaymentProvider}" PlaceholderText="{Binding L[PaymentProvider]}" />
+                </Grid>
+                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="10">
+                    <TextBox Text="{Binding PaymentAccountName}" PlaceholderText="{Binding L[AccountName]}" />
+                    <TextBox Grid.Column="1" Text="{Binding PaymentAccountHolderName}" PlaceholderText="{Binding L[AccountHolderName]}" />
+                    <TextBox Grid.Row="1" Text="{Binding PaymentEmail}" PlaceholderText="{Binding L.Email}" />
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding PaymentPhone}" PlaceholderText="{Binding L.Phone}" />
+                    <TextBox Grid.Row="2" Text="{Binding PaymentUsername}" PlaceholderText="{Binding L.Username}" />
+                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding PaymentAccountId}" PlaceholderText="{Binding L[AccountId]}" />
+                </Grid>
+                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="10">
+                    <TextBox Text="{Binding PaymentMaskedAccountNumber}" PlaceholderText="{Binding L[MaskedAccountNumber]}" />
+                    <TextBox Grid.Column="1" Text="{Binding PaymentLinkedCardLast4}" PlaceholderText="{Binding L[LinkedCardLast4]}" />
+                    <TextBox Grid.Row="1" Text="{Binding PaymentRoutingNumber}" PlaceholderText="{Binding L[RoutingNumber]}" />
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding PaymentIban}" PlaceholderText="{Binding L[Iban]}" />
+                    <TextBox Grid.Row="2" Text="{Binding PaymentSwiftBic}" PlaceholderText="{Binding L[SwiftBic]}" />
+                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding PaymentCurrency}" PlaceholderText="{Binding L[Currency]}" />
+                </Grid>
+                <TextBox Text="{Binding PaymentBillingAddress}" PlaceholderText="{Binding L.BillingAddress}" AcceptsReturn="True" MinHeight="64" TextWrapping="Wrap" />
+                <TextBox Text="{Binding PaymentWebsite}" PlaceholderText="{Binding L.Website}" />
+                <CheckBox Content="{Binding L[DefaultPaymentAddress]}" IsChecked="{Binding PaymentIsDefault}" />
+            </StackPanel>
+
             <TextBox Text="{Binding ImagePathsText}" PlaceholderText="{Binding L.ImagePathsWatermark}" AcceptsReturn="True" MinHeight="72" TextWrapping="Wrap" />
             <TextBlock Text="{Binding L.ImagePathsDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" TextWrapping="Wrap" />
             <TextBox Text="{Binding Notes}" PlaceholderText="{Binding L.Notes}" AcceptsReturn="True" MinHeight="72" TextWrapping="Wrap" />

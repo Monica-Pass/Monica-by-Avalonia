@@ -73,6 +73,7 @@ public sealed partial class PasswordEditorViewModel : ObservableObject, IDisposa
         LoginTypeOptions.Add(new PasswordLoginTypeChoice(PasswordLoginType.Sso, localization.Get("LoginTypeSso")));
         LoginTypeOptions.Add(new PasswordLoginTypeChoice(PasswordLoginType.Wifi, localization.Get("LoginTypeWifi")));
         LoginTypeOptions.Add(new PasswordLoginTypeChoice(PasswordLoginType.SshKey, localization.Get("LoginTypeSshKey")));
+        LoginTypeOptions.Add(new PasswordLoginTypeChoice(PasswordLoginType.Barcode, localization.Get("LoginTypeBarcode")));
         SelectedLoginType = LoginTypeOptions.FirstOrDefault(item => item.Value == source?.LoginType) ?? LoginTypeOptions[0];
         CustomIconTypeOptions.Add(new CustomIconTypeChoice("NONE", localization.Get("CustomIconUseDefault")));
         CustomIconTypeOptions.Add(new CustomIconTypeChoice("SIMPLE_ICON", localization.Get("CustomIconSimple")));
@@ -86,6 +87,8 @@ public sealed partial class PasswordEditorViewModel : ObservableObject, IDisposa
     public ILocalizationService L { get; }
     public PasswordEntry? Source { get; private set; }
     public bool IsNew { get; }
+    public bool IsBarcode => SelectedLoginType?.Value == PasswordLoginType.Barcode;
+    public string PasswordFieldLabel => L.Get(IsBarcode ? "BarcodePayload" : "Password");
     public ObservableCollection<PasswordCategoryChoice> CategoryOptions { get; } = [];
     public ObservableCollection<PasswordLoginTypeChoice> LoginTypeOptions { get; } = [];
     public ObservableCollection<BoundNoteChoice> BoundNoteOptions { get; } = [];

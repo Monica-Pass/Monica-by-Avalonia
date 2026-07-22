@@ -63,6 +63,8 @@
                                         <Grid>
                                             <ic:FluentIcon Icon="WalletCreditCard" FontSize="18" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsBankCard}}" />
                                             <ic:FluentIcon Icon="Document" FontSize="18" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsDocument}}" />
+                                            <ic:FluentIcon Icon="Home" FontSize="18" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsBillingAddress}}" />
+                                            <ic:FluentIcon Icon="Money" FontSize="18" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsPaymentAccount}}" />
                                         </Grid>
                                     </Border>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center" MinWidth="0" Spacing="3">
@@ -72,6 +74,8 @@
                                             <Grid>
                                                 <TextBlock Text="{Binding #Root.DataContext.L.BankCard}" FontSize="12" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsBankCard}}" />
                                                 <TextBlock Text="{Binding #Root.DataContext.L.Document}" FontSize="12" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsDocument}}" />
+                                                <TextBlock Text="{Binding #Root.DataContext.L.BillingAddress}" FontSize="12" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsBillingAddress}}" />
+                                                <TextBlock Text="{Binding #Root.DataContext.L.PaymentAccount}" FontSize="12" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsPaymentAccount}}" />
                                             </Grid>
                                         </Border>
                                     </StackPanel>

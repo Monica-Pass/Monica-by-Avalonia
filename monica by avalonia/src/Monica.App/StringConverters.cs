@@ -12,6 +12,8 @@ public static class StringConverters
     public static IValueConverter IsCards { get; } = new SectionConverter("Cards");
     public static IValueConverter IsBankCard { get; } = new SectionConverter("BankCard");
     public static IValueConverter IsDocument { get; } = new SectionConverter("Document");
+    public static IValueConverter IsBillingAddress { get; } = new SectionConverter("BillingAddress");
+    public static IValueConverter IsPaymentAccount { get; } = new SectionConverter("PaymentAccount");
     public static IValueConverter IsNotes { get; } = new SectionConverter("Notes");
     public static IValueConverter IsGenerator { get; } = new SectionConverter("Generator");
     public static IValueConverter IsArchive { get; } = new SectionConverter("Archive");

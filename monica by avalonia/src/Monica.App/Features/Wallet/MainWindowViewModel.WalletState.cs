@@ -44,9 +44,13 @@ public sealed partial class MainWindowViewModel
             return true;
         }
 
-        return item.ItemType == VaultItemType.BankCard
-            ? MatchesBankCardSearch(item, term)
-            : MatchesDocumentSearch(item, term);
+        return item.ItemType switch
+        {
+            VaultItemType.BankCard => MatchesBankCardSearch(item, term),
+            VaultItemType.BillingAddress => MatchesBillingAddressSearch(item, term),
+            VaultItemType.PaymentAccount => MatchesPaymentAccountSearch(item, term),
+            _ => MatchesDocumentSearch(item, term)
+        };
     }
 
     private static bool MatchesBankCardSearch(SecureItem item, string term)
@@ -75,6 +79,45 @@ public sealed partial class MainWindowViewModel
             data.IssuedBy,
             data.Nationality,
             data.AdditionalInfo);
+    }
+
+    private static bool MatchesBillingAddressSearch(SecureItem item, string term)
+    {
+        var data = WalletItemDataCodec.DecodeBillingAddress(item);
+        return ContainsAny(
+            term,
+            item.Title,
+            item.Notes,
+            data.FullName,
+            data.Company,
+            data.StreetAddress,
+            data.City,
+            data.StateProvince,
+            data.PostalCode,
+            data.Country,
+            data.Phone,
+            data.Email);
+    }
+
+    private static bool MatchesPaymentAccountSearch(SecureItem item, string term)
+    {
+        var data = WalletItemDataCodec.DecodePaymentAccount(item);
+        return ContainsAny(
+            term,
+            item.Title,
+            item.Notes,
+            data.Provider,
+            data.AccountName,
+            data.AccountHolderName,
+            data.Email,
+            data.Phone,
+            data.Username,
+            data.AccountId,
+            data.MaskedAccountNumber,
+            data.Iban,
+            data.SwiftBic,
+            data.Website,
+            data.Currency);
     }
 
     private void TrackWalletSelection(SecureItem item)
