@@ -174,7 +174,9 @@ public partial class App : Application
         services.AddSingleton<IFileSystemPickerService>(_ => new AvaloniaFileSystemPickerService(
             () => mainWindow,
             _.GetRequiredService<IPlatformIntegrationService>()));
-        services.AddSingleton<IBrowserBridgeService, CapabilityOnlyBrowserBridgeService>();
+        services.AddSingleton<IBrowserBridgeService>(provider => OperatingSystem.IsWindows()
+            ? new WindowsBrowserBridgeService(provider.GetRequiredService<IPlatformIntegrationService>())
+            : new CapabilityOnlyBrowserBridgeService(provider.GetRequiredService<IPlatformIntegrationService>()));
         services.AddSingleton<INativePasskeyService, CapabilityOnlyNativePasskeyService>();
         services.AddSingleton<ITrayService>(provider => OperatingSystem.IsWindows()
             ? new AvaloniaTrayService(
@@ -241,7 +243,8 @@ public partial class App : Application
         services.AddSingleton(provider => new DesktopIntegrationCoordinator(
             mainWindow,
             provider.GetRequiredService<ITrayService>(),
-            provider.GetRequiredService<IGlobalHotkeyService>()));
+            provider.GetRequiredService<IGlobalHotkeyService>(),
+            provider.GetRequiredService<IBrowserBridgeService>()));
         configureOverrides?.Invoke(services);
         return services.BuildServiceProvider();
     }

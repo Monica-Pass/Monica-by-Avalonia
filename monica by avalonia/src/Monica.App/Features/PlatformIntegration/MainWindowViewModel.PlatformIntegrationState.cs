@@ -144,10 +144,31 @@ public sealed partial class MainWindowViewModel
         var baseStatus = string.IsNullOrWhiteSpace(capability.UnsupportedReason)
             ? status
             : $"{status}: {capability.UnsupportedReason}";
-        return string.Equals(key, PlatformFeatureKeys.GlobalHotkey, StringComparison.OrdinalIgnoreCase) &&
-               !string.IsNullOrWhiteSpace(GlobalHotkeyRegistrationError)
-            ? $"{baseStatus} — {GlobalHotkeyRegistrationError}"
-            : baseStatus;
+        if (string.Equals(key, PlatformFeatureKeys.GlobalHotkey, StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(GlobalHotkeyRegistrationError))
+        {
+            return $"{baseStatus} — {GlobalHotkeyRegistrationError}";
+        }
+
+        if (string.Equals(key, PlatformFeatureKeys.BrowserBridge, StringComparison.OrdinalIgnoreCase))
+        {
+            if (!string.IsNullOrWhiteSpace(BrowserBridgeRuntimeError))
+            {
+                return $"{baseStatus} — {BrowserBridgeRuntimeError}";
+            }
+
+            if (BrowserBridgeIsRunning)
+            {
+                return $"{baseStatus} — {_localization.Format("BrowserBridgeListeningFormat", BrowserIntegrationPort)}";
+            }
+
+            if (BrowserIntegrationEnabled && !IsUnlocked)
+            {
+                return $"{baseStatus} — {_localization.Get("BrowserBridgeUnlockRequired")}";
+            }
+        }
+
+        return baseStatus;
     }
 
     private PlatformIntegrationCapability GetPlatformIntegration(string key) =>

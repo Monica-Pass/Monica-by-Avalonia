@@ -379,6 +379,8 @@ public interface ILocalizationService : INotifyPropertyChanged
     string BrowserIntegrationDescription { get; }
     string BrowserIntegrationPort { get; }
     string BrowserIntegrationPortDescription { get; }
+    string BrowserBridgeSessionToken { get; }
+    string BrowserBridgeSessionTokenDescription { get; }
     string CompactPasswordList { get; }
     string CompactPasswordListDescription { get; }
     string SyncSubtitle { get; }
@@ -870,6 +872,8 @@ public sealed class LocalizationService : ILocalizationService
     public string BrowserIntegrationDescription => Text();
     public string BrowserIntegrationPort => Text();
     public string BrowserIntegrationPortDescription => Text();
+    public string BrowserBridgeSessionToken => Text();
+    public string BrowserBridgeSessionTokenDescription => Text();
     public string CompactPasswordList => Text();
     public string CompactPasswordListDescription => Text();
     public string SyncSubtitle => Text();
@@ -1688,12 +1692,17 @@ public sealed class LocalizationService : ILocalizationService
         ["BrowserIntegrationDescription"] = "Expose a local bridge endpoint for browser extension integration.",
         ["BrowserIntegrationPort"] = "Local bridge port",
         ["BrowserIntegrationPortDescription"] = "Local TCP port used by the desktop browser bridge.",
+        ["BrowserBridgeSessionToken"] = "Session access token",
+        ["BrowserBridgeSessionTokenDescription"] = "Temporary token required by the browser extension. Locking Monica revokes it.",
+        ["BrowserBridgeListeningFormat"] = "Listening securely on 127.0.0.1:{0}",
+        ["BrowserBridgeUnlockRequired"] = "Unlock the vault to start the bridge",
+        ["BrowserBridgeTokenCopied"] = "Browser bridge token copied",
         ["CompactPasswordList"] = "Compact password list",
         ["CompactPasswordListDescription"] = "Use denser password rows for scanning large vaults.",
         ["PlatformIntegrations"] = "Platform integrations",
         ["PlatformIntegrationsDescriptionFormat"] = "{0}: {1}/{2} desktop integrations available or mapped.",
         ["Integration.browser-bridge.Title"] = "Browser bridge",
-        ["Integration.browser-bridge.Description"] = "Authenticated local browser bridge adapter is planned and currently unavailable.",
+        ["Integration.browser-bridge.Description"] = "Authenticated loopback bridge for origin-scoped browser extension credential queries.",
         ["Integration.external-links.Title"] = "External links",
         ["Integration.external-links.Description"] = "Open project, help and account links through the desktop shell.",
         ["Integration.file-picker.Title"] = "File picker",
@@ -2937,12 +2946,17 @@ public sealed class LocalizationService : ILocalizationService
         ["BrowserIntegrationDescription"] = "启用桌面端给浏览器扩展使用的本地桥接服务。",
         ["BrowserIntegrationPort"] = "本地桥接端口",
         ["BrowserIntegrationPortDescription"] = "浏览器桥接服务监听的本地端口。",
+        ["BrowserBridgeSessionToken"] = "会话访问令牌",
+        ["BrowserBridgeSessionTokenDescription"] = "浏览器扩展必须提供此临时令牌；锁定 Monica 后令牌立即失效。",
+        ["BrowserBridgeListeningFormat"] = "正在安全监听 127.0.0.1:{0}",
+        ["BrowserBridgeUnlockRequired"] = "解锁保险库后启动桥接服务",
+        ["BrowserBridgeTokenCopied"] = "浏览器桥接令牌已复制",
         ["CompactPasswordList"] = "紧凑密码列表",
         ["CompactPasswordListDescription"] = "让密码列表显示得更紧凑，适合小窗口和高密度浏览。",
         ["PlatformIntegrations"] = "平台集成",
         ["PlatformIntegrationsDescriptionFormat"] = "{0}：{1}/{2} 个桌面集成可用或已有等价能力。",
         ["Integration.browser-bridge.Title"] = "浏览器桥接",
-        ["Integration.browser-bridge.Description"] = "经过身份验证的本地浏览器桥接适配器仍在开发，当前无法启用。",
+        ["Integration.browser-bridge.Description"] = "通过身份验证的回环桥接服务，仅向浏览器扩展提供与目标域名匹配的凭据。",
         ["Integration.external-links.Title"] = "外部链接",
         ["Integration.external-links.Description"] = "通过桌面 shell 打开项目、帮助和账户链接。",
         ["Integration.file-picker.Title"] = "文件选择器",

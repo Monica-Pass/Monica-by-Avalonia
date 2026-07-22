@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Monica Autofill Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main>
+    <h1>Monica Autofill</h1>
+    <form id="settings-form">
+      <label for="port">Local bridge port</label>
+      <input id="port" name="port" type="number" min="1024" max="65535" required>
+      <label for="token">Session access token</label>
+      <input id="token" name="token" type="password" minlength="43" autocomplete="off" required>
+      <div class="actions">
+        <button type="submit">Save and test</button>
+      </div>
+      <output id="status" role="status" aria-live="polite"></output>
+    </form>
+  </main>
+  <script src="options.js"></script>
+</body>
+</html>

@@ -53,23 +53,26 @@ public sealed class DesktopIntegrationUiTests
     }
 
     [Fact]
-    public void Desktop_settings_disable_empty_browser_bridge_capability()
+    public void Desktop_settings_enable_operational_browser_bridge_capability()
     {
         var capability = new PlatformIntegrationService().GetCapability(PlatformFeatureKeys.BrowserBridge);
 
-        Assert.Equal(Monica.Core.Models.PlatformFeatureStatus.PlatformLimited, capability.Status);
-        Assert.False(capability.IsUsable);
+        Assert.Equal(Monica.Core.Models.PlatformFeatureStatus.Available, capability.Status);
+        Assert.True(capability.IsUsable);
     }
 
     [Fact]
-    public void Minimize_to_tray_hides_window_and_explicit_exit_closes_it()
+    public async Task Minimize_to_tray_hides_window_and_explicit_exit_closes_it()
     {
         var window = new Monica.App.MainWindow();
         using var services = Monica.App.App.ConfigureServices(window);
         var viewModel = services.GetRequiredService<MainWindowViewModel>();
         window.DataContext = viewModel;
-        viewModel.MinimizeToTray = true;
         window.Show();
+        await Task.Delay(150, TestContext.Current.CancellationToken);
+        Dispatcher.UIThread.RunJobs();
+        viewModel.MinimizeToTray = true;
+        Assert.True(viewModel.MinimizeToTray);
 
         window.Close();
         Dispatcher.UIThread.RunJobs();
@@ -84,6 +87,52 @@ public sealed class DesktopIntegrationUiTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.False(window.IsVisible);
+    }
+
+    [Fact]
+    public async Task Browser_bridge_follows_enable_unlock_and_lock_lifecycle()
+    {
+        var bridge = new RecordingBrowserBridgeService();
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window, collection =>
+            collection.AddSingleton<IBrowserBridgeService>(bridge));
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        var coordinator = services.GetRequiredService<DesktopIntegrationCoordinator>();
+        coordinator.Initialize(viewModel);
+
+        viewModel.BrowserIntegrationEnabled = true;
+        viewModel.IsUnlocked = true;
+
+        Assert.True(bridge.IsRunning);
+        Assert.True(viewModel.BrowserBridgeIsRunning);
+        Assert.Equal("test-session-token", viewModel.BrowserIntegrationSessionToken);
+
+        viewModel.IsUnlocked = false;
+
+        Assert.False(bridge.IsRunning);
+        Assert.False(viewModel.BrowserBridgeIsRunning);
+        Assert.Empty(viewModel.BrowserIntegrationSessionToken);
+
+        viewModel.IsUnlocked = true;
+        viewModel.BrowserIntegrationPort = 50123;
+        await PumpDebounceAsync();
+
+        Assert.Equal(50123, bridge.Port);
+    }
+
+    [Theory]
+    [InlineData("https://example.com", "example.com", true)]
+    [InlineData("https://example.com", "accounts.example.com", true)]
+    [InlineData("example.com", "example.com", true)]
+    [InlineData("https://accounts.example.com", "example.com", false)]
+    [InlineData("https://example.com", "example.com.attacker.test", false)]
+    [InlineData("androidapp://com.example.app", "example.com", false)]
+    public void Browser_credential_matcher_uses_strict_domain_boundaries(
+        string storedWebsite,
+        string requestedHost,
+        bool expected)
+    {
+        Assert.Equal(expected, BrowserCredentialMatcher.EntryMatchesHost(storedWebsite, requestedHost));
     }
 
     private static async Task PumpDebounceAsync()
@@ -126,5 +175,32 @@ public sealed class DesktopIntegrationUiTests
         }
 
         public void Dispose() => Unregister();
+    }
+
+    private sealed class RecordingBrowserBridgeService : IBrowserBridgeService
+    {
+        public PlatformIntegrationCapability Capability { get; } =
+            PlatformIntegrationService.Available(PlatformFeatureKeys.BrowserBridge, "Test bridge");
+        public bool IsRunning { get; private set; }
+        public int Port { get; private set; }
+        public string SessionToken { get; private set; } = "";
+        public string LastError { get; private set; } = "";
+
+        public bool TryStart(int port, Func<Uri, CancellationToken, Task<IReadOnlyList<BrowserBridgeCredential>>> queryCredentials)
+        {
+            IsRunning = true;
+            Port = port;
+            SessionToken = "test-session-token";
+            return true;
+        }
+
+        public void Stop()
+        {
+            IsRunning = false;
+            Port = 0;
+            SessionToken = "";
+        }
+
+        public void Dispose() => Stop();
     }
 }

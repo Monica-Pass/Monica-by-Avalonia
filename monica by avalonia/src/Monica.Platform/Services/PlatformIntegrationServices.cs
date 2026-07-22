@@ -53,10 +53,18 @@ public interface IFileSystemPickerService
     Task<string?> SaveBinaryFileAsync(string title, string suggestedFileName, ReadOnlyMemory<byte> content, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default);
 }
 
-public interface IBrowserBridgeService
+public interface IBrowserBridgeService : IDisposable
 {
     PlatformIntegrationCapability Capability { get; }
+    bool IsRunning { get; }
+    int Port { get; }
+    string SessionToken { get; }
+    string LastError { get; }
+    bool TryStart(int port, Func<Uri, CancellationToken, Task<IReadOnlyList<BrowserBridgeCredential>>> queryCredentials);
+    void Stop();
 }
+
+public sealed record BrowserBridgeCredential(long Id, string Title, string Username, string Password, string Website);
 
 public interface INativePasskeyService
 {
@@ -142,7 +150,7 @@ public sealed class PlatformIntegrationService : IPlatformIntegrationService
                 Available(PlatformFeatureKeys.SecretProtection, "Windows secret protection will use a DPAPI-backed adapter."),
                 Available(PlatformFeatureKeys.Tray, "Windows tray integration is available for desktop builds."),
                 Available(PlatformFeatureKeys.GlobalHotkey, "Windows global hotkeys can be registered by a platform adapter."),
-                PlatformLimited(PlatformFeatureKeys.BrowserBridge, "The authenticated local browser bridge adapter is not implemented yet."),
+                Available(PlatformFeatureKeys.BrowserBridge, "An authenticated loopback browser bridge is available for Windows desktop builds."),
                 Available(PlatformFeatureKeys.ExternalLinks, "External links can be opened through the Windows shell."),
                 PlatformLimited(PlatformFeatureKeys.NativePasskey, "Full Windows credential-provider integration requires a dedicated native adapter."),
                 DesktopEquivalent(PlatformFeatureKeys.NativeNotification, "Desktop notifications can replace Android notification features."),
@@ -247,6 +255,13 @@ public sealed class CapabilityOnlyFileSystemPickerService(IPlatformIntegrationSe
 public sealed class CapabilityOnlyBrowserBridgeService(IPlatformIntegrationService platformIntegrationService) : IBrowserBridgeService
 {
     public PlatformIntegrationCapability Capability => platformIntegrationService.GetCapability(PlatformFeatureKeys.BrowserBridge);
+    public bool IsRunning => false;
+    public int Port => 0;
+    public string SessionToken => "";
+    public string LastError => Capability.UnsupportedReason ?? "Browser integration is unavailable.";
+    public bool TryStart(int port, Func<Uri, CancellationToken, Task<IReadOnlyList<BrowserBridgeCredential>>> queryCredentials) => false;
+    public void Stop() { }
+    public void Dispose() { }
 }
 
 public sealed class CapabilityOnlyNativePasskeyService(IPlatformIntegrationService platformIntegrationService) : INativePasskeyService

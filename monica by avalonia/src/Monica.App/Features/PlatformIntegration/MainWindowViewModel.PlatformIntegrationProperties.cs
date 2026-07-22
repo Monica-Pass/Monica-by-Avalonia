@@ -52,5 +52,24 @@ public sealed partial class MainWindowViewModel
     [NotifyPropertyChangedFor(nameof(GlobalHotkeyIntegrationStatusText))]
     private string _globalHotkeyRegistrationError = "";
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(BrowserBridgeIntegrationStatusText))]
+    private bool _browserBridgeIsRunning;
+
+    [ObservableProperty]
+    private string _browserIntegrationSessionToken = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(BrowserBridgeIntegrationStatusText))]
+    private string _browserBridgeRuntimeError = "";
+
     internal void SetGlobalHotkeyRegistrationError(string error) => GlobalHotkeyRegistrationError = error;
+
+    internal void SetBrowserBridgeRuntimeState(bool isRunning, string sessionToken, string error)
+    {
+        BrowserBridgeIsRunning = isRunning;
+        BrowserIntegrationSessionToken = sessionToken;
+        BrowserBridgeRuntimeError = error;
+        CopyBrowserIntegrationTokenCommand.NotifyCanExecuteChanged();
+    }
 }

@@ -9,10 +9,15 @@ namespace Monica.App.Services;
 internal sealed class DesktopIntegrationCoordinator(
     MainWindow window,
     ITrayService trayService,
-    IGlobalHotkeyService globalHotkeyService) : IDisposable
+    IGlobalHotkeyService globalHotkeyService,
+    IBrowserBridgeService browserBridgeService) : IDisposable
 {
     private MainWindowViewModel? _viewModel;
     private readonly DispatcherTimer _hotkeyRegistrationTimer = new()
+    {
+        Interval = TimeSpan.FromMilliseconds(350)
+    };
+    private readonly DispatcherTimer _browserRegistrationTimer = new()
     {
         Interval = TimeSpan.FromMilliseconds(350)
     };
@@ -26,6 +31,7 @@ internal sealed class DesktopIntegrationCoordinator(
 
         _viewModel = viewModel;
         _hotkeyRegistrationTimer.Tick += HotkeyRegistrationTimer_OnTick;
+        _browserRegistrationTimer.Tick += BrowserRegistrationTimer_OnTick;
         trayService.Initialize(
             ShowWindow,
             () => Dispatcher.UIThread.Post(LockVault),
@@ -33,6 +39,7 @@ internal sealed class DesktopIntegrationCoordinator(
         viewModel.PropertyChanged += ViewModel_OnPropertyChanged;
         ApplyTraySetting();
         ApplyGlobalHotkeySetting();
+        ApplyBrowserBridgeSetting();
     }
 
     public void Dispose()
@@ -45,6 +52,9 @@ internal sealed class DesktopIntegrationCoordinator(
 
         _hotkeyRegistrationTimer.Stop();
         _hotkeyRegistrationTimer.Tick -= HotkeyRegistrationTimer_OnTick;
+        _browserRegistrationTimer.Stop();
+        _browserRegistrationTimer.Tick -= BrowserRegistrationTimer_OnTick;
+        browserBridgeService.Dispose();
         globalHotkeyService.Dispose();
         trayService.Dispose();
     }
@@ -60,6 +70,16 @@ internal sealed class DesktopIntegrationCoordinator(
         {
             _hotkeyRegistrationTimer.Stop();
             _hotkeyRegistrationTimer.Start();
+        }
+        else if (e.PropertyName is nameof(MainWindowViewModel.BrowserIntegrationEnabled) or
+                 nameof(MainWindowViewModel.BrowserIntegrationPort))
+        {
+            _browserRegistrationTimer.Stop();
+            _browserRegistrationTimer.Start();
+        }
+        else if (e.PropertyName == nameof(MainWindowViewModel.IsUnlocked))
+        {
+            ApplyBrowserBridgeSetting();
         }
     }
 
@@ -91,6 +111,49 @@ internal sealed class DesktopIntegrationCoordinator(
     {
         _hotkeyRegistrationTimer.Stop();
         ApplyGlobalHotkeySetting();
+    }
+
+    private void BrowserRegistrationTimer_OnTick(object? sender, EventArgs e)
+    {
+        _browserRegistrationTimer.Stop();
+        ApplyBrowserBridgeSetting();
+    }
+
+    private void ApplyBrowserBridgeSetting()
+    {
+        var viewModel = _viewModel;
+        browserBridgeService.Stop();
+        if (viewModel is null || !viewModel.BrowserIntegrationEnabled || !viewModel.IsUnlocked)
+        {
+            viewModel?.SetBrowserBridgeRuntimeState(false, "", "");
+            return;
+        }
+
+        if (browserBridgeService.TryStart(viewModel.BrowserIntegrationPort, QueryBrowserCredentialsAsync))
+        {
+            viewModel.SetBrowserBridgeRuntimeState(true, browserBridgeService.SessionToken, "");
+        }
+        else
+        {
+            viewModel.SetBrowserBridgeRuntimeState(false, "", browserBridgeService.LastError);
+        }
+    }
+
+    private async Task<IReadOnlyList<BrowserBridgeCredential>> QueryBrowserCredentialsAsync(
+        Uri origin,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var operation = Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            var viewModel = _viewModel;
+            return viewModel is { IsUnlocked: true }
+                ? BrowserCredentialMatcher.Match(viewModel.Passwords, origin)
+                : [];
+        });
+        var credentials = await operation;
+        cancellationToken.ThrowIfCancellationRequested();
+        return credentials;
     }
 
     private void ShowWindow() => Dispatcher.UIThread.Post(window.ShowFromDesktopIntegration);

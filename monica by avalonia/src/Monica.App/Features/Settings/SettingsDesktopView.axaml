@@ -37,6 +37,14 @@
                     <NumericUpDown MinWidth="180" Minimum="1024" Maximum="65535" Increment="1" Value="{Binding BrowserIntegrationPort}" IsEnabled="{Binding CanUseBrowserBridgeIntegration}" ToolTip.Tip="{Binding BrowserBridgeIntegrationStatusText}" AutomationProperties.Name="{Binding L.BrowserIntegrationPort}" />
                 </fa:FASettingsExpanderItem.Footer>
             </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding L.BrowserBridgeSessionToken}" Description="{Binding L.BrowserBridgeSessionTokenDescription}" IsVisible="{Binding BrowserBridgeIsRunning}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" MaxWidth="420">
+                        <TextBox Grid.Column="0" MinWidth="260" Text="{Binding BrowserIntegrationSessionToken}" IsReadOnly="True" PasswordChar="●" AutomationProperties.Name="{Binding L.BrowserBridgeSessionToken}" />
+                        <Button Grid.Column="1" Command="{Binding CopyBrowserIntegrationTokenCommand}" Content="{Binding L.Copy}" ToolTip.Tip="{Binding L.Copy}" />
+                    </Grid>
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
             <fa:FASettingsExpanderItem Content="{Binding L.CompactPasswordList}" Description="{Binding L.CompactPasswordListDescription}">
                 <fa:FASettingsExpanderItem.Footer>
                     <ToggleSwitch IsChecked="{Binding CompactPasswordList}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
