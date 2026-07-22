@@ -16,6 +16,7 @@ using Monica.Data.Mdbx;
 using Monica.Data.Repositories;
 using Monica.Data.Services;
 using Monica.Platform.Services;
+using Monica.Platform.Bitwarden;
 
 namespace Monica.App;
 
@@ -171,6 +172,8 @@ public partial class App : Application
         services.AddSingleton<IBitwardenPendingOperationStore, BitwardenPendingOperationStore>();
         services.AddSingleton<IBitwardenMutationProcessor, BitwardenMutationProcessor>();
         services.AddSingleton<IBitwardenSessionManager, BitwardenSessionManager>();
+        services.AddSingleton<IBitwardenHttpClientFactory, BitwardenHttpClientFactory>();
+        services.AddSingleton<IBitwardenAuthenticationService, BitwardenAuthenticationService>();
         services.AddSingleton<IVaultDataProtector, VaultDataProtector>();
         services.AddSingleton<ITotpService, TotpService>();
         services.AddSingleton<IPasswordGeneratorService, PasswordGeneratorService>();

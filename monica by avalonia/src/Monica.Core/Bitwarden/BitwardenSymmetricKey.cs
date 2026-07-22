@@ -29,6 +29,12 @@ public sealed class BitwardenSymmetricKey : IDisposable
     internal ReadOnlySpan<byte> MacKey =>
         _macKey ?? throw new ObjectDisposedException(nameof(BitwardenSymmetricKey));
 
+    public byte[] CopyEncryptionKey() =>
+        (_encryptionKey ?? throw new ObjectDisposedException(nameof(BitwardenSymmetricKey))).ToArray();
+
+    public byte[] CopyMacKey() =>
+        (_macKey ?? throw new ObjectDisposedException(nameof(BitwardenSymmetricKey))).ToArray();
+
     public void Dispose()
     {
         if (_encryptionKey is not null)
