@@ -132,7 +132,14 @@ public sealed partial class BitwardenPendingOperationStore(
               AND status = 'pending'
               AND next_attempt_at <= @Now
               AND attempt_count < @MaximumAttempts
-            ORDER BY next_attempt_at ASC, id ASC
+            ORDER BY CASE operation_type
+                         WHEN 'delete' THEN 0
+                         WHEN 'create' THEN 1
+                         WHEN 'update' THEN 2
+                         ELSE 3
+                     END,
+                     next_attempt_at ASC,
+                     id ASC
             LIMIT @Limit
             """,
             new
@@ -167,7 +174,7 @@ public sealed partial class BitwardenPendingOperationStore(
         var rows = claimedIds.Count == 0
             ? []
             : (await connection.QueryAsync<PendingOperationRow>(new CommandDefinition(
-                SelectSql + " WHERE id IN @Ids ORDER BY next_attempt_at ASC, id ASC",
+                SelectSql + " WHERE id IN @Ids ORDER BY CASE operation_type WHEN 'delete' THEN 0 WHEN 'create' THEN 1 WHEN 'update' THEN 2 ELSE 3 END, next_attempt_at ASC, id ASC",
                 new { Ids = claimedIds },
                 transaction,
                 cancellationToken: cancellationToken))).ToList();

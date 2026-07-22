@@ -10,6 +10,38 @@ namespace Monica.Tests;
 public sealed class BitwardenPendingOperationTests
 {
     [Fact]
+    public async Task ClaimsDeletesThenCreatesThenUpdates()
+    {
+        var harness = await CreateHarnessAsync();
+        var now = new DateTimeOffset(2026, 7, 22, 7, 0, 0, TimeSpan.Zero);
+        var operations = new[]
+        {
+            Operation(harness.VaultId, "update-item", "{}", now),
+            Operation(harness.VaultId, "create-item", "{}", now) with
+            {
+                OperationType = BitwardenMutationOperationType.Create,
+                ExpectedRemoteRevision = null,
+                IdempotencyKey = $"{harness.VaultId}:create:create-item"
+            },
+            Operation(harness.VaultId, "delete-item", "{}", now) with
+            {
+                OperationType = BitwardenMutationOperationType.Delete,
+                IdempotencyKey = $"{harness.VaultId}:delete:delete-item"
+            }
+        };
+        foreach (var operation in operations)
+        {
+            await harness.Store.EnqueueAsync(operation);
+        }
+
+        var claimed = await harness.Store.ClaimReadyAsync(harness.VaultId, now);
+
+        Assert.Equal(
+            [BitwardenMutationOperationType.Delete, BitwardenMutationOperationType.Create, BitwardenMutationOperationType.Update],
+            claimed.Select(operation => operation.OperationType));
+    }
+
+    [Fact]
     public async Task QueueEncryptsCoalescesClaimsAndStopsOnConflict()
     {
         var harness = await CreateHarnessAsync();
