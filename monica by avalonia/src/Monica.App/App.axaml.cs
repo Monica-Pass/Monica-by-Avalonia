@@ -177,7 +177,9 @@ public partial class App : Application
         services.AddSingleton<IBrowserBridgeService>(provider => OperatingSystem.IsWindows()
             ? new WindowsBrowserBridgeService(provider.GetRequiredService<IPlatformIntegrationService>())
             : new CapabilityOnlyBrowserBridgeService(provider.GetRequiredService<IPlatformIntegrationService>()));
-        services.AddSingleton<INativePasskeyService, CapabilityOnlyNativePasskeyService>();
+        services.AddSingleton<INativePasskeyService>(provider => OperatingSystem.IsWindows()
+            ? new WindowsNativePasskeyService(provider.GetRequiredService<IPlatformIntegrationService>())
+            : new CapabilityOnlyNativePasskeyService(provider.GetRequiredService<IPlatformIntegrationService>()));
         services.AddSingleton<ITrayService>(provider => OperatingSystem.IsWindows()
             ? new AvaloniaTrayService(
                 provider.GetRequiredService<IPlatformIntegrationService>(),

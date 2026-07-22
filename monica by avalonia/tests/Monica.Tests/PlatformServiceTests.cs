@@ -398,6 +398,45 @@ public sealed partial class PlatformServiceTests
     }
 
     [Fact]
+    public void Windows_native_passkey_service_reports_client_api_without_claiming_provider_registration()
+    {
+        var integration = new PlatformIntegrationService(
+            "Windows",
+            [PlatformIntegrationService.PlatformLimited(PlatformFeatureKeys.NativePasskey, "Credential provider unavailable.")]);
+        var service = new WindowsNativePasskeyService(integration);
+
+        Assert.False(service.Support.CanActAsWindowsCredentialProvider);
+        Assert.Contains("credential-provider", service.Support.StatusReason, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(PlatformFeatureStatus.PlatformLimited, service.Capability.Status);
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.True(service.Support.IsWebAuthnClientApiAvailable);
+            Assert.True(service.Support.WebAuthnApiVersion > 0);
+        }
+        else
+        {
+            Assert.False(service.Support.IsWebAuthnClientApiAvailable);
+            Assert.Equal(0u, service.Support.WebAuthnApiVersion);
+        }
+    }
+
+    [Fact]
+    public void Windows_platform_catalog_keeps_native_passkey_provider_platform_limited()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var capability = new PlatformIntegrationService().GetCapability(PlatformFeatureKeys.NativePasskey);
+
+        Assert.Equal(PlatformFeatureStatus.PlatformLimited, capability.Status);
+        Assert.False(capability.IsUsable);
+        Assert.Contains("WebAuthn client API availability is probed on demand", capability.UnsupportedReason, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("not a packaged system credential provider", capability.UnsupportedReason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Unsupported_secret_protector_throws_platform_reason()
     {
         var integration = new PlatformIntegrationService(

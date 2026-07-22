@@ -69,6 +69,7 @@ public sealed record BrowserBridgeCredential(long Id, string Title, string Usern
 public interface INativePasskeyService
 {
     PlatformIntegrationCapability Capability { get; }
+    NativePasskeySupport Support { get; }
 }
 
 public interface ITrayService : IDisposable
@@ -152,7 +153,7 @@ public sealed class PlatformIntegrationService : IPlatformIntegrationService
                 Available(PlatformFeatureKeys.GlobalHotkey, "Windows global hotkeys can be registered by a platform adapter."),
                 Available(PlatformFeatureKeys.BrowserBridge, "An authenticated loopback browser bridge is available for Windows desktop builds."),
                 Available(PlatformFeatureKeys.ExternalLinks, "External links can be opened through the Windows shell."),
-                PlatformLimited(PlatformFeatureKeys.NativePasskey, "Full Windows credential-provider integration requires a dedicated native adapter."),
+                WindowsNativePasskeyService.CreateCapability(),
                 DesktopEquivalent(PlatformFeatureKeys.NativeNotification, "Desktop notifications can replace Android notification features."),
                 Available(PlatformFeatureKeys.WindowSecurity, "Window-level security features can be mapped to Windows shell behavior.")
             ];
@@ -267,6 +268,7 @@ public sealed class CapabilityOnlyBrowserBridgeService(IPlatformIntegrationServi
 public sealed class CapabilityOnlyNativePasskeyService(IPlatformIntegrationService platformIntegrationService) : INativePasskeyService
 {
     public PlatformIntegrationCapability Capability => platformIntegrationService.GetCapability(PlatformFeatureKeys.NativePasskey);
+    public NativePasskeySupport Support => NativePasskeySupport.Unavailable(Capability.UnsupportedReason ?? "Native passkey integration is unavailable on this platform.");
 }
 
 public sealed class CapabilityOnlyTrayService(IPlatformIntegrationService platformIntegrationService) : ITrayService
