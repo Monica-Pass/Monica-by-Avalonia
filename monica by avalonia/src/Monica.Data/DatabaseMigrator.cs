@@ -9,7 +9,7 @@ public interface IDatabaseMigrator
 
 public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory) : IDatabaseMigrator
 {
-    public const int CurrentSchemaVersion = 73;
+    public const int CurrentSchemaVersion = 74;
 
     public async Task MigrateAsync(CancellationToken cancellationToken = default)
     {
@@ -35,6 +35,11 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
         await CreateCurrentSchemaAsync(connection, cancellationToken);
         await EnsurePasswordQuickAccessTableWithoutForeignKeyAsync(connection, cancellationToken);
         await EnsureColumnAsync(connection, "categories", "mdbx_folder_id", "TEXT DEFAULT NULL", cancellationToken);
+        await EnsureColumnAsync(connection, "categories", "parent_category_id", "INTEGER DEFAULT NULL", cancellationToken);
+        await EnsureColumnAsync(connection, "categories", "bitwarden_vault_id", "INTEGER DEFAULT NULL", cancellationToken);
+        await EnsureColumnAsync(connection, "categories", "bitwarden_folder_id", "TEXT DEFAULT NULL", cancellationToken);
+        await EnsureColumnAsync(connection, "categories", "bitwarden_parent_folder_id", "TEXT DEFAULT NULL", cancellationToken);
+        await EnsureColumnAsync(connection, "categories", "bitwarden_local_modified", "INTEGER NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(connection, "secure_items", "bound_password_id", "INTEGER DEFAULT NULL", cancellationToken);
         await EnsureColumnAsync(connection, "local_mdbx_databases", "remote_etag", "TEXT DEFAULT NULL", cancellationToken);
         await EnsureColumnAsync(connection, "local_mdbx_databases", "remote_last_modified_at", "INTEGER DEFAULT NULL", cancellationToken);
@@ -164,9 +169,16 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
             name TEXT NOT NULL,
             sort_order INTEGER NOT NULL DEFAULT 0,
             mdbx_database_id INTEGER DEFAULT NULL,
-            mdbx_folder_id TEXT DEFAULT NULL
+            mdbx_folder_id TEXT DEFAULT NULL,
+            parent_category_id INTEGER DEFAULT NULL,
+            bitwarden_vault_id INTEGER DEFAULT NULL,
+            bitwarden_folder_id TEXT DEFAULT NULL,
+            bitwarden_parent_folder_id TEXT DEFAULT NULL,
+            bitwarden_local_modified INTEGER NOT NULL DEFAULT 0
         );
         """,
+        "CREATE INDEX IF NOT EXISTS index_categories_parent ON categories(parent_category_id);",
+        "CREATE UNIQUE INDEX IF NOT EXISTS index_categories_bitwarden_folder ON categories(bitwarden_vault_id, bitwarden_folder_id) WHERE bitwarden_vault_id IS NOT NULL AND bitwarden_folder_id IS NOT NULL;",
         """
         CREATE TABLE IF NOT EXISTS password_entries (
             id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -449,6 +461,40 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
         """,
         "CREATE UNIQUE INDEX IF NOT EXISTS index_bitwarden_vaults_account_key ON bitwarden_vaults(account_key);",
         "CREATE INDEX IF NOT EXISTS index_bitwarden_vaults_canonical_email ON bitwarden_vaults(canonical_email);",
+        """
+        CREATE TABLE IF NOT EXISTS bitwarden_remote_folders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            bitwarden_vault_id INTEGER NOT NULL,
+            remote_folder_id TEXT NOT NULL,
+            encrypted_name TEXT NOT NULL,
+            parent_remote_folder_id TEXT DEFAULT NULL,
+            local_category_id INTEGER DEFAULT NULL,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            last_seen_at INTEGER NOT NULL,
+            sync_marker TEXT NOT NULL,
+            FOREIGN KEY(bitwarden_vault_id) REFERENCES bitwarden_vaults(id) ON DELETE CASCADE,
+            FOREIGN KEY(local_category_id) REFERENCES categories(id) ON DELETE SET NULL
+        );
+        """,
+        "CREATE UNIQUE INDEX IF NOT EXISTS index_bitwarden_remote_folders_identity ON bitwarden_remote_folders(bitwarden_vault_id, remote_folder_id);",
+        "CREATE INDEX IF NOT EXISTS index_bitwarden_remote_folders_parent ON bitwarden_remote_folders(bitwarden_vault_id, parent_remote_folder_id);",
+        """
+        CREATE TABLE IF NOT EXISTS bitwarden_conflict_backups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            bitwarden_vault_id INTEGER NOT NULL,
+            cipher_id TEXT NOT NULL,
+            item_kind TEXT NOT NULL,
+            local_item_id INTEGER NOT NULL,
+            local_revision_date TEXT DEFAULT NULL,
+            remote_revision_date TEXT DEFAULT NULL,
+            encrypted_payload_json TEXT NOT NULL,
+            reason TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            resolved_at INTEGER DEFAULT NULL,
+            FOREIGN KEY(bitwarden_vault_id) REFERENCES bitwarden_vaults(id) ON DELETE CASCADE
+        );
+        """,
+        "CREATE INDEX IF NOT EXISTS index_bitwarden_conflict_backups_unresolved ON bitwarden_conflict_backups(bitwarden_vault_id, resolved_at, created_at);",
         """
         CREATE TABLE IF NOT EXISTS attachments (
             id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,

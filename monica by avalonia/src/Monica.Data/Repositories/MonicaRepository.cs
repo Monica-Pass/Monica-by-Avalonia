@@ -31,6 +31,18 @@ public interface IMonicaRepository
     Task DeleteAttachmentAsync(long id, CancellationToken cancellationToken = default);
     Task DeleteAttachmentAsync(long id, Attachment attachment, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PasswordHistoryEntry>> GetPasswordHistoryAsync(long entryId, CancellationToken cancellationToken = default);
+    async Task<IReadOnlyDictionary<long, IReadOnlyList<PasswordHistoryEntry>>> GetPasswordHistoryByEntryIdsAsync(
+        IReadOnlyList<long> entryIds,
+        CancellationToken cancellationToken = default)
+    {
+        var result = new Dictionary<long, IReadOnlyList<PasswordHistoryEntry>>();
+        foreach (var entryId in entryIds.Distinct())
+        {
+            result[entryId] = await GetPasswordHistoryAsync(entryId, cancellationToken);
+        }
+
+        return result;
+    }
     Task<long> SavePasswordHistoryAsync(PasswordHistoryEntry entry, CancellationToken cancellationToken = default);
     Task TrimPasswordHistoryAsync(long entryId, int limit, CancellationToken cancellationToken = default);
     Task DeletePasswordHistoryAsync(long id, CancellationToken cancellationToken = default);
@@ -445,6 +457,37 @@ public sealed partial class MonicaRepository(
         return rows.Select(ToModel).Select(entry => _vaultDataProtector.Unprotect(entry)).ToList();
     }
 
+    public async Task<IReadOnlyDictionary<long, IReadOnlyList<PasswordHistoryEntry>>> GetPasswordHistoryByEntryIdsAsync(
+        IReadOnlyList<long> entryIds,
+        CancellationToken cancellationToken = default)
+    {
+        var distinctIds = entryIds.Where(id => id > 0).Distinct().ToArray();
+        if (distinctIds.Length == 0)
+        {
+            return new Dictionary<long, IReadOnlyList<PasswordHistoryEntry>>();
+        }
+
+        await migrator.MigrateAsync(cancellationToken);
+        await using var connection = connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<PasswordHistoryEntryRow>(
+            new CommandDefinition(
+                """
+                SELECT id, entry_id, password, last_used_at
+                FROM password_history_entries
+                WHERE entry_id IN @EntryIds
+                ORDER BY entry_id ASC, last_used_at DESC, id DESC
+                """,
+                new { EntryIds = distinctIds },
+                cancellationToken: cancellationToken));
+        return rows
+            .Select(ToModel)
+            .Select(entry => _vaultDataProtector.Unprotect(entry))
+            .GroupBy(entry => entry.EntryId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<PasswordHistoryEntry>)group.ToList());
+    }
+
     public async Task<long> SavePasswordHistoryAsync(PasswordHistoryEntry entry, CancellationToken cancellationToken = default)
     {
         await migrator.MigrateAsync(cancellationToken);
@@ -732,8 +775,20 @@ public sealed partial class MonicaRepository(
     {
         await migrator.MigrateAsync(cancellationToken);
         await using var connection = connectionFactory.CreateConnection();
-        var rows = await connection.QueryAsync<CategoryRow>("SELECT id, name, sort_order, mdbx_database_id, mdbx_folder_id FROM categories ORDER BY sort_order ASC, name ASC");
-        return rows.Select(row => new Category { Id = row.Id, Name = row.Name, SortOrder = row.SortOrder, MdbxDatabaseId = row.MdbxDatabaseId, MdbxFolderId = row.MdbxFolderId }).ToList();
+        var rows = await connection.QueryAsync<CategoryRow>("SELECT id, name, sort_order, mdbx_database_id, mdbx_folder_id, parent_category_id, bitwarden_vault_id, bitwarden_folder_id, bitwarden_parent_folder_id, bitwarden_local_modified FROM categories ORDER BY sort_order ASC, name ASC");
+        return rows.Select(row => new Category
+        {
+            Id = row.Id,
+            Name = row.Name,
+            SortOrder = row.SortOrder,
+            MdbxDatabaseId = row.MdbxDatabaseId,
+            MdbxFolderId = row.MdbxFolderId,
+            ParentCategoryId = row.ParentCategoryId,
+            BitwardenVaultId = row.BitwardenVaultId,
+            BitwardenFolderId = row.BitwardenFolderId,
+            BitwardenParentFolderId = row.BitwardenParentFolderId,
+            BitwardenLocalModified = row.BitwardenLocalModified
+        }).ToList();
     }
 
     public async Task<long> SaveCategoryAsync(Category category, CancellationToken cancellationToken = default)
@@ -743,14 +798,37 @@ public sealed partial class MonicaRepository(
         if (category.Id == 0)
         {
             category.Id = await connection.ExecuteScalarAsync<long>(
-                "INSERT INTO categories(name, sort_order, mdbx_database_id, mdbx_folder_id) VALUES(@Name, @SortOrder, @MdbxDatabaseId, @MdbxFolderId); SELECT last_insert_rowid();",
-                new { category.Name, category.SortOrder, category.MdbxDatabaseId, category.MdbxFolderId });
+                "INSERT INTO categories(name, sort_order, mdbx_database_id, mdbx_folder_id, parent_category_id, bitwarden_vault_id, bitwarden_folder_id, bitwarden_parent_folder_id, bitwarden_local_modified) VALUES(@Name, @SortOrder, @MdbxDatabaseId, @MdbxFolderId, @ParentCategoryId, @BitwardenVaultId, @BitwardenFolderId, @BitwardenParentFolderId, @BitwardenLocalModified); SELECT last_insert_rowid();",
+                new
+                {
+                    category.Name,
+                    category.SortOrder,
+                    category.MdbxDatabaseId,
+                    category.MdbxFolderId,
+                    category.ParentCategoryId,
+                    category.BitwardenVaultId,
+                    category.BitwardenFolderId,
+                    category.BitwardenParentFolderId,
+                    category.BitwardenLocalModified
+                });
         }
         else
         {
             await connection.ExecuteAsync(
-                "UPDATE categories SET name=@Name, sort_order=@SortOrder, mdbx_database_id=@MdbxDatabaseId, mdbx_folder_id=@MdbxFolderId WHERE id=@Id",
-                new { category.Id, category.Name, category.SortOrder, category.MdbxDatabaseId, category.MdbxFolderId });
+                "UPDATE categories SET name=@Name, sort_order=@SortOrder, mdbx_database_id=@MdbxDatabaseId, mdbx_folder_id=@MdbxFolderId, parent_category_id=@ParentCategoryId, bitwarden_vault_id=@BitwardenVaultId, bitwarden_folder_id=@BitwardenFolderId, bitwarden_parent_folder_id=@BitwardenParentFolderId, bitwarden_local_modified=@BitwardenLocalModified WHERE id=@Id",
+                new
+                {
+                    category.Id,
+                    category.Name,
+                    category.SortOrder,
+                    category.MdbxDatabaseId,
+                    category.MdbxFolderId,
+                    category.ParentCategoryId,
+                    category.BitwardenVaultId,
+                    category.BitwardenFolderId,
+                    category.BitwardenParentFolderId,
+                    category.BitwardenLocalModified
+                });
         }
 
         return category.Id;
@@ -1544,6 +1622,11 @@ public sealed partial class MonicaRepository(
         public int SortOrder { get; init; }
         public long? MdbxDatabaseId { get; init; }
         public string? MdbxFolderId { get; init; }
+        public long? ParentCategoryId { get; init; }
+        public long? BitwardenVaultId { get; init; }
+        public string? BitwardenFolderId { get; init; }
+        public string? BitwardenParentFolderId { get; init; }
+        public bool BitwardenLocalModified { get; init; }
     }
 
     private sealed class MdbxDatabaseRow

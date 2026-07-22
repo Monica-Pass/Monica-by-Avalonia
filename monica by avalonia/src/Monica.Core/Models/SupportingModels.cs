@@ -7,6 +7,11 @@ public sealed class Category
     public int SortOrder { get; set; }
     public long? MdbxDatabaseId { get; set; }
     public string? MdbxFolderId { get; set; }
+    public long? ParentCategoryId { get; set; }
+    public long? BitwardenVaultId { get; set; }
+    public string? BitwardenFolderId { get; set; }
+    public string? BitwardenParentFolderId { get; set; }
+    public bool BitwardenLocalModified { get; set; }
 }
 
 public sealed class OperationLog
