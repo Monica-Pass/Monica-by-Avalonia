@@ -119,7 +119,9 @@ public sealed class MasterPasswordMaintenanceService(
         new("bitwarden_vaults", "id", "encrypted_mac_key", SecretBucket.Bitwarden, false),
         new("bitwarden_vaults", "id", "encrypted_client_certificate_password", SecretBucket.Bitwarden, false),
         new("bitwarden_remote_folders", "id", "encrypted_name", SecretBucket.Bitwarden, false),
-        new("bitwarden_conflict_backups", "id", "encrypted_payload_json", SecretBucket.Bitwarden, false)
+        new("bitwarden_conflict_backups", "id", "encrypted_payload_json", SecretBucket.Bitwarden, false),
+        new("bitwarden_pending_operations", "id", "encrypted_payload_json", SecretBucket.Bitwarden, false),
+        new("bitwarden_pending_operations", "id", "encrypted_last_error", SecretBucket.Bitwarden, false)
     ];
 
     public async Task<MasterPasswordMaintenanceResult> ChangeMasterPasswordAsync(

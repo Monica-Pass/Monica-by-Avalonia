@@ -168,6 +168,8 @@ public partial class App : Application
         services.AddSingleton<IBitwardenRemoteFolderStore, BitwardenRemoteFolderStore>();
         services.AddSingleton<IBitwardenConflictBackupStore, BitwardenConflictBackupStore>();
         services.AddSingleton<IBitwardenPullMergeService, BitwardenPullMergeService>();
+        services.AddSingleton<IBitwardenPendingOperationStore, BitwardenPendingOperationStore>();
+        services.AddSingleton<IBitwardenMutationProcessor, BitwardenMutationProcessor>();
         services.AddSingleton<IBitwardenSessionManager, BitwardenSessionManager>();
         services.AddSingleton<IVaultDataProtector, VaultDataProtector>();
         services.AddSingleton<ITotpService, TotpService>();

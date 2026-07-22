@@ -9,7 +9,7 @@ public interface IDatabaseMigrator
 
 public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory) : IDatabaseMigrator
 {
-    public const int CurrentSchemaVersion = 74;
+    public const int CurrentSchemaVersion = 75;
 
     public async Task MigrateAsync(CancellationToken cancellationToken = default)
     {
@@ -495,6 +495,28 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
         );
         """,
         "CREATE INDEX IF NOT EXISTS index_bitwarden_conflict_backups_unresolved ON bitwarden_conflict_backups(bitwarden_vault_id, resolved_at, created_at);",
+        """
+        CREATE TABLE IF NOT EXISTS bitwarden_pending_operations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            bitwarden_vault_id INTEGER NOT NULL,
+            cipher_id TEXT NOT NULL,
+            operation_type TEXT NOT NULL,
+            expected_remote_revision TEXT DEFAULT NULL,
+            encrypted_payload_json TEXT DEFAULT NULL,
+            idempotency_key TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            failure_class TEXT NOT NULL DEFAULT 'none',
+            attempt_count INTEGER NOT NULL DEFAULT 0,
+            next_attempt_at INTEGER NOT NULL,
+            claimed_at INTEGER DEFAULT NULL,
+            encrypted_last_error TEXT DEFAULT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            FOREIGN KEY(bitwarden_vault_id) REFERENCES bitwarden_vaults(id) ON DELETE CASCADE
+        );
+        """,
+        "CREATE UNIQUE INDEX IF NOT EXISTS index_bitwarden_pending_operations_idempotency ON bitwarden_pending_operations(idempotency_key);",
+        "CREATE INDEX IF NOT EXISTS index_bitwarden_pending_operations_ready ON bitwarden_pending_operations(bitwarden_vault_id, status, next_attempt_at, id);",
         """
         CREATE TABLE IF NOT EXISTS attachments (
             id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
