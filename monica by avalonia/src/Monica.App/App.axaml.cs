@@ -174,6 +174,8 @@ public partial class App : Application
         services.AddSingleton<IBitwardenSessionManager, BitwardenSessionManager>();
         services.AddSingleton<IBitwardenHttpClientFactory, BitwardenHttpClientFactory>();
         services.AddSingleton<IBitwardenAuthenticationService, BitwardenAuthenticationService>();
+        services.AddSingleton<IBitwardenSyncTransport, BitwardenSyncTransport>();
+        services.AddSingleton<IBitwardenMutationTransportFactory, BitwardenMutationTransportFactory>();
         services.AddSingleton<IVaultDataProtector, VaultDataProtector>();
         services.AddSingleton<ITotpService, TotpService>();
         services.AddSingleton<IPasswordGeneratorService, PasswordGeneratorService>();
