@@ -3,7 +3,10 @@ using Monica.Core.Models;
 using Monica.Core.Services;
 using Monica.Data;
 using Monica.Data.Diagnostics;
+using Monica.Data.Mdbx;
 using Monica.Data.Repositories;
+using Monica.App.Services;
+using Monica.Platform.Services;
 using System;
 using System.IO;
 using System.Text.Json;
@@ -202,7 +205,40 @@ class Program
                 return 4;
             }
 
-            var repository = new MonicaRepository(factory, migrator);
+            var sqliteRepository = new MonicaRepository(factory, migrator);
+            var legacyBusinessDataInspector = new LegacyBusinessDataInspector(factory, migrator);
+            var legacyBusinessData = await legacyBusinessDataInspector.InspectAsync();
+            if (legacyBusinessData.HasData)
+            {
+                Console.Error.WriteLine(
+                    "Smoke vault seeding requires a clean SQLite business-data database. " +
+                    "Use a new MONICA_APPDATA_DIR instead of mixing synthetic data with legacy rows.");
+                return 5;
+            }
+
+            var nativeBridge = new MdbxUniffiNativeBridge();
+            if (!nativeBridge.IsAvailable)
+            {
+                Console.Error.WriteLine("Native MDBX is unavailable; canonical smoke data was not seeded.");
+                return 6;
+            }
+
+            var bootstrap = new CanonicalVaultBootstrapService(
+                sqliteRepository,
+                new MdbxVaultService(nativeBridge: nativeBridge),
+                legacyBusinessDataInspector,
+                new SmokeCanonicalVaultPathProvider(databasePath));
+            await bootstrap.EnsureReadyAsync();
+
+            using var vaultSession = new VaultSessionService();
+            vaultSession.MarkUnlocked();
+            using var mdbxVaultStore = new MdbxVaultStore(
+                nativeBridge,
+                crypto,
+                vaultSession);
+            IMonicaRepository repository = new MdbxBackedMonicaRepository(
+                sqliteRepository,
+                mdbxVaultStore);
             if ((await repository.GetPasswordsAsync()).Any(item => item.Title.StartsWith("Smoke ", StringComparison.Ordinal)))
             {
                 await EnsureSmokeH04DataAsync(repository, crypto);
@@ -416,7 +452,7 @@ class Program
         }
     }
 
-    private static async Task EnsureSmokeH04DataAsync(MonicaRepository repository, CryptoService crypto)
+    private static async Task EnsureSmokeH04DataAsync(IMonicaRepository repository, CryptoService crypto)
     {
         var allPasswords = await repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true);
         if (allPasswords.All(item => !string.Equals(item.Title, "Smoke Archived Account", StringComparison.Ordinal)))
@@ -514,7 +550,7 @@ class Program
         }
     }
 
-    private static async Task EnsureSmokeEdgeCaseDataAsync(MonicaRepository repository, CryptoService crypto)
+    private static async Task EnsureSmokeEdgeCaseDataAsync(IMonicaRepository repository, CryptoService crypto)
     {
         var categories = (await repository.GetCategoriesAsync()).ToList();
         await EnsureSmokeCategoryAsync(
@@ -633,7 +669,7 @@ class Program
     }
 
     private static async Task<Category> EnsureSmokeCategoryAsync(
-        MonicaRepository repository,
+        IMonicaRepository repository,
         List<Category> categories,
         string name,
         int sortOrder)
@@ -652,5 +688,19 @@ class Program
         await repository.SaveCategoryAsync(category);
         categories.Add(category);
         return category;
+    }
+
+    private sealed class SmokeCanonicalVaultPathProvider(string sqliteDatabasePath) : ICanonicalVaultPathProvider
+    {
+        public string CreateAvailablePath()
+        {
+            var databaseDirectory = Path.GetDirectoryName(Path.GetFullPath(sqliteDatabasePath))
+                ?? Environment.CurrentDirectory;
+            var mdbxDirectory = Path.Combine(databaseDirectory, "mdbx");
+            var preferred = Path.Combine(mdbxDirectory, "local.mdbx");
+            return !File.Exists(preferred)
+                ? preferred
+                : Path.Combine(mdbxDirectory, $"local-{Guid.NewGuid():N}.mdbx");
+        }
     }
 }

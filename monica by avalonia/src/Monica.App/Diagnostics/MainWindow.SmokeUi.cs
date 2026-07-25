@@ -305,14 +305,18 @@ public partial class MainWindow
         var failures = new List<string>();
         var sections = new[]
         {
+            "Passwords",
+            "Notes",
             "Totp",
             "Cards",
             "Generator",
             "Archive",
             "RecycleBin",
+            "SecurityAnalysis",
             "Timeline",
             "Mdbx",
-            "DatabaseManagement"
+            "DatabaseManagement",
+            "Settings"
         };
 
         try
