@@ -13,23 +13,55 @@ public sealed class MdbxUniffiNativeBridge : IMdbxNativeBridge
 
     public bool IsAvailable => _methodsType is not null && _isNativeLibraryAvailable;
 
-    public Task<IMdbxNativeVault> CreateVaultAsync(string path, string password, string deviceId, MdbxTigaMode mode, CancellationToken cancellationToken = default)
-    {
-        var methods = RequireMethodsType();
-        var ffiMode = ConvertTigaMode(methods.Assembly, mode);
-        var vault = Invoke(methods, null, ["CreateVaultWithTigaMode", "create_vault_with_tiga_mode"], path, password, deviceId, ffiMode);
-        return Task.FromResult<IMdbxNativeVault>(new MdbxUniffiNativeVault(vault));
-    }
+    public Task<IMdbxNativeVault> CreateVaultAsync(
+        string path,
+        string password,
+        string deviceId,
+        MdbxTigaMode mode,
+        CancellationToken cancellationToken = default) =>
+        RunBlockingNativeAsync<IMdbxNativeVault>(() =>
+        {
+            var methods = RequireMethodsType();
+            var ffiMode = ConvertTigaMode(methods.Assembly, mode);
+            var vault = Invoke(
+                methods,
+                null,
+                ["CreateVaultWithTigaMode", "create_vault_with_tiga_mode"],
+                path,
+                password,
+                deviceId,
+                ffiMode);
+            return new MdbxUniffiNativeVault(vault);
+        }, cancellationToken);
 
-    public Task<IMdbxNativeVault> OpenVaultAsync(string path, string password, string deviceId, CancellationToken cancellationToken = default)
-    {
-        var methods = RequireMethodsType();
-        var vault = Invoke(methods, null, ["OpenVault", "open_vault"], path, password, deviceId);
-        return Task.FromResult<IMdbxNativeVault>(new MdbxUniffiNativeVault(vault));
-    }
+    public Task<IMdbxNativeVault> OpenVaultAsync(
+        string path,
+        string password,
+        string deviceId,
+        CancellationToken cancellationToken = default) =>
+        RunBlockingNativeAsync<IMdbxNativeVault>(() =>
+        {
+            var methods = RequireMethodsType();
+            var vault = Invoke(methods, null, ["OpenVault", "open_vault"], path, password, deviceId);
+            return new MdbxUniffiNativeVault(vault);
+        }, cancellationToken);
 
     private Type RequireMethodsType() =>
         _methodsType ?? throw new InvalidOperationException("Generated MDBX UniFFI C# bindings were not found.");
+
+    private static Task<T> RunBlockingNativeAsync<T>(Func<T> operation, CancellationToken cancellationToken) =>
+        Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return operation();
+        }, cancellationToken);
+
+    private static Task RunBlockingNativeAsync(Action operation, CancellationToken cancellationToken) =>
+        Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            operation();
+        }, cancellationToken);
 
     private static object ConvertTigaMode(Assembly assembly, MdbxTigaMode mode)
     {
@@ -40,67 +72,120 @@ public sealed class MdbxUniffiNativeBridge : IMdbxNativeBridge
 
     private sealed class MdbxUniffiNativeVault(object vault) : IMdbxNativeVault, IDisposable
     {
-        public Task<MdbxNativeVaultInfo> GetInfoAsync(CancellationToken cancellationToken = default)
-        {
-            var info = Invoke(vault.GetType(), vault, ["Info", "info"]);
-            return Task.FromResult(new MdbxNativeVaultInfo(
-                GetString(info, "VaultId", "vaultId", "vault_id"),
-                GetString(info, "DeviceId", "deviceId", "device_id")));
-        }
+        public Task<MdbxNativeVaultInfo> GetInfoAsync(CancellationToken cancellationToken = default) =>
+            RunBlockingNativeAsync(() =>
+            {
+                var info = Invoke(vault.GetType(), vault, ["Info", "info"]);
+                return new MdbxNativeVaultInfo(
+                    GetString(info, "VaultId", "vaultId", "vault_id"),
+                    GetString(info, "DeviceId", "deviceId", "device_id"));
+            }, cancellationToken);
 
-        public Task<MdbxNativeProjectRecord> CreateProjectAsync(string title, CancellationToken cancellationToken = default)
-        {
-            var project = Invoke(vault.GetType(), vault, ["CreateProject", "create_project"], title);
-            return Task.FromResult(ToProject(project));
-        }
+        public Task<MdbxNativeProjectRecord> CreateProjectAsync(string title, CancellationToken cancellationToken = default) =>
+            RunBlockingNativeAsync(
+                () => ToProject(Invoke(vault.GetType(), vault, ["CreateProject", "create_project"], title)),
+                cancellationToken);
 
-        public Task<IReadOnlyList<MdbxNativeProjectRecord>> ListProjectsAsync(bool includeDeleted, CancellationToken cancellationToken = default)
-        {
-            var projects = Invoke(vault.GetType(), vault, ["ListProjects", "list_projects"], includeDeleted);
-            return Task.FromResult<IReadOnlyList<MdbxNativeProjectRecord>>(AsEnumerable(projects).Select(ToProject).ToList());
-        }
+        public Task<IReadOnlyList<MdbxNativeProjectRecord>> ListProjectsAsync(
+            bool includeDeleted,
+            CancellationToken cancellationToken = default) =>
+            RunBlockingNativeAsync<IReadOnlyList<MdbxNativeProjectRecord>>(
+                () => AsEnumerable(Invoke(vault.GetType(), vault, ["ListProjects", "list_projects"], includeDeleted))
+                    .Select(ToProject)
+                    .ToList(),
+                cancellationToken);
 
-        public Task<MdbxNativeEntryRecord> CreateEntryAsync(string projectId, string entryType, string title, string payloadJson, CancellationToken cancellationToken = default)
-        {
-            var entry = Invoke(vault.GetType(), vault, ["CreateEntry", "create_entry"], projectId, entryType, title, payloadJson);
-            return Task.FromResult(ToEntry(entry));
-        }
+        public Task<MdbxNativeEntryRecord> CreateEntryAsync(
+            string projectId,
+            string entryType,
+            string title,
+            string payloadJson,
+            CancellationToken cancellationToken = default) =>
+            RunBlockingNativeAsync(
+                () => ToEntry(Invoke(
+                    vault.GetType(),
+                    vault,
+                    ["CreateEntry", "create_entry"],
+                    projectId,
+                    entryType,
+                    title,
+                    payloadJson)),
+                cancellationToken);
 
-        public Task<IReadOnlyList<MdbxNativeEntryRecord>> ListEntriesAsync(string projectId, string? entryType = null, CancellationToken cancellationToken = default)
-        {
-            var entries = Invoke(vault.GetType(), vault, ["ListEntries", "list_entries"], projectId, entryType);
-            return Task.FromResult<IReadOnlyList<MdbxNativeEntryRecord>>(AsEnumerable(entries).Select(ToEntry).ToList());
-        }
+        public Task<IReadOnlyList<MdbxNativeEntryRecord>> ListEntriesAsync(
+            string projectId,
+            string? entryType = null,
+            CancellationToken cancellationToken = default) =>
+            RunBlockingNativeAsync<IReadOnlyList<MdbxNativeEntryRecord>>(
+                () => AsEnumerable(Invoke(vault.GetType(), vault, ["ListEntries", "list_entries"], projectId, entryType))
+                    .Select(ToEntry)
+                    .ToList(),
+                cancellationToken);
 
-        public Task<IReadOnlyList<MdbxNativeEntryRecord>> ListDeletedEntriesAsync(string projectId, string? entryType = null, CancellationToken cancellationToken = default)
-        {
-            var entries = Invoke(vault.GetType(), vault, ["ListDeletedEntries", "list_deleted_entries"], projectId, entryType);
-            return Task.FromResult<IReadOnlyList<MdbxNativeEntryRecord>>(AsEnumerable(entries).Select(ToEntry).ToList());
-        }
+        public Task<IReadOnlyList<MdbxNativeEntryRecord>> ListDeletedEntriesAsync(
+            string projectId,
+            string? entryType = null,
+            CancellationToken cancellationToken = default) =>
+            RunBlockingNativeAsync<IReadOnlyList<MdbxNativeEntryRecord>>(
+                () => AsEnumerable(Invoke(
+                        vault.GetType(),
+                        vault,
+                        ["ListDeletedEntries", "list_deleted_entries"],
+                        projectId,
+                        entryType))
+                    .Select(ToEntry)
+                    .ToList(),
+                cancellationToken);
 
-        public Task<MdbxNativeEntryRecord> UpdateEntryAsync(string projectId, string entryId, string entryType, string title, string payloadJson, CancellationToken cancellationToken = default)
-        {
-            var entry = Invoke(vault.GetType(), vault, ["UpdateEntry", "update_entry"], projectId, entryId, entryType, title, payloadJson);
-            return Task.FromResult(ToEntry(entry));
-        }
+        public Task<MdbxNativeEntryRecord> UpdateEntryAsync(
+            string projectId,
+            string entryId,
+            string entryType,
+            string title,
+            string payloadJson,
+            CancellationToken cancellationToken = default) =>
+            RunBlockingNativeAsync(
+                () => ToEntry(Invoke(
+                    vault.GetType(),
+                    vault,
+                    ["UpdateEntry", "update_entry"],
+                    projectId,
+                    entryId,
+                    entryType,
+                    title,
+                    payloadJson)),
+                cancellationToken);
 
-        public Task<MdbxNativeEntryRecord> MoveEntryAsync(string projectId, string entryId, string targetProjectId, CancellationToken cancellationToken = default)
-        {
-            var entry = Invoke(vault.GetType(), vault, ["MoveEntry", "move_entry"], projectId, entryId, targetProjectId);
-            return Task.FromResult(ToEntry(entry));
-        }
+        public Task<MdbxNativeEntryRecord> MoveEntryAsync(
+            string projectId,
+            string entryId,
+            string targetProjectId,
+            CancellationToken cancellationToken = default) =>
+            RunBlockingNativeAsync(
+                () => ToEntry(Invoke(
+                    vault.GetType(),
+                    vault,
+                    ["MoveEntry", "move_entry"],
+                    projectId,
+                    entryId,
+                    targetProjectId)),
+                cancellationToken);
 
-        public Task DeleteEntryAsync(string projectId, string entryId, CancellationToken cancellationToken = default)
-        {
-            Invoke(vault.GetType(), vault, ["DeleteEntry", "delete_entry"], projectId, entryId);
-            return Task.CompletedTask;
-        }
+        public Task DeleteEntryAsync(
+            string projectId,
+            string entryId,
+            CancellationToken cancellationToken = default) =>
+            RunBlockingNativeAsync(
+                () => Invoke(vault.GetType(), vault, ["DeleteEntry", "delete_entry"], projectId, entryId),
+                cancellationToken);
 
-        public Task<MdbxNativeEntryRecord> RestoreEntryAsync(string projectId, string entryId, CancellationToken cancellationToken = default)
-        {
-            var entry = Invoke(vault.GetType(), vault, ["RestoreEntry", "restore_entry"], projectId, entryId);
-            return Task.FromResult(ToEntry(entry));
-        }
+        public Task<MdbxNativeEntryRecord> RestoreEntryAsync(
+            string projectId,
+            string entryId,
+            CancellationToken cancellationToken = default) =>
+            RunBlockingNativeAsync(
+                () => ToEntry(Invoke(vault.GetType(), vault, ["RestoreEntry", "restore_entry"], projectId, entryId)),
+                cancellationToken);
 
         public Task<MdbxNativeAttachmentRecord> CreateAttachmentMetadataAsync(
             string projectId,
@@ -110,8 +195,8 @@ public sealed class MdbxUniffiNativeBridge : IMdbxNativeBridge
             string contentHash,
             ulong originalSize,
             CancellationToken cancellationToken = default)
-        {
-            var attachment = Invoke(
+        => RunBlockingNativeAsync(
+            () => ToAttachment(Invoke(
                 vault.GetType(),
                 vault,
                 ["CreateAttachmentMetadata", "create_attachment_metadata"],
@@ -120,45 +205,80 @@ public sealed class MdbxUniffiNativeBridge : IMdbxNativeBridge
                 fileName,
                 mediaType,
                 contentHash,
-                originalSize);
-            return Task.FromResult(ToAttachment(attachment));
-        }
+                originalSize)),
+            cancellationToken);
 
-        public Task<IReadOnlyList<MdbxNativeAttachmentRecord>> ListAttachmentsByProjectAsync(string projectId, CancellationToken cancellationToken = default)
-        {
-            var attachments = Invoke(vault.GetType(), vault, ["ListAttachmentsByProject", "list_attachments_by_project"], projectId);
-            return Task.FromResult<IReadOnlyList<MdbxNativeAttachmentRecord>>(AsEnumerable(attachments).Select(ToAttachment).ToList());
-        }
+        public Task<IReadOnlyList<MdbxNativeAttachmentRecord>> ListAttachmentsByProjectAsync(
+            string projectId,
+            CancellationToken cancellationToken = default) =>
+            RunBlockingNativeAsync<IReadOnlyList<MdbxNativeAttachmentRecord>>(
+                () => AsEnumerable(Invoke(
+                        vault.GetType(),
+                        vault,
+                        ["ListAttachmentsByProject", "list_attachments_by_project"],
+                        projectId))
+                    .Select(ToAttachment)
+                    .ToList(),
+                cancellationToken);
 
-        public Task<IReadOnlyList<MdbxNativeAttachmentRecord>> ListAttachmentsByEntryAsync(string entryId, CancellationToken cancellationToken = default)
-        {
-            var attachments = Invoke(vault.GetType(), vault, ["ListAttachmentsByEntry", "list_attachments_by_entry"], entryId);
-            return Task.FromResult<IReadOnlyList<MdbxNativeAttachmentRecord>>(AsEnumerable(attachments).Select(ToAttachment).ToList());
-        }
+        public Task<IReadOnlyList<MdbxNativeAttachmentRecord>> ListAttachmentsByEntryAsync(
+            string entryId,
+            CancellationToken cancellationToken = default) =>
+            RunBlockingNativeAsync<IReadOnlyList<MdbxNativeAttachmentRecord>>(
+                () => AsEnumerable(Invoke(
+                        vault.GetType(),
+                        vault,
+                        ["ListAttachmentsByEntry", "list_attachments_by_entry"],
+                        entryId))
+                    .Select(ToAttachment)
+                    .ToList(),
+                cancellationToken);
 
-        public Task<MdbxNativeAttachmentRecord> WriteAttachmentInlineContentAsync(string attachmentId, byte[] content, CancellationToken cancellationToken = default)
-        {
-            var attachment = Invoke(vault.GetType(), vault, ["WriteAttachmentInlineContent", "write_attachment_inline_content"], attachmentId, content);
-            return Task.FromResult(ToAttachment(attachment));
-        }
+        public Task<MdbxNativeAttachmentRecord> WriteAttachmentInlineContentAsync(
+            string attachmentId,
+            byte[] content,
+            CancellationToken cancellationToken = default) =>
+            RunBlockingNativeAsync(
+                () => ToAttachment(Invoke(
+                    vault.GetType(),
+                    vault,
+                    ["WriteAttachmentInlineContent", "write_attachment_inline_content"],
+                    attachmentId,
+                    content)),
+                cancellationToken);
 
-        public Task<byte[]> ReadAttachmentContentAsync(string attachmentId, CancellationToken cancellationToken = default)
-        {
-            var content = Invoke(vault.GetType(), vault, ["ReadAttachmentContent", "read_attachment_content"], attachmentId);
-            return Task.FromResult((byte[])content);
-        }
+        public Task<byte[]> ReadAttachmentContentAsync(
+            string attachmentId,
+            CancellationToken cancellationToken = default) =>
+            RunBlockingNativeAsync(
+                () => (byte[])Invoke(
+                    vault.GetType(),
+                    vault,
+                    ["ReadAttachmentContent", "read_attachment_content"],
+                    attachmentId),
+                cancellationToken);
 
-        public Task<MdbxNativeAttachmentRecord> RenameAttachmentAsync(string attachmentId, string fileName, string? mediaType, CancellationToken cancellationToken = default)
-        {
-            var attachment = Invoke(vault.GetType(), vault, ["RenameAttachment", "rename_attachment"], attachmentId, fileName, mediaType);
-            return Task.FromResult(ToAttachment(attachment));
-        }
+        public Task<MdbxNativeAttachmentRecord> RenameAttachmentAsync(
+            string attachmentId,
+            string fileName,
+            string? mediaType,
+            CancellationToken cancellationToken = default) =>
+            RunBlockingNativeAsync(
+                () => ToAttachment(Invoke(
+                    vault.GetType(),
+                    vault,
+                    ["RenameAttachment", "rename_attachment"],
+                    attachmentId,
+                    fileName,
+                    mediaType)),
+                cancellationToken);
 
-        public Task DeleteAttachmentAsync(string attachmentId, CancellationToken cancellationToken = default)
-        {
-            Invoke(vault.GetType(), vault, ["DeleteAttachment", "delete_attachment"], attachmentId);
-            return Task.CompletedTask;
-        }
+        public Task DeleteAttachmentAsync(
+            string attachmentId,
+            CancellationToken cancellationToken = default) =>
+            RunBlockingNativeAsync(
+                () => Invoke(vault.GetType(), vault, ["DeleteAttachment", "delete_attachment"], attachmentId),
+                cancellationToken);
 
         public void Dispose()
         {

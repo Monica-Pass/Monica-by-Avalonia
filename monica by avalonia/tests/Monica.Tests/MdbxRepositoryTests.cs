@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Monica.App.ViewModels;
 using Monica.Core.Models;
+using Monica.Core.Services;
 using Monica.Data;
 using Monica.Data.Mdbx;
 using Monica.Data.Repositories;
@@ -491,6 +492,39 @@ public sealed class MdbxRepositoryTests
             vaultLoadOpenCount <= 2,
             $"Expected Vault Access to reuse one password and one secure-item snapshot, but MDBX was opened {vaultLoadOpenCount} times.");
         Assert.Equal(2, bridge.OpenedPaths.Count);
+    }
+
+    [Fact]
+    public async Task Mdbx_store_reuses_the_native_vault_only_for_the_unlocked_session()
+    {
+        using var vaultSession = new VaultSessionService();
+        vaultSession.MarkUnlocked();
+        var bridge = new FakeMdbxNativeBridge();
+        using var store = new MdbxVaultStore(bridge, vaultSessionService: vaultSession);
+        var database = new LocalMdbxDatabase
+        {
+            Id = 42,
+            Name = "Session vault",
+            FilePath = Path.Combine(GetTempRootPath(), $"{Guid.NewGuid():N}.mdbx"),
+            WorkingCopyPath = Path.Combine(GetTempRootPath(), $"{Guid.NewGuid():N}.mdbx"),
+            EncryptedPassword = "session-password",
+            IsDefault = true,
+            IsOfflineAvailable = true
+        };
+
+        await Task.WhenAll(
+            store.GetCategoriesAsync(database),
+            store.GetPasswordsAsync(database, includeDeleted: true, includeArchived: true),
+            store.GetSecureItemsAsync(database, includeDeleted: true));
+
+        Assert.Single(bridge.OpenedPaths);
+        Assert.Equal(0, bridge.DisposedVaultCount);
+
+        vaultSession.MarkLocked();
+
+        Assert.Equal(1, bridge.DisposedVaultCount);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => store.GetCategoriesAsync(database));
+        Assert.Single(bridge.OpenedPaths);
     }
 
     [Fact]
@@ -2731,6 +2765,7 @@ public sealed class MdbxRepositoryTests
 
         public bool IsAvailable => true;
         public List<string> OpenedPaths { get; } = [];
+        public int DisposedVaultCount => _vaults.Values.Sum(vault => vault.DisposeCount);
 
         public Task<IMdbxNativeVault> CreateVaultAsync(string path, string password, string deviceId, MdbxTigaMode mode, CancellationToken cancellationToken = default)
         {
@@ -2831,6 +2866,8 @@ public sealed class MdbxRepositoryTests
         private int _nextProjectId = 1;
         private int _nextEntryId = 1;
         private int _nextAttachmentId = 1;
+
+        public int DisposeCount { get; private set; }
 
         public Task<MdbxNativeVaultInfo> GetInfoAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(new MdbxNativeVaultInfo("fake-vault", deviceId));
@@ -3054,6 +3091,7 @@ public sealed class MdbxRepositoryTests
 
         public void Dispose()
         {
+            DisposeCount++;
         }
     }
 }

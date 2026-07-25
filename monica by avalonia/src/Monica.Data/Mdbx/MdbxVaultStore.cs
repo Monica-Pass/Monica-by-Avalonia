@@ -53,7 +53,10 @@ public sealed record MdbxPasswordReadSnapshot(
     IReadOnlyDictionary<long, IReadOnlyList<CustomField>> CustomFieldsByEntryId,
     IReadOnlyDictionary<long, IReadOnlyList<Attachment>> AttachmentsByEntryId);
 
-public sealed partial class MdbxVaultStore(IMdbxNativeBridge nativeBridge, ICryptoService? cryptoService = null) : IMdbxVaultStore
+public sealed partial class MdbxVaultStore(
+    IMdbxNativeBridge nativeBridge,
+    ICryptoService? cryptoService = null,
+    IVaultSessionService? vaultSessionService = null) : IMdbxVaultStore, IDisposable
 {
     private const string DefaultProjectTitle = "Monica";
     private const string DeviceId = "monica-avalonia";
@@ -67,7 +70,11 @@ public sealed partial class MdbxVaultStore(IMdbxNativeBridge nativeBridge, ICryp
         IgnoreReadOnlyProperties = true
     };
 
-    public bool IsAvailable => nativeBridge.IsAvailable;
+    private readonly IMdbxNativeBridge _nativeBridge = nativeBridge;
+    private readonly ICryptoService? _cryptoService = cryptoService;
+    private readonly IVaultSessionService? _vaultSessionService = vaultSessionService;
+
+    public bool IsAvailable => _nativeBridge.IsAvailable;
 
     public async Task<IReadOnlyList<Category>> GetCategoriesAsync(LocalMdbxDatabase database, CancellationToken cancellationToken = default)
     {
@@ -862,21 +869,6 @@ public sealed partial class MdbxVaultStore(IMdbxNativeBridge nativeBridge, ICryp
         }
     }
 
-    private async Task<IMdbxNativeVault> OpenAsync(LocalMdbxDatabase database, CancellationToken cancellationToken)
-    {
-        var path = database.WorkingCopyPath ?? database.FilePath;
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            throw new InvalidOperationException("MDBX vault path is missing.");
-        }
-
-        if (string.IsNullOrWhiteSpace(database.EncryptedPassword))
-        {
-            throw new InvalidOperationException("MDBX vault password is missing.");
-        }
-
-        return await nativeBridge.OpenVaultAsync(path, database.EncryptedPassword, DeviceId, cancellationToken);
-    }
 
     private static async Task<MdbxNativeProjectRecord> EnsureDefaultProjectAsync(IMdbxNativeVault vault, CancellationToken cancellationToken)
     {
@@ -1121,19 +1113,19 @@ public sealed partial class MdbxVaultStore(IMdbxNativeBridge nativeBridge, ICryp
 
     private string ToPortableSensitiveValue(string value)
     {
-        if (string.IsNullOrEmpty(value) || cryptoService is null)
+        if (string.IsNullOrEmpty(value) || _cryptoService is null)
         {
             return value;
         }
 
-        if (!cryptoService.IsUnlocked)
+        if (!_cryptoService.IsUnlocked)
         {
             throw new InvalidOperationException("Vault must be unlocked before sensitive values can be written to MDBX.");
         }
 
         try
         {
-            return cryptoService.DecryptString(value);
+            return _cryptoService.DecryptString(value);
         }
         catch (Exception ex) when (ex is FormatException or CryptographicException or ArgumentException)
         {
