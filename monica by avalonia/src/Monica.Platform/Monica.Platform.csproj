@@ -10,7 +10,7 @@
     <PackageReference Include="KPCLib" Version="2.0.4" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Graph" Version="6.1.0" />
+    <PackageReference Include="Microsoft.Graph" Version="6.2.0" />
     <PackageReference Include="Microsoft.Identity.Client" Version="4.86.0" />
     <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.86.0" />
     <PackageReference Include="Polly" Version="8.6.6" />
