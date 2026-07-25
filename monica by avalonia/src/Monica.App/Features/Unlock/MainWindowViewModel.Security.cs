@@ -103,6 +103,7 @@ public sealed partial class MainWindowViewModel
         }
 
         CancelSensitiveBackgroundWork();
+        CancelBitwardenOperationAndClearSecrets();
         _vaultSessionService.MarkLocked();
         NotifyAutoLockScheduleChanged();
     }

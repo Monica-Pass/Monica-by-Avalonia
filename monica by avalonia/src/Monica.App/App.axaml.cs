@@ -255,6 +255,7 @@ public partial class App : Application
             _.GetRequiredService<IMonicaRepository>()));
         services.AddSingleton<IAppSettingsService, AppSettingsService>();
         services.AddSingleton<ILocalizationService, LocalizationService>();
+        services.AddSingleton<IBitwardenDeviceIdentityProvider, BitwardenDeviceIdentityProvider>();
         services.AddSingleton<IVaultUnlockCoordinator, VaultUnlockCoordinator>();
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton(provider => new DesktopIntegrationCoordinator(

@@ -18,10 +18,12 @@ using CommunityToolkit.Mvvm.Input;
 using FluentAvalonia.Styling;
 using Monica.App;
 using Monica.App.Services;
+using Monica.Core.Bitwarden;
 using Monica.Core.ImportExport;
 using Monica.Core.Models;
 using Monica.Core.Services;
 using Monica.Data;
+using Monica.Data.Bitwarden;
 using Monica.Data.Repositories;
 using Monica.Data.Services;
 using Monica.Platform.Services;
@@ -71,7 +73,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IExportAuthorizationService? exportAuthorizationService = null,
         IOneDriveBackupService? oneDriveBackupService = null,
         IKeePassVaultService? keePassVaultService = null,
-        IWebDavBackupCryptoService? webDavBackupCryptoService = null)
+        IWebDavBackupCryptoService? webDavBackupCryptoService = null,
+        IBitwardenAccountStore? bitwardenAccountStore = null,
+        IBitwardenAuthenticationService? bitwardenAuthenticationService = null,
+        IBitwardenSyncCoordinator? bitwardenSyncCoordinator = null,
+        IBitwardenSessionManager? bitwardenSessionManager = null,
+        IBitwardenPendingOperationStore? bitwardenPendingOperationStore = null,
+        IBitwardenConflictBackupStore? bitwardenConflictBackupStore = null,
+        IBitwardenDeviceIdentityProvider? bitwardenDeviceIdentityProvider = null)
     {
         _viewModelDispatcher = Dispatcher.CurrentDispatcher;
         _repository = repository;
@@ -88,6 +97,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _webDavBackupCryptoService = webDavBackupCryptoService ?? new WebDavBackupCryptoService();
         _oneDriveBackupService = oneDriveBackupService ?? new DisabledOneDriveBackupService();
         _keePassVaultService = keePassVaultService ?? new KeePassVaultService();
+        _bitwardenAccountStore = bitwardenAccountStore;
+        _bitwardenAuthenticationService = bitwardenAuthenticationService;
+        _bitwardenSyncCoordinator = bitwardenSyncCoordinator;
+        _bitwardenSessionManager = bitwardenSessionManager;
+        _bitwardenPendingOperationStore = bitwardenPendingOperationStore;
+        _bitwardenConflictBackupStore = bitwardenConflictBackupStore;
+        _bitwardenDeviceIdentityProvider = bitwardenDeviceIdentityProvider;
+        if (_bitwardenSyncCoordinator is not null)
+        {
+            _bitwardenSyncCoordinator.StateChanged += OnBitwardenSyncStateChanged;
+        }
         _mdbxVaultService = mdbxVaultService;
         _passwordAttachmentFileService = passwordAttachmentFileService;
         _passwordEditorDialogService = passwordEditorDialogService;
@@ -497,6 +517,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RaiseSyncPageState();
         RefreshVaultSources();
         RaiseWebDavBackupHistoryState();
+        RaiseBitwardenState();
         RaisePasswordQuickAccessState();
         RaisePasswordFilterState();
         RefreshNoteCategoryOptions();

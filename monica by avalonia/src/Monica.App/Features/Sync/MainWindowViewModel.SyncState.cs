@@ -75,6 +75,12 @@ public sealed partial class MainWindowViewModel
             OneDriveConnectionStatusText,
             _localization.Get("OneDriveBoundaryDescription")));
         SyncHealthItems.Add(new SyncHealthDisplayItem(
+            "Bitwarden",
+            HasBitwardenAccounts
+                ? _localization.Format("BitwardenAccountCountFormat", BitwardenAccounts.Count)
+                : _localization.Get("NotConfigured"),
+            BitwardenAccountsSummaryText));
+        SyncHealthItems.Add(new SyncHealthDisplayItem(
             _localization.MdbxVaults,
             MdbxDatabaseCountText,
             MdbxSyncDiagnosticsSummaryText));

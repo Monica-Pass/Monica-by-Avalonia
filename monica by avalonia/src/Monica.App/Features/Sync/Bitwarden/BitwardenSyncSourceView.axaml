@@ -1,0 +1,280 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:fa="using:FluentAvalonia.UI.Controls"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:bw="using:Monica.Core.Bitwarden"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Sync.Bitwarden.BitwardenSyncSourceView"
+             x:Name="BitwardenSyncSourceRoot"
+             x:DataType="vm:MainWindowViewModel">
+    <StackPanel Spacing="14" IsVisible="{Binding IsSyncSourcesSelected}">
+        <fa:FASettingsExpander Header="{Binding L[BitwardenOnlineVault]}"
+                               Description="{Binding BitwardenAccountsSummaryText}"
+                               IsExpanded="True"
+                               IsVisible="{Binding IsBitwardenIntegrationAvailable}">
+            <fa:FASettingsExpander.IconSource>
+                <fa:FASymbolIconSource Symbol="Sync" />
+            </fa:FASettingsExpander.IconSource>
+            <fa:FASettingsExpander.Items>
+                <fa:FASettingsExpanderItem Content="{Binding L[BitwardenAccounts]}"
+                                           Description="{Binding L[BitwardenAccountsDescription]}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <StackPanel Spacing="10" MinWidth="300" MaxWidth="620" HorizontalAlignment="Stretch">
+                            <ComboBox x:Name="BitwardenAccountSelector"
+                                      ItemsSource="{Binding BitwardenAccounts}"
+                                      SelectedItem="{Binding SelectedBitwardenAccount, Mode=TwoWay}"
+                                      PlaceholderText="{Binding L[BitwardenSelectAccount]}"
+                                      HorizontalAlignment="Stretch"
+                                      AutomationProperties.Name="{Binding L[BitwardenSelectAccount]}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:BitwardenAccountDisplayItem">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" MinWidth="250">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Email}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Text="{Binding ConnectionStatusText}" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <WrapPanel HorizontalAlignment="Right">
+                                <Button Classes="workspaceCommand"
+                                        Command="{Binding LoadBitwardenAccountsCommand}"
+                                        IsEnabled="{Binding !IsBitwardenOperationBusy}"
+                                        AutomationProperties.Name="{Binding L[BitwardenRefreshAccounts]}"
+                                        Margin="0,0,8,4">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <ic:FluentIcon Icon="ArrowClockwise" FontSize="17" />
+                                        <TextBlock Text="{Binding L.Refresh}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="workspacePrimaryCommand"
+                                        Command="{Binding ShowBitwardenConnectionEditorCommand}"
+                                        AutomationProperties.Name="{Binding L[BitwardenAddAccount]}"
+                                        Margin="0,0,0,4">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <ic:FluentIcon Icon="Add" FontSize="17" />
+                                        <TextBlock Text="{Binding L[BitwardenAddAccount]}" />
+                                    </StackPanel>
+                                </Button>
+                            </WrapPanel>
+                        </StackPanel>
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+
+                <fa:FASettingsExpanderItem Content="{Binding L[BitwardenAccountStatus]}"
+                                           Description="{Binding L[BitwardenAccountStatusDescription]}"
+                                           IsVisible="{Binding HasSelectedBitwardenAccount}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <StackPanel Spacing="12" MinWidth="300" MaxWidth="680" HorizontalAlignment="Stretch">
+                            <Border x:Name="BitwardenAccountStatusCard" Padding="14" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource LayerFillColorSubtleBrush}">
+                                <StackPanel Spacing="10">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Text="{Binding SelectedBitwardenAccount.DisplayName}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding SelectedBitwardenAccount.Email}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Padding="9,4" CornerRadius="10" BorderBrush="{DynamicResource AccentFillColorSecondaryBrush}" BorderThickness="1" VerticalAlignment="Top">
+                                            <TextBlock Text="{Binding SelectedBitwardenAccount.ConnectionStatusText}" FontSize="12" FontWeight="SemiBold" />
+                                        </Border>
+                                    </Grid>
+                                    <WrapPanel>
+                                        <Border Padding="10,7" Margin="0,0,8,8" CornerRadius="6" Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{Binding SelectedBitwardenAccount.ServerText}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding L[BitwardenServerUrl]}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Padding="10,7" Margin="0,0,8,8" CornerRadius="6" Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{Binding SelectedBitwardenAccount.PendingChangesText}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding L[PendingUpload]}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Padding="10,7" Margin="0,0,0,8" CornerRadius="6" Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{Binding SelectedBitwardenAccount.ConflictText}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding L[Conflict]}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                        </Border>
+                                    </WrapPanel>
+                                    <StackPanel Spacing="3">
+                                        <TextBlock Text="{Binding SelectedBitwardenAccount.LastSyncText}" />
+                                        <TextBlock Text="{Binding SelectedBitwardenAccount.DetailText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <fa:FAInfoBar IsOpen="{Binding IsBitwardenSyncActive}"
+                                          Severity="Informational"
+                                          Title="{Binding L[Syncing]}"
+                                          Message="{Binding BitwardenSyncStageText}" />
+                            <fa:FAInfoBar IsOpen="{Binding HasBitwardenOperationError}"
+                                          Severity="Error"
+                                          Title="{Binding L[Failed]}"
+                                          Message="{Binding BitwardenOperationError}" />
+
+                            <WrapPanel HorizontalAlignment="Right">
+                                <Button x:Name="BitwardenSyncNowButton" Classes="workspacePrimaryCommand"
+                                        Command="{Binding SyncBitwardenAccountCommand}"
+                                        CommandParameter="{Binding SelectedBitwardenAccount}"
+                                        IsEnabled="{Binding CanSyncSelectedBitwardenAccount}"
+                                        AutomationProperties.Name="{Binding L[BitwardenSyncNow]}"
+                                        Margin="0,0,8,4">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <ic:FluentIcon Icon="ArrowSync" FontSize="17" />
+                                        <TextBlock Text="{Binding L[BitwardenSyncNow]}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="BitwardenReconnectButton" Classes="workspaceCommand"
+                                        Command="{Binding ShowBitwardenConnectionEditorCommand}"
+                                        CommandParameter="{Binding SelectedBitwardenAccount}"
+                                        IsEnabled="{Binding !IsBitwardenOperationBusy}"
+                                        AutomationProperties.Name="{Binding L[BitwardenReconnect]}"
+                                        Margin="0,0,8,4">
+                                    <TextBlock Text="{Binding L[BitwardenReconnect]}" />
+                                </Button>
+                                <Button x:Name="BitwardenDisconnectButton" Classes="workspaceCommand"
+                                        Command="{Binding DisconnectBitwardenAccountCommand}"
+                                        CommandParameter="{Binding SelectedBitwardenAccount}"
+                                        IsEnabled="{Binding CanDisconnectSelectedBitwardenAccount}"
+                                        AutomationProperties.Name="{Binding L[BitwardenDisconnect]}"
+                                        Margin="0,0,0,4">
+                                    <TextBlock Text="{Binding L[BitwardenDisconnect]}" />
+                                </Button>
+                            </WrapPanel>
+                        </StackPanel>
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+
+                <fa:FASettingsExpanderItem Content="{Binding L[BitwardenConnectAccount]}"
+                                           Description="{Binding L[BitwardenConnectAccountDescription]}"
+                                           IsVisible="{Binding !IsBitwardenConnectionEditorVisible}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <Button Classes="workspaceCommand"
+                                Command="{Binding ShowBitwardenConnectionEditorCommand}"
+                                IsEnabled="{Binding !IsBitwardenOperationBusy}">
+                            <TextBlock Text="{Binding L[BitwardenAddAccount]}" />
+                        </Button>
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+
+                <fa:FASettingsExpanderItem Content="{Binding L[BitwardenConnectionDetails]}"
+                                           Description="{Binding L[BitwardenConnectionDetailsDescription]}"
+                                           IsVisible="{Binding IsBitwardenConnectionEditorVisible}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <StackPanel x:Name="BitwardenConnectionForm" Spacing="12" MinWidth="300" MaxWidth="620" HorizontalAlignment="Stretch">
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="{Binding L[BitwardenServerUrl]}" FontWeight="SemiBold" />
+                                <TextBox x:Name="BitwardenServerUrlBox"
+                                         Text="{Binding BitwardenServerUrl, Mode=TwoWay}"
+                                         PlaceholderText="https://vault.bitwarden.com/"
+                                         AutomationProperties.Name="{Binding L[BitwardenServerUrl]}" />
+                                <TextBlock Text="{Binding L[BitwardenServerUrlDescription]}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="{Binding L[BitwardenEmail]}" FontWeight="SemiBold" />
+                                <TextBox x:Name="BitwardenEmailBox"
+                                         Text="{Binding BitwardenEmail, Mode=TwoWay}"
+                                         PlaceholderText="name@example.com"
+                                         AutomationProperties.Name="{Binding L[BitwardenEmail]}" />
+                            </StackPanel>
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="{Binding L[BitwardenMasterPassword]}" FontWeight="SemiBold" />
+                                <TextBox x:Name="BitwardenMasterPasswordBox"
+                                         Text="{Binding BitwardenMasterPassword, Mode=TwoWay}"
+                                         PasswordChar="*"
+                                         AutomationProperties.Name="{Binding L[BitwardenMasterPassword]}" />
+                                <TextBlock Text="{Binding L[BitwardenMasterPasswordDescription]}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <fa:FAInfoBar x:Name="BitwardenChallengeInfoBar" IsOpen="{Binding IsBitwardenChallengeVisible}"
+                                          Severity="Warning"
+                                          Title="{Binding BitwardenChallengeTitle}"
+                                          Message="{Binding BitwardenChallengeDescription}" />
+
+                            <StackPanel x:Name="BitwardenTwoFactorChallengePanel" Spacing="10" IsVisible="{Binding IsBitwardenTwoFactorChallenge}">
+                                <StackPanel Spacing="5">
+                                    <TextBlock Text="{Binding L[BitwardenTwoFactorMethod]}" FontWeight="SemiBold" />
+                                    <ComboBox ItemsSource="{Binding BitwardenLoginFactors}"
+                                              SelectedItem="{Binding SelectedBitwardenLoginFactor, Mode=TwoWay}"
+                                              HorizontalAlignment="Stretch">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="bw:BitwardenLoginFactor">
+                                                <TextBlock Text="{Binding Name}" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Spacing="5">
+                                    <TextBlock Text="{Binding L[BitwardenTwoFactorToken]}" FontWeight="SemiBold" />
+                                    <TextBox Text="{Binding BitwardenTwoFactorToken, Mode=TwoWay}"
+                                             AutomationProperties.Name="{Binding L[BitwardenTwoFactorToken]}" />
+                                </StackPanel>
+                                <CheckBox IsChecked="{Binding BitwardenRememberTwoFactor}"
+                                          Content="{Binding L[BitwardenRememberTwoFactor]}" />
+                            </StackPanel>
+
+                            <StackPanel x:Name="BitwardenCaptchaChallengePanel" Spacing="8" IsVisible="{Binding IsBitwardenCaptchaChallenge}">
+                                <Border Padding="10" CornerRadius="6" Background="{DynamicResource LayerFillColorSubtleBrush}" IsVisible="{Binding HasBitwardenCaptchaSiteKey}">
+                                    <StackPanel Spacing="3">
+                                        <TextBlock Text="{Binding L[BitwardenCaptchaSiteKey]}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Text="{Binding BitwardenCaptchaSiteKey}" FontFamily="Consolas" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                                <StackPanel Spacing="5">
+                                    <TextBlock Text="{Binding L[BitwardenCaptchaResponse]}" FontWeight="SemiBold" />
+                                    <TextBox Text="{Binding BitwardenCaptchaResponse, Mode=TwoWay}"
+                                             AutomationProperties.Name="{Binding L[BitwardenCaptchaResponse]}" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <StackPanel x:Name="BitwardenNewDeviceChallengePanel" Spacing="5" IsVisible="{Binding IsBitwardenNewDeviceChallenge}">
+                                <TextBlock Text="{Binding L[BitwardenNewDeviceOtp]}" FontWeight="SemiBold" />
+                                <TextBox Text="{Binding BitwardenNewDeviceOtp, Mode=TwoWay}"
+                                         AutomationProperties.Name="{Binding L[BitwardenNewDeviceOtp]}" />
+                            </StackPanel>
+
+                            <fa:FAInfoBar IsOpen="{Binding HasBitwardenOperationError}"
+                                          Severity="Error"
+                                          Title="{Binding L[Failed]}"
+                                          Message="{Binding BitwardenOperationError}" />
+                            <fa:FAInfoBar IsOpen="True"
+                                          Severity="Informational"
+                                          Title="{Binding L[BitwardenSecurityNoticeTitle]}"
+                                          Message="{Binding L[BitwardenSecurityNoticeMessage]}" />
+
+                            <WrapPanel HorizontalAlignment="Right">
+                                <Button x:Name="BitwardenCancelConnectionButton" Classes="workspaceCommand"
+                                        Command="{Binding CancelBitwardenConnectionCommand}"
+                                        IsEnabled="{Binding !IsBitwardenOperationBusy}"
+                                        AutomationProperties.Name="{Binding L[BitwardenCancelConnection]}"
+                                        Margin="0,0,8,4">
+                                    <TextBlock Text="{Binding L.Cancel}" />
+                                </Button>
+                                <Button x:Name="BitwardenAuthenticateButton" Classes="workspacePrimaryCommand"
+                                        Command="{Binding AuthenticateBitwardenCommand}"
+                                        IsEnabled="{Binding CanAuthenticateBitwarden}"
+                                        AutomationProperties.Name="{Binding BitwardenLoginActionText}"
+                                        Margin="0,0,0,4">
+                                    <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="8">
+                                        <ProgressBar Width="28" Height="4" IsIndeterminate="True" IsVisible="{Binding IsBitwardenBusy}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{Binding BitwardenLoginActionText}" />
+                                    </Grid>
+                                </Button>
+                            </WrapPanel>
+                        </StackPanel>
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+            </fa:FASettingsExpander.Items>
+        </fa:FASettingsExpander>
+
+        <fa:FAInfoBar IsOpen="True"
+                      Severity="Warning"
+                      Title="Bitwarden"
+                      Message="{Binding L[BitwardenUnavailable]}"
+                      IsVisible="{Binding !IsBitwardenIntegrationAvailable}" />
+
+    </StackPanel>
+</UserControl>
