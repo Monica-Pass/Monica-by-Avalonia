@@ -254,11 +254,11 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
-    public async Task Performance_budget_add_password_does_not_rebuild_all_derived_collections()
+    public async Task Large_vault_add_password_does_not_rebuild_unrelated_derived_collections()
     {
-        var harness = CreateHarness();
+        var repositoryRecorder = FastPasswordMutationRepositoryProxy.Create(out var repository);
+        var harness = CreateHarness(repositoryOverride: repository);
         harness.Crypto.InitializeSession("performance password", new byte[16]);
-        await harness.Repository.GetPasswordsAsync();
 
         for (var index = 0; index < 10_000; index++)
         {
@@ -291,8 +291,10 @@ public sealed partial class PasswordManagementTests
             });
         }
 
+        _ = harness.ViewModel.FilteredPasswords.Count;
         _ = harness.ViewModel.FilteredTotpItems.Count;
         _ = harness.ViewModel.FilteredWalletItems.Count;
+        var passwordProjectionBuilds = harness.ViewModel.FilteredPasswordsProjectionBuildCount;
         var totpProjectionBuilds = harness.ViewModel.FilteredTotpProjectionBuildCount;
         var walletProjectionBuilds = harness.ViewModel.FilteredWalletProjectionBuildCount;
 
@@ -303,16 +305,24 @@ public sealed partial class PasswordManagementTests
             editor.Username = "new-user";
             editor.PasswordLines = "New strong password!Aa9";
         });
+        // Shared-runner wall-clock budgets mix scheduler/JIT noise with command work.
+        // These structural assertions guard the original full-projection regression deterministically.
+        var passwordCollectionChanges = new List<NotifyCollectionChangedAction>();
+        harness.ViewModel.Passwords.CollectionChanged += (_, args) =>
+            passwordCollectionChanges.Add(args.Action);
 
-        var stopwatch = Stopwatch.StartNew();
         await harness.ViewModel.AddPasswordCommand.ExecuteAsync(null);
-        stopwatch.Stop();
 
+        Assert.Equal([NotifyCollectionChangedAction.Add], passwordCollectionChanges);
+        Assert.Equal(10_001, harness.ViewModel.Passwords.Count);
+        Assert.Equal("New account", harness.ViewModel.Passwords[0].Title);
+        Assert.Equal(passwordProjectionBuilds, harness.ViewModel.FilteredPasswordsProjectionBuildCount);
         Assert.Equal(totpProjectionBuilds, harness.ViewModel.FilteredTotpProjectionBuildCount);
         Assert.Equal(walletProjectionBuilds, harness.ViewModel.FilteredWalletProjectionBuildCount);
-        Assert.True(
-            stopwatch.ElapsedMilliseconds < 120,
-            $"Adding one password to a 10,000-entry vault took {stopwatch.ElapsedMilliseconds} ms.");
+        Assert.Equal(1, repositoryRecorder.SavePasswordCallCount);
+        Assert.Equal(1, repositoryRecorder.ReplaceCustomFieldsCallCount);
+        Assert.Equal(1, repositoryRecorder.GetBoundTotpCallCount);
+        Assert.Equal(1, repositoryRecorder.LogCallCount);
         Assert.Contains(harness.ViewModel.TimelineEntries, item =>
             item.OperationType == "CREATE" && item.Title == "New account");
     }
@@ -4779,6 +4789,49 @@ public sealed partial class PasswordManagementTests
             targetMethod?.Name == nameof(IMonicaRepository.GetPasswordsAsync)
                 ? Task.FromException<IReadOnlyList<PasswordEntry>>(new InvalidOperationException("Simulated vault read failure"))
                 : throw new NotSupportedException($"Unexpected repository call: {targetMethod?.Name}");
+    }
+
+    private class FastPasswordMutationRepositoryProxy : DispatchProxy
+    {
+        private long _nextPasswordId = 40_000;
+
+        public int SavePasswordCallCount { get; private set; }
+        public int ReplaceCustomFieldsCallCount { get; private set; }
+        public int GetBoundTotpCallCount { get; private set; }
+        public int LogCallCount { get; private set; }
+
+        public static FastPasswordMutationRepositoryProxy Create(out IMonicaRepository repository)
+        {
+            repository = DispatchProxy.Create<IMonicaRepository, FastPasswordMutationRepositoryProxy>();
+            return (FastPasswordMutationRepositoryProxy)(object)repository;
+        }
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            switch (targetMethod?.Name)
+            {
+                case nameof(IMonicaRepository.SavePasswordAsync):
+                    {
+                        SavePasswordCallCount++;
+                        var entry = Assert.IsType<PasswordEntry>(args![0]);
+                        entry.Id = entry.Id == 0 ? ++_nextPasswordId : entry.Id;
+                        entry.UpdatedAt = DateTimeOffset.UtcNow;
+                        entry.CreatedAt = entry.CreatedAt == default ? entry.UpdatedAt : entry.CreatedAt;
+                        return Task.FromResult(entry.Id);
+                    }
+                case nameof(IMonicaRepository.ReplaceCustomFieldsAsync):
+                    ReplaceCustomFieldsCallCount++;
+                    return Task.CompletedTask;
+                case nameof(IMonicaRepository.GetSecureItemsByBoundPasswordIdAsync):
+                    GetBoundTotpCallCount++;
+                    return Task.FromResult<IReadOnlyList<SecureItem>>([]);
+                case nameof(IMonicaRepository.LogAsync):
+                    LogCallCount++;
+                    return Task.CompletedTask;
+                default:
+                    throw new NotSupportedException($"Unexpected repository call: {targetMethod?.Name}");
+            }
+        }
     }
 
     private sealed class CapturingClipboardService : IClipboardService
