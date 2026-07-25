@@ -94,6 +94,7 @@ public sealed partial class MainWindowViewModel
     {
         OnPropertyChanged(nameof(UnlockedShellContent));
         RaiseSecurityMaintenanceState();
+        RaiseDesktopIntegrationPresentationState();
         if (value)
         {
             _vaultSessionService.MarkUnlocked();

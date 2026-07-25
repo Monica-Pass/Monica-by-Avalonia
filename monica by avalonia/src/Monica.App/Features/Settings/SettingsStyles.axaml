@@ -12,6 +12,46 @@
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Margin" Value="0,0,0,16" />
 </Style>
+<Style Selector="TextBlock.settingsPageDescription">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+</Style>
+<Style Selector="Grid.settingsSectionHeader">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+</Style>
+<Style Selector="Border.settingsSectionIcon">
+    <Setter Property="Width" Value="36" />
+    <Setter Property="Height" Value="36" />
+    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="VerticalAlignment" Value="Top" />
+</Style>
+<Style Selector="TextBlock.settingsSectionTitle">
+    <Setter Property="FontSize" Value="18" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+</Style>
+<Style Selector="TextBlock.settingsSectionDescription">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+</Style>
+<Style Selector="Border.settingsPairingTokenSurface">
+    <Setter Property="Background" Value="{DynamicResource LayerFillColorSubtleBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Padding" Value="16" />
+</Style>
+<Style Selector="Border.settingsTokenMask">
+    <Setter Property="MinHeight" Value="38" />
+    <Setter Property="Padding" Value="12,7" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+</Style>
 <Style Selector="ItemsControl.settingsFlatGroup">
     <Setter Property="MaxWidth" Value="760" />
     <Setter Property="HorizontalAlignment" Value="Stretch" />

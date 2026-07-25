@@ -63,7 +63,11 @@ public sealed partial class MainWindowViewModel
     [NotifyPropertyChangedFor(nameof(BrowserBridgeIntegrationStatusText))]
     private string _browserBridgeRuntimeError = "";
 
-    internal void SetGlobalHotkeyRegistrationError(string error) => GlobalHotkeyRegistrationError = error;
+    internal void SetGlobalHotkeyRegistrationError(string error)
+    {
+        GlobalHotkeyRegistrationError = error;
+        RaiseDesktopIntegrationPresentationState();
+    }
 
     internal void SetBrowserBridgeRuntimeState(bool isRunning, string sessionToken, string error)
     {
@@ -71,5 +75,6 @@ public sealed partial class MainWindowViewModel
         BrowserIntegrationSessionToken = sessionToken;
         BrowserBridgeRuntimeError = error;
         CopyBrowserIntegrationTokenCommand.NotifyCanExecuteChanged();
+        RaiseDesktopIntegrationPresentationState();
     }
 }

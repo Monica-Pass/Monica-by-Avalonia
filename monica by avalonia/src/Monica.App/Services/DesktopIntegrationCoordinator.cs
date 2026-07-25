@@ -44,16 +44,18 @@ internal sealed class DesktopIntegrationCoordinator(
 
     public void Dispose()
     {
-        if (_viewModel is not null)
+        var viewModel = _viewModel;
+        if (viewModel is not null)
         {
-            _viewModel.PropertyChanged -= ViewModel_OnPropertyChanged;
-            _viewModel = null;
+            viewModel.PropertyChanged -= ViewModel_OnPropertyChanged;
         }
 
         _hotkeyRegistrationTimer.Stop();
         _hotkeyRegistrationTimer.Tick -= HotkeyRegistrationTimer_OnTick;
         _browserRegistrationTimer.Stop();
         _browserRegistrationTimer.Tick -= BrowserRegistrationTimer_OnTick;
+        StopBrowserBridge();
+        _viewModel = null;
         browserBridgeService.Dispose();
         globalHotkeyService.Dispose();
         trayService.Dispose();
@@ -74,8 +76,7 @@ internal sealed class DesktopIntegrationCoordinator(
         else if (e.PropertyName is nameof(MainWindowViewModel.BrowserIntegrationEnabled) or
                  nameof(MainWindowViewModel.BrowserIntegrationPort))
         {
-            _browserRegistrationTimer.Stop();
-            _browserRegistrationTimer.Start();
+            ScheduleBrowserBridgeRestart();
         }
         else if (e.PropertyName == nameof(MainWindowViewModel.IsUnlocked))
         {
@@ -119,13 +120,22 @@ internal sealed class DesktopIntegrationCoordinator(
         ApplyBrowserBridgeSetting();
     }
 
+    private void ScheduleBrowserBridgeRestart()
+    {
+        _browserRegistrationTimer.Stop();
+        StopBrowserBridge();
+        if (_viewModel is { BrowserIntegrationEnabled: true, IsUnlocked: true })
+        {
+            _browserRegistrationTimer.Start();
+        }
+    }
+
     private void ApplyBrowserBridgeSetting()
     {
         var viewModel = _viewModel;
-        browserBridgeService.Stop();
+        StopBrowserBridge();
         if (viewModel is null || !viewModel.BrowserIntegrationEnabled || !viewModel.IsUnlocked)
         {
-            viewModel?.SetBrowserBridgeRuntimeState(false, "", "");
             return;
         }
 
@@ -137,6 +147,12 @@ internal sealed class DesktopIntegrationCoordinator(
         {
             viewModel.SetBrowserBridgeRuntimeState(false, "", browserBridgeService.LastError);
         }
+    }
+
+    private void StopBrowserBridge()
+    {
+        browserBridgeService.Stop();
+        _viewModel?.SetBrowserBridgeRuntimeState(false, "", "");
     }
 
     private async Task<IReadOnlyList<BrowserBridgeCredential>> QueryBrowserCredentialsAsync(

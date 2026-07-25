@@ -14,6 +14,7 @@ public sealed partial class MainWindowViewModel
         }
 
         UpdateSettings(settings => settings.MinimizeToTray = value);
+        RaiseDesktopIntegrationPresentationState();
     }
 
     partial void OnQuickSearchEnabledChanged(bool value)
@@ -25,8 +26,13 @@ public sealed partial class MainWindowViewModel
         }
 
         UpdateSettings(settings => settings.QuickSearchEnabled = value);
+        RaiseDesktopIntegrationPresentationState();
     }
-    partial void OnQuickSearchHotkeyChanged(string value) => UpdateSettings(settings => settings.QuickSearchHotkey = value);
+    partial void OnQuickSearchHotkeyChanged(string value)
+    {
+        UpdateSettings(settings => settings.QuickSearchHotkey = value);
+        RaiseDesktopIntegrationPresentationState();
+    }
 
     partial void OnBrowserIntegrationEnabledChanged(bool value)
     {
@@ -37,9 +43,14 @@ public sealed partial class MainWindowViewModel
         }
 
         UpdateSettings(settings => settings.BrowserIntegrationEnabled = value);
+        RaiseDesktopIntegrationPresentationState();
     }
 
-    partial void OnBrowserIntegrationPortChanged(int value) => UpdateSettings(settings => settings.BrowserIntegrationPort = value);
+    partial void OnBrowserIntegrationPortChanged(int value)
+    {
+        UpdateSettings(settings => settings.BrowserIntegrationPort = value);
+        RaiseDesktopIntegrationPresentationState();
+    }
 
     private void RefreshPlatformIntegrationCapabilities()
     {
@@ -89,6 +100,7 @@ public sealed partial class MainWindowViewModel
         SaveTimelineExportCommand.NotifyCanExecuteChanged();
         ImportMarkdownNoteCommand.NotifyCanExecuteChanged();
         ExportCurrentNoteMarkdownCommand.NotifyCanExecuteChanged();
+        RaiseDesktopIntegrationPresentationState();
     }
 
     private void RefreshCapabilities()

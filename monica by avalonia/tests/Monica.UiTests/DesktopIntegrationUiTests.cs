@@ -115,9 +115,20 @@ public sealed class DesktopIntegrationUiTests
 
         viewModel.IsUnlocked = true;
         viewModel.BrowserIntegrationPort = 50123;
+
+        Assert.False(bridge.IsRunning);
+        Assert.False(viewModel.BrowserBridgeIsRunning);
+        Assert.Empty(viewModel.BrowserIntegrationSessionToken);
+
         await PumpDebounceAsync();
 
         Assert.Equal(50123, bridge.Port);
+
+        viewModel.BrowserIntegrationEnabled = false;
+
+        Assert.False(bridge.IsRunning);
+        Assert.False(viewModel.BrowserBridgeIsRunning);
+        Assert.Empty(viewModel.BrowserIntegrationSessionToken);
     }
 
     [Theory]
