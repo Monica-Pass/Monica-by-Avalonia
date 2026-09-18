@@ -1,5 +1,6 @@
 using System.Globalization;
 using Avalonia;
+using FluentIcons.Common;
 using Monica.App.Controls;
 using Monica.Core.Models;
 
@@ -91,11 +92,16 @@ public sealed record PasswordFolderFilterChoice(
     string SelectionKey = "",
     string? PathPrefix = null,
     bool HasChildren = false,
-    bool IsExpanded = false) : IFolderTreeRow
+    bool IsExpanded = false) : IFolderTreeRow, IVaultTreeRow
 {
     public string FolderDisplayName => string.IsNullOrWhiteSpace(DisplayName) ? Name : DisplayName;
     public string Key => SelectionKey;
     public string Label => FolderDisplayName;
     public Thickness Indent => FolderTreeLayout.IndentFor(Level);
     public bool IsCollapsed => HasChildren && !IsExpanded;
+
+    public VaultTreeRowKind RowKind => VaultTreeRowKind.Folder;
+    public bool IsEntryRow => false;
+    public Symbol EntrySymbol => Symbol.Folder;
+    public string EntryDetail => "";
 }

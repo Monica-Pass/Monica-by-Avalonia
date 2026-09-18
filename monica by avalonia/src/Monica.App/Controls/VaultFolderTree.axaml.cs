@@ -196,7 +196,9 @@ public partial class VaultFolderTree : UserControl
         if (!point.Properties.IsLeftButtonPressed ||
             e.Source is not Visual pressed ||
             FindRowItem(pressed) is not ListBoxItem item ||
-            item.DataContext is not IFolderTreeRow row)
+            item.DataContext is not IFolderTreeRow row ||
+            // Dragging reparents folders; an entry moves through the context menu instead.
+            row.IsEntryLeaf())
         {
             return;
         }
@@ -244,6 +246,7 @@ public partial class VaultFolderTree : UserControl
         ClearDragState();
 
         if (source is null || target is not IFolderTreeRow targetRow ||
+            targetRow.IsEntryLeaf() ||
             MoveFolderCommand is not { } command)
         {
             return;
@@ -265,6 +268,7 @@ public partial class VaultFolderTree : UserControl
         var accepts = false;
         if (_dragSourceRow is { } source &&
             candidate?.DataContext is IFolderTreeRow target &&
+            !target.IsEntryLeaf() &&
             !ReferenceEquals(target, source))
         {
             accepts = MoveFolderCommand?.CanExecute(new FolderMoveRequest(source, target)) == true;
