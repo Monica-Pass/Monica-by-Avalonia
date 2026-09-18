@@ -215,14 +215,6 @@ public sealed class LifecycleWorkflowUiTests
             .Select(item => item.Name ?? "")
             .ToArray();
 
-    private static string FindFeatureFile(string feature, string fileName)
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            var candidate = Path.Combine(directory.FullName, "src", "Monica.App", "Features", feature, fileName);
-            if (File.Exists(candidate)) return candidate;
-        }
-
-        throw new FileNotFoundException($"Could not locate {feature}/{fileName} from the test output directory.");
-    }
+    private static string FindFeatureFile(string feature, string fileName) =>
+        XamlSource.PathOf(fileName);
 }

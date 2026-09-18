@@ -116,14 +116,6 @@ public sealed class StoragePlatformWorkflowUiTests
         Assert.IsType<SyncBackupView>(content.Content);
     }
 
-    private static string ReadFeatureFile(string feature, string fileName)
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            var candidate = Path.Combine(directory.FullName, "src", "Monica.App", "Features", feature, fileName);
-            if (File.Exists(candidate)) return File.ReadAllText(candidate);
-        }
-
-        throw new FileNotFoundException($"Could not locate {feature}/{fileName} from the test output directory.");
-    }
+    private static string ReadFeatureFile(string feature, string fileName) =>
+        XamlSource.Text(fileName);
 }

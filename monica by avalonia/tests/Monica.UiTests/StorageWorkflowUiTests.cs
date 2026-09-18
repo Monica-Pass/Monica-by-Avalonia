@@ -223,14 +223,6 @@ public sealed class StorageWorkflowUiTests
         Assert.NotNull(sync.FindControl<TextBlock>("WebDavOperationStageText"));
     }
 
-    private static string ReadSyncFeatureFile(string fileName)
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            var candidate = Path.Combine(directory.FullName, "src", "Monica.App", "Features", "Sync", fileName);
-            if (File.Exists(candidate)) return File.ReadAllText(candidate);
-        }
-
-        throw new FileNotFoundException($"Could not locate Sync/{fileName} from the test output directory.");
-    }
+    private static string ReadSyncFeatureFile(string fileName) =>
+        XamlSource.Text(fileName);
 }

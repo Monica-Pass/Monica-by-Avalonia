@@ -50,19 +50,8 @@ public sealed class PasswordDetailWorkflowUiTests
     }
 
     private static int CountOccurrences(string value, string fragment) =>
-        value.Split(fragment, StringSplitOptions.None).Length - 1;
+        XamlSource.CountOccurrences(value, fragment);
 
-    private static string FindPasswordDetailXaml()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            var candidate = Path.Combine(directory.FullName, "src", "Monica.App", "PasswordDetailDialog.axaml");
-            if (File.Exists(candidate))
-            {
-                return candidate;
-            }
-        }
-
-        throw new FileNotFoundException("Could not locate PasswordDetailDialog.axaml from the test output directory.");
-    }
+    private static string FindPasswordDetailXaml() =>
+        XamlSource.PathOf("PasswordDetailDialog.axaml");
 }

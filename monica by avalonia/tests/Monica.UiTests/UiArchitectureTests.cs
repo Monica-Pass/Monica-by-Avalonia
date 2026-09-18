@@ -266,12 +266,7 @@ public sealed class UiArchitectureTests
     [Fact]
     public void Shared_controls_never_bind_to_the_shell_view_model()
     {
-        var controlsDirectory = FindAppDirectory("Controls");
-        var sources = Directory
-            .EnumerateFiles(controlsDirectory, "*.*", SearchOption.AllDirectories)
-            .Where(path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ||
-                           path.EndsWith(".axaml", StringComparison.OrdinalIgnoreCase))
-            .ToArray();
+        var sources = XamlSource.InDirectory("Controls");
 
         Assert.NotEmpty(sources);
         Assert.All(
@@ -282,18 +277,17 @@ public sealed class UiArchitectureTests
                 StringComparison.Ordinal));
     }
 
-    private static string FindAppDirectory(params string[] parts)
+    [Fact]
+    public void Tests_never_locate_desktop_source_by_a_hand_rolled_path()
     {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            var candidate = Path.Combine(
-                new[] { directory.FullName, "src", "Monica.App" }.Concat(parts).ToArray());
-            if (Directory.Exists(candidate))
-            {
-                return candidate;
-            }
-        }
+        // A test that rebuilds "src/Monica.App/<folder>/<file>" fails the moment a view moves,
+        // which reports a refactor as a defect. XamlSource resolves by file name instead.
+        var offenders = XamlSource.TestSources()
+            .Where(path => !path.EndsWith(nameof(XamlSource) + ".cs", StringComparison.Ordinal))
+            .Where(path => File.ReadAllText(path).Contains("\"src\", \"Monica.App\"", StringComparison.Ordinal))
+            .Select(Path.GetFileName)
+            .ToArray();
 
-        throw new DirectoryNotFoundException($"Could not locate {string.Join('/', parts)} under src/Monica.App.");
+        Assert.Empty(offenders);
     }
 }

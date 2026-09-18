@@ -176,23 +176,11 @@ public sealed class PasswordVaultCompositionUiTests
     }
 
     private static int CountOccurrences(string value, string fragment) =>
-        value.Split(fragment, StringSplitOptions.None).Length - 1;
+        XamlSource.CountOccurrences(value, fragment);
 
     private static string FindPasswordFeatureFile(string fileName) =>
-        FindAppFile("Features", "Passwords", fileName);
+        XamlSource.PathOf(fileName);
 
-    private static string FindAppFile(params string[] parts)
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            var candidate = Path.Combine(
-                new[] { directory.FullName, "src", "Monica.App" }.Concat(parts).ToArray());
-            if (File.Exists(candidate))
-            {
-                return candidate;
-            }
-        }
-
-        throw new FileNotFoundException($"Could not locate {string.Join('/', parts)} from the test output directory.");
-    }
+    private static string FindAppFile(params string[] parts) =>
+        XamlSource.PathOf(Path.GetFileName(parts[^1]));
 }

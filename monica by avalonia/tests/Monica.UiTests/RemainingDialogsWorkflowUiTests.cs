@@ -66,14 +66,6 @@ public sealed class RemainingDialogsWorkflowUiTests
         Assert.DoesNotContain("#C8FFFFFF", xaml, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string ReadSource(params string[] parts)
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            var candidate = Path.Combine([directory.FullName, "src", "Monica.App", .. parts]);
-            if (File.Exists(candidate)) return File.ReadAllText(candidate);
-        }
-
-        throw new FileNotFoundException(string.Join('/', parts));
-    }
+    private static string ReadSource(params string[] parts) =>
+        XamlSource.Text(Path.GetFileName(parts[^1]));
 }

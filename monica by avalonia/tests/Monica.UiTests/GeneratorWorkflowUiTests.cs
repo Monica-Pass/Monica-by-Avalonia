@@ -121,36 +121,9 @@ public sealed class GeneratorWorkflowUiTests
         Assert.True(content.ColumnDefinitions[1].Width.IsStar);
     }
 
-    private static string FindGeneratorFeatureFile(string fileName)
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            var candidate = Path.Combine(
-                directory.FullName,
-                "src",
-                "Monica.App",
-                "Features",
-                "Generator",
-                fileName);
-            if (File.Exists(candidate))
-            {
-                return candidate;
-            }
-        }
+    private static string FindGeneratorFeatureFile(string fileName) =>
+        XamlSource.PathOf(fileName);
 
-        throw new FileNotFoundException($"Could not locate {fileName} from the test output directory.");
-    }
-
-    private static int CountOccurrences(string text, string value)
-    {
-        var count = 0;
-        var offset = 0;
-        while ((offset = text.IndexOf(value, offset, StringComparison.Ordinal)) >= 0)
-        {
-            count++;
-            offset += value.Length;
-        }
-
-        return count;
-    }
+    private static int CountOccurrences(string text, string value) =>
+        XamlSource.CountOccurrences(text, value);
 }

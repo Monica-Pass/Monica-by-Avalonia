@@ -63,14 +63,6 @@ public sealed class TimelineWorkflowUiTests
         Assert.True(detail.IsVisible);
     }
 
-    private static string FindFeatureFile(string fileName)
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            var candidate = Path.Combine(directory.FullName, "src", "Monica.App", "Features", "Timeline", fileName);
-            if (File.Exists(candidate)) return candidate;
-        }
-
-        throw new FileNotFoundException($"Could not locate {fileName} from the test output directory.");
-    }
+    private static string FindFeatureFile(string fileName) =>
+        XamlSource.PathOf(fileName);
 }
