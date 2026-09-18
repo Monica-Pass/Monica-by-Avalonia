@@ -61,7 +61,7 @@ public sealed partial class MdbxVaultStore(
     private const string DefaultProjectTitle = "Monica";
     private const string DeviceId = "monica-avalonia";
     private static readonly string[] PasswordEntryTypes = ["login", "ssh-key"];
-    private static readonly string[] SecureEntryTypes = ["note", "totp", "card", "document-ref"];
+    private static readonly string[] SecureEntryTypes = ["note", "totp", "card", "document-ref", "identity"];
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -593,6 +593,7 @@ public sealed partial class MdbxVaultStore(
                 secureItem.IsDeleted = record.Deleted;
                 return secureItem;
             })
+            .Where(item => itemType is null || item.ItemType == itemType)
             .Where(item => includeDeleted || !item.IsDeleted)
             .OrderByDescending(item => item.IsFavorite)
             .ThenBy(item => item.SortOrder)
@@ -1377,8 +1378,9 @@ public sealed partial class MdbxVaultStore(
         VaultItemType.Totp => "totp",
         VaultItemType.BankCard => "card",
         VaultItemType.Document => "document-ref",
-        VaultItemType.BillingAddress => "billing-address",
-        VaultItemType.PaymentAccount => "payment-account",
+        // MDBX accepts nine entry types only and billing-address/payment-account are not among
+        // them; the payload "kind" still carries the exact Android kind string.
+        VaultItemType.BillingAddress or VaultItemType.PaymentAccount => "identity",
         _ => "note"
     };
 

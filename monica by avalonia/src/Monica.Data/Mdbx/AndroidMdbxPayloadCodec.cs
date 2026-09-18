@@ -171,17 +171,17 @@ public static class AndroidMdbxPayloadCodec
         string recordTitle,
         string entryType)
     {
-        var itemType = FromMdbxEntryType(entryType);
-        if (itemType is null)
-        {
-            return null;
-        }
-
         try
         {
             using var document = JsonDocument.Parse(payloadJson);
             var root = document.RootElement;
-            if (root.ValueKind != JsonValueKind.Object || !TryGetString(root, out _, "kind"))
+            if (root.ValueKind != JsonValueKind.Object || !TryGetString(root, out var kind, "kind"))
+            {
+                return null;
+            }
+
+            var itemType = FromAndroidSecureItemKind(kind) ?? FromMdbxEntryType(entryType);
+            if (itemType is null)
             {
                 return null;
             }
@@ -284,6 +284,17 @@ public static class AndroidMdbxPayloadCodec
         VaultItemType.BillingAddress => "billing_address",
         VaultItemType.PaymentAccount => "payment_account",
         _ => "note"
+    };
+
+    private static VaultItemType? FromAndroidSecureItemKind(string kind) => kind.Trim().ToLowerInvariant() switch
+    {
+        "note" => VaultItemType.Note,
+        "totp" => VaultItemType.Totp,
+        "bank_card" or "card" => VaultItemType.BankCard,
+        "document" or "document_ref" or "document-ref" => VaultItemType.Document,
+        "billing_address" or "billing-address" => VaultItemType.BillingAddress,
+        "payment_account" or "payment-account" => VaultItemType.PaymentAccount,
+        _ => null
     };
 
     private static VaultItemType? FromMdbxEntryType(string entryType) => entryType.Trim().ToLowerInvariant() switch

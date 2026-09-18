@@ -1153,6 +1153,53 @@ public sealed class MdbxRepositoryTests
         Assert.Contains(await repository.GetSecureItemsAsync(includeDeleted: true), item => item.Id == note.Id && item.IsDeleted);
     }
 
+    [Theory]
+    [InlineData(VaultItemType.Note)]
+    [InlineData(VaultItemType.Totp)]
+    [InlineData(VaultItemType.BankCard)]
+    [InlineData(VaultItemType.Document)]
+    [InlineData(VaultItemType.BillingAddress)]
+    [InlineData(VaultItemType.PaymentAccount)]
+    public async Task Repository_lists_and_updates_every_secure_item_type_without_duplicating(VaultItemType itemType)
+    {
+        var repository = CreateRepository(out var bridge);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        var item = new SecureItem
+        {
+            ItemType = itemType,
+            Title = $"{itemType} original",
+            ItemData = SecureItemDataFor(itemType)
+        };
+
+        await repository.SaveSecureItemAsync(item);
+
+        Assert.Equal($"{itemType} original", Assert.Single(await repository.GetSecureItemsAsync()).Title);
+        Assert.Equal($"{itemType} original", Assert.Single(await repository.GetSecureItemsAsync(itemType)).Title);
+
+        item.Title = $"{itemType} renamed";
+        await repository.SaveSecureItemAsync(item);
+
+        var renamed = Assert.Single(await repository.GetSecureItemsAsync(itemType));
+        Assert.Equal($"{itemType} renamed", renamed.Title);
+        Assert.Equal(1, bridge.CountActiveEntries(database.WorkingCopyPath!));
+
+        await repository.ClearVaultDataAsync(VaultClearScope.SecureItems);
+
+        Assert.Empty(await repository.GetSecureItemsAsync());
+        Assert.True(Assert.Single(await repository.GetSecureItemsAsync(includeDeleted: true)).IsDeleted);
+        Assert.Equal(0, bridge.CountActiveEntries(database.WorkingCopyPath!));
+    }
+
+    private static string SecureItemDataFor(VaultItemType itemType) => itemType switch
+    {
+        VaultItemType.Totp => """{"secret":"JBSWY3DPEHPK3PXP"}""",
+        VaultItemType.BankCard => """{"number":"4111111111111111"}""",
+        VaultItemType.BillingAddress => """{"fullName":"Ada Lovelace","streetAddress":"1 Smoke Street"}""",
+        VaultItemType.PaymentAccount => """{"provider":"Stripe"}""",
+        VaultItemType.Document => """{"documentName":"lease.pdf"}""",
+        _ => """{"body":"keep this"}"""
+    };
+
     [Fact]
     public async Task Repository_prefers_mdbx_secure_item_payload_over_sqlite_cache()
     {
@@ -2883,23 +2930,53 @@ public sealed class MdbxRepositoryTests
         public Task<IReadOnlyList<MdbxNativeProjectRecord>> ListProjectsAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<MdbxNativeProjectRecord>>(_projects.ToList());
 
+        private static readonly string[] NativeEntryTypes =
+        [
+            "login", "note", "totp", "card", "document-ref", "identity", "passkey", "ssh-key", "api-token"
+        ];
+
+        private static void ValidateEntryType(string entryType)
+        {
+            if (!NativeEntryTypes.Contains(entryType, StringComparer.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"native mdbx_ffi rejects this entry type: @entryType={entryType}");
+            }
+        }
+
         public Task<MdbxNativeEntryRecord> CreateEntryAsync(string projectId, string entryType, string title, string payloadJson, CancellationToken cancellationToken = default)
         {
+            ValidateEntryType(entryType);
             var entry = new MdbxNativeEntryRecord($"entry-{_nextEntryId++}", projectId, entryType, title, payloadJson, Deleted: false);
             _entries.Add(entry);
             return Task.FromResult(entry);
         }
 
-        public Task<IReadOnlyList<MdbxNativeEntryRecord>> ListEntriesAsync(string projectId, string? entryType = null, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<MdbxNativeEntryRecord>>(
-                _entries.Where(entry => Matches(entry, projectId, entryType) && !entry.Deleted).ToList());
+        public Task<IReadOnlyList<MdbxNativeEntryRecord>> ListEntriesAsync(string projectId, string? entryType = null, CancellationToken cancellationToken = default)
+        {
+            if (entryType is not null)
+            {
+                ValidateEntryType(entryType);
+            }
 
-        public Task<IReadOnlyList<MdbxNativeEntryRecord>> ListDeletedEntriesAsync(string projectId, string? entryType = null, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<MdbxNativeEntryRecord>>(
+            return Task.FromResult<IReadOnlyList<MdbxNativeEntryRecord>>(
+                _entries.Where(entry => Matches(entry, projectId, entryType) && !entry.Deleted).ToList());
+        }
+
+        public Task<IReadOnlyList<MdbxNativeEntryRecord>> ListDeletedEntriesAsync(string projectId, string? entryType = null, CancellationToken cancellationToken = default)
+        {
+            if (entryType is not null)
+            {
+                ValidateEntryType(entryType);
+            }
+
+            return Task.FromResult<IReadOnlyList<MdbxNativeEntryRecord>>(
                 _entries.Where(entry => Matches(entry, projectId, entryType) && entry.Deleted).ToList());
+        }
 
         public Task<MdbxNativeEntryRecord> UpdateEntryAsync(string projectId, string entryId, string entryType, string title, string payloadJson, CancellationToken cancellationToken = default)
         {
+            ValidateEntryType(entryType);
             var index = _entries.FindIndex(entry => entry.EntryId == entryId && entry.ProjectId == projectId);
             if (index < 0)
             {
@@ -3019,6 +3096,7 @@ public sealed class MdbxRepositoryTests
 
         public void SeedEntry(string projectTitle, string entryType, string title, string payloadJson)
         {
+            ValidateEntryType(entryType);
             var project = _projects.FirstOrDefault(project => string.Equals(project.Title, projectTitle, StringComparison.OrdinalIgnoreCase));
             if (project is null)
             {

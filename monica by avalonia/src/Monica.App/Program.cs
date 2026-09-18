@@ -548,6 +548,54 @@ class Program
                 ImagePaths = WalletItemDataCodec.EncodeImagePaths(documentData.ImagePaths)
             });
         }
+
+        if (secureItems.All(item => !string.Equals(item.Title, "Smoke Billing Address", StringComparison.Ordinal)))
+        {
+            var addressData = new BillingAddressWalletData
+            {
+                FullName = "Smoke User",
+                Company = "Smoke Labs",
+                StreetAddress = "12 Smoke Street",
+                City = "Smoke City",
+                StateProvince = "SK",
+                PostalCode = "100010",
+                Country = "Smokeland",
+                Phone = "+1 555 0100",
+                Email = "billing@smoke.local",
+                IsDefault = true
+            };
+            await repository.SaveSecureItemAsync(new SecureItem
+            {
+                ItemType = VaultItemType.BillingAddress,
+                Title = "Smoke Billing Address",
+                Notes = "Billing address row for H04 wallet selection smoke.",
+                ItemData = WalletItemDataCodec.EncodeBillingAddress(addressData),
+                ImagePaths = WalletItemDataCodec.EncodeImagePaths(addressData.ImagePaths)
+            });
+        }
+
+        if (secureItems.All(item => !string.Equals(item.Title, "Smoke Payment Account", StringComparison.Ordinal)))
+        {
+            var paymentData = new PaymentAccountWalletData
+            {
+                PaymentType = "DIGITAL_WALLET",
+                Provider = "Smoke Pay",
+                AccountName = "smoke.user",
+                AccountHolderName = "Smoke User",
+                Email = "pay@smoke.local",
+                AccountId = "SMOKE-PAY-0001",
+                Currency = "USD",
+                IsDefault = true
+            };
+            await repository.SaveSecureItemAsync(new SecureItem
+            {
+                ItemType = VaultItemType.PaymentAccount,
+                Title = "Smoke Payment Account",
+                Notes = "Payment account row for H04 wallet selection smoke.",
+                ItemData = WalletItemDataCodec.EncodePaymentAccount(paymentData),
+                ImagePaths = WalletItemDataCodec.EncodeImagePaths(paymentData.ImagePaths)
+            });
+        }
     }
 
     private static async Task EnsureSmokeEdgeCaseDataAsync(IMonicaRepository repository, CryptoService crypto)

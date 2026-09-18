@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using Microsoft.Data.Sqlite;
+using Monica.Core.Models;
 using Monica.Data;
+using Monica.Data.Mdbx;
 using Monica.Data.Repositories;
 using Monica.Platform.Services;
 
@@ -75,6 +77,21 @@ public sealed class SmokeVaultSeedTests
 
             Assert.True(entryCount >= 30, $"Expected canonical smoke entries, found {entryCount}.");
             Assert.Contains(projects, project => project.Title.Contains("Smoke/Work", StringComparison.Ordinal));
+
+            using var store = new MdbxVaultStore(bridge);
+            var secureItems = await store.GetSecureItemsAsync(database);
+            Assert.Equal(
+                "Smoke Billing Address",
+                Assert.Single(secureItems, item => item.ItemType == VaultItemType.BillingAddress).Title);
+            Assert.Equal(
+                "Smoke Payment Account",
+                Assert.Single(secureItems, item => item.ItemType == VaultItemType.PaymentAccount).Title);
+            Assert.Equal(
+                "Smoke Billing Address",
+                Assert.Single(await store.GetSecureItemsAsync(database, VaultItemType.BillingAddress)).Title);
+            Assert.Equal(
+                "Smoke Payment Account",
+                Assert.Single(await store.GetSecureItemsAsync(database, VaultItemType.PaymentAccount)).Title);
         }
         finally
         {
