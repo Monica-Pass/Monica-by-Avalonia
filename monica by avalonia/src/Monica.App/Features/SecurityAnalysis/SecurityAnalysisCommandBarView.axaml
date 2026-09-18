@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Monica.App.Controls"
              xmlns:fa="using:FluentAvalonia.UI.Controls"
              xmlns:vm="using:Monica.App.ViewModels"
              x:Class="Monica.App.Features.SecurityAnalysis.SecurityAnalysisCommandBarView"
@@ -15,7 +16,7 @@
             <fa:FACommandBar.PrimaryCommands>
                 <fa:FACommandBarButton Command="{Binding CheckCompromisedPasswordsCommand}"
                                        IsEnabled="{Binding !IsSecurityAnalysisBusy}"
-                                       IconSource="Shield"
+                                       IconSource="{controls:FluentSymbol Shield}"
                                        Label="{Binding L.CheckCompromisedPasswords}"
                                        ToolTip.Tip="{Binding L.CheckCompromisedPasswords}"
                                        AutomationProperties.Name="{Binding L.CheckCompromisedPasswords}" />
@@ -23,19 +24,19 @@
             <fa:FACommandBar.SecondaryCommands>
                 <fa:FACommandBarButton Command="{Binding RefreshSecurityAnalysisCommand}"
                                        IsEnabled="{Binding !IsSecurityAnalysisBusy}"
-                                       IconSource="ArrowClockwise"
+                                       IconSource="{controls:FluentSymbol ArrowClockwise}"
                                        Label="{Binding L[RefreshSecurityAnalysis]}"
                                        AutomationProperties.Name="{Binding L[RefreshSecurityAnalysis]}" />
                 <fa:FACommandBarButton x:Name="CancelCompromisedCheckButton"
                                        Command="{Binding CheckCompromisedPasswordsCancelCommand}"
                                        IsVisible="{Binding IsCheckingCompromisedPasswords}"
-                                       IconSource="Dismiss"
+                                       IconSource="{controls:FluentSymbol Dismiss}"
                                        Label="{Binding L[CancelSecurityCheck]}"
                                        AutomationProperties.Name="{Binding L[CancelSecurityCheck]}" />
                 <fa:FACommandBarButton x:Name="CancelSecurityAnalysisRefreshButton"
                                        Command="{Binding RefreshSecurityAnalysisCancelCommand}"
                                        IsVisible="{Binding IsRefreshingSecurityAnalysis}"
-                                       IconSource="Dismiss"
+                                       IconSource="{controls:FluentSymbol Dismiss}"
                                        Label="{Binding L[CancelSecurityCheck]}"
                                        AutomationProperties.Name="{Binding L[CancelSecurityCheck]}" />
             </fa:FACommandBar.SecondaryCommands>

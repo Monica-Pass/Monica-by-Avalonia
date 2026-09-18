@@ -1,0 +1,176 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:local="using:Monica.App"
+             xmlns:controls="using:Monica.App.Controls"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Controls.VaultFolderTree"
+             x:Name="Root"
+             x:DataType="vm:MainWindowViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="ListBox.folderTree ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="ListBox.folderTree ListBoxItem:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+        </Style>
+        <Style Selector="ListBox.folderTree ListBoxItem:selected">
+            <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
+        </Style>
+        <Style Selector="ListBox.folderTree ListBoxItem Border.folderSelectionPipe">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="ListBox.folderTree ListBoxItem:selected Border.folderSelectionPipe">
+            <Setter Property="IsVisible" Value="True" />
+        </Style>
+        <Style Selector="ListBox.folderTree ListBoxItem.draggingSource">
+            <Setter Property="Opacity" Value="0.45" />
+        </Style>
+        <Style Selector="ListBox.folderTree ListBoxItem.dropTarget">
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+        </Style>
+        <Style Selector="Button.folderTreeReset">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="8,2,4,2" />
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        </Style>
+        <Style Selector="Button.folderTreeReset.on">
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,*" RowSpacing="6">
+        <!-- Ancestors are already visible as rows above the selection, so the header carries no
+             path: just the way back to an unfiltered list, and the one visible create action. -->
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+            <Panel>
+                <Border Width="3"
+                        Height="16"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
+                        CornerRadius="1.5"
+                        IsVisible="{Binding #Root.IsAllFoldersSelected}"
+                        Background="{DynamicResource AccentFillColorDefaultBrush}" />
+                <Button x:Name="AllFoldersButton"
+                        Classes="folderTreeReset"
+                        Classes.on="{Binding #Root.IsAllFoldersSelected}"
+                        Command="{Binding #Root.AllFoldersCommand}"
+                        Content="{Binding #Root.DataContext.L.AllFolders}"
+                        AutomationProperties.Name="{Binding #Root.DataContext.L.AllFolders}" />
+            </Panel>
+            <Button Grid.Column="1"
+                    x:Name="CreateFolderButton"
+                    Classes="folderTreeReset"
+                    Width="24"
+                    Height="24"
+                    Padding="0"
+                    HorizontalAlignment="Right"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    Click="OnCreateFolderClick"
+                    ToolTip.Tip="{Binding #Root.DataContext.L.NewFolder}"
+                    AutomationProperties.Name="{Binding #Root.DataContext.L.NewFolder}">
+                <ic:FluentIcon Icon="FolderAdd" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <!-- Folder names are typed in place rather than in a modal, and only while editing. -->
+        <TextBox Grid.Row="1"
+                 x:Name="FolderNameBox"
+                 IsVisible="{Binding #Root.IsNaming}"
+                 Text="{Binding #Root.FolderName, Mode=TwoWay}"
+                 PlaceholderText="{Binding #Root.NamingPlaceholder}"
+                 MinHeight="28"
+                 Padding="6,3"
+                 KeyDown="OnFolderNameKeyDown"
+                 LostFocus="OnFolderNameLostFocus"
+                 AutomationProperties.Name="{Binding #Root.NamingPlaceholder}" />
+
+        <ListBox Grid.Row="2"
+                 x:Name="FolderTreeList"
+                 Classes="folderTree"
+                 ItemsSource="{Binding #Root.ItemsSource}"
+                 SelectedItem="{Binding #Root.SelectedItem, Mode=TwoWay}"
+                 SelectionMode="Single"
+                 KeyDown="OnTreeKeyDown"
+                 Background="Transparent"
+                 Padding="0"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate><VirtualizingStackPanel Orientation="Vertical" /></ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="controls:IFolderTreeRow">
+                    <!-- Transparent so the whole row is right-clickable, not just the label. -->
+                    <Panel MinHeight="28" Background="Transparent">
+                        <Panel.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="{Binding #Root.DataContext.L.NewFolder}" Click="OnCreateFolderClick">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="FolderAdd" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{Binding #Root.DataContext.L.RenameFolder}"
+                                          InputGesture="F2"
+                                          IsEnabled="{Binding #Root.CanManageSelected}"
+                                          Click="OnRenameFolderClick">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="Edit" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{Binding #Root.DataContext.L.DeleteFolder}"
+                                          IsEnabled="{Binding #Root.CanManageSelected}"
+                                          Command="{Binding #Root.DeleteFolderCommand}">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="Delete" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
+                            </ContextMenu>
+                        </Panel.ContextMenu>
+                        <Border Width="3"
+                                Height="16"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                CornerRadius="1.5"
+                                Classes="folderSelectionPipe"
+                                Background="{DynamicResource AccentFillColorDefaultBrush}" />
+                        <Grid ColumnDefinitions="20,18,*"
+                              ColumnSpacing="6"
+                              Margin="{Binding Indent}"
+                              VerticalAlignment="Center">
+                            <Button Classes="workspaceCommand"
+                                    Width="20"
+                                    Height="20"
+                                    Padding="0"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Command="{Binding #Root.ToggleExpansionCommand}"
+                                    CommandParameter="{Binding}"
+                                    IsVisible="{Binding HasChildren}"
+                                    AutomationProperties.Name="{Binding Label}">
+                                <Panel>
+                                    <ic:FluentIcon Icon="ChevronDown" FontSize="14" IsVisible="{Binding IsExpanded}" />
+                                    <ic:FluentIcon Icon="ChevronRight"
+                                                   FontSize="14"
+                                                   IsVisible="{Binding IsExpanded, Converter={x:Static local:BoolConverters.Not}}" />
+                                </Panel>
+                            </Button>
+                            <ic:FluentIcon Grid.Column="1"
+                                           Icon="Folder"
+                                           FontSize="14"
+                                           VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding Label}"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                    </Panel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </Grid>
+</UserControl>

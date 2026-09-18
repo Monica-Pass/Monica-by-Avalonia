@@ -251,7 +251,7 @@ public sealed partial class PlatformServiceTests
         Assert.False(string.IsNullOrWhiteSpace(metadata.EncryptedPassword));
         Assert.Equal("mdbx-1/argon2id", metadata.KdfProfile);
         Assert.True(stream.CanWrite);
-        Assert.Equal("MDBX-1", await ReadMdbxFormatVersionAsync(path));
+        Assert.Equal("MDBX-2", await ReadMdbxFormatVersionAsync(path));
     }
 
     [Fact]
@@ -266,7 +266,7 @@ public sealed partial class PlatformServiceTests
 
         Assert.Equal(1, bridge.CreateCalls);
         Assert.Equal(1, bridge.OpenCalls);
-        Assert.Equal("MDBX-1 vault native-vault", metadata.Description);
+        Assert.Equal("MDBX-2 vault native-vault", metadata.Description);
         Assert.True(stream.CanWrite);
         Assert.True(File.Exists(path));
     }
@@ -283,7 +283,7 @@ public sealed partial class PlatformServiceTests
 
         Assert.Equal(0, bridge.CreateCalls);
         Assert.Equal(1, bridge.OpenCalls);
-        Assert.Equal("MDBX-1 vault native-vault", metadata.Description);
+        Assert.Equal("MDBX-2 vault native-vault", metadata.Description);
         Assert.Equal(path, metadata.WorkingCopyPath);
     }
 
@@ -526,6 +526,7 @@ public sealed partial class PlatformServiceTests
     private sealed class RecordingNativeBridge : IMdbxNativeBridge
     {
         public bool IsAvailable => true;
+        public string WritableStorageFormat => "MDBX-2";
         public int CreateCalls { get; private set; }
         public int OpenCalls { get; private set; }
 
@@ -552,7 +553,7 @@ public sealed partial class PlatformServiceTests
         public Task<MdbxNativeProjectRecord> CreateProjectAsync(string title, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
-        public Task<IReadOnlyList<MdbxNativeProjectRecord>> ListProjectsAsync(bool includeDeleted, CancellationToken cancellationToken = default) =>
+        public Task<IReadOnlyList<MdbxNativeProjectRecord>> ListProjectsAsync(CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task<MdbxNativeEntryRecord> CreateEntryAsync(string projectId, string entryType, string title, string payloadJson, CancellationToken cancellationToken = default) =>
@@ -576,22 +577,13 @@ public sealed partial class PlatformServiceTests
         public Task<MdbxNativeEntryRecord> RestoreEntryAsync(string projectId, string entryId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
-        public Task<MdbxNativeAttachmentRecord> CreateAttachmentMetadataAsync(string projectId, string? entryId, string fileName, string? mediaType, string contentHash, ulong originalSize, CancellationToken cancellationToken = default) =>
+        public Task<MdbxNativeAttachmentRecord> CreateAttachmentAsync(string projectId, string? entryId, string fileName, string? mediaType, byte[] content, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
-        public Task<IReadOnlyList<MdbxNativeAttachmentRecord>> ListAttachmentsByProjectAsync(string projectId, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<IReadOnlyList<MdbxNativeAttachmentRecord>> ListAttachmentsByEntryAsync(string entryId, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<MdbxNativeAttachmentRecord> WriteAttachmentInlineContentAsync(string attachmentId, byte[] content, CancellationToken cancellationToken = default) =>
+        public Task<IReadOnlyList<MdbxNativeAttachmentRecord>> ListAttachmentsAsync(string projectId, string? entryId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task<byte[]> ReadAttachmentContentAsync(string attachmentId, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<MdbxNativeAttachmentRecord> RenameAttachmentAsync(string attachmentId, string fileName, string? mediaType, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task DeleteAttachmentAsync(string attachmentId, CancellationToken cancellationToken = default) =>

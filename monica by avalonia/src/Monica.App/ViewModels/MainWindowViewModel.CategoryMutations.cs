@@ -74,6 +74,43 @@ public sealed partial class MainWindowViewModel
         return new LocalCategoryRenameResult(category, oldPath, renamePlan.DestinationPath);
     }
 
+    private async Task<LocalCategoryRenameResult?> MoveLocalCategoryAsync(
+        Category? category,
+        string? destinationParentPath)
+    {
+        if (category is null)
+        {
+            StatusMessage = _localization.Get("SelectFolderToManage");
+            return null;
+        }
+
+        var movePlan = LocalCategoryPath.PlanSubtreeMove(Categories, category, destinationParentPath);
+        if (movePlan is null)
+        {
+            return null;
+        }
+
+        if (movePlan.HasConflict)
+        {
+            StatusMessage = _localization.Format(
+                "FolderAlreadyExistsFormat",
+                movePlan.ConflictPath ?? destinationParentPath ?? string.Empty);
+            return null;
+        }
+
+        var oldPath = category.Name;
+        foreach (var updatedCategory in Categories.Where(item => movePlan.UpdatedPaths.ContainsKey(item.Id)))
+        {
+            updatedCategory.Name = movePlan.UpdatedPaths[updatedCategory.Id];
+            await _repository.SaveCategoryAsync(updatedCategory);
+        }
+
+        await LogCategoryOperationAsync(category, "UPDATE");
+        RefreshCategoryConsumers(category.Id);
+        StatusMessage = _localization.Format("RenamedFolderFormat", oldPath, movePlan.DestinationPath);
+        return new LocalCategoryRenameResult(category, oldPath, movePlan.DestinationPath);
+    }
+
     private async Task<LocalCategoryDeleteResult?> DeleteLocalCategoryAsync(Category? category)
     {
         if (category is null)

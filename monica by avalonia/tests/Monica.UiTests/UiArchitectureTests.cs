@@ -108,6 +108,7 @@ public sealed class UiArchitectureTests
                     "DatabaseManagement", "Sync", "Settings", "Lock"
                 ],
                 navigationTags);
+            AssertSingleSelectedRailItem(navigation, "Passwords");
             var lockItem = navigation.FooterMenuItems
                 .OfType<FANavigationViewItem>()
                 .Single(item => string.Equals(item.Tag?.ToString(), "Lock", StringComparison.Ordinal));
@@ -123,6 +124,15 @@ public sealed class UiArchitectureTests
 
             Assert.Equal("Notes", viewModel.SelectedSection);
             Assert.IsType<NoteWorkspaceView>(workspaceHost.CurrentWorkspace);
+            AssertSingleSelectedRailItem(navigation, "Notes");
+
+            var timelineItem = navigation.MenuItems
+                .OfType<FANavigationViewItem>()
+                .Single(item => string.Equals(item.Tag?.ToString(), "Timeline", StringComparison.Ordinal));
+            viewModel.SelectedSection = "Timeline";
+            Dispatcher.UIThread.RunJobs();
+            Assert.Same(timelineItem, navigation.SelectedItem);
+            AssertSingleSelectedRailItem(navigation, "Timeline");
 
             var shell = Assert.Single(window.GetVisualDescendants().OfType<Monica.App.Features.UnlockedShellView>());
             shell.ActivateNavigationTag("Lock");
@@ -136,6 +146,56 @@ public sealed class UiArchitectureTests
             window.Close();
         }
     }
+
+    private static void AssertSingleSelectedRailItem(FANavigationView navigation, string section) =>
+        Assert.Equal(
+            new[] { section },
+            navigation.MenuItems
+                .Concat(navigation.FooterMenuItems)
+                .OfType<FANavigationViewItem>()
+                .Where(item => item.IsSelected)
+                .Select(item => item.Tag?.ToString()));
+
+    [Fact]
+    public void Rail_paints_no_accent_indicator_even_when_the_section_moves_between_panes()
+    {
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<Monica.App.ViewModels.MainWindowViewModel>();
+        window.Show();
+        try
+        {
+            window.DataContext = viewModel;
+            viewModel.IsUnlocked = true;
+            Dispatcher.UIThread.RunJobs();
+
+            viewModel.SelectSectionCommand.Execute("DatabaseManagement");
+            Dispatcher.UIThread.RunJobs();
+            viewModel.SelectSectionCommand.Execute("Passwords");
+            Dispatcher.UIThread.RunJobs();
+
+            var navigation = Assert.Single(window.GetVisualDescendants().OfType<FANavigationView>());
+            var railItems = navigation.MenuItems
+                .Concat(navigation.FooterMenuItems)
+                .OfType<FANavigationViewItem>()
+                .ToArray();
+            Assert.DoesNotContain(railItems, IndicatorIsPainted);
+            Assert.Equal(["Passwords"], railItems.Where(item => item.IsSelected).Select(item => item.Tag?.ToString()));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    // The rail fades the bars it should not show, so a painted bar is one that is both in the
+    // layout and not faded out.
+    private static bool IndicatorIsPainted(FANavigationViewItem item) =>
+        item.GetVisualDescendants()
+            .OfType<Border>()
+            .SingleOrDefault(border => border.Name == "SelectionIndicator") is { } bar &&
+        bar.IsEffectivelyVisible &&
+        bar.Opacity > 0;
 
     [Fact]
     public void Locked_shell_does_not_eagerly_load_feature_style_dictionaries()

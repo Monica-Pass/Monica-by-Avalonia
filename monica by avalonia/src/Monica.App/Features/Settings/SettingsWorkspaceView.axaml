@@ -1,10 +1,10 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ic="using:FluentIcons.Avalonia" xmlns:local="using:Monica.App" xmlns:settings="using:Monica.App.Features.Settings" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsWorkspaceView" x:DataType="vm:MainWindowViewModel">
+﻿<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ic="using:FluentIcons.Avalonia" xmlns:local="using:Monica.App" xmlns:settings="using:Monica.App.Features.Settings" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsWorkspaceView" x:DataType="vm:MainWindowViewModel">
     <UserControl.Styles>
         <StyleInclude Source="/Features/Settings/SettingsStyles.axaml" />
     </UserControl.Styles>
     <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsSettings}}" RowDefinitions="*" HorizontalAlignment="Stretch" ClipToBounds="True">
         <Grid x:Name="SettingsWorkspaceLayoutGrid" ColumnDefinitions="248,*" RowDefinitions="*" MinWidth="0">
-            <Border x:Name="SettingsSidebarRegion" Classes="workspaceSidebar" Padding="14" ClipToBounds="True" CornerRadius="0" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,1,0" Background="Transparent">
+            <Border x:Name="SettingsSidebarRegion" Classes="workspaceSidebar" Padding="14" ClipToBounds="True" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,1,0">
                 <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="8">
                         <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.Settings}" Margin="2,0,0,4" />

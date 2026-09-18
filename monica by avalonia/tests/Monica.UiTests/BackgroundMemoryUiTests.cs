@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Controls;
@@ -18,6 +19,8 @@ namespace Monica.UiTests;
 [Collection(AvaloniaUiTestCollection.Name)]
 public sealed class BackgroundMemoryUiTests
 {
+    private const int CollectionBudgetMilliseconds = 2500;
+
     public BackgroundMemoryUiTests()
     {
         AvaloniaUiThreadTestContext.VerifyAccess();
@@ -348,14 +351,19 @@ public sealed class BackgroundMemoryUiTests
         IReadOnlyList<WeakReference> references,
         CancellationToken cancellationToken)
     {
-        for (var attempt = 0; attempt < 5 && references.Any(reference => reference.IsAlive); attempt++)
+        // The navigation selection animation holds a DispatcherTimer for 700 ms after the last selection
+        // change, and that timer keeps the just-detached workspace alive until it elapses.
+        var deadline = Stopwatch.StartNew();
+        while (deadline.ElapsedMilliseconds < CollectionBudgetMilliseconds)
         {
             Dispatcher.UIThread.RunJobs();
             ForceFullCollection();
-            if (references.Any(reference => reference.IsAlive))
+            if (!references.Any(reference => reference.IsAlive))
             {
-                await Task.Delay(20, cancellationToken);
+                return;
             }
+
+            await Task.Delay(50, cancellationToken);
         }
 
         Assert.All(references, reference => Assert.False(reference.IsAlive));

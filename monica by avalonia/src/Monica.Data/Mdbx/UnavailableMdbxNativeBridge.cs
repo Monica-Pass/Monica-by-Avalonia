@@ -6,6 +6,8 @@ public sealed class UnavailableMdbxNativeBridge : IMdbxNativeBridge
 {
     public bool IsAvailable => false;
 
+    public string WritableStorageFormat => "";
+
     public Task<IMdbxNativeVault> CreateVaultAsync(string path, string password, string deviceId, MdbxTigaMode mode, CancellationToken cancellationToken = default) =>
         throw new InvalidOperationException("MDBX UniFFI native bridge is not available.");
 

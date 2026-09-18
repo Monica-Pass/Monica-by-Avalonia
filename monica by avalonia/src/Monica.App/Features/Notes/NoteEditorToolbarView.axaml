@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Monica.App.Controls"
              xmlns:fa="using:FluentAvalonia.UI.Controls"
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:notes="using:Monica.App.Features.Notes"
@@ -22,19 +23,19 @@
             <fa:FACommandBar.PrimaryCommands>
                 <fa:FACommandBarButton Tag="undo"
                                        Click="ToolbarButton_OnClick"
-                                       IconSource="Undo"
+                                       IconSource="{controls:FluentSymbol ArrowUndo}"
                                        Label="{Binding L[NoteToolbarUndo]}"
                                        ToolTip.Tip="{Binding L[NoteToolbarUndo]}"
                                        AutomationProperties.Name="{Binding L[NoteToolbarUndo]}" />
                 <fa:FACommandBarButton Tag="redo"
                                        Click="ToolbarButton_OnClick"
-                                       IconSource="Redo"
+                                       IconSource="{controls:FluentSymbol ArrowRedo}"
                                        Label="{Binding L[NoteToolbarRedo]}"
                                        ToolTip.Tip="{Binding L[NoteToolbarRedo]}"
                                        AutomationProperties.Name="{Binding L[NoteToolbarRedo]}" />
                 <fa:FACommandBarButton Tag="find"
                                        Click="ToolbarButton_OnClick"
-                                       IconSource="Find"
+                                       IconSource="{controls:FluentSymbol Search}"
                                        Label="{Binding L[NoteFind]}"
                                        ToolTip.Tip="{Binding L[NoteFind]}"
                                        AutomationProperties.Name="{Binding L[NoteFind]}" />
@@ -60,25 +61,25 @@
 
                 <fa:FACommandBarButton Tag="bold"
                                        Click="ToolbarButton_OnClick"
-                                       IconSource="Bold"
+                                       IconSource="{controls:FluentSymbol TextBold}"
                                        Label="{Binding L[NoteToolbarBold]}"
                                        ToolTip.Tip="{Binding L[NoteToolbarBold]}"
                                        AutomationProperties.Name="{Binding L[NoteToolbarBold]}" />
                 <fa:FACommandBarButton Tag="italic"
                                        Click="ToolbarButton_OnClick"
-                                       IconSource="Italic"
+                                       IconSource="{controls:FluentSymbol TextItalic}"
                                        Label="{Binding L[NoteToolbarItalic]}"
                                        ToolTip.Tip="{Binding L[NoteToolbarItalic]}"
                                        AutomationProperties.Name="{Binding L[NoteToolbarItalic]}" />
                 <fa:FACommandBarButton Tag="ul"
                                        Click="ToolbarButton_OnClick"
-                                       IconSource="Bullets"
+                                       IconSource="{controls:FluentSymbol TextBulletList}"
                                        Label="{Binding L[NoteToolbarUnorderedList]}"
                                        ToolTip.Tip="{Binding L[NoteToolbarUnorderedList]}"
                                        AutomationProperties.Name="{Binding L[NoteToolbarUnorderedList]}" />
                 <fa:FACommandBarButton Tag="link"
                                        Click="ToolbarButton_OnClick"
-                                       IconSource="Link"
+                                       IconSource="{controls:FluentSymbol Link}"
                                        Label="{Binding L[NoteToolbarLink]}"
                                        ToolTip.Tip="{Binding L[NoteToolbarLink]}"
                                        AutomationProperties.Name="{Binding L[NoteToolbarLink]}" />
@@ -133,15 +134,15 @@
             </fa:FACommandBar.PrimaryCommands>
 
             <fa:FACommandBar.SecondaryCommands>
-                <fa:FACommandBarButton Tag="replace" Click="ToolbarButton_OnClick" IconSource="Find" Label="{Binding L[NoteToolbarFindReplace]}" AutomationProperties.Name="{Binding L[NoteToolbarFindReplace]}" />
-                <fa:FACommandBarButton Tag="strike" Click="ToolbarButton_OnClick" IconSource="Font" Label="{Binding L[NoteToolbarStrikethrough]}" AutomationProperties.Name="{Binding L[NoteToolbarStrikethrough]}" />
-                <fa:FACommandBarButton Tag="inlinecode" Click="ToolbarButton_OnClick" IconSource="Code" Label="{Binding L[NoteToolbarInlineCode]}" AutomationProperties.Name="{Binding L[NoteToolbarInlineCode]}" />
-                <fa:FACommandBarButton Tag="quote" Click="ToolbarButton_OnClick" IconSource="Comment" Label="{Binding L[NoteToolbarQuote]}" AutomationProperties.Name="{Binding L[NoteToolbarQuote]}" />
-                <fa:FACommandBarButton Tag="code" Click="ToolbarButton_OnClick" IconSource="Code" Label="{Binding L[NoteToolbarCodeBlock]}" AutomationProperties.Name="{Binding L[NoteToolbarCodeBlock]}" />
-                <fa:FACommandBarButton Tag="ol" Click="ToolbarButton_OnClick" IconSource="List" Label="{Binding L[NoteToolbarOrderedList]}" AutomationProperties.Name="{Binding L[NoteToolbarOrderedList]}" />
-                <fa:FACommandBarButton Tag="todo" Click="ToolbarButton_OnClick" IconSource="Checkmark" Label="{Binding L[NoteToolbarTaskList]}" AutomationProperties.Name="{Binding L[NoteToolbarTaskList]}" />
-                <fa:FACommandBarButton Tag="table" Click="ToolbarButton_OnClick" IconSource="ViewAll" Label="{Binding L[NoteToolbarTable]}" AutomationProperties.Name="{Binding L[NoteToolbarTable]}" />
-                <fa:FACommandBarButton Tag="hr" Click="ToolbarButton_OnClick" IconSource="Remove" Label="{Binding L[NoteToolbarHorizontalRule]}" AutomationProperties.Name="{Binding L[NoteToolbarHorizontalRule]}" />
+                <fa:FACommandBarButton Tag="replace" Click="ToolbarButton_OnClick" IconSource="{controls:FluentSymbol Search}" Label="{Binding L[NoteToolbarFindReplace]}" AutomationProperties.Name="{Binding L[NoteToolbarFindReplace]}" />
+                <fa:FACommandBarButton Tag="strike" Click="ToolbarButton_OnClick" IconSource="{controls:FluentSymbol TextStrikethrough}" Label="{Binding L[NoteToolbarStrikethrough]}" AutomationProperties.Name="{Binding L[NoteToolbarStrikethrough]}" />
+                <fa:FACommandBarButton Tag="inlinecode" Click="ToolbarButton_OnClick" IconSource="{controls:FluentSymbol Code}" Label="{Binding L[NoteToolbarInlineCode]}" AutomationProperties.Name="{Binding L[NoteToolbarInlineCode]}" />
+                <fa:FACommandBarButton Tag="quote" Click="ToolbarButton_OnClick" IconSource="{controls:FluentSymbol TextQuote}" Label="{Binding L[NoteToolbarQuote]}" AutomationProperties.Name="{Binding L[NoteToolbarQuote]}" />
+                <fa:FACommandBarButton Tag="code" Click="ToolbarButton_OnClick" IconSource="{controls:FluentSymbol Code}" Label="{Binding L[NoteToolbarCodeBlock]}" AutomationProperties.Name="{Binding L[NoteToolbarCodeBlock]}" />
+                <fa:FACommandBarButton Tag="ol" Click="ToolbarButton_OnClick" IconSource="{controls:FluentSymbol TextNumberList}" Label="{Binding L[NoteToolbarOrderedList]}" AutomationProperties.Name="{Binding L[NoteToolbarOrderedList]}" />
+                <fa:FACommandBarButton Tag="todo" Click="ToolbarButton_OnClick" IconSource="{controls:FluentSymbol TaskListSquare}" Label="{Binding L[NoteToolbarTaskList]}" AutomationProperties.Name="{Binding L[NoteToolbarTaskList]}" />
+                <fa:FACommandBarButton Tag="table" Click="ToolbarButton_OnClick" IconSource="{controls:FluentSymbol Table}" Label="{Binding L[NoteToolbarTable]}" AutomationProperties.Name="{Binding L[NoteToolbarTable]}" />
+                <fa:FACommandBarButton Tag="hr" Click="ToolbarButton_OnClick" IconSource="{controls:FluentSymbol LineHorizontal1}" Label="{Binding L[NoteToolbarHorizontalRule]}" AutomationProperties.Name="{Binding L[NoteToolbarHorizontalRule]}" />
             </fa:FACommandBar.SecondaryCommands>
         </fa:FACommandBar>
     </Border>

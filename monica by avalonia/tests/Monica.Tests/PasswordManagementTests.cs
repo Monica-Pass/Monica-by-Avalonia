@@ -4,6 +4,7 @@ using System.Collections.Specialized;
 using System.Reflection;
 using System.Text.Json.Nodes;
 using Monica.App.Services;
+using Monica.App.Controls;
 using Monica.App.ViewModels;
 using Monica.Core.ImportExport;
 using Monica.Core.Models;
@@ -3144,6 +3145,55 @@ public sealed partial class PasswordManagementTests
         Assert.Contains(
             harness.ViewModel.PasswordFolderFilters,
             item => item.Id == secrets.Id && item.Level == 2);
+    }
+
+    [Fact]
+    public async Task ViewModel_moves_password_folder_into_the_dropped_folder()
+    {
+        var harness = CreateHarness();
+        var work = new Category { Name = "Work", SortOrder = 1 };
+        var production = new Category { Name = "Work/Production", SortOrder = 2 };
+        var personal = new Category { Name = "Personal", SortOrder = 3 };
+        await harness.Repository.SaveCategoryAsync(work);
+        await harness.Repository.SaveCategoryAsync(production);
+        await harness.Repository.SaveCategoryAsync(personal);
+        await harness.ViewModel.LoadAsync();
+
+        var source = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == work.Id);
+        var target = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == personal.Id);
+        var request = new FolderMoveRequest(source, target);
+
+        Assert.True(harness.ViewModel.MovePasswordFolderCommand.CanExecute(request));
+        await harness.ViewModel.MovePasswordFolderCommand.ExecuteAsync(request);
+
+        var categories = await harness.Repository.GetCategoriesAsync();
+        Assert.Contains(categories, item => item.Id == work.Id && item.Name == "Personal/Work");
+        Assert.Contains(categories, item => item.Id == production.Id && item.Name == "Personal/Work/Production");
+        Assert.Equal(
+            harness.ViewModel.L.Format("RenamedFolderFormat", "Work", "Personal/Work"),
+            harness.ViewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task ViewModel_refuses_moving_a_password_folder_into_its_own_descendant()
+    {
+        var harness = CreateHarness();
+        var work = new Category { Name = "Work", SortOrder = 1 };
+        var production = new Category { Name = "Work/Production", SortOrder = 2 };
+        await harness.Repository.SaveCategoryAsync(work);
+        await harness.Repository.SaveCategoryAsync(production);
+        await harness.ViewModel.LoadAsync();
+
+        var source = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == work.Id);
+        var target = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == production.Id);
+        var request = new FolderMoveRequest(source, target);
+
+        Assert.False(harness.ViewModel.MovePasswordFolderCommand.CanExecute(request));
+        await harness.ViewModel.MovePasswordFolderCommand.ExecuteAsync(request);
+
+        var categories = await harness.Repository.GetCategoriesAsync();
+        Assert.Contains(categories, item => item.Id == work.Id && item.Name == "Work");
+        Assert.Contains(categories, item => item.Id == production.Id && item.Name == "Work/Production");
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Monica.App.Controls"
              xmlns:fa="using:FluentAvalonia.UI.Controls"
              xmlns:vm="using:Monica.App.ViewModels"
              x:Class="Monica.App.Features.Mdbx.MdbxCommandBarView"
@@ -14,7 +15,7 @@
         <fa:FACommandBar.PrimaryCommands>
             <fa:FACommandBarButton Command="{Binding CreateMdbxVaultCommand}"
                                    IsEnabled="{Binding !IsMdbxBusy}"
-                                   IconSource="Database"
+                                   IconSource="{controls:FluentSymbol Database}"
                                    Label="{Binding L.CreateLocalMdbxVault}"
                                    ToolTip.Tip="{Binding L.CreateLocalMdbxVault}"
                                    AutomationProperties.Name="{Binding L.CreateLocalMdbxVault}" />
@@ -22,12 +23,12 @@
         <fa:FACommandBar.SecondaryCommands>
             <fa:FACommandBarButton Command="{Binding RefreshMdbxVaultsCommand}"
                                    IsEnabled="{Binding !IsMdbxBusy}"
-                                   IconSource="ArrowClockwise"
+                                   IconSource="{controls:FluentSymbol ArrowClockwise}"
                                    Label="{Binding L.Refresh}"
                                    ToolTip.Tip="{Binding L.Refresh}"
                                    AutomationProperties.Name="{Binding L.Refresh}" />
             <fa:FACommandBarButton Command="{Binding ConfigureMdbxRemoteSourcesCommand}"
-                                   IconSource="Settings"
+                                   IconSource="{controls:FluentSymbol Settings}"
                                    Label="{Binding L.Configure}"
                                    AutomationProperties.Name="{Binding L.Configure}" />
         </fa:FACommandBar.SecondaryCommands>

@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Monica.App.Controls"
              xmlns:fa="using:FluentAvalonia.UI.Controls"
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:local="using:Monica.App"
@@ -61,7 +62,7 @@
                                      HorizontalAlignment="Stretch">
                         <fa:FACommandBar.PrimaryCommands>
                             <fa:FACommandBarButton Command="{Binding AddWalletItemCommand}"
-                                                   IconSource="Add"
+                                                   IconSource="{controls:FluentSymbol Add}"
                                                    Label="{Binding L.AddItem}"
                                                    ToolTip.Tip="{Binding L.AddItem}"
                                                    AutomationProperties.Name="{Binding L.AddItem}" />
@@ -69,7 +70,7 @@
                         <fa:FACommandBar.SecondaryCommands>
                             <fa:FACommandBarButton Command="{Binding SaveWalletCsvExportCommand}"
                                                    IsEnabled="{Binding CanUseFilePicker}"
-                                                   IconSource="ArrowDownload"
+                                                   IconSource="{controls:FluentSymbol ArrowDownload}"
                                                    Label="{Binding L[ExportWalletCsv]}"
                                                    AutomationProperties.Name="{Binding L[ExportWalletCsv]}" />
                         </fa:FACommandBar.SecondaryCommands>

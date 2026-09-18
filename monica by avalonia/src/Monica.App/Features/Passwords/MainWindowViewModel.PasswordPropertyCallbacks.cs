@@ -42,6 +42,7 @@ public sealed partial class MainWindowViewModel
         RaisePasswordSelectionState();
         ReconcileSelectedPasswordDetails();
         OnPropertyChanged(nameof(CanManageSelectedPasswordFolder));
+        OnPropertyChanged(nameof(IsAllPasswordFoldersSelected));
     }
     partial void OnSelectedPasswordSortChanged(string value)
     {

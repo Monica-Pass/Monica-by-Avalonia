@@ -2764,6 +2764,7 @@ public sealed class MdbxRepositoryTests
         private readonly Dictionary<string, FakeMdbxNativeVault> _vaults = new(StringComparer.OrdinalIgnoreCase);
 
         public bool IsAvailable => true;
+        public string WritableStorageFormat => "MDBX-2";
         public List<string> OpenedPaths { get; } = [];
         public int DisposedVaultCount => _vaults.Values.Sum(vault => vault.DisposeCount);
 
@@ -2874,14 +2875,13 @@ public sealed class MdbxRepositoryTests
 
         public Task<MdbxNativeProjectRecord> CreateProjectAsync(string title, CancellationToken cancellationToken = default)
         {
-            var project = new MdbxNativeProjectRecord($"project-{_nextProjectId++}", title, Deleted: false);
+            var project = new MdbxNativeProjectRecord($"project-{_nextProjectId++}", title);
             _projects.Add(project);
             return Task.FromResult(project);
         }
 
-        public Task<IReadOnlyList<MdbxNativeProjectRecord>> ListProjectsAsync(bool includeDeleted, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<MdbxNativeProjectRecord>>(
-                _projects.Where(project => includeDeleted || !project.Deleted).ToList());
+        public Task<IReadOnlyList<MdbxNativeProjectRecord>> ListProjectsAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<MdbxNativeProjectRecord>>(_projects.ToList());
 
         public Task<MdbxNativeEntryRecord> CreateEntryAsync(string projectId, string entryType, string title, string payloadJson, CancellationToken cancellationToken = default)
         {
@@ -2938,78 +2938,41 @@ public sealed class MdbxRepositoryTests
         public Task<MdbxNativeEntryRecord> RestoreEntryAsync(string projectId, string entryId, CancellationToken cancellationToken = default) =>
             Task.FromResult(SetDeleted(projectId, entryId, deleted: false));
 
-        public Task<MdbxNativeAttachmentRecord> CreateAttachmentMetadataAsync(
+        public Task<MdbxNativeAttachmentRecord> CreateAttachmentAsync(
             string projectId,
             string? entryId,
             string fileName,
             string? mediaType,
-            string contentHash,
-            ulong originalSize,
+            byte[] content,
             CancellationToken cancellationToken = default)
         {
+            var attachmentId = $"attachment-{_nextAttachmentId++}";
+            _attachmentContent[attachmentId] = content.ToArray();
             var attachment = new MdbxNativeAttachmentRecord(
-                $"attachment-{_nextAttachmentId++}",
+                attachmentId,
                 projectId,
                 entryId,
                 fileName,
                 mediaType,
-                "metadata-only",
-                contentHash,
-                originalSize,
-                0,
-                0,
+                "embedded-inline",
+                "",
+                (ulong)content.LongLength,
+                (ulong)content.LongLength,
+                1,
                 Deleted: false);
             _attachments.Add(attachment);
             return Task.FromResult(attachment);
         }
 
-        public Task<IReadOnlyList<MdbxNativeAttachmentRecord>> ListAttachmentsByProjectAsync(string projectId, CancellationToken cancellationToken = default) =>
+        public Task<IReadOnlyList<MdbxNativeAttachmentRecord>> ListAttachmentsAsync(string projectId, string? entryId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<MdbxNativeAttachmentRecord>>(
-                _attachments.Where(attachment => attachment.ProjectId == projectId && !attachment.Deleted).ToList());
-
-        public Task<IReadOnlyList<MdbxNativeAttachmentRecord>> ListAttachmentsByEntryAsync(string entryId, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<MdbxNativeAttachmentRecord>>(
-                _attachments.Where(attachment => attachment.EntryId == entryId && !attachment.Deleted).ToList());
-
-        public Task<MdbxNativeAttachmentRecord> WriteAttachmentInlineContentAsync(string attachmentId, byte[] content, CancellationToken cancellationToken = default)
-        {
-            var index = _attachments.FindIndex(attachment => attachment.AttachmentId == attachmentId);
-            if (index < 0)
-            {
-                throw new InvalidOperationException($"Attachment '{attachmentId}' was not found.");
-            }
-
-            _attachmentContent[attachmentId] = content.ToArray();
-            var updated = _attachments[index] with
-            {
-                StorageMode = "embedded-inline",
-                OriginalSize = (ulong)content.LongLength,
-                StoredSize = (ulong)content.LongLength,
-                ChunkCount = 1
-            };
-            _attachments[index] = updated;
-            return Task.FromResult(updated);
-        }
+                _attachments.Where(attachment =>
+                    attachment.ProjectId == projectId &&
+                    (entryId is null || attachment.EntryId == entryId) &&
+                    !attachment.Deleted).ToList());
 
         public Task<byte[]> ReadAttachmentContentAsync(string attachmentId, CancellationToken cancellationToken = default) =>
             Task.FromResult(TryReadAttachmentContent(attachmentId) ?? throw new InvalidOperationException($"Attachment '{attachmentId}' was not found."));
-
-        public Task<MdbxNativeAttachmentRecord> RenameAttachmentAsync(string attachmentId, string fileName, string? mediaType, CancellationToken cancellationToken = default)
-        {
-            var index = _attachments.FindIndex(attachment => attachment.AttachmentId == attachmentId);
-            if (index < 0)
-            {
-                throw new InvalidOperationException($"Attachment '{attachmentId}' was not found.");
-            }
-
-            var updated = _attachments[index] with
-            {
-                FileName = fileName,
-                MediaType = mediaType
-            };
-            _attachments[index] = updated;
-            return Task.FromResult(updated);
-        }
 
         public Task DeleteAttachmentAsync(string attachmentId, CancellationToken cancellationToken = default)
         {
@@ -3059,7 +3022,7 @@ public sealed class MdbxRepositoryTests
             var project = _projects.FirstOrDefault(project => string.Equals(project.Title, projectTitle, StringComparison.OrdinalIgnoreCase));
             if (project is null)
             {
-                project = new MdbxNativeProjectRecord($"project-{_nextProjectId++}", projectTitle, Deleted: false);
+                project = new MdbxNativeProjectRecord($"project-{_nextProjectId++}", projectTitle);
                 _projects.Add(project);
             }
 

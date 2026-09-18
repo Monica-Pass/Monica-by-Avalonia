@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ic="using:FluentIcons.Avalonia" xmlns:local="using:Monica.App" xmlns:sync="using:Monica.App.Features.Sync" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Sync.SyncWorkspaceView" x:DataType="vm:MainWindowViewModel">
+﻿<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ic="using:FluentIcons.Avalonia" xmlns:local="using:Monica.App" xmlns:sync="using:Monica.App.Features.Sync" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Sync.SyncWorkspaceView" x:DataType="vm:MainWindowViewModel">
     <UserControl.Styles>
         <StyleInclude Source="/Features/Sync/SyncStyles.axaml" />
     </UserControl.Styles>
@@ -55,7 +55,7 @@
             </Grid>
         </Border>
         <Grid x:Name="SyncWorkspaceLayoutGrid" Grid.Row="1" ColumnDefinitions="260,*" RowDefinitions="*" MinWidth="0">
-            <Border x:Name="SyncSidebarRegion" Classes="workspaceSidebar" Padding="14" ClipToBounds="True" CornerRadius="0" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,1,0" Background="Transparent">
+            <Border x:Name="SyncSidebarRegion" Classes="workspaceSidebar" Padding="14" ClipToBounds="True" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,1,0">
                 <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="14">
                         <StackPanel Spacing="8">

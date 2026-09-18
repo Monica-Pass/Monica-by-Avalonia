@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Monica.App.Controls"
              xmlns:fa="using:FluentAvalonia.UI.Controls"
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:local="using:Monica.App"
@@ -64,19 +65,19 @@
                         <fa:FACommandBar.PrimaryCommands>
                             <fa:FACommandBarButton x:Name="AddAuthenticatorButton"
                                                    Command="{Binding AddTotpCommand}"
-                                                   IconSource="Add"
+                                                   IconSource="{controls:FluentSymbol Add}"
                                                    Label="{Binding TotpManualAddText}"
                                                    ToolTip.Tip="{Binding L.AddAuthenticator}"
                                                    AutomationProperties.Name="{Binding L.AddAuthenticator}" />
                             <fa:FACommandBarButton x:Name="ScanAuthenticatorButton"
                                                    Command="{Binding ScanTotpQrCommand}"
-                                                   IconSource="QrCode"
+                                                   IconSource="{controls:FluentSymbol QrCode}"
                                                    Label="{Binding TotpScanQrText}"
                                                    ToolTip.Tip="{Binding TotpScanQrText}"
                                                    AutomationProperties.Name="{Binding TotpScanQrText}" />
                             <fa:FACommandBarButton x:Name="RefreshAuthenticatorButton"
                                                    Command="{Binding LoadCommand}"
-                                                   IconSource="ArrowClockwise"
+                                                   IconSource="{controls:FluentSymbol ArrowClockwise}"
                                                    Label="{Binding L.Refresh}"
                                                    ToolTip.Tip="{Binding L.Refresh}"
                                                    AutomationProperties.Name="{Binding L.Refresh}" />
@@ -84,22 +85,22 @@
                         <fa:FACommandBar.SecondaryCommands>
                             <fa:FACommandBarButton Command="{Binding ImportTotpCsvFileCommand}"
                                                    IsEnabled="{Binding CanUseFilePicker}"
-                                                   IconSource="ArrowUpload"
+                                                   IconSource="{controls:FluentSymbol ArrowUpload}"
                                                    Label="{Binding L.ImportTotpCsv}"
                                                    AutomationProperties.Name="{Binding L.ImportTotpCsv}" />
                             <fa:FACommandBarButton Command="{Binding ImportAegisJsonFileCommand}"
                                                    IsEnabled="{Binding CanUseFilePicker}"
-                                                   IconSource="ArrowUpload"
+                                                   IconSource="{controls:FluentSymbol ArrowUpload}"
                                                    Label="{Binding L.ImportAegisJson}"
                                                    AutomationProperties.Name="{Binding L.ImportAegisJson}" />
                             <fa:FACommandBarButton Command="{Binding SaveTotpCsvExportCommand}"
                                                    IsEnabled="{Binding CanUseFilePicker}"
-                                                   IconSource="ArrowDownload"
+                                                   IconSource="{controls:FluentSymbol ArrowDownload}"
                                                    Label="{Binding L.SaveTotpCsvExport}"
                                                    AutomationProperties.Name="{Binding L.SaveTotpCsvExport}" />
                             <fa:FACommandBarButton Command="{Binding SaveAegisJsonExportCommand}"
                                                    IsEnabled="{Binding CanUseFilePicker}"
-                                                   IconSource="ArrowDownload"
+                                                   IconSource="{controls:FluentSymbol ArrowDownload}"
                                                    Label="{Binding L.SaveAegisExport}"
                                                    AutomationProperties.Name="{Binding L.SaveAegisExport}" />
                         </fa:FACommandBar.SecondaryCommands>

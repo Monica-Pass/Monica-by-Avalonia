@@ -66,7 +66,7 @@ public sealed class SmokeVaultSeedTests
                 database.WorkingCopyPath ?? database.FilePath,
                 database.EncryptedPassword!,
                 "monica-smoke-seed-test");
-            var projects = await vault.ListProjectsAsync(includeDeleted: false);
+            var projects = await vault.ListProjectsAsync();
             var entryCount = 0;
             foreach (var project in projects)
             {

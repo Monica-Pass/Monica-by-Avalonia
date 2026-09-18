@@ -1,5 +1,6 @@
 using System.Globalization;
 using Avalonia;
+using Monica.App.Controls;
 using Monica.Core.Models;
 
 namespace Monica.App.ViewModels;
@@ -38,8 +39,10 @@ public sealed class PasswordListRow
     public bool IsExpanded { get; }
     public bool IsCollapsed => IsStackHeader && !IsExpanded;
     public string StackCountText => Members.Count.ToString(CultureInfo.InvariantCulture);
+    public bool IsStacked => Members.Count > 1;
+    public string RowSubtitle => string.IsNullOrWhiteSpace(Entry.Username) ? Entry.Website : Entry.Username;
     public string StackSubtitle => Members.Count == 1
-        ? Entry.Username
+        ? RowSubtitle
         : string.Join(" / ", Members
             .Select(item => string.IsNullOrWhiteSpace(item.Username) ? item.Website : item.Username)
             .Where(value => !string.IsNullOrWhiteSpace(value))
@@ -49,7 +52,6 @@ public sealed class PasswordListRow
     public bool HasGroupAuthenticator => Members.Any(item => item.HasAuthenticator);
     public bool HasGroupAttachments => Members.Any(item => item.HasAttachments);
     public Thickness RowMargin => IsStackChild ? new Thickness(22, 0, 0, 0) : new Thickness(0, 0, 0, 4);
-    public double RowMinHeight => IsStackChild ? 50 : 58;
     public Thickness StackLineMargin => new(-5, IsFirstStackChild ? -8 : -34, 0, IsLastStackChild ? -8 : -34);
     public bool IsGroupSelected
     {
@@ -89,9 +91,11 @@ public sealed record PasswordFolderFilterChoice(
     string SelectionKey = "",
     string? PathPrefix = null,
     bool HasChildren = false,
-    bool IsExpanded = false)
+    bool IsExpanded = false) : IFolderTreeRow
 {
     public string FolderDisplayName => string.IsNullOrWhiteSpace(DisplayName) ? Name : DisplayName;
-    public Thickness Indent => new(Math.Max(0, Level) * 14, 0, 0, 0);
+    public string Key => SelectionKey;
+    public string Label => FolderDisplayName;
+    public Thickness Indent => FolderTreeLayout.IndentFor(Level);
     public bool IsCollapsed => HasChildren && !IsExpanded;
 }

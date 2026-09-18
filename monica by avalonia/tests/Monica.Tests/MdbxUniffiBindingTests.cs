@@ -19,12 +19,12 @@ public sealed class MdbxUniffiBindingTests
 
         Assert.True(stream.CanWrite);
         Assert.Equal(path, metadata.WorkingCopyPath);
-        Assert.Equal("MDBX-1", await ReadFormatVersionAsync(path));
-        Assert.StartsWith("MDBX-1 vault ", metadata.Description, StringComparison.Ordinal);
+        Assert.Equal("MDBX-2", await ReadFormatVersionAsync(path));
+        Assert.StartsWith("MDBX-2 vault ", metadata.Description, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task Native_bridge_creates_mdbx1_vault_and_roundtrips_entry()
+    public async Task Native_bridge_creates_mdbx2_vault_and_roundtrips_entry()
     {
         var bridge = new MdbxUniffiNativeBridge();
         Assert.True(bridge.IsAvailable);
@@ -41,17 +41,15 @@ public sealed class MdbxUniffiBindingTests
             "login",
             "GitHub",
             """{"kind":"password","username":"dev","password":"secret"}""");
-        var attachment = await created.CreateAttachmentMetadataAsync(
+        var attachmentContent = "native attachment bytes"u8.ToArray();
+        var writtenAttachment = await created.CreateAttachmentAsync(
             project.ProjectId,
             entry.EntryId,
             "recovery.txt",
             "text/plain",
-            "",
-            0);
-        var attachmentContent = "native attachment bytes"u8.ToArray();
-        var writtenAttachment = await created.WriteAttachmentInlineContentAsync(attachment.AttachmentId, attachmentContent);
-        var readAttachment = await created.ReadAttachmentContentAsync(attachment.AttachmentId);
-        await created.DeleteAttachmentAsync(attachment.AttachmentId);
+            attachmentContent);
+        var readAttachment = await created.ReadAttachmentContentAsync(writtenAttachment.AttachmentId);
+        await created.DeleteAttachmentAsync(writtenAttachment.AttachmentId);
         DisposeVault(created);
 
         var reopened = await bridge.OpenVaultAsync(path, password, deviceId);
@@ -60,11 +58,11 @@ public sealed class MdbxUniffiBindingTests
 
         Assert.False(string.IsNullOrWhiteSpace(info.VaultId));
         Assert.Equal(deviceId, info.DeviceId);
-        Assert.False(project.Deleted);
+        Assert.Equal("Personal", project.Title);
         Assert.Equal("GitHub", entry.Title);
         Assert.Equal("embedded-inline", writtenAttachment.StorageMode);
         Assert.Equal(attachmentContent, readAttachment);
-        Assert.Equal("MDBX-1", await ReadFormatVersionAsync(path));
+        Assert.Equal("MDBX-2", await ReadFormatVersionAsync(path));
         var reloaded = Assert.Single(entries);
         Assert.Equal(entry.EntryId, reloaded.EntryId);
         Assert.Contains("\"username\":\"dev\"", reloaded.PayloadJson, StringComparison.Ordinal);

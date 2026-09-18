@@ -23,7 +23,7 @@ internal sealed class MdbxTestVaultEngine : IMdbxVaultEngine
             );
             DELETE FROM vault_meta;
             INSERT INTO vault_meta(vault_id, format_version, default_tiga_mode)
-            VALUES ($vault_id, 'MDBX-1', $mode);
+            VALUES ($vault_id, 'MDBX-2', $mode);
             """;
         command.Parameters.AddWithValue("$vault_id", Guid.NewGuid().ToString("N"));
         command.Parameters.AddWithValue("$mode", mode.ToString().ToLowerInvariant());

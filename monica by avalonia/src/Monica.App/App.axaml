@@ -5,6 +5,10 @@
              RequestedThemeVariant="Default">
     <Application.Resources>
         <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="/Styles/DesignTokens.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+
             <SolidColorBrush x:Key="LayerFillColorDefaultBrush" Color="#F7F7F7" />
             <SolidColorBrush x:Key="LayerFillColorAltBrush" Color="#FFFFFF" />
             <SolidColorBrush x:Key="LayerFillColorSubtleBrush" Color="#EFEFEF" />
@@ -77,6 +81,7 @@
         </Style>
 
         <Style Selector="TextBlock">
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}" />
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
         </Style>
 
@@ -211,5 +216,9 @@
         <Style Selector="ListBoxItem:selected">
             <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
         </Style>
+
+        <!-- Shared workspace vocabulary; must stay application-scoped so per-view
+             refactors cannot silently disconnect it again. -->
+        <StyleInclude Source="/Controls/VaultShellStyles.axaml" />
     </Application.Styles>
 </Application>

@@ -66,7 +66,7 @@ public sealed class AuthenticatorWorkflowUiTests
 
         Assert.Equal(2, CountOccurrences(xaml, "Command=\"{Binding AddTotpCommand}\""));
         Assert.Equal(1, CountOccurrences(xaml, "Command=\"{Binding ScanTotpQrCommand}\""));
-        Assert.Contains("IconSource=\"QrCode\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("IconSource=\"{controls:FluentSymbol QrCode}\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Icon=\"Document\"", xaml, StringComparison.Ordinal);
     }
 

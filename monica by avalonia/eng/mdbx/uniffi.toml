@@ -1,0 +1,5 @@
+[bindings.csharp]
+namespace = "Monica.Mdbx.Ffi"
+global_methods_class_name = "MdbxFfi"
+access_modifier = "public"
+cdylib_name = "mdbx_ffi"

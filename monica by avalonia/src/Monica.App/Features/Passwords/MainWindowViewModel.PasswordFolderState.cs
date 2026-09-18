@@ -80,6 +80,7 @@ public sealed partial class MainWindowViewModel
             PasswordFolderFilters.FirstOrDefault();
         RaiseFilteredPasswordsChanged();
         OnPropertyChanged(nameof(CanManageSelectedPasswordFolder));
+        OnPropertyChanged(nameof(IsAllPasswordFoldersSelected));
         RaisePasswordFolderFilterCollections();
         RaisePasswordFilterState();
     }

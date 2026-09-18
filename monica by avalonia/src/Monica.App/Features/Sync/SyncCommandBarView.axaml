@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Monica.App.Controls"
              xmlns:fa="using:FluentAvalonia.UI.Controls"
              xmlns:vm="using:Monica.App.ViewModels"
              x:Class="Monica.App.Features.Sync.SyncCommandBarView"
@@ -14,7 +15,7 @@
             <fa:FACommandBar.PrimaryCommands>
                 <fa:FACommandBarButton Command="{Binding CreateWebDavBackupCommand}"
                                        IsEnabled="{Binding !IsWebDavBusy}"
-                                       IconSource="ArrowUpload"
+                                       IconSource="{controls:FluentSymbol ArrowUpload}"
                                        Label="{Binding L.BackupNow}"
                                        ToolTip.Tip="{Binding L.BackupNow}"
                                        AutomationProperties.Name="{Binding L.BackupNow}" />
@@ -22,7 +23,7 @@
             <fa:FACommandBar.SecondaryCommands>
                 <fa:FACommandBarButton Command="{Binding TestWebDavConnectionCommand}"
                                        IsEnabled="{Binding !IsWebDavBusy}"
-                                       IconSource="ArrowSync"
+                                       IconSource="{controls:FluentSymbol ArrowSync}"
                                        Label="{Binding L.TestConnection}"
                                        ToolTip.Tip="{Binding L.TestConnection}"
                                        AutomationProperties.Name="{Binding L.TestConnection}" />

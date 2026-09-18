@@ -118,8 +118,10 @@ public sealed partial class VaultCredentialTests
             "monica.db");
 
         Assert.Equal("monica.db", Path.GetFileName(factory.DatabasePath));
-        Assert.Equal("Monica by Avalonia", Path.GetFileName(Path.GetDirectoryName(factory.DatabasePath)));
         Assert.NotEqual(legacyWindowsPath, factory.DatabasePath);
+        // MONICA_APPDATA_DIR is pinned to a temp root for the whole assembly, so the
+        // built-in folder name is checked through the constant that produces it.
+        Assert.Equal("Monica by Avalonia", MonicaAppDataPaths.DefaultApplicationDataDirectoryName);
     }
 
     [Fact]

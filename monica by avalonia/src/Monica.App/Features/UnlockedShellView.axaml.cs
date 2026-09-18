@@ -1,9 +1,12 @@
+﻿using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Threading;
 using FluentAvalonia.UI.Controls;
+using FluentIcons.Common;
 using Monica.App.Controls;
 using Monica.App.ViewModels;
 
@@ -11,37 +14,38 @@ namespace Monica.App.Features;
 
 public partial class UnlockedShellView : UserControl
 {
-    private const double CompactContentBreakpoint = 920;
-
     private static readonly DeferredNavigationItem[] DeferredVaultItems =
     [
-        new("L.SecureNotes", "Notes", FASymbol.ProtectedDocument),
-        new("L.Totp", "Totp", FASymbol.Clock),
-        new("L.Cards", "Cards", FASymbol.ContactInfo)
+        new("L.Passwords", "Passwords", Symbol.Key),
+        new("L.SecureNotes", "Notes", Symbol.Note),
+        new("L.Totp", "Totp", Symbol.Fingerprint),
+        new("L.Cards", "Cards", Symbol.WalletCreditCard)
     ];
 
     private static readonly DeferredNavigationItem[] DeferredToolItems =
     [
-        new("L.Generator", "Generator", FASymbol.Edit),
-        new("L.SecurityAnalysis", "SecurityAnalysis", FASymbol.Permissions),
-        new("L.Timeline", "Timeline", FASymbol.Clock)
+        new("L.Generator", "Generator", Symbol.Sparkle),
+        new("L.SecurityAnalysis", "SecurityAnalysis", Symbol.Shield),
+        new("L.Timeline", "Timeline", Symbol.Clock)
     ];
 
     private static readonly DeferredNavigationItem[] DeferredStorageItems =
     [
-        new("L.Archive", "Archive", FASymbol.Library),
-        new("L.RecycleBin", "RecycleBin", FASymbol.Delete),
-        new("L.MdbxVaults", "Mdbx", FASymbol.Folder)
+        new("L.Archive", "Archive", Symbol.Archive),
+        new("L.RecycleBin", "RecycleBin", Symbol.Delete),
+        new("L.MdbxVaults", "Mdbx", Symbol.Database)
     ];
 
     private static readonly DeferredNavigationItem[] DeferredFooterItems =
     [
-        new("L.DatabaseManagement", "DatabaseManagement", FASymbol.Library),
-        new("L.SyncAndBackup", "Sync", FASymbol.Sync),
-        new("L.Settings", "Settings", FASymbol.Setting)
+        new("L.DatabaseManagement", "DatabaseManagement", Symbol.Library),
+        new("L.SyncAndBackup", "Sync", Symbol.ArrowSync),
+        new("L.Settings", "Settings", Symbol.Settings)
     ];
 
     private readonly WorkspaceHostView _workspaceHost;
+    private readonly Dictionary<string, FANavigationViewItem> _navigationItemsByTag = new(StringComparer.OrdinalIgnoreCase);
+    private NavigationSelectionMirror? _navigationMirror;
     private Grid? _workspaceScaffold;
     private bool _workspaceScaffoldInitialized;
     private bool _shellChromeInitialized;
@@ -54,7 +58,6 @@ public partial class UnlockedShellView : UserControl
             WorkspaceHostView.SectionProperty,
             new Binding(nameof(MainWindowViewModel.SelectedSection)));
         _workspaceHost.SizeChanged += WorkspaceHost_OnSizeChanged;
-        SizeChanged += Shell_OnSizeChanged;
         Content = CreateLoadingPlaceholder();
         Dispatcher.UIThread.Post(InitializeWorkspaceScaffold, DispatcherPriority.Background);
     }
@@ -67,7 +70,7 @@ public partial class UnlockedShellView : UserControl
         }
 
         _workspaceScaffoldInitialized = true;
-        _workspaceScaffold = new Grid { Margin = new Thickness(18) };
+        _workspaceScaffold = new Grid { Margin = new Thickness(16) };
         _workspaceScaffold.Children.Add(_workspaceHost);
         Content = _workspaceScaffold;
         Dispatcher.UIThread.Post(InitializeDeferredShellChrome, DispatcherPriority.SystemIdle);
@@ -84,7 +87,6 @@ public partial class UnlockedShellView : UserControl
         _workspaceScaffold?.Children.Remove(_workspaceHost);
         _workspaceScaffold = null;
         InitializeComponent();
-        UpdateShellLayout(Bounds.Width);
         WorkspaceHostSlot.Content = _workspaceHost;
         Dispatcher.UIThread.Post(InitializeDeferredNavigation, DispatcherPriority.SystemIdle);
     }
@@ -97,6 +99,7 @@ public partial class UnlockedShellView : UserControl
         }
 
         _deferredNavigationInitialized = true;
+        VaultNavigationView.MenuItems.Add(CreateNavigationHeader("L.VaultNavigationGroup", "Vault"));
         AddNavigationItems(DeferredVaultItems);
         VaultNavigationView.MenuItems.Add(CreateNavigationHeader("L.ToolsNavigationGroup", "Tools"));
         AddNavigationItems(DeferredToolItems);
@@ -110,11 +113,22 @@ public partial class UnlockedShellView : UserControl
                 CreateNavigationItem(DeferredFooterItems[index]));
         }
 
-        VaultNavigationView.FooterMenuItems.Add(new FANavigationViewItemSeparator());
-        var lockItem = CreateNavigationItem(new DeferredNavigationItem("LockVaultText", "Lock", FASymbol.Admin));
+        var lockItem = CreateNavigationItem(new DeferredNavigationItem("LockVaultText", "Lock", Symbol.LockClosed));
         lockItem.Name = "LockVaultNavigationItem";
         lockItem.SelectsOnInvoked = false;
         VaultNavigationView.FooterMenuItems.Add(lockItem);
+
+        DataContextChanged += (_, _) =>
+        {
+            if (DataContext is MainWindowViewModel viewModel)
+            {
+                ObserveViewModel(viewModel);
+            }
+        };
+        if (DataContext is MainWindowViewModel dataContext)
+        {
+            ObserveViewModel(dataContext);
+        }
     }
 
     private void AddNavigationItems(IEnumerable<DeferredNavigationItem> items)
@@ -132,15 +146,62 @@ public partial class UnlockedShellView : UserControl
         return header;
     }
 
-    private static FANavigationViewItem CreateNavigationItem(DeferredNavigationItem source)
+    private FANavigationViewItem CreateNavigationItem(DeferredNavigationItem source)
     {
         var item = new FANavigationViewItem
         {
             Tag = source.Tag,
-            IconSource = new FASymbolIconSource { Symbol = source.Symbol }
+            IconSource = new FluentSymbolIconSource { Symbol = source.Symbol }
         };
         item.Bind(ContentControl.ContentProperty, new Binding(source.LabelPath));
+        _navigationItemsByTag[source.Tag] = item;
         return item;
+    }
+
+    private void ObserveViewModel(MainWindowViewModel viewModel)
+    {
+        if (!ReferenceEquals(_navigationMirror?.ViewModel, viewModel))
+        {
+            ReleaseViewModelObservation();
+            _navigationMirror = NavigationSelectionMirror.Attach(viewModel, this);
+        }
+
+        SyncNavigationSelection(viewModel.SelectedSection);
+    }
+
+    private void ReleaseViewModelObservation()
+    {
+        _navigationMirror?.Dispose();
+        _navigationMirror = null;
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            ObserveViewModel(viewModel);
+        }
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        ReleaseViewModelObservation();
+    }
+
+    // Sections can also change without a rail click (unlock, keyboard shortcuts, in-page
+    // navigation), and FANavigationView only highlights what it selected itself.
+    private void SyncNavigationSelection(string section)
+    {
+        if (!_deferredNavigationInitialized ||
+            !_navigationItemsByTag.TryGetValue(section, out var item) ||
+            ReferenceEquals(VaultNavigationView.SelectedItem, item))
+        {
+            return;
+        }
+
+        VaultNavigationView.SelectedItem = item;
     }
 
     private static Control CreateLoadingPlaceholder() =>
@@ -212,21 +273,6 @@ public partial class UnlockedShellView : UserControl
         viewModel.SelectSectionCommand.Execute(tag);
     }
 
-    private void Shell_OnSizeChanged(object? sender, SizeChangedEventArgs e)
-    {
-        if (_shellChromeInitialized)
-        {
-            UpdateShellLayout(e.NewSize.Width);
-        }
-    }
-
-    private void UpdateShellLayout(double width)
-    {
-        WorkspaceContentGrid.Margin = width > 0 && width < CompactContentBreakpoint
-            ? new Thickness(12)
-            : new Thickness(20);
-    }
-
     private void WorkspaceHost_OnSizeChanged(object? sender, SizeChangedEventArgs e)
     {
         if (DataContext is MainWindowViewModel viewModel)
@@ -236,8 +282,47 @@ public partial class UnlockedShellView : UserControl
         }
     }
 
+    // The view model must not be able to reach a shell it no longer displays. Subscribing the
+    // shell itself would do exactly that: the only place to unsubscribe is the visual-tree detach,
+    // and a minimized window never runs another layout pass, so the detach — and with it the whole
+    // workspace graph — is deferred until the window comes back. This mirror is what the view model
+    // holds instead; it keeps the shell weak and unsubscribes itself once the shell is gone.
+    private sealed class NavigationSelectionMirror : IDisposable
+    {
+        private readonly WeakReference<UnlockedShellView> _shell;
+
+        private NavigationSelectionMirror(MainWindowViewModel viewModel, UnlockedShellView shell)
+        {
+            ViewModel = viewModel;
+            _shell = new WeakReference<UnlockedShellView>(shell);
+            viewModel.PropertyChanged += OnPropertyChanged;
+        }
+
+        public MainWindowViewModel ViewModel { get; }
+
+        public static NavigationSelectionMirror Attach(MainWindowViewModel viewModel, UnlockedShellView shell) =>
+            new(viewModel, shell);
+
+        public void Dispose() => ViewModel.PropertyChanged -= OnPropertyChanged;
+
+        private void OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (!_shell.TryGetTarget(out var shell))
+            {
+                Dispose();
+                return;
+            }
+
+            if (e.PropertyName == nameof(MainWindowViewModel.SelectedSection) &&
+                sender is MainWindowViewModel viewModel)
+            {
+                shell.SyncNavigationSelection(viewModel.SelectedSection);
+            }
+        }
+    }
+
     private sealed record DeferredNavigationItem(
         string LabelPath,
         string Tag,
-        FASymbol Symbol);
+        Symbol Symbol);
 }

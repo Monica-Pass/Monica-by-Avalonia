@@ -199,8 +199,8 @@ public sealed partial class MdbxVaultStore
         public Task<MdbxNativeProjectRecord> CreateProjectAsync(string title, CancellationToken cancellationToken = default) =>
             _vault.CreateProjectAsync(title, cancellationToken);
 
-        public Task<IReadOnlyList<MdbxNativeProjectRecord>> ListProjectsAsync(bool includeDeleted, CancellationToken cancellationToken = default) =>
-            _vault.ListProjectsAsync(includeDeleted, cancellationToken);
+        public Task<IReadOnlyList<MdbxNativeProjectRecord>> ListProjectsAsync(CancellationToken cancellationToken = default) =>
+            _vault.ListProjectsAsync(cancellationToken);
 
         public Task<MdbxNativeEntryRecord> CreateEntryAsync(
             string projectId,
@@ -247,50 +247,25 @@ public sealed partial class MdbxVaultStore
             CancellationToken cancellationToken = default) =>
             _vault.RestoreEntryAsync(projectId, entryId, cancellationToken);
 
-        public Task<MdbxNativeAttachmentRecord> CreateAttachmentMetadataAsync(
+        public Task<MdbxNativeAttachmentRecord> CreateAttachmentAsync(
             string projectId,
             string? entryId,
             string fileName,
             string? mediaType,
-            string contentHash,
-            ulong originalSize,
-            CancellationToken cancellationToken = default) =>
-            _vault.CreateAttachmentMetadataAsync(
-                projectId,
-                entryId,
-                fileName,
-                mediaType,
-                contentHash,
-                originalSize,
-                cancellationToken);
-
-        public Task<IReadOnlyList<MdbxNativeAttachmentRecord>> ListAttachmentsByProjectAsync(
-            string projectId,
-            CancellationToken cancellationToken = default) =>
-            _vault.ListAttachmentsByProjectAsync(projectId, cancellationToken);
-
-        public Task<IReadOnlyList<MdbxNativeAttachmentRecord>> ListAttachmentsByEntryAsync(
-            string entryId,
-            CancellationToken cancellationToken = default) =>
-            _vault.ListAttachmentsByEntryAsync(entryId, cancellationToken);
-
-        public Task<MdbxNativeAttachmentRecord> WriteAttachmentInlineContentAsync(
-            string attachmentId,
             byte[] content,
             CancellationToken cancellationToken = default) =>
-            _vault.WriteAttachmentInlineContentAsync(attachmentId, content, cancellationToken);
+            _vault.CreateAttachmentAsync(projectId, entryId, fileName, mediaType, content, cancellationToken);
+
+        public Task<IReadOnlyList<MdbxNativeAttachmentRecord>> ListAttachmentsAsync(
+            string projectId,
+            string? entryId,
+            CancellationToken cancellationToken = default) =>
+            _vault.ListAttachmentsAsync(projectId, entryId, cancellationToken);
 
         public Task<byte[]> ReadAttachmentContentAsync(
             string attachmentId,
             CancellationToken cancellationToken = default) =>
             _vault.ReadAttachmentContentAsync(attachmentId, cancellationToken);
-
-        public Task<MdbxNativeAttachmentRecord> RenameAttachmentAsync(
-            string attachmentId,
-            string fileName,
-            string? mediaType,
-            CancellationToken cancellationToken = default) =>
-            _vault.RenameAttachmentAsync(attachmentId, fileName, mediaType, cancellationToken);
 
         public Task DeleteAttachmentAsync(string attachmentId, CancellationToken cancellationToken = default) =>
             _vault.DeleteAttachmentAsync(attachmentId, cancellationToken);

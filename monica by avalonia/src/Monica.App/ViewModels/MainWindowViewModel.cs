@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -191,7 +191,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    public string SelectedSectionTitle => SectionTitle(SelectedSection);
     public string ShellVaultText => SelectedSection switch
     {
         "Mdbx" => "MDBX",
@@ -210,15 +209,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         "Settings" => "Ready",
         _ => StatusMessage
     };
-    public string ShellPageText => SelectedSectionTitle;
-    public string ShellPlatformText => OperatingSystem.IsWindows() ? "Windows" :
-        OperatingSystem.IsMacOS() ? "macOS" :
-        OperatingSystem.IsLinux() ? "Linux" :
-        "Desktop";
 
     partial void OnSelectedSectionChanged(string value)
     {
-        OnPropertyChanged(nameof(SelectedSectionTitle));
         RaiseShellStatus();
         RestoreActiveWorkspaceState();
         RefreshSecurityAnalysisIfNeeded();
@@ -270,8 +263,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(ShellVaultText));
         OnPropertyChanged(nameof(ShellSyncText));
-        OnPropertyChanged(nameof(ShellPageText));
-        OnPropertyChanged(nameof(ShellPlatformText));
     }
 
     private async Task LoadAfterUnlockAsync()
@@ -495,7 +486,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RefreshChoiceLabels();
         RefreshPlatformIntegrationCapabilities();
         RefreshCapabilities();
-        OnPropertyChanged(nameof(SelectedSectionTitle));
         OnPropertyChanged(nameof(PlatformIntegrationsTitle));
         RaisePlatformIntegrationState();
         RaiseAboutText();
@@ -567,26 +557,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
 
-    private string SectionTitle(string section)
-    {
-        return section switch
-        {
-            "Passwords" => _localization.Passwords,
-            "Notes" => _localization.SecureNotes,
-            "Totp" => _localization.Totp,
-            "Cards" => _localization.Cards,
-            "Generator" => _localization.Generator,
-            "Archive" => _localization.Archive,
-            "RecycleBin" => _localization.RecycleBin,
-            "SecurityAnalysis" => _localization.SecurityAnalysis,
-            "Timeline" => _localization.Timeline,
-            "Mdbx" => _localization.Get("MdbxVaults"),
-            "DatabaseManagement" => _localization.DatabaseManagement,
-            "Sync" => _localization.SyncAndBackup,
-            "Settings" => _localization.Settings,
-            _ => section
-        };
-    }
 
 
 

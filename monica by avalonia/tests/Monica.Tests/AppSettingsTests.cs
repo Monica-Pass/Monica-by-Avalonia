@@ -360,7 +360,7 @@ public sealed partial class AppSettingsTests
         var webDavDatabase = Assert.Single(
             viewModel.MdbxDatabases,
             database => database.StorageLocation == MdbxStorageLocation.RemoteWebDav);
-        Assert.Equal("MDBX-1", await ReadMdbxFormatVersionAsync(webDavDatabase.WorkingCopyPath!));
+        Assert.Equal("MDBX-2", await ReadMdbxFormatVersionAsync(webDavDatabase.WorkingCopyPath!));
         Assert.Equal(SyncStatus.Synced, webDavDatabase.LastSyncStatus);
         Assert.NotNull(webDavDatabase.LastSyncedAt);
         Assert.Equal(webDavDatabase.FilePath, webDav.UploadedBinaryPath);

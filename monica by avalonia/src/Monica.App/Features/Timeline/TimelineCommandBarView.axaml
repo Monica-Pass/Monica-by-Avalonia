@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Monica.App.Controls"
              xmlns:fa="using:FluentAvalonia.UI.Controls"
              xmlns:vm="using:Monica.App.ViewModels"
              x:Class="Monica.App.Features.Timeline.TimelineCommandBarView"
@@ -13,7 +14,7 @@
                      HorizontalAlignment="Stretch">
         <fa:FACommandBar.PrimaryCommands>
             <fa:FACommandBarButton Command="{Binding LoadCommand}"
-                                   IconSource="ArrowClockwise"
+                                   IconSource="{controls:FluentSymbol ArrowClockwise}"
                                    Label="{Binding L.Refresh}"
                                    ToolTip.Tip="{Binding L.Refresh}"
                                    AutomationProperties.Name="{Binding L.Refresh}" />
@@ -21,7 +22,7 @@
         <fa:FACommandBar.SecondaryCommands>
             <fa:FACommandBarButton Command="{Binding SaveTimelineExportCommand}"
                                    IsEnabled="{Binding CanUseFilePicker}"
-                                   IconSource="ArrowDownload"
+                                   IconSource="{controls:FluentSymbol ArrowDownload}"
                                    Label="{Binding L.Export}"
                                    ToolTip.Tip="{Binding L.Export}"
                                    AutomationProperties.Name="{Binding L.Export}" />

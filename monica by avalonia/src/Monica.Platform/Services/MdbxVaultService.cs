@@ -17,7 +17,7 @@ public interface IMdbxVaultEngine
 
 public sealed class MdbxVaultService(IMdbxVaultEngine? engine = null, IMdbxNativeBridge? nativeBridge = null) : IMdbxVaultService
 {
-    private const string ExpectedFormatVersion = "MDBX-1";
+    private const string ExpectedFormatVersion = "MDBX-2";
     private const string DeviceId = "monica-avalonia";
     private readonly IMdbxVaultEngine _engine = engine ?? new MdbxCliVaultEngine();
     private readonly IMdbxNativeBridge _nativeBridge = nativeBridge ?? new UnavailableMdbxNativeBridge();
@@ -33,7 +33,7 @@ public sealed class MdbxVaultService(IMdbxVaultEngine? engine = null, IMdbxNativ
             using var vault = File.Exists(fullPath)
                 ? await _nativeBridge.OpenVaultAsync(fullPath, password, DeviceId, cancellationToken)
                 : await _nativeBridge.CreateVaultAsync(fullPath, password, DeviceId, mode, cancellationToken);
-            inspection = await InspectNativeVaultAsync(fullPath, vault, cancellationToken);
+            inspection = await InspectNativeVaultAsync(fullPath, vault, _nativeBridge.WritableStorageFormat, cancellationToken);
         }
         else
         {
@@ -78,7 +78,7 @@ public sealed class MdbxVaultService(IMdbxVaultEngine? engine = null, IMdbxNativ
         if (_nativeBridge.IsAvailable)
         {
             using var vault = await _nativeBridge.OpenVaultAsync(path, database.EncryptedPassword, DeviceId, cancellationToken);
-            inspection = await InspectNativeVaultAsync(path, vault, cancellationToken);
+            inspection = await InspectNativeVaultAsync(path, vault, _nativeBridge.WritableStorageFormat, cancellationToken);
         }
         else
         {
@@ -92,10 +92,10 @@ public sealed class MdbxVaultService(IMdbxVaultEngine? engine = null, IMdbxNativ
         return stream;
     }
 
-    private static async Task<MdbxVaultInspection> InspectNativeVaultAsync(string path, IMdbxNativeVault vault, CancellationToken cancellationToken)
+    private static async Task<MdbxVaultInspection> InspectNativeVaultAsync(string path, IMdbxNativeVault vault, string writableStorageFormat, CancellationToken cancellationToken)
     {
         var info = await vault.GetInfoAsync(cancellationToken);
-        return new MdbxVaultInspection(path, true, ExpectedFormatVersion, info.VaultId, "Available");
+        return new MdbxVaultInspection(path, true, writableStorageFormat, info.VaultId, "Available");
     }
 
     private static void EnsureExpectedFormat(MdbxVaultInspection inspection)

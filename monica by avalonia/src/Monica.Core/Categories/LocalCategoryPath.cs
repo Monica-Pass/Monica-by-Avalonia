@@ -108,6 +108,39 @@ public static class LocalCategoryPath
         return new LocalCategoryRenamePlan(destinationPath, updatedPaths, conflictPath);
     }
 
+    public static LocalCategoryRenamePlan? PlanSubtreeMove(
+        IEnumerable<Category> categories,
+        Category sourceCategory,
+        string? destinationParentPath)
+    {
+        var allCategories = categories.ToArray();
+        var sourcePath = Normalize(sourceCategory.Name);
+        var destinationParent = Normalize(destinationParentPath ?? "");
+        if (sourcePath.Length == 0 ||
+            string.Equals(ParentPath(sourcePath) ?? "", destinationParent, StringComparison.OrdinalIgnoreCase) ||
+            IsDescendantOrSelf(sourcePath, destinationParent))
+        {
+            return null;
+        }
+
+        var destinationPath = Build(destinationParent, LeafName(sourcePath));
+        var moving = allCategories
+            .Where(category => IsDescendantOrSelf(sourcePath, category.Name))
+            .ToArray();
+        var movingIds = moving.Select(category => category.Id).ToHashSet();
+        var updatedPaths = moving.ToDictionary(
+            category => category.Id,
+            category => destinationPath + Normalize(category.Name)[sourcePath.Length..]);
+        var occupiedPaths = allCategories
+            .Where(category => !movingIds.Contains(category.Id))
+            .Select(category => Normalize(category.Name))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var conflictPath = updatedPaths.Values
+            .FirstOrDefault(path => occupiedPaths.Contains(path));
+
+        return new LocalCategoryRenamePlan(destinationPath, updatedPaths, conflictPath);
+    }
+
     private static IEnumerable<string> EnumerateParentPaths(string path)
     {
         var segments = path.Split('/');

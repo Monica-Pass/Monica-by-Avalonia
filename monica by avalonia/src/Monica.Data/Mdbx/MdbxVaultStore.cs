@@ -461,7 +461,7 @@ public sealed partial class MdbxVaultStore(
                 continue;
             }
 
-            var nativeAttachments = (await vault.ListAttachmentsByEntryAsync(item.Record.EntryId, cancellationToken))
+            var nativeAttachments = (await vault.ListAttachmentsAsync(item.Record.ProjectId, item.Record.EntryId, cancellationToken))
                 .Where(attachment => !attachment.Deleted)
                 .ToList();
             result[payload.Item.Id] = nativeAttachments.Count > 0
@@ -546,7 +546,7 @@ public sealed partial class MdbxVaultStore(
             boundPasswordEntryId,
             NormalizeSecureItemAttachments(item.Id, DecodeSecureItemImagePaths(item)).ToList());
         var record = await SaveEntryAsync(vault, project.ProjectId, item.MdbxFolderId, SecureEntryTypes, entryType, item.Title, payload, cancellationToken);
-        await DeleteUnreferencedEntryAttachmentsAsync(vault, record.EntryId, DecodeSecureItemImagePaths(item), cancellationToken);
+        await DeleteUnreferencedEntryAttachmentsAsync(vault, record, DecodeSecureItemImagePaths(item), cancellationToken);
 
         item.MdbxDatabaseId = database.Id;
         item.MdbxFolderId = record.EntryId;
@@ -765,15 +765,13 @@ public sealed partial class MdbxVaultStore(
         using var _ = vault;
         var entryRecord = await FindEntryAsync(vault, item.MdbxFolderId!, SecureEntryTypes, includeDeleted: true, cancellationToken)
             ?? throw new InvalidOperationException("Secure item MDBX entry was not found.");
-        var metadata = await vault.CreateAttachmentMetadataAsync(
+        var written = await vault.CreateAttachmentAsync(
             entryRecord.ProjectId,
             item.MdbxFolderId,
             attachment.FileName,
             string.IsNullOrWhiteSpace(attachment.ContentType) ? null : attachment.ContentType,
-            "",
-            (ulong)Math.Max(0, content.LongLength),
+            content,
             cancellationToken);
-        var written = await vault.WriteAttachmentInlineContentAsync(metadata.AttachmentId, content, cancellationToken);
 
         attachment.OwnerType = "SECURE_ITEM";
         attachment.OwnerId = item.Id;
@@ -798,18 +796,15 @@ public sealed partial class MdbxVaultStore(
         var vault = await OpenAsync(database, cancellationToken);
         using var _ = vault;
         var entryRecord = await FindEntryAsync(vault, entry.MdbxFolderId!, PasswordEntryTypes, includeDeleted: true, cancellationToken);
-        var project = entryRecord is null
-            ? await EnsureDefaultProjectAsync(vault, cancellationToken)
-            : new MdbxNativeProjectRecord(entryRecord.ProjectId, "", Deleted: false);
-        var metadata = await vault.CreateAttachmentMetadataAsync(
-            project.ProjectId,
+        var projectId = entryRecord?.ProjectId
+            ?? (await EnsureDefaultProjectAsync(vault, cancellationToken)).ProjectId;
+        var written = await vault.CreateAttachmentAsync(
+            projectId,
             entry.MdbxFolderId,
             attachment.FileName,
             string.IsNullOrWhiteSpace(attachment.ContentType) ? null : attachment.ContentType,
-            "",
-            (ulong)Math.Max(0, content.LongLength),
+            content,
             cancellationToken);
-        var written = await vault.WriteAttachmentInlineContentAsync(metadata.AttachmentId, content, cancellationToken);
 
         attachment.StoragePath = ToAttachmentStoragePath(written.AttachmentId);
         if (attachment.Id <= 0)
@@ -846,7 +841,7 @@ public sealed partial class MdbxVaultStore(
     {
         var vault = await OpenAsync(database, cancellationToken);
         using var _ = vault;
-        var projects = await vault.ListProjectsAsync(false, cancellationToken);
+        var projects = await vault.ListProjectsAsync(cancellationToken);
         foreach (var project in projects)
         {
             foreach (var entryType in entryTypes)
@@ -856,7 +851,7 @@ public sealed partial class MdbxVaultStore(
                 {
                     if (deleteAttachments)
                     {
-                        var attachments = await vault.ListAttachmentsByEntryAsync(record.EntryId, cancellationToken);
+                        var attachments = await vault.ListAttachmentsAsync(project.ProjectId, record.EntryId, cancellationToken);
                         foreach (var attachment in attachments)
                         {
                             await vault.DeleteAttachmentAsync(attachment.AttachmentId, cancellationToken);
@@ -877,7 +872,7 @@ public sealed partial class MdbxVaultStore(
 
     private static async Task<MdbxNativeProjectRecord> EnsureProjectAsync(IMdbxNativeVault vault, string? projectId, string title, CancellationToken cancellationToken)
     {
-        var projects = await vault.ListProjectsAsync(false, cancellationToken);
+        var projects = await vault.ListProjectsAsync(cancellationToken);
         if (!string.IsNullOrWhiteSpace(projectId))
         {
             var existingById = projects.FirstOrDefault(project => string.Equals(project.ProjectId, projectId, StringComparison.OrdinalIgnoreCase));
@@ -894,7 +889,7 @@ public sealed partial class MdbxVaultStore(
 
     private static async Task<IReadOnlyList<MdbxNativeProjectRecord>> EnsureProjectsForReadAsync(IMdbxNativeVault vault, CancellationToken cancellationToken)
     {
-        var projects = (await vault.ListProjectsAsync(false, cancellationToken)).ToList();
+        var projects = (await vault.ListProjectsAsync(cancellationToken)).ToList();
         if (projects.Any(project => string.Equals(project.Title, DefaultProjectTitle, StringComparison.OrdinalIgnoreCase)))
         {
             return projects;
@@ -1000,13 +995,13 @@ public sealed partial class MdbxVaultStore(
         return null;
     }
 
-    private static async Task DeleteUnreferencedEntryAttachmentsAsync(IMdbxNativeVault vault, string entryId, IReadOnlyList<string> referencedImagePaths, CancellationToken cancellationToken)
+    private static async Task DeleteUnreferencedEntryAttachmentsAsync(IMdbxNativeVault vault, MdbxNativeEntryRecord record, IReadOnlyList<string> referencedImagePaths, CancellationToken cancellationToken)
     {
         var referencedAttachmentIds = referencedImagePaths
             .Select(TryParseAttachmentStoragePath)
             .Where(id => !string.IsNullOrWhiteSpace(id))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var attachment in await vault.ListAttachmentsByEntryAsync(entryId, cancellationToken))
+        foreach (var attachment in await vault.ListAttachmentsAsync(record.ProjectId, record.EntryId, cancellationToken))
         {
             if (!referencedAttachmentIds.Contains(attachment.AttachmentId))
             {

@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 
@@ -1108,6 +1108,7 @@ public sealed class LocalizationService : ILocalizationService
         ["AddPassword"] = "Add Password",
         ["EditPassword"] = "Edit Password",
         ["PasswordDetails"] = "Password Details",
+        ["PasswordDetailEmptyHint"] = "Select an entry to inspect its credentials, attachments, and history.",
         ["LoadingPasswordDetails"] = "Loading password details...",
         ["BackToPasswordList"] = "Back to password list",
         ["RetryPasswordDetails"] = "Retry loading details",
@@ -2337,7 +2338,7 @@ public sealed class LocalizationService : ILocalizationService
         ["RefreshSecurityAnalysis"] = "Refresh analysis",
         ["CancelSecurityCheck"] = "Cancel check",
         ["BackToSecurityIssues"] = "Back to security issues",
-        ["CreatedMdbxMetadata"] = "Created a real MDBX-1 vault and registered its local metadata"
+        ["CreatedMdbxMetadata"] = "Created a real MDBX-2 vault and registered its local metadata"
     };
 
     private static readonly Dictionary<string, string> Chinese = new()
@@ -2458,6 +2459,7 @@ public sealed class LocalizationService : ILocalizationService
         ["AddPassword"] = "添加密码",
         ["EditPassword"] = "编辑密码",
         ["PasswordDetails"] = "密码详情",
+        ["PasswordDetailEmptyHint"] = "选择一个条目后可查看凭据、附件和历史记录。",
         ["LoadingPasswordDetails"] = "正在加载密码详情...",
         ["BackToPasswordList"] = "返回密码列表",
         ["RetryPasswordDetails"] = "重新加载详情",
@@ -3603,6 +3605,6 @@ public sealed class LocalizationService : ILocalizationService
         ["RefreshSecurityAnalysis"] = "刷新分析",
         ["CancelSecurityCheck"] = "取消检查",
         ["BackToSecurityIssues"] = "返回安全问题列表",
-        ["CreatedMdbxMetadata"] = "已创建真实 MDBX-1 保险库并登记本地元数据"
+        ["CreatedMdbxMetadata"] = "已创建真实 MDBX-2 保险库并登记本地元数据"
     };
 }
