@@ -6,7 +6,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
-using Monica.App.ViewModels;
+using Monica.App.Services;
 
 namespace Monica.App.Controls;
 
@@ -31,6 +31,9 @@ public partial class VaultFolderTree : UserControl
 
     public static readonly StyledProperty<IEnumerable?> ItemsSourceProperty =
         AvaloniaProperty.Register<VaultFolderTree, IEnumerable?>(nameof(ItemsSource));
+
+    public static readonly StyledProperty<ILocalizationService?> TextProperty =
+        AvaloniaProperty.Register<VaultFolderTree, ILocalizationService?>(nameof(Text));
 
     public static readonly StyledProperty<object?> SelectedItemProperty =
         AvaloniaProperty.Register<VaultFolderTree, object?>(nameof(SelectedItem));
@@ -93,6 +96,12 @@ public partial class VaultFolderTree : UserControl
     {
         get => GetValue(ItemsSourceProperty);
         set => SetValue(ItemsSourceProperty, value);
+    }
+
+    public ILocalizationService? Text
+    {
+        get => GetValue(TextProperty);
+        set => SetValue(TextProperty, value);
     }
 
     public object? SelectedItem
@@ -335,7 +344,7 @@ public partial class VaultFolderTree : UserControl
     {
         _namingMode = mode;
         FolderName = initialName ?? string.Empty;
-        NamingPlaceholder = (DataContext as MainWindowViewModel)?.L.Get(
+        NamingPlaceholder = Text?.Get(
             mode == FolderNamingMode.Rename ? "RenameFolder" : "NewFolder") ?? string.Empty;
         IsNaming = true;
         Dispatcher.UIThread.Post(

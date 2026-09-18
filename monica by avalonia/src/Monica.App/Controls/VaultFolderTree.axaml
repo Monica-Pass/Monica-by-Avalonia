@@ -3,10 +3,9 @@
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:local="using:Monica.App"
              xmlns:controls="using:Monica.App.Controls"
-             xmlns:vm="using:Monica.App.ViewModels"
              x:Class="Monica.App.Controls.VaultFolderTree"
              x:Name="Root"
-             x:DataType="vm:MainWindowViewModel">
+             x:DataType="controls:VaultFolderTree">
 
     <UserControl.Styles>
         <Style Selector="ListBox.folderTree ListBoxItem">
@@ -65,8 +64,8 @@
                         Classes="folderTreeReset"
                         Classes.on="{Binding #Root.IsAllFoldersSelected}"
                         Command="{Binding #Root.AllFoldersCommand}"
-                        Content="{Binding #Root.DataContext.L.AllFolders}"
-                        AutomationProperties.Name="{Binding #Root.DataContext.L.AllFolders}" />
+                        Content="{Binding #Root.Text.AllFolders}"
+                        AutomationProperties.Name="{Binding #Root.Text.AllFolders}" />
             </Panel>
             <Button Grid.Column="1"
                     x:Name="CreateFolderButton"
@@ -78,8 +77,8 @@
                     HorizontalContentAlignment="Center"
                     VerticalContentAlignment="Center"
                     Click="OnCreateFolderClick"
-                    ToolTip.Tip="{Binding #Root.DataContext.L.NewFolder}"
-                    AutomationProperties.Name="{Binding #Root.DataContext.L.NewFolder}">
+                    ToolTip.Tip="{Binding #Root.Text.NewFolder}"
+                    AutomationProperties.Name="{Binding #Root.Text.NewFolder}">
                 <ic:FluentIcon Icon="FolderAdd" FontSize="14" />
             </Button>
         </Grid>
@@ -115,16 +114,16 @@
                     <Panel MinHeight="28" Background="Transparent">
                         <Panel.ContextMenu>
                             <ContextMenu>
-                                <MenuItem Header="{Binding #Root.DataContext.L.NewFolder}" Click="OnCreateFolderClick">
+                                <MenuItem Header="{Binding #Root.Text.NewFolder}" Click="OnCreateFolderClick">
                                     <MenuItem.Icon><ic:FluentIcon Icon="FolderAdd" FontSize="14" /></MenuItem.Icon>
                                 </MenuItem>
-                                <MenuItem Header="{Binding #Root.DataContext.L.RenameFolder}"
+                                <MenuItem Header="{Binding #Root.Text.RenameFolder}"
                                           InputGesture="F2"
                                           IsEnabled="{Binding #Root.CanManageSelected}"
                                           Click="OnRenameFolderClick">
                                     <MenuItem.Icon><ic:FluentIcon Icon="Edit" FontSize="14" /></MenuItem.Icon>
                                 </MenuItem>
-                                <MenuItem Header="{Binding #Root.DataContext.L.DeleteFolder}"
+                                <MenuItem Header="{Binding #Root.Text.DeleteFolder}"
                                           IsEnabled="{Binding #Root.CanManageSelected}"
                                           Command="{Binding #Root.DeleteFolderCommand}">
                                     <MenuItem.Icon><ic:FluentIcon Icon="Delete" FontSize="14" /></MenuItem.Icon>

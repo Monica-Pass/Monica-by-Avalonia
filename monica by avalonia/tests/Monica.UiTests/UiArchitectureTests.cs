@@ -262,4 +262,38 @@ public sealed class UiArchitectureTests
             workspaces,
             workspace => Assert.Contains(workspace.Styles, style => style is Avalonia.Styling.Styles));
     }
+
+    [Fact]
+    public void Shared_controls_never_bind_to_the_shell_view_model()
+    {
+        var controlsDirectory = FindAppDirectory("Controls");
+        var sources = Directory
+            .EnumerateFiles(controlsDirectory, "*.*", SearchOption.AllDirectories)
+            .Where(path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ||
+                           path.EndsWith(".axaml", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        Assert.NotEmpty(sources);
+        Assert.All(
+            sources,
+            path => Assert.DoesNotContain(
+                "MainWindowViewModel",
+                File.ReadAllText(path),
+                StringComparison.Ordinal));
+    }
+
+    private static string FindAppDirectory(params string[] parts)
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            var candidate = Path.Combine(
+                new[] { directory.FullName, "src", "Monica.App" }.Concat(parts).ToArray());
+            if (Directory.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        throw new DirectoryNotFoundException($"Could not locate {string.Join('/', parts)} under src/Monica.App.");
+    }
 }

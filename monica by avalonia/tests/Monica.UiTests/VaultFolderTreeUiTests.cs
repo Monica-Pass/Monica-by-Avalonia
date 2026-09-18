@@ -1,12 +1,14 @@
 using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Headless;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Monica.App.Controls;
+using Monica.App.Services;
 
 namespace Monica.UiTests;
 
@@ -277,6 +279,28 @@ public sealed class VaultFolderTreeUiTests
         Assert.Same(resetCommand, resetButton.Command);
         resetButton.Command!.Execute(null);
         Assert.Equal(1, resetCalls);
+    }
+
+    [Fact]
+    public void Folder_tree_captions_come_from_the_supplied_text_source()
+    {
+        var text = new LocalizationService();
+        var tree = new VaultFolderTree
+        {
+            Text = text,
+            ItemsSource = Array.Empty<FakeFolderRow>(),
+            CreateFolderCommand = new DelegateCommand(() => { }),
+        };
+
+        Assert.Equal(text.AllFolders, tree.FindControl<Button>("AllFoldersButton")!.Content);
+        Assert.Equal(
+            text.NewFolder,
+            ToolTip.GetTip(tree.FindControl<Button>("CreateFolderButton")!));
+
+        tree.FindControl<Button>("CreateFolderButton")!
+            .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+        Assert.Equal(text.NewFolder, tree.NamingPlaceholder);
     }
 
     private static ListBoxItem RowContainer(ListBox list, IFolderTreeRow row) =>
