@@ -84,3 +84,14 @@ public static class VaultTreeKey
 
     public static string SecureItem(long itemId) => $"s:{itemId}";
 }
+
+/// The library page owns no editing surface: a selected row only names which of the existing
+/// editors the right-hand slot has to host.
+public enum VaultSurface
+{
+    None,
+    Password,
+    Note,
+    Totp,
+    Card
+}

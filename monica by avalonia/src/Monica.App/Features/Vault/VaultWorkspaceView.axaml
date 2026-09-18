@@ -1,0 +1,123 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:controls="using:Monica.App.Controls"
+             xmlns:vault="using:Monica.App.Features.Vault"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Vault.VaultWorkspaceView"
+             x:Name="Root"
+             x:DataType="vm:MainWindowViewModel">
+    <UserControl.Styles>
+        <!-- The right-hand slot hosts the other pages' editors, and each of those resolves its
+             own class names through the feature stylesheet it is normally nested in. -->
+        <StyleInclude Source="/Features/Passwords/PasswordVaultStyles.axaml" />
+        <StyleInclude Source="/Features/Notes/NoteStyles.axaml" />
+        <StyleInclude Source="/Features/Authenticator/AuthenticatorStyles.axaml" />
+        <StyleInclude Source="/Features/Wallet/WalletStyles.axaml" />
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- One strip for everything that narrows the tree; the tree itself is the only navigator. -->
+        <Border Grid.Row="0" Classes="workspaceToolbar">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                <TextBlock Classes="workspacePageTitle"
+                           Text="{Binding L.Library}"
+                           VerticalAlignment="Center" />
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Left"
+                            Spacing="4">
+                    <Button Classes="workspaceFilterChip"
+                            Classes.accent="{Binding IsVaultGroupAll}"
+                            Content="{Binding L.LibraryAll}"
+                            Command="{Binding SelectVaultGroupCommand}"
+                            CommandParameter="{x:Static vault:VaultEntryGroup.All}" />
+                    <Button Classes="workspaceFilterChip"
+                            Classes.accent="{Binding IsVaultGroupPasswords}"
+                            Content="{Binding L.Passwords}"
+                            Command="{Binding SelectVaultGroupCommand}"
+                            CommandParameter="{x:Static vault:VaultEntryGroup.Passwords}" />
+                    <Button Classes="workspaceFilterChip"
+                            Classes.accent="{Binding IsVaultGroupNotes}"
+                            Content="{Binding L.SecureNotes}"
+                            Command="{Binding SelectVaultGroupCommand}"
+                            CommandParameter="{x:Static vault:VaultEntryGroup.Notes}" />
+                    <Button Classes="workspaceFilterChip"
+                            Classes.accent="{Binding IsVaultGroupTotp}"
+                            Content="{Binding L.Totp}"
+                            Command="{Binding SelectVaultGroupCommand}"
+                            CommandParameter="{x:Static vault:VaultEntryGroup.Totp}" />
+                    <Button Classes="workspaceFilterChip"
+                            Classes.accent="{Binding IsVaultGroupCards}"
+                            Content="{Binding L.Cards}"
+                            Command="{Binding SelectVaultGroupCommand}"
+                            CommandParameter="{x:Static vault:VaultEntryGroup.Cards}" />
+                    <Button Classes="workspaceFilterChip"
+                            Classes.accent="{Binding VaultFavoritesOnly}"
+                            Content="{Binding L.LibraryFavorites}"
+                            Command="{Binding ToggleVaultFavoritesCommand}" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+                    <TextBox x:Name="VaultSearchBox"
+                             Text="{Binding VaultSearchText, Mode=TwoWay}"
+                             PlaceholderText="{Binding L.Search}"
+                             Width="200"
+                             MinHeight="{DynamicResource ControlHeight}"
+                             VerticalContentAlignment="Center"
+                             AutomationProperties.Name="{Binding L.Search}" />
+                    <Button Classes="workspaceCommand"
+                            IsVisible="{Binding HasVaultSearchText}"
+                            Command="{Binding ClearVaultSearchCommand}"
+                            ToolTip.Tip="{Binding L.ClearSearch}"
+                            AutomationProperties.Name="{Binding L.ClearSearch}"
+                            VerticalAlignment="Center">
+                        <ic:FluentIcon Icon="Dismiss" FontSize="14" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" ColumnDefinitions="340,*">
+            <Border Grid.Column="0" Classes="workspaceTreeRail">
+                <Panel>
+                    <controls:VaultFolderTree x:Name="VaultTree"
+                                              Text="{Binding L}"
+                                              ItemsSource="{Binding VaultTreeRows}"
+                                              SelectedItem="{Binding SelectedVaultRow, Mode=TwoWay}"
+                                              ToggleExpansionCommand="{Binding ToggleVaultFolderExpansionCommand}"
+                                              CreateFolderCommand="{Binding CreateVaultFolderCommand}"
+                                              RenameFolderCommand="{Binding RenameSelectedVaultFolderCommand}"
+                                              DeleteFolderCommand="{Binding DeleteSelectedVaultFolderCommand}"
+                                              MoveFolderCommand="{Binding MoveVaultFolderCommand}"
+                                              CanManageSelected="{Binding CanManageSelectedVaultFolder}"
+                                              FolderName="{Binding NewFolderName, Mode=TwoWay}"
+                                              EditEntryCommand="{Binding EditSelectedVaultEntryCommand}"
+                                              MoveEntryCommand="{Binding MoveSelectedVaultEntryCommand}"
+                                              DeleteEntryCommand="{Binding DeleteSelectedVaultEntryCommand}" />
+                    <TextBlock Classes="workspaceMeta"
+                               IsVisible="{Binding !HasVaultRows}"
+                               Text="{Binding VaultEmptyStateText}"
+                               TextWrapping="Wrap"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center" />
+                </Panel>
+            </Border>
+
+            <!-- The page owns no editing surface: whatever the selected row names opens here. -->
+            <Border Grid.Column="1" Classes="workspaceDetail">
+                <Panel>
+                    <ContentControl x:Name="VaultSurfaceHost"
+                                    HorizontalContentAlignment="Stretch"
+                                    VerticalContentAlignment="Stretch" />
+                    <TextBlock Classes="workspaceMeta"
+                               IsVisible="{Binding !HasVaultSelection}"
+                               Text="{Binding L.LibraryOpenHint}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center" />
+                </Panel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -52,7 +52,7 @@
         <!-- Ancestors are already visible as rows above the selection, so the header carries no
              path: just the way back to an unfiltered list, and the one visible create action. -->
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-            <Panel>
+            <Panel IsVisible="{Binding #Root.AllFoldersCommand, Converter={x:Static ObjectConverters.IsNotNull}}">
                 <Border Width="3"
                         Height="16"
                         HorizontalAlignment="Left"
@@ -109,23 +109,44 @@
                 <ItemsPanelTemplate><VirtualizingStackPanel Orientation="Vertical" /></ItemsPanelTemplate>
             </ListBox.ItemsPanel>
             <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="controls:IFolderTreeRow">
+                <DataTemplate x:DataType="controls:IVaultTreeRow">
                     <!-- Transparent so the whole row is right-clickable, not just the label. -->
                     <Panel MinHeight="28" Background="Transparent">
                         <Panel.ContextMenu>
                             <ContextMenu>
-                                <MenuItem Header="{Binding #Root.Text.NewFolder}" Click="OnCreateFolderClick">
+                                <MenuItem Header="{Binding #Root.Text.NewFolder}"
+                                          IsVisible="{Binding #Root.IsEntrySelection, Converter={x:Static local:BoolConverters.Not}}"
+                                          Click="OnCreateFolderClick">
                                     <MenuItem.Icon><ic:FluentIcon Icon="FolderAdd" FontSize="14" /></MenuItem.Icon>
                                 </MenuItem>
                                 <MenuItem Header="{Binding #Root.Text.RenameFolder}"
                                           InputGesture="F2"
+                                          IsVisible="{Binding #Root.IsEntrySelection, Converter={x:Static local:BoolConverters.Not}}"
                                           IsEnabled="{Binding #Root.CanManageSelected}"
                                           Click="OnRenameFolderClick">
                                     <MenuItem.Icon><ic:FluentIcon Icon="Edit" FontSize="14" /></MenuItem.Icon>
                                 </MenuItem>
                                 <MenuItem Header="{Binding #Root.Text.DeleteFolder}"
+                                          IsVisible="{Binding #Root.IsEntrySelection, Converter={x:Static local:BoolConverters.Not}}"
                                           IsEnabled="{Binding #Root.CanManageSelected}"
                                           Command="{Binding #Root.DeleteFolderCommand}">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="Delete" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
+                                <!-- An entry moves by folder picker, never by drag, so these three
+                                     replace the folder group instead of adding to it. -->
+                                <MenuItem Header="{Binding #Root.Text.Edit}"
+                                          IsVisible="{Binding #Root.IsEntrySelection}"
+                                          Command="{Binding #Root.EditEntryCommand}">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="Edit" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{Binding #Root.Text.MoveToFolder}"
+                                          IsVisible="{Binding #Root.IsEntrySelection}"
+                                          Command="{Binding #Root.MoveEntryCommand}">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="Folder" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{Binding #Root.Text.Delete}"
+                                          IsVisible="{Binding #Root.IsEntrySelection}"
+                                          Command="{Binding #Root.DeleteEntryCommand}">
                                     <MenuItem.Icon><ic:FluentIcon Icon="Delete" FontSize="14" /></MenuItem.Icon>
                                 </MenuItem>
                             </ContextMenu>
@@ -137,7 +158,7 @@
                                 CornerRadius="1.5"
                                 Classes="folderSelectionPipe"
                                 Background="{DynamicResource AccentFillColorDefaultBrush}" />
-                        <Grid ColumnDefinitions="20,18,*"
+                        <Grid ColumnDefinitions="20,18,*,Auto"
                               ColumnSpacing="6"
                               Margin="{Binding Indent}"
                               VerticalAlignment="Center">
@@ -158,14 +179,23 @@
                                                    IsVisible="{Binding IsExpanded, Converter={x:Static local:BoolConverters.Not}}" />
                                 </Panel>
                             </Button>
+                            <!-- Every row names its own glyph, so a folder and a leaf share one shape. -->
                             <ic:FluentIcon Grid.Column="1"
-                                           Icon="Folder"
+                                           Icon="{Binding EntrySymbol, Converter={x:Static local:IconConverters.FromSymbol}}"
                                            FontSize="14"
                                            VerticalAlignment="Center" />
                             <TextBlock Grid.Column="2"
                                        Text="{Binding Label}"
                                        TextTrimming="CharacterEllipsis"
                                        VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="3"
+                                       Text="{Binding EntryDetail}"
+                                       MaxWidth="96"
+                                       MinWidth="0"
+                                       FontSize="12"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         </Grid>
                     </Panel>
                 </DataTemplate>

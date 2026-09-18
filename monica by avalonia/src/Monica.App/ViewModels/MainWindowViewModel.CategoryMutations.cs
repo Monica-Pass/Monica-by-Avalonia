@@ -151,6 +151,7 @@ public sealed partial class MainWindowViewModel
         RefreshPasswordFolderFilters(preferredPasswordCategoryId);
         RefreshNoteCategoryOptions();
         RaiseNoteTreeState();
+        RaiseVaultTreeState();
     }
 
     private static void ClearCategoryReferences(IEnumerable<SecureItem> items, long categoryId)

@@ -305,6 +305,7 @@ public partial class MainWindow
         var failures = new List<string>();
         var sections = new[]
         {
+            "Vault",
             "Passwords",
             "Notes",
             "Totp",

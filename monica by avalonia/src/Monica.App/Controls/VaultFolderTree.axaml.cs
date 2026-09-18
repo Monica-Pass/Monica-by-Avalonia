@@ -59,8 +59,22 @@ public partial class VaultFolderTree : UserControl
     public static readonly StyledProperty<ICommand?> MoveFolderCommandProperty =
         AvaloniaProperty.Register<VaultFolderTree, ICommand?>(nameof(MoveFolderCommand));
 
+    public static readonly StyledProperty<ICommand?> EditEntryCommandProperty =
+        AvaloniaProperty.Register<VaultFolderTree, ICommand?>(nameof(EditEntryCommand));
+
+    public static readonly StyledProperty<ICommand?> MoveEntryCommandProperty =
+        AvaloniaProperty.Register<VaultFolderTree, ICommand?>(nameof(MoveEntryCommand));
+
+    public static readonly StyledProperty<ICommand?> DeleteEntryCommandProperty =
+        AvaloniaProperty.Register<VaultFolderTree, ICommand?>(nameof(DeleteEntryCommand));
+
     public static readonly StyledProperty<bool> CanManageSelectedProperty =
         AvaloniaProperty.Register<VaultFolderTree, bool>(nameof(CanManageSelected));
+
+    // The context menu is built per row, but its items live in one menu, so the menu group is chosen
+    // from the row the pointer last pressed rather than from the item's own data context.
+    public static readonly StyledProperty<bool> IsEntrySelectionProperty =
+        AvaloniaProperty.Register<VaultFolderTree, bool>(nameof(IsEntrySelection));
 
     public static readonly StyledProperty<string?> FolderNameProperty =
         AvaloniaProperty.Register<VaultFolderTree, string?>(nameof(FolderName));
@@ -152,6 +166,30 @@ public partial class VaultFolderTree : UserControl
         set => SetValue(MoveFolderCommandProperty, value);
     }
 
+    public ICommand? EditEntryCommand
+    {
+        get => GetValue(EditEntryCommandProperty);
+        set => SetValue(EditEntryCommandProperty, value);
+    }
+
+    public ICommand? MoveEntryCommand
+    {
+        get => GetValue(MoveEntryCommandProperty);
+        set => SetValue(MoveEntryCommandProperty, value);
+    }
+
+    public ICommand? DeleteEntryCommand
+    {
+        get => GetValue(DeleteEntryCommandProperty);
+        set => SetValue(DeleteEntryCommandProperty, value);
+    }
+
+    public bool IsEntrySelection
+    {
+        get => GetValue(IsEntrySelectionProperty);
+        set => SetValue(IsEntrySelectionProperty, value);
+    }
+
     public bool CanManageSelected
     {
         get => GetValue(CanManageSelectedProperty);
@@ -174,6 +212,17 @@ public partial class VaultFolderTree : UserControl
     {
         get => GetValue(NamingPlaceholderProperty);
         set => SetValue(NamingPlaceholderProperty, value);
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+
+        if (change.Property == SelectedItemProperty)
+        {
+            var selected = change.GetNewValue<object?>();
+            IsEntrySelection = selected is IFolderTreeRow row && row.IsEntryLeaf();
+        }
     }
 
     private void OnTreePointerPressed(object? sender, PointerPressedEventArgs e)
@@ -329,7 +378,7 @@ public partial class VaultFolderTree : UserControl
 
     private void OnTreeKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key == Key.F2 && CanManageSelected)
+        if (e.Key == Key.F2 && CanManageSelected && !IsEntrySelection)
         {
             BeginRename();
             e.Handled = true;

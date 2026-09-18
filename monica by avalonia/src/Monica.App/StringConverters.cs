@@ -1,6 +1,7 @@
 using System.Globalization;
 using Avalonia;
 using Avalonia.Data.Converters;
+using FluentIcons.Common;
 
 namespace Monica.App;
 
@@ -99,6 +100,22 @@ public static class BoolConverters
     {
         public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
             value is bool boolValue && boolValue ? 1d : 0.18d;
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+            throw new NotSupportedException();
+    }
+}
+
+public static class IconConverters
+{
+    public static IValueConverter FromSymbol { get; } = new SymbolToIconConverter();
+
+    // FluentIcon.Icon is a struct that only converts to and from Symbol explicitly, and a binding
+    // applies no cast: without this bridge every dynamic glyph silently keeps the control default.
+    private sealed class SymbolToIconConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+            (Icon)(Symbol)value!;
 
         public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
             throw new NotSupportedException();

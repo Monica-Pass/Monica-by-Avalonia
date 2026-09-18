@@ -107,6 +107,40 @@
         <Setter Property="Padding" Value="{DynamicResource PaddingPane}" />
     </Style>
 
+    <!-- A workspace splits into a header strip, an optional rail and one detail surface, and the
+         only chrome between them is a hairline. Regions carry no fill of their own. -->
+    <Style Selector="Border.workspaceToolbar">
+        <Setter Property="Padding" Value="8" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+    </Style>
+    <Style Selector="Border.workspaceTreeRail">
+        <Setter Property="Padding" Value="10,8" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="0,0,1,0" />
+    </Style>
+    <Style Selector="Border.workspaceDetail">
+        <Setter Property="Padding" Value="16,12" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1,0,0,0" />
+    </Style>
+
+    <!-- Header chips size to their label; workspaceNavItem is a sidebar item and stretches. -->
+    <Style Selector="Button.workspaceFilterChip">
+        <Setter Property="MinHeight" Value="{DynamicResource ControlHeight}" />
+        <Setter Property="Padding" Value="9,4" />
+        <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.workspaceFilterChip:pointerover">
+        <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundPointerOver}" />
+    </Style>
+    <Style Selector="Button.workspaceFilterChip.accent">
+        <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
+    </Style>
+
     <!-- Status chips are plain meta text; keeping the class name avoids touching
          every call site while dropping the pill chrome in one place. -->
     <Style Selector="Border.workspaceStatusChip">

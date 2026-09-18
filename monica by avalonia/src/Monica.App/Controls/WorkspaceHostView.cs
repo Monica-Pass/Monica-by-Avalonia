@@ -14,6 +14,7 @@ using Monica.App.Features.SecurityAnalysis;
 using Monica.App.Features.Settings;
 using Monica.App.Features.Sync;
 using Monica.App.Features.Timeline;
+using Monica.App.Features.Vault;
 using Monica.App.Features.Wallet;
 
 namespace Monica.App.Controls;
@@ -23,6 +24,7 @@ public sealed class WorkspaceHostView : ContentControl
     private static readonly IReadOnlyDictionary<string, Func<Control>> WorkspaceFactories =
         new Dictionary<string, Func<Control>>(StringComparer.OrdinalIgnoreCase)
         {
+            ["Vault"] = static () => new VaultWorkspaceView(),
             ["Passwords"] = static () => new PasswordVaultView(),
             ["Notes"] = static () => new NoteWorkspaceView(),
             ["Totp"] = static () => new AuthenticatorWorkspaceView(),

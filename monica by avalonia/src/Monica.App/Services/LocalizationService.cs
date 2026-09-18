@@ -21,6 +21,13 @@ public interface ILocalizationService : INotifyPropertyChanged
     string SecureNotes { get; }
     string Totp { get; }
     string Cards { get; }
+    string Library { get; }
+    string LibraryAll { get; }
+    string LibraryFavorites { get; }
+    string LibraryEmptyHint { get; }
+    string LibraryNoMatchesHint { get; }
+    string LibraryOpenHint { get; }
+    string ClearSearch { get; }
     string Generator { get; }
     string Archive { get; }
     string RecycleBin { get; }
@@ -515,6 +522,13 @@ public sealed class LocalizationService : ILocalizationService
     public string SecureNotes => Text();
     public string Totp => Text();
     public string Cards => Text();
+    public string Library => Text();
+    public string LibraryAll => Text();
+    public string LibraryFavorites => Text();
+    public string LibraryEmptyHint => Text();
+    public string LibraryNoMatchesHint => Text();
+    public string LibraryOpenHint => Text();
+    public string ClearSearch => Text();
     public string Generator => Text();
     public string Archive => Text();
     public string RecycleBin => Text();
@@ -993,6 +1007,13 @@ public sealed class LocalizationService : ILocalizationService
         ["SecureNotes"] = "Secure Notes",
         ["Totp"] = "TOTP",
         ["Cards"] = "Cards",
+        ["Library"] = "Library",
+        ["LibraryAll"] = "All",
+        ["LibraryFavorites"] = "Favorites",
+        ["LibraryEmptyHint"] = "Nothing saved yet.",
+        ["LibraryNoMatchesHint"] = "No item matches this filter.",
+        ["LibraryOpenHint"] = "Pick an item to open it.",
+        ["ClearSearch"] = "Clear search",
         ["Generator"] = "Generator",
         ["Archive"] = "Archive",
         ["RecycleBin"] = "Recycle Bin",
@@ -2350,6 +2371,13 @@ public sealed class LocalizationService : ILocalizationService
         ["SecureNotes"] = "安全笔记",
         ["Totp"] = "动态口令",
         ["Cards"] = "卡包",
+        ["Library"] = "库",
+        ["LibraryAll"] = "全部",
+        ["LibraryFavorites"] = "收藏",
+        ["LibraryEmptyHint"] = "还没有任何内容。",
+        ["LibraryNoMatchesHint"] = "没有符合当前筛选的项目。",
+        ["LibraryOpenHint"] = "选择一项以打开。",
+        ["ClearSearch"] = "清除搜索",
         ["Generator"] = "生成器",
         ["Archive"] = "归档",
         ["RecycleBin"] = "回收站",
