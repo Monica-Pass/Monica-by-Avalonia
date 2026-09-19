@@ -33,6 +33,26 @@ function Invoke-CheckedCommand {
     }
 }
 
+function Assert-TestReportRanTests {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ReportPath
+    )
+
+    if (-not (Test-Path -LiteralPath $ReportPath)) {
+        throw "The test run did not write $ReportPath."
+    }
+
+    # An in-proc run whose filter matches nothing still exits 0, so the report itself is the only
+    # evidence that the gate had anything to guard.
+    $executed = [regex]::Matches((Get-Content -LiteralPath $ReportPath -Raw), '<UnitTest ').Count
+    if ($executed -eq 0) {
+        throw "$ReportPath records zero executed tests; the selection matched nothing and the gate would pass vacuously."
+    }
+
+    Write-Host "$ReportPath recorded $executed executed tests."
+}
+
 function Assert-NoTrackedGeneratedArtifacts {
     $trackedFiles = @(& git ls-files)
     if ($LASTEXITCODE -ne 0) {
@@ -189,29 +209,35 @@ try {
     New-Item -ItemType Directory -Force -Path $uiTestResultsDirectory | Out-Null
     $uiTestAssembly = "tests/Monica.UiTests/bin/$Configuration/net10.0/Monica.UiTests.dll"
 
-    # Cold-start measurements must run in a fresh test process. Other headless
-    # UI tests can legitimately warm Avalonia and dispatcher state, which makes
-    # a cold budget phase report unrelated queue contention.
+    $perfBudgetReport = "$uiTestResultsDirectory/PerfBudget.trx"
+    $functionalReport = "$uiTestResultsDirectory/Monica.UiTests.trx"
+
+    # Wall-clock budgets must run in a fresh test process, ahead of the headless UI tests that
+    # legitimately warm Avalonia and dispatcher state - otherwise a cold budget phase reports
+    # unrelated queue contention. The functional run carries no timing verdict at all, so a
+    # developer's loaded machine cannot turn it red by being busy.
     Invoke-CheckedCommand dotnet @(
         $uiTestAssembly,
-        '-class',
-        'Monica.UiTests.ColdStartupPerformanceTests',
+        '-filter',
+        '/[Category=perf-budget]',
         '-reporter',
         'quiet',
         '-noColor',
         '-trx',
-        "$uiTestResultsDirectory/ColdStartupPerformanceTests.trx"
+        $perfBudgetReport
     )
+    Assert-TestReportRanTests $perfBudgetReport
     Invoke-CheckedCommand dotnet @(
         $uiTestAssembly,
-        '-class-',
-        'Monica.UiTests.ColdStartupPerformanceTests',
+        '-filter',
+        '/[Category!=perf-budget]',
         '-reporter',
         'quiet',
         '-noColor',
         '-trx',
-        "$uiTestResultsDirectory/Monica.UiTests.trx"
+        $functionalReport
     )
+    Assert-TestReportRanTests $functionalReport
 
     Write-Host 'Commercial release verification passed.'
 } finally {

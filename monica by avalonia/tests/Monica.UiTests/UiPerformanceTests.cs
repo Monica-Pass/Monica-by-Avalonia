@@ -44,6 +44,20 @@ public sealed class UiPerformanceTests
         Assert.NotNull(shellHost);
         Assert.Null(shellHost.Content);
         Assert.DoesNotContain(window.GetVisualDescendants(), control => control is WorkspaceHostView);
+    }
+
+    // Wall-clock budget: run it where the cores are not shared with everything else the
+    // developer has open. Locally: -filter "/[Category!=perf-budget]".
+    [Fact]
+    [Trait("Category", "perf-budget")]
+    public void Performance_budget_warm_locked_shell_construction_stays_within_budget()
+    {
+        _ = new Monica.App.MainWindow();
+
+        var stopwatch = Stopwatch.StartNew();
+        var window = new Monica.App.MainWindow();
+        stopwatch.Stop();
+
         Assert.True(
             stopwatch.ElapsedMilliseconds < 250,
             $"Locked shell construction took {stopwatch.ElapsedMilliseconds} ms.");
@@ -165,18 +179,36 @@ public sealed class UiPerformanceTests
     }
 
     [Fact]
-    public void Performance_budget_library_rematerializes_a_large_vault_in_one_pass()
+    public void Library_rematerializes_a_large_vault_with_one_reset()
     {
-        // Clearing filters is the widest rebuild the library can be asked for: every row is rebuilt and
-        // handed to the bound tree at once. Warm on this harness the builder costs ~5ms per 5,000 entries
-        // and the view-model publish 10-40ms; the rest is the dispatcher pass that lets the tree take the
-        // rows. Handing the tree a fresh collection measured 197-224ms for that pass against 241-295ms
-        // for refilling the bound one row by row - bands that overlap this harness's noise, so the ceiling
-        // below only catches a real cliff and the one-reset contract is asserted structurally instead.
-        // Best of three rounds decides the verdict, because any single round can be inflated by an
-        // unrelated collection.
-        const int passwordCount = 5_000;
+        RematerializeLargeVault();
+    }
+
+    // Wall-clock budget: run it where the cores are not shared with everything else the
+    // developer has open. Locally: -filter "/[Category!=perf-budget]".
+    [Fact]
+    [Trait("Category", "perf-budget")]
+    public void Performance_budget_library_rematerialization_stays_within_budget()
+    {
         const int ceilingMs = 400;
+        var (fastestMs, materialized) = RematerializeLargeVault();
+
+        Assert.True(
+            fastestMs < ceilingMs,
+            $"Re-materializing {materialized} library rows took {fastestMs} ms at best.");
+    }
+
+    // Clearing filters is the widest rebuild the library can be asked for: every row is rebuilt and
+    // handed to the bound tree at once. Warm on this harness the builder costs ~5ms per 5,000 entries
+    // and the view-model publish 10-40ms; the rest is the dispatcher pass that lets the tree take the
+    // rows. Handing the tree a fresh collection measured 197-224ms for that pass against 241-295ms
+    // for refilling the bound one row by row - bands that overlap this harness's noise, which is why
+    // the one-reset contract is asserted structurally here and only the ceiling is a budget.
+    // Best of three rounds decides the verdict, because any single round can be inflated by an
+    // unrelated collection.
+    private static (long FastestMs, int Materialized) RematerializeLargeVault()
+    {
+        const int passwordCount = 5_000;
         var repository = DispatchProxy.Create<IMonicaRepository, VaultLoadRepositoryProxy>();
         var probe = (VaultLoadRepositoryProxy)(object)repository;
         probe.PasswordItems = Enumerable.Range(1, passwordCount)
@@ -219,14 +251,12 @@ public sealed class UiPerformanceTests
                 fastestMs = Math.Min(fastestMs, pass.ElapsedMilliseconds);
             }
 
-            Assert.True(
-                fastestMs < ceilingMs,
-                $"Re-materializing {materialized} library rows took {fastestMs} ms at best.");
             // The rebuild hands the tree a new collection rather than refilling the old one, so a binding
             // that stopped following it would keep showing stale rows while the numbers looked healthy.
             Assert.Contains(
                 window.GetVisualDescendants().OfType<ListBox>(),
                 list => ReferenceEquals(list.ItemsSource, viewModel.VaultTreeRows));
+            return (fastestMs, materialized);
         }
         finally
         {

@@ -8,25 +8,37 @@ using Monica.Data.Repositories;
 namespace Monica.UiTests;
 
 [Collection(AvaloniaUiTestCollection.Name)]
-public sealed class NoteEditorPerformanceTests
+public sealed class NoteEditorPerformanceTests : IDisposable
 {
+    private const int LargeNoteLineCount = 5000;
+
+    private ServiceProvider? _editorServices;
+
     public NoteEditorPerformanceTests()
     {
         AvaloniaUiThreadTestContext.VerifyAccess();
     }
 
-    [Fact]
-    public void Note_editor_content_projection_builds_once_per_text_change()
+    public void Dispose()
     {
-        const int lineCount = 5000;
-        var window = new Monica.App.MainWindow();
-        using var services = Monica.App.App.ConfigureServices(window);
-        var viewModel = services.GetRequiredService<MainWindowViewModel>();
-        var content = string.Join(
+        _editorServices?.Dispose();
+        _editorServices = null;
+    }
+
+    private static string LargeNoteContent() =>
+        string.Join(
             '\n',
-            Enumerable.Range(1, lineCount)
+            Enumerable.Range(1, LargeNoteLineCount)
                 .Select(index => $"# Section {index} [reference](https://example.com/{index}) recovery word"));
 
+    // The editor binds its preview, outline and status bar to lazy view model properties, so a
+    // PropertyChanged handler that reads them is what makes a build-count assert measure the
+    // projections instead of a bare field assignment.
+    private MainWindowViewModel OpenEditorWithRenderedProjections()
+    {
+        var window = new Monica.App.MainWindow();
+        _editorServices = Monica.App.App.ConfigureServices(window);
+        var viewModel = _editorServices.GetRequiredService<MainWindowViewModel>();
         viewModel.PropertyChanged += (_, args) =>
         {
             switch (args.PropertyName)
@@ -73,9 +85,15 @@ public sealed class NoteEditorPerformanceTests
             }
         };
 
-        var stopwatch = Stopwatch.StartNew();
-        viewModel.NoteContent = content;
-        stopwatch.Stop();
+        return viewModel;
+    }
+
+    [Fact]
+    public void Note_editor_content_projection_builds_once_per_text_change()
+    {
+        var viewModel = OpenEditorWithRenderedProjections();
+
+        viewModel.NoteContent = LargeNoteContent();
 
         Assert.True(
             viewModel.NoteContentAnalysisBuildCount == 1 &&
@@ -83,14 +101,11 @@ public sealed class NoteEditorPerformanceTests
             $"Expected one content-analysis build and one preview build, but observed " +
             $"analysis={viewModel.NoteContentAnalysisBuildCount} and " +
             $"preview={viewModel.NotePreviewProjectionBuildCount}.");
-        Assert.True(
-            stopwatch.ElapsedMilliseconds < 250,
-            $"Large note projection took {stopwatch.ElapsedMilliseconds} ms.");
         var outlineItems = viewModel.NoteOutlineItems;
         var referenceItems = viewModel.NoteReferenceItems;
-        Assert.Equal(lineCount, viewModel.NoteLineCount);
-        Assert.Equal(lineCount, outlineItems.Count);
-        Assert.Equal(lineCount, referenceItems.Count);
+        Assert.Equal(LargeNoteLineCount, viewModel.NoteLineCount);
+        Assert.Equal(LargeNoteLineCount, outlineItems.Count);
+        Assert.Equal(LargeNoteLineCount, referenceItems.Count);
         Assert.Same(outlineItems, viewModel.NoteOutlineItems);
         Assert.Same(referenceItems, viewModel.NoteReferenceItems);
 
@@ -100,6 +115,24 @@ public sealed class NoteEditorPerformanceTests
         Assert.Equal(2, viewModel.NotePreviewProjectionBuildCount);
         Assert.Same(outlineItems, viewModel.NoteOutlineItems);
         Assert.Same(referenceItems, viewModel.NoteReferenceItems);
+    }
+
+    // Wall-clock budget: run it where the cores are not shared with everything else the
+    // developer has open. Locally: -filter "/[Category!=perf-budget]".
+    [Fact]
+    [Trait("Category", "perf-budget")]
+    public void Note_editor_large_note_projection_stays_within_budget()
+    {
+        var viewModel = OpenEditorWithRenderedProjections();
+        var content = LargeNoteContent();
+
+        var stopwatch = Stopwatch.StartNew();
+        viewModel.NoteContent = content;
+        stopwatch.Stop();
+
+        Assert.True(
+            stopwatch.ElapsedMilliseconds < 250,
+            $"Large note projection took {stopwatch.ElapsedMilliseconds} ms.");
     }
 
     [Fact]

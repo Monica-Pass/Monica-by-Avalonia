@@ -409,8 +409,19 @@ public sealed partial class MainWindowViewModel
             ObserveVaultEntry(row);
         }
 
-        VaultTreeRows = rebuilt;
-        OnPropertyChanged(nameof(VaultTreeRows));
+        // The bound list can answer a replaced collection with its own first row, and a row nobody
+        // clicked must not open an editor: the swap happens with opens suppressed and
+        // RestoreVaultSelection decides afterwards what is actually selected.
+        _isRestoringVaultSelection = true;
+        try
+        {
+            VaultTreeRows = rebuilt;
+            OnPropertyChanged(nameof(VaultTreeRows));
+        }
+        finally
+        {
+            _isRestoringVaultSelection = false;
+        }
 
         RestoreVaultSelection(selectedKey);
         OnPropertyChanged(nameof(HasVaultRows));
@@ -481,17 +492,17 @@ public sealed partial class MainWindowViewModel
 
     private void RestoreVaultSelection(string? selectedKey)
     {
-        if (string.IsNullOrEmpty(selectedKey))
+        var match = string.IsNullOrEmpty(selectedKey)
+            ? null
+            : VaultTreeRows.FirstOrDefault(row => string.Equals(row.Key, selectedKey, StringComparison.Ordinal));
+
+        if (ReferenceEquals(match, SelectedVaultRow))
         {
             return;
         }
 
-        var match = VaultTreeRows.FirstOrDefault(row => string.Equals(row.Key, selectedKey, StringComparison.Ordinal));
-        if (match is null || ReferenceEquals(match, SelectedVaultRow))
-        {
-            return;
-        }
-
+        // Nothing of the user's survived the rebuild, so the row the list selected for itself goes
+        // back the way it came: no highlight, no editor.
         _isRestoringVaultSelection = true;
         SelectedVaultRow = match;
         _isRestoringVaultSelection = false;

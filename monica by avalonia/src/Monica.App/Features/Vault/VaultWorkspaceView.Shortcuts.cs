@@ -180,8 +180,11 @@ public partial class VaultWorkspaceView
             command = viewModel.CopyTotpCommand;
             parameter = totp;
         }
-        else if (row is { Item: not null, Kind: VaultEntryKind.BankCard or VaultEntryKind.Document or
-                VaultEntryKind.BillingAddress or VaultEntryKind.PaymentAccount })
+        else if (row is
+        {
+            Item: not null, Kind: VaultEntryKind.BankCard or VaultEntryKind.Document or
+                VaultEntryKind.BillingAddress or VaultEntryKind.PaymentAccount
+        })
         {
             command = viewModel.CopySelectedWalletPrimaryFieldCommand;
             parameter = null;

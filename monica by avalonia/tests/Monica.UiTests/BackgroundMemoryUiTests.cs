@@ -370,12 +370,14 @@ public sealed class BackgroundMemoryUiTests
         [.. viewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Select(row => row.Key).Order()];
 
     // A coalesced tree rebuild and a debounced repository pass both need real dispatcher time, and a bare
-    // sleep would hide which of the two a test is actually waiting for.
+    // sleep would hide which of the two a test is actually waiting for. This is a wait, not a budget:
+    // every caller asserts the outcome it is waiting for, so a longer deadline cannot hide a regression,
+    // while a desktop that is competing for cores can easily take longer than two seconds to get here.
     private static async Task PumpUntilAsync(
         Func<bool> condition,
         string description,
         CancellationToken cancellationToken,
-        int budgetMilliseconds = 2000)
+        int budgetMilliseconds = 10_000)
     {
         var deadline = Stopwatch.StartNew();
         while (deadline.ElapsedMilliseconds < budgetMilliseconds)
