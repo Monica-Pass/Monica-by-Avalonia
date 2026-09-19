@@ -52,7 +52,7 @@
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderBrush" Value="Transparent" />
 </Style>
-<Style Selector="Button.databasePivotButton.accent">
+<Style Selector="Button.databasePivotButton.selected">
     <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
     <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
     <Setter Property="BorderThickness" Value="0,0,0,2" />

@@ -60,31 +60,31 @@
                     <StackPanel Spacing="14">
                         <StackPanel Spacing="8">
                             <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.SyncAndBackup}" />
-                            <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSyncConfigurationSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Configuration">
+                            <Button Classes="workspaceNavItem" Classes.selected="{Binding IsSyncConfigurationSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Configuration">
                                 <StackPanel Orientation="Horizontal" Spacing="10">
                                     <ic:FluentIcon Icon="ArrowSync" FontSize="17" />
                                     <TextBlock Text="{Binding L.SyncConfiguration}" />
                                 </StackPanel>
                             </Button>
-                            <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSyncBackupSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Backup">
+                            <Button Classes="workspaceNavItem" Classes.selected="{Binding IsSyncBackupSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Backup">
                                 <StackPanel Orientation="Horizontal" Spacing="10">
                                     <ic:FluentIcon Icon="Save" FontSize="17" />
                                     <TextBlock Text="{Binding L.BackupHistory}" />
                                 </StackPanel>
                             </Button>
-                            <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSyncSourcesSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Sources">
+                            <Button Classes="workspaceNavItem" Classes.selected="{Binding IsSyncSourcesSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Sources">
                                 <StackPanel Orientation="Horizontal" Spacing="10">
                                     <ic:FluentIcon Icon="Database" FontSize="17" />
                                     <TextBlock Text="{Binding L.CloudAndLocalVaults}" />
                                 </StackPanel>
                             </Button>
-                            <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSyncImportSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Import">
+                            <Button Classes="workspaceNavItem" Classes.selected="{Binding IsSyncImportSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Import">
                                 <StackPanel Orientation="Horizontal" Spacing="10">
                                     <ic:FluentIcon Icon="ArrowUpload" FontSize="17" />
                                     <TextBlock Text="{Binding L.ImportData}" />
                                 </StackPanel>
                             </Button>
-                            <Button Classes="workspaceNavItem" Classes.accent="{Binding IsSyncExportSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Export">
+                            <Button Classes="workspaceNavItem" Classes.selected="{Binding IsSyncExportSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Export">
                                 <StackPanel Orientation="Horizontal" Spacing="10">
                                     <ic:FluentIcon Icon="ArrowDownload" FontSize="17" />
                                     <TextBlock Text="{Binding L.ExportData}" />

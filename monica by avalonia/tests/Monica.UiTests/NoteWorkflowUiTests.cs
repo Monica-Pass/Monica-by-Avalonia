@@ -259,7 +259,7 @@ public sealed class NoteWorkflowUiTests
         Assert.DoesNotContain("Margin=\"0,0,158,0\"", tabsXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("NoteTabStripWidth", tabsXaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"NoteTreeList\"", treeXaml, StringComparison.Ordinal);
-        Assert.Contains("Classes.accent=\"{Binding IsNoteFolderNavigation}\"", treeXaml, StringComparison.Ordinal);
+        Assert.Contains("Classes.selected=\"{Binding IsNoteFolderNavigation}\"", treeXaml, StringComparison.Ordinal);
         Assert.Contains("ToggleNoteTreeGroupCommand", treeXaml, StringComparison.Ordinal);
         Assert.Contains("SelectNoteTreeGroupCommand", treeXaml, StringComparison.Ordinal);
         Assert.Contains("Classes.selected=\"{Binding IsSelected}\"", treeXaml, StringComparison.Ordinal);

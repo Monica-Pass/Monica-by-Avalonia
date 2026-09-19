@@ -30,16 +30,16 @@
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                        FontSize="12" />
             <WrapPanel>
-                <Button x:Name="SecurityIssueSeverityAllButton" Classes="workspaceCommand" Classes.accent="{Binding IsAllSecurityIssueSeveritySelected}" Command="{Binding SelectSecurityIssueSeverityFilterCommand}" CommandParameter="All" ToolTip.Tip="{Binding L[SecurityIssueSeverityAll]}" AutomationProperties.Name="{Binding L[SecurityIssueSeverityAll]}" MinHeight="40" Padding="8,4" Margin="0,0,6,6">
+                <Button x:Name="SecurityIssueSeverityAllButton" Classes="workspaceCommand" Classes.selected="{Binding IsAllSecurityIssueSeveritySelected}" Command="{Binding SelectSecurityIssueSeverityFilterCommand}" CommandParameter="All" ToolTip.Tip="{Binding L[SecurityIssueSeverityAll]}" AutomationProperties.Name="{Binding L[SecurityIssueSeverityAll]}" MinHeight="40" Padding="8,4" Margin="0,0,6,6">
                     <TextBlock Text="{Binding L[SecurityIssueSeverityAll]}" />
                 </Button>
-                <Button x:Name="SecurityIssueSeverityHighButton" Classes="workspaceCommand" Classes.accent="{Binding IsHighSecurityIssueSeveritySelected}" Command="{Binding SelectSecurityIssueSeverityFilterCommand}" CommandParameter="High" ToolTip.Tip="{Binding L[HighSeverity]}" AutomationProperties.Name="{Binding L[HighSeverity]}" MinHeight="40" Padding="8,4" Margin="0,0,6,6">
+                <Button x:Name="SecurityIssueSeverityHighButton" Classes="workspaceCommand" Classes.selected="{Binding IsHighSecurityIssueSeveritySelected}" Command="{Binding SelectSecurityIssueSeverityFilterCommand}" CommandParameter="High" ToolTip.Tip="{Binding L[HighSeverity]}" AutomationProperties.Name="{Binding L[HighSeverity]}" MinHeight="40" Padding="8,4" Margin="0,0,6,6">
                     <TextBlock Text="{Binding L[HighSeverity]}" />
                 </Button>
-                <Button x:Name="SecurityIssueSeverityMediumButton" Classes="workspaceCommand" Classes.accent="{Binding IsMediumSecurityIssueSeveritySelected}" Command="{Binding SelectSecurityIssueSeverityFilterCommand}" CommandParameter="Medium" ToolTip.Tip="{Binding L[MediumSeverity]}" AutomationProperties.Name="{Binding L[MediumSeverity]}" MinHeight="40" Padding="8,4" Margin="0,0,6,6">
+                <Button x:Name="SecurityIssueSeverityMediumButton" Classes="workspaceCommand" Classes.selected="{Binding IsMediumSecurityIssueSeveritySelected}" Command="{Binding SelectSecurityIssueSeverityFilterCommand}" CommandParameter="Medium" ToolTip.Tip="{Binding L[MediumSeverity]}" AutomationProperties.Name="{Binding L[MediumSeverity]}" MinHeight="40" Padding="8,4" Margin="0,0,6,6">
                     <TextBlock Text="{Binding L[MediumSeverity]}" />
                 </Button>
-                <Button x:Name="SecurityIssueSeverityLowButton" Classes="workspaceCommand" Classes.accent="{Binding IsLowSecurityIssueSeveritySelected}" Command="{Binding SelectSecurityIssueSeverityFilterCommand}" CommandParameter="Low" ToolTip.Tip="{Binding L[LowSeverity]}" AutomationProperties.Name="{Binding L[LowSeverity]}" MinHeight="40" Padding="8,4" Margin="0,0,6,6">
+                <Button x:Name="SecurityIssueSeverityLowButton" Classes="workspaceCommand" Classes.selected="{Binding IsLowSecurityIssueSeveritySelected}" Command="{Binding SelectSecurityIssueSeverityFilterCommand}" CommandParameter="Low" ToolTip.Tip="{Binding L[LowSeverity]}" AutomationProperties.Name="{Binding L[LowSeverity]}" MinHeight="40" Padding="8,4" Margin="0,0,6,6">
                     <TextBlock Text="{Binding L[LowSeverity]}" />
                 </Button>
                 <Button x:Name="ClearSecurityIssueFiltersButton" Classes="workspaceCommand" Command="{Binding ClearSecurityIssueFiltersCommand}" IsVisible="{Binding HasSecurityIssueFilters}" ToolTip.Tip="{Binding L[ClearSecurityIssueFilters]}" AutomationProperties.Name="{Binding L[ClearSecurityIssueFilters]}" MinHeight="40" Padding="8,4" Margin="0,0,0,6">

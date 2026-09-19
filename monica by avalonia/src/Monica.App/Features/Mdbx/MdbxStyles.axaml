@@ -58,7 +58,7 @@
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderBrush" Value="Transparent" />
 </Style>
-<Style Selector="Button.mdbxPivotButton.accent">
+<Style Selector="Button.mdbxPivotButton.selected">
     <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
     <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
     <Setter Property="BorderThickness" Value="2,0,0,0" />

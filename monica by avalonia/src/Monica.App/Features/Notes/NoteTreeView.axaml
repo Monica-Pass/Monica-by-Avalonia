@@ -38,7 +38,7 @@
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="2">
                     <Button x:Name="NoteFolderNavigationButton"
                             Classes="noteNavigationPivotButton"
-                            Classes.accent="{Binding IsNoteFolderNavigation}"
+                            Classes.selected="{Binding IsNoteFolderNavigation}"
                             Command="{Binding SelectNoteNavigationModeCommand}"
                             CommandParameter="Folders"
                             AutomationProperties.Name="{Binding L.Folders}"
@@ -51,7 +51,7 @@
                     <Button x:Name="NoteTagNavigationButton"
                             Grid.Column="1"
                             Classes="noteNavigationPivotButton"
-                            Classes.accent="{Binding IsNoteTagNavigation}"
+                            Classes.selected="{Binding IsNoteTagNavigation}"
                             Command="{Binding SelectNoteNavigationModeCommand}"
                             CommandParameter="Tags"
                             AutomationProperties.Name="{Binding L[NoteTagsLabel]}"

@@ -26,16 +26,16 @@
                 <Grid x:Name="MdbxWorkbenchLayoutGrid" ColumnDefinitions="176,*" RowDefinitions="Auto" Margin="16,16,20,20" ColumnSpacing="20">
                     <StackPanel x:Name="MdbxSectionNavigator" Spacing="4">
                         <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.MdbxDiagnostics}" Margin="12,0,0,6" />
-                        <Button Classes="mdbxPivotButton" Classes.accent="{Binding IsMdbxHealthSelected}" Command="{Binding SelectMdbxWorkspacePageCommand}" CommandParameter="Health">
+                        <Button Classes="mdbxPivotButton" Classes.selected="{Binding IsMdbxHealthSelected}" Command="{Binding SelectMdbxWorkspacePageCommand}" CommandParameter="Health">
                             <TextBlock Text="{Binding L.MdbxHealthSection}" TextTrimming="CharacterEllipsis" />
                         </Button>
-                        <Button Classes="mdbxPivotButton" Classes.accent="{Binding IsMdbxDetailsSelected}" Command="{Binding SelectMdbxWorkspacePageCommand}" CommandParameter="Details">
+                        <Button Classes="mdbxPivotButton" Classes.selected="{Binding IsMdbxDetailsSelected}" Command="{Binding SelectMdbxWorkspacePageCommand}" CommandParameter="Details">
                             <TextBlock Text="{Binding L.Details}" TextTrimming="CharacterEllipsis" />
                         </Button>
-                        <Button Classes="mdbxPivotButton" Classes.accent="{Binding IsMdbxSourcesSelected}" Command="{Binding SelectMdbxWorkspacePageCommand}" CommandParameter="Sources">
+                        <Button Classes="mdbxPivotButton" Classes.selected="{Binding IsMdbxSourcesSelected}" Command="{Binding SelectMdbxWorkspacePageCommand}" CommandParameter="Sources">
                             <TextBlock Text="{Binding L.MdbxSourcesSection}" TextTrimming="CharacterEllipsis" />
                         </Button>
-                        <Button Classes="mdbxPivotButton" Classes.accent="{Binding IsMdbxRuntimeSelected}" Command="{Binding SelectMdbxWorkspacePageCommand}" CommandParameter="Runtime">
+                        <Button Classes="mdbxPivotButton" Classes.selected="{Binding IsMdbxRuntimeSelected}" Command="{Binding SelectMdbxWorkspacePageCommand}" CommandParameter="Runtime">
                             <TextBlock Text="{Binding L.MdbxRuntime}" TextTrimming="CharacterEllipsis" />
                         </Button>
                     </StackPanel>

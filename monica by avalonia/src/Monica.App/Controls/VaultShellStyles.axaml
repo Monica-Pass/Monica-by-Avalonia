@@ -137,7 +137,7 @@
     <Style Selector="Button.workspaceFilterChip:pointerover">
         <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundPointerOver}" />
     </Style>
-    <Style Selector="Button.workspaceFilterChip.accent">
+    <Style Selector="Button.workspaceFilterChip.selected">
         <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
     </Style>
 
@@ -163,7 +163,7 @@
     <Style Selector="Button.workspaceNavItem:pointerover">
         <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundPointerOver}" />
     </Style>
-    <Style Selector="Button.workspaceNavItem.accent">
+    <Style Selector="Button.workspaceNavItem.selected">
         <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
     </Style>
 
@@ -223,7 +223,7 @@
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="BorderThickness" Value="1" />
     </Style>
-    <Style Selector="Border.workspaceNavItem.accent">
+    <Style Selector="Border.workspaceNavItem.selected">
         <Setter Property="Background" Value="{DynamicResource AccentFillColorTertiaryBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
     </Style>

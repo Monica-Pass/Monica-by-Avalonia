@@ -160,12 +160,14 @@ public partial class App
             var smokeSuccess = true;
             await Task.Delay(300);
             await viewModel.InitializeAsync();
-            ApplySmokeUiTheme(viewModel, smokeTheme);
             viewModel.SmokeVaultLoadDelayMilliseconds = smokeVaultLoadDelayMilliseconds;
             viewModel.MasterPassword = password;
             await viewModel.UnlockCommand.ExecuteAsync(null);
             var vaultReady = await WaitForSmokeVaultReadyAsync(viewModel, TimeSpan.FromSeconds(30));
             smokeSuccess &= vaultReady;
+            // Settings keep landing asynchronously after InitializeAsync returns, and each apply
+            // re-writes the theme, so overriding earlier would only be undone before the capture.
+            ApplySmokeUiTheme(viewModel, smokeTheme);
             AppDiagnostics.Info(
                 $"Smoke UI vault ready result. success={vaultReady}, " +
                 $"loadMs={viewModel.LastVaultLoadDurationMilliseconds}, passwords={viewModel.Passwords.Count}");

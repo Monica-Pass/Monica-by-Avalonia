@@ -28,7 +28,7 @@
                             HorizontalAlignment="Left"
                             Spacing="4">
                     <Button Classes="workspaceFilterChip"
-                            Classes.accent="{Binding VaultFavoritesOnly}"
+                            Classes.selected="{Binding VaultFavoritesOnly}"
                             Content="{Binding L.LibraryFavorites}"
                             Command="{Binding ToggleVaultFavoritesCommand}" />
                 </StackPanel>
