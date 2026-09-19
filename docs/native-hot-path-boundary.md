@@ -62,6 +62,24 @@ remaining passes cannot be timed today because the rules are private `MainWindow
 methods and the benchmark fixture stores secrets in plaintext, so no crypto crosses the
 repository. Attribution depends on lifting the analysis use-case out of the view model.
 
-`.kdbx` decode cost is unknown: no KeePass fixture exists in either repository, and desktop
-currently reads key files but cannot create them. The first measurement of the KeePass arc
-must be opening a large real `.kdbx`, before any managed crypto is added to it.
+`.kdbx` decode is now measured, against databases written by KeePassXC 2.7.11 (KDBX4, AES-256,
+AES-KDF 1,000,000 rounds) read through `KeePassVaultService.ReadAsync`:
+
+| entries | file bytes | decode | private bytes after decode |
+| --- | --- | --- | --- |
+| 2,000 (21 groups) | 123,998 | 378 ms | 33 MB |
+| 20,000 (21 groups) | 1,185,246 | 987 ms | 116 MB |
+
+Decoding is correct at third-party fidelity: 20,000 of 20,000 `otp` seeds, URLs and protected
+password strings all came back. The problem is not crypto and not CPU — it is the shape of the
+result. A 1.18 MB file becomes a fully materialized list of 20,000 snapshots holding 116 MB of
+private bytes, which is 96% of the 120 MB budget the artifact gate enforces, before the shell,
+the tree or any entry detail exists. The same vault opened through the MDBX store costs 506 ms
+and stays inside budget.
+
+So the first rule for the KeePass arc: **change the data shape before adding features.** A
+locked `.kdbx` must be read lazily, keeping the decrypted database behind the session and
+projecting rows on demand, the way `KeePassNativeBrowser` does on Android. Streaming the
+snapshot list would trade a few milliseconds for a footprint that scales with the screen
+rather than with the file.
+
