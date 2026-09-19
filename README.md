@@ -123,6 +123,7 @@ flowchart TB
 - [浏览器桥接协议](docs/browser-bridge-protocol.md)
 - [Bitwarden 在线同步边界](docs/bitwarden-online-sync-boundary.md)
 - [原生 Passkey 平台边界](docs/native-passkey-boundary.md)
+- [原生核边界与热路径实测](docs/native-hot-path-boundary.md)
 
 ## 构建与运行
 

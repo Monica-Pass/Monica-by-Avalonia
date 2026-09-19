@@ -33,7 +33,7 @@
 | 剪贴板最小暴露 | 已验证 | `SecureClipboardService` 的所有权检查与定时清除 | `SecurityBaselineTests.cs` 和 clipboard lifecycle 测试 |
 | 后台敏感状态释放 | 已验证 | 最小化时释放工作区、详情、预热编辑器和可重建缓存 | `BackgroundMemoryUiTests.cs`、`BackgroundSensitiveDetailUiTests.cs`、`BackgroundTransientSecretUiTests.cs` |
 | 浏览器桥接隔离 | 已验证 | IPv4 loopback、256 位会话令牌、HTTPS origin/extension caller 校验 | `BrowserBridgeServiceTests.cs`、`browser-bridge-protocol.md` |
-| Bitwarden 网络与密码学限制 | 已验证 | HTTPS endpoint policy、KDF 上限、Type 2 authenticated CipherString、固定时间 MAC 校验 | `BitwardenProtocolTests.cs`、network authentication 和 transport 测试 |
+| Bitwarden 网络与密码学限制 | 已验证（限制） | HTTPS endpoint policy、KDF 协议上限、Type 2 authenticated CipherString、固定时间 MAC 校验；`BitwardenProtocolTests.cs` | 协议上限允许 Argon2 m=256 MB；实测该参数使进程私有字节永久停在 270 MB（托管堆不回还），见 `native-hot-path-boundary.md` |
 | 导入、同步和设置失败时不泄露秘密 | 已验证 | 错误净化、临时状态清理、原子设置持久化 | `*FailureSecurity.cs`、`AppSettingsTests.AtomicPersistence.cs` |
 
 ## 桌面体验、性能与可维护性
