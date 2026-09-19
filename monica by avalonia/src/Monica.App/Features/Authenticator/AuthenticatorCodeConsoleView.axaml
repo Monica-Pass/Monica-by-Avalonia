@@ -4,100 +4,84 @@
              xmlns:vm="using:Monica.App.ViewModels"
              x:Class="Monica.App.Features.Authenticator.AuthenticatorCodeConsoleView"
              x:DataType="vm:MainWindowViewModel">
-    <Grid RowDefinitions="Auto,*">
-        <Button x:Name="BackToAuthenticatorListButton"
-                Classes="workspaceCommand"
-                Command="{Binding ShowTotpListCommand}"
-                ToolTip.Tip="{Binding L[BackToAuthenticatorList]}"
-                AutomationProperties.Name="{Binding L[BackToAuthenticatorList]}"
-                HorizontalAlignment="Left"
-                Margin="0,0,0,12"
-                IsVisible="False">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-                <ic:FluentIcon Icon="ArrowLeft" FontSize="16" />
-                <TextBlock Text="{Binding L[BackToAuthenticatorList]}" />
-            </StackPanel>
-        </Button>
-
-        <Grid Grid.Row="1">
-            <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" IsVisible="{Binding HasSelectedTotpItem}">
-                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
-                    <Border Width="50" Height="50" CornerRadius="25" Background="{DynamicResource ControlFillColorDefaultBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
-                        <ic:FluentIcon Icon="Key" FontSize="22" Foreground="{DynamicResource AccentFillColorDefaultBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <StackPanel Grid.Column="1" MinWidth="0" VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="{Binding SelectedTotpDetails.Title}" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                            <ic:FluentIcon Icon="Star" FontSize="16" Foreground="{DynamicResource SystemFillColorCautionBrush}" IsVisible="{Binding SelectedTotpItem.IsFavorite}" />
-                        </StackPanel>
-                        <TextBlock Text="{Binding SelectedTotpDetails.Account}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                    </StackPanel>
-                    <TextBlock Grid.Column="2" Text="{Binding SelectedTotpItem.TotpTimeRemaining}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" IsVisible="{Binding !SelectedTotpDetails.IsCounterBased}" />
-                </Grid>
-
-                <Border Grid.Row="1" Classes="totpCodeSurface" Margin="0,24,0,0" MaxWidth="560" HorizontalAlignment="Stretch">
-                    <StackPanel Spacing="14" HorizontalAlignment="Center">
-                        <TextBlock Text="{Binding L.TotpCode}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
-                        <TextBlock x:Name="AuthenticatorCurrentCode"
-                                   Text="{Binding SelectedTotpItem.TotpCode}"
-                                   AutomationProperties.Name="{Binding SelectedTotpItem.TotpCode}"
-                                   AutomationProperties.HelpText="{Binding L.TotpCode}"
-                                   FontFamily="Cascadia Mono, Consolas"
-                                   FontSize="{Binding TotpCodeFontSize}"
-                                   FontWeight="Bold"
-                                   Foreground="{DynamicResource AccentFillColorDefaultBrush}"
-                                   HorizontalAlignment="Center" />
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" MaxWidth="360" HorizontalAlignment="Stretch" IsVisible="{Binding !SelectedTotpDetails.IsCounterBased}">
-                            <ProgressBar Maximum="100" Value="{Binding SelectedTotpItem.TotpProgress}" Height="6" VerticalAlignment="Center" />
-                            <Border Grid.Column="1" Classes="workspaceStatusChip">
-                                <TextBlock Text="{Binding SelectedTotpItem.TotpTimeRemaining}" FontSize="12" FontWeight="SemiBold" />
-                            </Border>
-                        </Grid>
-                        <Border Classes="workspaceStatusChip" IsVisible="{Binding SelectedTotpDetails.IsCounterBased}">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <TextBlock Text="{Binding L[TotpCounter]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                <TextBlock Text="{Binding SelectedTotpDetails.CounterText}" FontWeight="SemiBold" />
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
+    <Grid>
+        <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" IsVisible="{Binding HasSelectedTotpItem}">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                <Border Width="50" Height="50" CornerRadius="25" Background="{DynamicResource ControlFillColorDefaultBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                    <ic:FluentIcon Icon="Key" FontSize="22" Foreground="{DynamicResource AccentFillColorDefaultBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
-
-                <WrapPanel Grid.Row="2" Orientation="Horizontal" Margin="0,18,0,8" HorizontalAlignment="Center">
-                    <Button x:Name="CopyAuthenticatorCodeButton" Classes="workspacePrimaryCommand" Command="{Binding CopyTotpCommand}" CommandParameter="{Binding SelectedTotpItem}" ToolTip.Tip="{Binding L.CopyCode}" AutomationProperties.Name="{Binding L.CopyCode}" Margin="0,0,8,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="Copy" FontSize="18" />
-                            <TextBlock Text="{Binding L.CopyCode}" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="workspaceCommand" Command="{Binding EditTotpCommand}" CommandParameter="{Binding SelectedTotpItem}" ToolTip.Tip="{Binding L.Edit}" AutomationProperties.Name="{Binding L.Edit}" Margin="0,0,8,8">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <ic:FluentIcon Icon="Edit" FontSize="16" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding L.Edit}" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button x:Name="AdvanceTotpButton" Classes="workspaceCommand" Command="{Binding AdvanceTotpCommand}" CommandParameter="{Binding SelectedTotpItem}" IsVisible="{Binding SelectedTotpDetails.IsCounterBased}" ToolTip.Tip="{Binding L[GenerateNextTotp]}" AutomationProperties.Name="{Binding L[GenerateNextTotp]}" Margin="0,0,8,8">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <ic:FluentIcon Icon="ArrowSync" FontSize="16" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding L[GenerateNextTotp]}" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="workspaceCommand" Command="{Binding ToggleTotpFavoriteCommand}" CommandParameter="{Binding SelectedTotpItem}" ToolTip.Tip="{Binding L.Favorite}" AutomationProperties.Name="{Binding L.Favorite}" Width="40" Height="40" Padding="0" Margin="0,0,0,8">
-                        <ic:FluentIcon Icon="Star" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Button>
-                </WrapPanel>
-
-                <Border Grid.Row="3" Margin="0,12,0,0" Padding="14" CornerRadius="8" Background="{DynamicResource LayerFillColorSubtleBrush}" VerticalAlignment="Top">
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                        <ic:FluentIcon Icon="Clock" FontSize="18" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Top" />
-                        <TextBlock Grid.Column="1" Text="{Binding L.TotpPageDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                    </Grid>
-                </Border>
+                <StackPanel Grid.Column="1" MinWidth="0" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="{Binding SelectedTotpDetails.Title}" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <ic:FluentIcon Icon="Star" FontSize="16" Foreground="{DynamicResource SystemFillColorCautionBrush}" IsVisible="{Binding SelectedTotpItem.IsFavorite}" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding SelectedTotpDetails.Account}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <TextBlock Grid.Column="2" Text="{Binding SelectedTotpItem.TotpTimeRemaining}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" IsVisible="{Binding !SelectedTotpDetails.IsCounterBased}" />
             </Grid>
 
-            <StackPanel IsVisible="{Binding !HasSelectedTotpItem}" Spacing="10" Width="260" Margin="24" HorizontalAlignment="Left" VerticalAlignment="Top">
-                <ic:FluentIcon Icon="Key" FontSize="34" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
-                <TextBlock Text="{Binding L.TotpPageDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" />
-            </StackPanel>
+            <Border Grid.Row="1" Classes="totpCodeSurface" Margin="0,24,0,0" MaxWidth="560" HorizontalAlignment="Stretch">
+                <StackPanel Spacing="14" HorizontalAlignment="Center">
+                    <TextBlock Text="{Binding L.TotpCode}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                    <TextBlock x:Name="AuthenticatorCurrentCode"
+                               Text="{Binding SelectedTotpItem.TotpCode}"
+                               AutomationProperties.Name="{Binding SelectedTotpItem.TotpCode}"
+                               AutomationProperties.HelpText="{Binding L.TotpCode}"
+                               FontFamily="Cascadia Mono, Consolas"
+                               FontSize="{Binding TotpCodeFontSize}"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                               HorizontalAlignment="Center" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" MaxWidth="360" HorizontalAlignment="Stretch" IsVisible="{Binding !SelectedTotpDetails.IsCounterBased}">
+                        <ProgressBar Maximum="100" Value="{Binding SelectedTotpItem.TotpProgress}" Height="6" VerticalAlignment="Center" />
+                        <Border Grid.Column="1" Classes="workspaceStatusChip">
+                            <TextBlock Text="{Binding SelectedTotpItem.TotpTimeRemaining}" FontSize="12" FontWeight="SemiBold" />
+                        </Border>
+                    </Grid>
+                    <Border Classes="workspaceStatusChip" IsVisible="{Binding SelectedTotpDetails.IsCounterBased}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="{Binding L[TotpCounter]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Text="{Binding SelectedTotpDetails.CounterText}" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <WrapPanel Grid.Row="2" Orientation="Horizontal" Margin="0,18,0,8" HorizontalAlignment="Center">
+                <Button x:Name="CopyAuthenticatorCodeButton" Classes="workspacePrimaryCommand" Command="{Binding CopyTotpCommand}" CommandParameter="{Binding SelectedTotpItem}" ToolTip.Tip="{Binding L.CopyCode}" AutomationProperties.Name="{Binding L.CopyCode}" Margin="0,0,8,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:FluentIcon Icon="Copy" FontSize="18" />
+                        <TextBlock Text="{Binding L.CopyCode}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding EditTotpCommand}" CommandParameter="{Binding SelectedTotpItem}" ToolTip.Tip="{Binding L.Edit}" AutomationProperties.Name="{Binding L.Edit}" Margin="0,0,8,8">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:FluentIcon Icon="Edit" FontSize="16" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding L.Edit}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="AdvanceTotpButton" Classes="workspaceCommand" Command="{Binding AdvanceTotpCommand}" CommandParameter="{Binding SelectedTotpItem}" IsVisible="{Binding SelectedTotpDetails.IsCounterBased}" ToolTip.Tip="{Binding L[GenerateNextTotp]}" AutomationProperties.Name="{Binding L[GenerateNextTotp]}" Margin="0,0,8,8">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:FluentIcon Icon="ArrowSync" FontSize="16" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding L[GenerateNextTotp]}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="workspaceCommand" Command="{Binding ToggleTotpFavoriteCommand}" CommandParameter="{Binding SelectedTotpItem}" ToolTip.Tip="{Binding L.Favorite}" AutomationProperties.Name="{Binding L.Favorite}" Width="40" Height="40" Padding="0" Margin="0,0,0,8">
+                    <ic:FluentIcon Icon="Star" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Button>
+            </WrapPanel>
+
+            <Border Grid.Row="3" Margin="0,12,0,0" Padding="14" CornerRadius="8" Background="{DynamicResource LayerFillColorSubtleBrush}" VerticalAlignment="Top">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                    <ic:FluentIcon Icon="Clock" FontSize="18" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Top" />
+                    <TextBlock Grid.Column="1" Text="{Binding L.TotpPageDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                </Grid>
+            </Border>
         </Grid>
+
+        <StackPanel IsVisible="{Binding !HasSelectedTotpItem}" Spacing="10" Width="260" Margin="24" HorizontalAlignment="Left" VerticalAlignment="Top">
+            <ic:FluentIcon Icon="Key" FontSize="34" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
+            <TextBlock Text="{Binding L.TotpPageDescription}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" />
+        </StackPanel>
     </Grid>
 </UserControl>

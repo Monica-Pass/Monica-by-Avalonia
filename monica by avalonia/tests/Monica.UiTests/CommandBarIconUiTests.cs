@@ -5,7 +5,6 @@ using Avalonia.VisualTree;
 using FluentAvalonia.UI.Controls;
 using FluentIcons.Avalonia;
 using Monica.App.Controls;
-using Monica.App.Features.Authenticator;
 using Monica.App.Features.DatabaseManagement;
 using Monica.App.Features.Generator;
 using Monica.App.Features.Mdbx;
@@ -13,7 +12,6 @@ using Monica.App.Features.Notes;
 using Monica.App.Features.SecurityAnalysis;
 using Monica.App.Features.Sync;
 using Monica.App.Features.Timeline;
-using Monica.App.Features.Wallet;
 
 namespace Monica.UiTests;
 
@@ -22,8 +20,6 @@ public sealed class CommandBarIconUiTests
 {
     public static TheoryData<string> CommandBarHosts() =>
     [
-        nameof(AuthenticatorWorkspaceView),
-        nameof(WalletWorkspaceView),
         nameof(DatabaseCommandBarView),
         nameof(GeneratorResultView),
         nameof(MdbxCommandBarView),
@@ -35,8 +31,6 @@ public sealed class CommandBarIconUiTests
 
     private static UserControl CreateHost(string name) => name switch
     {
-        nameof(AuthenticatorWorkspaceView) => new AuthenticatorWorkspaceView(),
-        nameof(WalletWorkspaceView) => new WalletWorkspaceView(),
         nameof(DatabaseCommandBarView) => new DatabaseCommandBarView(),
         nameof(GeneratorResultView) => new GeneratorResultView(),
         nameof(MdbxCommandBarView) => new MdbxCommandBarView(),

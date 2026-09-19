@@ -73,9 +73,6 @@ public sealed partial class MainWindowViewModel
     partial void OnIsInsertingNoteImageChanged(bool value) =>
         InsertNoteImageCommand.NotifyCanExecuteChanged();
 
-    [ObservableProperty]
-    private bool _noteNarrowShowsTree = true;
-
     public string NoteLineNumbersText => GetNoteContentAnalysis().LineNumbersText;
     public int NoteLineCount => GetNoteContentAnalysis().LineCount;
     public int NoteWordCount => GetNoteContentAnalysis().WordCount;
@@ -165,31 +162,10 @@ public sealed partial class MainWindowViewModel
     public bool IsNoteWorkspaceNarrow =>
         NoteWorkspaceViewportWidth > 0 &&
         NoteWorkspaceViewportWidth < 760;
-    public bool IsNoteTreePaneVisible =>
-        !NoteSplitPreviewMode &&
-        (!IsNoteWorkspaceNarrow || NoteNarrowShowsTree);
-    public bool IsNoteEditorWorkspaceVisible =>
-        !IsNoteWorkspaceNarrow || !NoteNarrowShowsTree;
-    public bool ShowBackToNoteList =>
-        IsNoteWorkspaceNarrow &&
-        !NoteNarrowShowsTree;
-    public bool ShowAddNoteInTreeHeader =>
-        IsNoteWorkspaceNarrow &&
-        NoteNarrowShowsTree;
-    public GridLength NoteTreeColumnWidth => IsNoteTreePaneVisible
-        ? IsNoteWorkspaceNarrow
-            ? new GridLength(1, GridUnitType.Star)
-            : new GridLength(280)
-        : new GridLength(0);
-    public GridLength NoteWorkspaceEditorColumnWidth => IsNoteEditorWorkspaceVisible
-        ? new GridLength(1, GridUnitType.Star)
-        : new GridLength(0);
     public bool IsNoteInspectorPaneVisible =>
+        HasOpenNoteTabs &&
         !NoteSplitPreviewMode &&
         NoteWorkspaceViewportWidth >= 1180;
-    public GridLength NoteInspectorColumnWidth => IsNoteInspectorPaneVisible
-        ? new GridLength(280)
-        : new GridLength(0);
     public Thickness NoteEditorContentMargin => IsNoteWorkspaceNarrow
         ? new Thickness(16, 20, 16, 16)
         : new Thickness(28, 24, 28, 20);
@@ -202,6 +178,14 @@ public sealed partial class MainWindowViewModel
             NoteSplitPreviewMode = value == 2;
         }
     }
+
+    // The toolbar offers the three modes as one radio group, so each item reads the same index back.
+    public bool IsNoteEditModeSelected => NoteViewModeIndex == 0;
+
+    public bool IsNotePreviewModeSelected => NoteViewModeIndex == 1;
+
+    public bool IsNoteSplitModeSelected => NoteViewModeIndex == 2;
+
     public string NoteEditorStatusText =>
         NoteSelectedCharacterCount > 0
             ? _localization.Format(
@@ -220,21 +204,7 @@ public sealed partial class MainWindowViewModel
                 NoteWordCount,
                 NoteCharacterCount);
     public bool HasOpenNoteTabs => OpenNoteTabs.Count > 0;
-    public double NoteTabWidth => CalculateNoteTabWidth(OpenNoteTabs.Count, NoteTabRailViewportWidth);
-    private double _noteTabRailViewportWidth;
     private double _noteWorkspaceViewportWidth;
-
-    public double NoteTabRailViewportWidth
-    {
-        get => _noteTabRailViewportWidth;
-        set
-        {
-            if (SetProperty(ref _noteTabRailViewportWidth, Math.Max(0, value)))
-            {
-                OnPropertyChanged(nameof(NoteTabWidth));
-            }
-        }
-    }
 
     public double NoteWorkspaceViewportWidth
     {
@@ -243,41 +213,9 @@ public sealed partial class MainWindowViewModel
         {
             if (SetProperty(ref _noteWorkspaceViewportWidth, Math.Max(0, value)))
             {
-                if (IsNoteWorkspaceNarrow)
-                {
-                    NoteNarrowShowsTree = SelectedNoteTab is null;
-                }
-
                 RaiseNoteWorkspaceLayoutState();
             }
         }
-    }
-
-    private static double CalculateNoteTabWidth(int tabCount, double viewportWidth)
-    {
-        const double maxWidth = 148;
-        const double minWidth = 76;
-        const double tabGap = 4;
-
-        if (tabCount <= 0)
-        {
-            return maxWidth;
-        }
-
-        if (viewportWidth <= 0 || double.IsNaN(viewportWidth))
-        {
-            return tabCount switch
-            {
-                <= 1 => maxWidth,
-                <= 4 => 136,
-                <= 7 => 112,
-                <= 10 => 92,
-                _ => minWidth
-            };
-        }
-
-        var widthThatFits = (viewportWidth - ((tabCount - 1) * tabGap) - 8) / tabCount;
-        return Math.Clamp(widthThatFits, minWidth, maxWidth);
     }
 
     [ObservableProperty]

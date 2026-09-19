@@ -7,7 +7,6 @@ public sealed class NoteImageWorkflowUiTests
     public void Note_image_toolbar_exposes_accessible_busy_state()
     {
         var toolbarXaml = File.ReadAllText(FindSourceFile("NoteEditorToolbarView.axaml"));
-        var tabStripXaml = File.ReadAllText(FindSourceFile("NoteTabStripView.axaml"));
 
         Assert.Contains("x:Name=\"InsertNoteImageButton\"", toolbarXaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"InsertNoteImageProgress\"", toolbarXaml, StringComparison.Ordinal);
@@ -17,10 +16,13 @@ public sealed class NoteImageWorkflowUiTests
             "AutomationProperties.Name=\"{Binding InsertNoteImageActionLabel}\"",
             toolbarXaml,
             StringComparison.Ordinal);
-        Assert.Contains(
-            "Header=\"{Binding InsertNoteImageActionLabel}\"",
-            tabStripXaml,
-            StringComparison.Ordinal);
+
+        // The tab strip kept a second copy of that label and went away with the notes page, so the
+        // toolbar is the one place left that reports the busy state. The library tree is the navigator.
+        Assert.Equal(
+            ["NoteEditorToolbarView.axaml"],
+            [.. XamlSource.ContainsAnywhere("InsertNoteImageActionLabel")
+                .Where(name => name.EndsWith(".axaml", StringComparison.Ordinal))]);
     }
 
     private static string FindSourceFile(string fileName) =>

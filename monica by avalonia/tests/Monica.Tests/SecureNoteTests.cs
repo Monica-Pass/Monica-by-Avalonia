@@ -62,7 +62,7 @@ public sealed class SecureNoteTests
         second.IsDirty = false;
         first.IsDirty = false;
 
-        viewModel.SelectNoteTabCommand.Execute(first);
+        viewModel.SelectedNoteTab = first;
 
         Assert.Equal(work.Id, viewModel.SelectedNoteCategory?.Id);
         Assert.False(first.IsDirty);
@@ -72,9 +72,9 @@ public sealed class SecureNoteTests
 
         Assert.True(first.IsDirty);
         Assert.False(second.IsDirty);
-        viewModel.SelectNoteTabCommand.Execute(second);
+        viewModel.SelectedNoteTab = second;
         Assert.Equal(personal.Id, viewModel.SelectedNoteCategory?.Id);
-        viewModel.SelectNoteTabCommand.Execute(first);
+        viewModel.SelectedNoteTab = first;
         Assert.Equal(personal.Id, viewModel.SelectedNoteCategory?.Id);
     }
 
@@ -102,7 +102,7 @@ public sealed class SecureNoteTests
         viewModel.NoteTitle = "Desktop design";
         viewModel.NoteContent = "draft two";
         viewModel.SelectedNoteCategory = viewModel.NoteCategoryOptions.Single(option => option.Id == child.Id);
-        viewModel.SelectNoteTabCommand.Execute(first);
+        viewModel.SelectedNoteTab = first;
         viewModel.SelectedNoteCategory = viewModel.NoteCategoryOptions.Single(option => option.Id == child.Id);
 
         await viewModel.SaveAllNoteTabsCommand.ExecuteAsync(null);

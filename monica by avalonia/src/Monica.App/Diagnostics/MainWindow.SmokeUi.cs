@@ -434,6 +434,14 @@ public partial class MainWindow
 
                 await Task.Delay(150);
 
+                // With no row selected a preset shows only the open hint, so the gate would never see
+                // an editing surface at all: open the first entry the preset has.
+                if (section is "Vault" or "Passwords" or "Notes" or "Totp" or "Cards")
+                {
+                    viewModel.SelectedVaultRow = viewModel.VaultTreeRows.FirstOrDefault(row => row.IsEntryRow);
+                    await Task.Delay(150);
+                }
+
                 var fileName = $"{section}_{Math.Max(1, (int)Math.Round(Bounds.Width))}x{Math.Max(1, (int)Math.Round(Bounds.Height))}.png";
                 var path = Path.Combine(screenshotDirectory, fileName);
                 if (!await SaveSmokeScreenshotAsync(path))
@@ -486,7 +494,9 @@ public partial class MainWindow
 
         await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
         var bitmap = new RenderTargetBitmap(new PixelSize(width, height), new Vector(96, 96));
-        bitmap.Render(this);
+        // Rendering the Window itself captures its top-level drawing group, which the composited
+        // renderer leaves stale: every section then saved the same frozen frame.
+        bitmap.Render((Visual)Content!);
         bitmap.Save(path, new PngBitmapEncoderOptions());
         return File.Exists(path) && new FileInfo(path).Length > 0;
     }

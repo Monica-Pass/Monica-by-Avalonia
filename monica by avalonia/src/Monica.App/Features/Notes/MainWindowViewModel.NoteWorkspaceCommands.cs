@@ -1,5 +1,3 @@
-using System.Text;
-using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using Monica.App.Services;
 using Monica.Core.Models;
@@ -25,7 +23,6 @@ public sealed partial class MainWindowViewModel
         OpenNoteTabs.Add(tab);
         NotifyNoteTabsChanged();
         SelectedNoteTab = tab;
-        NoteNarrowShowsTree = false;
         StatusMessage = _localization.Get("EditingNewSecureNote");
     }
 
@@ -35,17 +32,20 @@ public sealed partial class MainWindowViewModel
         if (item is not null)
         {
             OpenNoteTab(item);
-            NoteNarrowShowsTree = false;
         }
     }
 
+    // The editor toolbar is the only place left that picks how a note reads, so the three modes are
+    // one command with a word rather than three properties the view has to keep straight.
     [RelayCommand]
-    private void SelectNoteTab(NoteEditorTab? tab)
+    private void SetNoteViewMode(string? mode)
     {
-        if (tab is not null)
+        NoteViewModeIndex = mode switch
         {
-            SelectedNoteTab = tab;
-        }
+            "preview" => 1,
+            "split" => 2,
+            _ => 0
+        };
     }
 
     [RelayCommand]
@@ -102,7 +102,15 @@ public sealed partial class MainWindowViewModel
     private void NotifyNoteTabsChanged()
     {
         OnPropertyChanged(nameof(HasOpenNoteTabs));
-        OnPropertyChanged(nameof(NoteTabWidth));
+        OnPropertyChanged(nameof(IsNoteInspectorPaneVisible));
+    }
+
+    private void RaiseNoteViewModeState()
+    {
+        OnPropertyChanged(nameof(NoteViewModeIndex));
+        OnPropertyChanged(nameof(IsNoteEditModeSelected));
+        OnPropertyChanged(nameof(IsNotePreviewModeSelected));
+        OnPropertyChanged(nameof(IsNoteSplitModeSelected));
     }
 
     private void RaiseNoteEditorLayoutState()
@@ -119,15 +127,8 @@ public sealed partial class MainWindowViewModel
     private void RaiseNoteWorkspaceLayoutState()
     {
         OnPropertyChanged(nameof(IsNoteWorkspaceNarrow));
-        OnPropertyChanged(nameof(IsNoteTreePaneVisible));
-        OnPropertyChanged(nameof(IsNoteEditorWorkspaceVisible));
-        OnPropertyChanged(nameof(ShowBackToNoteList));
-        OnPropertyChanged(nameof(ShowAddNoteInTreeHeader));
-        OnPropertyChanged(nameof(NoteTreeColumnWidth));
-        OnPropertyChanged(nameof(NoteWorkspaceEditorColumnWidth));
         OnPropertyChanged(nameof(NoteEditorContentMargin));
         OnPropertyChanged(nameof(IsNoteInspectorPaneVisible));
-        OnPropertyChanged(nameof(NoteInspectorColumnWidth));
     }
 
     private void RaiseOtherWorkspaceLayoutState()
@@ -165,15 +166,6 @@ public sealed partial class MainWindowViewModel
 
     [RelayCommand]
     private void ClearNoteSearch() => NoteSearchText = "";
-
-    [RelayCommand]
-    private void ShowNoteTree()
-    {
-        if (IsNoteWorkspaceNarrow)
-        {
-            NoteNarrowShowsTree = true;
-        }
-    }
 
     private void RefreshNoteTabState()
     {

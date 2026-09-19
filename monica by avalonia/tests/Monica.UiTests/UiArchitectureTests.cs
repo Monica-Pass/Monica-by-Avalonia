@@ -43,10 +43,11 @@ public sealed class UiArchitectureTests
         UserControl[] workspaces =
         [
             new UnlockView(),
-            new PasswordVaultView(),
-            new NoteWorkspaceView(),
-            new AuthenticatorWorkspaceView(),
-            new WalletWorkspaceView(),
+            new VaultWorkspaceView(),
+            new PasswordDetailPaneView(),
+            new NoteEditorView(),
+            new AuthenticatorCodeConsoleView(),
+            new WalletWorkbenchView(),
             new GeneratorWorkspaceView(),
             new ArchiveWorkspaceView(),
             new RecycleBinWorkspaceView(),
@@ -287,10 +288,7 @@ public sealed class UiArchitectureTests
     {
         UserControl[] workspaces =
         [
-            new PasswordVaultView(),
-            new NoteWorkspaceView(),
-            new AuthenticatorWorkspaceView(),
-            new WalletWorkspaceView(),
+            new VaultWorkspaceView(),
             new GeneratorWorkspaceView(),
             new ArchiveWorkspaceView(),
             new RecycleBinWorkspaceView(),
@@ -304,6 +302,19 @@ public sealed class UiArchitectureTests
         Assert.All(
             workspaces,
             workspace => Assert.Contains(workspace.Styles, style => style is Avalonia.Styling.Styles));
+
+        // The library replaced four pages, so it carries the sheets the surfaces it hosts still
+        // resolve their class names through. The password sheet went with the list page that owned it.
+        Assert.Equal(3, new VaultWorkspaceView().Styles.OfType<Avalonia.Styling.Styles>().Count());
+        Assert.All(
+            new[]
+            {
+                "/Features/Notes/NoteStyles.axaml",
+                "/Features/Authenticator/AuthenticatorStyles.axaml",
+                "/Features/Wallet/WalletStyles.axaml"
+            },
+            source => Assert.Contains("VaultWorkspaceView.axaml", XamlSource.ContainsAnywhere(source)));
+        Assert.Empty(XamlSource.ContainsAnywhere("PasswordVaultStyles"));
     }
 
     [Fact]

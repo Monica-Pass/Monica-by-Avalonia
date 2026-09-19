@@ -1,7 +1,9 @@
-using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.VisualTree;
+using FluentAvalonia.UI.Controls;
 using Monica.App.Features.Authenticator;
-using Monica.App.ViewModels;
+using Monica.App.Features.Vault;
+using Monica.Core.Services;
 
 namespace Monica.UiTests;
 
@@ -14,149 +16,123 @@ public sealed class AuthenticatorWorkflowUiTests
     }
 
     [Fact]
-    public void Authenticator_workspace_exposes_search_empty_state_and_accessible_commands()
+    public void Authenticator_console_exposes_the_code_and_the_actions_a_user_needs()
     {
-        var view = new AuthenticatorWorkspaceView();
+        var console = new AuthenticatorCodeConsoleView();
 
-        Assert.NotNull(view.FindControl<TextBox>("AuthenticatorSearchBox"));
-        Assert.NotNull(view.FindControl<Button>("AuthenticatorSearchClearButton"));
-        var accountListView = Assert.IsType<AuthenticatorAccountListView>(
-            view.FindControl<AuthenticatorAccountListView>("AuthenticatorAccountListView"));
-        Assert.NotNull(accountListView.AccountList);
-        Assert.NotNull(view.FindControl<StackPanel>("AuthenticatorEmptyState"));
-        Assert.NotNull(view.FindControl<Button>("EmptyAuthenticatorAddButton"));
-        Assert.NotNull(view.FindControl<Button>("EmptyAuthenticatorClearFiltersButton"));
-        var console = Assert.IsType<AuthenticatorCodeConsoleView>(
-            view.FindControl<AuthenticatorCodeConsoleView>("AuthenticatorCodeConsole"));
         Assert.NotNull(console.FindControl<TextBlock>("AuthenticatorCurrentCode"));
         Assert.NotNull(console.FindControl<Button>("CopyAuthenticatorCodeButton"));
         Assert.NotNull(console.FindControl<Button>("AdvanceTotpButton"));
     }
 
     [Fact]
-    public void Authenticator_search_controls_describe_exact_actions_and_announce_results()
+    public void Authenticator_console_shows_the_live_code_for_a_selected_entry()
     {
-        var view = new AuthenticatorWorkspaceView();
-        var xaml = File.ReadAllText(FindAuthenticatorFeatureFile("AuthenticatorWorkspaceView.axaml"));
+        using var library = LibraryUiHarness.Open("Totp");
+        library.ViewModel.TotpItems.Add(new Monica.Core.Models.SecureItem
+        {
+            Id = 71,
+            ItemType = Monica.Core.Models.VaultItemType.Totp,
+            Title = "Two factor",
+            ItemData = TotpDataResolver.ToItemData(
+                TotpDataResolver.FromAuthenticatorKey("JBSWY3DPEHPK3PXP", "Two factor", "desktop")!)
+        });
+        library.Settle();
 
-        Assert.NotNull(view.FindControl<Button>("AuthenticatorSearchClearButton"));
-        Assert.Contains(
-            "AutomationProperties.Name=\"{Binding ClearTotpSearchText}\"",
-            xaml,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "AutomationProperties.HelpText=\"{Binding TotpSearchHelpText}\"",
-            xaml,
-            StringComparison.Ordinal);
-        var filterPane = Assert.IsType<AuthenticatorFilterPaneView>(
-            view.FindControl<AuthenticatorFilterPaneView>("AuthenticatorFilterPane"));
-        var status = filterPane.FindControl<TextBlock>("TotpFilteredStatusText");
-        Assert.NotNull(status);
-        Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting(status));
+        library.SelectFirstEntry();
+
+        var console = Assert.IsType<AuthenticatorCodeConsoleView>(library.SurfaceHost.Content);
+        Assert.Equal(VaultSurface.Totp, library.ViewModel.SelectedVaultSurface);
+        Assert.Same(library.ViewModel, console.DataContext);
+        Assert.NotNull(library.ViewModel.SelectedTotpItem);
+        Assert.Equal(
+            1,
+            library.Window.GetVisualDescendants().OfType<AuthenticatorCodeConsoleView>().Count());
+        var copy = console.FindControl<Button>("CopyAuthenticatorCodeButton")!;
+        Assert.Same(library.ViewModel.CopyTotpCommand, copy.Command);
+        Assert.Same(library.ViewModel.SelectedTotpItem, copy.CommandParameter);
     }
 
     [Fact]
-    public void Authenticator_header_owns_primary_add_and_single_scan_action()
+    public void Authenticator_scan_action_is_offered_once_and_only_in_its_own_preset()
     {
-        var xaml = File.ReadAllText(FindAuthenticatorFeatureFile("AuthenticatorWorkspaceView.axaml"));
+        using var library = LibraryUiHarness.Open("Totp");
+        var more = library.Workspace.FindControl<Button>("VaultMoreButton")!;
+        var flyout = Assert.IsType<MenuFlyout>(more.Flyout);
 
-        Assert.Equal(2, CountOccurrences(xaml, "Command=\"{Binding AddTotpCommand}\""));
-        Assert.Equal(1, CountOccurrences(xaml, "Command=\"{Binding ScanTotpQrCommand}\""));
-        Assert.Contains("IconSource=\"{controls:FluentSymbol QrCode}\"", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("Icon=\"Document\"", xaml, StringComparison.Ordinal);
+        // A preset switch closes an open menu, so each state has to be read from a menu the user
+        // could actually see: an item left over from a hidden flyout reports itself invisible.
+        MenuItem ShowAndFindScanItem()
+        {
+            flyout.ShowAt(more);
+            library.Settle();
+            return Assert.Single(
+                LibraryUiHarness.MenuItems(flyout),
+                item => Equals(item.Command, library.ViewModel.ScanTotpQrCommand));
+        }
+
+        Assert.True(ShowAndFindScanItem().IsVisible);
+        flyout.Hide();
+
+        library.ViewModel.SelectSectionCommand.Execute("Vault");
+        library.Settle();
+        Assert.False(ShowAndFindScanItem().IsVisible);
+        flyout.Hide();
     }
 
     [Fact]
-    public void Authenticator_more_menu_contains_only_executable_actions()
+    public void Authenticator_hotp_counter_stays_visible_only_for_a_counter_based_entry()
     {
-        var xaml = File.ReadAllText(FindAuthenticatorFeatureFile("AuthenticatorWorkspaceView.axaml"));
-
-        Assert.DoesNotContain("TotpShowHiddenText", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("SortTitleText", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("TotpHelpText", xaml, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Authenticator_code_console_preserves_hotp_counter_semantics()
-    {
-        var xaml = File.ReadAllText(FindAuthenticatorFeatureFile("AuthenticatorCodeConsoleView.axaml"));
+        var xaml = File.ReadAllText(XamlSource.PathOf("AuthenticatorCodeConsoleView.axaml"));
 
         Assert.Contains("Command=\"{Binding AdvanceTotpCommand}\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("SelectedTotpDetails.IsCounterBased", xaml, StringComparison.Ordinal);
-        Assert.Contains("L[TotpCounter]", xaml, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding SelectedTotpDetails.IsCounterBased}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("SelectedTotpDetails.CounterText", xaml, StringComparison.Ordinal);
     }
 
+    // The authenticator header used to own favourite, delete and clear-selection buttons; the library
+    // batch menu is the one place left that carries them, so it has to answer to the same commands.
     [Fact]
-    public void Authenticator_batch_commands_use_desktop_targets_and_named_automation()
+    public void Authenticator_batch_actions_route_through_the_library_batch_menu()
     {
-        var view = new AuthenticatorWorkspaceView();
-        var xaml = File.ReadAllText(FindAuthenticatorFeatureFile("AuthenticatorWorkspaceView.axaml"));
+        using var library = LibraryUiHarness.Open("Totp");
+        library.ViewModel.TotpItems.Add(new Monica.Core.Models.SecureItem
+        {
+            Id = 72,
+            ItemType = Monica.Core.Models.VaultItemType.Totp,
+            Title = "Batchable code"
+        });
+        library.Settle();
+        library.ViewModel.SelectAllVaultRowsCommand.Execute(null);
+        library.Settle();
 
-        Assert.NotNull(view.FindControl<Button>("FavoriteSelectedTotpButton"));
-        Assert.NotNull(view.FindControl<Button>("DeleteSelectedTotpButton"));
-        Assert.NotNull(view.FindControl<Button>("ClearTotpSelectionButton"));
-        Assert.Contains("x:Name=\"FavoriteSelectedTotpButton\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"DeleteSelectedTotpButton\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"ClearTotpSelectionButton\"", xaml, StringComparison.Ordinal);
-        Assert.Equal(3, CountOccurrences(xaml, "Width=\"40\" Height=\"40\""));
+        var batch = library.Workspace.FindControl<Button>("VaultBatchButton")!;
+        Assert.True(batch.IsVisible);
+        var flyout = Assert.IsType<MenuFlyout>(batch.Flyout);
+        flyout.ShowAt(batch);
+        library.Settle();
+        var items = LibraryUiHarness.MenuItems(flyout).ToArray();
+
+        var favorite = items.Single(item => Equals(item.Command, library.ViewModel.FavoriteVaultBatchCommand));
+        var delete = items.Single(item => Equals(item.Command, library.ViewModel.DeleteVaultBatchCommand));
+        var clear = items.Single(item => Equals(item.Command, library.ViewModel.ClearVaultBatchSelectionCommand));
+        Assert.True(favorite.IsVisible);
+        Assert.True(delete.IsVisible);
+        Assert.True(library.ViewModel.HasVaultBatchSelection);
+
+        clear.Command!.Execute(clear.CommandParameter);
+        library.Settle();
+        Assert.False(library.ViewModel.HasVaultBatchSelection);
+        flyout.Hide();
     }
 
     [Fact]
-    public void Authenticator_workspace_separates_filter_and_account_scroll_ownership()
+    public void Authenticator_console_owns_no_scroll_surface_of_its_own()
     {
-        var view = new AuthenticatorWorkspaceView();
-        var xaml = File.ReadAllText(FindAuthenticatorFeatureFile("AuthenticatorWorkspaceView.axaml"));
-        var accountListXaml = File.ReadAllText(FindAuthenticatorFeatureFile("AuthenticatorAccountListView.axaml"));
+        var xaml = File.ReadAllText(XamlSource.PathOf("AuthenticatorCodeConsoleView.axaml"));
 
-        Assert.Contains("<views:AuthenticatorFilterPaneView x:Name=\"AuthenticatorFilterPane\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("<views:AuthenticatorAccountListView x:Name=\"AuthenticatorAccountListView\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Classes=\"totpAccountRail\"", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("Classes=\"workspaceSidebar\"", xaml, StringComparison.Ordinal);
-        Assert.Contains(
-            "Classes=\"totpCodeSurface\"",
-            File.ReadAllText(FindAuthenticatorFeatureFile("AuthenticatorCodeConsoleView.axaml")),
-            StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"AuthenticatorAccountListScrollViewer\"", accountListXaml, StringComparison.Ordinal);
-        Assert.NotNull(view.FindControl<Control>("AuthenticatorFilterPane"));
-        Assert.NotNull(view.FindControl<Control>("AuthenticatorAccountListView"));
+        // The library detail pane is the only scroller, so the console cannot start a nested one.
+        Assert.DoesNotContain("<ScrollViewer", xaml, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"totpCodeSurface\"", xaml, StringComparison.Ordinal);
     }
-
-    [Fact]
-    public void Authenticator_workspace_switches_to_single_pane_at_narrow_width()
-    {
-        var view = new AuthenticatorWorkspaceView();
-
-        Assert.NotNull(view.FindControl<Grid>("AuthenticatorMasterDetailGrid"));
-        Assert.NotNull(view.FindControl<Border>("AuthenticatorListRegion"));
-        Assert.NotNull(view.FindControl<Border>("AuthenticatorCodeRegion"));
-        Assert.NotNull(view.FindControl<Border>("AuthenticatorInspectorRegion"));
-        var console = Assert.IsType<AuthenticatorCodeConsoleView>(
-            view.FindControl<AuthenticatorCodeConsoleView>("AuthenticatorCodeConsole"));
-        Assert.NotNull(console.FindControl<Button>("BackToAuthenticatorListButton"));
-
-        view.UpdateResponsiveLayoutForWidth(680);
-        Assert.True(view.IsNarrowLayout);
-        Assert.True(view.FindControl<Border>("AuthenticatorListRegion")!.IsVisible);
-        Assert.False(view.FindControl<Border>("AuthenticatorCodeRegion")!.IsVisible);
-        Assert.False(view.FindControl<Border>("AuthenticatorInspectorRegion")!.IsVisible);
-
-        view.UpdateResponsiveLayoutForWidth(900);
-        Assert.True(view.IsMediumLayout);
-        Assert.True(view.FindControl<Border>("AuthenticatorListRegion")!.IsVisible);
-        Assert.True(view.FindControl<Border>("AuthenticatorCodeRegion")!.IsVisible);
-        Assert.False(view.FindControl<Border>("AuthenticatorInspectorRegion")!.IsVisible);
-
-        view.UpdateResponsiveLayoutForWidth(1200);
-        Assert.False(view.IsNarrowLayout);
-        Assert.True(view.FindControl<Border>("AuthenticatorListRegion")!.IsVisible);
-        Assert.True(view.FindControl<Border>("AuthenticatorCodeRegion")!.IsVisible);
-        Assert.True(view.FindControl<Border>("AuthenticatorInspectorRegion")!.IsVisible);
-    }
-
-    private static string FindAuthenticatorFeatureFile(string fileName) =>
-        XamlSource.PathOf(fileName);
-
-    private static int CountOccurrences(string text, string value) =>
-        XamlSource.CountOccurrences(text, value);
 }

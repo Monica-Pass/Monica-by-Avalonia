@@ -8,8 +8,4 @@ public partial class WalletWorkbenchView : UserControl
     {
         InitializeComponent();
     }
-
-    public void SetBackButtonVisible(bool isVisible) => BackToWalletListButton.IsVisible = isVisible;
-
-    public void SetCompactSupplementVisible(bool isVisible) => WalletCompactSupplement.IsVisible = isVisible;
 }

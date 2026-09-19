@@ -8,6 +8,4 @@ public partial class AuthenticatorCodeConsoleView : UserControl
     {
         InitializeComponent();
     }
-
-    public void SetBackButtonVisible(bool isVisible) => BackToAuthenticatorListButton.IsVisible = isVisible;
 }

@@ -78,7 +78,7 @@ public partial class NoteEditorView : UserControl
 
     public void EnsureSelectedHistory() => EnsureSelectedNoteEditorHistory();
 
-    public void JumpToLine(int lineNumber) => JumpToNoteLine(lineNumber);
+    private void Inspector_OnLineRequested(object? sender, NoteLineRequestedEventArgs e) => JumpToNoteLine(e.LineNumber);
 
     public void RemoveHistory(NoteEditorTab tab) => _noteEditorHistories.Remove(tab);
 

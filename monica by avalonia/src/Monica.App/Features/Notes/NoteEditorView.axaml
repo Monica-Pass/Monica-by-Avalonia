@@ -6,7 +6,7 @@
              xmlns:vm="using:Monica.App.ViewModels"
              x:Class="Monica.App.Features.Notes.NoteEditorView"
              x:DataType="vm:MainWindowViewModel">
-    <Grid>
+    <Grid ColumnDefinitions="*,Auto">
         <Grid x:Name="NoteEditorContent"
               IsVisible="{Binding HasOpenNoteTabs}"
               RowDefinitions="Auto,Auto,Auto,*"
@@ -15,31 +15,18 @@
               MinWidth="0"
               ClipToBounds="True"
               HorizontalAlignment="Stretch">
-        <Grid Margin="0,0,0,16" ColumnDefinitions="Auto,*" ColumnSpacing="10">
-            <Button x:Name="BackToNoteListButton"
-                    IsVisible="{Binding ShowBackToNoteList}"
-                    Command="{Binding ShowNoteTreeCommand}"
-                    ToolTip.Tip="{Binding L[BackToNoteList]}"
-                    AutomationProperties.Name="{Binding L[BackToNoteList]}"
-                    Width="34"
-                    Height="34"
-                    Padding="0"
-                    VerticalAlignment="Center">
-                <ic:FluentIcon Icon="ArrowLeft" FontSize="18" />
-            </Button>
-            <TextBox Grid.Column="1"
-                     Text="{Binding NoteTitle}"
-                     Classes="noteChromeLessTextBox"
-                     PlaceholderText="{Binding L.NoteTitleWatermark}"
-                     AutomationProperties.Name="{Binding L.NoteTitleWatermark}"
-                     FontSize="32"
-                     FontWeight="SemiBold"
-                     BorderThickness="0"
-                     Background="Transparent"
-                     Padding="0"
-                     TextWrapping="Wrap"
-                     MaxLines="2" />
-        </Grid>
+        <TextBox Margin="0,0,0,16"
+                 Text="{Binding NoteTitle}"
+                 Classes="noteChromeLessTextBox"
+                 PlaceholderText="{Binding L.NoteTitleWatermark}"
+                 AutomationProperties.Name="{Binding L.NoteTitleWatermark}"
+                 FontSize="32"
+                 FontWeight="SemiBold"
+                 BorderThickness="0"
+                 Background="Transparent"
+                 Padding="0"
+                 TextWrapping="Wrap"
+                 MaxLines="2" />
 
         <notes:NoteEditorToolbarView Grid.Row="1" ActionRequested="NoteEditorToolbarView_OnActionRequested" />
 
@@ -115,7 +102,16 @@
         </Grid>
         </Grid>
 
+        <!-- Outline, backlinks and counts belong to the note being read, so the inspector rides along
+             with the editor instead of living on a note page of its own. -->
+        <notes:NoteInspectorView x:Name="NoteInspectorRegion"
+                                 Grid.Column="1"
+                                 Width="280"
+                                 IsVisible="{Binding IsNoteInspectorPaneVisible}"
+                                 LineRequested="Inspector_OnLineRequested" />
+
         <StackPanel x:Name="NoteEditorEmptyState"
+                    Grid.ColumnSpan="2"
                     IsVisible="{Binding HasOpenNoteTabs, Converter={x:Static local:BoolConverters.Not}}"
                     Width="320"
                     Spacing="12"
@@ -124,7 +120,8 @@
             <ic:FluentIcon Icon="Note" FontSize="38" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
             <TextBlock Text="{Binding L[NoteEmptyTitle]}" FontSize="20" FontWeight="SemiBold" TextAlignment="Center" />
             <TextBlock Text="{Binding L[NoteEmptyDescription]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" />
-            <Button Command="{Binding AddNoteCommand}"
+            <Button x:Name="EmptyNoteAddButton"
+                    Command="{Binding AddNoteCommand}"
                     AutomationProperties.Name="{Binding L.NewSecureNote}"
                     HorizontalAlignment="Center">
                 <StackPanel Orientation="Horizontal" Spacing="8">

@@ -1,9 +1,12 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using FluentAvalonia.UI.Controls;
 using Microsoft.Extensions.DependencyInjection;
+using Monica.App.Controls;
 using Monica.App.Features.Notes;
+using Monica.App.Features.Vault;
 using Monica.App.ViewModels;
 
 namespace Monica.UiTests;
@@ -16,106 +19,124 @@ public sealed class NoteWorkflowUiTests
         AvaloniaUiThreadTestContext.VerifyAccess();
     }
 
+    // The note page is gone: the editor and its inspector are one surface the library hands over.
     [Fact]
-    public void Note_workspace_exposes_responsive_master_editor_regions()
+    public void Note_surface_hosts_the_editor_and_an_inspector_that_collapses_without_taking_width()
     {
-        var view = new NoteWorkspaceView();
+        var view = new NoteEditorView();
 
-        Assert.NotNull(view.FindControl<Grid>("NoteWorkspaceGrid"));
-        Assert.NotNull(view.FindControl<NoteTreeView>("NoteTreeRegion"));
-        Assert.NotNull(view.FindControl<NoteEditorView>("NoteEditorRegion"));
+        Assert.NotNull(view.FindControl<Grid>("NoteEditorContent"));
         Assert.NotNull(view.FindControl<NoteInspectorView>("NoteInspectorRegion"));
+        Assert.NotNull(view.FindControl<StackPanel>("NoteEditorEmptyState"));
+
+        var xaml = File.ReadAllText(FindSourceFile("NoteEditorView.axaml"));
+        Assert.Contains("ColumnDefinitions=\"*,Auto\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Grid.Column=\"1\"", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Note_views_expose_empty_search_and_return_actions()
+    public void Note_surface_keeps_a_way_in_when_no_note_is_open()
     {
-        var tree = new NoteTreeView();
         var editor = new NoteEditorView();
 
-        Assert.NotNull(tree.FindControl<TextBox>("NoteSearchBox"));
-        Assert.NotNull(tree.FindControl<Button>("ClearNoteSearchButton"));
-        Assert.NotNull(tree.FindControl<StackPanel>("NoteTreeEmptyState"));
-        Assert.NotNull(tree.FindControl<Button>("EmptyNoteTreeAddButton"));
-        Assert.NotNull(editor.FindControl<Grid>("NoteEditorContent"));
         Assert.NotNull(editor.FindControl<StackPanel>("NoteEditorEmptyState"));
-        Assert.NotNull(editor.FindControl<Button>("BackToNoteListButton"));
-        Assert.NotNull(tree.FindControl<Button>("NoteFolderNavigationButton"));
-        Assert.NotNull(tree.FindControl<Button>("NoteTagNavigationButton"));
-        Assert.NotNull(tree.FindControl<TextBox>("NewNoteFolderNameBox"));
-        Assert.NotNull(tree.FindControl<Button>("CreateNoteFolderButton"));
-        Assert.NotNull(tree.FindControl<Button>("RenameNoteFolderButton"));
-        Assert.NotNull(tree.FindControl<Button>("DeleteNoteFolderButton"));
+        Assert.NotNull(editor.FindControl<Button>("EmptyNoteAddButton"));
+
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        editor.DataContext = viewModel;
+        Assert.False(viewModel.HasOpenNoteTabs);
+
+        editor.FindControl<Button>("EmptyNoteAddButton")!.Command!.Execute(null);
+
+        Assert.True(viewModel.HasOpenNoteTabs);
+        Assert.IsType<NoteEditorTab>(viewModel.SelectedNoteTab);
     }
 
     [Fact]
-    public void Note_workspace_uses_wide_medium_narrow_and_split_layout_contracts()
+    public void Note_surface_uses_the_width_contract_the_library_gives_it()
     {
         var window = new Monica.App.MainWindow();
         using var services = Monica.App.App.ConfigureServices(window);
         var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        viewModel.AddNoteCommand.Execute(null);
 
         viewModel.NoteWorkspaceViewportWidth = 1179;
-        Assert.True(viewModel.IsNoteTreePaneVisible);
-        Assert.True(viewModel.IsNoteEditorWorkspaceVisible);
+        Assert.False(viewModel.IsNoteWorkspaceNarrow);
         Assert.False(viewModel.IsNoteInspectorPaneVisible);
-        Assert.False(viewModel.ShowAddNoteInTreeHeader);
-        Assert.Equal(new GridLength(0), viewModel.NoteInspectorColumnWidth);
+        Assert.Equal(new Thickness(28, 24, 28, 20), viewModel.NoteEditorContentMargin);
 
         viewModel.NoteWorkspaceViewportWidth = 1180;
         Assert.True(viewModel.IsNoteInspectorPaneVisible);
-        Assert.Equal(new GridLength(280), viewModel.NoteInspectorColumnWidth);
 
-        viewModel.NoteSplitPreviewMode = true;
-        Assert.False(viewModel.IsNoteTreePaneVisible);
-        Assert.False(viewModel.IsNoteInspectorPaneVisible);
+        // Split view trades the inspector for a second column of its own, whatever the width is.
+        viewModel.SetNoteViewModeCommand.Execute("split");
         Assert.True(viewModel.IsNoteEditorPaneVisible);
         Assert.True(viewModel.IsNotePreviewPaneVisible);
+        Assert.False(viewModel.IsNoteInspectorPaneVisible);
 
-        viewModel.NoteSplitPreviewMode = false;
+        viewModel.SetNoteViewModeCommand.Execute("edit");
         viewModel.NoteWorkspaceViewportWidth = 759;
-        viewModel.NoteNarrowShowsTree = true;
-        Assert.True(viewModel.IsNoteTreePaneVisible);
-        Assert.False(viewModel.IsNoteEditorWorkspaceVisible);
-        Assert.True(viewModel.ShowAddNoteInTreeHeader);
-        viewModel.NoteNarrowShowsTree = false;
-        Assert.False(viewModel.IsNoteTreePaneVisible);
-        Assert.True(viewModel.IsNoteEditorWorkspaceVisible);
-        Assert.False(viewModel.ShowAddNoteInTreeHeader);
+        Assert.True(viewModel.IsNoteWorkspaceNarrow);
+        Assert.False(viewModel.IsNoteInspectorPaneVisible);
         Assert.Equal(new Thickness(16, 20, 16, 16), viewModel.NoteEditorContentMargin);
     }
 
     [Fact]
-    public void Note_workspace_uses_native_command_and_single_scroll_surfaces()
+    public void Note_toolbar_uses_a_native_command_bar_and_the_inspector_a_single_scroll_surface()
     {
         var toolbar = new NoteEditorToolbarView();
         var inspector = new NoteInspectorView();
-        var tree = new NoteTreeView();
-        var tabs = new NoteTabStripView();
 
         Assert.NotNull(toolbar.FindControl<FACommandBar>("NoteEditorCommandBar"));
+        Assert.NotNull(toolbar.FindControl<Button>("SaveNoteButton"));
         Assert.NotNull(toolbar.FindControl<Button>("NoteHeadingMenuButton"));
+        Assert.NotNull(toolbar.FindControl<Button>("NoteViewModeMenuButton"));
         Assert.NotNull(inspector.FindControl<ScrollViewer>("NoteInspectorScrollViewer"));
-        Assert.NotNull(tree.FindControl<ListBox>("NoteTreeList"));
-        Assert.NotNull(tabs.FindControl<Grid>("NoteTabRail"));
-        Assert.NotNull(tabs.FindControl<StackPanel>("NoteTabCommandRegion"));
-        Assert.NotNull(tabs.FindControl<Border>("NoteInspectorHeader"));
-        Assert.NotNull(tabs.FindControl<Border>("NoteDocumentCommandSurface"));
 
-        var tabCommands = new[]
+        var toolbarXaml = File.ReadAllText(FindSourceFile("NoteEditorToolbarView.axaml"));
+        Assert.Contains("<fa:FACommandBar", toolbarXaml, StringComparison.Ordinal);
+        Assert.Contains("<fa:FACommandBar.SecondaryCommands>", toolbarXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<WrapPanel", toolbarXaml, StringComparison.Ordinal);
+        // Read mode used to be a page header control; the toolbar is the only place left that owns it.
+        Assert.Contains("Command=\"{Binding SetNoteViewModeCommand}\" CommandParameter=\"preview\"",
+            toolbarXaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Note_view_mode_menu_offers_exactly_the_three_modes_as_one_radio_group()
+    {
+        var anchor = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(anchor);
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        var toolbar = new NoteEditorToolbarView { DataContext = viewModel };
+        var host = new Window { Content = toolbar };
+        host.Show();
+        try
         {
-            tabs.FindControl<Button>("PreviousNoteTabButton"),
-            tabs.FindControl<Button>("NextNoteTabButton"),
-            tabs.FindControl<Button>("AddNoteTabButton"),
-            tabs.FindControl<Button>("SaveNoteTabButton"),
-            tabs.FindControl<Button>("MoreNoteTabButton")
-        };
-        Assert.All(tabCommands, command =>
+            var viewMode = toolbar.FindControl<Button>("NoteViewModeMenuButton")!;
+            var flyout = Assert.IsType<MenuFlyout>(viewMode.Flyout);
+            // A closed flyout has realized nothing, so the commands and roles only read back once
+            // the menu is on screen — which is also the only state a user can meet it in.
+            flyout.ShowAt(viewMode);
+            Dispatcher.UIThread.RunJobs();
+            var modes = flyout.Items.OfType<MenuItem>().ToArray();
+
+            Assert.Equal(3, modes.Length);
+            Assert.All(modes, mode => Assert.Same(viewModel.SetNoteViewModeCommand, mode.Command));
+            Assert.Equal(
+                new[] { "edit", "preview", "split" },
+                modes.Select(mode => mode.CommandParameter).ToArray());
+
+            // One radio group, so the mode the user is reading is always the one that is marked.
+            Assert.All(modes, mode => Assert.Equal(MenuItemToggleType.Radio, mode.ToggleType));
+            flyout.Hide();
+        }
+        finally
         {
-            Assert.NotNull(command);
-            Assert.True(command.Width >= 40);
-            Assert.True(command.Height >= 40);
-        });
+            host.Close();
+        }
     }
 
     [Fact]
@@ -124,6 +145,7 @@ public sealed class NoteWorkflowUiTests
         var window = new Monica.App.MainWindow();
         using var services = Monica.App.App.ConfigureServices(window);
         var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        viewModel.AddNoteCommand.Execute(null);
         viewModel.NoteWorkspaceViewportWidth = 900;
         var toolbar = new NoteEditorToolbarView { DataContext = viewModel };
         var host = new Window
@@ -145,10 +167,11 @@ public sealed class NoteWorkflowUiTests
             Assert.True(properties.Bounds.Height > 0);
             var flyout = Assert.IsType<Flyout>(properties.Flyout);
             var flyoutSurface = Assert.IsType<Border>(flyout.Content);
-            var propertiesPanel = Assert.IsType<NotePropertiesPanelView>(flyoutSurface.Child);
+            // The compact flyout carries the whole inspector, not a thinner copy of the fields.
+            var inspector = Assert.IsType<NoteInspectorView>(flyoutSurface.Child);
             flyout.ShowAt(properties);
             Dispatcher.UIThread.RunJobs();
-            Assert.Same(viewModel, propertiesPanel.DataContext);
+            Assert.Same(viewModel, inspector.DataContext);
             flyout.Hide();
 
             viewModel.NoteWorkspaceViewportWidth = 1180;
@@ -193,86 +216,62 @@ public sealed class NoteWorkflowUiTests
         Assert.Contains("ToolTip.Tip=\"{Binding FullPath}\"", xaml, StringComparison.Ordinal);
     }
 
+    // The note tree owned its rows' commands; the library tree now owns every row's, and they still
+    // belong to the workspace view model rather than to a view of their own.
     [Fact]
-    public void Note_tree_row_overflow_binds_commands_to_the_workspace_view_model()
+    public void Note_rows_are_driven_by_the_library_commands_owned_by_the_workspace()
     {
         var window = new Monica.App.MainWindow();
         using var services = Monica.App.App.ConfigureServices(window);
         var viewModel = services.GetRequiredService<MainWindowViewModel>();
-        var note = new Monica.Core.Models.SecureItem
-        {
-            Id = 42,
-            ItemType = Monica.Core.Models.VaultItemType.Note,
-            Title = "Command ownership"
-        };
-        var row = new NoteTreeItemView
-        {
-            DataContext = note,
-            ViewModel = viewModel
-        };
-        var host = new Window
-        {
-            Width = 320,
-            Height = 120,
-            Content = row
-        };
-        host.Show();
-
+        window.Show();
         try
         {
+            window.DataContext = viewModel;
+            viewModel.IsUnlocked = true;
+            viewModel.NoteItems.Add(new Monica.Core.Models.SecureItem
+            {
+                Id = 43,
+                ItemType = Monica.Core.Models.VaultItemType.Note,
+                Title = "Command ownership"
+            });
+            viewModel.SelectSectionCommand.Execute(VaultPresets.LibrarySection);
             Dispatcher.UIThread.RunJobs();
-            var more = row.FindControl<Button>("NoteItemMoreButton");
-            Assert.NotNull(more);
-            var flyout = Assert.IsType<MenuFlyout>(more.Flyout);
-            flyout.ShowAt(more);
-            Dispatcher.UIThread.RunJobs();
-            var commands = flyout.Items.OfType<MenuItem>().ToArray();
 
-            Assert.Equal(3, commands.Length);
-            Assert.Same(viewModel.OpenNoteCommand, commands[0].Command);
-            Assert.Same(viewModel.ToggleNoteFavoriteCommand, commands[1].Command);
-            Assert.Same(viewModel.DeleteNoteCommand, commands[2].Command);
-            Assert.All(commands, command => Assert.Same(note, command.CommandParameter));
-            flyout.Hide();
+            var workspace = Assert.Single(window.GetVisualDescendants().OfType<VaultWorkspaceView>());
+            var tree = workspace.FindControl<VaultFolderTree>("VaultTree")!;
+
+            Assert.Same(viewModel.EditSelectedVaultEntryCommand, tree.EditEntryCommand);
+            Assert.Same(viewModel.MoveSelectedVaultEntryCommand, tree.MoveEntryCommand);
+            Assert.Same(viewModel.DeleteSelectedVaultEntryCommand, tree.DeleteEntryCommand);
+
+            var noteRow = Assert.Single(viewModel.VaultTreeRows.OfType<VaultTreeEntryRow>());
+            viewModel.SelectedVaultRow = noteRow;
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(VaultSurface.Note, viewModel.SelectedVaultSurface);
         }
         finally
         {
-            host.Close();
+            window.Close();
         }
     }
 
     [Fact]
-    public void Note_xaml_owns_secondary_commands_without_magic_overlay_margins()
+    public void Note_xaml_avoids_magic_overlay_margins()
     {
         var toolbarXaml = File.ReadAllText(FindSourceFile("NoteEditorToolbarView.axaml"));
-        var tabsXaml = File.ReadAllText(FindSourceFile("NoteTabStripView.axaml"));
-        var treeXaml = File.ReadAllText(FindSourceFile("NoteTreeView.axaml"));
-        var treeItemXaml = File.ReadAllText(FindSourceFile("NoteTreeItemView.axaml"));
         var editorXaml = File.ReadAllText(FindSourceFile("NoteEditorView.axaml"));
         var stylesXaml = File.ReadAllText(FindSourceFile("NoteStyles.axaml"));
 
-        Assert.Contains("<fa:FACommandBar", toolbarXaml, StringComparison.Ordinal);
-        Assert.Contains("<fa:FACommandBar.SecondaryCommands>", toolbarXaml, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"NoteHeadingMenuButton\"", toolbarXaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("<WrapPanel", toolbarXaml, StringComparison.Ordinal);
-        Assert.Contains("ColumnDefinitions=\"Auto,*,Auto\"", tabsXaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("Margin=\"0,0,158,0\"", tabsXaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("NoteTabStripWidth", tabsXaml, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"NoteTreeList\"", treeXaml, StringComparison.Ordinal);
-        Assert.Contains("Classes.selected=\"{Binding IsNoteFolderNavigation}\"", treeXaml, StringComparison.Ordinal);
-        Assert.Contains("ToggleNoteTreeGroupCommand", treeXaml, StringComparison.Ordinal);
-        Assert.Contains("SelectNoteTreeGroupCommand", treeXaml, StringComparison.Ordinal);
-        Assert.Contains("Classes.selected=\"{Binding IsSelected}\"", treeXaml, StringComparison.Ordinal);
-        Assert.Contains("IsVisible=\"{Binding IsNoteFolderNavigation}\"", treeXaml, StringComparison.Ordinal);
-        Assert.Contains("VirtualizingStackPanel", treeXaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("Command=\"{Binding LoadCommand}\"", treeXaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("L[NoteHome]", treeXaml, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"NoteItemMoreButton\"", treeItemXaml, StringComparison.Ordinal);
-        Assert.Contains("<MenuFlyout>", treeItemXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Margin=\"0,0,158,0\"", toolbarXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Margin=\"-48", editorXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Margin=\"-48", toolbarXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Border.noteToolbar Button", stylesXaml, StringComparison.Ordinal);
     }
 
     private static string FindSourceFile(string fileName) =>
         XamlSource.PathOf(fileName);
+
+    private static int CountOccurrences(string text, string value) =>
+        XamlSource.CountOccurrences(text, value);
 }

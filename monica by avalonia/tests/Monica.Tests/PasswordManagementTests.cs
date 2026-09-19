@@ -89,26 +89,27 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
-    public void ViewModel_note_workspace_uses_single_pane_navigation_when_narrow()
+    public void ViewModel_note_editor_layout_follows_the_width_it_is_given()
     {
         var harness = CreateHarness();
         harness.ViewModel.NoteWorkspaceViewportWidth = 680;
 
         Assert.True(harness.ViewModel.IsNoteWorkspaceNarrow);
-        Assert.True(harness.ViewModel.IsNoteTreePaneVisible);
-        Assert.False(harness.ViewModel.IsNoteEditorWorkspaceVisible);
+        Assert.False(harness.ViewModel.IsNoteInspectorPaneVisible);
 
         harness.ViewModel.AddNoteCommand.Execute(null);
 
-        Assert.False(harness.ViewModel.NoteNarrowShowsTree);
-        Assert.False(harness.ViewModel.IsNoteTreePaneVisible);
-        Assert.True(harness.ViewModel.IsNoteEditorWorkspaceVisible);
+        Assert.True(harness.ViewModel.HasOpenNoteTabs);
+        Assert.False(harness.ViewModel.IsNoteInspectorPaneVisible);
+        Assert.Equal(16, harness.ViewModel.NoteEditorContentMargin.Left);
+        Assert.Equal(20, harness.ViewModel.NoteEditorContentMargin.Top);
 
-        harness.ViewModel.ShowNoteTreeCommand.Execute(null);
+        harness.ViewModel.NoteWorkspaceViewportWidth = 1180;
 
-        Assert.True(harness.ViewModel.NoteNarrowShowsTree);
-        Assert.True(harness.ViewModel.IsNoteTreePaneVisible);
-        Assert.False(harness.ViewModel.IsNoteEditorWorkspaceVisible);
+        Assert.False(harness.ViewModel.IsNoteWorkspaceNarrow);
+        Assert.True(harness.ViewModel.IsNoteInspectorPaneVisible);
+        Assert.Equal(28, harness.ViewModel.NoteEditorContentMargin.Left);
+        Assert.Equal(24, harness.ViewModel.NoteEditorContentMargin.Top);
 
         harness.ViewModel.NoteSearchText = "missing";
         harness.ViewModel.ClearNoteSearchCommand.Execute(null);

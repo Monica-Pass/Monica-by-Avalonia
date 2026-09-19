@@ -1,6 +1,9 @@
 using Avalonia.Controls;
-using Monica.App.Controls;
+using Avalonia.LogicalTree;
+using Avalonia.VisualTree;
 using Monica.App.Features.Passwords;
+using Monica.App.Features.Vault;
+using Monica.Core.Models;
 
 namespace Monica.UiTests;
 
@@ -13,118 +16,145 @@ public sealed class PasswordVaultCompositionUiTests
     }
 
     [Fact]
-    public void Password_vault_is_composed_from_focused_workspace_views()
+    public void Library_composes_one_tree_and_a_detail_surface_that_is_built_on_demand()
     {
-        var view = new PasswordVaultView();
+        using var library = LibraryUiHarness.Open("Passwords");
+        library.ViewModel.Passwords.Add(new PasswordEntry { Id = 61, Title = "Mail" });
+        library.Settle();
 
-        Assert.NotNull(view.FindControl<PasswordVaultToolbarView>("PasswordVaultToolbar"));
-        Assert.NotNull(view.FindControl<PasswordFolderFilterView>("PasswordFolderFilters"));
-        Assert.NotNull(view.FindControl<PasswordListPaneView>("PasswordListPane"));
-        var detailHost = view.FindControl<ContentControl>("PasswordDetailPaneHost");
-        Assert.NotNull(detailHost);
-        Assert.IsNotType<PasswordDetailPaneView>(detailHost.Content);
+        Assert.Single(library.Window.GetVisualDescendants().OfType<VaultWorkspaceView>());
+        Assert.Null(library.SurfaceHost.Content);
 
-        view.FocusDetails();
+        library.SelectFirstEntry();
+        var first = Assert.IsType<PasswordDetailPaneView>(library.SurfaceHost.Content);
 
-        Assert.IsType<PasswordDetailPaneView>(detailHost.Content);
+        // Re-selecting must reuse the cached surface, not build a second parser over the same entry.
+        library.ViewModel.SelectedVaultRow = null;
+        library.Settle();
+        library.SelectFirstEntry();
+
+        Assert.Same(first, Assert.IsType<PasswordDetailPaneView>(library.SurfaceHost.Content));
+        Assert.Equal(
+            1,
+            library.Window.GetVisualDescendants().OfType<PasswordDetailPaneView>().Count());
+    }
+
+    // The list page used to collapse into one pane and drill in below ~800px. The library is a fixed
+    // rail + detail, so no window width may hide either half.
+    [Theory]
+    [InlineData(680)]
+    [InlineData(900)]
+    [InlineData(1280)]
+    public void Library_keeps_both_panes_at_every_window_width(double width)
+    {
+        using var library = LibraryUiHarness.Open("Passwords", width);
+        library.ViewModel.Passwords.Add(new PasswordEntry { Id = 62, Title = "Bank" });
+        library.Settle();
+        library.SelectFirstEntry();
+
+        var layout = library.Tree.GetLogicalAncestors().OfType<Grid>().First();
+        Assert.Equal(new GridLength(340), layout.ColumnDefinitions[0].Width);
+        Assert.Equal(new GridLength(1, GridUnitType.Star), layout.ColumnDefinitions[1].Width);
+
+        var rail = library.Tree.GetLogicalAncestors().OfType<Border>().First();
+        var detailRegion = library.SurfaceHost.GetLogicalAncestors().OfType<Border>().First();
+        Assert.Equal(0, Grid.GetColumn(rail));
+        Assert.Equal(1, Grid.GetColumn(detailRegion));
+        Assert.True(rail.IsVisible);
+        Assert.True(detailRegion.IsVisible);
+        Assert.True(library.SurfaceHost.IsVisible);
+    }
+
+    // The deleted filter panel owned exactly eight toggles. The favourites chip carries one, so the
+    // more menu has to carry the other seven — and each has to drive its own flag both ways.
+    [Fact]
+    public void Every_quick_filter_the_panel_owned_is_still_reachable()
+    {
+        using var library = LibraryUiHarness.Open("Passwords");
+        var viewModel = library.ViewModel;
+        var more = library.Workspace.FindControl<Button>("VaultMoreButton")!;
+        var flyout = Assert.IsType<MenuFlyout>(more.Flyout);
+        flyout.ShowAt(more);
+        library.Settle();
+        var submenu = flyout.Items.OfType<MenuItem>().ElementAt(1);
+        submenu.IsSubMenuOpen = true;
+        library.Settle();
+        var items = submenu.Items.OfType<MenuItem>().ToArray();
+
+        var filters = new (Action<bool> Write, Func<bool> Read)[]
+        {
+            (value => viewModel.QuickFilter2Fa = value, () => viewModel.QuickFilter2Fa),
+            (value => viewModel.QuickFilterNotes = value, () => viewModel.QuickFilterNotes),
+            (value => viewModel.QuickFilterPasskey = value, () => viewModel.QuickFilterPasskey),
+            (value => viewModel.QuickFilterBoundNote = value, () => viewModel.QuickFilterBoundNote),
+            (value => viewModel.QuickFilterUncategorized = value, () => viewModel.QuickFilterUncategorized),
+            (value => viewModel.QuickFilterLocalOnly = value, () => viewModel.QuickFilterLocalOnly),
+            (value => viewModel.QuickFilterAttachments = value, () => viewModel.QuickFilterAttachments)
+        };
+        Assert.Equal(filters.Length, items.Length);
+
+        for (var index = 0; index < filters.Length; index++)
+        {
+            filters[index].Write(true);
+            library.Settle();
+
+            // Whichever item lit up is the one that flag drives; a mislabelled or dropped row shows
+            // up here as either no item or the wrong item, not as a green test.
+            var item = Assert.Single(items, candidate => candidate.IsChecked);
+            Assert.True(viewModel.HasVaultQuickFilters);
+
+            item.IsChecked = false;
+            library.Settle();
+            Assert.False(filters[index].Read());
+            Assert.False(viewModel.HasVaultQuickFilters);
+        }
+
+        flyout.Hide();
     }
 
     [Fact]
-    public void Focused_password_views_expose_required_keyboard_and_state_controls()
+    public void Password_data_commands_stay_off_the_library()
     {
-        var toolbar = new PasswordVaultToolbarView();
-        var list = new PasswordListPaneView();
-        var details = new PasswordDetailPaneView();
+        var libraryXaml = XamlSource.TextFor<VaultWorkspaceView>();
 
-        Assert.NotNull(toolbar.FindControl<TextBox>("PasswordSearchBox"));
-        Assert.NotNull(toolbar.FindControl<Border>("PasswordVaultCommandSurface"));
-        Assert.NotNull(toolbar.FindControl<Button>("PasswordSearchClearButton"));
-        Assert.NotNull(list.FindControl<ListBox>("PasswordListBox"));
-        Assert.NotNull(list.FindControl<CheckBox>("SelectAllVisiblePasswordsCheckBox"));
-        Assert.NotNull(details.FindControl<Button>("BackToPasswordListButton"));
-        Assert.NotNull(details.FindControl<Button>("RetryPasswordDetailsButton"));
-    }
-
-    [Fact]
-    public void Password_filter_controls_are_named_compact_and_theme_aware()
-    {
-        var toolbar = new PasswordVaultToolbarView();
-        _ = new PasswordQuickFilterPanelView();
-        var toolbarXaml = File.ReadAllText(FindPasswordFeatureFile("PasswordVaultToolbarView.axaml"));
-        var filterPanelXaml = File.ReadAllText(FindPasswordFeatureFile("PasswordQuickFilterPanelView.axaml"));
-        var listXaml = File.ReadAllText(FindPasswordFeatureFile("PasswordListPaneView.axaml"));
-        var stylesXaml = File.ReadAllText(FindPasswordFeatureFile("PasswordVaultStyles.axaml"));
-        var shellStylesXaml = File.ReadAllText(FindAppFile("Controls", "VaultShellStyles.axaml"));
-
-        Assert.NotNull(toolbar.FindControl<Button>("PasswordQuickFiltersButton"));
-        Assert.Contains("x:Name=\"PasswordQuickFiltersButton\"", toolbarXaml, StringComparison.Ordinal);
-        Assert.Contains("Text=\"{Binding L.PasswordFilters}\"", toolbarXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("PasswordCsv", libraryXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("DeletedPasswords", libraryXaml, StringComparison.Ordinal);
         Assert.Contains(
-            "AutomationProperties.Name=\"{Binding L.PasswordFilters}\"",
-            toolbarXaml,
+            "Command=\"{Binding ImportPasswordCsvCommand}\"",
+            XamlSource.Text("SyncImportView.axaml"),
             StringComparison.Ordinal);
-        Assert.Contains("<local:PasswordQuickFilterPanelView />", toolbarXaml, StringComparison.Ordinal);
-        Assert.Equal(8, CountOccurrences(filterPanelXaml, "Classes=\"passwordFilterOption\""));
-        Assert.DoesNotContain("Classes=\"passwordFilterChip\"", toolbarXaml, StringComparison.Ordinal);
-        Assert.Contains("Text=\"{Binding PasswordListStatusText}\"", listXaml, StringComparison.Ordinal);
+        Assert.NotEmpty(XamlSource.ContainsAnywhere("CommandParameter=\"RecycleBin\""));
+    }
+
+    [Fact]
+    public void Password_vault_styles_left_no_dead_selectors_behind()
+    {
+        // The list page's stylesheet was deleted with it, so every class it styled must be gone from
+        // the app and the shared shell classes must be the ones the library actually applies.
+        Assert.All(
+            new[]
+            {
+                "passwordFilterOption",
+                "passwordVaultList",
+                "passwordChromeToolbar",
+                "passwordListRegion",
+                "passwordDetailRegion",
+                "passwordFolderNavigationRegion"
+            },
+            deadClass => Assert.Empty(XamlSource.ContainsAnywhere(deadClass)));
+        Assert.DoesNotContain("#101010", XamlSource.Text("VaultShellStyles.axaml"), StringComparison.OrdinalIgnoreCase);
         Assert.Contains(
             "<Setter Property=\"Foreground\" Value=\"{DynamicResource TextOnAccentFillColorPrimaryBrush}\" />",
-            shellStylesXaml,
+            XamlSource.Text("VaultShellStyles.axaml"),
             StringComparison.Ordinal);
-        Assert.Contains("Classes=\"workspacePrimaryCommand\"", toolbarXaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("passwordPrimaryCommand", stylesXaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("#101010", stylesXaml, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Classes=\"workspacePrimaryCommand\"", XamlSource.TextFor<VaultWorkspaceView>(), StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Password_vault_redesign_wide_layout_exposes_folder_list_and_details()
+    public void Password_detail_promotes_copy_actions_and_groups_secondary_commands()
     {
-        var view = new PasswordVaultView();
+        var xaml = XamlSource.TextFor<PasswordDetailPaneView>();
 
-        view.UpdateResponsiveLayoutForWidth(1280);
-
-        var folderNavigation = view.FindControl<Border>("PasswordFolderNavigationRegion");
-        Assert.NotNull(folderNavigation);
-        Assert.True(folderNavigation.IsVisible);
-        Assert.True(view.FindControl<Border>("PasswordListRegion")!.IsVisible);
-        Assert.True(view.FindControl<Border>("PasswordDetailRegion")!.IsVisible);
-        Assert.Equal(0, view.FindControl<Border>("PasswordListRegion")!.Margin.Left);
-        Assert.Equal(0, view.FindControl<Border>("PasswordDetailRegion")!.Margin.Left);
-    }
-
-    [Fact]
-    public void Password_vault_redesign_medium_hides_folder_rail_and_narrow_drills_into_details()
-    {
-        var view = new PasswordVaultView();
-
-        view.UpdateResponsiveLayoutForWidth(900);
-        var layout = view.FindControl<Grid>("PasswordMasterDetailGrid");
-        var listRegion = view.FindControl<Border>("PasswordListRegion")!;
-        var detailRegion = view.FindControl<Border>("PasswordDetailRegion")!;
-        Assert.False(view.IsWideLayout);
-        Assert.False(view.FindControl<Border>("PasswordFolderNavigationRegion")!.IsVisible);
-        Assert.Equal(new GridLength(320), layout!.ColumnDefinitions[0].Width);
-        Assert.Equal(new GridLength(1, GridUnitType.Star), layout.ColumnDefinitions[1].Width);
-        Assert.Equal(0, Grid.GetColumn(listRegion));
-        Assert.Equal(1, Grid.GetColumn(detailRegion));
-        Assert.True(listRegion.IsVisible);
-        Assert.True(detailRegion.IsVisible);
-
-        view.UpdateResponsiveLayoutForWidth(680);
-        Assert.True(view.IsNarrowLayout);
-        Assert.False(view.FindControl<Border>("PasswordFolderNavigationRegion")!.IsVisible);
-        Assert.Equal(new GridLength(1, GridUnitType.Star), layout.ColumnDefinitions[0].Width);
-        Assert.True(listRegion.IsVisible);
-        Assert.False(detailRegion.IsVisible);
-    }
-
-    [Fact]
-    public void Password_vault_redesign_detail_promotes_copy_actions_and_groups_secondary_commands()
-    {
-        var details = new PasswordDetailPaneView();
-        var xaml = File.ReadAllText(FindPasswordFeatureFile("PasswordDetailPaneView.axaml"));
-
-        Assert.NotNull(details.FindControl<Button>("PasswordDetailMoreButton"));
         Assert.Contains("Text=\"{Binding L.CopyPassword}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding L.CopyUsername}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding L.CopyWebsite}\"", xaml, StringComparison.Ordinal);
@@ -134,53 +164,4 @@ public sealed class PasswordVaultCompositionUiTests
         Assert.Contains("Header=\"{Binding L.MoveToRecycleBin}\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("ToolTip.Tip=\"{Binding L.EditPassword}\"", xaml, StringComparison.Ordinal);
     }
-
-    [Fact]
-    public void Password_vault_redesign_toolbar_keeps_primary_add_and_secondary_data_commands()
-    {
-        var toolbar = new PasswordVaultToolbarView();
-        var xaml = File.ReadAllText(FindPasswordFeatureFile("PasswordVaultToolbarView.axaml"));
-
-        Assert.NotNull(toolbar.FindControl<Button>("PasswordQuickFiltersButton"));
-        Assert.Contains("Text=\"{Binding L.AddPassword}\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Header=\"{Binding L.ImportPasswordCsv}\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Header=\"{Binding L.ExportPasswordCsv}\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Header=\"{Binding L.DeletedPasswords}\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"PasswordVaultCommandSurface\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("<local:PasswordFolderNavigationView", File.ReadAllText(FindPasswordFeatureFile("PasswordVaultView.axaml")), StringComparison.Ordinal);
-        Assert.DoesNotContain("passwordFolderBar", File.ReadAllText(FindPasswordFeatureFile("PasswordFolderFilterView.axaml")), StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Password_vault_redesign_keeps_folder_navigation_available_at_every_width()
-    {
-        var view = new PasswordVaultView();
-        var folderNavigation = new PasswordFolderNavigationView();
-        var compactFilters = view.FindControl<PasswordFolderFilterView>("PasswordFolderFilters");
-
-        var folderTree = folderNavigation.FindControl<VaultFolderTree>("PasswordFolderTree");
-        Assert.NotNull(folderTree);
-        Assert.NotNull(folderTree.FindControl<ListBox>("FolderTreeList"));
-        Assert.Contains(
-            "MoveFolderCommand=\"{Binding MovePasswordFolderCommand}\"",
-            File.ReadAllText(FindPasswordFeatureFile("PasswordFolderNavigationView.axaml")),
-            StringComparison.Ordinal);
-        Assert.NotNull(compactFilters);
-        Assert.NotNull(compactFilters.FindControl<ComboBox>("CompactPasswordFolderPicker"));
-
-        view.UpdateResponsiveLayoutForWidth(1280);
-        Assert.False(compactFilters.ShowCompactFolderPicker);
-
-        view.UpdateResponsiveLayoutForWidth(900);
-        Assert.True(compactFilters.ShowCompactFolderPicker);
-    }
-
-    private static int CountOccurrences(string value, string fragment) =>
-        XamlSource.CountOccurrences(value, fragment);
-
-    private static string FindPasswordFeatureFile(string fileName) =>
-        XamlSource.PathOf(fileName);
-
-    private static string FindAppFile(params string[] parts) =>
-        XamlSource.PathOf(Path.GetFileName(parts[^1]));
 }

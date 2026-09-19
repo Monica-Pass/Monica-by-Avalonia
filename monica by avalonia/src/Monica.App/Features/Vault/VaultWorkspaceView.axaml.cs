@@ -20,6 +20,17 @@ public partial class VaultWorkspaceView : UserControl
         DataContextChanged += OnDataContextChanged;
         AttachedToVisualTree += OnAttachedToVisualTree;
         DetachedFromVisualTree += OnDetachedFromVisualTree;
+        VaultSurfaceHost.SizeChanged += (_, e) => ReportNoteViewportWidth(e.NewSize.Width);
+    }
+
+    // The note editor arranges its rail, tabs and inspector from the width it is given, and in the
+    // library that is the detail pane rather than the whole page.
+    private void ReportNoteViewportWidth(double width)
+    {
+        if (_viewModel is { } viewModel && viewModel.SelectedVaultSurface == VaultSurface.Note)
+        {
+            viewModel.NoteWorkspaceViewportWidth = width;
+        }
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e) => AttachViewModel(DataContext as MainWindowViewModel);
@@ -99,6 +110,10 @@ public partial class VaultWorkspaceView : UserControl
 
         view.DataContext = _viewModel;
         VaultSurfaceHost.Content = view;
+        if (surface == VaultSurface.Note)
+        {
+            ReportNoteViewportWidth(VaultSurfaceHost.Bounds.Width);
+        }
     }
 
     private Control CreateSurface(VaultSurface surface) => surface switch

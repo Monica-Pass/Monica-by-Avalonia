@@ -51,7 +51,7 @@ public sealed partial class MainWindowViewModel
         }
 
         RaiseNoteEditorLayoutState();
-        OnPropertyChanged(nameof(NoteViewModeIndex));
+        RaiseNoteViewModeState();
         CaptureSelectedNoteTabViewState();
     }
 
@@ -63,7 +63,7 @@ public sealed partial class MainWindowViewModel
         }
 
         RaiseNoteEditorLayoutState();
-        OnPropertyChanged(nameof(NoteViewModeIndex));
+        RaiseNoteViewModeState();
         CaptureSelectedNoteTabViewState();
     }
 
@@ -74,8 +74,6 @@ public sealed partial class MainWindowViewModel
     partial void OnNoteNavigationModeChanged(string value) => RaiseNoteTreeState();
 
     partial void OnSelectedNoteFolderKeyChanged(string value) => RaiseNoteTreeState();
-
-    partial void OnNoteNarrowShowsTreeChanged(bool value) => RaiseNoteWorkspaceLayoutState();
 
     partial void OnSelectedNoteChanged(SecureItem? value)
     {
@@ -102,11 +100,6 @@ public sealed partial class MainWindowViewModel
         }
 
         LoadNoteTab(newValue);
-        if (IsNoteWorkspaceNarrow)
-        {
-            NoteNarrowShowsTree = newValue is null;
-        }
-
         RefreshNoteTabState();
     }
 }

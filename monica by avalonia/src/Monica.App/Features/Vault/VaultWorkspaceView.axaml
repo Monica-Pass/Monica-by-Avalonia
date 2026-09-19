@@ -9,7 +9,6 @@
     <UserControl.Styles>
         <!-- The right-hand slot hosts the other pages' editors, and each of those resolves its
              own class names through the feature stylesheet it is normally nested in. -->
-        <StyleInclude Source="/Features/Passwords/PasswordVaultStyles.axaml" />
         <StyleInclude Source="/Features/Notes/NoteStyles.axaml" />
         <StyleInclude Source="/Features/Authenticator/AuthenticatorStyles.axaml" />
         <StyleInclude Source="/Features/Wallet/WalletStyles.axaml" />
@@ -90,6 +89,13 @@
                                         </MenuItem>
                                     </MenuItem.Items>
                                 </MenuItem>
+                                <!-- The authenticator page's header owned the scan-a-picture-of-a-code
+                                     way in; the preset that replaced it hands it to the one menu it kept. -->
+                                <MenuItem Header="{Binding TotpScanQrText}"
+                                          IsVisible="{Binding IsVaultTotpPreset}"
+                                          Command="{Binding ScanTotpQrCommand}">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="QrCode" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
                             </MenuFlyout>
                         </Button.Flyout>
                     </Button>
@@ -111,6 +117,11 @@
                                           Command="{Binding FavoriteVaultBatchCommand}">
                                     <MenuItem.Icon><ic:FluentIcon Icon="Star" FontSize="14" /></MenuItem.Icon>
                                 </MenuItem>
+                                <MenuItem Header="{Binding L.StackSelectedPasswords}"
+                                          IsVisible="{Binding VaultBatchSupportsStack}"
+                                          Command="{Binding StackVaultBatchCommand}">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="Library" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
                                 <MenuItem Header="{Binding L.BatchArchive}"
                                           IsVisible="{Binding VaultBatchSupportsArchive}"
                                           Command="{Binding ArchiveVaultBatchCommand}">
@@ -130,14 +141,24 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+                    <!-- The four vault pages each carried this pair; the library is the one search
+                         field left, so it inherits the keyboard hint and the spoken result count. -->
+                    <TextBlock x:Name="VaultFilteredStatusText"
+                               Classes="workspaceMeta"
+                               IsVisible="{Binding HasVaultSearchText}"
+                               VerticalAlignment="Center"
+                               Text="{Binding VaultFilteredStatusText}"
+                               AutomationProperties.LiveSetting="Polite" />
                     <TextBox x:Name="VaultSearchBox"
                              Text="{Binding VaultSearchText, Mode=TwoWay}"
                              PlaceholderText="{Binding L.Search}"
                              Width="200"
                              MinHeight="{DynamicResource ControlHeight}"
                              VerticalContentAlignment="Center"
-                             AutomationProperties.Name="{Binding L.Search}" />
-                    <Button Classes="workspaceCommand"
+                             AutomationProperties.Name="{Binding L.Search}"
+                             AutomationProperties.HelpText="{Binding VaultSearchHelpText}" />
+                    <Button x:Name="VaultSearchClearButton"
+                            Classes="workspaceCommand"
                             IsVisible="{Binding HasVaultSearchText}"
                             Command="{Binding ClearVaultSearchCommand}"
                             ToolTip.Tip="{Binding L.ClearSearch}"
@@ -208,7 +229,8 @@
                                               CopyRowUsernameCommand="{Binding CopyRowUsernameCommand}"
                                               CopyRowSecretCommand="{Binding CopyRowSecretCommand}"
                                               CopyRowCodeCommand="{Binding CopyRowCodeCommand}" />
-                    <TextBlock Classes="workspaceMeta"
+                    <TextBlock x:Name="VaultEmptyState"
+                               Classes="workspaceMeta"
                                IsVisible="{Binding !HasVaultRows}"
                                Text="{Binding VaultEmptyStateText}"
                                TextWrapping="Wrap"

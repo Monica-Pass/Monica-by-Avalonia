@@ -6,6 +6,7 @@ using Monica.App.Controls;
 using Monica.App.Features;
 using Monica.App.Features.Authenticator;
 using Monica.App.Features.Passwords;
+using Monica.App.Features.Notes;
 using Monica.App.Features.Unlock;
 using Monica.App.Features.Vault;
 using Monica.App.Features.Wallet;
@@ -49,35 +50,35 @@ public sealed class ColdStartupPerformanceTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void Cold_password_vault_constructor_reports_first_use_cost()
+    public void Cold_library_constructor_reports_first_use_cost()
     {
         AvaloniaUiThreadTestContext.VerifyAccess();
 
         var phase = Stopwatch.StartNew();
-        var vault = new PasswordVaultView();
+        var library = new VaultWorkspaceView();
         phase.Stop();
 
-        output.WriteLine($"passwordVaultView={phase.Elapsed.TotalMilliseconds:F3} ms");
-        Assert.NotNull(vault);
+        output.WriteLine($"vaultWorkspaceView={phase.Elapsed.TotalMilliseconds:F3} ms");
+        Assert.NotNull(library);
         Assert.True(
             phase.ElapsedMilliseconds < 700,
-            $"Cold Password Vault view construction took {phase.Elapsed.TotalMilliseconds:F3} ms.");
+            $"Cold library view construction took {phase.Elapsed.TotalMilliseconds:F3} ms.");
     }
 
     [Fact]
-    public void Cold_password_list_constructor_reports_first_use_cost()
+    public void Cold_note_editor_constructor_reports_first_use_cost()
     {
         AvaloniaUiThreadTestContext.VerifyAccess();
 
         var phase = Stopwatch.StartNew();
-        var list = new PasswordListPaneView();
+        var editor = new NoteEditorView();
         phase.Stop();
 
-        output.WriteLine($"passwordListPaneView={phase.Elapsed.TotalMilliseconds:F3} ms");
-        Assert.NotNull(list);
+        output.WriteLine($"noteEditorView={phase.Elapsed.TotalMilliseconds:F3} ms");
+        Assert.NotNull(editor);
         Assert.True(
             phase.ElapsedMilliseconds < 700,
-            $"Cold Password list view construction took {phase.Elapsed.TotalMilliseconds:F3} ms.");
+            $"Cold note editor construction took {phase.Elapsed.TotalMilliseconds:F3} ms.");
     }
 
     [Fact]
@@ -97,35 +98,35 @@ public sealed class ColdStartupPerformanceTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void Cold_password_toolbar_constructor_reports_first_use_cost()
+    public void Cold_authenticator_console_constructor_reports_first_use_cost()
     {
         AvaloniaUiThreadTestContext.VerifyAccess();
 
         var phase = Stopwatch.StartNew();
-        var toolbar = new PasswordVaultToolbarView();
+        var console = new AuthenticatorCodeConsoleView();
         phase.Stop();
 
-        output.WriteLine($"passwordToolbarView={phase.Elapsed.TotalMilliseconds:F3} ms");
-        Assert.NotNull(toolbar);
+        output.WriteLine($"authenticatorCodeConsoleView={phase.Elapsed.TotalMilliseconds:F3} ms");
+        Assert.NotNull(console);
         Assert.True(
             phase.ElapsedMilliseconds < 700,
-            $"Cold Password toolbar view construction took {phase.Elapsed.TotalMilliseconds:F3} ms.");
+            $"Cold authenticator console construction took {phase.Elapsed.TotalMilliseconds:F3} ms.");
     }
 
     [Fact]
-    public void Cold_password_folder_filter_constructor_reports_first_use_cost()
+    public void Cold_wallet_workbench_constructor_reports_first_use_cost()
     {
         AvaloniaUiThreadTestContext.VerifyAccess();
 
         var phase = Stopwatch.StartNew();
-        var filters = new PasswordFolderFilterView();
+        var workbench = new WalletWorkbenchView();
         phase.Stop();
 
-        output.WriteLine($"passwordFolderFilterView={phase.Elapsed.TotalMilliseconds:F3} ms");
-        Assert.NotNull(filters);
+        output.WriteLine($"walletWorkbenchView={phase.Elapsed.TotalMilliseconds:F3} ms");
+        Assert.NotNull(workbench);
         Assert.True(
             phase.ElapsedMilliseconds < 700,
-            $"Cold Password folder filter view construction took {phase.Elapsed.TotalMilliseconds:F3} ms.");
+            $"Cold wallet workbench construction took {phase.Elapsed.TotalMilliseconds:F3} ms.");
     }
 
     [Fact]
@@ -339,16 +340,19 @@ public sealed class ColdStartupPerformanceTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void Secondary_editor_workspace_idle_warmup_removes_first_command_path_cost()
+    public void Library_attach_warms_the_editors_and_removes_first_command_path_cost()
     {
         AvaloniaUiThreadTestContext.VerifyAccess();
 
-        var authenticatorWorkspace = new AuthenticatorWorkspaceView();
-        var walletWorkspace = new WalletWorkspaceView();
-        Dispatcher.UIThread.RunJobs();
+        using var library = LibraryUiHarness.Open();
+        library.Settle();
 
+        // The whole-library preset can open any of the three dialogs, so arriving on the page has to
+        // pay for all of them before the first tap.
+        Assert.True(VaultEditorDialogWarmup.IsPasswordWarmed);
         Assert.True(VaultEditorDialogWarmup.IsTotpWarmed);
         Assert.True(VaultEditorDialogWarmup.IsWalletWarmed);
+
         var phase = Stopwatch.StartNew();
         var totpEditor = VaultEditorDialogWarmup.TakeTotpEditorView();
         var totpCommandPathMilliseconds = phase.Elapsed.TotalMilliseconds;
@@ -360,15 +364,13 @@ public sealed class ColdStartupPerformanceTests(ITestOutputHelper output)
         output.WriteLine(
             $"totpCommandPath={totpCommandPathMilliseconds:F3} ms, " +
             $"walletCommandPath={walletCommandPathMilliseconds:F3} ms");
-        Assert.NotNull(authenticatorWorkspace);
-        Assert.NotNull(walletWorkspace);
         Assert.NotNull(totpEditor);
         Assert.NotNull(walletEditor);
         Assert.True(
             totpCommandPathMilliseconds < 50,
-            $"TOTP editor construction after workspace idle warmup took {totpCommandPathMilliseconds:F3} ms.");
+            $"TOTP editor construction after library idle warmup took {totpCommandPathMilliseconds:F3} ms.");
         Assert.True(
             walletCommandPathMilliseconds < 50,
-            $"Wallet editor construction after workspace idle warmup took {walletCommandPathMilliseconds:F3} ms.");
+            $"Wallet editor construction after library idle warmup took {walletCommandPathMilliseconds:F3} ms.");
     }
 }

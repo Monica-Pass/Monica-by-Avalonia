@@ -41,9 +41,28 @@ public sealed partial class MainWindowViewModel
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasVaultSearchText))]
+    [NotifyPropertyChangedFor(nameof(VaultFilteredStatusText))]
     private string _vaultSearchText = "";
 
     public bool HasVaultSearchText => !string.IsNullOrWhiteSpace(VaultSearchText);
+
+    public string VaultSearchHelpText => _localization.Get("VaultSearchHelp");
+
+    // A screen reader needs the same "what did my search leave behind" announcement the four vault
+    // pages made, counted over the filter rather than the tree: collapsing a folder hides rows on
+    // screen without narrowing what the search matched.
+    public string VaultFilteredStatusText => HasVaultSearchText
+        ? _localization.Format("VaultFilteredStatusFormat", VaultMatchedEntryCount(), VaultTotalEntryCount())
+        : "";
+
+    private int VaultMatchedEntryCount()
+    {
+        var filter = CurrentVaultFilter();
+        return Passwords.Count(entry => filter.MatchesPassword(entry)) +
+               VaultSecureItems().Count(item => filter.MatchesSecureItem(item));
+    }
+
+    private int VaultTotalEntryCount() => Passwords.Count + NoteItems.Count + TotpItems.Count + WalletItems.Count;
 
     // A type filter already says what the user means, so its header button creates that type in one
     // click; with everything in view the page asks instead of silently picking a kind.
@@ -91,6 +110,8 @@ public sealed partial class MainWindowViewModel
     // Website and username only exist on a credential, so the quick filters and those two sort keys
     // are offered by the password preset alone.
     public bool IsVaultPasswordsPreset => VaultGroup == VaultEntryGroup.Passwords;
+
+    public bool IsVaultTotpPreset => VaultGroup == VaultEntryGroup.Totp;
 
     public bool HasVaultQuickFilters => CurrentVaultQuickFilters().IsOn;
 
@@ -269,6 +290,7 @@ public sealed partial class MainWindowViewModel
         RestoreVaultSelection(selectedKey);
         OnPropertyChanged(nameof(HasVaultRows));
         OnPropertyChanged(nameof(VaultEmptyStateText));
+        OnPropertyChanged(nameof(VaultFilteredStatusText));
     }
 
     private SecureItem[] VaultSecureItems()

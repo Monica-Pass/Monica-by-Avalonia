@@ -1,4 +1,5 @@
 using System.Windows.Input;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Threading;
@@ -148,6 +149,28 @@ public sealed class VaultWorkspaceUiTests
         }
     }
 
+    // Ctrl+F is one of the keys the four deleted pages answered, and this is the only search field
+    // left in the app, so the shortcut and the name a screen reader reads have to stay wired.
+    [Fact]
+    public void Library_ctrl_f_hands_the_caret_to_the_search_field()
+    {
+        using var library = LibraryUiHarness.Open();
+        var searchBox = library.Workspace.FindControl<TextBox>("VaultSearchBox")!;
+        var headerButton = library.Workspace.FindControl<Button>("VaultCreateMenuButton")!;
+
+        headerButton.Focus();
+        library.Settle();
+        Assert.False(searchBox.IsFocused);
+
+        Assert.True(
+            TryLibraryKey(library.Workspace, library.ViewModel, headerButton, Key.F, KeyModifiers.Control));
+        library.Settle();
+
+        Assert.True(searchBox.IsFocused);
+        Assert.Equal(library.ViewModel.VaultSearchHelpText, AutomationProperties.GetHelpText(searchBox));
+        Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetName(searchBox)));
+    }
+
     [Fact]
     public void Control_a_checks_every_batchable_row_the_library_shows()
     {
@@ -231,6 +254,48 @@ public sealed class VaultWorkspaceUiTests
             viewModel.ClearVaultBatchSelectionCommand.Execute(null);
             Dispatcher.UIThread.RunJobs();
             Assert.All(boxes, box => Assert.False(box.IsChecked));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    // The note editor used to measure the whole page it owned. Hosted in the library it only has the
+    // detail pane, so the width it arranges its rail and inspector from has to be that pane's.
+    [Fact]
+    public void The_note_surface_reports_the_width_it_is_given()
+    {
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        window.Width = 1280;
+        window.Height = 800;
+        window.Show();
+        try
+        {
+            window.DataContext = viewModel;
+            viewModel.IsUnlocked = true;
+            viewModel.NoteItems.Add(new Monica.Core.Models.SecureItem
+            {
+                Id = 41,
+                ItemType = Monica.Core.Models.VaultItemType.Note,
+                Title = "Recipe"
+            });
+            viewModel.SelectSectionCommand.Execute("Vault");
+            Dispatcher.UIThread.RunJobs();
+
+            var workspace = Assert.Single(window.GetVisualDescendants().OfType<VaultWorkspaceView>());
+            var host = workspace.FindControl<ContentControl>("VaultSurfaceHost")!;
+            var noteRow = Assert.Single(viewModel.VaultTreeRows.OfType<VaultTreeEntryRow>());
+
+            viewModel.SelectedVaultRow = noteRow;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(VaultSurface.Note, viewModel.SelectedVaultSurface);
+            Assert.IsType<Monica.App.Features.Notes.NoteEditorView>(host.Content);
+            Assert.Equal(host.Bounds.Width, viewModel.NoteWorkspaceViewportWidth);
+            Assert.InRange(viewModel.NoteWorkspaceViewportWidth, 1, window.Bounds.Width - 1);
         }
         finally
         {

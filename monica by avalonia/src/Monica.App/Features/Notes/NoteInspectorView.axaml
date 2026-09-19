@@ -7,8 +7,7 @@
              x:Class="Monica.App.Features.Notes.NoteInspectorView"
              x:Name="Root"
              x:DataType="vm:MainWindowViewModel">
-    <Border IsVisible="{Binding IsNoteInspectorPaneVisible}"
-            BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
+    <Border BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
             BorderThickness="1,0,0,0"
             Background="{DynamicResource LayerFillColorDefaultBrush}">
         <ScrollViewer x:Name="NoteInspectorScrollViewer"

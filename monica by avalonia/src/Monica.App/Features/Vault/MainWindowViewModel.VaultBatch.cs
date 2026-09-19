@@ -28,6 +28,9 @@ public sealed partial class MainWindowViewModel
 
     public bool VaultBatchSupportsArchive => VaultBatchPasswordCount > 0;
 
+    // Stacking only means anything across a set of copies, so one checked password gets no offer.
+    public bool VaultBatchSupportsStack => VaultBatchPasswordCount > 1;
+
     internal void RaiseVaultBatchState()
     {
         OnPropertyChanged(nameof(VaultBatchCount));
@@ -35,6 +38,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(VaultBatchLabel));
         OnPropertyChanged(nameof(VaultBatchSupportsFavorite));
         OnPropertyChanged(nameof(VaultBatchSupportsArchive));
+        OnPropertyChanged(nameof(VaultBatchSupportsStack));
     }
 
     [RelayCommand]
@@ -72,6 +76,17 @@ public sealed partial class MainWindowViewModel
         if (VaultBatchTotpCount > 0)
         {
             await FavoriteSelectedTotpCommand.ExecuteAsync(null);
+        }
+
+        RaiseVaultBatchState();
+    }
+
+    [RelayCommand]
+    private async Task StackVaultBatchAsync()
+    {
+        if (VaultBatchSupportsStack)
+        {
+            await StackSelectedPasswordsCommand.ExecuteAsync(null);
         }
 
         RaiseVaultBatchState();

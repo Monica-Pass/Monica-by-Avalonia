@@ -1,8 +1,9 @@
-using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.VisualTree;
+using FluentAvalonia.UI.Controls;
+using Monica.App.Features.Vault;
 using Monica.App.Features.Wallet;
 using Monica.App.Services;
-using Monica.App.ViewModels;
 
 namespace Monica.UiTests;
 
@@ -14,111 +15,74 @@ public sealed class WalletWorkflowUiTests
         AvaloniaUiThreadTestContext.VerifyAccess();
     }
 
+    // The card page owned a list, an inspector and a workbench. The library keeps the workbench and
+    // takes the rest away, so the workbench has to answer for the identity card on its own.
     [Fact]
-    public void Wallet_workspace_exposes_search_selection_and_empty_state_actions()
+    public void Wallet_workbench_carries_the_identity_surface_and_its_own_single_scroll()
     {
-        var view = new WalletWorkspaceView();
+        var xaml = File.ReadAllText(XamlSource.PathOf("WalletWorkbenchView.axaml"));
 
-        Assert.NotNull(view.FindControl<TextBox>("WalletSearchBox"));
-        Assert.NotNull(view.FindControl<Button>("WalletSearchClearButton"));
-        var itemListView = Assert.IsType<WalletItemListView>(
-            view.FindControl<WalletItemListView>("WalletItemListView"));
-        Assert.NotNull(itemListView.ItemList);
-        Assert.NotNull(view.FindControl<StackPanel>("WalletEmptyState"));
-        Assert.NotNull(view.FindControl<Button>("EmptyWalletAddButton"));
-        Assert.NotNull(view.FindControl<Button>("EmptyWalletClearSearchButton"));
-        Assert.NotNull(view.FindControl<FluentAvalonia.UI.Controls.FACommandBar>("WalletCommandBar"));
+        Assert.Contains("Classes=\"walletIdentitySurface\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding SelectedWalletDetails.KindText}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding SelectedWalletDetails.PrimaryText}\"", xaml, StringComparison.Ordinal);
+        Assert.Equal(1, CountOccurrences(xaml, "<ScrollViewer"));
+        Assert.DoesNotContain("BackToWalletListButton", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Wallet_search_controls_describe_exact_actions_and_announce_results()
+    public void Wallet_workbench_is_the_only_card_surface_the_library_opens()
     {
-        var view = new WalletWorkspaceView();
-        var xaml = File.ReadAllText(FindWalletFeatureFile("WalletWorkspaceView.axaml"));
+        using var library = LibraryUiHarness.Open("Cards");
+        library.ViewModel.WalletItems.Add(new Monica.Core.Models.SecureItem
+        {
+            Id = 81,
+            ItemType = Monica.Core.Models.VaultItemType.BankCard,
+            Title = "Travel card"
+        });
+        library.Settle();
 
-        Assert.NotNull(view.FindControl<Button>("WalletSearchClearButton"));
-        Assert.Contains(
-            "AutomationProperties.Name=\"{Binding ClearWalletSearchText}\"",
-            xaml,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "AutomationProperties.HelpText=\"{Binding WalletSearchHelpText}\"",
-            xaml,
-            StringComparison.Ordinal);
-        var status = view.FindControl<TextBlock>("WalletFilteredStatusText");
-        Assert.NotNull(status);
-        Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting(status));
+        library.SelectFirstEntry();
+
+        Assert.Equal(VaultSurface.Card, library.ViewModel.SelectedVaultSurface);
+        Assert.IsType<WalletWorkbenchView>(library.SurfaceHost.Content);
+        Assert.Equal(1, library.Window.GetVisualDescendants().OfType<WalletWorkbenchView>().Count());
+        Assert.NotNull(library.ViewModel.SelectedWalletItem);
+        Assert.NotNull(library.ViewModel.SelectedWalletDetails);
     }
 
     [Fact]
-    public void Wallet_command_ownership_and_component_boundaries_follow_desktop_logic()
+    public void Wallet_add_and_delete_are_owned_by_the_library_not_by_the_workbench()
     {
-        var view = new WalletWorkspaceView();
-        var xaml = File.ReadAllText(FindWalletFeatureFile("WalletWorkspaceView.axaml"));
-        var listXaml = File.ReadAllText(FindWalletFeatureFile("WalletItemListView.axaml"));
+        using var library = LibraryUiHarness.Open();
+        var create = library.Workspace.FindControl<Button>("VaultCreateMenuButton")!;
+        var flyout = Assert.IsType<MenuFlyout>(create.Flyout);
+        flyout.ShowAt(create);
+        library.Settle();
 
-        Assert.Equal(2, CountOccurrences(xaml, "Command=\"{Binding AddWalletItemCommand}\""));
-        Assert.DoesNotContain("WalletMoreActionsButton", xaml, StringComparison.Ordinal);
-        Assert.Contains("<views:WalletItemListView x:Name=\"WalletItemListView\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Classes=\"walletCollectionRail\"", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("Classes=\"workspaceSidebar\"", xaml, StringComparison.Ordinal);
-        Assert.Contains(
-            "Classes=\"walletIdentitySurface\"",
-            File.ReadAllText(FindWalletFeatureFile("WalletWorkbenchView.axaml")),
-            StringComparison.Ordinal);
-        Assert.DoesNotContain("<ScrollViewer", listXaml, StringComparison.Ordinal);
-        Assert.Contains("ScrollViewer.VerticalScrollBarVisibility=\"Auto\"", listXaml, StringComparison.Ordinal);
-        Assert.NotNull(view.FindControl<WalletItemListView>("WalletItemListView"));
-        Assert.NotNull(view.FindControl<Button>("DeleteSelectedWalletItemsButton"));
-        Assert.NotNull(view.FindControl<Button>("ClearWalletSelectionButton"));
-        Assert.Equal(2, CountOccurrences(xaml, "Width=\"40\" Height=\"40\""));
+        var addItem = Assert.Single(
+            LibraryUiHarness.MenuItems(flyout),
+            item => Equals(item.Command, library.ViewModel.AddWalletItemCommand));
+        Assert.NotNull(addItem.Command);
+        flyout.Hide();
+
+        var workbenchXaml = File.ReadAllText(XamlSource.PathOf("WalletWorkbenchView.axaml"));
+        Assert.DoesNotContain("DeleteWalletItemCommand", workbenchXaml, StringComparison.Ordinal);
+        Assert.NotNull(library.Tree.DeleteEntryCommand);
+        Assert.Same(library.ViewModel.DeleteSelectedVaultEntryCommand, library.Tree.DeleteEntryCommand);
     }
 
     [Fact]
-    public void Wallet_search_actions_are_localized_for_english_and_chinese()
+    public void Wallet_search_and_result_announcements_are_localized_for_english_and_chinese()
     {
         var localization = new LocalizationService();
 
-        Assert.Equal("Clear wallet search", localization.Get("ClearWalletSearch"));
-        Assert.Contains("Ctrl+F", localization.Get("WalletSearchHelp"), StringComparison.Ordinal);
+        Assert.Contains("Ctrl+F", localization.Get("VaultSearchHelp"), StringComparison.Ordinal);
+        Assert.Equal("{0} visible · {1} total", localization.Get("VaultFilteredStatusFormat"));
 
         localization.SetLanguage("zh-CN");
 
-        Assert.Equal("清除卡包搜索", localization.Get("ClearWalletSearch"));
-        Assert.Contains("Ctrl+F", localization.Get("WalletSearchHelp"), StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Wallet_workspace_exposes_wide_medium_and_narrow_regions()
-    {
-        var view = new WalletWorkspaceView();
-
-        Assert.NotNull(view.FindControl<Grid>("WalletMasterDetailGrid"));
-        Assert.NotNull(view.FindControl<Border>("WalletListRegion"));
-        Assert.NotNull(view.FindControl<Border>("WalletWorkbenchRegion"));
-        Assert.NotNull(view.FindControl<Border>("WalletInspectorRegion"));
-        var workbench = Assert.IsType<WalletWorkbenchView>(
-            view.FindControl<WalletWorkbenchView>("WalletWorkbench"));
-        Assert.NotNull(workbench.FindControl<Button>("BackToWalletListButton"));
-
-        view.UpdateResponsiveLayoutForWidth(680);
-        Assert.True(view.IsNarrowLayout);
-        Assert.True(view.FindControl<Border>("WalletListRegion")!.IsVisible);
-        Assert.False(view.FindControl<Border>("WalletWorkbenchRegion")!.IsVisible);
-        Assert.False(view.FindControl<Border>("WalletInspectorRegion")!.IsVisible);
-
-        view.UpdateResponsiveLayoutForWidth(900);
-        Assert.True(view.IsMediumLayout);
-        Assert.True(view.FindControl<Border>("WalletListRegion")!.IsVisible);
-        Assert.True(view.FindControl<Border>("WalletWorkbenchRegion")!.IsVisible);
-        Assert.False(view.FindControl<Border>("WalletInspectorRegion")!.IsVisible);
-
-        view.UpdateResponsiveLayoutForWidth(1200);
-        Assert.False(view.IsNarrowLayout);
-        Assert.False(view.IsMediumLayout);
-        Assert.True(view.FindControl<Border>("WalletListRegion")!.IsVisible);
-        Assert.True(view.FindControl<Border>("WalletWorkbenchRegion")!.IsVisible);
-        Assert.True(view.FindControl<Border>("WalletInspectorRegion")!.IsVisible);
+        Assert.Contains("Ctrl+F", localization.Get("VaultSearchHelp"), StringComparison.Ordinal);
+        Assert.Equal("显示 {0} 条 · 共 {1} 条", localization.Get("VaultFilteredStatusFormat"));
     }
 
     [Fact]
@@ -141,19 +105,13 @@ public sealed class WalletWorkflowUiTests
     public void Wallet_editor_exposes_android_extended_types_as_desktop_panels()
     {
         var editor = new WalletItemEditorDialog();
-        var xaml = File.ReadAllText(FindWalletFeatureFile("WalletItemEditorDialog.axaml"));
-        var listXaml = File.ReadAllText(FindWalletFeatureFile("WalletItemListView.axaml"));
+        var xaml = File.ReadAllText(XamlSource.PathOf("WalletItemEditorDialog.axaml"));
 
         Assert.NotNull(editor.FindControl<StackPanel>("BillingAddressEditorPanel"));
         Assert.NotNull(editor.FindControl<StackPanel>("PaymentAccountEditorPanel"));
         Assert.Contains("IsVisible=\"{Binding IsBillingAddress}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding IsPaymentAccount}\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("StringConverters.IsBillingAddress", listXaml, StringComparison.Ordinal);
-        Assert.Contains("StringConverters.IsPaymentAccount", listXaml, StringComparison.Ordinal);
     }
-
-    private static string FindWalletFeatureFile(string fileName) =>
-        XamlSource.PathOf(fileName);
 
     private static int CountOccurrences(string text, string value) =>
         XamlSource.CountOccurrences(text, value);

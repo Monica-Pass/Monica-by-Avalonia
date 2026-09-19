@@ -21,6 +21,13 @@
                          Background="Transparent"
                          HorizontalAlignment="Stretch">
             <fa:FACommandBar.PrimaryCommands>
+                <fa:FACommandBarButton x:Name="SaveNoteButton"
+                                       Command="{Binding SaveNoteCommand}"
+                                       IsEnabled="{Binding HasOpenNoteTabs}"
+                                       IconSource="{controls:FluentSymbol Save}"
+                                       Label="{Binding L[SaveNote]}"
+                                       ToolTip.Tip="{Binding L[SaveNote]}"
+                                       AutomationProperties.Name="{Binding L[SaveNote]}" />
                 <fa:FACommandBarButton Tag="undo"
                                        Click="ToolbarButton_OnClick"
                                        IconSource="{controls:FluentSymbol ArrowUndo}"
@@ -110,6 +117,36 @@
                         </Grid>
                     </Button>
                 </fa:FACommandBarElementContainer>
+
+                <!-- Read mode used to belong to the note page header; with the page gone the
+                     toolbar is the only place left that knows how a note is being shown. -->
+                <fa:FACommandBarElementContainer>
+                    <Button x:Name="NoteViewModeMenuButton"
+                            ToolTip.Tip="{Binding L[NoteViewModes]}"
+                            AutomationProperties.Name="{Binding L[NoteViewModes]}"
+                            Width="40"
+                            Height="40"
+                            Padding="0">
+                        <ic:FluentIcon Icon="BookOpen"
+                                       FontSize="16"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        <Button.Flyout>
+                            <MenuFlyout>
+                                <MenuItem Header="{Binding L[NoteEditMode]}" ToggleType="Radio"
+                                          IsChecked="{Binding IsNoteEditModeSelected}"
+                                          Command="{Binding SetNoteViewModeCommand}" CommandParameter="edit" />
+                                <MenuItem Header="{Binding L[NotePreviewMode]}" ToggleType="Radio"
+                                          IsChecked="{Binding IsNotePreviewModeSelected}"
+                                          Command="{Binding SetNoteViewModeCommand}" CommandParameter="preview" />
+                                <MenuItem Header="{Binding L[NoteSplitMode]}" ToggleType="Radio"
+                                          IsChecked="{Binding IsNoteSplitModeSelected}"
+                                          Command="{Binding SetNoteViewModeCommand}" CommandParameter="split" />
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
+                </fa:FACommandBarElementContainer>
+
                 <fa:FACommandBarElementContainer IsVisible="{Binding !IsNoteInspectorPaneVisible}">
                     <Button x:Name="CompactNotePropertiesButton"
                             IsVisible="{Binding !IsNoteInspectorPaneVisible}"
@@ -124,8 +161,8 @@
                                        VerticalAlignment="Center" />
                         <Button.Flyout>
                             <Flyout Placement="BottomEdgeAlignedRight">
-                                <Border Width="320" Padding="16">
-                                    <notes:NotePropertiesPanelView DataContext="{Binding #Root.DataContext}" />
+                                <Border Width="320" MaxHeight="460">
+                                    <notes:NoteInspectorView DataContext="{Binding #Root.DataContext}" />
                                 </Border>
                             </Flyout>
                         </Button.Flyout>
@@ -134,6 +171,9 @@
             </fa:FACommandBar.PrimaryCommands>
 
             <fa:FACommandBar.SecondaryCommands>
+                <fa:FACommandBarButton Command="{Binding SaveAllNoteTabsCommand}" IconSource="{controls:FluentSymbol SaveMultiple}" Label="{Binding L[SaveAllNotes]}" AutomationProperties.Name="{Binding L[SaveAllNotes]}" />
+                <fa:FACommandBarButton Command="{Binding ImportMarkdownNoteCommand}" IsEnabled="{Binding CanUseFilePicker}" IconSource="{controls:FluentSymbol ArrowImport}" Label="{Binding L[ImportMarkdown]}" AutomationProperties.Name="{Binding L[ImportMarkdown]}" />
+                <fa:FACommandBarButton Command="{Binding ExportCurrentNoteMarkdownCommand}" IsEnabled="{Binding HasOpenNoteTabs}" IconSource="{controls:FluentSymbol ArrowExport}" Label="{Binding L[ExportMarkdown]}" AutomationProperties.Name="{Binding L[ExportMarkdown]}" />
                 <fa:FACommandBarButton Tag="replace" Click="ToolbarButton_OnClick" IconSource="{controls:FluentSymbol Search}" Label="{Binding L[NoteToolbarFindReplace]}" AutomationProperties.Name="{Binding L[NoteToolbarFindReplace]}" />
                 <fa:FACommandBarButton Tag="strike" Click="ToolbarButton_OnClick" IconSource="{controls:FluentSymbol TextStrikethrough}" Label="{Binding L[NoteToolbarStrikethrough]}" AutomationProperties.Name="{Binding L[NoteToolbarStrikethrough]}" />
                 <fa:FACommandBarButton Tag="inlinecode" Click="ToolbarButton_OnClick" IconSource="{controls:FluentSymbol Code}" Label="{Binding L[NoteToolbarInlineCode]}" AutomationProperties.Name="{Binding L[NoteToolbarInlineCode]}" />

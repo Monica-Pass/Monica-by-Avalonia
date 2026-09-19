@@ -562,6 +562,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(VaultEmptyStateText));
         OnPropertyChanged(nameof(VaultCreateLabel));
         OnPropertyChanged(nameof(VaultMoreButtonTip));
+        OnPropertyChanged(nameof(VaultSearchHelpText));
+        OnPropertyChanged(nameof(VaultFilteredStatusText));
         if (!_hasCompromisedPasswordCheckResults)
         {
             CompromisedPasswordStatus = _localization.Get("CompromisedPasswordNotChecked");
