@@ -7,6 +7,15 @@ namespace Monica.App;
 internal static class AppDiagnostics
 {
     private const int QueueCapacity = 4_096;
+
+    // This log sits next to the vault, so it has to be bounded: the append-only writer reached
+    // 215 MB on a development machine where one launch path threw on every start.
+    internal const long MaxLogBytes = 2 * 1024 * 1024;
+
+    // A rolled segment is kept as runtime.log.1, so the retained pair stays under these two numbers
+    // together. Anything past the backup ceiling predates the cap and is dropped rather than rotated.
+    internal const long MaxBackupBytes = 4 * 1024 * 1024;
+
     private static readonly string LogPath = MonicaAppDataPaths.GetPath("runtime.log");
     private static readonly Channel<DiagnosticEvent> LogEvents = Channel.CreateBounded<DiagnosticEvent>(
         new BoundedChannelOptions(QueueCapacity)
@@ -95,23 +104,8 @@ internal static class AppDiagnostics
                 Directory.CreateDirectory(directory);
             }
 
-            await using var stream = new FileStream(
-                LogPath,
-                FileMode.Append,
-                FileAccess.Write,
-                FileShare.ReadWrite,
-                bufferSize: 4_096,
-                FileOptions.Asynchronous | FileOptions.SequentialScan);
-            await using var writer = new StreamWriter(stream);
-
-            while (await LogEvents.Reader.WaitToReadAsync().ConfigureAwait(false))
+            while (!await WriteLogSegmentAsync().ConfigureAwait(false))
             {
-                while (LogEvents.Reader.TryRead(out var diagnosticEvent))
-                {
-                    await writer.WriteAsync(Format(diagnosticEvent)).ConfigureAwait(false);
-                }
-
-                await writer.FlushAsync().ConfigureAwait(false);
             }
         }
         catch (Exception exception)
@@ -121,6 +115,68 @@ internal static class AppDiagnostics
             {
                 Debug.WriteLine(Format(diagnosticEvent));
             }
+        }
+    }
+
+    // True once the channel is drained for good, false when the size cap ended this segment early.
+    private static async Task<bool> WriteLogSegmentAsync()
+    {
+        RollLogIfOverlong(LogPath, MaxLogBytes, MaxBackupBytes);
+        await using var stream = new FileStream(
+            LogPath,
+            FileMode.Append,
+            FileAccess.Write,
+            FileShare.ReadWrite,
+            bufferSize: 4_096,
+            FileOptions.Asynchronous | FileOptions.SequentialScan);
+        await using var writer = new StreamWriter(stream);
+
+        while (await LogEvents.Reader.WaitToReadAsync().ConfigureAwait(false))
+        {
+            while (LogEvents.Reader.TryRead(out var diagnosticEvent))
+            {
+                await writer.WriteAsync(Format(diagnosticEvent)).ConfigureAwait(false);
+            }
+
+            await writer.FlushAsync().ConfigureAwait(false);
+            if (stream.Length > MaxLogBytes)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    internal static void RollLogIfOverlong(string logPath, long maxBytes, long maxBackupBytes)
+    {
+        try
+        {
+            if (!File.Exists(logPath) || new FileInfo(logPath).Length <= maxBytes)
+            {
+                return;
+            }
+
+            var backupPath = logPath + ".1";
+            if (File.Exists(backupPath))
+            {
+                File.Delete(backupPath);
+            }
+
+            // A rolled segment overshoots the cap by at most one flush and is worth keeping for
+            // support. A log far past it predates the cap entirely, and its tail is not worth the
+            // disk it would occupy - drop it and start clean.
+            if (new FileInfo(logPath).Length > maxBackupBytes)
+            {
+                File.Delete(logPath);
+                return;
+            }
+
+            File.Move(logPath, backupPath);
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Runtime diagnostic log could not be rolled: {exception}");
         }
     }
 

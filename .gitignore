@@ -62,3 +62,5 @@ monica by avalonia/publish/
 # Smoke UI captures; these hold live vault databases
 monica by avalonia/.e2e-*/
 monica by avalonia/.uitest-appdata/
+# Local probe scripts; the CI gate is eng/ci/verify-artifact-runtime.ps1
+monica by avalonia/.tools/
