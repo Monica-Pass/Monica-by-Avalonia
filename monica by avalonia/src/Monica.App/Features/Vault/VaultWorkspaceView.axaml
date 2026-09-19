@@ -31,6 +31,68 @@
                             Classes.selected="{Binding VaultFavoritesOnly}"
                             Content="{Binding L.LibraryFavorites}"
                             Command="{Binding ToggleVaultFavoritesCommand}" />
+                    <!-- Sort keys and quick filters belong to the tree, not to a toolbar of their own,
+                         so they live behind one chip that lights up when one of them is on. -->
+                    <Button x:Name="VaultMoreButton"
+                            Classes="workspaceFilterChip"
+                            Classes.selected="{Binding HasVaultQuickFilters}"
+                            Content="{Binding L.LibraryMore}"
+                            ToolTip.Tip="{Binding VaultMoreButtonTip}"
+                            AutomationProperties.Name="{Binding L.LibraryMore}">
+                        <Button.Flyout>
+                            <MenuFlyout>
+                                <MenuItem Header="{Binding L.LibrarySort}">
+                                    <MenuItem.Icon>
+                                        <ic:FluentIcon Icon="ArrowSort" FontSize="14" />
+                                    </MenuItem.Icon>
+                                    <MenuItem.Items>
+                                        <MenuItem Header="{Binding SortUpdatedText}" ToggleType="Radio" IsChecked="{Binding IsSortUpdatedSelected}"
+                                                  Command="{Binding SetPasswordSortCommand}" CommandParameter="updated-desc" />
+                                        <MenuItem Header="{Binding SortTitleText}" ToggleType="Radio" IsChecked="{Binding IsSortTitleSelected}"
+                                                  Command="{Binding SetPasswordSortCommand}" CommandParameter="title-asc" />
+                                        <MenuItem Header="{Binding SortWebsiteText}" ToggleType="Radio" IsChecked="{Binding IsSortWebsiteSelected}"
+                                                  IsVisible="{Binding IsVaultPasswordsPreset}"
+                                                  Command="{Binding SetPasswordSortCommand}" CommandParameter="website-asc" />
+                                        <MenuItem Header="{Binding SortUsernameText}" ToggleType="Radio" IsChecked="{Binding IsSortUsernameSelected}"
+                                                  IsVisible="{Binding IsVaultPasswordsPreset}"
+                                                  Command="{Binding SetPasswordSortCommand}" CommandParameter="username-asc" />
+                                        <MenuItem Header="{Binding SortCreatedText}" ToggleType="Radio" IsChecked="{Binding IsSortCreatedSelected}"
+                                                  Command="{Binding SetPasswordSortCommand}" CommandParameter="created-desc" />
+                                        <MenuItem Header="{Binding SortFavoritesText}" ToggleType="Radio" IsChecked="{Binding IsSortFavoritesSelected}"
+                                                  Command="{Binding SetPasswordSortCommand}" CommandParameter="favorites-first" />
+                                    </MenuItem.Items>
+                                </MenuItem>
+                                <MenuItem Header="{Binding L.PasswordFilters}" IsVisible="{Binding IsVaultPasswordsPreset}">
+                                    <MenuItem.Icon>
+                                        <ic:FluentIcon Icon="Filter" FontSize="14" />
+                                    </MenuItem.Icon>
+                                    <MenuItem.Items>
+                                        <MenuItem Header="{Binding L.QuickFilter2Fa}" ToggleType="CheckBox" IsChecked="{Binding QuickFilter2Fa, Mode=TwoWay}">
+                                            <MenuItem.Icon><ic:FluentIcon Icon="Key" FontSize="14" /></MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem Header="{Binding L.QuickFilterNotes}" ToggleType="CheckBox" IsChecked="{Binding QuickFilterNotes, Mode=TwoWay}">
+                                            <MenuItem.Icon><ic:FluentIcon Icon="Note" FontSize="14" /></MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem Header="{Binding L.QuickFilterPasskey}" ToggleType="CheckBox" IsChecked="{Binding QuickFilterPasskey, Mode=TwoWay}">
+                                            <MenuItem.Icon><ic:FluentIcon Icon="Fingerprint" FontSize="14" /></MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem Header="{Binding L.QuickFilterBoundNote}" ToggleType="CheckBox" IsChecked="{Binding QuickFilterBoundNote, Mode=TwoWay}">
+                                            <MenuItem.Icon><ic:FluentIcon Icon="Document" FontSize="14" /></MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem Header="{Binding L.QuickFilterUncategorized}" ToggleType="CheckBox" IsChecked="{Binding QuickFilterUncategorized, Mode=TwoWay}">
+                                            <MenuItem.Icon><ic:FluentIcon Icon="Folder" FontSize="14" /></MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem Header="{Binding L.QuickFilterLocalOnly}" ToggleType="CheckBox" IsChecked="{Binding QuickFilterLocalOnly, Mode=TwoWay}">
+                                            <MenuItem.Icon><ic:FluentIcon Icon="Desktop" FontSize="14" /></MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem Header="{Binding L.QuickFilterAttachments}" ToggleType="CheckBox" IsChecked="{Binding QuickFilterAttachments, Mode=TwoWay}">
+                                            <MenuItem.Icon><ic:FluentIcon Icon="Attach" FontSize="14" /></MenuItem.Icon>
+                                        </MenuItem>
+                                    </MenuItem.Items>
+                                </MenuItem>
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">

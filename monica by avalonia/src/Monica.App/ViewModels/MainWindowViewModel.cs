@@ -146,6 +146,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasVaultCreatePreset))]
     [NotifyPropertyChangedFor(nameof(VaultCreateLabel))]
     [NotifyPropertyChangedFor(nameof(VaultCreateCommand))]
+    [NotifyPropertyChangedFor(nameof(IsVaultPasswordsPreset))]
+    [NotifyPropertyChangedFor(nameof(HasVaultQuickFilters))]
     private string _selectedSection = "Vault";
 
     [ObservableProperty]
@@ -559,6 +561,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(NoteReferenceItems));
         OnPropertyChanged(nameof(VaultEmptyStateText));
         OnPropertyChanged(nameof(VaultCreateLabel));
+        OnPropertyChanged(nameof(VaultMoreButtonTip));
         if (!_hasCompromisedPasswordCheckResults)
         {
             CompromisedPasswordStatus = _localization.Get("CompromisedPasswordNotChecked");

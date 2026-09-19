@@ -21,11 +21,14 @@ public enum VaultEntryGroup
 public sealed record VaultTreeFilter(
     VaultEntryGroup Group = VaultEntryGroup.All,
     string? Search = null,
-    bool FavoritesOnly = false)
+    bool FavoritesOnly = false,
+    string Sort = "updated-desc",
+    VaultQuickFilters? QuickFilters = null)
 {
     public bool HasSearch => !string.IsNullOrWhiteSpace(Search);
 
-    public bool IsNarrowing => HasSearch || FavoritesOnly || Group != VaultEntryGroup.All;
+    public bool IsNarrowing =>
+        HasSearch || FavoritesOnly || Group != VaultEntryGroup.All || (QuickFilters?.IsOn ?? false);
 
     public bool Matches(VaultEntryKind kind) => Group switch
     {
@@ -46,6 +49,11 @@ public sealed record VaultTreeFilter(
         }
 
         if (!Matches(VaultEntryKinds.FromPassword(entry)))
+        {
+            return false;
+        }
+
+        if (QuickFilters is { } quickFilters && !quickFilters.Matches(entry))
         {
             return false;
         }
@@ -118,9 +126,6 @@ public sealed record VaultTreeEntryRow : IVaultTreeRow
     public SecureItem? Item { get; init; }
 
     public string Key { get; init; } = "";
-
-    /// Builder input for sibling ordering; the tree control never reads it.
-    public int SortOrder { get; init; }
 
     public VaultTreeRowKind RowKind => VaultTreeRowKind.Entry;
 

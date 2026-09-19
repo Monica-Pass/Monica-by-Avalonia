@@ -12,6 +12,10 @@ public class VaultTreeBuilderTests
 
     private static readonly Category BankPrimary = new() { Id = 12, Name = "Bank/Primary", SortOrder = 1 };
 
+    /// Every fixture timestamp is measured off this one instant, so a test that does not pass a
+    /// `…SecondsAgo` cannot drift into a different order when the clock moves.
+    private static readonly DateTimeOffset BaseTime = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+
     [Fact]
     public void Entries_filed_in_a_folder_hang_under_it_one_indent_deeper()
     {
@@ -68,20 +72,48 @@ public class VaultTreeBuilderTests
     }
 
     [Fact]
-    public void Folders_precede_entries_and_entries_follow_sort_order_then_title()
+    public void Folders_precede_entries_and_the_default_sort_is_recently_updated()
     {
         var rows = VaultTreeBuilder.Build(
             [Bank, BankPrimary],
             [
-                Password(1, "Aa", Bank.Id, sortOrder: 5),
-                Password(2, "Bb", Bank.Id, sortOrder: 1),
-                Password(3, "Cc", Bank.Id, sortOrder: 5)
+                Password(1, "Oldest", Bank.Id, updatedSecondsAgo: 300),
+                Password(2, "Newest", Bank.Id, updatedSecondsAgo: 1),
+                Password(3, "Middle", Bank.Id, updatedSecondsAgo: 100)
             ],
             [],
             [],
             new VaultTreeFilter());
 
-        Assert.Equal(["f:Bank", "f:Bank/Primary", "p:2", "p:1", "p:3"], Keys(rows));
+        Assert.Equal(["f:Bank", "f:Bank/Primary", "p:2", "p:3", "p:1"], Keys(rows));
+    }
+
+    [Theory]
+    [InlineData("title-asc", new[] { "f:Bank", "p:3", "p:2", "p:1" })]
+    [InlineData("website-asc", new[] { "f:Bank", "p:1", "p:2", "p:3" })]
+    [InlineData("username-asc", new[] { "f:Bank", "p:2", "p:1", "p:3" })]
+    [InlineData("created-desc", new[] { "f:Bank", "p:3", "p:1", "p:2" })]
+    [InlineData("favorites-first", new[] { "f:Bank", "p:1", "p:2", "p:3" })]
+    [InlineData("updated-desc", new[] { "f:Bank", "p:2", "p:1", "p:3" })]
+    public void Each_sort_key_orders_the_rows_in_its_folder(string sort, string[] expectedKeys)
+    {
+        // Title / website / username are set so each text key gives a different answer, and the
+        // timestamps are set so the two time keys disagree with them and with each other.
+        var rows = VaultTreeBuilder.Build(
+            [Bank],
+            [
+                Password(1, "Zebra", Bank.Id, website: "a.example", username: "carol",
+                    updatedSecondsAgo: 50, createdSecondsAgo: 20, favorite: true),
+                Password(2, "Yankee", Bank.Id, website: "b.example", username: "alice",
+                    updatedSecondsAgo: 10, createdSecondsAgo: 90),
+                Password(3, "Alpha", Bank.Id, website: "", username: "",
+                    updatedSecondsAgo: 900, createdSecondsAgo: 5)
+            ],
+            [],
+            [],
+            new VaultTreeFilter(Sort: sort));
+
+        Assert.Equal(expectedKeys, Keys(rows));
     }
 
     [Fact]
@@ -185,12 +217,76 @@ public class VaultTreeBuilderTests
     }
 
     [Fact]
+    public void Each_quick_filter_keeps_only_the_passwords_it_describes()
+    {
+        var credential = Password(1, "Alpha", Bank.Id);
+        credential.AuthenticatorKey = "JBSWY3DPEHPK3PXP";
+        credential.HasAttachments = true;
+        credential.BitwardenVaultId = 7;
+
+        var passkey = Password(2, "Beta", Bank.Id);
+        passkey.Notes = "recovery kit in the drawer";
+        passkey.PasskeyBindings = """[{"credentialId":"aXk"}]""";
+        passkey.KeepassDatabaseId = 3;
+
+        var bound = Password(3, "Gamma");
+        bound.BoundNoteId = 21;
+        bound.Notes = "shelf";
+
+        var cases = new (VaultQuickFilters Filter, string[] Expected)[]
+        {
+            (new VaultQuickFilters(TwoFactor: true), ["f:Bank", "p:1"]),
+            (new VaultQuickFilters(WithNotes: true), ["f:Bank", "p:2", "p:3"]),
+            (new VaultQuickFilters(Passkey: true), ["f:Bank", "p:2"]),
+            (new VaultQuickFilters(BoundNote: true), ["p:3"]),
+            (new VaultQuickFilters(Uncategorized: true), ["p:3"]),
+            (new VaultQuickFilters(LocalOnly: true), ["p:3"]),
+            (new VaultQuickFilters(WithAttachments: true), ["f:Bank", "p:1"]),
+            (new VaultQuickFilters(Uncategorized: true, LocalOnly: true), ["p:3"]),
+            (new VaultQuickFilters(TwoFactor: true, WithAttachments: true), ["f:Bank", "p:1"]),
+            (new VaultQuickFilters(Uncategorized: true, WithAttachments: true), [])
+        };
+
+        foreach (var (filter, expected) in cases)
+        {
+            var rows = VaultTreeBuilder.Build(
+                [Bank],
+                [credential, passkey, bound],
+                [],
+                [],
+                new VaultTreeFilter(QuickFilters: filter));
+
+            Assert.Equal(expected, Keys(rows));
+        }
+    }
+
+    [Fact]
+    public void Quick_filters_speak_only_about_passwords_so_secure_items_survive_them()
+    {
+        // The more menu offers the filters under the passwords preset alone, so the tree never has
+        // to guess what "has a passkey" means for a note — but it must not drop one either.
+        var remote = Password(1, "Alpha");
+        remote.BitwardenVaultId = 7;
+        var rows = VaultTreeBuilder.Build(
+            [],
+            [remote],
+            [Secure(21, VaultItemType.Note, "Shops")],
+            [],
+            new VaultTreeFilter(QuickFilters: new VaultQuickFilters(LocalOnly: true)));
+
+        Assert.Equal(["s:21"], Keys(rows));
+    }
+
+    [Fact]
     public void An_unnarrowed_library_reports_itself_as_unfiltered()
     {
         Assert.False(new VaultTreeFilter().IsNarrowing);
         Assert.False(new VaultTreeFilter(Search: "   ").IsNarrowing);
+        Assert.False(new VaultTreeFilter(QuickFilters: VaultQuickFilters.None).IsNarrowing);
+        Assert.False(new VaultTreeFilter(Sort: "title-asc").IsNarrowing);
         Assert.True(new VaultTreeFilter(Search: "x").IsNarrowing);
         Assert.True(new VaultTreeFilter(Group: VaultEntryGroup.Notes).IsNarrowing);
+        Assert.True(new VaultTreeFilter(QuickFilters: new VaultQuickFilters(TwoFactor: true)).IsNarrowing);
     }
 
     [Fact]
@@ -286,8 +382,9 @@ public class VaultTreeBuilderTests
         long? categoryId = null,
         string username = "",
         string website = "",
-        int sortOrder = 0,
-        bool favorite = false) =>
+        bool favorite = false,
+        int updatedSecondsAgo = 0,
+        int createdSecondsAgo = 0) =>
         new()
         {
             Id = id,
@@ -295,8 +392,9 @@ public class VaultTreeBuilderTests
             CategoryId = categoryId,
             Username = username,
             Website = website,
-            SortOrder = sortOrder,
-            IsFavorite = favorite
+            IsFavorite = favorite,
+            UpdatedAt = BaseTime.AddSeconds(-updatedSecondsAgo),
+            CreatedAt = BaseTime.AddSeconds(-createdSecondsAgo)
         };
 
     private static SecureItem Secure(
@@ -309,6 +407,8 @@ public class VaultTreeBuilderTests
             Id = id,
             ItemType = itemType,
             Title = title,
-            IsFavorite = favorite
+            IsFavorite = favorite,
+            UpdatedAt = BaseTime,
+            CreatedAt = BaseTime
         };
 }

@@ -87,11 +87,43 @@ public sealed partial class MainWindowViewModel
 
     public bool HasVaultRows => VaultTreeRows.Count > 0;
 
+    // Website and username only exist on a credential, so the quick filters and those two sort keys
+    // are offered by the password preset alone.
+    public bool IsVaultPasswordsPreset => VaultGroup == VaultEntryGroup.Passwords;
+
+    public bool HasVaultQuickFilters => CurrentVaultQuickFilters().IsOn;
+
+    public string VaultMoreButtonTip =>
+        $"{_localization.Get("LibrarySort")}: {GetPasswordSortLabel(SelectedPasswordSort)}";
+
     // The same empty tree means two different things depending on whether a filter is on.
     public string VaultEmptyStateText =>
         _localization.Get(CurrentVaultFilter().IsNarrowing ? "LibraryNoMatchesHint" : "LibraryEmptyHint");
 
-    private VaultTreeFilter CurrentVaultFilter() => new(VaultGroup, VaultSearchText, VaultFavoritesOnly);
+    private VaultTreeFilter CurrentVaultFilter() =>
+        new(VaultGroup, VaultSearchText, VaultFavoritesOnly, SelectedPasswordSort, CurrentVaultQuickFilters());
+
+    // The sort order and the quick filters are the vault pages' own state, so the library narrows and
+    // reorders exactly as the list it replaced does instead of keeping a second copy of both.
+    private VaultQuickFilters CurrentVaultQuickFilters() => IsVaultPasswordsPreset
+        ? new VaultQuickFilters(
+            QuickFilter2Fa,
+            QuickFilterNotes,
+            QuickFilterPasskey,
+            QuickFilterBoundNote,
+            QuickFilterUncategorized,
+            QuickFilterLocalOnly,
+            QuickFilterAttachments)
+        : VaultQuickFilters.None;
+
+    /// Called by the shared filter callbacks: a quick filter or a sort order moves the tree as much
+    /// as it moves the password list, and the more menu has to report that something is on.
+    private void RaiseVaultFilterState()
+    {
+        OnPropertyChanged(nameof(HasVaultQuickFilters));
+        OnPropertyChanged(nameof(VaultMoreButtonTip));
+        RaiseVaultTreeState();
+    }
 
     partial void OnSelectedVaultRowChanged(IVaultTreeRow? value)
     {

@@ -1,3 +1,4 @@
+using Monica.App.Features.Vault;
 using Monica.Core.Models;
 
 namespace Monica.App.ViewModels;
@@ -149,12 +150,7 @@ public sealed partial class MainWindowViewModel
         return _passwordAttachmentSearchMatches.Contains(item.Id);
     }
 
-    private static bool IsLocalOnlyPassword(PasswordEntry item)
-    {
-        return item.BitwardenVaultId is null &&
-            item.KeepassDatabaseId is null &&
-            item.MdbxDatabaseId is null;
-    }
+    private static bool IsLocalOnlyPassword(PasswordEntry item) => VaultQuickFilters.IsLocalOnly(item);
 
     private static bool ContainsAny(string query, params string[] values) =>
         values.Any(value => value.Contains(query, StringComparison.OrdinalIgnoreCase));

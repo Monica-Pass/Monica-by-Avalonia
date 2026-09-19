@@ -80,6 +80,7 @@ public sealed partial class MainWindowViewModel
     [NotifyPropertyChangedFor(nameof(IsSortUsernameSelected))]
     [NotifyPropertyChangedFor(nameof(IsSortCreatedSelected))]
     [NotifyPropertyChangedFor(nameof(IsSortFavoritesSelected))]
+    [NotifyPropertyChangedFor(nameof(VaultMoreButtonTip))]
     private string _selectedPasswordSort = "updated-desc";
 
     public ObservableCollection<PasswordEntry> Passwords { get; } = new ObservableRangeCollection<PasswordEntry>();

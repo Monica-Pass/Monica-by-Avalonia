@@ -31,7 +31,7 @@ public static class VaultTreeBuilder
         foreach (var entry in passwords.Where(filter.MatchesPassword))
         {
             AddEntry(entriesByPath, folderPathByCategoryId, entry.CategoryId, VaultTreeKey.Password(entry.Id),
-                entry.Title, entry.SortOrder, VaultEntryKinds.FromPassword(entry),
+                entry.Title, VaultEntryKinds.FromPassword(entry),
                 entry.Username.Length > 0 ? entry.Username : entry.Website,
                 password: entry);
         }
@@ -40,7 +40,7 @@ public static class VaultTreeBuilder
         {
             var kind = VaultEntryKinds.FromSecureItem(item)!.Value;
             AddEntry(entriesByPath, folderPathByCategoryId, item.CategoryId, VaultTreeKey.SecureItem(item.Id),
-                item.Title, item.SortOrder, kind, VaultEntryKinds.LabelFor(kind), item: item);
+                item.Title, kind, VaultEntryKinds.LabelFor(kind), item: item);
         }
 
         foreach (var root in roots)
@@ -54,7 +54,7 @@ public static class VaultTreeBuilder
             Emit(root, rows, entriesByPath, collapsedFolderKeys, filter);
         }
 
-        foreach (var entry in SortedEntries(entriesByPath, UnfiledPath))
+        foreach (var entry in SortedEntries(entriesByPath, UnfiledPath, filter.Sort))
         {
             rows.Add(entry);
         }
@@ -109,7 +109,6 @@ public static class VaultTreeBuilder
         long? categoryId,
         string key,
         string title,
-        int sortOrder,
         VaultEntryKind kind,
         string detail,
         PasswordEntry? password = null,
@@ -132,7 +131,6 @@ public static class VaultTreeBuilder
             Label = string.IsNullOrWhiteSpace(title) ? VaultEntryKinds.LabelFor(kind) : title.Trim(),
             Indent = FolderTreeLayout.IndentFor(Depth(path)),
             EntryDetail = detail,
-            SortOrder = sortOrder,
             Password = password,
             Item = item
         });
@@ -150,7 +148,7 @@ public static class VaultTreeBuilder
             return;
         }
 
-        var hasEntries = SortedEntries(entriesByPath, node.Path).Count > 0;
+        var hasEntries = entriesByPath.ContainsKey(node.Path);
         var hasChildren = node.Children.Count > 0 || hasEntries;
         var isExpanded = (filter.IsNarrowing || !collapsedFolderKeys.Contains(node.Key)) && hasChildren;
         rows.Add(new VaultTreeFolderRow
@@ -173,7 +171,7 @@ public static class VaultTreeBuilder
             Emit(child, rows, entriesByPath, collapsedFolderKeys, filter);
         }
 
-        foreach (var entry in SortedEntries(entriesByPath, node.Path))
+        foreach (var entry in SortedEntries(entriesByPath, node.Path, filter.Sort))
         {
             rows.Add(entry);
         }
@@ -185,7 +183,7 @@ public static class VaultTreeBuilder
 
     private static int CountMatches(FolderNode node, Dictionary<string, List<VaultTreeEntryRow>> entriesByPath)
     {
-        var matches = SortedEntries(entriesByPath, node.Path).Count;
+        var matches = entriesByPath.TryGetValue(node.Path, out var bucket) ? bucket.Count : 0;
         foreach (var child in node.Children)
         {
             matches += CountMatches(child, entriesByPath);
@@ -197,18 +195,57 @@ public static class VaultTreeBuilder
 
     private static IReadOnlyList<VaultTreeEntryRow> SortedEntries(
         Dictionary<string, List<VaultTreeEntryRow>> entriesByPath,
-        string path)
+        string path,
+        string sort)
     {
         if (!entriesByPath.TryGetValue(path, out var bucket))
         {
             return [];
         }
 
-        return bucket
-            .OrderBy(row => row.SortOrder)
-            .ThenBy(row => row.Label, StringComparer.CurrentCultureIgnoreCase)
-            .ThenBy(row => row.Key, StringComparer.Ordinal)
-            .ToArray();
+        IOrderedEnumerable<VaultTreeEntryRow> ordered = sort switch
+        {
+            "title-asc" => bucket.OrderBy(row => row.Label, StringComparer.CurrentCultureIgnoreCase),
+            "website-asc" => bucket
+                .OrderBy(row => SortText(WebsiteOf(row)), StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(row => row.Label, StringComparer.CurrentCultureIgnoreCase),
+            "username-asc" => bucket
+                .OrderBy(row => SortText(UsernameOf(row)), StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(row => row.Label, StringComparer.CurrentCultureIgnoreCase),
+            "created-desc" => bucket
+                .OrderByDescending(CreatedOf)
+                .ThenBy(row => row.Label, StringComparer.CurrentCultureIgnoreCase),
+            "favorites-first" => bucket
+                .OrderByDescending(FavoriteOf)
+                .ThenByDescending(UpdatedOf)
+                .ThenBy(row => row.Label, StringComparer.CurrentCultureIgnoreCase),
+            _ => bucket
+                .OrderByDescending(UpdatedOf)
+                .ThenBy(row => row.Label, StringComparer.CurrentCultureIgnoreCase)
+        };
+
+        return ordered.ThenBy(row => row.Key, StringComparer.Ordinal).ToArray();
+    }
+
+    // Only a credential has a website or a username, so the other rows simply never lead those sorts.
+    private static string WebsiteOf(VaultTreeEntryRow row) => row.Password?.Website ?? "";
+
+    private static string UsernameOf(VaultTreeEntryRow row) => row.Password?.Username ?? "";
+
+    private static DateTimeOffset UpdatedOf(VaultTreeEntryRow row) =>
+        row.Password?.UpdatedAt ?? row.Item?.UpdatedAt ?? DateTimeOffset.MinValue;
+
+    private static DateTimeOffset CreatedOf(VaultTreeEntryRow row) =>
+        row.Password?.CreatedAt ?? row.Item?.CreatedAt ?? DateTimeOffset.MinValue;
+
+    private static bool FavoriteOf(VaultTreeEntryRow row) =>
+        row.Password?.IsFavorite ?? row.Item?.IsFavorite ?? false;
+
+    /// Blank values sort last on purpose: an entry without a website should not lead a website sort.
+    private static string SortText(string? value)
+    {
+        var text = value?.Trim();
+        return string.IsNullOrEmpty(text) ? "\uffff" : text;
     }
 
     private static int Depth(string path) =>

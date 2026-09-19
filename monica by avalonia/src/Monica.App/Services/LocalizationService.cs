@@ -25,6 +25,8 @@ public interface ILocalizationService : INotifyPropertyChanged
     string LibraryAll { get; }
     string LibraryCreate { get; }
     string LibraryFavorites { get; }
+    string LibraryMore { get; }
+    string LibrarySort { get; }
     string LibraryEmptyHint { get; }
     string LibraryNoMatchesHint { get; }
     string LibraryOpenHint { get; }
@@ -527,6 +529,8 @@ public sealed class LocalizationService : ILocalizationService
     public string LibraryAll => Text();
     public string LibraryCreate => Text();
     public string LibraryFavorites => Text();
+    public string LibraryMore => Text();
+    public string LibrarySort => Text();
     public string LibraryEmptyHint => Text();
     public string LibraryNoMatchesHint => Text();
     public string LibraryOpenHint => Text();
@@ -1013,6 +1017,8 @@ public sealed class LocalizationService : ILocalizationService
         ["LibraryAll"] = "All",
         ["LibraryCreate"] = "Add",
         ["LibraryFavorites"] = "Favorites",
+        ["LibraryMore"] = "More",
+        ["LibrarySort"] = "Sort",
         ["LibraryEmptyHint"] = "Nothing saved yet.",
         ["LibraryNoMatchesHint"] = "No item matches this filter.",
         ["LibraryOpenHint"] = "Pick an item to open it.",
@@ -2378,6 +2384,8 @@ public sealed class LocalizationService : ILocalizationService
         ["LibraryAll"] = "全部",
         ["LibraryCreate"] = "添加",
         ["LibraryFavorites"] = "收藏",
+        ["LibraryMore"] = "更多",
+        ["LibrarySort"] = "排序",
         ["LibraryEmptyHint"] = "还没有任何内容。",
         ["LibraryNoMatchesHint"] = "没有符合当前筛选的项目。",
         ["LibraryOpenHint"] = "选择一项以打开。",

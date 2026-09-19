@@ -28,13 +28,13 @@ public sealed partial class MainWindowViewModel
     }
 
     partial void OnQuickFilterFavoriteChanged(bool value) => RefreshPasswordFilters();
-    partial void OnQuickFilter2FaChanged(bool value) => RefreshPasswordFilters();
-    partial void OnQuickFilterNotesChanged(bool value) => RefreshPasswordFilters();
-    partial void OnQuickFilterPasskeyChanged(bool value) => RefreshPasswordFilters();
-    partial void OnQuickFilterBoundNoteChanged(bool value) => RefreshPasswordFilters();
-    partial void OnQuickFilterUncategorizedChanged(bool value) => RefreshPasswordFilters();
-    partial void OnQuickFilterLocalOnlyChanged(bool value) => RefreshPasswordFilters();
-    partial void OnQuickFilterAttachmentsChanged(bool value) => RefreshPasswordFilters();
+    partial void OnQuickFilter2FaChanged(bool value) => RefreshPasswordAndVaultFilters();
+    partial void OnQuickFilterNotesChanged(bool value) => RefreshPasswordAndVaultFilters();
+    partial void OnQuickFilterPasskeyChanged(bool value) => RefreshPasswordAndVaultFilters();
+    partial void OnQuickFilterBoundNoteChanged(bool value) => RefreshPasswordAndVaultFilters();
+    partial void OnQuickFilterUncategorizedChanged(bool value) => RefreshPasswordAndVaultFilters();
+    partial void OnQuickFilterLocalOnlyChanged(bool value) => RefreshPasswordAndVaultFilters();
+    partial void OnQuickFilterAttachmentsChanged(bool value) => RefreshPasswordAndVaultFilters();
     partial void OnSelectedPasswordFolderFilterChanged(PasswordFolderFilterChoice? value)
     {
         RaiseFilteredPasswordsChanged();
@@ -49,6 +49,14 @@ public sealed partial class MainWindowViewModel
         UpdateSettings(settings => settings.PasswordSortOrder = value);
         RaiseFilteredPasswordsChanged();
         RefreshPasswordSelectionStateFromPasswords();
+        RaiseVaultFilterState();
+    }
+
+    // One filter switch, two projections: the password list and the library tree read the same state.
+    private void RefreshPasswordAndVaultFilters()
+    {
+        RefreshPasswordFilters();
+        RaiseVaultFilterState();
     }
 
     partial void OnSelectedPasswordChanged(PasswordEntry? value)
