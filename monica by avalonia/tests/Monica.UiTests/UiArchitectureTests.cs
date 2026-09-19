@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FluentAvalonia.UI.Controls;
+using FluentIcons.Common;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.App.Controls;
 using Monica.App.Features.Archive;
@@ -18,6 +19,7 @@ using Monica.App.Features.Settings;
 using Monica.App.Features.Sync;
 using Monica.App.Features.Timeline;
 using Monica.App.Features.Unlock;
+using Monica.App.Features.Vault;
 using Monica.App.Features.Wallet;
 
 namespace Monica.UiTests;
@@ -103,7 +105,7 @@ public sealed class UiArchitectureTests
                 .ToArray();
             Assert.Equal(
                 [
-                    "Passwords", "Notes", "Totp", "Cards", "Generator", "SecurityAnalysis",
+                    "Vault", "Passwords", "Notes", "Totp", "Cards", "Generator", "SecurityAnalysis",
                     "Timeline", "Archive", "RecycleBin", "Mdbx",
                     "DatabaseManagement", "Sync", "Settings", "Lock"
                 ],
@@ -146,6 +148,47 @@ public sealed class UiArchitectureTests
             window.Close();
         }
     }
+
+    [Fact]
+    public void Library_item_reaches_the_library_page_and_no_two_rail_items_share_a_glyph()
+    {
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<Monica.App.ViewModels.MainWindowViewModel>();
+        window.Show();
+        try
+        {
+            window.DataContext = viewModel;
+            viewModel.IsUnlocked = true;
+            Dispatcher.UIThread.RunJobs();
+
+            var workspaceHost = Assert.Single(window.GetVisualDescendants().OfType<WorkspaceHostView>());
+            var navigation = Assert.Single(window.GetVisualDescendants().OfType<FANavigationView>());
+            var railItems = navigation.MenuItems
+                .Concat(navigation.FooterMenuItems)
+                .OfType<FANavigationViewItem>()
+                .ToArray();
+
+            // What breaks a rail is two pages wearing the same mark, not which mark either one chose,
+            // so the invariant is pinned rather than the individual symbols.
+            var glyphs = railItems.ToDictionary(item => item.Tag?.ToString() ?? "", item => RailGlyph(item));
+            Assert.Equal(glyphs.Count, glyphs.Values.Distinct().Count());
+
+            var libraryItem = railItems.Single(item => string.Equals(item.Tag?.ToString(), "Vault", StringComparison.Ordinal));
+            navigation.SelectedItem = libraryItem;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal("Vault", viewModel.SelectedSection);
+            Assert.IsType<VaultWorkspaceView>(workspaceHost.CurrentWorkspace);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static Symbol RailGlyph(FANavigationViewItem item) =>
+        Assert.IsType<FluentSymbolIconSource>(item.IconSource).Symbol;
 
     private static void AssertSingleSelectedRailItem(FANavigationView navigation, string section) =>
         Assert.Equal(

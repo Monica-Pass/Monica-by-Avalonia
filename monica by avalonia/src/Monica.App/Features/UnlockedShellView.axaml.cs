@@ -16,6 +16,7 @@ public partial class UnlockedShellView : UserControl
 {
     private static readonly DeferredNavigationItem[] DeferredVaultItems =
     [
+        new("L.Library", "Vault", Symbol.Library),
         new("L.Passwords", "Passwords", Symbol.Key),
         new("L.SecureNotes", "Notes", Symbol.Note),
         new("L.Totp", "Totp", Symbol.Fingerprint),
@@ -38,7 +39,7 @@ public partial class UnlockedShellView : UserControl
 
     private static readonly DeferredNavigationItem[] DeferredFooterItems =
     [
-        new("L.DatabaseManagement", "DatabaseManagement", Symbol.Library),
+        new("L.DatabaseManagement", "DatabaseManagement", Symbol.Storage),
         new("L.SyncAndBackup", "Sync", Symbol.ArrowSync),
         new("L.Settings", "Settings", Symbol.Settings)
     ];
