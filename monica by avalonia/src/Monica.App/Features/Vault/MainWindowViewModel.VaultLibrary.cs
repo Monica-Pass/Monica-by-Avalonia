@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Windows.Input;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -36,6 +37,9 @@ public sealed partial class MainWindowViewModel
     [NotifyPropertyChangedFor(nameof(IsVaultGroupNotes))]
     [NotifyPropertyChangedFor(nameof(IsVaultGroupTotp))]
     [NotifyPropertyChangedFor(nameof(IsVaultGroupCards))]
+    [NotifyPropertyChangedFor(nameof(HasVaultCreatePreset))]
+    [NotifyPropertyChangedFor(nameof(VaultCreateLabel))]
+    [NotifyPropertyChangedFor(nameof(VaultCreateCommand))]
     private VaultEntryGroup _vaultGroup = VaultEntryGroup.All;
 
     [ObservableProperty]
@@ -56,6 +60,28 @@ public sealed partial class MainWindowViewModel
     public bool IsVaultGroupCards => VaultGroup == VaultEntryGroup.Cards;
 
     public bool HasVaultSearchText => !string.IsNullOrWhiteSpace(VaultSearchText);
+
+    // A type filter already says what the user means, so its header button creates that type in one
+    // click; with everything in view the page asks instead of silently picking a kind.
+    public bool HasVaultCreatePreset => VaultGroup != VaultEntryGroup.All;
+
+    public string VaultCreateLabel => VaultGroup switch
+    {
+        VaultEntryGroup.Passwords => _localization.Get("AddPassword"),
+        VaultEntryGroup.Notes => _localization.Get("NewSecureNote"),
+        VaultEntryGroup.Totp => _localization.Get("AddAuthenticator"),
+        VaultEntryGroup.Cards => _localization.Get("AddWalletItem"),
+        _ => _localization.Get("LibraryCreate")
+    };
+
+    public ICommand? VaultCreateCommand => VaultGroup switch
+    {
+        VaultEntryGroup.Passwords => AddPasswordCommand,
+        VaultEntryGroup.Notes => AddNoteCommand,
+        VaultEntryGroup.Totp => AddTotpCommand,
+        VaultEntryGroup.Cards => AddWalletItemCommand,
+        _ => null
+    };
 
     /// Which existing editor the right-hand slot has to host for the current selection. The library
     /// page owns no editing surface of its own; it routes a row to whichever page already edits it.

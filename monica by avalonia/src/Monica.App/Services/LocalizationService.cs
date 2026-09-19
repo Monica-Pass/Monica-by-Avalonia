@@ -23,6 +23,7 @@ public interface ILocalizationService : INotifyPropertyChanged
     string Cards { get; }
     string Library { get; }
     string LibraryAll { get; }
+    string LibraryCreate { get; }
     string LibraryFavorites { get; }
     string LibraryEmptyHint { get; }
     string LibraryNoMatchesHint { get; }
@@ -524,6 +525,7 @@ public sealed class LocalizationService : ILocalizationService
     public string Cards => Text();
     public string Library => Text();
     public string LibraryAll => Text();
+    public string LibraryCreate => Text();
     public string LibraryFavorites => Text();
     public string LibraryEmptyHint => Text();
     public string LibraryNoMatchesHint => Text();
@@ -1009,6 +1011,7 @@ public sealed class LocalizationService : ILocalizationService
         ["Cards"] = "Cards",
         ["Library"] = "Library",
         ["LibraryAll"] = "All",
+        ["LibraryCreate"] = "Add",
         ["LibraryFavorites"] = "Favorites",
         ["LibraryEmptyHint"] = "Nothing saved yet.",
         ["LibraryNoMatchesHint"] = "No item matches this filter.",
@@ -2373,6 +2376,7 @@ public sealed class LocalizationService : ILocalizationService
         ["Cards"] = "卡包",
         ["Library"] = "库",
         ["LibraryAll"] = "全部",
+        ["LibraryCreate"] = "添加",
         ["LibraryFavorites"] = "收藏",
         ["LibraryEmptyHint"] = "还没有任何内容。",
         ["LibraryNoMatchesHint"] = "没有符合当前筛选的项目。",

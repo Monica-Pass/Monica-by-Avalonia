@@ -550,6 +550,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(NoteFormatText));
         OnPropertyChanged(nameof(NoteEditorStatusText));
         OnPropertyChanged(nameof(NoteReferenceItems));
+        OnPropertyChanged(nameof(VaultEmptyStateText));
+        OnPropertyChanged(nameof(VaultCreateLabel));
         if (!_hasCompromisedPasswordCheckResults)
         {
             CompromisedPasswordStatus = _localization.Get("CompromisedPasswordNotChecked");
