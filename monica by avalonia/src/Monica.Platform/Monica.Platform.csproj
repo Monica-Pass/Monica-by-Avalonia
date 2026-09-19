@@ -25,10 +25,18 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <!-- The engine a build ships must be the one its platform can dlopen; copying every platform's
+         binary into every artifact is how a linux-x64 publish ended up carrying a Windows PE and
+         no libmdbx_ffi.so at all. RID publish wins, a plain build or test run uses its own host. -->
+    <MonicaNativeRid Condition="'$(MonicaNativeRid)' == '' and '$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</MonicaNativeRid>
+    <MonicaNativeRid Condition="'$(MonicaNativeRid)' == '' and '$(NETCoreSdkPortableRuntimeIdentifier)' != ''">$(NETCoreSdkPortableRuntimeIdentifier)</MonicaNativeRid>
+  </PropertyGroup>
+
   <ItemGroup>
-    <Content Include="Mdbx\runtimes\**\*.*" Exclude="Mdbx\runtimes\**\.gitkeep">
+    <Content Include="Mdbx\runtimes\$(MonicaNativeRid)\*.*" Exclude="Mdbx\runtimes\$(MonicaNativeRid)\.gitkeep">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <Link>%(Filename)%(Extension)</Link>
     </Content>
   </ItemGroup>
 

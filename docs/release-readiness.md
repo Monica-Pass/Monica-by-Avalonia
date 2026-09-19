@@ -57,7 +57,8 @@
 | 项目 | 状态 | 证据或边界 |
 | --- | --- | --- |
 | 统一商业质量门 | 已验证 | `eng/ci/verify-commercial-release.ps1` 执行卫生、文件体积、格式、漏洞、零警告构建、核心和 Headless UI 测试 |
-| JIT 桌面包 | 已验证（默认） | Build/Release 工作流覆盖 Windows、Linux、macOS；Release 默认 `jit` |
+| Windows JIT 包 | 已验证（默认） | Build/Release 工作流覆盖 `win-x64`；产物门真跑 canonical vault 与带窗口冒烟 |
+| Linux / macOS JIT 包 | 受阻 | 缺自研原生引擎：产物里没有 `libmdbx_ffi.so` / `libmdbx_ffi.dylib`，应用能启动但打不开保险库。引擎需由 Rust 源仓库 `crates/mdbx-ffi` 交叉编译后放入 `src/Monica.Platform/Mdbx/runtimes/<rid>/`；产物门现在会因缺引擎直接失败，不再警告后跳过 |
 | NativeAOT 包 | 实验性 | CI 保留 AOT 构建信号，但 Release 输入明确标为 experimental，且不再默认选择 |
 | Action 供应链固定 | 已验证 | 所有第三方 Action 固定完整 commit SHA，checkout 不保留凭据 |
 | 依赖更新 | 已验证（配置） | `.github/dependabot.yml` 每周检查 GitHub Actions 与 NuGet |

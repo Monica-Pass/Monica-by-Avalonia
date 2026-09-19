@@ -19,10 +19,26 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $exeName = if ($RuntimeIdentifier -like 'win-*') { 'Monica.App.exe' } else { 'Monica.App' }
-$exePath = Join-Path (Resolve-Path -LiteralPath $PublishDirectory).Path $exeName
+$publishRoot = (Resolve-Path -LiteralPath $PublishDirectory).Path
+$exePath = Join-Path $publishRoot $exeName
 
 if (-not (Test-Path -LiteralPath $exePath)) {
     throw "Published artifact '$exePath' was not found."
+}
+
+# The engine is what turns "no entries" into a real answer, so the file the platform can dlopen has
+# to be inside the artifact before anything is smoked: a linux-x64 build once shipped a Windows PE
+# here, opened no vault, and still reported a passing runtime smoke.
+$nativeLibraryName = if ($RuntimeIdentifier -like 'win-*') {
+    'mdbx_ffi.dll'
+} elseif ($RuntimeIdentifier -like 'osx-*') {
+    'libmdbx_ffi.dylib'
+} else {
+    'libmdbx_ffi.so'
+}
+
+if (-not (Test-Path -LiteralPath (Join-Path $publishRoot $nativeLibraryName))) {
+    throw "Published artifact for $RuntimeIdentifier carries no $nativeLibraryName, so it cannot open a vault."
 }
 
 $tempRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [System.IO.Path]::GetTempPath() }
@@ -120,21 +136,11 @@ function Invoke-ArtifactCommand {
 try {
     # Evidence is worthless if the failing run's directory disappears with it.
     $keepRunRoot = $true
-    $requiresNativeMdbx = $RuntimeIdentifier -like 'win-*'
     Write-Host "Runtime smoke for $RuntimeIdentifier/$Mode using $exePath"
 
     $initOutput = Invoke-ArtifactCommand -Label 'init-empty-smoke-vault' -Arguments @('--init-empty-smoke-vault', $MasterPassword, $databasePath)
     if ($initOutput -notmatch 'Empty smoke vault initialized') {
         throw 'init-empty-smoke-vault did not report success.'
-    }
-
-    if (-not $requiresNativeMdbx) {
-        # Only mdbx_ffi.dll is shipped today; canonical vault seeding cannot run elsewhere.
-        Write-Warning "SKIPPED canonical MDBX seeding for ${RuntimeIdentifier}: no native MDBX library is published for this runtime."
-        $null = Invoke-ArtifactCommand -Label 'smoke-vault' -Arguments @('--smoke-vault', $databasePath, $MasterPassword, 'definitely-wrong-password')
-        Write-Host ("RUNTIME SMOKE partial. rid={0} mode={1} covered=sqlite+dapper+crypto skipped=canonical-mdbx-vault" -f $RuntimeIdentifier, $Mode)
-        $keepRunRoot = $false
-        return
     }
 
     $seedOutput = Invoke-ArtifactCommand -Label 'seed-smoke-vault' -Arguments @('--seed-smoke-vault', $MasterPassword, $databasePath)
@@ -149,8 +155,17 @@ try {
         throw 'Canonical MDBX vault files were not created next to the SQLite database.'
     }
 
+    Write-Host ("CANONICAL VAULT passed. rid={0} mode={1} native={2} canonicalVaultFiles={3}" -f `
+        $RuntimeIdentifier, $Mode, $nativeLibraryName, $mdbxFiles.Count)
+
     # The windowed smoke is the only gate that drives the shipped shell end to end and samples
-    # memory once locked; it needs native MDBX plus a desktop session, so Windows only.
+    # memory once locked. Its runner needs an interactive session, which Linux and macOS do not have.
+    if ($RuntimeIdentifier -notlike 'win-*') {
+        Write-Host ("UI SMOKE not covered for {0}: that runner has no desktop session." -f $RuntimeIdentifier)
+        $keepRunRoot = $false
+        return
+    }
+
     $uiAppData = Join-Path $runRoot 'ui-appdata'
     New-Item -ItemType Directory -Force -Path $uiAppData | Out-Null
     $env:MONICA_APPDATA_DIR = $uiAppData
@@ -198,7 +213,7 @@ try {
         Remove-Item Env:MONICA_APPDATA_DIR -ErrorAction SilentlyContinue
     }
 
-    Write-Host ("RUNTIME SMOKE passed. rid={0} mode={1} canonicalVaultFiles={2}" -f $RuntimeIdentifier, $Mode, $mdbxFiles.Count)
+    Write-Host ("RUNTIME SMOKE passed. rid={0} mode={1}" -f $RuntimeIdentifier, $Mode)
     $keepRunRoot = $false
 }
 finally {

@@ -47,6 +47,7 @@ dotnet publish $Project `
     --self-contained true `
     --output $publishDir `
     /p:ContinuousIntegrationBuild=true `
+    /p:MonicaNativeRid=$RuntimeIdentifier `
     /p:PublishAot=$publishAot `
     /p:PublishReadyToRun=$publishReadyToRun `
     /p:PublishSingleFile=false `
