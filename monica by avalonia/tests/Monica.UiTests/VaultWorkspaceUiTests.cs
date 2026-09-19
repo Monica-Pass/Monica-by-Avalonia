@@ -149,6 +149,99 @@ public sealed class VaultWorkspaceUiTests
     }
 
     [Fact]
+    public void Control_a_checks_every_batchable_row_the_library_shows()
+    {
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        window.Show();
+        try
+        {
+            window.DataContext = viewModel;
+            viewModel.IsUnlocked = true;
+            viewModel.Passwords.Add(Entry(1, "Alpha", 100));
+            viewModel.NoteItems.Add(new Monica.Core.Models.SecureItem
+            {
+                Id = 41,
+                ItemType = Monica.Core.Models.VaultItemType.Note,
+                Title = "Recipe"
+            });
+            viewModel.SelectSectionCommand.Execute("Vault");
+            Dispatcher.UIThread.RunJobs();
+
+            var workspace = Assert.Single(window.GetVisualDescendants().OfType<VaultWorkspaceView>());
+            var searchBox = workspace.FindControl<TextBox>("VaultSearchBox")!;
+
+            Assert.True(TryLibraryKey(workspace, viewModel, searchBox, Key.A, KeyModifiers.Control));
+            // The note answers to no bulk command, so select-all cannot invent a check mark for it.
+            Assert.Equal(1, viewModel.VaultBatchCount);
+            Assert.True(viewModel.HasVaultBatchSelection);
+            Assert.True(viewModel.Passwords[0].IsSelected);
+            Assert.False(viewModel.NoteItems[0].IsSelected);
+
+            viewModel.ClearVaultBatchSelectionCommand.Execute(null);
+            Assert.False(viewModel.HasVaultBatchSelection);
+            Assert.False(viewModel.Passwords[0].IsSelected);
+
+            // Typing in the search box means selecting the text in it, not the whole library.
+            searchBox.Focus();
+            Assert.False(TryLibraryKey(workspace, viewModel, searchBox, Key.A, KeyModifiers.Control));
+            Assert.False(viewModel.HasVaultBatchSelection);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    // Select-all deliberately leaves the rows in place, so the ones already on screen have to be told
+    // to read the check mark again. Reading the container rather than the view-model is the point: a
+    // selection that only moves the header count looks exactly like this test failing.
+    [Fact]
+    public void Bulk_selection_repaints_the_check_marks_already_on_screen()
+    {
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        window.Show();
+        try
+        {
+            window.DataContext = viewModel;
+            viewModel.IsUnlocked = true;
+            viewModel.Passwords.Add(Entry(1, "Alpha", 200));
+            viewModel.Passwords.Add(Entry(2, "Bravo", 100));
+            viewModel.SelectSectionCommand.Execute("Vault");
+            Dispatcher.UIThread.RunJobs();
+
+            var workspace = Assert.Single(window.GetVisualDescendants().OfType<VaultWorkspaceView>());
+            var tree = Assert.Single(workspace.GetVisualDescendants().OfType<VaultFolderTree>());
+            var list = tree.FindControl<ListBox>("FolderTreeList")!;
+            var boxes = viewModel.VaultTreeRows.OfType<VaultTreeEntryRow>()
+                .Select(row => Assert.Single(
+                    RowContainer(list, row).GetVisualDescendants().OfType<CheckBox>()))
+                .ToArray();
+
+            Assert.Equal(2, boxes.Length);
+            Assert.All(boxes, box => Assert.False(box.IsChecked));
+
+            viewModel.SelectAllVaultRowsCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.All(boxes, box => Assert.True(box.IsChecked == true));
+
+            viewModel.ClearVaultBatchSelectionCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.All(boxes, box => Assert.False(box.IsChecked));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static ListBoxItem RowContainer(ListBox list, IFolderTreeRow row) =>
+        (ListBoxItem)list.ContainerFromItem(row)!;
+
+    [Fact]
     public void More_menu_sort_and_quick_filters_move_the_tree()
     {
         var window = new Monica.App.MainWindow();
@@ -293,13 +386,15 @@ public sealed class VaultWorkspaceUiTests
         VaultWorkspaceView workspace,
         MainWindowViewModel viewModel,
         Control source,
-        Key key)
+        Key key,
+        KeyModifiers modifiers = KeyModifiers.None)
     {
         var args = new KeyEventArgs
         {
             RoutedEvent = InputElement.KeyDownEvent,
             Source = source,
-            Key = key
+            Key = key,
+            KeyModifiers = modifiers
         };
         workspace.TryHandleShortcut(viewModel, args);
         return args.Handled;

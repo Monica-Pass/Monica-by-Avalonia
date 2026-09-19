@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Avalonia;
 using FluentIcons.Common;
 using Monica.App.Controls;
@@ -109,10 +110,33 @@ public sealed record VaultTreeFolderRow : IVaultTreeRow
     public Symbol EntrySymbol => Symbol.Folder;
 
     public string EntryDetail => "";
+
+    public bool IsBatchable => false;
+
+    public bool CanCopyUsername => false;
+
+    public bool CanCopySecret => false;
+
+    public bool CanCopyCode => false;
+
+    // A folder has no checkbox, so the only way this is ever reached is a stray write; dropping it
+    // keeps the row template free of a per-kind guard.
+    public bool IsSelected
+    {
+        get => false;
+        set { }
+    }
 }
 
-public sealed record VaultTreeEntryRow : IVaultTreeRow
+public sealed record VaultTreeEntryRow : IVaultTreeRow, INotifyPropertyChanged
 {
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    /// A bulk selection changes every check mark without rebuilding the rows, so the host tells the
+    /// rows already on screen to read the entry again.
+    internal void RaiseIsSelectedChanged() =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+
     public required VaultEntryKind Kind { get; init; }
 
     public required string Label { get; init; }
@@ -138,4 +162,36 @@ public sealed record VaultTreeEntryRow : IVaultTreeRow
     public Symbol EntrySymbol => VaultEntryKinds.SymbolFor(Kind);
 
     public string EntryDetail { get; init; } = "";
+
+    /// Notes answer to no bulk command, so only the types with one get a checkbox.
+    public bool IsBatchable =>
+        Password is not null ||
+        Kind is VaultEntryKind.Totp or VaultEntryKind.BankCard or VaultEntryKind.Document or
+            VaultEntryKind.BillingAddress or VaultEntryKind.PaymentAccount;
+
+    public bool CanCopyUsername => Password is { } password && !string.IsNullOrWhiteSpace(password.Username);
+
+    public bool CanCopySecret => Password is not null;
+
+    // A code lives either on the authenticator item itself or inside a password's TOTP seed.
+    public bool CanCopyCode =>
+        Kind == VaultEntryKind.Totp || Password is { HasAuthenticator: true };
+
+    /// The entry, not the row, owns the check mark: the library tree and the detail pages have to
+    /// report one selection, and a rebuild reads it back from here.
+    public bool IsSelected
+    {
+        get => Password?.IsSelected ?? Item?.IsSelected ?? false;
+        set
+        {
+            if (Password is { } password)
+            {
+                password.IsSelected = value;
+            }
+            else if (Item is { } item)
+            {
+                item.IsSelected = value;
+            }
+        }
+    }
 }

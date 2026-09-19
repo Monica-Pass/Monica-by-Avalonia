@@ -93,6 +93,40 @@
                             </MenuFlyout>
                         </Button.Flyout>
                     </Button>
+                    <!-- The check marks live on the entries, so this chip appears the moment any row is
+                         checked and says how many the actions below will sweep up. -->
+                    <Button x:Name="VaultBatchButton"
+                            Classes="workspaceFilterChip"
+                            IsVisible="{Binding HasVaultBatchSelection}"
+                            Content="{Binding VaultBatchLabel}"
+                            AutomationProperties.Name="{Binding VaultBatchLabel}">
+                        <Button.Flyout>
+                            <MenuFlyout>
+                                <MenuItem Header="{Binding L.BatchMove}"
+                                          Command="{Binding MoveVaultBatchToFolderCommand}">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="Folder" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{Binding L.BatchFavorite}"
+                                          IsVisible="{Binding VaultBatchSupportsFavorite}"
+                                          Command="{Binding FavoriteVaultBatchCommand}">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="Star" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{Binding L.BatchArchive}"
+                                          IsVisible="{Binding VaultBatchSupportsArchive}"
+                                          Command="{Binding ArchiveVaultBatchCommand}">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="Archive" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{Binding L.BatchDelete}"
+                                          Command="{Binding DeleteVaultBatchCommand}">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="Delete" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{Binding L.BatchSelectAll}"
+                                          Command="{Binding SelectAllVaultRowsCommand}" />
+                                <MenuItem Header="{Binding L.BatchClear}"
+                                          Command="{Binding ClearVaultBatchSelectionCommand}" />
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
@@ -170,7 +204,10 @@
                                               FolderName="{Binding NewFolderName, Mode=TwoWay}"
                                               EditEntryCommand="{Binding EditSelectedVaultEntryCommand}"
                                               MoveEntryCommand="{Binding MoveSelectedVaultEntryCommand}"
-                                              DeleteEntryCommand="{Binding DeleteSelectedVaultEntryCommand}" />
+                                              DeleteEntryCommand="{Binding DeleteSelectedVaultEntryCommand}"
+                                              CopyRowUsernameCommand="{Binding CopyRowUsernameCommand}"
+                                              CopyRowSecretCommand="{Binding CopyRowSecretCommand}"
+                                              CopyRowCodeCommand="{Binding CopyRowCodeCommand}" />
                     <TextBlock Classes="workspaceMeta"
                                IsVisible="{Binding !HasVaultRows}"
                                Text="{Binding VaultEmptyStateText}"

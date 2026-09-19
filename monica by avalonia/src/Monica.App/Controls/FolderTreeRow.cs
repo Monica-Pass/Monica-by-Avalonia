@@ -32,6 +32,15 @@ public interface IVaultTreeRow : IFolderTreeRow
     bool IsEntryRow { get; }
     Symbol EntrySymbol { get; }
     string EntryDetail { get; }
+
+    // Which actions a row answers to is the host's call, so it arrives as flags rather than as the
+    // vault model: only rows a bulk command can act on show a checkbox, and only rows that hold a
+    // given value show that copy item.
+    bool IsBatchable { get; }
+    bool IsSelected { get; set; }
+    bool CanCopyUsername { get; }
+    bool CanCopySecret { get; }
+    bool CanCopyCode { get; }
 }
 
 // Dropping one folder row onto another asks the host to reparent the source; whether the move is

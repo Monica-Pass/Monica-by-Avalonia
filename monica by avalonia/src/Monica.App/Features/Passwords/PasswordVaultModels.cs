@@ -104,4 +104,15 @@ public sealed record PasswordFolderFilterChoice(
     public bool IsEntryRow => false;
     public Symbol EntrySymbol => Symbol.Folder;
     public string EntryDetail => "";
+
+    // The folder rail holds no entries, so none of its rows can be checked or copied.
+    public bool IsBatchable => false;
+    public bool CanCopyUsername => false;
+    public bool CanCopySecret => false;
+    public bool CanCopyCode => false;
+    public bool IsSelected
+    {
+        get => false;
+        set { }
+    }
 }

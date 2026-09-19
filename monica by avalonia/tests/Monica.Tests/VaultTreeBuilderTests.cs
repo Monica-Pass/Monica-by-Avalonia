@@ -372,6 +372,75 @@ public class VaultTreeBuilderTests
         Assert.Equal(VaultEntryKinds.LabelFor(VaultEntryKind.Password), rows[0].Label);
     }
 
+    [Fact]
+    public void A_row_advertises_only_the_actions_its_entry_can_answer_to()
+    {
+        var rows = VaultTreeBuilder.Build(
+            [Bank],
+            [
+                Password(1, "Work", username: "joyins", authenticatorKey: "JBSWY3DPEHPK3PXP"),
+                Password(2, "Static", categoryId: Bank.Id),
+            ],
+            [Secure(21, VaultItemType.Totp, "Authenticator"), Secure(22, VaultItemType.Note, "Recipes")],
+            [],
+            new VaultTreeFilter());
+        var byKey = rows.ToDictionary(row => row.Key);
+
+        // A folder holds nothing a row action can read, so it advertises no action at all.
+        var folder = byKey["f:Bank"];
+        Assert.False(folder.IsBatchable);
+        Assert.False(folder.CanCopyUsername);
+        Assert.False(folder.CanCopySecret);
+        Assert.False(folder.CanCopyCode);
+
+        var work = byKey["p:1"];
+        Assert.True(work.IsBatchable);
+        Assert.True(work.CanCopyUsername);
+        // The seed lives on the password row, so the code is copied from here rather than from a
+        // separate authenticator leaf.
+        Assert.True(work.CanCopyCode);
+
+        var bare = byKey["p:2"];
+        Assert.False(bare.CanCopyUsername);
+        Assert.False(bare.CanCopyCode);
+
+        // An authenticator item carries a code and neither half of a credential.
+        var totp = byKey["s:21"];
+        Assert.True(totp.IsBatchable);
+        Assert.True(totp.CanCopyCode);
+        Assert.False(totp.CanCopyUsername);
+        Assert.False(totp.CanCopySecret);
+
+        // No bulk command reaches a note, so its row shows no check mark.
+        Assert.False(byKey["s:22"].IsBatchable);
+    }
+
+    [Fact]
+    public void The_check_mark_belongs_to_the_entry_so_a_rebuild_reads_the_same_selection()
+    {
+        var checking = Password(1, "Checking");
+        var card = Secure(21, VaultItemType.BankCard, "Debit");
+        var byKey = VaultTreeBuilder
+            .Build([Bank], [checking], [card], [], new VaultTreeFilter())
+            .ToDictionary(row => row.Key);
+
+        Assert.False(byKey["p:1"].IsSelected);
+        byKey["p:1"].IsSelected = true;
+        byKey["s:21"].IsSelected = true;
+        Assert.True(checking.IsSelected);
+        Assert.True(card.IsSelected);
+
+        var rebuilt = VaultTreeBuilder
+            .Build([Bank], [checking], [card], [], new VaultTreeFilter())
+            .ToDictionary(row => row.Key);
+        Assert.True(rebuilt["p:1"].IsSelected);
+        Assert.True(rebuilt["s:21"].IsSelected);
+
+        // A folder row has no box to check, and a stray write must not reach anything.
+        byKey["f:Bank"].IsSelected = true;
+        Assert.False(byKey["f:Bank"].IsSelected);
+    }
+
     private static List<string> Keys(IReadOnlyList<IVaultTreeRow> rows) => rows.Select(row => row.Key).ToList();
 
     private static double Indent(IVaultTreeRow row) => row.Indent.Left;
@@ -383,6 +452,7 @@ public class VaultTreeBuilderTests
         string username = "",
         string website = "",
         bool favorite = false,
+        string authenticatorKey = "",
         int updatedSecondsAgo = 0,
         int createdSecondsAgo = 0) =>
         new()
@@ -393,6 +463,7 @@ public class VaultTreeBuilderTests
             Username = username,
             Website = website,
             IsFavorite = favorite,
+            AuthenticatorKey = authenticatorKey,
             UpdatedAt = BaseTime.AddSeconds(-updatedSecondsAgo),
             CreatedAt = BaseTime.AddSeconds(-createdSecondsAgo)
         };

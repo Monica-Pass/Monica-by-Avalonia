@@ -46,6 +46,14 @@
         <Style Selector="Button.folderTreeReset.on">
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
         </Style>
+        <!-- A row is 28px tall, so the check mark carries none of the default control padding. -->
+        <Style Selector="CheckBox.treeRowCheck">
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
     </UserControl.Styles>
 
     <Grid RowDefinitions="Auto,Auto,*" RowSpacing="6">
@@ -139,6 +147,26 @@
                                           Command="{Binding #Root.EditEntryCommand}">
                                     <MenuItem.Icon><ic:FluentIcon Icon="Edit" FontSize="14" /></MenuItem.Icon>
                                 </MenuItem>
+                                <!-- A row offers only the values it actually holds, so the flags come from
+                                     the row rather than from a kind test in this control. -->
+                                <MenuItem Header="{Binding #Root.Text.CopyUsername}"
+                                          IsVisible="{Binding CanCopyUsername}"
+                                          Command="{Binding #Root.CopyRowUsernameCommand}"
+                                          CommandParameter="{Binding}">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="Person" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{Binding #Root.Text.CopyPassword}"
+                                          IsVisible="{Binding CanCopySecret}"
+                                          Command="{Binding #Root.CopyRowSecretCommand}"
+                                          CommandParameter="{Binding}">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="Key" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{Binding #Root.Text.CopyCode}"
+                                          IsVisible="{Binding CanCopyCode}"
+                                          Command="{Binding #Root.CopyRowCodeCommand}"
+                                          CommandParameter="{Binding}">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="NumberSymbol" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
                                 <MenuItem Header="{Binding #Root.Text.MoveToFolder}"
                                           IsVisible="{Binding #Root.IsEntrySelection}"
                                           Command="{Binding #Root.MoveEntryCommand}">
@@ -162,6 +190,13 @@
                               ColumnSpacing="6"
                               Margin="{Binding Indent}"
                               VerticalAlignment="Center">
+                            <!-- The check mark is the bulk-selection state the host already keeps on the
+                                 entry, so tree and list pages can never disagree about what is selected.
+                                 It takes the chevron's column: a leaf has no expander to make room for. -->
+                            <CheckBox Classes="treeRowCheck"
+                                      IsChecked="{Binding IsSelected}"
+                                      IsVisible="{Binding IsBatchable}"
+                                      AutomationProperties.Name="{Binding Label}" />
                             <Button Classes="workspaceCommand"
                                     Width="20"
                                     Height="20"

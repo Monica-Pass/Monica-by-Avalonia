@@ -17,7 +17,8 @@ public sealed partial class MainWindowViewModel
     private const int VaultSearchCoalesceMs = 60;
 
     private readonly HashSet<string> _collapsedVaultFolderKeys = new(StringComparer.OrdinalIgnoreCase);
-    private readonly List<INotifyPropertyChanged> _observedVaultEntries = [];
+    private readonly Dictionary<INotifyPropertyChanged, VaultTreeEntryRow> _observedVaultEntries = new(
+        ReferenceEqualityComparer.Instance);
     private DispatcherTimer? _vaultSearchDebounce;
     private bool _isVaultTreeAttached;
     private bool _isRestoringVaultSelection;
@@ -291,13 +292,13 @@ public sealed partial class MainWindowViewModel
         if (observed is not null)
         {
             observed.PropertyChanged += OnVaultEntryPropertyChanged;
-            _observedVaultEntries.Add(observed);
+            _observedVaultEntries[observed] = entry;
         }
     }
 
     private void DetachVaultEntryObservers()
     {
-        foreach (var observed in _observedVaultEntries)
+        foreach (var observed in _observedVaultEntries.Keys)
         {
             observed.PropertyChanged -= OnVaultEntryPropertyChanged;
         }
@@ -313,6 +314,20 @@ public sealed partial class MainWindowViewModel
                 nameof(SecureItem.Title) or nameof(SecureItem.IsFavorite))
         {
             RebuildVaultTree();
+            return;
+        }
+
+        // A row reads its own check mark off the entry, so a selection needs no new rows: the row that
+        // is already on screen is told to read it again, and only the header notices the set moved.
+        if (e.PropertyName is nameof(PasswordEntry.IsSelected) or nameof(SecureItem.IsSelected))
+        {
+            if (sender is INotifyPropertyChanged observed &&
+                _observedVaultEntries.TryGetValue(observed, out var row))
+            {
+                row.RaiseIsSelectedChanged();
+            }
+
+            RaiseVaultBatchState();
         }
     }
 

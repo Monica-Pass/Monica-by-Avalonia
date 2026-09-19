@@ -68,6 +68,17 @@ public partial class VaultFolderTree : UserControl
     public static readonly StyledProperty<ICommand?> DeleteEntryCommandProperty =
         AvaloniaProperty.Register<VaultFolderTree, ICommand?>(nameof(DeleteEntryCommand));
 
+    // Copy is asked for row by row because a tree mixes the kinds that hold different values, and
+    // the parameter is the row itself so a copy never waits for the selection to catch up.
+    public static readonly StyledProperty<ICommand?> CopyRowUsernameCommandProperty =
+        AvaloniaProperty.Register<VaultFolderTree, ICommand?>(nameof(CopyRowUsernameCommand));
+
+    public static readonly StyledProperty<ICommand?> CopyRowSecretCommandProperty =
+        AvaloniaProperty.Register<VaultFolderTree, ICommand?>(nameof(CopyRowSecretCommand));
+
+    public static readonly StyledProperty<ICommand?> CopyRowCodeCommandProperty =
+        AvaloniaProperty.Register<VaultFolderTree, ICommand?>(nameof(CopyRowCodeCommand));
+
     public static readonly StyledProperty<bool> CanManageSelectedProperty =
         AvaloniaProperty.Register<VaultFolderTree, bool>(nameof(CanManageSelected));
 
@@ -182,6 +193,24 @@ public partial class VaultFolderTree : UserControl
     {
         get => GetValue(DeleteEntryCommandProperty);
         set => SetValue(DeleteEntryCommandProperty, value);
+    }
+
+    public ICommand? CopyRowUsernameCommand
+    {
+        get => GetValue(CopyRowUsernameCommandProperty);
+        set => SetValue(CopyRowUsernameCommandProperty, value);
+    }
+
+    public ICommand? CopyRowSecretCommand
+    {
+        get => GetValue(CopyRowSecretCommandProperty);
+        set => SetValue(CopyRowSecretCommandProperty, value);
+    }
+
+    public ICommand? CopyRowCodeCommand
+    {
+        get => GetValue(CopyRowCodeCommandProperty);
+        set => SetValue(CopyRowCodeCommandProperty, value);
     }
 
     public bool IsEntrySelection

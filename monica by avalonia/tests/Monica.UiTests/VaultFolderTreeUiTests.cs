@@ -106,12 +106,18 @@ public sealed class VaultFolderTreeUiTests
     [Fact]
     public void Folder_rows_are_right_clickable_across_their_full_width()
     {
+        var deleteFolder = new DelegateCommand(() => { });
+        var deleteEntry = new DelegateCommand(() => { });
+        var copySecret = new DelegateCommand<IVaultTreeRow>(_ => { });
         var selected = new FakeFolderRow("alpha", "Alpha");
         var row = new FakeFolderRow("beta", "Beta");
         var tree = new VaultFolderTree
         {
             ItemsSource = new[] { selected, row },
             SelectedItem = selected,
+            DeleteFolderCommand = deleteFolder,
+            DeleteEntryCommand = deleteEntry,
+            CopyRowSecretCommand = copySecret,
         };
         var window = new Window { Content = tree };
         window.Show();
@@ -140,12 +146,13 @@ public sealed class VaultFolderTreeUiTests
                 window.GetVisualDescendants().OfType<ContextMenu>(),
                 contextMenu => ReferenceEquals(contextMenu, menuHost.ContextMenu));
             var items = menu.Items.OfType<MenuItem>().ToArray();
-            Assert.Equal(6, items.Length);
 
-            // One menu holds both groups; a folder row shows only the folder half of it.
-            Assert.All(items.Take(3), item => Assert.True(item.IsVisible));
-            Assert.All(items.Skip(3), item => Assert.False(item.IsVisible));
-            Assert.All(items.Skip(1).Take(2), item => Assert.False(item.IsEnabled));
+            // One menu holds every group; a folder row shows only the folder half of it, and a
+            // folder it cannot delete stays in the menu disabled rather than vanishing.
+            Assert.True(ItemFor(items, deleteFolder).IsVisible);
+            Assert.False(ItemFor(items, deleteFolder).IsEnabled);
+            Assert.False(ItemFor(items, deleteEntry).IsVisible);
+            Assert.False(ItemFor(items, copySecret).IsVisible);
         }
         finally
         {
@@ -159,11 +166,13 @@ public sealed class VaultFolderTreeUiTests
         var deletes = 0;
         var folder = new FakeFolderRow("alpha", "Alpha");
         var entry = new FakeEntryRow("p:1", "Checking");
+        var deleteFolder = new DelegateCommand(() => { });
         var deleteEntry = new DelegateCommand(() => deletes++);
         var tree = new VaultFolderTree
         {
             ItemsSource = new IFolderTreeRow[] { folder, entry },
             CanManageSelected = true,
+            DeleteFolderCommand = deleteFolder,
             DeleteEntryCommand = deleteEntry,
         };
         var window = new Window { Content = tree };
@@ -185,12 +194,71 @@ public sealed class VaultFolderTreeUiTests
             Assert.NotNull(entryMenuHost);
 
             var items = MenuItems(entryMenuHost!);
-            Assert.All(items.Take(3), item => Assert.False(item.IsVisible));
-            Assert.All(items.Skip(3), item => Assert.True(item.IsVisible));
-            Assert.Same(deleteEntry, items[5].Command);
+            Assert.False(ItemFor(items, deleteFolder).IsVisible);
+            Assert.True(ItemFor(items, deleteEntry).IsVisible);
 
-            items[5].Command!.Execute(null);
+            ItemFor(items, deleteEntry).Command!.Execute(null);
             Assert.Equal(1, deletes);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [Fact]
+    public void Entry_rows_carry_only_the_copy_actions_and_the_check_mark_they_can_answer_to()
+    {
+        var copied = new List<IVaultTreeRow>();
+        var credential = new FakeEntryRow("p:1", "Checking")
+        {
+            CanCopyUsername = true,
+            CanCopySecret = true,
+            IsBatchable = true
+        };
+        var folder = new FakeFolderRow("alpha", "Alpha");
+        var copyUsername = new DelegateCommand<IVaultTreeRow>(copied.Add);
+        var copySecret = new DelegateCommand<IVaultTreeRow>(copied.Add);
+        var copyCode = new DelegateCommand<IVaultTreeRow>(copied.Add);
+        var tree = new VaultFolderTree
+        {
+            ItemsSource = new IFolderTreeRow[] { folder, credential },
+            CopyRowUsernameCommand = copyUsername,
+            CopyRowSecretCommand = copySecret,
+            CopyRowCodeCommand = copyCode,
+        };
+        var window = new Window { Content = tree };
+        window.Show();
+        try
+        {
+            Dispatcher.UIThread.RunJobs();
+
+            var list = tree.FindControl<ListBox>("FolderTreeList")!;
+            var credentialItem = RowContainer(list, credential);
+            var folderItem = RowContainer(list, folder);
+
+            // A row with no bulk command behind it keeps its check mark out of the layout instead of
+            // showing a box that would check nothing.
+            var credentialCheck = Assert.Single(credentialItem.GetVisualDescendants().OfType<CheckBox>());
+            Assert.True(credentialCheck.IsVisible);
+            Assert.False(Assert.Single(folderItem.GetVisualDescendants().OfType<CheckBox>()).IsVisible);
+
+            credentialCheck.IsChecked = true;
+            Assert.True(credential.IsSelected);
+
+            window.MouseDown(CenterOf(window, credentialItem), MouseButton.Right);
+            window.MouseUp(CenterOf(window, credentialItem), MouseButton.Right);
+            Dispatcher.UIThread.RunJobs();
+
+            var items = MenuItems(RowContextMenuHost(credentialItem)!);
+            Assert.True(ItemFor(items, copyUsername).IsVisible);
+            Assert.True(ItemFor(items, copySecret).IsVisible);
+            // Nothing on this row holds a code, so the item is not offered at all.
+            Assert.False(ItemFor(items, copyCode).IsVisible);
+
+            // The menu acts on the row it was opened from, whatever the list selection says.
+            ItemFor(items, copySecret).Command!.Execute(ItemFor(items, copySecret).CommandParameter);
+            Assert.Same(credential, Assert.Single(copied));
         }
         finally
         {
@@ -402,9 +470,12 @@ public sealed class VaultFolderTreeUiTests
 
             // Every row realizes the chevron button, and the button asks the host whether it can
             // run even on a leaf it hides the chevron for; a host command narrowed to one row type
-            // throws here rather than declining quietly.
+            // throws here rather than declining quietly. The check mark is a Button too, so the
+            // command it answers to is what makes a button the chevron.
             var entryItem = RowContainer(list, entry);
-            var chevron = entryItem.GetVisualDescendants().OfType<Button>().Single();
+            var chevron = entryItem.GetVisualDescendants()
+                .OfType<Button>()
+                .Single(button => ReferenceEquals(button.Command, tree.ToggleExpansionCommand));
             chevron.Command!.Execute(chevron.CommandParameter);
 
             var toggledRow = Assert.Single(toggled);
@@ -463,7 +534,7 @@ public sealed class VaultFolderTreeUiTests
     {
         var glyph = Assert.Single(
             RowContainer(list, row).GetVisualDescendants().OfType<FluentIcon>(),
-            icon => Grid.GetColumn(icon) == 1);
+            icon => icon.GetVisualParent() is Grid);
         return (Symbol)glyph.Icon;
     }
 
@@ -475,6 +546,11 @@ public sealed class VaultFolderTreeUiTests
 
     private static MenuItem[] MenuItems(Panel host) =>
         host.ContextMenu!.Items.OfType<MenuItem>().ToArray();
+
+    // Menus carry items the row hides rather than dropping them, so tests name an item by the
+    // command behind it — a position would move every time the menu gains an action.
+    private static MenuItem ItemFor(MenuItem[] items, ICommand command) =>
+        items.Single(item => ReferenceEquals(item.Command, command));
 
     private static Point CenterOf(Window window, ListBoxItem item) =>
         item.TranslatePoint(new Point(item.Bounds.Width / 2, item.Bounds.Height / 2), window)!.Value;
@@ -494,6 +570,20 @@ public sealed class VaultFolderTreeUiTests
         public Symbol EntrySymbol => Symbol.Folder;
 
         public string EntryDetail => "";
+
+        public bool IsBatchable => false;
+
+        public bool CanCopyUsername => false;
+
+        public bool CanCopySecret => false;
+
+        public bool CanCopyCode => false;
+
+        public bool IsSelected
+        {
+            get => false;
+            set { }
+        }
     }
 
     private sealed record FakeEntryRow(string Key, string Label) : IVaultTreeRow
@@ -511,6 +601,16 @@ public sealed class VaultFolderTreeUiTests
         public Symbol EntrySymbol => Symbol.Key;
 
         public string EntryDetail => "joyins";
+
+        public bool IsBatchable { get; init; }
+
+        public bool CanCopyUsername { get; init; }
+
+        public bool CanCopySecret { get; init; }
+
+        public bool CanCopyCode { get; init; }
+
+        public bool IsSelected { get; set; }
     }
 
     private sealed class RecordingMoveCommand(List<FolderMoveRequest> moves, bool accepts = true) : ICommand

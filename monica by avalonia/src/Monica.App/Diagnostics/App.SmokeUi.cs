@@ -230,6 +230,17 @@ public partial class App
                     $"Smoke UI keyboard checks result. success={success}, status={viewModel.StatusMessage}");
             }
 
+            if (HasSmokeUiFlag(Environment.GetCommandLineArgs(), "--smoke-ui-batch-select"))
+            {
+                // The same command the header chip and Ctrl+A raise, so this proves the published
+                // build reaches the bulk state — and leaves it on screen for the capture below.
+                viewModel.SelectAllVaultRowsCommand.Execute(null);
+                var batchSelected = viewModel.HasVaultBatchSelection && viewModel.VaultBatchCount > 0;
+                smokeSuccess &= batchSelected;
+                AppDiagnostics.Info(
+                    $"Smoke UI batch selection result. success={batchSelected}, count={viewModel.VaultBatchCount}");
+            }
+
             if (!string.IsNullOrWhiteSpace(smokeScreenshotDirectory))
             {
                 var success = await mainWindow.RunSmokeUiOtherPagesScreenshotsAsync(smokeScreenshotDirectory);

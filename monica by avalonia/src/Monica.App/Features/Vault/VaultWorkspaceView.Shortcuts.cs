@@ -121,6 +121,13 @@ public partial class VaultWorkspaceView
             return TryCopySelected(viewModel, row, e, copySecret: e.KeyModifiers.HasFlag(KeyModifiers.Shift));
         }
 
+        // Checked rows are what the header's batch actions sweep up, so Ctrl+A has to stop at the
+        // rows this tree is showing right now, and the search box keeps its own select-all.
+        if (e.Key == Key.A && e.KeyModifiers == KeyModifiers.Control && !IsSearchFocused)
+        {
+            return ExecuteOnSelection(viewModel.SelectAllVaultRowsCommand, viewModel, e);
+        }
+
         if (e.KeyModifiers != KeyModifiers.None)
         {
             return false;

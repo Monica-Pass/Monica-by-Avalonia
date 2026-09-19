@@ -93,6 +93,9 @@ public interface ILocalizationService : INotifyPropertyChanged
     string BatchFavorite { get; }
     string BatchArchive { get; }
     string BatchDelete { get; }
+    string BatchMove { get; }
+    string BatchSelectAll { get; }
+    string BatchClear { get; }
     string MoveToFolder { get; }
     string Move { get; }
     string MoveSelectedPasswordsDescription { get; }
@@ -597,6 +600,9 @@ public sealed class LocalizationService : ILocalizationService
     public string BatchFavorite => Text();
     public string BatchArchive => Text();
     public string BatchDelete => Text();
+    public string BatchMove => Text();
+    public string BatchSelectAll => Text();
+    public string BatchClear => Text();
     public string MoveToFolder => Text();
     public string Move => Text();
     public string MoveSelectedPasswordsDescription => Text();
@@ -1157,6 +1163,10 @@ public sealed class LocalizationService : ILocalizationService
         ["BatchFavorite"] = "Favorite selected",
         ["BatchArchive"] = "Archive selected",
         ["BatchDelete"] = "Delete selected",
+        ["BatchMove"] = "Move selected",
+        ["BatchSelectAll"] = "Select all shown",
+        ["BatchClear"] = "Clear selection",
+        ["BatchCountFormat"] = "{0} selected",
         ["MoveToFolder"] = "Move to folder",
         ["Move"] = "Move",
         ["MoveSelectedPasswordsDescription"] = "Choose the folder/category that should own the selected password records.",
@@ -2536,6 +2546,10 @@ public sealed class LocalizationService : ILocalizationService
         ["BatchFavorite"] = "收藏所选",
         ["BatchArchive"] = "归档所选",
         ["BatchDelete"] = "删除所选",
+        ["BatchMove"] = "移动所选",
+        ["BatchSelectAll"] = "选择显示的项目",
+        ["BatchClear"] = "取消选择",
+        ["BatchCountFormat"] = "已选 {0} 项",
         ["MoveToFolder"] = "移动到文件夹",
         ["Move"] = "移动",
         ["ArchivePassword"] = "归档密码",
