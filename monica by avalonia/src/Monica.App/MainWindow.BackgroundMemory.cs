@@ -53,7 +53,7 @@ public partial class MainWindow
     }
 
     private void SynchronizeBackgroundMemoryState(MainWindowViewModel? viewModel) =>
-        viewModel?.SetUnlockedShellHibernated(_isUnlockedShellHibernated);
+        viewModel?.SetShellHibernatedByWindow(_isUnlockedShellHibernated);
 
     private void BackgroundMemoryOnClosed(object? sender, EventArgs e)
     {

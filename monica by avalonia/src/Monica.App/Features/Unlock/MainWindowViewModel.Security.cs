@@ -97,6 +97,7 @@ public sealed partial class MainWindowViewModel
         RaiseDesktopIntegrationPresentationState();
         if (value)
         {
+            SetShellHibernatedByLock(false);
             _vaultSessionService.MarkUnlocked();
             IsPrivacyScreenVisible = false;
             NotifyAutoLockScheduleChanged();
@@ -105,6 +106,7 @@ public sealed partial class MainWindowViewModel
 
         CancelSensitiveBackgroundWork();
         CancelBitwardenOperationAndClearSecrets();
+        SetShellHibernatedByLock(true);
         _vaultSessionService.MarkLocked();
         NotifyAutoLockScheduleChanged();
     }

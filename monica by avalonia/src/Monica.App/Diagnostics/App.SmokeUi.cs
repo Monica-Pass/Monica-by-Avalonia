@@ -242,11 +242,54 @@ public partial class App
                 $"Smoke UI release gate completed. success={smokeSuccess}, " +
                 $"loadMs={viewModel.LastVaultLoadDurationMilliseconds}, passwords={viewModel.Passwords.Count}, " +
                 $"notes={viewModel.NoteItems.Count}, totp={viewModel.TotpItems.Count}, wallet={viewModel.WalletItems.Count}");
+            var lockCycleSuccess = true;
+            if (HasSmokeUiFlag(Environment.GetCommandLineArgs(), "--smoke-ui-lock-after-checks"))
+            {
+                lockCycleSuccess = await RunSmokeUiPostLockMemorySampleAsync(viewModel, password);
+            }
+
             if (smokeExitAfterChecks)
             {
-                desktop.Shutdown(smokeSuccess ? 0 : 1);
+                desktop.Shutdown(smokeSuccess && lockCycleSuccess ? 0 : 1);
             }
         }, DispatcherPriority.Background);
+    }
+
+    private static async Task<bool> RunSmokeUiPostLockMemorySampleAsync(
+        MainWindowViewModel viewModel,
+        string password)
+    {
+        ReportSmokeUiMemory(viewModel, "unlocked");
+        viewModel.LockCommand.Execute(null);
+        var locked = await WaitForSmokeConditionAsync(() => !viewModel.IsUnlocked, TimeSpan.FromSeconds(10));
+        // The lock handler schedules its compaction one second later, so sample only after it lands.
+        await Task.Delay(2500);
+        ReportSmokeUiMemory(viewModel, "locked");
+
+        // The shell caches are released on lock, so re-unlocking must rebuild them from the vault.
+        viewModel.MasterPassword = password;
+        await viewModel.UnlockCommand.ExecuteAsync(null);
+        var restored = await WaitForSmokeConditionAsync(
+            () => viewModel.IsUnlocked && viewModel.Passwords.Count > 0,
+            TimeSpan.FromSeconds(20));
+        AppDiagnostics.Info(
+            $"Smoke UI lock cycle result. locked={locked}, reUnlocked={restored}, " +
+            $"passwords={viewModel.Passwords.Count}, notes={viewModel.NoteItems.Count}");
+        return locked && restored;
+    }
+
+    private static void ReportSmokeUiMemory(MainWindowViewModel viewModel, string stage)
+    {
+        using var process = System.Diagnostics.Process.GetCurrentProcess();
+        var workingSetMb = Environment.WorkingSet / 1048576d;
+        var privateMb = process.PrivateMemorySize64 / 1048576d;
+        var peakWorkingSetMb = process.PeakWorkingSet64 / 1048576d;
+        var managedMb = GC.GetTotalMemory(forceFullCollection: false) / 1048576d;
+        AppDiagnostics.Info(
+            $"Smoke UI memory. stage={stage}, unlocked={viewModel.IsUnlocked}, " +
+            $"workingSetMB={workingSetMb:F1}, privateMB={privateMb:F1}, " +
+            $"peakWorkingSetMB={peakWorkingSetMb:F1}, managedHeapMB={managedMb:F1}, " +
+            $"threads={process.Threads.Count}");
     }
 
     private static void ApplySmokeUiViewportSize(MainWindow mainWindow, SmokeUiViewportSize? smokeViewportSize)

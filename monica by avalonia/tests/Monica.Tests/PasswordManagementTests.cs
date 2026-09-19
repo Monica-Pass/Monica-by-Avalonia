@@ -2057,10 +2057,10 @@ public sealed partial class PasswordManagementTests
         Assert.Equal(12, harness.ViewModel.PasswordQuickAccessRecordCacheCount);
         Assert.Equal(6, harness.ViewModel.RecentPasswordQuickAccessItems.Count());
         Assert.Equal(6, harness.ViewModel.FrequentPasswordQuickAccessItems.Count());
-        harness.ViewModel.SetUnlockedShellHibernated(true);
+        harness.ViewModel.SetShellHibernatedByWindow(true);
         Assert.Equal(12, harness.ViewModel.PasswordQuickAccessRecordCacheCount);
 
-        harness.ViewModel.SetUnlockedShellHibernated(false);
+        harness.ViewModel.SetShellHibernatedByWindow(false);
         var previouslyUncached = harness.ViewModel.Passwords.Single(item => item.Id == entries[6].Id);
         await harness.ViewModel.ShowPasswordDetailsCommand.ExecuteAsync(previouslyUncached);
 
@@ -3998,7 +3998,7 @@ public sealed partial class PasswordManagementTests
         var check = harness.ViewModel.CheckCompromisedPasswordsCommand.ExecuteAsync(null);
         await service.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
 
-        harness.ViewModel.SetUnlockedShellHibernated(true);
+        harness.ViewModel.SetShellHibernatedByWindow(true);
         await check;
 
         Assert.True(service.WasCancelled);
@@ -4070,18 +4070,18 @@ public sealed partial class PasswordManagementTests
             });
         }
 
-        harness.ViewModel.SetUnlockedShellHibernated(true);
-        harness.ViewModel.SetUnlockedShellHibernated(false);
+        harness.ViewModel.SetShellHibernatedByWindow(true);
+        harness.ViewModel.SetShellHibernatedByWindow(false);
         harness.ViewModel.SelectedSection = "SecurityAnalysis";
         await generator.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
         Assert.True(harness.ViewModel.IsRefreshingSecurityAnalysis);
 
-        harness.ViewModel.SetUnlockedShellHibernated(true);
+        harness.ViewModel.SetShellHibernatedByWindow(true);
         Assert.Empty(harness.ViewModel.SecuritySummaryItems);
         Assert.Empty(harness.ViewModel.SecurityIssueItems);
         Assert.Empty(harness.ViewModel.FilteredSecurityIssueItems);
 
-        harness.ViewModel.SetUnlockedShellHibernated(false);
+        harness.ViewModel.SetShellHibernatedByWindow(false);
         generator.Release();
         WaitForCondition(() =>
             !harness.ViewModel.IsRefreshingSecurityAnalysis &&

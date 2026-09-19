@@ -27,7 +27,7 @@ public sealed partial class PasswordManagementTests
         var historyItem = Assert.Single(harness.ViewModel.GeneratedPasswordHistory);
         historyItem.ToggleVisibilityCommand.Execute(null);
 
-        harness.ViewModel.SetUnlockedShellHibernated(true);
+        harness.ViewModel.SetShellHibernatedByWindow(true);
 
         Assert.Empty(harness.ViewModel.GeneratedPassword);
         Assert.Empty(harness.ViewModel.GeneratedPasswordHistory);

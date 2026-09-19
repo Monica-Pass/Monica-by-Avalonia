@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -394,6 +395,7 @@ public partial class MainWindow
         }
 
         var failures = new List<string>();
+        var frameHashes = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         var sections = new[]
         {
             "Vault",
@@ -417,6 +419,19 @@ public partial class MainWindow
             foreach (var section in sections)
             {
                 viewModel.SelectSectionCommand.Execute(section);
+                var settled = await WaitForSmokeWindowConditionAsync(
+                    () => viewModel.IsUnlocked &&
+                          string.Equals(viewModel.SelectedSection, section, StringComparison.OrdinalIgnoreCase),
+                    TimeSpan.FromSeconds(3));
+                if (!settled)
+                {
+                    failures.Add($"{section}:not-settled");
+                    AppDiagnostics.Info(
+                        $"Smoke UI screenshot skipped. section={section}, reason=section-not-settled, " +
+                        $"selected={viewModel.SelectedSection}, unlocked={viewModel.IsUnlocked}");
+                    continue;
+                }
+
                 await Task.Delay(150);
 
                 var fileName = $"{section}_{Math.Max(1, (int)Math.Round(Bounds.Width))}x{Math.Max(1, (int)Math.Round(Bounds.Height))}.png";
@@ -428,7 +443,19 @@ public partial class MainWindow
                     continue;
                 }
 
-                AppDiagnostics.Info($"Smoke UI screenshot saved. section={section}, path={path}");
+                var hash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
+                if (frameHashes.TryGetValue(hash, out var twins))
+                {
+                    failures.Add($"{section}:duplicate-of-{twins[0]}");
+                    twins.Add(section);
+                    AppDiagnostics.Info(
+                        $"Smoke UI screenshot duplicated. section={section}, sameFrameAs={string.Join(",", twins)}");
+                }
+                else
+                {
+                    frameHashes[hash] = new List<string> { section };
+                    AppDiagnostics.Info($"Smoke UI screenshot saved. section={section}, path={path}, sha256={hash[..12]}");
+                }
             }
         }
         catch (Exception ex)
@@ -440,7 +467,8 @@ public partial class MainWindow
         var success = failures.Count == 0;
         AppDiagnostics.Info(
             $"Smoke UI other pages screenshots completed. success={success}, " +
-            $"failureCount={failures.Count}, failures={string.Join(",", failures)}, directory={screenshotDirectory}");
+            $"failureCount={failures.Count}, failures={string.Join(",", failures)}, " +
+            $"distinctFrames={frameHashes.Count}, directory={screenshotDirectory}");
         return success;
     }
 
