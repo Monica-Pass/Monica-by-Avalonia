@@ -19,25 +19,42 @@ public sealed class MdbxUniffiNativeBridge : IMdbxNativeBridge
     // Android falls back to this when an attachment carries no declared mime type.
     private const string DefaultMediaType = "application/octet-stream";
 
-    private static readonly Lazy<MdbxRuntimeManifest?> Manifest = new(() =>
+    private static readonly Lazy<(MdbxRuntimeManifest? Manifest, string? Error)> Runtime = new(() =>
     {
         try
         {
             // Touching the bindings validates the scaffolding contract version and every
             // method checksum, so an ABI skew is reported here rather than on first use.
-            return MdbxFfi.MdbxRuntimeManifest();
+            return (MdbxFfi.MdbxRuntimeManifest(), null);
         }
         catch (Exception ex) when (ex is UniffiException or DllNotFoundException or SEHException
                                    or EntryPointNotFoundException or BadImageFormatException
                                    or TypeInitializationException)
         {
-            return null;
+            return (null, DescribeLoadFailure(ex));
         }
     });
 
-    public bool IsAvailable => Manifest.Value is not null;
+    public bool IsAvailable => Runtime.Value.Manifest is not null;
 
-    public string WritableStorageFormat => Manifest.Value?.WritableStorageFormat ?? "";
+    // Without the reason, every caller downstream of a missing engine can only report "no entries",
+    // which reads to the user exactly like a vault that is genuinely empty.
+    public string? AvailabilityError => Runtime.Value.Error;
+
+    public string WritableStorageFormat => Runtime.Value.Manifest?.WritableStorageFormat ?? "";
+
+    private static string DescribeLoadFailure(Exception ex) =>
+        $"The native vault engine ({ExpectedLibraryName()}) could not be loaded: {ex.GetType().Name}: {ex.Message}";
+
+    private static string ExpectedLibraryName()
+    {
+        var fileName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+            ? "mdbx_ffi.dll"
+            : RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+                ? "libmdbx_ffi.dylib"
+                : "libmdbx_ffi.so";
+        return $"{fileName}, {RuntimeInformation.OSDescription} {RuntimeInformation.ProcessArchitecture}";
+    }
 
     public Task<IMdbxNativeVault> CreateVaultAsync(
         string path,

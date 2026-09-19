@@ -1,5 +1,6 @@
 using Monica.Core.Services;
 using Monica.Data;
+using Monica.Data.Mdbx;
 
 namespace Monica.App.Services;
 
@@ -32,6 +33,7 @@ public enum VaultUnlockStatus
     PasswordTooShort,
     ConfirmationMismatch,
     WrongPassword,
+    StorageEngineUnavailable,
     Failed
 }
 
@@ -39,7 +41,8 @@ public sealed class VaultUnlockCoordinator(
     IVaultCredentialStore credentialStore,
     ICryptoService cryptoService,
     ILegacyVaultDetector legacyVaultDetector,
-    ICanonicalVaultBootstrapService? canonicalVaultBootstrapService = null) : IVaultUnlockCoordinator
+    ICanonicalVaultBootstrapService? canonicalVaultBootstrapService = null,
+    IMdbxNativeBridge? nativeBridge = null) : IVaultUnlockCoordinator
 {
     public async Task<VaultInitializationState> InitializeAsync(CancellationToken cancellationToken = default)
     {
@@ -72,6 +75,19 @@ public sealed class VaultUnlockCoordinator(
             }
 
             var storedHash = await credentialStore.GetAsync(cancellationToken);
+
+            // Every vault read comes back empty without the engine, so an Unlocked result would
+            // advertise a working vault that shows nothing - and on first run the master password
+            // below would be stored for a vault that can never be created.
+            if (nativeBridge is { IsAvailable: false })
+            {
+                return new VaultUnlockResult(
+                    VaultUnlockStatus.StorageEngineUnavailable,
+                    storedHash is not null,
+                    "VaultStorageEngineUnavailable",
+                    new InvalidOperationException(nativeBridge.AvailabilityError ?? "Native vault engine is unavailable."));
+            }
+
             var created = false;
             if (storedHash is null)
             {

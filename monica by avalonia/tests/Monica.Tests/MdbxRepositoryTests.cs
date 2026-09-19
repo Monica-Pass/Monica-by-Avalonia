@@ -2811,6 +2811,7 @@ public sealed class MdbxRepositoryTests
         private readonly Dictionary<string, FakeMdbxNativeVault> _vaults = new(StringComparer.OrdinalIgnoreCase);
 
         public bool IsAvailable => true;
+        public string? AvailabilityError => null;
         public string WritableStorageFormat => "MDBX-2";
         public List<string> OpenedPaths { get; } = [];
         public int DisposedVaultCount => _vaults.Values.Sum(vault => vault.DisposeCount);

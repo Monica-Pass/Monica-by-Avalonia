@@ -526,6 +526,7 @@ public sealed partial class PlatformServiceTests
     private sealed class RecordingNativeBridge : IMdbxNativeBridge
     {
         public bool IsAvailable => true;
+        public string? AvailabilityError => null;
         public string WritableStorageFormat => "MDBX-2";
         public int CreateCalls { get; private set; }
         public int OpenCalls { get; private set; }

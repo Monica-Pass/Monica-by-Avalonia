@@ -6,6 +6,10 @@ public interface IMdbxNativeBridge
 {
     bool IsAvailable { get; }
 
+    /// <summary>Why the native engine could not be loaded, or null when it loaded. An empty vault is not
+    /// an acceptable answer while this is set: callers have to surface it instead.</summary>
+    string? AvailabilityError { get; }
+
     /// <summary>Storage format the loaded native runtime writes, or empty when it could not be probed.</summary>
     string WritableStorageFormat { get; }
 

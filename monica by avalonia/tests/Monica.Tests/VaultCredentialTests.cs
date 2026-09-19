@@ -1,6 +1,7 @@
 using Monica.Core.ImportExport;
 using Monica.Core.Services;
 using Monica.Data;
+using Monica.Data.Mdbx;
 using Monica.Data.Repositories;
 using Monica.App.ViewModels;
 using Monica.App.Services;
@@ -216,6 +217,74 @@ public sealed partial class VaultCredentialTests
 
         Assert.Equal(VaultUnlockStatus.WrongPassword, wrong.Status);
         Assert.Equal(VaultUnlockStatus.Unlocked, unlocked.Status);
+    }
+
+    [Fact]
+    public async Task Unlock_coordinator_refuses_a_missing_engine_before_storing_a_credential()
+    {
+        var freshPath = GetTempDatabasePath();
+        var freshFactory = new SqliteConnectionFactory(freshPath);
+        var freshStore = new VaultCredentialStore(freshFactory, new DatabaseMigrator(freshFactory));
+        var firstRun = await new VaultUnlockCoordinator(
+            freshStore,
+            new CryptoService(),
+            new LegacyVaultDetector(freshFactory),
+            nativeBridge: new UnavailableMdbxNativeBridge())
+            .UnlockOrCreateAsync("correct password", "correct password", LegacyVaultDetection.Empty);
+        var storedAfterRefusal = await freshStore.GetAsync();
+
+        var existingPath = GetTempDatabasePath();
+        var existingFactory = new SqliteConnectionFactory(existingPath);
+        var existingStore = new VaultCredentialStore(existingFactory, new DatabaseMigrator(existingFactory));
+        await existingStore.SaveAsync(new CryptoService().HashMasterPassword("correct password"));
+        var existingVault = await new VaultUnlockCoordinator(
+            existingStore,
+            new CryptoService(),
+            new LegacyVaultDetector(existingFactory),
+            nativeBridge: new UnavailableMdbxNativeBridge())
+            .UnlockOrCreateAsync("correct password", "", LegacyVaultDetection.Empty);
+        var withEngine = await new VaultUnlockCoordinator(
+            existingStore,
+            new CryptoService(),
+            new LegacyVaultDetector(existingFactory),
+            nativeBridge: new LoadedNativeBridgeStub())
+            .UnlockOrCreateAsync("correct password", "", LegacyVaultDetection.Empty);
+
+        Assert.Equal(VaultUnlockStatus.StorageEngineUnavailable, firstRun.Status);
+        // Reporting Unlocked over an engine that cannot write would leave a master password behind for a
+        // vault that can never be created, which the next launch shows as an empty vault.
+        Assert.Null(storedAfterRefusal);
+        Assert.Equal(VaultUnlockStatus.StorageEngineUnavailable, existingVault.Status);
+        Assert.True(existingVault.IsVaultInitialized);
+        Assert.NotNull(existingVault.Error);
+        // The engine flag is the only difference between the last two results.
+        Assert.Equal(VaultUnlockStatus.Unlocked, withEngine.Status);
+    }
+
+    [Fact]
+    public async Task Vault_unlock_reports_a_missing_storage_engine_instead_of_an_empty_vault()
+    {
+        var path = GetTempDatabasePath();
+        var factory = new SqliteConnectionFactory(path);
+        var viewModel = CreateViewModel(
+            path,
+            vaultUnlockCoordinator: new VaultUnlockCoordinator(
+                new VaultCredentialStore(factory, new DatabaseMigrator(factory)),
+                new CryptoService(),
+                new LegacyVaultDetector(factory),
+                nativeBridge: new UnavailableMdbxNativeBridge()));
+        await viewModel.InitializeAsync();
+        viewModel.MasterPassword = "correct password";
+
+        await viewModel.UnlockCommand.ExecuteAsync(null);
+        var reported = viewModel.StatusMessage;
+
+        Assert.False(viewModel.IsUnlocked);
+        Assert.True(viewModel.HasUnlockError);
+        Assert.Equal(viewModel.L.Get("VaultStorageEngineUnavailable"), reported);
+        Assert.DoesNotContain("VaultStorageEngineUnavailable", reported, StringComparison.Ordinal);
+        // The generic line reads as "try again", which sends the user retrying into the same dead end.
+        Assert.NotEqual(viewModel.L.Get("VaultAccessUnlockFailed"), reported);
     }
 
     [Fact]
@@ -714,6 +783,30 @@ public sealed partial class VaultCredentialTests
             LegacyVaultDetection legacyVaultDetection,
             CancellationToken cancellationToken = default) =>
             Task.FromException<VaultUnlockResult>(new NotSupportedException());
+    }
+
+    private sealed class LoadedNativeBridgeStub : IMdbxNativeBridge
+    {
+        public bool IsAvailable => true;
+
+        public string? AvailabilityError => null;
+
+        public string WritableStorageFormat => "MDBX-2";
+
+        public Task<IMdbxNativeVault> CreateVaultAsync(
+            string path,
+            string password,
+            string deviceId,
+            MdbxTigaMode mode,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IMdbxNativeVault> OpenVaultAsync(
+            string path,
+            string password,
+            string deviceId,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class FailedVaultUnlockCoordinator(string detail) : IVaultUnlockCoordinator

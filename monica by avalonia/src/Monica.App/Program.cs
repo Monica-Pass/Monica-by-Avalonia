@@ -123,7 +123,20 @@ class Program
             var nativeBridge = new MdbxUniffiNativeBridge();
             if (!nativeBridge.IsAvailable)
             {
-                Console.WriteLine("Vault smoke readback skipped: native MDBX is unavailable on this runtime.");
+                // The readback below is the only step that proves the engine shipped inside this
+                // artifact can read a vault, so skipping it has to stay a failure whenever a canonical
+                // vault is actually present: measured with mdbx_ffi.dll removed from a published folder,
+                // this command reported "Vault smoke test passed." against 27 stored passwords.
+                if (HasCanonicalVaultFiles(args[1]))
+                {
+                    Console.Error.WriteLine(
+                        $"Vault smoke test failed: {nativeBridge.AvailabilityError} " +
+                        $"A canonical MDBX vault sits next to {args[1]} and this runtime cannot read it.");
+                    return 7;
+                }
+
+                Console.WriteLine(
+                    "Vault smoke readback skipped: native MDBX is unavailable on this runtime and no canonical vault exists.");
                 Console.WriteLine("Vault smoke test passed.");
                 return 0;
             }
@@ -771,13 +784,24 @@ class Program
         return category;
     }
 
+    // The canonical vault lives next to the SQLite database, so its presence is what separates a
+    // runtime that was never meant to hold a vault from an artifact whose engine cannot read one.
+    private static string CanonicalVaultDirectory(string sqliteDatabasePath) =>
+        Path.Combine(
+            Path.GetDirectoryName(Path.GetFullPath(sqliteDatabasePath)) ?? Environment.CurrentDirectory,
+            "mdbx");
+
+    private static bool HasCanonicalVaultFiles(string sqliteDatabasePath)
+    {
+        var directory = CanonicalVaultDirectory(sqliteDatabasePath);
+        return Directory.Exists(directory) && Directory.EnumerateFiles(directory, "*.mdbx").Any();
+    }
+
     private sealed class SmokeCanonicalVaultPathProvider(string sqliteDatabasePath) : ICanonicalVaultPathProvider
     {
         public string CreateAvailablePath()
         {
-            var databaseDirectory = Path.GetDirectoryName(Path.GetFullPath(sqliteDatabasePath))
-                ?? Environment.CurrentDirectory;
-            var mdbxDirectory = Path.Combine(databaseDirectory, "mdbx");
+            var mdbxDirectory = CanonicalVaultDirectory(sqliteDatabasePath);
             var preferred = Path.Combine(mdbxDirectory, "local.mdbx");
             return !File.Exists(preferred)
                 ? preferred

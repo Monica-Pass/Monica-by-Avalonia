@@ -47,6 +47,21 @@ public sealed partial class MainWindowViewModel
                     ClearVaultAccessSecrets();
                     SetUnlockError(_localization.Get(result.MessageKey));
                     return;
+                case VaultUnlockStatus.StorageEngineUnavailable:
+                    // The vault on disk is neither gone nor creatable until the engine loads, so the
+                    // screen keeps the initialized flag the coordinator read rather than falling back
+                    // to the generic "unlock failed" or first-run mode.
+                    IsVaultInitialized = result.IsVaultInitialized;
+                    _cryptoService.Lock();
+                    IsUnlocked = false;
+                    if (result.Error is not null)
+                    {
+                        AppDiagnostics.Error("Native vault engine unavailable; unlock refused", result.Error);
+                    }
+
+                    ClearVaultAccessSecrets();
+                    SetUnlockError(_localization.Get("VaultStorageEngineUnavailable"));
+                    return;
                 case VaultUnlockStatus.Failed:
                     IsVaultInitialized = result.IsVaultInitialized || DefaultVaultDatabaseExists();
                     _cryptoService.Lock();

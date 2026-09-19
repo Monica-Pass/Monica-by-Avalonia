@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Monica.Core.Models;
+using Monica.Data.Mdbx;
 using Monica.Platform.Services;
 
 namespace Monica.Tests;
@@ -11,6 +12,7 @@ public sealed class MdbxUniffiBindingTests
     {
         var bridge = new MdbxUniffiNativeBridge();
         Assert.True(bridge.IsAvailable);
+        Assert.Null(bridge.AvailabilityError);
         var service = new MdbxVaultService(new ThrowingMdbxVaultEngine(), bridge);
         var path = TestTempPaths.CreateFilePath(".mdbx");
 
@@ -21,6 +23,15 @@ public sealed class MdbxUniffiBindingTests
         Assert.Equal(path, metadata.WorkingCopyPath);
         Assert.Equal("MDBX-2", await ReadFormatVersionAsync(path));
         Assert.StartsWith("MDBX-2 vault ", metadata.Description, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Bridge_that_cannot_load_reports_why()
+    {
+        var bridge = new UnavailableMdbxNativeBridge();
+
+        Assert.False(bridge.IsAvailable);
+        Assert.False(string.IsNullOrWhiteSpace(bridge.AvailabilityError));
     }
 
     [Fact]
