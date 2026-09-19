@@ -45,7 +45,7 @@ public sealed class WalletWorkflowUiTests
 
         Assert.Equal(VaultSurface.Card, library.ViewModel.SelectedVaultSurface);
         Assert.IsType<WalletWorkbenchView>(library.SurfaceHost.Content);
-        Assert.Equal(1, library.Window.GetVisualDescendants().OfType<WalletWorkbenchView>().Count());
+        Assert.Single(library.Window.GetVisualDescendants().OfType<WalletWorkbenchView>());
         Assert.NotNull(library.ViewModel.SelectedWalletItem);
         Assert.NotNull(library.ViewModel.SelectedWalletDetails);
     }

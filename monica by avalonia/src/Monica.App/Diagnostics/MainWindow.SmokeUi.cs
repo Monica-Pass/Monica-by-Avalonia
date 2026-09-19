@@ -493,7 +493,9 @@ public partial class MainWindow
         }
 
         await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
-        var bitmap = new RenderTargetBitmap(new PixelSize(width, height), new Vector(96, 96));
+        // Each frame holds a native backing surface, and the run captures one per section, so the
+        // bitmap has to go back — otherwise the screenshots inflate the memory this gate measures.
+        using var bitmap = new RenderTargetBitmap(new PixelSize(width, height), new Vector(96, 96));
         // Rendering the Window itself captures its top-level drawing group, which the composited
         // renderer leaves stale: every section then saved the same frozen frame.
         bitmap.Render((Visual)Content!);

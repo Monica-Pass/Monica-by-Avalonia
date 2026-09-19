@@ -34,9 +34,7 @@ public sealed class PasswordVaultCompositionUiTests
         library.SelectFirstEntry();
 
         Assert.Same(first, Assert.IsType<PasswordDetailPaneView>(library.SurfaceHost.Content));
-        Assert.Equal(
-            1,
-            library.Window.GetVisualDescendants().OfType<PasswordDetailPaneView>().Count());
+        Assert.Single(library.Window.GetVisualDescendants().OfType<PasswordDetailPaneView>());
     }
 
     // The list page used to collapse into one pane and drill in below ~800px. The library is a fixed

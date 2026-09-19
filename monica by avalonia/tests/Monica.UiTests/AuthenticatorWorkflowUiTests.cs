@@ -45,9 +45,8 @@ public sealed class AuthenticatorWorkflowUiTests
         Assert.Equal(VaultSurface.Totp, library.ViewModel.SelectedVaultSurface);
         Assert.Same(library.ViewModel, console.DataContext);
         Assert.NotNull(library.ViewModel.SelectedTotpItem);
-        Assert.Equal(
-            1,
-            library.Window.GetVisualDescendants().OfType<AuthenticatorCodeConsoleView>().Count());
+        Assert.Same(console, Assert.Single(
+            library.Window.GetVisualDescendants().OfType<AuthenticatorCodeConsoleView>()));
         var copy = console.FindControl<Button>("CopyAuthenticatorCodeButton")!;
         Assert.Same(library.ViewModel.CopyTotpCommand, copy.Command);
         Assert.Same(library.ViewModel.SelectedTotpItem, copy.CommandParameter);

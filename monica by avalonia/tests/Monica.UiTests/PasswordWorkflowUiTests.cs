@@ -96,9 +96,7 @@ public sealed class PasswordWorkflowUiTests
         Assert.Equal(VaultSurface.Password, library.ViewModel.SelectedVaultSurface);
         Assert.Same(library.ViewModel, detail.DataContext);
         Assert.NotNull(library.ViewModel.SelectedPassword);
-        Assert.Equal(
-            1,
-            library.Window.GetVisualDescendants().OfType<PasswordDetailPaneView>().Count());
+        Assert.Single(library.Window.GetVisualDescendants().OfType<PasswordDetailPaneView>());
     }
 
     [Fact]
