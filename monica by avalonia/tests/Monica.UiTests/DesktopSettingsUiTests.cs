@@ -1,6 +1,7 @@
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using FluentAvalonia.UI.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.App.Features.Settings;
@@ -156,6 +157,56 @@ public sealed class DesktopSettingsUiTests
         finally
         {
             host.Close();
+        }
+    }
+
+    [Fact]
+    public void General_settings_combos_keep_their_selection_across_language_switches()
+    {
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        var view = new SettingsGeneralView { DataContext = viewModel };
+        var host = new Window { Width = 1280, Height = 800, Content = view };
+        host.Show();
+        try
+        {
+            Dispatcher.UIThread.RunJobs();
+
+            var combos = view.GetVisualDescendants().OfType<ComboBox>().ToArray();
+            Assert.Equal(3, combos.Length);
+            AssertCombosRenderSelection(combos, viewModel);
+
+            foreach (var language in new[] { "zh-CN", "en-US", "system" })
+            {
+                viewModel.SettingsLanguage = language;
+                Dispatcher.UIThread.RunJobs();
+
+                Assert.Equal(language, viewModel.SettingsLanguage);
+                Assert.Equal(3, viewModel.LanguageOptions.Count);
+                AssertCombosRenderSelection(combos, viewModel);
+            }
+        }
+        finally
+        {
+            host.Close();
+        }
+    }
+
+    private static void AssertCombosRenderSelection(ComboBox[] combos, MainWindowViewModel viewModel)
+    {
+        for (var index = 0; index < combos.Length; index++)
+        {
+            var combo = combos[index];
+            var rendered = combo.GetVisualDescendants()
+                .OfType<TextBlock>()
+                .Select(text => text.Text)
+                .Where(text => !string.IsNullOrWhiteSpace(text))
+                .ToArray();
+            Assert.True(
+                rendered.Length > 0,
+                $"ComboBox #{index} renders nothing. Language={viewModel.SettingsLanguage} " +
+                $"SelectedValue={combo.SelectedValue ?? "<null>"} Items={combo.ItemsSource?.GetType().Name ?? "<null>"}");
         }
     }
 

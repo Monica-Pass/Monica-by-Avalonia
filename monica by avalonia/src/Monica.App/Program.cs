@@ -112,6 +112,31 @@ class Program
                 return 5;
             }
 
+            var nativeBridge = new MdbxUniffiNativeBridge();
+            if (!nativeBridge.IsAvailable)
+            {
+                Console.WriteLine("Vault smoke readback skipped: native MDBX is unavailable on this runtime.");
+                Console.WriteLine("Vault smoke test passed.");
+                return 0;
+            }
+
+            var sqliteRepository = new MonicaRepository(factory, migrator);
+            var bootstrap = new CanonicalVaultBootstrapService(
+                sqliteRepository,
+                new MdbxVaultService(nativeBridge: nativeBridge),
+                new LegacyBusinessDataInspector(factory, migrator),
+                new SmokeCanonicalVaultPathProvider(args[1]));
+            await bootstrap.EnsureReadyAsync();
+
+            using var vaultSession = new VaultSessionService();
+            vaultSession.MarkUnlocked();
+            using var mdbxVaultStore = new MdbxVaultStore(nativeBridge, unlockCrypto, vaultSession);
+            IMonicaRepository repository = new MdbxBackedMonicaRepository(sqliteRepository, mdbxVaultStore);
+            if (!await VaultSmokeReadback.VerifyAsync(repository, sqliteRepository, unlockCrypto))
+            {
+                return 6;
+            }
+
             Console.WriteLine("Vault smoke test passed.");
             return 0;
         }

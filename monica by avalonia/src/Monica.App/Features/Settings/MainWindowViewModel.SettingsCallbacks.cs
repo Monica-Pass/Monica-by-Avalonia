@@ -43,7 +43,7 @@ public sealed partial class MainWindowViewModel
 
     partial void OnSettingsLanguageChanged(string value)
     {
-        if (_isApplyingSettings)
+        if (_isApplyingSettings || string.IsNullOrEmpty(value))
         {
             return;
         }
@@ -55,11 +55,25 @@ public sealed partial class MainWindowViewModel
 
     partial void OnSettingsThemeChanged(string value)
     {
+        if (string.IsNullOrEmpty(value))
+        {
+            return;
+        }
+
         ApplyTheme(value);
         UpdateSettings(settings => settings.Theme = value);
     }
 
-    partial void OnStartupSectionChanged(string value) => UpdateSettings(settings => settings.StartupSection = value);
+    partial void OnStartupSectionChanged(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return;
+        }
+
+        UpdateSettings(settings => settings.StartupSection = value);
+    }
+
     partial void OnAutoLockEnabledChanged(bool value)
     {
         UpdateSettings(settings => settings.AutoLockEnabled = value);

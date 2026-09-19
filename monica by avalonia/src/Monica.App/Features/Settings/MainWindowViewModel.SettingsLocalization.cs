@@ -75,6 +75,17 @@ public sealed partial class MainWindowViewModel
 
     private static void ReplaceOptions(ObservableCollection<SettingsChoice> target, params SettingsChoice[] choices)
     {
+        if (target.Count == choices.Length &&
+            target.Zip(choices).All(pair => Equals(pair.First.Value, pair.Second.Value)))
+        {
+            for (var index = 0; index < choices.Length; index++)
+            {
+                target[index].Label = choices[index].Label;
+            }
+
+            return;
+        }
+
         target.Clear();
         foreach (var choice in choices)
         {

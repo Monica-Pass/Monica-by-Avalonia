@@ -413,13 +413,13 @@ public sealed class MasterPasswordMaintenanceService(
     private sealed record PlainSecretCell(SecretColumnSpec Spec, long Id, string PlainText);
     private sealed record EncryptedSecretCell(SecretColumnSpec Spec, long Id, string Value);
 
-    internal sealed class SecretCellRow
+    private sealed class SecretCellRow
     {
         public long Id { get; init; }
         public string Value { get; init; } = "";
     }
 
-    internal sealed class CredentialRow
+    private sealed class CredentialRow
     {
         public string Hash { get; init; } = "";
         public string SaltBase64 { get; init; } = "";

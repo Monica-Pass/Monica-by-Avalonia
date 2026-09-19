@@ -1488,7 +1488,7 @@ public sealed partial class MonicaRepository(
     private static DateTimeOffset FromUnixMilliseconds(long value) => DateTimeOffset.FromUnixTimeMilliseconds(value);
     private static DateTimeOffset? FromNullableUnixMilliseconds(long? value) => value is null ? null : DateTimeOffset.FromUnixTimeMilliseconds(value.Value);
 
-    internal sealed class PasswordEntryRow
+    private sealed class PasswordEntryRow
     {
         public long Id { get; init; }
         public string Title { get; init; } = "";
@@ -1545,7 +1545,7 @@ public sealed partial class MonicaRepository(
         public bool BitwardenLocalModified { get; init; }
     }
 
-    internal sealed class CustomFieldRow
+    private sealed class CustomFieldRow
     {
         public long Id { get; init; }
         public long EntryId { get; init; }
@@ -1555,7 +1555,7 @@ public sealed partial class MonicaRepository(
         public int SortOrder { get; init; }
     }
 
-    internal sealed class AttachmentRow
+    private sealed class AttachmentRow
     {
         public long Id { get; init; }
         public string OwnerType { get; init; } = "";
@@ -1569,7 +1569,7 @@ public sealed partial class MonicaRepository(
         public string? KeepassBinaryRef { get; init; }
     }
 
-    internal sealed class PasswordHistoryEntryRow
+    private sealed class PasswordHistoryEntryRow
     {
         public long Id { get; init; }
         public long EntryId { get; init; }
@@ -1577,14 +1577,14 @@ public sealed partial class MonicaRepository(
         public long LastUsedAt { get; init; }
     }
 
-    internal sealed class PasswordQuickAccessRecordRow
+    private sealed class PasswordQuickAccessRecordRow
     {
         public long PasswordId { get; init; }
         public int OpenCount { get; init; }
         public long LastOpenedAt { get; init; }
     }
 
-    internal sealed class SecureItemRow
+    private sealed class SecureItemRow
     {
         public long Id { get; init; }
         public string ItemType { get; init; } = "";
@@ -1615,7 +1615,7 @@ public sealed partial class MonicaRepository(
         public string SyncStatus { get; init; } = "NONE";
     }
 
-    internal sealed class CategoryRow
+    private sealed class CategoryRow
     {
         public long Id { get; init; }
         public string Name { get; init; } = "";
@@ -1629,7 +1629,7 @@ public sealed partial class MonicaRepository(
         public bool BitwardenLocalModified { get; init; }
     }
 
-    internal sealed class MdbxDatabaseRow
+    private sealed class MdbxDatabaseRow
     {
         public long Id { get; init; }
         public string Name { get; init; } = "";
@@ -1661,7 +1661,7 @@ public sealed partial class MonicaRepository(
         public string? RemoteAccountId { get; init; }
     }
 
-    internal sealed class OperationLogRow
+    private sealed class OperationLogRow
     {
         public long Id { get; init; }
         public string ItemType { get; init; } = "";
