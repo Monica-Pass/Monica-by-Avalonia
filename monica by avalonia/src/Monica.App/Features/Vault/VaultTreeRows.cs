@@ -19,9 +19,9 @@ public enum VaultEntryGroup
 
 /// A filter that is active prunes the tree down to surviving entries and forces what remains
 /// open, so a match can never hide behind a collapsed folder. The two id sets are the delayed half
-/// of a search: a repository pass over custom fields and
-/// attachment metadata runs off the UI thread and arrives after the tree has already narrowed on the
-/// in-memory fields, so they are only ever supplied while they still describe the current text.
+/// of a search: a repository pass over custom fields and attachment metadata runs off the UI thread
+/// and arrives after the tree has already narrowed on the in-memory fields, so they are only ever
+/// supplied while they still describe the current text.
 public sealed record VaultTreeFilter(
     VaultEntryGroup Group = VaultEntryGroup.All,
     string? Search = null,
@@ -31,6 +31,16 @@ public sealed record VaultTreeFilter(
     IReadOnlySet<long>? CustomFieldMatchIds = null,
     IReadOnlySet<long>? AttachmentMatchIds = null)
 {
+    // Split when the filter is made rather than per entry: one refresh asks every row in the library,
+    // and a narrowed clone has to be built fresh instead of with { Search = ... } so it cannot inherit
+    // terms parsed from the text it dropped.
+    private readonly IReadOnlyList<string> _terms = VaultSearchFields.ParseTerms(Search);
+
+    /// The decoded text a payload holds that its row does not show. A decode is the expensive half of a
+    /// secure-item match, so the page memoizes it and hands the lookup over; without one the filter
+    /// decodes each item it is asked about.
+    public Func<SecureItem, string>? SecureItemPayloadText { get; init; }
+
     public bool HasSearch => !string.IsNullOrWhiteSpace(Search);
 
     public bool IsNarrowing =>
@@ -75,7 +85,7 @@ public sealed record VaultTreeFilter(
 
         return CustomFieldMatchIds?.Contains(entry.Id) == true ||
                AttachmentMatchIds?.Contains(entry.Id) == true ||
-               VaultSearchFields.MatchesPassword(entry, Search!.Trim());
+               VaultSearchFields.MatchesPassword(entry, _terms);
     }
 
     public bool MatchesSecureItem(SecureItem item)
@@ -95,11 +105,16 @@ public sealed record VaultTreeFilter(
             return false;
         }
 
-        return !HasSearch || Contains(item.Title) || Contains(item.Notes);
-    }
+        if (!HasSearch)
+        {
+            return true;
+        }
 
-    private bool Contains(string value) =>
-        value.Contains(Search!.Trim(), StringComparison.CurrentCultureIgnoreCase);
+        var payloadText = SecureItemPayloadText is { } lookup
+            ? lookup(item)
+            : VaultSearchFields.SecureItemPayloadText(item);
+        return VaultSearchFields.MatchesSecureItem(item, _terms, payloadText);
+    }
 }
 
 public sealed record VaultTreeFolderRow : IVaultTreeRow

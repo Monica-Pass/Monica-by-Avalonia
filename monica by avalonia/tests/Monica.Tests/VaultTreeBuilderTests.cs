@@ -3,6 +3,7 @@ using Avalonia;
 using Monica.App.Controls;
 using Monica.App.Features.Vault;
 using Monica.Core.Models;
+using Monica.Core.Services;
 using Xunit;
 
 namespace Monica.Tests;
@@ -244,6 +245,108 @@ public class VaultTreeBuilderTests
             [], entries, [], [],
             new VaultTreeFilter(Search: "post", AttachmentMatchIds: new HashSet<long> { 1 }));
         Assert.Equal(["p:1", "p:2"], Keys(rows));
+    }
+
+    [Fact]
+    public void Search_reads_what_a_secure_item_payload_hides()
+    {
+        // A library row shows these entries' titles and nothing else from their payloads, so a field the
+        // tree stops decoding drops its row in silence. One case per payload field, and the failure
+        // names the field; the companion has the same type and no term anywhere in it.
+        var cases = new (string Name, string Term, SecureItem Tagged, SecureItem Untagged)[]
+        {
+            ("totp issuer", Term, Totp(1, issuer: Term), Totp(2)),
+            ("totp account", Term, Totp(3, accountName: Term), Totp(4)),
+            ("totp type", "hotp", Totp(5, otpType: "HOTP"), Totp(6)),
+            ("card number", Term, Card(7, data => data.CardNumber = Term), Card(8)),
+            ("cardholder", Term, Card(9, data => data.CardholderName = Term), Card(10)),
+            ("bank name", Term, Card(11, data => data.BankName = Term), Card(12)),
+            ("card brand", Term, Card(13, data => data.Brand = Term), Card(14)),
+            ("card billing address", Term, Card(15, data => data.BillingAddress = Term), Card(16)),
+            ("document number", Term, Document(17, data => data.DocumentNumber = Term), Document(18)),
+            ("document name", Term, Document(19, data => data.FullName = Term), Document(20)),
+            ("document issuer", Term, Document(21, data => data.IssuedBy = Term), Document(22)),
+            ("document nationality", Term, Document(23, data => data.Nationality = Term), Document(24)),
+            ("document extra info", Term, Document(25, data => data.AdditionalInfo = Term), Document(26)),
+            ("address name", Term, Address(27, data => data.FullName = Term), Address(28)),
+            ("address company", Term, Address(29, data => data.Company = Term), Address(30)),
+            ("address street", Term, Address(31, data => data.StreetAddress = Term), Address(32)),
+            ("address city", Term, Address(33, data => data.City = Term), Address(34)),
+            ("address province", Term, Address(35, data => data.StateProvince = Term), Address(36)),
+            ("address postal code", Term, Address(37, data => data.PostalCode = Term), Address(38)),
+            ("address country", Term, Address(39, data => data.Country = Term), Address(40)),
+            ("address phone", Term, Address(41, data => data.Phone = Term), Address(42)),
+            ("address email", Term, Address(43, data => data.Email = Term), Address(44)),
+            ("account provider", Term, Account(45, data => data.Provider = Term), Account(46)),
+            ("account name", Term, Account(47, data => data.AccountName = Term), Account(48)),
+            ("account holder", Term, Account(49, data => data.AccountHolderName = Term), Account(50)),
+            ("account email", Term, Account(51, data => data.Email = Term), Account(52)),
+            ("account phone", Term, Account(53, data => data.Phone = Term), Account(54)),
+            ("account username", Term, Account(55, data => data.Username = Term), Account(56)),
+            ("account id", Term, Account(57, data => data.AccountId = Term), Account(58)),
+            ("account masked number", Term, Account(59, data => data.MaskedAccountNumber = Term), Account(60)),
+            ("account iban", Term, Account(61, data => data.Iban = Term), Account(62)),
+            ("account swift bic", Term, Account(63, data => data.SwiftBic = Term), Account(64)),
+            ("account website", Term, Account(65, data => data.Website = Term), Account(66)),
+            ("account currency", Term, Account(67, data => data.Currency = Term), Account(68)),
+            ("note body", Term, Note(69, content: $"Rotation {Term} at 3am"), Note(70)),
+            ("note tag", Term, Note(71, tags: Term), Note(72))
+        };
+
+        foreach (var (name, term, tagged, untagged) in cases)
+        {
+            var rows = VaultTreeBuilder.Build(
+                [], [], [tagged, untagged], [], new VaultTreeFilter(Search: term));
+            Assert.True(
+                Keys(rows).SequenceEqual([$"s:{tagged.Id}"]),
+                $"Search no longer reads {name}.");
+        }
+    }
+
+    [Fact]
+    public void A_query_asks_every_word_to_land_somewhere()
+    {
+        // The note page already read a space as "and". The tree applies that to every type, so words in
+        // different fields still find one entry — and one missing word still prunes it.
+        var entries = new[] { Password(1, "Courier", phone: "+55 938 1122"), Password(2, "Untagged") };
+
+        var rows = VaultTreeBuilder.Build(
+            [], entries, [], [], new VaultTreeFilter(Search: "  courier, 938;; 1122 "));
+        Assert.Equal(["p:1"], Keys(rows));
+
+        rows = VaultTreeBuilder.Build(
+            [], entries, [], [], new VaultTreeFilter(Search: "courier 9999"));
+        Assert.Empty(Keys(rows));
+    }
+
+    [Fact]
+    public void Searching_a_library_of_payloads_rebuilds_the_tree_within_its_budget()
+    {
+        // Calling the builder directly skips the view model's payload memo, so every pass pays the full
+        // decode: this is the first search after a load, which is the pass that cannot be cached.
+        // Measured here at 90-200 ms per rebuild, so the ceiling leaves room for a noisy CI box without
+        // hiding a real regression.
+        var items = Enumerable.Range(1, 5_000).Select(index => index switch
+        {
+            <= 1_000 => Note(index, content: $"{new string('x', 512)} body{index}"),
+            <= 2_000 => Card(index, data => data.CardholderName = $"Holder {index}"),
+            <= 3_000 => Totp(index, issuer: $"Issuer {index}"),
+            <= 4_000 => Account(index, data => data.AccountName = $"account{index}@example.org"),
+            _ => Document(index, data => data.DocumentNumber = $"D{index:D5}")
+        }).ToArray();
+        var filter = new VaultTreeFilter(Search: "no-such-term-anywhere");
+
+        VaultTreeBuilder.Build([], [], items, [], filter);
+        var stopwatch = Stopwatch.StartNew();
+        for (var pass = 0; pass < 5; pass++)
+        {
+            VaultTreeBuilder.Build([], [], items, [], filter);
+        }
+
+        var perRebuild = stopwatch.ElapsedMilliseconds / 5.0;
+        Assert.True(
+            perRebuild < 400,
+            $"A 5,000-item payload search rebuild took {perRebuild:0.##} ms.");
     }
 
     [Fact]
@@ -540,6 +643,7 @@ public class VaultTreeBuilderTests
         long? categoryId = null,
         string username = "",
         string website = "",
+        string phone = "",
         bool favorite = false,
         string authenticatorKey = "",
         int updatedSecondsAgo = 0,
@@ -551,6 +655,7 @@ public class VaultTreeBuilderTests
             CategoryId = categoryId,
             Username = username,
             Website = website,
+            Phone = phone,
             IsFavorite = favorite,
             AuthenticatorKey = authenticatorKey,
             UpdatedAt = BaseTime.AddSeconds(-updatedSecondsAgo),
@@ -571,4 +676,58 @@ public class VaultTreeBuilderTests
             UpdatedAt = BaseTime,
             CreatedAt = BaseTime
         };
+
+    // The title is a fixed neutral word on purpose: a row that survives a search is there because the
+    // tree read the payload behind it, not because the fixture happened to repeat the term on screen.
+    private static SecureItem PayloadItem(long id, VaultItemType itemType, string itemData) => new()
+    {
+        Id = id,
+        ItemType = itemType,
+        Title = "Untagged",
+        ItemData = itemData,
+        UpdatedAt = BaseTime,
+        CreatedAt = BaseTime
+    };
+
+    private static T Payload<T>(Action<T>? write) where T : new()
+    {
+        var data = new T();
+        write?.Invoke(data);
+        return data;
+    }
+
+    private static SecureItem Totp(
+        long id,
+        string issuer = "",
+        string accountName = "",
+        string otpType = "TOTP") =>
+        PayloadItem(
+            id,
+            VaultItemType.Totp,
+            TotpDataResolver.ToItemData(new TotpData(
+                "JBSWY3DPEHPK3PXP",
+                issuer,
+                accountName,
+                OtpType: otpType)));
+
+    private static SecureItem Card(long id, Action<BankCardWalletData>? write = null) =>
+        PayloadItem(id, VaultItemType.BankCard, WalletItemDataCodec.EncodeBankCard(Payload(write)));
+
+    private static SecureItem Document(long id, Action<DocumentWalletData>? write = null) =>
+        PayloadItem(id, VaultItemType.Document, WalletItemDataCodec.EncodeDocument(Payload(write)));
+
+    private static SecureItem Address(long id, Action<BillingAddressWalletData>? write = null) =>
+        PayloadItem(id, VaultItemType.BillingAddress, WalletItemDataCodec.EncodeBillingAddress(Payload(write)));
+
+    private static SecureItem Account(long id, Action<PaymentAccountWalletData>? write = null) =>
+        PayloadItem(
+            id,
+            VaultItemType.PaymentAccount,
+            WalletItemDataCodec.EncodePaymentAccount(Payload(write)));
+
+    private static SecureItem Note(long id, string content = "", string tags = "") =>
+        PayloadItem(
+            id,
+            VaultItemType.Note,
+            NoteContentCodec.BuildSavePayload("Untagged", content, tags, isMarkdown: false).ItemData);
 }

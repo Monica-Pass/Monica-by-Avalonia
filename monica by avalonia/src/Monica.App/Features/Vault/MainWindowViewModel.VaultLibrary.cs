@@ -63,7 +63,7 @@ public sealed partial class MainWindowViewModel
                 ? _localization.Format(
                     "VaultFilteredStatusFormat",
                     VaultMatchedEntryCount(filter),
-                    VaultGroupEntryCount(filter))
+                    VaultGroupEntryCount(filter.Group))
                 : "";
         }
     }
@@ -72,11 +72,8 @@ public sealed partial class MainWindowViewModel
         Passwords.Count(entry => filter.MatchesPassword(entry)) +
         VaultSecureItems().Count(item => filter.MatchesSecureItem(item));
 
-    private int VaultGroupEntryCount(VaultTreeFilter filter)
-    {
-        var scope = filter with { Search = null, FavoritesOnly = false, QuickFilters = null };
-        return VaultMatchedEntryCount(scope);
-    }
+    private int VaultGroupEntryCount(VaultEntryGroup group) =>
+        VaultMatchedEntryCount(new VaultTreeFilter(group));
 
     // A type filter already says what the user means, so its header button creates that type in one
     // click; with everything in view the page asks instead of silently picking a kind.
@@ -142,7 +139,8 @@ public sealed partial class MainWindowViewModel
             CustomFieldMatchIds = LiveMetadataMatches(VaultSearchText, _passwordCustomFieldSearchQuery,
                 _passwordCustomFieldSearchMatches),
             AttachmentMatchIds = LiveMetadataMatches(VaultSearchText, _passwordAttachmentSearchQuery,
-                _passwordAttachmentSearchMatches)
+                _passwordAttachmentSearchMatches),
+            SecureItemPayloadText = VaultSecureItemPayloadText
         };
 
     // The metadata ids arrive a quarter second after the tree has already narrowed on the in-memory
@@ -156,6 +154,42 @@ public sealed partial class MainWindowViewModel
         !string.Equals(searchText, publishedQuery, StringComparison.Ordinal)
             ? null
             : matches;
+
+    private Dictionary<SecureItem, VaultPayloadText>? _vaultPayloadTexts;
+
+    private sealed record VaultPayloadText(string ItemData, string Title, string Notes, string Text);
+
+    // Decoding a payload is the only part of a library search that is more than a string compare, and
+    // one refresh asks every item twice — the tree and the match count — while a search of a few
+    // keystrokes asks the whole library again per letter. The text does not depend on the query, so it
+    // is memoized for as long as the library is on screen and dropped with it.
+    private string VaultSecureItemPayloadText(SecureItem item)
+    {
+        var cache = _vaultPayloadTexts ??= [];
+        if (cache.TryGetValue(item, out var cached) &&
+            cached.ItemData == item.ItemData &&
+            cached.Title == item.Title &&
+            cached.Notes == item.Notes)
+        {
+            return cached.Text;
+        }
+
+        var payloadText = VaultSearchFields.SecureItemPayloadText(item);
+        if (cache.Count > NoteItems.Count + TotpItems.Count + WalletItems.Count)
+        {
+            // Deleting in bulk while a search is on screen would otherwise leave the dropped entries
+            // referenced by keys nobody will ask about again.
+            _vaultPayloadTexts = null;
+        }
+        else
+        {
+            cache[item] = new VaultPayloadText(item.ItemData, item.Title, item.Notes, payloadText);
+        }
+
+        return payloadText;
+    }
+
+    private void ReleaseVaultSearchPayloads() => _vaultPayloadTexts = null;
 
     // The sort order and the quick filters are the vault pages' own state, so the library narrows and
     // reorders exactly as the list it replaced does instead of keeping a second copy of both.
@@ -195,6 +229,11 @@ public sealed partial class MainWindowViewModel
         // the metadata search answers separately once the repository pass over custom fields and
         // attachments finishes.
         QueuePasswordSearchQuery(value);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            ReleaseVaultSearchPayloads();
+        }
+
         QueueVaultTreeRefresh();
     }
 
@@ -295,6 +334,7 @@ public sealed partial class MainWindowViewModel
     {
         DetachVaultEntryObservers();
         VaultTreeRows.Clear();
+        ReleaseVaultSearchPayloads();
         SelectedVaultRow = null;
         OnPropertyChanged(nameof(HasVaultRows));
         OnPropertyChanged(nameof(VaultEmptyStateText));

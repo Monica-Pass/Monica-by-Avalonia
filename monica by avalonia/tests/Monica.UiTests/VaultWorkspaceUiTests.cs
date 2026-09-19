@@ -172,6 +172,45 @@ public sealed class VaultWorkspaceUiTests
     }
 
     [Fact]
+    public async Task Library_search_reads_a_payload_again_once_the_item_is_edited()
+    {
+        // The decoded payload text a search reads is memoized per item while the library is on screen, so
+        // a save has to be the next thing the search sees. A cache keyed only by the item would keep
+        // showing a note under the words it no longer contains.
+        using var library = LibraryUiHarness.Open();
+        var viewModel = library.ViewModel;
+        var note = new Monica.Core.Models.SecureItem
+        {
+            Id = 71,
+            ItemType = Monica.Core.Models.VaultItemType.Note,
+            Title = "Runbook",
+            ItemData = Monica.Core.Models.NoteContentCodec.BuildSavePayload(
+                "Runbook", "rotation window alpha", "", false).ItemData
+        };
+        viewModel.NoteItems.Add(note);
+        library.Settle();
+
+        viewModel.VaultSearchText = "alpha";
+        await library.AwaitTreeRefresh();
+        Assert.Equal(["s:71"], EntryKeys(viewModel));
+
+        // A save reaches the library as a rebuild over the same item instance, not as a new object, so
+        // only the memo noticing that the payload itself changed can drop the row the old words match.
+        note.ItemData = Monica.Core.Models.NoteContentCodec.BuildSavePayload(
+            "Runbook", "rotation window beta", "", false).ItemData;
+        viewModel.NoteItems[0] = note;
+        library.Settle();
+        Assert.Empty(EntryKeys(viewModel));
+
+        viewModel.VaultSearchText = "beta";
+        await library.AwaitTreeRefresh();
+        Assert.Equal(["s:71"], EntryKeys(viewModel));
+    }
+
+    private static List<string> EntryKeys(MainWindowViewModel viewModel) =>
+        [.. viewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Select(row => row.Key)];
+
+    [Fact]
     public void Control_a_checks_every_batchable_row_the_library_shows()
     {
         var window = new Monica.App.MainWindow();
