@@ -60,22 +60,20 @@ public sealed partial class MainWindowViewModel
             ClearKeePassImportPreview();
             IsKeePassImportProgressIndeterminate = true;
             StatusMessage = _localization.Get("KeePassPreviewLoading");
-            var preview = await _keePassVaultService.ReadAsync(
+            var session = await _keePassVaultService.OpenAsync(
                 _keePassPendingFile.Content,
                 _keePassPendingFile.FileName,
                 password,
                 cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            _keePassImportPreview = preview;
-            KeePassPreviewEntryCount = preview.Entries.Count;
-            KeePassPreviewGroupCount = preview.Groups.Count;
+            _keePassVaultSession = session;
             OnPropertyChanged(nameof(HasKeePassImportPreview));
             OnPropertyChanged(nameof(KeePassPreviewSummaryText));
             StatusMessage = _localization.Format(
                 "KeePassPreviewReadyFormat",
-                preview.DatabaseName,
-                preview.Entries.Count,
-                preview.Groups.Count);
+                session.DatabaseName,
+                session.EntryCount,
+                session.GroupCount);
         }
         catch (OperationCanceledException)
         {
@@ -105,8 +103,8 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private async Task ImportKeePassVaultAsync()
     {
-        var preview = _keePassImportPreview;
-        if (preview is null)
+        var session = _keePassVaultSession;
+        if (session is null)
         {
             StatusMessage = _localization.Get("KeePassPreviewRequired");
             return;
@@ -116,8 +114,8 @@ public sealed partial class MainWindowViewModel
             _localization.Get("KeePassImportConfirmationTitle"),
             _localization.Format(
                 "KeePassImportConfirmationMessageFormat",
-                preview.DatabaseName,
-                preview.Entries.Count),
+                session.DatabaseName,
+                session.EntryCount),
             _localization.Get("Import"),
             _localization.Cancel);
         if (!confirmed || !TryBeginKeePassOperation(out var cancellationToken))
@@ -138,14 +136,13 @@ public sealed partial class MainWindowViewModel
                 .Select(item => CreateKeePassSourceKey(item.KeepassDatabaseId!.Value, item.KeepassEntryUuid!))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             KeePassImportProgress = 0;
-            KeePassImportProgressMaximum = preview.Entries.Count;
+            KeePassImportProgressMaximum = session.EntryCount;
             IsKeePassImportProgressIndeterminate = false;
             OnPropertyChanged(nameof(KeePassImportProgressText));
 
-            foreach (var source in preview.Entries)
+            await foreach (var source in session.ReadDetailsAsync(cancellationToken))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var sourceKey = CreateKeePassSourceKey(preview.DatabaseId, source.EntryUuid);
+                var sourceKey = CreateKeePassSourceKey(session.DatabaseId, source.Row.EntryUuid);
                 if (!sourceKeys.Add(sourceKey))
                 {
                     skipped++;
@@ -153,7 +150,7 @@ public sealed partial class MainWindowViewModel
                     continue;
                 }
 
-                var entry = CreatePasswordFromKeePass(preview.DatabaseId, source);
+                var entry = CreatePasswordFromKeePass(session.DatabaseId, source);
                 await _repository.SavePasswordAsync(entry, cancellationToken);
                 if (source.CustomFields.Count > 0)
                 {
@@ -178,11 +175,11 @@ public sealed partial class MainWindowViewModel
                         {
                             OwnerType = "PASSWORD",
                             OwnerId = entry.Id,
-                            FileName = attachment.Name,
+                            FileName = attachment.Row.Name,
                             ContentType = "application/octet-stream",
                             SizeBytes = attachment.Content.Length,
-                            CreatedAt = source.CreatedAt,
-                            KeepassBinaryRef = attachment.BinaryReference
+                            CreatedAt = source.Row.CreatedAt,
+                            KeepassBinaryRef = attachment.Row.BinaryReference
                         },
                         entry.Id,
                         attachment.Content.ToArray());
@@ -200,11 +197,11 @@ public sealed partial class MainWindowViewModel
             await LogOperationAsync(new OperationLog
             {
                 ItemType = "VAULT",
-                ItemTitle = preview.DatabaseName,
+                ItemTitle = session.DatabaseName,
                 OperationType = "IMPORT_KEEPASS",
                 ChangesJson = JsonSerializer.Serialize(new
                 {
-                    databaseId = preview.DatabaseId,
+                    databaseId = session.DatabaseId,
                     imported,
                     skipped
                 }),

@@ -288,17 +288,6 @@ public sealed partial class PlatformServiceTests
     }
 
     [Fact]
-    public async Task KeePass_service_reports_missing_file()
-    {
-        var service = new KeePassVaultService();
-
-        var summary = await service.InspectAsync(Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.kdbx"), null);
-
-        Assert.False(summary.Exists);
-        Assert.Contains("not found", summary.Status, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
     public void Platform_integration_reports_declared_capabilities()
     {
         var service = new PlatformIntegrationService(

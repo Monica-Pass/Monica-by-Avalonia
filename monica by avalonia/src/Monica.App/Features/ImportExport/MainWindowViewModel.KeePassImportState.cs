@@ -13,7 +13,7 @@ public sealed partial class MainWindowViewModel
 
     private readonly IKeePassVaultService _keePassVaultService;
     private PickedBinaryFile? _keePassPendingFile;
-    private KeePassVaultSnapshot? _keePassImportPreview;
+    private KeePassVaultSession? _keePassVaultSession;
     private CancellationTokenSource? _keePassOperationCancellation;
     private int _keePassOperationActive;
 
@@ -30,12 +30,6 @@ public sealed partial class MainWindowViewModel
     private bool _isKeePassImportBusy;
 
     [ObservableProperty]
-    private int _keePassPreviewEntryCount;
-
-    [ObservableProperty]
-    private int _keePassPreviewGroupCount;
-
-    [ObservableProperty]
     private int _keePassImportProgress;
 
     [ObservableProperty]
@@ -45,15 +39,15 @@ public sealed partial class MainWindowViewModel
     private bool _isKeePassImportProgressIndeterminate = true;
 
     public bool HasKeePassSelectedFile => !string.IsNullOrWhiteSpace(KeePassSelectedFileName);
-    public bool HasKeePassImportPreview => _keePassImportPreview is not null;
+    public bool HasKeePassImportPreview => _keePassVaultSession is not null;
     public bool IsKeePassImportIdle => !IsKeePassImportBusy;
-    public string KeePassPreviewSummaryText => _keePassImportPreview is null
+    public string KeePassPreviewSummaryText => _keePassVaultSession is null
         ? _localization.Get("KeePassPreviewEmpty")
         : _localization.Format(
             "KeePassPreviewReadyFormat",
-            _keePassImportPreview.DatabaseName,
-            KeePassPreviewEntryCount,
-            KeePassPreviewGroupCount);
+            _keePassVaultSession.DatabaseName,
+            _keePassVaultSession.EntryCount,
+            _keePassVaultSession.GroupCount);
     public string KeePassImportProgressText => KeePassImportProgressMaximum <= 0
         ? ""
         : _localization.Format("KeePassImportProgressFormat", KeePassImportProgress, KeePassImportProgressMaximum);
@@ -109,9 +103,8 @@ public sealed partial class MainWindowViewModel
 
     private void ClearKeePassImportPreview()
     {
-        _keePassImportPreview = null;
-        KeePassPreviewEntryCount = 0;
-        KeePassPreviewGroupCount = 0;
+        _keePassVaultSession?.Dispose();
+        _keePassVaultSession = null;
         OnPropertyChanged(nameof(HasKeePassImportPreview));
         OnPropertyChanged(nameof(KeePassPreviewSummaryText));
     }
@@ -119,19 +112,23 @@ public sealed partial class MainWindowViewModel
     private static string CreateKeePassSourceKey(long databaseId, string entryUuid) =>
         $"{databaseId}:{entryUuid.Trim()}";
 
-    private PasswordEntry CreatePasswordFromKeePass(long databaseId, KeePassEntrySnapshot source) => new()
+    private PasswordEntry CreatePasswordFromKeePass(long databaseId, KeePassEntryDetail source)
     {
-        Title = string.IsNullOrWhiteSpace(source.Title) ? _localization.Untitled : source.Title,
-        Website = source.Url,
-        Username = source.UserName,
-        Password = source.Password,
-        Notes = source.Notes,
-        AuthenticatorKey = source.AuthenticatorKey,
-        KeepassDatabaseId = databaseId,
-        KeepassGroupPath = source.GroupPath,
-        KeepassEntryUuid = source.EntryUuid,
-        KeepassGroupUuid = source.GroupUuid,
-        CreatedAt = source.CreatedAt,
-        UpdatedAt = source.UpdatedAt
-    };
+        var row = source.Row;
+        return new PasswordEntry
+        {
+            Title = string.IsNullOrWhiteSpace(row.Title) ? _localization.Untitled : row.Title,
+            Website = row.Url,
+            Username = row.UserName,
+            Password = source.Password,
+            Notes = source.Notes,
+            AuthenticatorKey = source.AuthenticatorKey,
+            KeepassDatabaseId = databaseId,
+            KeepassGroupPath = row.GroupPath,
+            KeepassEntryUuid = row.EntryUuid,
+            KeepassGroupUuid = row.GroupUuid,
+            CreatedAt = row.CreatedAt,
+            UpdatedAt = row.UpdatedAt
+        };
+    }
 }

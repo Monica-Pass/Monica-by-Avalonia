@@ -1,9 +1,5 @@
 using System.Reflection;
-using KeePassLib;
-using KeePassLib.Cryptography.KeyDerivation;
-using KeePassLib.Keys;
-using KeePassLib.Security;
-using KeePassLib.Serialization;
+using System.Runtime.CompilerServices;
 using Monica.Platform.Services;
 
 namespace Monica.Tests;
@@ -13,58 +9,147 @@ public sealed partial class PlatformServiceTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task KeePass_service_reads_kdbx3_and_kdbx4_with_groups_fields_totp_and_attachments(bool useKdbx3)
+    public async Task KeePass_service_opens_kdbx3_and_kdbx4_and_streams_every_field(bool useKdbx3)
     {
-        var fixture = CreateKeePassFixture("correct horse battery staple", useKdbx3);
+        var fixture = KeePassTestVault.Create("correct horse battery staple", useKdbx3, withAttachment: true);
         var service = new KeePassVaultService();
+        using var session = await service.OpenAsync(fixture.Content, "business-vault.kdbx", fixture.Password);
 
-        var snapshot = await service.ReadAsync(fixture.Content, "business-vault.kdbx", fixture.Password);
+        Assert.Equal("Business", session.DatabaseName);
+        Assert.Equal("business-vault.kdbx", session.SourceFileName);
+        Assert.Equal(fixture.RootUuid, session.RootGroupUuid);
+        Assert.True(session.DatabaseId > 0);
+        Assert.Equal(2, session.GroupCount);
+        Assert.Equal(2, session.EntryCount);
+        Assert.Equal(
+            fixture.Groups.Select(group => group.Path),
+            session.Groups.Select(group => group.Path));
+        Assert.Equal("Personal/Cloud", session.Groups.Single(group => group.Name == "Cloud").Path);
 
-        Assert.Equal("Fixture Vault", snapshot.DatabaseName);
-        Assert.Equal("business-vault.kdbx", snapshot.SourceFileName);
-        Assert.Equal(fixture.RootUuid, snapshot.RootGroupUuid);
-        Assert.True(snapshot.DatabaseId > 0);
-        Assert.Equal(2, snapshot.Groups.Count);
-        var group = Assert.Single(snapshot.Groups, item => item.Name == "Accounts");
-        Assert.Equal("Personal/Accounts", group.Path);
-        var entry = Assert.Single(snapshot.Entries);
-        Assert.Equal("Example", entry.Title);
-        Assert.Equal("person@example.com", entry.UserName);
-        Assert.Equal("correct-secret", entry.Password);
-        Assert.Equal("https://example.com/login", entry.Url);
-        Assert.Equal("Imported note", entry.Notes);
-        Assert.Equal("otpauth://totp/Example:person@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Example", entry.AuthenticatorKey);
-        Assert.Equal("Personal/Accounts", entry.GroupPath);
-        Assert.Equal(fixture.EntryUuid, entry.EntryUuid);
-        Assert.Equal(fixture.GroupUuid, entry.GroupUuid);
-        Assert.Contains(entry.CustomFields, item => item.Name == "Account number" && item.Value == "AC-42" && item.IsProtected);
-        var attachment = Assert.Single(entry.Attachments);
-        Assert.Equal("recovery.txt", attachment.Name);
-        Assert.Equal("recovery.txt", attachment.BinaryReference);
-        Assert.Equal("recovery material"u8.ToArray(), attachment.Content.ToArray());
+        var details = await CollectDetailsAsync(session);
+        var cloud = Assert.Single(details, detail => detail.Row.Title == KeePassTestVault.CloudTitle);
+        Assert.Equal("cloud@example.com", cloud.Row.UserName);
+        Assert.Equal(KeePassTestVault.CloudPassword, cloud.Password);
+        Assert.Equal("Cloud note", cloud.Notes);
+        Assert.Equal(KeePassTestVault.CloudTotp, cloud.AuthenticatorKey);
+        Assert.Equal("https://cloud.example.com", cloud.Row.Url);
+        Assert.Equal("Personal/Cloud", cloud.Row.GroupPath);
+        Assert.Equal(
+            fixture.Entries.Single(entry => entry.Title == KeePassTestVault.CloudTitle).Uuid,
+            cloud.Row.EntryUuid);
+        Assert.Equal(
+            fixture.Entries.Single(entry => entry.Title == KeePassTestVault.CloudTitle).GroupUuid,
+            cloud.Row.GroupUuid);
+        var customField = Assert.Single(cloud.CustomFields);
+        Assert.Equal("Tenant", customField.Name);
+        Assert.Equal("Production", customField.Value);
+        Assert.True(customField.IsProtected);
+        var attachment = Assert.Single(cloud.Attachments);
+        Assert.Equal(KeePassTestVault.AttachmentName, attachment.Row.Name);
+        Assert.Equal(KeePassTestVault.AttachmentName, attachment.Row.BinaryReference);
+        Assert.Equal(KeePassTestVault.AttachmentContent.Length, attachment.Row.SizeBytes);
+        Assert.Equal(
+            System.Text.Encoding.UTF8.GetBytes(KeePassTestVault.AttachmentContent),
+            attachment.Content.ToArray());
+    }
+
+    [Fact]
+    public async Task KeePass_session_reports_counts_without_resolving_any_entry_secret()
+    {
+        var fixture = KeePassTestVault.Create("password", withAttachment: true);
+        var service = new KeePassVaultService();
+        using var session = await service.OpenAsync(fixture.Content, "business.kdbx", fixture.Password);
+
+        Assert.Equal(2, session.EntryCount);
+        Assert.Equal(2, session.GroupCount);
+        Assert.All(session.Groups, group => Assert.False(string.IsNullOrWhiteSpace(group.Uuid)));
+        Assert.DoesNotContain(
+            KeePassTestVault.CloudPassword,
+            string.Join('|', session.Groups.Select(group => group.Path + group.Name + group.Uuid)),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task KeePass_session_releases_the_unlocked_database_when_disposed()
+    {
+        var fixture = KeePassTestVault.Create("password");
+        var service = new KeePassVaultService();
+        var session = await service.OpenAsync(fixture.Content, "business.kdbx", fixture.Password);
+
+        session.Dispose();
+        session.Dispose();
+
+        Assert.Equal(0, session.EntryCount);
+        Assert.Empty(session.Groups);
+        await Assert.ThrowsAsync<ObjectDisposedException>(async () => await CollectDetailsAsync(session));
+    }
+
+    [Fact]
+    public async Task KeePass_released_session_lets_the_decrypted_model_be_collected()
+    {
+        var fixture = KeePassTestVault.Create("password");
+        var weakRoot = await OpenIndexAndReleaseAsync(fixture);
+        for (var attempt = 0; attempt < 5 && weakRoot.IsAlive; attempt++)
+        {
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, true);
+            GC.WaitForPendingFinalizers();
+        }
+
+        Assert.False(weakRoot.IsAlive);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static async Task<WeakReference> OpenIndexAndReleaseAsync(KeePassTestVault.Fixture fixture)
+    {
+        var service = new KeePassVaultService();
+        using var session = await service.OpenAsync(fixture.Content, "business.kdbx", fixture.Password);
+        var root = typeof(KeePassVaultSession)
+            .GetField("_root", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(session)!;
+        return new WeakReference(root);
+    }
+
+    [Fact]
+    public async Task KeePass_session_stays_readable_after_an_abandoned_enumeration()
+    {
+        var fixture = KeePassTestVault.Create("password");
+        var service = new KeePassVaultService();
+        using var session = await service.OpenAsync(fixture.Content, "business.kdbx", fixture.Password);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+
+        var streamed = 0;
+        await foreach (var detail in session.ReadDetailsAsync(timeout.Token))
+        {
+            streamed++;
+            Assert.False(string.IsNullOrWhiteSpace(detail.Row.Title));
+            break;
+        }
+
+        Assert.Equal(1, streamed);
+        var resumed = await CollectDetailsAsync(session, timeout.Token);
+        Assert.Equal(session.EntryCount, resumed.Count);
     }
 
     [Fact]
     public async Task KeePass_service_returns_stable_database_identity_for_the_same_root_group()
     {
-        var first = CreateKeePassFixture("password", useKdbx3: false);
-        var second = CreateKeePassFixture("password", useKdbx3: false, first.RootUuidBytes);
+        var first = KeePassTestVault.Create("password");
+        var second = KeePassTestVault.Create("password", rootUuidBytes: first.RootUuidBytes);
         var service = new KeePassVaultService();
+        using var firstSession = await service.OpenAsync(first.Content, "first.kdbx", first.Password);
+        using var secondSession = await service.OpenAsync(second.Content, "renamed.kdbx", second.Password);
 
-        var firstSnapshot = await service.ReadAsync(first.Content, "first.kdbx", first.Password);
-        var secondSnapshot = await service.ReadAsync(second.Content, "renamed.kdbx", second.Password);
-
-        Assert.Equal(firstSnapshot.DatabaseId, secondSnapshot.DatabaseId);
+        Assert.Equal(firstSession.DatabaseId, secondSession.DatabaseId);
     }
 
     [Fact]
     public async Task KeePass_service_normalizes_wrong_password_without_leaking_secret_or_file_name()
     {
-        var fixture = CreateKeePassFixture("real-password", useKdbx3: false);
+        var fixture = KeePassTestVault.Create("real-password");
         var service = new KeePassVaultService();
 
         var error = await Assert.ThrowsAsync<KeePassVaultException>(() =>
-            service.ReadAsync(fixture.Content, "private-client-name.kdbx", "wrong-password"));
+            service.OpenAsync(fixture.Content, "private-client-name.kdbx", "wrong-password"));
 
         Assert.Equal(KeePassVaultError.InvalidCredentialsOrFile, error.Error);
         Assert.DoesNotContain("wrong-password", error.ToString(), StringComparison.Ordinal);
@@ -79,7 +164,7 @@ public sealed partial class PlatformServiceTests
         var service = new KeePassVaultService();
 
         var error = await Assert.ThrowsAsync<KeePassVaultException>(() =>
-            service.ReadAsync("not-a-kdbx"u8.ToArray(), "damaged.kdbx", "password"));
+            service.OpenAsync("not-a-kdbx"u8.ToArray(), "damaged.kdbx", "password"));
 
         Assert.Equal(KeePassVaultError.InvalidCredentialsOrFile, error.Error);
         Assert.Null(error.InnerException);
@@ -88,74 +173,25 @@ public sealed partial class PlatformServiceTests
     [Fact]
     public async Task KeePass_service_honors_pre_cancelled_reads()
     {
-        var fixture = CreateKeePassFixture("password", useKdbx3: false);
+        var fixture = KeePassTestVault.Create("password");
         var service = new KeePassVaultService();
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
-            service.ReadAsync(fixture.Content, "cancelled.kdbx", fixture.Password, cancellation.Token));
+            service.OpenAsync(fixture.Content, "cancelled.kdbx", fixture.Password, cancellation.Token));
     }
 
-    private static KeePassFixture CreateKeePassFixture(string password, bool useKdbx3, byte[]? rootUuidBytes = null)
+    private static async Task<List<KeePassEntryDetail>> CollectDetailsAsync(
+        KeePassVaultSession session,
+        CancellationToken cancellationToken = default)
     {
-        var key = new CompositeKey();
-        key.AddUserKey(new KcpPassword(password));
-        var database = new PwDatabase();
-        database.New(IOConnectionInfo.FromPath("fixture.kdbx"), key);
-        database.Name = "Fixture Vault";
-        database.RootGroup.Name = "Fixture Root";
-        if (rootUuidBytes is not null)
+        var details = new List<KeePassEntryDetail>();
+        await foreach (var detail in session.ReadDetailsAsync(cancellationToken))
         {
-            database.RootGroup.Uuid = new PwUuid(rootUuidBytes);
+            details.Add(detail);
         }
 
-        var personal = new PwGroup(true, true, "Personal", PwIcon.Folder);
-        database.RootGroup.AddGroup(personal, true);
-        var accounts = new PwGroup(true, true, "Accounts", PwIcon.Folder);
-        personal.AddGroup(accounts, true);
-        var entry = new PwEntry(true, true);
-        entry.Strings.Set(PwDefs.TitleField, new ProtectedString(false, "Example"));
-        entry.Strings.Set(PwDefs.UserNameField, new ProtectedString(false, "person@example.com"));
-        entry.Strings.Set(PwDefs.PasswordField, new ProtectedString(true, "correct-secret"));
-        entry.Strings.Set(PwDefs.UrlField, new ProtectedString(false, "https://example.com/login"));
-        entry.Strings.Set(PwDefs.NotesField, new ProtectedString(false, "Imported note"));
-        entry.Strings.Set("otp", new ProtectedString(true, "otpauth://totp/Example:person@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Example"));
-        entry.Strings.Set("Account number", new ProtectedString(true, "AC-42"));
-        entry.Binaries.Set("recovery.txt", new ProtectedBinary(true, "recovery material"u8.ToArray()));
-        accounts.AddEntry(entry, true);
-
-        if (useKdbx3)
-        {
-            database.KdfParameters = new AesKdf().GetDefaultParameters();
-        }
-
-        using var stream = new MemoryStream();
-        var writer = new KdbxFile(database);
-        if (useKdbx3)
-        {
-            typeof(KdbxFile)
-                .GetProperty("ForceVersion", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .SetValue(writer, 0x00030001u);
-        }
-
-        writer.Save(stream, database.RootGroup, KdbxFormat.Default, null);
-        var fixture = new KeePassFixture(
-            stream.ToArray(),
-            password,
-            database.RootGroup.Uuid.ToHexString(),
-            database.RootGroup.Uuid.UuidBytes,
-            accounts.Uuid.ToHexString(),
-            entry.Uuid.ToHexString());
-        database.Close();
-        return fixture;
+        return details;
     }
-
-    private sealed record KeePassFixture(
-        byte[] Content,
-        string Password,
-        string RootUuid,
-        byte[] RootUuidBytes,
-        string GroupUuid,
-        string EntryUuid);
 }

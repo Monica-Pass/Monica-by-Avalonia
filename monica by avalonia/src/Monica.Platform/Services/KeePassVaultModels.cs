@@ -13,41 +13,41 @@ public sealed class KeePassVaultException(KeePassVaultError error, string messag
     public KeePassVaultError Error { get; } = error;
 }
 
-public sealed record KeePassVaultSnapshot(
-    long DatabaseId,
-    string DatabaseName,
-    string SourceFileName,
-    string RootGroupUuid,
-    IReadOnlyList<KeePassGroupSnapshot> Groups,
-    IReadOnlyList<KeePassEntrySnapshot> Entries);
-
-public sealed record KeePassGroupSnapshot(
+public sealed record KeePassGroupRow(
     string Name,
     string Path,
     string Uuid,
     string? ParentUuid);
 
-public sealed record KeePassEntrySnapshot(
-    string Title,
-    string UserName,
-    string Password,
-    string Url,
-    string Notes,
-    string AuthenticatorKey,
-    string GroupPath,
+public sealed record KeePassEntryRow(
     string EntryUuid,
     string GroupUuid,
+    string GroupPath,
+    string Title,
+    string UserName,
+    string Url,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    IReadOnlyList<KeePassCustomFieldSnapshot> CustomFields,
-    IReadOnlyList<KeePassAttachmentSnapshot> Attachments);
+    IReadOnlyList<KeePassAttachmentRow> Attachments);
 
-public sealed record KeePassCustomFieldSnapshot(
+public sealed record KeePassAttachmentRow(
+    string Name,
+    string BinaryReference,
+    long SizeBytes);
+
+public sealed record KeePassEntryDetail(
+    KeePassEntryRow Row,
+    string Password,
+    string Notes,
+    string AuthenticatorKey,
+    IReadOnlyList<KeePassCustomField> CustomFields,
+    IReadOnlyList<KeePassAttachmentContent> Attachments);
+
+public sealed record KeePassCustomField(
     string Name,
     string Value,
     bool IsProtected);
 
-public sealed record KeePassAttachmentSnapshot(
-    string Name,
-    string BinaryReference,
+public sealed record KeePassAttachmentContent(
+    KeePassAttachmentRow Row,
     ReadOnlyMemory<byte> Content);

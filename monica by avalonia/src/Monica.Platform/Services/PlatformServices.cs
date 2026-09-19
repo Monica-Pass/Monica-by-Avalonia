@@ -173,15 +173,12 @@ public sealed record OneDriveSignInChallenge(
 
 public interface IKeePassVaultService
 {
-    Task<KeePassVaultSummary> InspectAsync(string path, string? password, CancellationToken cancellationToken = default);
-    Task<KeePassVaultSnapshot> ReadAsync(
+    Task<KeePassVaultSession> OpenAsync(
         ReadOnlyMemory<byte> content,
         string fileName,
         string? password,
         CancellationToken cancellationToken = default);
 }
-
-public sealed record KeePassVaultSummary(string Path, bool Exists, string Status, int GroupCount, int EntryCount);
 
 public interface IMdbxVaultService
 {

@@ -62,24 +62,44 @@ remaining passes cannot be timed today because the rules are private `MainWindow
 methods and the benchmark fixture stores secrets in plaintext, so no crypto crosses the
 repository. Attribution depends on lifting the analysis use-case out of the view model.
 
-`.kdbx` decode is now measured, against databases written by KeePassXC 2.7.11 (KDBX4, AES-256,
-AES-KDF 1,000,000 rounds) read through `KeePassVaultService.ReadAsync`:
+`.kdbx` decode is measured against databases written by KeePassXC 2.7.11 (KDBX4, AES-256,
+AES-KDF 1,000,000 rounds) opened through `KeePassVaultService.OpenAsync`. The eager snapshot
+list is gone: a locked file now becomes a session that indexes groups and counts on open and
+resolves each entry's secrets, custom fields and attachment bytes one at a time while the
+caller enumerates it.
 
-| entries | file bytes | decode | private bytes after decode |
-| --- | --- | --- | --- |
-| 2,000 (21 groups) | 123,998 | 378 ms | 33 MB |
-| 20,000 (21 groups) | 1,185,246 | 987 ms | 116 MB |
+| entries | file bytes | open | stream every detail | peak private | working set |
+| --- | --- | --- | --- | --- | --- |
+| 2,000 (20 groups) | 123,998 | 676 ms | 72 ms | +21 MB | 55 MB |
+| 20,000 (20 groups) | 1,185,246 | 1,742 ms | 295 ms | +74 MB | 115 MB |
 
 Decoding is correct at third-party fidelity: 20,000 of 20,000 `otp` seeds, URLs and protected
-password strings all came back. The problem is not crypto and not CPU — it is the shape of the
-result. A 1.18 MB file becomes a fully materialized list of 20,000 snapshots holding 116 MB of
-private bytes, which is 96% of the 120 MB budget the artifact gate enforces, before the shell,
-the tree or any entry detail exists. The same vault opened through the MDBX store costs 506 ms
-and stays inside budget.
+password strings came back, and the same holds for KDBX 3.1. Neither the crypto nor the
+projection dominates the cost any more, and the model is not pinned: closing the session and
+releasing it makes the whole decrypted graph collectable, which
+`KeePass_released_session_lets_the_decrypted_model_be_collected` now guards. An earlier draft
+of this page claimed `KeePassLib` kept ~2.45 KB per entry permanently (49 MB at 20,000
+entries); that was a harness artifact and is wrong.
 
-So the first rule for the KeePass arc: **change the data shape before adding features.** A
-locked `.kdbx` must be read lazily, keeping the decrypted database behind the session and
-projecting rows on demand, the way `KeePassNativeBrowser` does on Android. Streaming the
-snapshot list would trade a few milliseconds for a footprint that scales with the screen
-rather than with the file.
+What is not settled is the memory the process does not give back. In the console harness,
+after close, dispose, drop and an aggressive compacting collect, private bytes sit +8 MB over
+baseline for the 2,000-entry file and +52 MB for the 20,000-entry one, and the same harness
+reports the root group still reachable by weak reference. That harness cannot carry the
+conclusion, because top-level statements keep locals alive to the end of `Main`: the identical
+pattern there refused to release a plain 40 MB array either. The clean-scope test is what
+actually rules out a `KeePassLib` static root. So the open question is not whether the model
+leaks, but whether the real app's working set returns inside the 120 MB gate after a large
+`.kdbx` is opened and closed, which has not been measured on the shipped artifact yet.
+
+Two `KeePassLib` constraints found while making this green, both of which bind the write-back
+slice:
+
+- **`.kdbx` saves must be serialized process-wide.** Concurrent `KdbxFile.Save` calls are not
+  thread safe: 6 of 240 files written in parallel rejected the key that created them, while 72
+  written serially never failed. Silent data loss on a user's real vault is the failure mode,
+  so any future save path needs one gate, not a per-database lock.
+- **Concurrent unlocks are safe, but only if `Close()` always runs.** 180 parallel opens of 12
+  distinct databases, with two held open at a time, produced zero failures both with and
+  without a global lock. Ownership is guarded in `OpenCore` with a `finally` that closes the
+  database whenever ownership was not transferred.
 

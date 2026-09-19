@@ -1,0 +1,211 @@
+using System.Runtime.CompilerServices;
+using KeePassLib;
+
+namespace Monica.Platform.Services;
+
+/// <summary>
+/// An unlocked KeePass database. The decoded model stays owned by the session so callers never
+/// re-read the file, while entry secrets and attachment bytes are resolved one entry at a time
+/// instead of being projected for the whole database up front.
+/// </summary>
+public sealed class KeePassVaultSession : IDisposable
+{
+    private PwDatabase? _database;
+    private PwGroup? _root;
+    private readonly List<KeePassGroupRow> _groups = [];
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private bool _disposed;
+
+    internal KeePassVaultSession(PwDatabase database, string fileName, CancellationToken cancellationToken)
+    {
+        _database = database;
+        _root = database.RootGroup ?? throw KeePassVaultFaults.InvalidFile();
+        SourceFileName = fileName;
+        RootGroupUuid = _root.Uuid.ToHexString();
+        DatabaseId = KeePassVaultText.CreateDatabaseId(_root.Uuid.UuidBytes);
+        DatabaseName = string.IsNullOrWhiteSpace(database.Name)
+            ? Path.GetFileNameWithoutExtension(fileName)
+            : database.Name.Trim();
+        Index(_root, cancellationToken);
+    }
+
+    public long DatabaseId { get; }
+
+    public string DatabaseName { get; }
+
+    public string SourceFileName { get; }
+
+    public string RootGroupUuid { get; }
+
+    public IReadOnlyList<KeePassGroupRow> Groups => _groups;
+
+    public int GroupCount => _groups.Count;
+
+    public int EntryCount { get; private set; }
+
+    /// <summary>
+    /// Streams every entry with its secrets, custom fields and attachment content resolved.
+    /// One entry is materialized at a time, so a large database costs one entry, not the file.
+    /// </summary>
+    public async IAsyncEnumerable<KeePassEntryDetail> ReadDetailsAsync(
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        var root = _root ?? throw new ObjectDisposedException(nameof(KeePassVaultSession));
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await foreach (var detail in ReadGroupDetailsAsync(root, root, "", cancellationToken)
+                               .ConfigureAwait(false))
+            {
+                yield return detail;
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        var database = _database;
+        _database = null;
+        _root = null;
+        _groups.Clear();
+        EntryCount = 0;
+        if (database is { IsOpen: true })
+        {
+            database.Close();
+        }
+
+        _gate.Dispose();
+    }
+
+    private static async IAsyncEnumerable<KeePassEntryDetail> ReadGroupDetailsAsync(
+        PwGroup root,
+        PwGroup group,
+        string path,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        foreach (var entry in group.Entries)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return CreateDetail(entry, path);
+        }
+
+        foreach (var child in group.Groups)
+        {
+            await foreach (var detail in ReadGroupDetailsAsync(
+                               root,
+                               child,
+                               KeePassVaultText.GroupPathOf(child, root),
+                               cancellationToken)
+                               .ConfigureAwait(false))
+            {
+                yield return detail;
+            }
+        }
+    }
+
+    private void Index(PwGroup root, CancellationToken cancellationToken)
+    {
+        var state = new IndexState();
+        IndexGroup(root, root, "", state, cancellationToken);
+        EntryCount = state.EntryCount;
+    }
+
+    private void IndexGroup(PwGroup root, PwGroup group, string path, IndexState state, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!ReferenceEquals(group, root))
+        {
+            if (_groups.Count >= KeePassVaultLimits.MaximumGroupCount)
+            {
+                throw KeePassVaultFaults.ResourceLimitExceeded();
+            }
+
+            _groups.Add(new KeePassGroupRow(
+                KeePassVaultText.NormalizeDisplayText(group.Name, "Untitled group"),
+                path,
+                group.Uuid.ToHexString(),
+                group.ParentGroup?.Uuid.ToHexString()));
+        }
+
+        foreach (var entry in group.Entries)
+        {
+            if (state.EntryCount >= KeePassVaultLimits.MaximumEntryCount)
+            {
+                throw KeePassVaultFaults.ResourceLimitExceeded();
+            }
+
+            state.EntryCount++;
+            foreach (var binary in entry.Binaries)
+            {
+                state.TotalAttachmentBytes = KeePassVaultLimits.AddAttachmentBytes(
+                    binary.Value.Length,
+                    state.TotalAttachmentBytes);
+            }
+        }
+
+        foreach (var child in group.Groups)
+        {
+            IndexGroup(root, child, KeePassVaultText.GroupPathOf(child, root), state, cancellationToken);
+        }
+    }
+
+    private sealed class IndexState
+    {
+        public int EntryCount { get; set; }
+
+        public long TotalAttachmentBytes { get; set; }
+    }
+
+    private static KeePassEntryDetail CreateDetail(PwEntry entry, string groupPath)
+    {
+        var attachmentRows = entry.Binaries
+            .Select(binary => new KeePassAttachmentRow(binary.Key, binary.Key, binary.Value.Length))
+            .ToArray();
+        var row = new KeePassEntryRow(
+            entry.Uuid.ToHexString(),
+            entry.ParentGroup?.Uuid.ToHexString() ?? "",
+            groupPath,
+            entry.Strings.ReadSafe(PwDefs.TitleField),
+            entry.Strings.ReadSafe(PwDefs.UserNameField),
+            entry.Strings.ReadSafe(PwDefs.UrlField),
+            KeePassVaultText.ToDateTimeOffset(entry.CreationTime),
+            KeePassVaultText.ToDateTimeOffset(entry.LastModificationTime),
+            attachmentRows);
+        var customFields = entry.Strings
+            .Where(item => KeePassVaultText.IsCustomField(item.Key))
+            .Select(item => new KeePassCustomField(item.Key, item.Value.ReadString(), item.Value.IsProtected))
+            .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var attachments = entry.Binaries
+            .Select(binary => new KeePassAttachmentContent(
+                new KeePassAttachmentRow(binary.Key, binary.Key, binary.Value.Length),
+                binary.Value.ReadData()))
+            .ToArray();
+        return new KeePassEntryDetail(
+            row,
+            entry.Strings.ReadSafe(PwDefs.PasswordField),
+            entry.Strings.ReadSafe(PwDefs.NotesField),
+            KeePassVaultText.ReadTotp(entry),
+            customFields,
+            attachments);
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(KeePassVaultSession));
+        }
+    }
+}
