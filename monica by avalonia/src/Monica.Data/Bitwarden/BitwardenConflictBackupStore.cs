@@ -145,7 +145,7 @@ public sealed class BitwardenConflictBackupStore(
         }
     }
 
-    private sealed class ConflictBackupRow
+    internal sealed class ConflictBackupRow
     {
         public long Id { get; init; }
         public long VaultId { get; init; }

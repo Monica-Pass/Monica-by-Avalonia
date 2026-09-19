@@ -89,6 +89,20 @@ jobs:
           -FileVersion "${{ steps.version.outputs.file_version }}"
           -InformationalVersion "${{ steps.version.outputs.informational_version }}"
 
+      - name: Verify artifact runs
+        id: runtime-smoke
+        shell: pwsh
+        working-directory: ${{ env.PROJECT_DIR }}
+        # A published artifact that cannot open a vault must never reach an upload.
+        # NativeAOT still has reflection-dependent data-layer paths, so its run is
+        # reported as a known-failing check here instead of being skipped or passed.
+        continue-on-error: ${{ matrix.mode == 'aot' }}
+        run: >
+          ./eng/ci/verify-artifact-runtime.ps1
+          -PublishDirectory "${{ steps.publish.outputs.publish_dir }}"
+          -RuntimeIdentifier "${{ matrix.rid }}"
+          -Mode "${{ matrix.mode }}"
+
       - name: Pack portable artifact
         id: pack
         shell: pwsh

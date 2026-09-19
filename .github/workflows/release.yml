@@ -160,6 +160,15 @@ jobs:
           -FileVersion "${{ needs.version.outputs.file_version }}"
           -InformationalVersion "${{ needs.version.outputs.informational_version }}"
 
+      - name: Verify artifact runs
+        shell: pwsh
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: >
+          ./eng/ci/verify-artifact-runtime.ps1
+          -PublishDirectory "${{ steps.publish.outputs.publish_dir }}"
+          -RuntimeIdentifier win-x64
+          -Mode "${{ matrix.mode }}"
+
       - name: Build installer
         shell: pwsh
         working-directory: ${{ env.PROJECT_DIR }}
@@ -224,6 +233,15 @@ jobs:
           -FileVersion "${{ needs.version.outputs.file_version }}"
           -InformationalVersion "${{ needs.version.outputs.informational_version }}"
 
+      - name: Verify artifact runs
+        shell: pwsh
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: >
+          ./eng/ci/verify-artifact-runtime.ps1
+          -PublishDirectory "${{ steps.publish.outputs.publish_dir }}"
+          -RuntimeIdentifier "${{ matrix.rid }}"
+          -Mode "${{ matrix.mode }}"
+
       - name: Build deb
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
@@ -279,6 +297,15 @@ jobs:
           -AssemblyVersion "${{ needs.version.outputs.assembly_version }}"
           -FileVersion "${{ needs.version.outputs.file_version }}"
           -InformationalVersion "${{ needs.version.outputs.informational_version }}"
+
+      - name: Verify artifact runs
+        shell: pwsh
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: >
+          ./eng/ci/verify-artifact-runtime.ps1
+          -PublishDirectory "${{ steps.publish.outputs.publish_dir }}"
+          -RuntimeIdentifier "${{ matrix.rid }}"
+          -Mode "${{ matrix.mode }}"
 
       - name: Build dmg
         shell: bash

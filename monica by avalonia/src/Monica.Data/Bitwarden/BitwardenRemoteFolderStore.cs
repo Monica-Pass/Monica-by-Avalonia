@@ -212,7 +212,7 @@ public sealed class BitwardenRemoteFolderStore(
 
     private sealed record ProtectedFolder(BitwardenRemoteFolder Folder, string EncryptedName);
 
-    private sealed class RemoteFolderRow
+    internal sealed class RemoteFolderRow
     {
         public long VaultId { get; init; }
         public string RemoteFolderId { get; init; } = "";

@@ -101,7 +101,7 @@ public sealed partial class BitwardenPendingOperationStore
         _ => throw new BitwardenProtocolException($"Stored Bitwarden failure class is invalid: {value}.")
     };
 
-    private sealed class PendingOperationRow
+    internal sealed class PendingOperationRow
     {
         public long Id { get; init; }
         public long VaultId { get; init; }
