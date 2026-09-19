@@ -41,7 +41,7 @@ public sealed class BackgroundMemoryUiTests
             viewModel.NoteContent = "Unsaved background draft";
             Dispatcher.UIThread.RunJobs();
 
-            foreach (var section in new[] { "Notes", "Totp", "Cards" })
+            foreach (var section in new[] { "Passwords", "Notes", "Totp", "Cards" })
             {
                 viewModel.SelectSectionCommand.Execute(section);
                 Dispatcher.UIThread.RunJobs();
@@ -112,6 +112,7 @@ public sealed class BackgroundMemoryUiTests
         {
             window.DataContext = viewModel;
             viewModel.IsUnlocked = true;
+            viewModel.SelectSectionCommand.Execute("Passwords");
             Dispatcher.UIThread.RunJobs();
 
             window.WindowState = WindowState.Minimized;
@@ -169,6 +170,7 @@ public sealed class BackgroundMemoryUiTests
         {
             window.DataContext = viewModel;
             viewModel.IsUnlocked = true;
+            viewModel.SelectSectionCommand.Execute("Passwords");
             Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
             var initialBuilds = viewModel.FilteredPasswordsProjectionBuildCount;
 
@@ -239,7 +241,7 @@ public sealed class BackgroundMemoryUiTests
         Monica.App.MainWindow window)
     {
         var host = Assert.Single(window.GetVisualDescendants().OfType<WorkspaceHostView>());
-        Assert.Equal(["Passwords", "Notes", "Totp", "Cards"], host.CreatedSections);
+        Assert.Equal(["Vault", "Passwords", "Notes", "Totp", "Cards"], host.CreatedSections);
         Assert.NotNull(host.CurrentWorkspace);
         return (new WeakReference(host), new WeakReference(host.CurrentWorkspace));
     }

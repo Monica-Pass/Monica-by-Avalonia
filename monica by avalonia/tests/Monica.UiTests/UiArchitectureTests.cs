@@ -89,8 +89,8 @@ public sealed class UiArchitectureTests
             Assert.NotNull(shellHost);
             Assert.Same(viewModel, shellHost.Content);
             var workspaceHost = Assert.Single(window.GetVisualDescendants().OfType<WorkspaceHostView>());
-            Assert.IsType<PasswordVaultView>(workspaceHost.CurrentWorkspace);
-            Assert.Equal(["Passwords"], workspaceHost.CreatedSections);
+            Assert.IsType<VaultWorkspaceView>(workspaceHost.CurrentWorkspace);
+            Assert.Equal(["Vault"], workspaceHost.CreatedSections);
 
             var navigation = Assert.Single(window.GetVisualDescendants().OfType<FANavigationView>());
             var navigationGroups = navigation.MenuItems
@@ -110,7 +110,7 @@ public sealed class UiArchitectureTests
                     "DatabaseManagement", "Sync", "Settings", "Lock"
                 ],
                 navigationTags);
-            AssertSingleSelectedRailItem(navigation, "Passwords");
+            AssertSingleSelectedRailItem(navigation, "Vault");
             var lockItem = navigation.FooterMenuItems
                 .OfType<FANavigationViewItem>()
                 .Single(item => string.Equals(item.Tag?.ToString(), "Lock", StringComparison.Ordinal));

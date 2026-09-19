@@ -65,6 +65,7 @@ public sealed class PasswordWorkflowUiTests
         {
             window.DataContext = viewModel;
             viewModel.IsUnlocked = true;
+            viewModel.SelectSectionCommand.Execute("Passwords");
             Dispatcher.UIThread.RunJobs();
             var workspace = Assert.Single(window.GetVisualDescendants().OfType<PasswordVaultView>());
             var searchBox = workspace

@@ -139,8 +139,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public ILocalizationService L => _localization;
 
+    // The library is the whole vault in one tree, so it is what an unlocked vault should show;
+    // every single type is a filter on it rather than a destination of its own.
     [ObservableProperty]
-    private string _selectedSection = "Passwords";
+    private string _selectedSection = "Vault";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasRecoverableStatusMessage))]

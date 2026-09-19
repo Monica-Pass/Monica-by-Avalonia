@@ -7,6 +7,7 @@ using Monica.App.Features;
 using Monica.App.Features.Authenticator;
 using Monica.App.Features.Passwords;
 using Monica.App.Features.Unlock;
+using Monica.App.Features.Vault;
 using Monica.App.Features.Wallet;
 using Monica.App.ViewModels;
 
@@ -265,7 +266,7 @@ public sealed class ColdStartupPerformanceTests(ITestOutputHelper output)
             var host = Assert.Single(window.GetVisualDescendants().OfType<WorkspaceHostView>());
             var deferredShellMilliseconds = phase.Elapsed.TotalMilliseconds;
             Assert.NotNull(host.CurrentWorkspace);
-            Assert.IsNotType<PasswordVaultView>(host.CurrentWorkspace);
+            Assert.IsNotType<VaultWorkspaceView>(host.CurrentWorkspace);
 
             phase.Restart();
             Dispatcher.UIThread.RunJobs(DispatcherPriority.ContextIdle);
@@ -274,7 +275,7 @@ public sealed class ColdStartupPerformanceTests(ITestOutputHelper output)
 
             output.WriteLine(
                 $"workspaceHostActive={host.IsActive}, section={host.Section}, created={host.CreatedSections.Count}");
-            Assert.IsType<PasswordVaultView>(host.CurrentWorkspace);
+            Assert.IsType<VaultWorkspaceView>(host.CurrentWorkspace);
             var totalMilliseconds = propertyMilliseconds + firstFrameDispatcherMilliseconds +
                 deferredShellMilliseconds + deferredWorkspaceMilliseconds;
             output.WriteLine(
