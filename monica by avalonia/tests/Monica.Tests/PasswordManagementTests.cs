@@ -1687,6 +1687,7 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
+    [Trait("Category", "perf-budget")]
     public void ViewModel_embedded_password_details_handles_many_rapid_selection_changes()
     {
         RunOnStaThread(ViewModelEmbeddedPasswordDetailsHandlesManyRapidSelectionChangesCore);
@@ -1777,6 +1778,7 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
+    [Trait("Category", "perf-budget")]
     public void ViewModel_selecting_password_with_large_detail_payload_returns_immediately()
     {
         RunOnStaThread(ViewModelSelectingPasswordWithLargeDetailPayloadReturnsImmediatelyCore);
@@ -1852,6 +1854,7 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
+    [Trait("Category", "perf-budget")]
     public void ViewModel_switching_password_after_details_rendered_keeps_selection_setter_light()
     {
         RunOnStaThread(ViewModelSwitchingPasswordAfterDetailsRenderedKeepsSelectionSetterLightCore);
@@ -4059,6 +4062,7 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
+    [Trait("Category", "perf-budget")]
     public async Task ViewModel_dispatches_large_security_analysis_without_blocking_the_caller()
     {
         var harness = CreateHarness();

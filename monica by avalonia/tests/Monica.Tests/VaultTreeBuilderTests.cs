@@ -320,6 +320,7 @@ public class VaultTreeBuilderTests
     }
 
     [Fact]
+    [Trait("Category", "perf-budget")]
     public void Searching_a_library_of_payloads_rebuilds_the_tree_within_its_budget()
     {
         // Calling the builder directly skips the view model's payload memo, so every pass pays the full
@@ -350,6 +351,7 @@ public class VaultTreeBuilderTests
     }
 
     [Fact]
+    [Trait("Category", "perf-budget")]
     public void Searching_a_large_library_rebuilds_the_tree_within_its_budget()
     {
         // A term nothing matches is the worst case: every entry walks all 23 fields, and every folder

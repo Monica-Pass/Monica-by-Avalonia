@@ -28,9 +28,13 @@ public sealed class VaultSnapshotLoaderTests(ITestOutputHelper output)
         Assert.True(
             probe.MaxConcurrentReadCount >= 5,
             $"Expected five post-password reads to overlap, but observed {probe.MaxConcurrentReadCount} concurrent read(s).");
+        // Six serialized reads cost at least one delay each; two phases cost about two. Four times the
+        // slowest delay the probe actually saw still rules out serialization on any load.
+        var serialBoundMs = 4 * probe.MaxSingleReadDelayMs;
         Assert.True(
-            stopwatch.ElapsedMilliseconds < 450,
-            $"Six simulated 100 ms reads took {stopwatch.ElapsedMilliseconds} ms; expected one password phase plus one parallel fan-out phase.");
+            stopwatch.ElapsedMilliseconds < serialBoundMs,
+            $"Six simulated reads took {stopwatch.ElapsedMilliseconds} ms against a slowest single read of " +
+            $"{probe.MaxSingleReadDelayMs} ms; expected one password phase plus one parallel fan-out phase.");
     }
 
     [Fact]
@@ -94,8 +98,10 @@ public sealed class VaultSnapshotLoaderTests(ITestOutputHelper output)
         private int _readCallCount;
         private int _passwordReadCompleted;
         private int _allPostPasswordReadsStartedAfterPassword = 1;
+        private long _maxSingleReadDelayMs;
 
         public int MaxConcurrentReadCount => Volatile.Read(ref _maxConcurrentReadCount);
+        public long MaxSingleReadDelayMs => Volatile.Read(ref _maxSingleReadDelayMs);
         public int ReadCallCount => Volatile.Read(ref _readCallCount);
         public int CustomFieldReadCallCount { get; private set; }
         public int AttachmentReadCallCount { get; private set; }
@@ -181,6 +187,7 @@ public sealed class VaultSnapshotLoaderTests(ITestOutputHelper output)
             Interlocked.Increment(ref _readCallCount);
             var activeReadCount = Interlocked.Increment(ref _activeReadCount);
             UpdateMaximumConcurrentReads(activeReadCount);
+            var elapsed = Stopwatch.StartNew();
             try
             {
                 await Task.Delay(ReadDelay, cancellationToken);
@@ -188,6 +195,15 @@ public sealed class VaultSnapshotLoaderTests(ITestOutputHelper output)
             }
             finally
             {
+                var observed = elapsed.ElapsedMilliseconds;
+                while (observed > Volatile.Read(ref _maxSingleReadDelayMs))
+                {
+                    Interlocked.CompareExchange(
+                        ref _maxSingleReadDelayMs,
+                        observed,
+                        Volatile.Read(ref _maxSingleReadDelayMs));
+                }
+
                 Interlocked.Decrement(ref _activeReadCount);
             }
         }

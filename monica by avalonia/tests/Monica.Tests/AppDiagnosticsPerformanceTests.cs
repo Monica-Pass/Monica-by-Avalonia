@@ -5,6 +5,7 @@ namespace Monica.Tests;
 public sealed class AppDiagnosticsPerformanceTests
 {
     [Fact]
+    [Trait("Category", "perf-budget")]
     public void Performance_budget_diagnostics_do_not_block_the_caller_on_file_io()
     {
         Monica.App.AppDiagnostics.Info("Performance diagnostic warmup");

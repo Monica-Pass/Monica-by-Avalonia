@@ -18,6 +18,7 @@ public sealed class WebDavBackupCryptoTests
     }
 
     [Fact]
+    [Trait("Category", "perf-budget")]
     public async Task Encrypt_async_returns_without_blocking_the_caller()
     {
         var service = new WebDavBackupCryptoService();

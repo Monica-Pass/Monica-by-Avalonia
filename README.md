@@ -152,11 +152,16 @@ dotnet run --project "src\Monica.App\Monica.App.csproj"
 
 ## 测试与质量门
 
-核心与集成测试使用普通 `dotnet test`：
+核心与集成测试使用普通 `dotnet test`。日常本地跑功能通道，它不含任何墙钟预算，
+机器繁忙也不会假失败：
 
 ```powershell
-dotnet test "tests\Monica.Tests\Monica.Tests.csproj" --configuration Release
+dotnet test "tests\Monica.Tests\Monica.Tests.csproj" --configuration Release --filter "Category!=perf-budget"
 ```
+
+9 个 `perf-budget` 计时预算需要独占 CPU，因此统一脚本会在其余测试之前单独顺序跑
+它们；本地直接 `dotnet test`（不带 filter）时这些预算会和功能测试争抢核心，
+在满载机器上会假失败。
 
 完整验证必须使用统一脚本。它会执行仓库卫生检查、重点文件体积限制、格式验证、
 NuGet 直接与传递依赖漏洞审计、Release 零警告构建、核心测试、冷启动预算和其余

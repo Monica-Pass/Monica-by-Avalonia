@@ -193,6 +193,16 @@ try {
     }
 
     Invoke-CheckedCommand dotnet $buildArguments
+
+    # The unit suite's wall-clock budgets fail on a loaded machine exactly like the UI suite's do, so
+    # they run alone and sequentially first - xunit otherwise interleaves them with the functional
+    # tests, and the functional pass then carries no timing verdict at all. Note the filter key:
+    # xunit v2 surfaces [Trait("Category", …)] as the VSTest property "Category", and
+    # "TestCategory=…" silently matches nothing. Thresholds are unchanged; only the schedule is.
+    $unitTestResultsDirectory = 'TestResults/Monica.Tests'
+    New-Item -ItemType Directory -Force -Path $unitTestResultsDirectory | Out-Null
+    $unitPerfBudgetReport = "$unitTestResultsDirectory/PerfBudget.trx"
+    $unitFunctionalReport = "$unitTestResultsDirectory/Monica.Tests.trx"
     Invoke-CheckedCommand dotnet @(
         'test',
         'tests/Monica.Tests/Monica.Tests.csproj',
@@ -200,11 +210,32 @@ try {
         $Configuration,
         '--no-restore',
         '--no-build',
-        '--logger',
-        'trx',
         '--results-directory',
-        'TestResults/Monica.Tests'
+        $unitTestResultsDirectory,
+        '--filter',
+        'Category=perf-budget',
+        '--logger',
+        'trx;LogFileName=PerfBudget.trx',
+        '--',
+        'xUnit.ParallelizeTestCollections=false',
+        'xUnit.MaxParallelThreads=1'
     )
+    Assert-TestReportRanTests $unitPerfBudgetReport
+    Invoke-CheckedCommand dotnet @(
+        'test',
+        'tests/Monica.Tests/Monica.Tests.csproj',
+        '--configuration',
+        $Configuration,
+        '--no-restore',
+        '--no-build',
+        '--results-directory',
+        $unitTestResultsDirectory,
+        '--filter',
+        'Category!=perf-budget',
+        '--logger',
+        'trx;LogFileName=Monica.Tests.trx'
+    )
+    Assert-TestReportRanTests $unitFunctionalReport
     $uiTestResultsDirectory = 'TestResults/Monica.UiTests'
     New-Item -ItemType Directory -Force -Path $uiTestResultsDirectory | Out-Null
     $uiTestAssembly = "tests/Monica.UiTests/bin/$Configuration/net10.0/Monica.UiTests.dll"

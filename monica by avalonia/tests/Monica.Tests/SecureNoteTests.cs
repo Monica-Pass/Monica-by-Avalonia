@@ -277,6 +277,7 @@ public sealed class SecureNoteTests
     }
 
     [Fact]
+    [Trait("Category", "perf-budget")]
     public void Note_editor_caret_lookup_uses_cached_line_index()
     {
         const int lineCount = 5000;
