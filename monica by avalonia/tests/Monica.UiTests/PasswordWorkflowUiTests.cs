@@ -1,11 +1,6 @@
 using Avalonia.Automation;
 using Avalonia.Controls;
-using Avalonia.Input;
-using Avalonia.Threading;
-using Avalonia.VisualTree;
-using Microsoft.Extensions.DependencyInjection;
 using Monica.App.Features.Passwords;
-using Monica.App.ViewModels;
 
 namespace Monica.UiTests;
 
@@ -52,48 +47,6 @@ public sealed class PasswordWorkflowUiTests
         var status = list.FindControl<TextBlock>("PasswordListStatusText");
         Assert.NotNull(status);
         Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting(status));
-    }
-
-    [Fact]
-    public void Password_search_escape_preserves_non_search_filters()
-    {
-        var window = new Monica.App.MainWindow();
-        using var services = Monica.App.App.ConfigureServices(window);
-        var viewModel = services.GetRequiredService<MainWindowViewModel>();
-        window.Show();
-        try
-        {
-            window.DataContext = viewModel;
-            viewModel.IsUnlocked = true;
-            viewModel.SelectSectionCommand.Execute("Passwords");
-            Dispatcher.UIThread.RunJobs();
-            var workspace = Assert.Single(window.GetVisualDescendants().OfType<PasswordVaultView>());
-            var searchBox = workspace
-                .FindControl<PasswordVaultToolbarView>("PasswordVaultToolbar")!
-                .FindControl<TextBox>("PasswordSearchBox")!;
-            viewModel.QuickFilterFavorite = true;
-            viewModel.PasswordSearchText = "github";
-            viewModel.PasswordSearchQuery = "github";
-            searchBox.Focus();
-            var args = new KeyEventArgs
-            {
-                RoutedEvent = InputElement.KeyDownEvent,
-                Source = searchBox,
-                Key = Key.Escape
-            };
-
-            window.TryHandlePasswordWorkspaceShortcut(viewModel, args);
-
-            Assert.True(args.Handled);
-            Assert.Empty(viewModel.PasswordSearchText);
-            Assert.Empty(viewModel.PasswordSearchQuery);
-            Assert.True(viewModel.QuickFilterFavorite);
-            Assert.True(viewModel.HasPasswordFilters);
-        }
-        finally
-        {
-            window.Close();
-        }
     }
 
     [Fact]

@@ -225,6 +225,13 @@ public partial class VaultFolderTree : UserControl
         }
     }
 
+    public bool IsTreeFocused => FolderTreeList.IsFocused;
+
+    public void FocusTree() => FolderTreeList.Focus();
+
+    // Arrow keys move the selection through the host, so the row they land on has to stay on screen.
+    public void ScrollIntoView(object item) => FolderTreeList.ScrollIntoView(item);
+
     private void OnTreePointerPressed(object? sender, PointerPressedEventArgs e)
     {
         var point = e.GetCurrentPoint(FolderTreeList);

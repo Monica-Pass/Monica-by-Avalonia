@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
+using Monica.App.Features.Vault;
 using Monica.App.ViewModels;
 
 namespace Monica.App;
@@ -49,31 +50,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (string.Equals(viewModel.SelectedSection, "Notes", StringComparison.OrdinalIgnoreCase))
+        if (VaultPresets.IsLibrarySection(viewModel.SelectedSection) &&
+            VaultWorkspaceView.TryHandleShortcut(viewModel, e))
         {
-            HandleNoteWorkspaceShortcut(viewModel, e);
-            if (e.Handled)
-            {
-                return;
-            }
-        }
-
-        if (string.Equals(viewModel.SelectedSection, "Totp", StringComparison.OrdinalIgnoreCase))
-        {
-            HandleAuthenticatorWorkspaceShortcut(viewModel, e);
-            if (e.Handled)
-            {
-                return;
-            }
-        }
-
-        if (string.Equals(viewModel.SelectedSection, "Cards", StringComparison.OrdinalIgnoreCase))
-        {
-            HandleWalletWorkspaceShortcut(viewModel, e);
-            if (e.Handled)
-            {
-                return;
-            }
+            return;
         }
 
         if (string.Equals(viewModel.SelectedSection, "Generator", StringComparison.OrdinalIgnoreCase))
@@ -106,70 +86,36 @@ public partial class MainWindow : Window
             if (TryExecuteCurrentSectionNewCommand(viewModel))
             {
                 e.Handled = true;
-                return;
             }
         }
-
-        if (!string.Equals(viewModel.SelectedSection, "Passwords", StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        TryHandlePasswordWorkspaceShortcut(viewModel, e);
     }
 
+    // Ctrl+N means "add one of what I am looking at", and after the type pages became presets the
+    // library already knows which type that is; only the sections outside it still name a command.
     private static bool TryExecuteCurrentSectionNewCommand(MainWindowViewModel viewModel)
     {
-        switch (viewModel.SelectedSection)
+        if (VaultPresets.IsLibrarySection(viewModel.SelectedSection))
         {
-            case "Passwords":
-                if (viewModel.AddPasswordCommand.CanExecute(null))
-                {
-                    viewModel.AddPasswordCommand.Execute(null);
-                    return true;
-                }
-
-                return false;
-
-            case "Totp":
-                if (viewModel.AddTotpCommand.CanExecute(null))
-                {
-                    viewModel.AddTotpCommand.Execute(null);
-                    return true;
-                }
-
-                return false;
-
-            case "Cards":
-                if (viewModel.AddWalletItemCommand.CanExecute(null))
-                {
-                    viewModel.AddWalletItemCommand.Execute(null);
-                    return true;
-                }
-
-                return false;
-
-            case "Generator":
-                if (viewModel.GeneratePasswordCommand.CanExecute(null))
-                {
-                    viewModel.GeneratePasswordCommand.Execute(null);
-                    return true;
-                }
-
-                return false;
-
-            case "Mdbx":
-                if (viewModel.CreateMdbxVaultCommand.CanExecute(null))
-                {
-                    viewModel.CreateMdbxVaultCommand.Execute(null);
-                    return true;
-                }
-
-                return false;
-
-            default:
-                return false;
+            return TryExecuteNewCommand(viewModel.VaultCreateCommand);
         }
+
+        return viewModel.SelectedSection switch
+        {
+            "Generator" => TryExecuteNewCommand(viewModel.GeneratePasswordCommand),
+            "Mdbx" => TryExecuteNewCommand(viewModel.CreateMdbxVaultCommand),
+            _ => false
+        };
+    }
+
+    private static bool TryExecuteNewCommand(System.Windows.Input.ICommand? command)
+    {
+        if (command is null || !command.CanExecute(null))
+        {
+            return false;
+        }
+
+        command.Execute(null);
+        return true;
     }
 
     private static bool IsTextEditingSource(object? source) => source is TextBox;

@@ -1,8 +1,14 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Monica.App.Features.Authenticator;
+using Monica.App.Features.Notes;
+using Monica.App.Features.Passwords;
+using Monica.App.Features.Vault;
+using Monica.App.Features.Wallet;
 using Monica.App.ViewModels;
 
 namespace Monica.App;
@@ -47,47 +53,94 @@ public partial class MainWindow
                 TimeSpan.FromSeconds(10));
             Check("vault-ready", vaultReady, $"passwords={viewModel.Passwords.Count}");
 
+            var library = VaultWorkspaceView;
             viewModel.SelectSectionCommand.Execute("Passwords");
             await Task.Delay(50);
-            PasswordVaultView.FocusSearch();
-            Check("password-search-focus", PasswordVaultView.IsSearchFocused, $"section={viewModel.SelectedSection}");
+            library.FocusSearch();
+            Check("library-search-focus", library.IsSearchFocused, $"section={viewModel.SelectedSection}");
 
-            viewModel.PasswordSearchText = "Smoke";
-            await Task.Delay(50);
-            Check("password-filter-active", viewModel.HasPasswordFilters, $"summary={viewModel.PasswordFilterSummaryText}");
-            if (viewModel.ClearPasswordFiltersCommand.CanExecute(null))
+            var allPasswordRows = viewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().ToList();
+            Check("library-tree-has-rows", allPasswordRows.Count >= 2, $"count={allPasswordRows.Count}");
+
+            // A search term copied from a row that is really on screen keeps the narrowing
+            // assertion true for any seeded vault instead of only for one naming scheme.
+            var needle = allPasswordRows.FirstOrDefault()?.Label ?? "";
+            viewModel.VaultSearchText = needle;
+            await Task.Delay(150);
+            var searchedRows = viewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().ToList();
+            Check(
+                "library-search-narrows",
+                needle.Length > 0 && searchedRows.Count >= 1 && searchedRows.Count < allPasswordRows.Count,
+                $"needle='{needle}', all={allPasswordRows.Count}, searched={searchedRows.Count}");
+
+            bool PressEscape()
             {
-                viewModel.ClearPasswordFiltersCommand.Execute(null);
+                var args = new KeyEventArgs
+                {
+                    RoutedEvent = InputElement.KeyDownEvent,
+                    Source = library,
+                    Key = Key.Escape
+                };
+                library.TryHandleShortcut(viewModel, args);
+                return args.Handled;
             }
 
-            await Task.Delay(50);
             Check(
-                "password-escape-clear-filters",
-                !viewModel.HasPasswordFilters && string.IsNullOrWhiteSpace(viewModel.PasswordSearchText),
-                $"search='{viewModel.PasswordSearchText}'");
+                "library-escape-clears-search",
+                PressEscape() && !viewModel.HasVaultSearchText,
+                $"search='{viewModel.VaultSearchText}'");
 
-            var visiblePasswords = viewModel.FilteredPasswords.ToArray();
-            Check("password-list-has-rows", visiblePasswords.Length >= 2, $"count={visiblePasswords.Length}");
-            if (visiblePasswords.Length >= 2)
+            viewModel.VaultFavoritesOnly = true;
+            await Task.Delay(150);
+            var favoriteRows = viewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().ToList();
+            Check(
+                "library-favorites-only",
+                favoriteRows.Count == viewModel.Passwords.Count(entry => entry.IsFavorite) &&
+                favoriteRows.All(row => row.Password?.IsFavorite == true),
+                $"favoriteRows={favoriteRows.Count}");
+
+            if (favoriteRows.Count > 0)
             {
-                viewModel.SelectedPassword = visiblePasswords[0];
-                PasswordVaultView.SelectAdjacentPassword(viewModel, 1);
+                viewModel.SelectedVaultRow = favoriteRows[0];
+                await Task.Delay(80);
+                Check(
+                    "library-selection-opens-password-editor",
+                    library.MountedSurface is PasswordDetailPaneView,
+                    $"surface={library.MountedSurface?.GetType().Name ?? "none"}");
+
+                Check(
+                    "library-escape-closes-selection",
+                    PressEscape() && viewModel.SelectedVaultRow is null && viewModel.VaultFavoritesOnly,
+                    $"selected={viewModel.SelectedVaultRow?.Label}");
+
+                Check(
+                    "library-escape-clears-favorites",
+                    PressEscape() && !viewModel.VaultFavoritesOnly,
+                    $"favoritesOnly={viewModel.VaultFavoritesOnly}");
+            }
+
+            viewModel.VaultSearchText = "";
+            viewModel.VaultFavoritesOnly = false;
+            await Task.Delay(150);
+            var visibleRows = viewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().ToList();
+            if (visibleRows.Count >= 2)
+            {
+                viewModel.SelectedVaultRow = visibleRows[0];
+                library.SelectAdjacentEntry(viewModel, 1);
                 await Task.Delay(50);
                 Check(
-                    "password-arrow-select-next",
-                    viewModel.SelectedPassword?.Id == visiblePasswords[1].Id,
-                    $"selected={viewModel.SelectedPassword?.Title}");
+                    "library-arrow-select-next",
+                    viewModel.SelectedVaultRow?.Key == visibleRows[1].Key,
+                    $"selected={viewModel.SelectedVaultRow?.Label}");
 
                 var detailsReady = await WaitForSmokeWindowConditionAsync(
                     () => viewModel.SelectedPasswordDetails?.Entry.Id == viewModel.SelectedPassword?.Id &&
                           viewModel.HasCurrentSelectedPasswordDetails &&
                           !viewModel.IsLoadingSelectedPasswordDetails,
                     TimeSpan.FromSeconds(3));
-                Check("password-details-ready", detailsReady, $"selected={viewModel.SelectedPassword?.Title}");
-                PasswordVaultView.FocusDetails();
-                Check("password-enter-focus-details", PasswordVaultView.IsDetailFocused, $"hasDetails={viewModel.HasCurrentSelectedPasswordDetails}");
+                Check("library-details-ready", detailsReady, $"selected={viewModel.SelectedPassword?.Title}");
                 Check(
-                    "password-delete-command-available",
+                    "library-delete-command-available",
                     viewModel.SelectedPassword is not null &&
                     viewModel.DeletePasswordCommand.CanExecute(viewModel.SelectedPassword),
                     $"selected={viewModel.SelectedPassword?.Title}");
@@ -127,7 +180,7 @@ public partial class MainWindow
                     $"selected={viewModel.SelectedNoteTab?.Title}");
             }
 
-            await NoteWorkspaceView.RunKeyboardSmokeChecksAsync(Check);
+            await VaultWorkspaceView.RunNoteEditorKeyboardSmokeChecksAsync(viewModel, Check);
 
             viewModel.SelectSectionCommand.Execute("Generator");
             await Task.Delay(50);
@@ -189,14 +242,6 @@ public partial class MainWindow
         var pages = new[]
         {
             new SmokePageLayoutCheck(
-                "Totp",
-                ["totpAccountList"],
-                ["totpCodeConsole", "totpInspector"]),
-            new SmokePageLayoutCheck(
-                "Cards",
-                ["walletItemList"],
-                ["walletWorkbench", "walletInspector"]),
-            new SmokePageLayoutCheck(
                 "Generator",
                 [],
                 ["generatorResultPanel", "generatorOptionsPanel"]),
@@ -244,6 +289,52 @@ public partial class MainWindow
                 "viewport-ready",
                 viewportReady,
                 $"bounds={Bounds.Width:0}x{Bounds.Height:0}, min={MinWidth:0}x{MinHeight:0}");
+
+            // The four vault sections are presets of the one library page, so what proves a preset is
+            // the slice it filters to and the surface a row of that slice opens — not a page shell.
+            var libraryPresets = new (string Section, VaultEntryGroup Group, Type? Surface)[]
+            {
+                ("Vault", VaultEntryGroup.All, null),
+                ("Passwords", VaultEntryGroup.Passwords, typeof(PasswordDetailPaneView)),
+                ("Notes", VaultEntryGroup.Notes, typeof(NoteEditorView)),
+                ("Totp", VaultEntryGroup.Totp, typeof(AuthenticatorCodeConsoleView)),
+                ("Cards", VaultEntryGroup.Cards, typeof(WalletWorkbenchView))
+            };
+
+            foreach (var preset in libraryPresets)
+            {
+                viewModel.SelectSectionCommand.Execute(preset.Section);
+                await Task.Delay(80);
+                var libraries = this.GetVisualDescendants().OfType<VaultWorkspaceView>().ToList();
+                Check(
+                    $"library-{preset.Section}-one-instance",
+                    libraries.Count == 1 && libraries[0].IsVisible,
+                    $"instances={libraries.Count}");
+                Check(
+                    $"library-{preset.Section}-group",
+                    viewModel.VaultGroup == preset.Group,
+                    $"group={viewModel.VaultGroup}");
+
+                var filter = new VaultTreeFilter(preset.Group);
+                var rows = viewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().ToList();
+                Check(
+                    $"library-{preset.Section}-rows-in-group",
+                    rows.Count > 0 && rows.All(row => filter.Matches(row.Kind)),
+                    $"rows={rows.Count}");
+
+                viewModel.SelectedVaultRow = null;
+                await Task.Delay(30);
+                if (rows.Count > 0)
+                {
+                    viewModel.SelectedVaultRow = rows[0];
+                    await Task.Delay(80);
+                    var mounted = libraries[0].MountedSurface;
+                    Check(
+                        $"library-{preset.Section}-surface",
+                        mounted is not null && (preset.Surface?.IsInstanceOfType(mounted) ?? true),
+                        $"surface={mounted?.GetType().Name ?? "none"}");
+                }
+            }
 
             foreach (var page in pages)
             {

@@ -60,13 +60,26 @@ public partial class VaultWorkspaceView : UserControl
         viewModel.SetVaultTreeActive(true);
         viewModel.PropertyChanged += ViewModelOnPropertyChanged;
         ShowSurface(viewModel.SelectedVaultSurface);
+        VaultEditorDialogWarmup.EnsureWarmedFor(viewModel.VaultGroup);
     }
 
+    // A rail tap can change the preset while this page stays cached on screen, so the editors to
+    // prepare are re-chosen on every section change, not only on attach.
     private void ViewModelOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(MainWindowViewModel.SelectedVaultSurface) && _viewModel is { } viewModel)
+        if (_viewModel is not { } viewModel)
         {
-            ShowSurface(viewModel.SelectedVaultSurface);
+            return;
+        }
+
+        switch (e.PropertyName)
+        {
+            case nameof(MainWindowViewModel.SelectedVaultSurface):
+                ShowSurface(viewModel.SelectedVaultSurface);
+                break;
+            case nameof(MainWindowViewModel.SelectedSection):
+                VaultEditorDialogWarmup.EnsureWarmedFor(viewModel.VaultGroup);
+                break;
         }
     }
 
@@ -88,11 +101,26 @@ public partial class VaultWorkspaceView : UserControl
         VaultSurfaceHost.Content = view;
     }
 
-    private static Control CreateSurface(VaultSurface surface) => surface switch
+    private Control CreateSurface(VaultSurface surface) => surface switch
     {
-        VaultSurface.Note => new NoteEditorView(),
+        VaultSurface.Note => CreateNoteSurface(),
         VaultSurface.Totp => new AuthenticatorCodeConsoleView(),
         VaultSurface.Card => new WalletWorkbenchView(),
         _ => new PasswordDetailPaneView()
     };
+
+    // The editor closes a tab on its own request; only this page knows that closing has to be
+    // confirmed and that the tree has to drop the row afterwards.
+    private NoteEditorView CreateNoteSurface()
+    {
+        var editor = new NoteEditorView();
+        editor.CloseRequested += (_, args) =>
+        {
+            if (_viewModel is { } viewModel)
+            {
+                CloseNoteTabWithPrompt(viewModel, args.Tab);
+            }
+        };
+        return editor;
+    }
 }

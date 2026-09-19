@@ -44,9 +44,7 @@ internal static class XamlSource
     public static IReadOnlyList<string> InDirectory(params string[] relativeDirectory)
     {
         var directory = AppRelativePath(relativeDirectory);
-        return [.. Directory.EnumerateFiles(directory, "*.*", SearchOption.AllDirectories)
-            .Where(path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ||
-                           path.EndsWith(".axaml", StringComparison.OrdinalIgnoreCase))];
+        return [.. EnumerateSourceFiles(directory)];
     }
 
     /// This test project's own sources, so a guard can police the tests without each file writing
@@ -60,7 +58,7 @@ internal static class XamlSource
             var candidate = Path.Combine(directory.FullName, "tests", "Monica.UiTests");
             if (Directory.Exists(candidate))
             {
-                return [.. Directory.EnumerateFiles(candidate, "*.cs", SearchOption.AllDirectories)];
+                return [.. EnumerateSourceFiles(candidate)];
             }
         }
 
@@ -108,14 +106,8 @@ internal static class XamlSource
         var root = AppRelativePath();
         var paths = new Dictionary<string, string>(StringComparer.Ordinal);
         var collisions = new List<string>();
-        foreach (var path in Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories))
+        foreach (var path in EnumerateSourceFiles(root))
         {
-            if (!path.EndsWith(".axaml", StringComparison.OrdinalIgnoreCase) &&
-                !path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
             var fileName = Path.GetFileName(path);
             if (paths.TryGetValue(fileName, out var existing))
             {
@@ -135,4 +127,14 @@ internal static class XamlSource
 
         return paths;
     }
+
+    private static IEnumerable<string> EnumerateSourceFiles(string directory) =>
+        Directory.EnumerateFiles(directory, "*.*", SearchOption.AllDirectories).Where(IsSourceFile);
+
+    private static bool IsSourceFile(string path) =>
+        (path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ||
+         path.EndsWith(".axaml", StringComparison.OrdinalIgnoreCase)) &&
+        !path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            .Any(segment => segment.Equals("obj", StringComparison.OrdinalIgnoreCase) ||
+                            segment.Equals("bin", StringComparison.OrdinalIgnoreCase));
 }

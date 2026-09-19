@@ -3,8 +3,7 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Monica.App.Controls;
 using Monica.App.Features.Generator;
-using Monica.App.Features.Notes;
-using Monica.App.Features.Passwords;
+using Monica.App.Features.Vault;
 using Monica.App.ViewModels;
 
 namespace Monica.App;
@@ -19,11 +18,16 @@ public partial class MainWindow
     private WorkspaceHostView WorkspaceHost =>
         CurrentWorkspaceHost ?? throw new InvalidOperationException("The unlocked workspace shell is not active.");
 
-    private PasswordVaultView PasswordVaultView =>
-        WorkspaceHost.GetOrCreate<PasswordVaultView>("Passwords");
+    private VaultWorkspaceView VaultWorkspaceView =>
+        WorkspaceHost.GetOrCreate<VaultWorkspaceView>(VaultPresets.LibrarySection);
 
-    private NoteWorkspaceView NoteWorkspaceView =>
-        WorkspaceHost.GetOrCreate<NoteWorkspaceView>("Notes");
+    // Keys typed while the library is up have to reach the instance that is already on screen; a
+    // notification must never be the reason a page gets built.
+    private VaultWorkspaceView? CurrentVaultWorkspace =>
+        CurrentWorkspaceHost is { } host &&
+        host.TryGet<VaultWorkspaceView>(VaultPresets.LibrarySection, out var workspace)
+            ? workspace
+            : null;
 
     private GeneratorWorkspaceView GeneratorWorkspaceView =>
         WorkspaceHost.GetOrCreate<GeneratorWorkspaceView>("Generator");

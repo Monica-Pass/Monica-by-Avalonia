@@ -1,9 +1,5 @@
 using Avalonia.Automation;
 using Avalonia.Controls;
-using Avalonia.Input;
-using Avalonia.Threading;
-using Avalonia.VisualTree;
-using Microsoft.Extensions.DependencyInjection;
 using Monica.App.Features.Wallet;
 using Monica.App.Services;
 using Monica.App.ViewModels;
@@ -90,56 +86,6 @@ public sealed class WalletWorkflowUiTests
 
         Assert.Equal("清除卡包搜索", localization.Get("ClearWalletSearch"));
         Assert.Contains("Ctrl+F", localization.Get("WalletSearchHelp"), StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Wallet_search_escape_is_scoped_to_the_focused_search_box()
-    {
-        var window = new Monica.App.MainWindow();
-        using var services = Monica.App.App.ConfigureServices(window);
-        var viewModel = services.GetRequiredService<MainWindowViewModel>();
-        window.Show();
-        try
-        {
-            window.DataContext = viewModel;
-            viewModel.IsUnlocked = true;
-            viewModel.SelectSectionCommand.Execute("Cards");
-            Dispatcher.UIThread.RunJobs();
-            var workspace = Assert.Single(window.GetVisualDescendants().OfType<WalletWorkspaceView>());
-            var searchBox = workspace.FindControl<TextBox>("WalletSearchBox")!;
-            var workbench = workspace.FindControl<Border>("WalletWorkbenchRegion")!;
-            viewModel.WalletSearchText = "visa";
-            searchBox.Focus();
-            var searchArgs = new KeyEventArgs
-            {
-                RoutedEvent = InputElement.KeyDownEvent,
-                Source = searchBox,
-                Key = Key.Escape
-            };
-
-            window.HandleWalletWorkspaceShortcut(viewModel, searchArgs);
-
-            Assert.True(searchArgs.Handled);
-            Assert.Empty(viewModel.WalletSearchText);
-
-            viewModel.WalletSearchText = "passport";
-            workbench.Focus();
-            var workbenchArgs = new KeyEventArgs
-            {
-                RoutedEvent = InputElement.KeyDownEvent,
-                Source = workbench,
-                Key = Key.Escape
-            };
-
-            window.HandleWalletWorkspaceShortcut(viewModel, workbenchArgs);
-
-            Assert.False(workbenchArgs.Handled);
-            Assert.Equal("passport", viewModel.WalletSearchText);
-        }
-        finally
-        {
-            window.Close();
-        }
     }
 
     [Fact]

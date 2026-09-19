@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Threading;
 using FluentAvalonia.UI.Controls;
 using Monica.App.Features.Notes;
@@ -15,56 +14,6 @@ public partial class MainWindow
     private MainWindowViewModel? _observedViewModel;
 
     internal Func<Task>? ShutdownRequestedAsync { get; set; }
-
-    private async void HandleNoteWorkspaceShortcut(MainWindowViewModel viewModel, KeyEventArgs e)
-    {
-        if (NoteWorkspaceView.TryHandleShortcut(e))
-        {
-            return;
-        }
-
-        if (viewModel.IsNoteWorkspaceNarrow &&
-            !viewModel.NoteNarrowShowsTree &&
-            (e.Key == Key.Escape || (e.Key == Key.Left && e.KeyModifiers == KeyModifiers.Alt)))
-        {
-            viewModel.ShowNoteTreeCommand.Execute(null);
-            e.Handled = true;
-            return;
-        }
-
-        if (!e.KeyModifiers.HasFlag(KeyModifiers.Control))
-        {
-            return;
-        }
-
-        if (e.Key == Key.S)
-        {
-            e.Handled = true;
-            if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
-            {
-                await viewModel.SaveAllNoteTabsCommand.ExecuteAsync(null);
-            }
-            else
-            {
-                await viewModel.SaveNoteCommand.ExecuteAsync(null);
-            }
-
-            return;
-        }
-
-        if (e.Key == Key.N)
-        {
-            viewModel.AddNoteCommand.Execute(null);
-            e.Handled = true;
-            return;
-        }
-
-        if (e.Key == Key.W && viewModel.SelectedNoteTab is not null)
-        {
-            e.Handled = true;
-            await NoteWorkspaceView.CloseTabWithPromptAsync(viewModel, viewModel.SelectedNoteTab);
-        }
-    }
 
     private void OnClosed(object? sender, EventArgs e)
     {
@@ -109,7 +58,7 @@ public partial class MainWindow
         {
             if (dirtyCount > 0 && viewModel is not null)
             {
-                var result = await NoteWorkspaceView.ShowUnsavedTabsDialogAsync(dirtyCount);
+                var result = await NoteClosePrompts.ShowUnsavedTabsAsync(this, viewModel, dirtyCount);
                 if (result == FAContentDialogResult.Primary)
                 {
                     await viewModel.SaveAllNoteTabsCommand.ExecuteAsync(null);
@@ -160,14 +109,6 @@ public partial class MainWindow
         }
 
         UpdateWorkspaceActivation(_observedViewModel);
-
-        Dispatcher.UIThread.Post(() =>
-        {
-            if (CurrentWorkspaceHost?.TryGet<NoteWorkspaceView>("Notes", out var noteWorkspace) == true)
-            {
-                noteWorkspace.UpdateTabScroll();
-            }
-        });
     }
 
     private void ViewModel_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -178,34 +119,7 @@ public partial class MainWindow
         }
         else if (e.PropertyName == nameof(MainWindowViewModel.SelectedNoteTab))
         {
-            Dispatcher.UIThread.Post(() =>
-            {
-                if (CurrentWorkspaceHost?.TryGet<NoteWorkspaceView>("Notes", out var noteWorkspace) == true)
-                {
-                    noteWorkspace.HandleSelectedTabChanged();
-                }
-            });
-        }
-        else if (e.PropertyName == nameof(MainWindowViewModel.NoteTabWidth))
-        {
-            Dispatcher.UIThread.Post(() =>
-            {
-                if (CurrentWorkspaceHost?.TryGet<NoteWorkspaceView>("Notes", out var noteWorkspace) == true)
-                {
-                    noteWorkspace.HandleTabWidthChanged();
-                }
-            });
-        }
-        else if (e.PropertyName == nameof(MainWindowViewModel.NoteNarrowShowsTree) &&
-                 _observedViewModel?.NoteNarrowShowsTree == true)
-        {
-            Dispatcher.UIThread.Post(() =>
-            {
-                if (CurrentWorkspaceHost?.TryGet<NoteWorkspaceView>("Notes", out var noteWorkspace) == true)
-                {
-                    noteWorkspace.FocusNoteTree();
-                }
-            });
+            Dispatcher.UIThread.Post(() => CurrentVaultWorkspace?.HandleSelectedNoteTabChanged());
         }
     }
 

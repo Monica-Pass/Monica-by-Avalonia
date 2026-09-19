@@ -89,7 +89,7 @@ public sealed class UiArchitectureTests
             Assert.NotNull(shellHost);
             Assert.Same(viewModel, shellHost.Content);
             var workspaceHost = Assert.Single(window.GetVisualDescendants().OfType<WorkspaceHostView>());
-            Assert.IsType<VaultWorkspaceView>(workspaceHost.CurrentWorkspace);
+            var libraryView = Assert.IsType<VaultWorkspaceView>(workspaceHost.CurrentWorkspace);
             Assert.Equal(["Vault"], workspaceHost.CreatedSections);
 
             var navigation = Assert.Single(window.GetVisualDescendants().OfType<FANavigationView>());
@@ -125,7 +125,7 @@ public sealed class UiArchitectureTests
             Dispatcher.UIThread.RunJobs();
 
             Assert.Equal("Notes", viewModel.SelectedSection);
-            Assert.IsType<NoteWorkspaceView>(workspaceHost.CurrentWorkspace);
+            Assert.Same(libraryView, workspaceHost.CurrentWorkspace);
             AssertSingleSelectedRailItem(navigation, "Notes");
 
             var timelineItem = navigation.MenuItems

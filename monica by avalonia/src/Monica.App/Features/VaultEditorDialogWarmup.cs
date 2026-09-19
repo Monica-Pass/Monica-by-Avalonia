@@ -1,4 +1,5 @@
 using Avalonia.Threading;
+using Monica.App.Features.Vault;
 using Monica.App.Features.Wallet;
 
 namespace Monica.App.Features;
@@ -23,6 +24,31 @@ internal static class VaultEditorDialogWarmup
     internal static void EnsurePasswordWarmed() => EnsureWarmed(PasswordEditor);
     internal static void EnsureTotpWarmed() => EnsureWarmed(TotpEditor);
     internal static void EnsureWalletWarmed() => EnsureWarmed(WalletEditor);
+
+    // The library page shows one preset at a time and can only open the editors that preset
+    // contains, so the page prepares exactly those. The whole library mixes every type, and notes
+    // edit in place, so they need nothing.
+    internal static void EnsureWarmedFor(VaultEntryGroup group)
+    {
+        switch (group)
+        {
+            case VaultEntryGroup.Passwords:
+                EnsureWarmed(PasswordEditor);
+                break;
+            case VaultEntryGroup.Totp:
+                EnsureWarmed(TotpEditor);
+                break;
+            case VaultEntryGroup.Cards:
+                EnsureWarmed(WalletEditor);
+                break;
+            case VaultEntryGroup.All:
+                EnsureWarmed(PasswordEditor);
+                EnsureWarmed(TotpEditor);
+                EnsureWarmed(WalletEditor);
+                break;
+        }
+    }
+
     internal static PasswordEditorDialog TakePasswordEditorView() => PasswordEditor.TakePreparedView();
     internal static TotpEditorDialog TakeTotpEditorView() => TotpEditor.TakePreparedView();
     internal static WalletItemEditorDialog TakeWalletEditorView() => WalletEditor.TakePreparedView();

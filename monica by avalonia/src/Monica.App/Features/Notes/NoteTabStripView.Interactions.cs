@@ -157,44 +157,11 @@ public partial class NoteTabStripView
         NotifyTabClosed(tab);
     }
 
-    private async Task<FAContentDialogResult> ShowUnsavedNoteTabDialogAsync(NoteEditorTab tab)
-    {
-        var title = string.IsNullOrWhiteSpace(tab.Title) ? GetLocalizedText("Untitled") : tab.Title.Trim();
-        var dialog = new FAContentDialog
-        {
-            Title = GetLocalizedText("SaveNoteChangesTitle"),
-            Content = new TextBlock
-            {
-                Text = FormatLocalizedText("UnsavedNoteMessageFormat", title),
-                TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                MaxWidth = 420
-            },
-            PrimaryButtonText = GetLocalizedText("Save"),
-            SecondaryButtonText = GetLocalizedText("Discard"),
-            CloseButtonText = GetLocalizedText("Cancel"),
-            DefaultButton = FAContentDialogButton.Primary
-        };
+    private async Task<FAContentDialogResult> ShowUnsavedNoteTabDialogAsync(NoteEditorTab tab) =>
+        await NoteClosePrompts.ShowUnsavedTabAsync(OwnerWindow(), (MainWindowViewModel)DataContext!, tab);
 
-        return await dialog.ShowAsync((Window)TopLevel.GetTopLevel(this)!);
-    }
+    public async Task<FAContentDialogResult> ShowUnsavedTabsDialogAsync(int dirtyCount) =>
+        await NoteClosePrompts.ShowUnsavedTabsAsync(OwnerWindow(), (MainWindowViewModel)DataContext!, dirtyCount);
 
-    public async Task<FAContentDialogResult> ShowUnsavedTabsDialogAsync(int dirtyCount)
-    {
-        var dialog = new FAContentDialog
-        {
-            Title = GetLocalizedText("SaveUnsavedNotesTitle"),
-            Content = new TextBlock
-            {
-                Text = FormatLocalizedText("UnsavedNotesMessageFormat", dirtyCount),
-                TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                MaxWidth = 440
-            },
-            PrimaryButtonText = GetLocalizedText("SaveAllNotes"),
-            SecondaryButtonText = GetLocalizedText("Discard"),
-            CloseButtonText = GetLocalizedText("Cancel"),
-            DefaultButton = FAContentDialogButton.Primary
-        };
-
-        return await dialog.ShowAsync((Window)TopLevel.GetTopLevel(this)!);
-    }
+    private Window OwnerWindow() => (Window)TopLevel.GetTopLevel(this)!;
 }

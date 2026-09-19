@@ -6,8 +6,10 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.App.Controls;
+using Monica.App.Features.Generator;
 using Monica.App.Features.Notes;
 using Monica.App.Features.Passwords;
+using Monica.App.Features.Vault;
 using Monica.App.ViewModels;
 using Monica.Core.Models;
 using Monica.Core.Services;
@@ -52,16 +54,20 @@ public sealed class UiPerformanceTests
     {
         var host = new WorkspaceHostView { IsActive = true, Section = "Passwords" };
         Dispatcher.UIThread.RunJobs(DispatcherPriority.ContextIdle);
-        var passwordView = Assert.IsType<PasswordVaultView>(host.CurrentWorkspace);
+        var libraryView = Assert.IsType<VaultWorkspaceView>(host.CurrentWorkspace);
 
         host.Section = "Notes";
         Dispatcher.UIThread.RunJobs(DispatcherPriority.ContextIdle);
-        Assert.IsType<NoteWorkspaceView>(host.CurrentWorkspace);
+        Assert.Same(libraryView, host.CurrentWorkspace);
 
-        host.Section = "Passwords";
+        host.Section = "Generator";
         Dispatcher.UIThread.RunJobs(DispatcherPriority.ContextIdle);
-        Assert.Same(passwordView, host.CurrentWorkspace);
-        Assert.Equal(["Passwords", "Notes"], host.CreatedSections);
+        Assert.IsType<GeneratorWorkspaceView>(host.CurrentWorkspace);
+
+        host.Section = "Vault";
+        Dispatcher.UIThread.RunJobs(DispatcherPriority.ContextIdle);
+        Assert.Same(libraryView, host.CurrentWorkspace);
+        Assert.Equal(["Vault", "Generator"], host.CreatedSections);
 
         host.IsActive = false;
         Assert.Null(host.CurrentWorkspace);
@@ -69,8 +75,8 @@ public sealed class UiPerformanceTests
 
         host.IsActive = true;
         Dispatcher.UIThread.RunJobs(DispatcherPriority.ContextIdle);
-        Assert.IsType<PasswordVaultView>(host.CurrentWorkspace);
-        Assert.NotSame(passwordView, host.CurrentWorkspace);
+        Assert.IsType<VaultWorkspaceView>(host.CurrentWorkspace);
+        Assert.NotSame(libraryView, host.CurrentWorkspace);
     }
 
     [Fact]

@@ -18,7 +18,7 @@ public partial class MainWindow
             return false;
         }
 
-        var success = await NoteWorkspaceView.RunSmokeChecksAsync(viewModel);
+        var success = await VaultWorkspaceView.RunNoteEditorSmokeChecksAsync(viewModel);
 
         AppDiagnostics.Info(
             $"Smoke UI note editor checks completed. success={success}, " +

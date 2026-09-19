@@ -3,19 +3,15 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Threading;
 using Monica.App.Features.Archive;
-using Monica.App.Features.Authenticator;
 using Monica.App.Features.DatabaseManagement;
 using Monica.App.Features.Generator;
 using Monica.App.Features.Mdbx;
-using Monica.App.Features.Notes;
-using Monica.App.Features.Passwords;
 using Monica.App.Features.RecycleBin;
 using Monica.App.Features.SecurityAnalysis;
 using Monica.App.Features.Settings;
 using Monica.App.Features.Sync;
 using Monica.App.Features.Timeline;
 using Monica.App.Features.Vault;
-using Monica.App.Features.Wallet;
 
 namespace Monica.App.Controls;
 
@@ -25,10 +21,6 @@ public sealed class WorkspaceHostView : ContentControl
         new Dictionary<string, Func<Control>>(StringComparer.OrdinalIgnoreCase)
         {
             ["Vault"] = static () => new VaultWorkspaceView(),
-            ["Passwords"] = static () => new PasswordVaultView(),
-            ["Notes"] = static () => new NoteWorkspaceView(),
-            ["Totp"] = static () => new AuthenticatorWorkspaceView(),
-            ["Cards"] = static () => new WalletWorkspaceView(),
             ["Generator"] = static () => new GeneratorWorkspaceView(),
             ["Archive"] = static () => new ArchiveWorkspaceView(),
             ["RecycleBin"] = static () => new RecycleBinWorkspaceView(),
@@ -39,6 +31,11 @@ public sealed class WorkspaceHostView : ContentControl
             ["Sync"] = static () => new SyncWorkspaceView(),
             ["Settings"] = static () => new SettingsWorkspaceView()
         };
+
+    // The four type sections are presets of the library, so they share its instance and its cache
+    // key; switching preset filters the tree the page is already showing.
+    private static string WorkspaceKeyFor(string section) =>
+        VaultPresets.IsLibrarySection(section) ? VaultPresets.LibrarySection : section;
 
     public static readonly StyledProperty<string?> SectionProperty =
         AvaloniaProperty.Register<WorkspaceHostView, string?>(nameof(Section));
@@ -84,7 +81,7 @@ public sealed class WorkspaceHostView : ContentControl
     public bool TryGet<TWorkspace>(string section, out TWorkspace workspace)
         where TWorkspace : Control
     {
-        if (_workspaces.TryGetValue(section, out var cached) && cached is TWorkspace typedWorkspace)
+        if (_workspaces.TryGetValue(WorkspaceKeyFor(section), out var cached) && cached is TWorkspace typedWorkspace)
         {
             workspace = typedWorkspace;
             return true;
@@ -106,22 +103,23 @@ public sealed class WorkspaceHostView : ContentControl
 
     private Control GetOrCreate(string section)
     {
-        if (_workspaces.TryGetValue(section, out var workspace))
+        var workspaceKey = WorkspaceKeyFor(section);
+        if (_workspaces.TryGetValue(workspaceKey, out var workspace))
         {
             return workspace;
         }
 
-        if (!WorkspaceFactories.TryGetValue(section, out var factory))
+        if (!WorkspaceFactories.TryGetValue(workspaceKey, out var factory))
         {
             throw new ArgumentOutOfRangeException(nameof(section), section, "Unknown workspace section.");
         }
 
-        _pendingSections.Remove(section);
+        _pendingSections.Remove(workspaceKey);
         workspace = factory();
-        _workspaces.Add(section, workspace);
-        if (!_createdSections.Contains(section, StringComparer.OrdinalIgnoreCase))
+        _workspaces.Add(workspaceKey, workspace);
+        if (!_createdSections.Contains(workspaceKey, StringComparer.OrdinalIgnoreCase))
         {
-            _createdSections.Add(section);
+            _createdSections.Add(workspaceKey);
         }
 
         return workspace;
@@ -149,33 +147,32 @@ public sealed class WorkspaceHostView : ContentControl
             return;
         }
 
-        if (_workspaces.TryGetValue(Section, out var workspace))
+        var workspaceKey = WorkspaceKeyFor(Section);
+        if (_workspaces.TryGetValue(workspaceKey, out var workspace))
         {
             Content = workspace;
             return;
         }
 
         Content = CreateLoadingPlaceholder();
-        if (_pendingSections.Add(Section))
+        if (_pendingSections.Add(workspaceKey))
         {
-            var section = Section;
             Dispatcher.UIThread.Post(
-                () => MaterializeWorkspace(section),
+                () => MaterializeWorkspace(workspaceKey),
                 DispatcherPriority.ContextIdle);
         }
     }
 
-    private void MaterializeWorkspace(string section)
+    private void MaterializeWorkspace(string workspaceKey)
     {
-        if (!_pendingSections.Remove(section) ||
+        if (!_pendingSections.Remove(workspaceKey) ||
             !IsActive ||
-            !string.Equals(Section, section, StringComparison.OrdinalIgnoreCase))
+            !string.Equals(WorkspaceKeyFor(Section ?? ""), workspaceKey, StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
 
-        var materializedWorkspace = GetOrCreate(section);
-        Content = materializedWorkspace;
+        Content = GetOrCreate(workspaceKey);
     }
 
     private static Control CreateLoadingPlaceholder() =>

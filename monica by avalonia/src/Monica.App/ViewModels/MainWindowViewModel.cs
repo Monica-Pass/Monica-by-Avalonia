@@ -142,6 +142,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
     // The library is the whole vault in one tree, so it is what an unlocked vault should show;
     // every single type is a filter on it rather than a destination of its own.
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(VaultGroup))]
+    [NotifyPropertyChangedFor(nameof(HasVaultCreatePreset))]
+    [NotifyPropertyChangedFor(nameof(VaultCreateLabel))]
+    [NotifyPropertyChangedFor(nameof(VaultCreateCommand))]
     private string _selectedSection = "Vault";
 
     [ObservableProperty]
@@ -214,6 +218,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     partial void OnSelectedSectionChanged(string value)
     {
+        RefreshVaultPreset();
         RaiseShellStatus();
         RestoreActiveWorkspaceState();
         RefreshSecurityAnalysisIfNeeded();

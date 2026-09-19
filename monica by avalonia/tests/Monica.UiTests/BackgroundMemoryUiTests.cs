@@ -41,11 +41,8 @@ public sealed class BackgroundMemoryUiTests
             viewModel.NoteContent = "Unsaved background draft";
             Dispatcher.UIThread.RunJobs();
 
-            foreach (var section in new[] { "Passwords", "Notes", "Totp", "Cards" })
-            {
-                viewModel.SelectSectionCommand.Execute(section);
-                Dispatcher.UIThread.RunJobs();
-            }
+            viewModel.SelectSectionCommand.Execute("Cards");
+            Dispatcher.UIThread.RunJobs();
 
             VaultEditorDialogWarmup.EnsurePasswordWarmed();
             VaultEditorDialogWarmup.EnsureTotpWarmed();
@@ -76,7 +73,7 @@ public sealed class BackgroundMemoryUiTests
 
             Assert.Same(viewModel, shellHost.Content);
             var restoredHost = Assert.Single(window.GetVisualDescendants().OfType<WorkspaceHostView>());
-            Assert.Equal(["Cards"], restoredHost.CreatedSections);
+            Assert.Equal(["Vault"], restoredHost.CreatedSections);
             Assert.False(VaultEditorDialogWarmup.IsPasswordWarmed);
             Assert.False(VaultEditorDialogWarmup.IsTotpWarmed);
             Assert.True(VaultEditorDialogWarmup.IsWalletWarmed);
@@ -241,7 +238,7 @@ public sealed class BackgroundMemoryUiTests
         Monica.App.MainWindow window)
     {
         var host = Assert.Single(window.GetVisualDescendants().OfType<WorkspaceHostView>());
-        Assert.Equal(["Vault", "Passwords", "Notes", "Totp", "Cards"], host.CreatedSections);
+        Assert.Equal(["Vault"], host.CreatedSections);
         Assert.NotNull(host.CurrentWorkspace);
         return (new WeakReference(host), new WeakReference(host.CurrentWorkspace));
     }

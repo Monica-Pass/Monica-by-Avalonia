@@ -31,16 +31,9 @@ public sealed partial class MainWindowViewModel
     [NotifyPropertyChangedFor(nameof(SelectedVaultFolderPath))]
     private IVaultTreeRow? _selectedVaultRow;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsVaultGroupAll))]
-    [NotifyPropertyChangedFor(nameof(IsVaultGroupPasswords))]
-    [NotifyPropertyChangedFor(nameof(IsVaultGroupNotes))]
-    [NotifyPropertyChangedFor(nameof(IsVaultGroupTotp))]
-    [NotifyPropertyChangedFor(nameof(IsVaultGroupCards))]
-    [NotifyPropertyChangedFor(nameof(HasVaultCreatePreset))]
-    [NotifyPropertyChangedFor(nameof(VaultCreateLabel))]
-    [NotifyPropertyChangedFor(nameof(VaultCreateCommand))]
-    private VaultEntryGroup _vaultGroup = VaultEntryGroup.All;
+    // The rail tag the user picked IS the preset; a second observable would let the navigation and
+    // the tree disagree about which slice of the library is on screen.
+    public VaultEntryGroup VaultGroup => VaultPresets.GroupOf(SelectedSection);
 
     [ObservableProperty]
     private bool _vaultFavoritesOnly;
@@ -48,16 +41,6 @@ public sealed partial class MainWindowViewModel
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasVaultSearchText))]
     private string _vaultSearchText = "";
-
-    public bool IsVaultGroupAll => VaultGroup == VaultEntryGroup.All;
-
-    public bool IsVaultGroupPasswords => VaultGroup == VaultEntryGroup.Passwords;
-
-    public bool IsVaultGroupNotes => VaultGroup == VaultEntryGroup.Notes;
-
-    public bool IsVaultGroupTotp => VaultGroup == VaultEntryGroup.Totp;
-
-    public bool IsVaultGroupCards => VaultGroup == VaultEntryGroup.Cards;
 
     public bool HasVaultSearchText => !string.IsNullOrWhiteSpace(VaultSearchText);
 
@@ -125,14 +108,20 @@ public sealed partial class MainWindowViewModel
         QueueVaultTreeRefresh();
     }
 
-    partial void OnVaultGroupChanged(VaultEntryGroup value)
+    partial void OnVaultFavoritesOnlyChanged(bool value)
     {
         RebuildVaultTree();
     }
 
-    partial void OnVaultFavoritesOnlyChanged(bool value)
+    // A section switch can change the preset while the library stays on screen, because the four
+    // type sections resolve to this page; the shell calls this after it raises SelectedSection.
+    public void RefreshVaultPreset()
     {
-        RebuildVaultTree();
+        OnPropertyChanged(nameof(VaultEmptyStateText));
+        if (_isVaultTreeAttached)
+        {
+            RebuildVaultTree();
+        }
     }
 
     // Only the library page watches the shared collections, and it detaches the moment another
@@ -389,12 +378,6 @@ public sealed partial class MainWindowViewModel
         request.Target is VaultTreeFolderRow { Path.Length: > 0 } target &&
         FindCategory(source.CategoryId.Value) is { } category &&
         LocalCategoryPath.PlanSubtreeMove(Categories, category, LocalCategoryPath.Normalize(target.Path)) is not null;
-
-    [RelayCommand]
-    private void SelectVaultGroup(VaultEntryGroup group)
-    {
-        VaultGroup = group;
-    }
 
     [RelayCommand]
     private void ClearVaultSearch() => VaultSearchText = "";

@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Monica.App.Features.Vault;
 using Monica.App.ViewModels;
 
 namespace Monica.App;
@@ -22,13 +23,13 @@ public partial class MainWindow
             return;
         }
 
-        viewModel.SelectedSection = "Passwords";
+        viewModel.SelectedSection = VaultPresets.LibrarySection;
         Dispatcher.UIThread.Post(
             () =>
             {
                 if (DataContext is MainWindowViewModel { IsUnlocked: true })
                 {
-                    PasswordVaultView.FocusSearch();
+                    VaultWorkspaceView.FocusSearch();
                 }
             },
             DispatcherPriority.ContextIdle);
