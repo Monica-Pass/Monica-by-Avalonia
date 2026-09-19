@@ -238,19 +238,20 @@ public partial class App
                     $"Smoke UI other pages screenshots result. success={success}, directory={smokeScreenshotDirectory}");
             }
 
-            AppDiagnostics.Info(
-                $"Smoke UI release gate completed. success={smokeSuccess}, " +
-                $"loadMs={viewModel.LastVaultLoadDurationMilliseconds}, passwords={viewModel.Passwords.Count}, " +
-                $"notes={viewModel.NoteItems.Count}, totp={viewModel.TotpItems.Count}, wallet={viewModel.WalletItems.Count}");
             var lockCycleSuccess = true;
             if (HasSmokeUiFlag(Environment.GetCommandLineArgs(), "--smoke-ui-lock-after-checks"))
             {
                 lockCycleSuccess = await RunSmokeUiPostLockMemorySampleAsync(viewModel, password);
+                smokeSuccess &= lockCycleSuccess;
             }
 
+            AppDiagnostics.Info(
+                $"Smoke UI release gate completed. success={smokeSuccess}, " +
+                $"loadMs={viewModel.LastVaultLoadDurationMilliseconds}, passwords={viewModel.Passwords.Count}, " +
+                $"notes={viewModel.NoteItems.Count}, totp={viewModel.TotpItems.Count}, wallet={viewModel.WalletItems.Count}");
             if (smokeExitAfterChecks)
             {
-                desktop.Shutdown(smokeSuccess && lockCycleSuccess ? 0 : 1);
+                desktop.Shutdown(smokeSuccess ? 0 : 1);
             }
         }, DispatcherPriority.Background);
     }
@@ -260,25 +261,45 @@ public partial class App
         string password)
     {
         ReportSmokeUiMemory(viewModel, "unlocked");
+        var expectedPasswords = viewModel.Passwords.Count;
+        var expectedNotes = viewModel.NoteItems.Count;
+        var expectedTotp = viewModel.TotpItems.Count;
+        var expectedWallet = viewModel.WalletItems.Count;
         viewModel.LockCommand.Execute(null);
         var locked = await WaitForSmokeConditionAsync(() => !viewModel.IsUnlocked, TimeSpan.FromSeconds(10));
         // The lock handler schedules its compaction one second later, so sample only after it lands.
         await Task.Delay(2500);
-        ReportSmokeUiMemory(viewModel, "locked");
+        var lockedPrivateMb = ReportSmokeUiMemory(viewModel, "locked");
+        var maxLockedMemoryMb = GetSmokeUiCount(
+            Environment.GetCommandLineArgs(), "--smoke-ui-max-memory-mb");
+        var memoryWithinBudget = maxLockedMemoryMb <= 0 || lockedPrivateMb <= maxLockedMemoryMb;
+        if (maxLockedMemoryMb > 0)
+        {
+            AppDiagnostics.Info(
+                $"Smoke UI memory budget result. success={memoryWithinBudget}, " +
+                $"lockedPrivateMB={lockedPrivateMb:F1}, maxMB={maxLockedMemoryMb}");
+        }
 
         // The shell caches are released on lock, so re-unlocking must rebuild them from the vault.
         viewModel.MasterPassword = password;
         await viewModel.UnlockCommand.ExecuteAsync(null);
         var restored = await WaitForSmokeConditionAsync(
-            () => viewModel.IsUnlocked && viewModel.Passwords.Count > 0,
+            () => viewModel.IsUnlocked &&
+                  viewModel.Passwords.Count >= expectedPasswords &&
+                  viewModel.NoteItems.Count >= expectedNotes &&
+                  viewModel.TotpItems.Count >= expectedTotp &&
+                  viewModel.WalletItems.Count >= expectedWallet,
             TimeSpan.FromSeconds(20));
         AppDiagnostics.Info(
             $"Smoke UI lock cycle result. locked={locked}, reUnlocked={restored}, " +
-            $"passwords={viewModel.Passwords.Count}, notes={viewModel.NoteItems.Count}");
-        return locked && restored;
+            $"passwords={viewModel.Passwords.Count}/{expectedPasswords}, " +
+            $"notes={viewModel.NoteItems.Count}/{expectedNotes}, " +
+            $"totp={viewModel.TotpItems.Count}/{expectedTotp}, " +
+            $"wallet={viewModel.WalletItems.Count}/{expectedWallet}");
+        return locked && restored && memoryWithinBudget;
     }
 
-    private static void ReportSmokeUiMemory(MainWindowViewModel viewModel, string stage)
+    private static double ReportSmokeUiMemory(MainWindowViewModel viewModel, string stage)
     {
         using var process = System.Diagnostics.Process.GetCurrentProcess();
         var workingSetMb = Environment.WorkingSet / 1048576d;
@@ -290,6 +311,7 @@ public partial class App
             $"workingSetMB={workingSetMb:F1}, privateMB={privateMb:F1}, " +
             $"peakWorkingSetMB={peakWorkingSetMb:F1}, managedHeapMB={managedMb:F1}, " +
             $"threads={process.Threads.Count}");
+        return privateMb;
     }
 
     private static void ApplySmokeUiViewportSize(MainWindow mainWindow, SmokeUiViewportSize? smokeViewportSize)

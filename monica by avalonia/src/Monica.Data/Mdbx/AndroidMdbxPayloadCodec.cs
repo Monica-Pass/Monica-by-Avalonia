@@ -79,6 +79,14 @@ public static class AndroidMdbxPayloadCodec
                 JsonSerializer.Serialize(writer, attachments, ExtensionJsonOptions);
             }
 
+            // Android keeps archive state in Room only, so there is no canonical archived
+            // field to reuse; without this an archived entry reappears after a reload.
+            if (entry.IsArchived || entry.ArchivedAt is not null)
+            {
+                writer.WriteBoolean("is_archived", entry.IsArchived);
+                WriteNullableUnixMilliseconds(writer, "archived_at", entry.ArchivedAt);
+            }
+
             writer.WriteEndObject();
         }
 
@@ -112,6 +120,8 @@ public static class AndroidMdbxPayloadCodec
                 CategoryId = GetInt64(root, "category_id", "categoryId"),
                 MdbxFolderId = NormalizeMdbxFolderId(GetNullableString(root, "mdbx_folder_id", "mdbxFolderId")),
                 DeletedAt = GetDateTimeOffset(root, "deleted_at", "deletedAt"),
+                IsArchived = GetBoolean(root, "is_archived", "isArchived"),
+                ArchivedAt = GetDateTimeOffset(root, "archived_at", "archivedAt"),
                 BoundNoteId = GetInt64(root, "bound_note_room_id", "boundNoteRoomId"),
                 LoginType = ParseLoginType(GetString(root, "login_type", "loginType")),
                 AuthenticatorKey = GetString(root, "authenticator_key", "authenticatorKey"),

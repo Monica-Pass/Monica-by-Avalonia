@@ -8,7 +8,12 @@ param(
     [ValidateSet('jit', 'aot')]
     [string] $Mode = 'jit',
 
-    [string] $MasterPassword = 'CiRuntime!2026'
+    [string] $MasterPassword = 'CiRuntime!2026',
+
+    # Background budget agreed for the locked/minimized process, in private bytes.
+    [int] $MaxLockedMemoryMb = 120,
+
+    [int] $UiTimeoutSeconds = 180
 )
 
 $ErrorActionPreference = 'Stop'
@@ -28,10 +33,30 @@ New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
 New-Item -ItemType Directory -Force -Path $vaultDirectory | Out-Null
 $databasePath = Join-Path $vaultDirectory 'vault.db'
 
+function Write-AppLogEvidence {
+    param(
+        [string] $Label,
+        [string] $AppLogPath
+    )
+
+    if (-not $AppLogPath -or -not (Test-Path -LiteralPath $AppLogPath)) {
+        return
+    }
+
+    Write-Host "--- $Label app log ---"
+    Get-Content -LiteralPath $AppLogPath |
+        Select-String -SimpleMatch 'check failed', 'budget result', 'release gate completed', 'lock cycle result' |
+        ForEach-Object { Write-Host ($_.Line -replace '^\[[^\]]+\]\s*', '') }
+}
+
 function Invoke-ArtifactCommand {
     param(
         [string] $Label,
-        [string[]] $Arguments
+        [string[]] $Arguments,
+        [int] $TimeoutSeconds = 0,
+        # A windowed run reports through runtime.log rather than stdout, so point at it to
+        # keep the evidence when the process exits nonzero.
+        [string] $AppLogPath = ''
     )
 
     Write-Host "::group=$Label"
@@ -43,27 +68,58 @@ function Invoke-ArtifactCommand {
     $stderrPath = Join-Path $logDirectory "$Label.err.txt"
     # A string array splits any argument containing a space; quote each argument explicitly.
     $commandLine = (@($Arguments | ForEach-Object { '"' + ($_ -replace '"', '\"') + '"' }) -join ' ')
-    $process = Start-Process -FilePath $exePath -ArgumentList $commandLine -NoNewWindow -Wait -PassThru `
-        -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
-    $stdout = if (Test-Path -LiteralPath $stdoutPath) { Get-Content -LiteralPath $stdoutPath -Raw } else { '' }
-    $stderr = if (Test-Path -LiteralPath $stderrPath) { Get-Content -LiteralPath $stderrPath -Raw } else { '' }
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $exePath
+    $startInfo.Arguments = $commandLine
+    $startInfo.WorkingDirectory = Split-Path -Parent $exePath
+    $startInfo.UseShellExecute = $false
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+    $startInfo.StandardErrorEncoding = [System.Text.Encoding]::UTF8
+    # Start-Process -PassThru can hand back an object whose ExitCode is null, which then reads
+    # as a failed step; Process::Start keeps the real exit code.
+    [System.Diagnostics.Process]$process = [System.Diagnostics.Process]::Start($startInfo)
+    if ($null -eq $process) {
+        throw "$Label never ran: no process was started for $RuntimeIdentifier/$Mode."
+    }
+
+    # Draining the pipes concurrently is what keeps a chatty child from blocking on the pipe buffer.
+    $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+    $stderrTask = $process.StandardError.ReadToEndAsync()
+    $finished = if ($TimeoutSeconds -gt 0) {
+        $process.WaitForExit($TimeoutSeconds * 1000)
+    } else {
+        $process.WaitForExit()
+        $true
+    }
+    if (-not $finished) {
+        $process.Kill($true)
+        Write-AppLogEvidence -Label $Label -AppLogPath $AppLogPath
+        throw "$Label did not finish within $TimeoutSeconds seconds for $RuntimeIdentifier/$Mode."
+    }
+
+    $stdout = $stdoutTask.Result
+    $stderr = $stderrTask.Result
+    Set-Content -LiteralPath $stdoutPath -Value $stdout -Encoding UTF8
+    Set-Content -LiteralPath $stderrPath -Value $stderr -Encoding UTF8
     foreach ($line in (($stdout + [Environment]::NewLine + $stderr) -split "`r?`n")) {
         if ($line.Trim().Length -gt 0) { Write-Host $line }
     }
     Write-Host "::endgroup::"
 
-    if ($null -eq $process) {
-        throw "$Label never ran: no process was started for $RuntimeIdentifier/$Mode."
-    }
-
-    if ($process.ExitCode -ne 0) {
-        throw "$Label failed for $RuntimeIdentifier/$Mode with exit code $($process.ExitCode). Output: $((($stdout + $stderr) -join ' | ').Trim())"
+    $exitCode = $process.ExitCode
+    if ($exitCode -ne 0) {
+        Write-AppLogEvidence -Label $Label -AppLogPath $AppLogPath
+        throw "$Label failed for $RuntimeIdentifier/$Mode with exit code $exitCode. Output: $(($stdout + $stderr).Trim())"
     }
 
     return ($stdout + $stderr)
 }
 
 try {
+    # Evidence is worthless if the failing run's directory disappears with it.
+    $keepRunRoot = $true
     $requiresNativeMdbx = $RuntimeIdentifier -like 'win-*'
     Write-Host "Runtime smoke for $RuntimeIdentifier/$Mode using $exePath"
 
@@ -77,6 +133,7 @@ try {
         Write-Warning "SKIPPED canonical MDBX seeding for ${RuntimeIdentifier}: no native MDBX library is published for this runtime."
         $null = Invoke-ArtifactCommand -Label 'smoke-vault' -Arguments @('--smoke-vault', $databasePath, $MasterPassword, 'definitely-wrong-password')
         Write-Host ("RUNTIME SMOKE partial. rid={0} mode={1} covered=sqlite+dapper+crypto skipped=canonical-mdbx-vault" -f $RuntimeIdentifier, $Mode)
+        $keepRunRoot = $false
         return
     }
 
@@ -92,10 +149,64 @@ try {
         throw 'Canonical MDBX vault files were not created next to the SQLite database.'
     }
 
+    # The windowed smoke is the only gate that drives the shipped shell end to end and samples
+    # memory once locked; it needs native MDBX plus a desktop session, so Windows only.
+    $uiAppData = Join-Path $runRoot 'ui-appdata'
+    New-Item -ItemType Directory -Force -Path $uiAppData | Out-Null
+    $env:MONICA_APPDATA_DIR = $uiAppData
+    $uiLog = Join-Path $uiAppData 'runtime.log'
+    try {
+        $null = Invoke-ArtifactCommand -Label 'ui-init-empty-smoke-vault' -Arguments @('--init-empty-smoke-vault', $MasterPassword)
+        $uiSeed = Invoke-ArtifactCommand -Label 'ui-seed-smoke-vault' -Arguments @('--seed-smoke-vault', $MasterPassword)
+        if ($uiSeed -notmatch 'Smoke vault seeded') {
+            throw 'ui-seed-smoke-vault did not report success.'
+        }
+
+        $null = Invoke-ArtifactCommand -Label 'smoke-ui' -TimeoutSeconds $UiTimeoutSeconds -AppLogPath $uiLog -Arguments @(
+            '--smoke-ui-unlock', $MasterPassword,
+            '--smoke-ui-width', '1280',
+            '--smoke-ui-height', '800',
+            '--smoke-ui-h04-lists',
+            '--smoke-ui-note-editor-checks',
+            '--smoke-ui-other-pages-checks',
+            '--smoke-ui-keyboard-checks',
+            '--smoke-ui-max-vault-load-ms', '4000',
+            '--smoke-ui-max-memory-mb', "$MaxLockedMemoryMb",
+            '--smoke-ui-lock-after-checks',
+            '--smoke-ui-exit-after-checks'
+        )
+
+        if (-not (Test-Path -LiteralPath $uiLog)) {
+            throw "smoke-ui produced no runtime log at $uiLog."
+        }
+
+        $gateLines = @(Get-Content -LiteralPath $uiLog | Select-String -SimpleMatch `
+            'release gate completed', 'budget result', 'check failed', 'lock cycle result')
+        foreach ($line in $gateLines) { Write-Host ($line.Line -replace '^\[[^\]]+\]\s*', '') }
+        $gateLine = $gateLines | Where-Object { $_.Line -match 'release gate completed' } | Select-Object -Last 1
+        if ($null -eq $gateLine) {
+            throw 'smoke-ui produced no release gate line.'
+        }
+
+        if ($gateLine.Line -notmatch 'success=True') {
+            throw "smoke-ui release gate reported failure: $($gateLine.Line)"
+        }
+
+        Write-Host ("UI SMOKE passed. rid={0} mode={1} lockedBudgetMB={2}" -f $RuntimeIdentifier, $Mode, $MaxLockedMemoryMb)
+    }
+    finally {
+        Remove-Item Env:MONICA_APPDATA_DIR -ErrorAction SilentlyContinue
+    }
+
     Write-Host ("RUNTIME SMOKE passed. rid={0} mode={1} canonicalVaultFiles={2}" -f $RuntimeIdentifier, $Mode, $mdbxFiles.Count)
+    $keepRunRoot = $false
 }
 finally {
     if (Test-Path -LiteralPath $runRoot) {
-        Remove-Item -LiteralPath $runRoot -Recurse -Force -ErrorAction SilentlyContinue
+        if ($keepRunRoot) {
+            Write-Host "RUNTIME SMOKE evidence kept at $runRoot"
+        } else {
+            Remove-Item -LiteralPath $runRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 }

@@ -66,10 +66,18 @@ class Program
 
     // Avalonia configuration, don't remove; also used by visual designer.
     public static AppBuilder BuildAvaloniaApp()
-        => AppBuilder.Configure<App>()
+    {
+        return AppBuilder.Configure<App>()
             .UsePlatformDetect()
+            // ANGLE pulls in ~180MB of GPU driver images, which alone breaks the
+            // background memory budget; software raster measured faster at 1280x800.
+            .With(new Win32PlatformOptions
+            {
+                RenderingMode = new[] { Win32RenderingMode.Software }
+            })
             .WithInterFont()
             .LogToTrace();
+    }
 
     private static async Task<int> RunVaultSmokeTestAsync(string[] args)
     {

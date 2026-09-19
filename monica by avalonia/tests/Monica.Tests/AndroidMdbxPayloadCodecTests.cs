@@ -124,6 +124,34 @@ public sealed class AndroidMdbxPayloadCodecTests
         Assert.False(root.TryGetProperty("title", out _));
     }
 
+    [Fact]
+    public void Encode_password_omits_archive_extension_for_active_entries()
+    {
+        using var document = JsonDocument.Parse(AndroidMdbxPayloadCodec.EncodePassword(
+            new PasswordEntry { Id = 42, Title = "Active" },
+            []));
+
+        Assert.False(document.RootElement.TryGetProperty("is_archived", out _));
+        Assert.False(document.RootElement.TryGetProperty("archived_at", out _));
+    }
+
+    [Fact]
+    public void Encode_password_round_trips_archive_state()
+    {
+        var archivedAt = new DateTimeOffset(2026, 5, 4, 3, 2, 1, TimeSpan.Zero);
+        var entry = new PasswordEntry { Id = 42, Title = "Archived", IsArchived = true, ArchivedAt = archivedAt };
+
+        var payload = AndroidMdbxPayloadCodec.EncodePassword(entry, []);
+        using var document = JsonDocument.Parse(payload);
+        Assert.True(document.RootElement.GetProperty("is_archived").GetBoolean());
+        Assert.Equal(archivedAt.ToUnixTimeMilliseconds(), document.RootElement.GetProperty("archived_at").GetInt64());
+
+        var decoded = AndroidMdbxPayloadCodec.DecodePassword(payload, "Archived");
+        Assert.NotNull(decoded);
+        Assert.True(decoded.Entry.IsArchived);
+        Assert.Equal(archivedAt, decoded.Entry.ArchivedAt);
+    }
+
     [Theory]
     [InlineData("android-note-v1.json", "note", VaultItemType.Note, 101)]
     [InlineData("android-totp-v1.json", "totp", VaultItemType.Totp, 102)]

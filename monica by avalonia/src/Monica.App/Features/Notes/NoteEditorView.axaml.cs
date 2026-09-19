@@ -1,5 +1,7 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.VisualTree;
 using Monica.App.ViewModels;
 
 namespace Monica.App.Features.Notes;
@@ -153,8 +155,14 @@ public partial class NoteEditorView : UserControl
         NoteContentEditor.Text = viewModel.NoteContent;
         NoteContentEditor.SelectionStart = 0;
         NoteContentEditor.SelectionEnd = NoteContentEditor.Text?.Length ?? 0;
+        // Leaving split/preview mode rebuilds the editor pane; Avalonia refuses focus on a
+        // control without a top level, so the request has to wait for the re-attach.
+        var focusBlocker = await WaitForNoteEditorFocusableAsync();
         NoteContentEditor.Focus();
-        check("note-editor-focus", NoteContentEditor.IsFocused, $"section={viewModel.SelectedSection}");
+        check(
+            "note-editor-focus",
+            NoteContentEditor.IsFocused,
+            $"section={viewModel.SelectedSection}, blocker={focusBlocker}");
 
         IndentSelectedLines(outdent: false);
         check("note-tab-indents-lines", (NoteContentEditor.Text ?? "").StartsWith("    alpha", StringComparison.Ordinal), $"content='{NoteContentEditor.Text}'");
@@ -174,6 +182,54 @@ public partial class NoteEditorView : UserControl
 
     private void RequestClose(NoteEditorTab tab) =>
         CloseRequested?.Invoke(this, new NoteEditorCloseRequestedEventArgs(tab));
+
+    private async Task<string> WaitForNoteEditorFocusableAsync()
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(1);
+        while (true)
+        {
+            var blocker = DescribeNoteEditorFocusBlocker();
+            if (blocker.Length == 0)
+            {
+                return "";
+            }
+
+            if (DateTime.UtcNow >= deadline)
+            {
+                return blocker;
+            }
+
+            await Task.Delay(10);
+        }
+    }
+
+    private string DescribeNoteEditorFocusBlocker()
+    {
+        if (TopLevel.GetTopLevel(NoteContentEditor) is null)
+        {
+            return "detached";
+        }
+
+        if (NoteContentEditor.IsEffectivelyVisible && NoteContentEditor.IsEffectivelyEnabled)
+        {
+            return "";
+        }
+
+        for (Visual? node = NoteContentEditor; node is not null; node = node.GetVisualParent())
+        {
+            if (!node.IsEffectivelyVisible)
+            {
+                return $"invisible:{node.GetType().Name}/{node.Name}";
+            }
+
+            if (node is InputElement { IsEffectivelyEnabled: false } input)
+            {
+                return $"disabled:{input.GetType().Name}/{input.Name}";
+            }
+        }
+
+        return "unknown";
+    }
 
     private string GetLocalizedText(string key) =>
         DataContext is MainWindowViewModel viewModel
