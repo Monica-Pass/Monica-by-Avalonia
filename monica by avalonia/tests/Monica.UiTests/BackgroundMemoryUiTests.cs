@@ -353,8 +353,10 @@ public sealed class BackgroundMemoryUiTests
         // The navigation selection animation holds a DispatcherTimer for 700 ms after the last selection
         // change, and that timer keeps the just-detached workspace alive until it elapses.
         var deadline = Stopwatch.StartNew();
+        var pumps = 0;
         while (deadline.ElapsedMilliseconds < CollectionBudgetMilliseconds)
         {
+            pumps++;
             Dispatcher.UIThread.RunJobs();
             ForceFullCollection();
             if (!references.Any(reference => reference.IsAlive))
@@ -365,7 +367,19 @@ public sealed class BackgroundMemoryUiTests
             await Task.Delay(50, cancellationToken);
         }
 
-        Assert.All(references, reference => Assert.False(reference.IsAlive));
+        // Name what survived and how often the loop actually ran: release timing depends on how much
+        // of the dispatcher the test managed to pump, so a bare "Assert.False failed" red cannot be
+        // diagnosed once the process is gone.
+        var survivors = references
+            .Where(reference => reference.IsAlive)
+            .Select(reference => reference.Target?.GetType().Name ?? "unknown")
+            .Distinct()
+            .Order()
+            .ToArray();
+        Assert.True(
+            survivors.Length == 0,
+            $"{string.Join(", ", survivors)} still live after {deadline.ElapsedMilliseconds} ms and " +
+            $"{pumps} dispatcher pumps (budget {CollectionBudgetMilliseconds} ms).");
     }
 
     private sealed record ProjectionBuildCounts(
