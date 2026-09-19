@@ -156,6 +156,88 @@ public sealed partial class DataRepositoryTests
     }
 
     [Fact]
+    public async Task Migration_v72_adds_category_columns_before_the_indexes_that_need_them()
+    {
+        var path = GetTempDatabasePath();
+        var factory = new SqliteConnectionFactory(path);
+        var migrator = new DatabaseMigrator(factory);
+
+        // The categories table as it stands in a real schema-72 database: five columns, no tree
+        // or Bitwarden columns. Every other migration test starts from an empty file, so none of
+        // them ever reached the index below before the column that feeds it existed.
+        await using (var legacyConnection = factory.CreateConnection())
+        {
+            await legacyConnection.OpenAsync();
+            await using var legacyCommand = legacyConnection.CreateCommand();
+            legacyCommand.CommandText =
+                """
+                CREATE TABLE categories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    name TEXT NOT NULL,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    mdbx_database_id INTEGER DEFAULT NULL,
+                    mdbx_folder_id TEXT DEFAULT NULL
+                );
+                INSERT INTO categories (name, sort_order, mdbx_folder_id) VALUES ('Banking', 3, 'legacy-folder');
+                PRAGMA user_version=72;
+                """;
+            await legacyCommand.ExecuteNonQueryAsync();
+        }
+
+        await migrator.MigrateAsync();
+
+        await using var connection = factory.CreateConnection();
+        await connection.OpenAsync();
+        await using (var columnCommand = connection.CreateCommand())
+        {
+            columnCommand.CommandText = "PRAGMA table_info(categories);";
+            await using var reader = await columnCommand.ExecuteReaderAsync();
+            var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            while (await reader.ReadAsync())
+            {
+                columns.Add(reader.GetString(1));
+            }
+
+            Assert.Contains("parent_category_id", columns);
+            Assert.Contains("bitwarden_vault_id", columns);
+            Assert.Contains("bitwarden_folder_id", columns);
+        }
+
+        await using (var indexCommand = connection.CreateCommand())
+        {
+            indexCommand.CommandText =
+                "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'categories' ORDER BY name;";
+            await using var reader = await indexCommand.ExecuteReaderAsync();
+            var indexes = new List<string>();
+            while (await reader.ReadAsync())
+            {
+                indexes.Add(reader.GetString(0));
+            }
+
+            Assert.Contains("index_categories_parent", indexes);
+            Assert.Contains("index_categories_bitwarden_folder", indexes);
+        }
+
+        await using (var preservedCommand = connection.CreateCommand())
+        {
+            preservedCommand.CommandText = "SELECT name, sort_order, mdbx_folder_id FROM categories WHERE id = 1;";
+            await using var reader = await preservedCommand.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("Banking", reader.GetString(0));
+            Assert.Equal(3L, reader.GetInt64(1));
+            Assert.Equal("legacy-folder", reader.GetString(2));
+        }
+
+        await using (var versionCommand = connection.CreateCommand())
+        {
+            versionCommand.CommandText = "PRAGMA user_version;";
+            Assert.Equal(
+                DatabaseMigrator.CurrentSchemaVersion,
+                Convert.ToInt32(await versionCommand.ExecuteScalarAsync()));
+        }
+    }
+
+    [Fact]
     public async Task Migration_refuses_legacy_pascal_case_windows_vault()
     {
         var path = GetTempDatabasePath();

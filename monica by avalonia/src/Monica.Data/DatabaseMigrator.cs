@@ -32,7 +32,7 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
             throw new InvalidOperationException($"Database schema {version} is newer than this Monica build ({CurrentSchemaVersion}).");
         }
 
-        await CreateCurrentSchemaAsync(connection, cancellationToken);
+        await CreateTablesAsync(connection, cancellationToken);
         await EnsurePasswordQuickAccessTableWithoutForeignKeyAsync(connection, cancellationToken);
         await EnsureColumnAsync(connection, "categories", "mdbx_folder_id", "TEXT DEFAULT NULL", cancellationToken);
         await EnsureColumnAsync(connection, "categories", "parent_category_id", "INTEGER DEFAULT NULL", cancellationToken);
@@ -52,7 +52,7 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
         await EnsureColumnAsync(connection, "bitwarden_vaults", "custom_ca_certificate_path", "TEXT DEFAULT NULL", cancellationToken);
         await EnsureColumnAsync(connection, "bitwarden_vaults", "client_certificate_path", "TEXT DEFAULT NULL", cancellationToken);
         await EnsureColumnAsync(connection, "bitwarden_vaults", "encrypted_client_certificate_password", "TEXT DEFAULT NULL", cancellationToken);
-        await ExecuteAsync(connection, "CREATE INDEX IF NOT EXISTS index_secure_items_bound_password_id ON secure_items(bound_password_id);", cancellationToken);
+        await CreateIndexesAsync(connection, cancellationToken);
         await ExecuteAsync(connection, $"PRAGMA user_version={CurrentSchemaVersion};", cancellationToken);
     }
 
@@ -64,9 +64,20 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
         return Convert.ToInt32(result);
     }
 
-    private static async Task CreateCurrentSchemaAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    private static async Task CreateTablesAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
-        foreach (var sql in SchemaStatements)
+        foreach (var sql in SchemaStatements.Where(static sql => sql.StartsWith("CREATE TABLE", StringComparison.Ordinal)))
+        {
+            await ExecuteAsync(connection, sql, cancellationToken);
+        }
+    }
+
+    // Indexes run after the EnsureColumnAsync pass on purpose: CREATE TABLE IF NOT EXISTS leaves an
+    // existing table exactly as it was, so indexing a column that pass has not added yet aborts the
+    // whole migration and the vault never opens.
+    private static async Task CreateIndexesAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        foreach (var sql in SchemaStatements.Where(static sql => !sql.StartsWith("CREATE TABLE", StringComparison.Ordinal)))
         {
             await ExecuteAsync(connection, sql, cancellationToken);
         }
@@ -313,6 +324,7 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
         "CREATE INDEX IF NOT EXISTS index_secure_items_keepass_entry_uuid ON secure_items(keepass_entry_uuid);",
         "CREATE INDEX IF NOT EXISTS index_secure_items_mdbx_database_id ON secure_items(mdbx_database_id);",
         "CREATE INDEX IF NOT EXISTS index_secure_items_mdbx_database_folder ON secure_items(mdbx_database_id, mdbx_folder_id);",
+        "CREATE INDEX IF NOT EXISTS index_secure_items_bound_password_id ON secure_items(bound_password_id);",
         "CREATE UNIQUE INDEX IF NOT EXISTS index_secure_items_bitwarden_vault_cipher_unique ON secure_items(bitwarden_vault_id, bitwarden_cipher_id) WHERE bitwarden_vault_id IS NOT NULL AND bitwarden_cipher_id IS NOT NULL;",
         """
         CREATE TABLE IF NOT EXISTS operation_logs (
