@@ -140,7 +140,6 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        RestorePasswordSearchQueryIfActive();
         RestoreBackgroundDetailState();
     }
 

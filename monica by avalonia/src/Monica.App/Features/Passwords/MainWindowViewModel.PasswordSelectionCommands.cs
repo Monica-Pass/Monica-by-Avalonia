@@ -230,6 +230,11 @@ public sealed partial class MainWindowViewModel
                 {
                     PasswordSearchQuery = query;
                 }
+
+                // The library tree already narrowed on the in-memory fields; this rebuild is the part
+                // that turns a custom-field or attachment hit into a row. Detached, it is a no-op and
+                // the next attach rebuilds with these ids anyway.
+                RaiseVaultTreeState();
             }
         });
     }

@@ -104,30 +104,7 @@ public sealed partial class MainWindowViewModel
             return true;
         }
 
-        if (ContainsAny(term,
-            item.Title,
-            item.Username,
-            item.Website,
-            item.Notes,
-            item.AuthenticatorKey,
-            item.AppName,
-            item.AppPackageName,
-            item.Email,
-            item.Phone,
-            item.AddressLine,
-            item.City,
-            item.State,
-            item.ZipCode,
-            item.Country,
-            item.CreditCardHolder,
-            item.CreditCardExpiry,
-            item.SsoProvider,
-            item.PasskeyBindings,
-            item.WifiMetadata,
-            item.SshKeyData,
-            item.KeepassGroupPath ?? "",
-            item.MdbxFolderId ?? "",
-            item.BitwardenFolderId ?? ""))
+        if (VaultSearchFields.MatchesPassword(item, term))
         {
             return true;
         }

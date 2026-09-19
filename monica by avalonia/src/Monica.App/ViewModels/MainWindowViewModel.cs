@@ -409,9 +409,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 RaiseAllCountState();
                 RaiseFilteredPasswordsChanged();
             });
-            if (!string.IsNullOrWhiteSpace(PasswordSearchText))
+            if (!string.IsNullOrWhiteSpace(VaultSearchText))
             {
-                QueuePasswordSearchQuery(PasswordSearchText);
+                QueuePasswordSearchQuery(VaultSearchText);
             }
             EndPasswordProjectionNotificationDeferral();
             StatusMessage = _localization.Get("VaultUnlocked");

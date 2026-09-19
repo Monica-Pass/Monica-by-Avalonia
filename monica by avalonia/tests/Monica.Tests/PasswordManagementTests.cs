@@ -619,32 +619,54 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
-    public void ViewModel_searches_existing_custom_fields_on_demand()
+    public void Library_search_narrows_the_tree_to_a_field_no_row_displays()
     {
         RunOnStaThread(() =>
         {
             var harness = CreateHarness();
-            var matching = new PasswordEntry { Title = "Matching account", Password = "one" };
+            var courier = new PasswordEntry { Title = "Courier", Phone = "+55 938 1122", Password = "one" };
+            var mailbox = new PasswordEntry { Title = "Mailbox", Password = "two" };
+            harness.Repository.SavePasswordAsync(courier).GetAwaiter().GetResult();
+            harness.Repository.SavePasswordAsync(mailbox).GetAwaiter().GetResult();
+            harness.ViewModel.LoadAsync().GetAwaiter().GetResult();
+            harness.ViewModel.SetVaultTreeActive(true);
+            Assert.Equal(2, VaultRowKeys(harness.ViewModel).Count);
+
+            // A library row shows a title and a username, never a phone number, so only the tree's
+            // own match can decide whether the search reaches this entry.
+            harness.ViewModel.VaultSearchText = "938 1122";
+            WaitForCondition(() => VaultRowKeys(harness.ViewModel).SequenceEqual([$"p:{courier.Id}"]));
+        });
+    }
+
+    [Fact]
+    public void Library_search_adds_a_custom_field_hit_once_the_metadata_pass_lands()
+    {
+        RunOnStaThread(() =>
+        {
+            var harness = CreateHarness();
+            var hidden = new PasswordEntry { Title = "Matching account", Password = "one" };
             var other = new PasswordEntry { Title = "Other account", Password = "two" };
-            harness.Repository.SavePasswordAsync(matching).GetAwaiter().GetResult();
+            harness.Repository.SavePasswordAsync(hidden).GetAwaiter().GetResult();
             harness.Repository.SavePasswordAsync(other).GetAwaiter().GetResult();
-            harness.Repository.ReplaceCustomFieldsAsync(matching.Id,
+            harness.Repository.ReplaceCustomFieldsAsync(hidden.Id,
             [
                 new CustomField { Title = "Recovery hint", Value = "deep blue", SortOrder = 0 }
             ]).GetAwaiter().GetResult();
             harness.ViewModel.LoadAsync().GetAwaiter().GetResult();
+            harness.ViewModel.SetVaultTreeActive(true);
 
-            harness.ViewModel.PasswordSearchText = "deep blue";
-            WaitForCondition(() => harness.ViewModel.PasswordSearchQuery == "deep blue");
+            // No visible field carries the term, so the row can only come back through the ids the
+            // repository pass publishes — and only that row, since the other entry stays pruned.
+            harness.ViewModel.VaultSearchText = "deep blue";
+            WaitForCondition(() => VaultRowKeys(harness.ViewModel).SequenceEqual([$"p:{hidden.Id}"]));
 
-            Assert.Equal(
-                [matching.Id],
-                harness.ViewModel.FilteredPasswords.Select(item => item.Id).ToArray());
-
+            // A vault load drops the metadata caches, so surviving it takes the search to re-run
+            // itself against the text still in the box. The load blocks this thread, so its own
+            // re-queue cannot have published yet and the tree is provably empty here.
             harness.ViewModel.LoadAsync().GetAwaiter().GetResult();
-            WaitForCondition(() =>
-                harness.ViewModel.FilteredPasswords.Count == 1 &&
-                harness.ViewModel.FilteredPasswords[0].Id == matching.Id);
+            Assert.Empty(VaultRowKeys(harness.ViewModel));
+            WaitForCondition(() => VaultRowKeys(harness.ViewModel).SequenceEqual([$"p:{hidden.Id}"]));
         });
     }
 
@@ -4757,6 +4779,9 @@ public sealed partial class PasswordManagementTests
     {
         return value.Split(["\r\n", "\n", "\r"], StringSplitOptions.RemoveEmptyEntries);
     }
+
+    private static List<string> VaultRowKeys(MainWindowViewModel viewModel) =>
+        viewModel.VaultTreeRows.Where(row => row.IsEntryRow).Select(row => row.Key).ToList();
 
     private static void WaitForCondition(Func<bool> predicate, int timeoutMilliseconds = 2000)
     {

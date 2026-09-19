@@ -18,13 +18,18 @@ public enum VaultEntryGroup
 }
 
 /// A filter that is active prunes the tree down to surviving entries and forces what remains
-/// open, so a match can never hide behind a collapsed folder.
+/// open, so a match can never hide behind a collapsed folder. The two id sets are the delayed half
+/// of a search: a repository pass over custom fields and
+/// attachment metadata runs off the UI thread and arrives after the tree has already narrowed on the
+/// in-memory fields, so they are only ever supplied while they still describe the current text.
 public sealed record VaultTreeFilter(
     VaultEntryGroup Group = VaultEntryGroup.All,
     string? Search = null,
     bool FavoritesOnly = false,
     string Sort = "updated-desc",
-    VaultQuickFilters? QuickFilters = null)
+    VaultQuickFilters? QuickFilters = null,
+    IReadOnlySet<long>? CustomFieldMatchIds = null,
+    IReadOnlySet<long>? AttachmentMatchIds = null)
 {
     public bool HasSearch => !string.IsNullOrWhiteSpace(Search);
 
@@ -63,8 +68,14 @@ public sealed record VaultTreeFilter(
             return false;
         }
 
-        return !HasSearch || Contains(entry.Title) || Contains(entry.Username) ||
-               Contains(entry.Website) || Contains(entry.Email);
+        if (!HasSearch)
+        {
+            return true;
+        }
+
+        return CustomFieldMatchIds?.Contains(entry.Id) == true ||
+               AttachmentMatchIds?.Contains(entry.Id) == true ||
+               VaultSearchFields.MatchesPassword(entry, Search!.Trim());
     }
 
     public bool MatchesSecureItem(SecureItem item)

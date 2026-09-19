@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Controls;
@@ -11,8 +12,10 @@ using Monica.App.Controls;
 using Monica.App.Features;
 using Monica.App.Features.Notes;
 using Monica.App.Features.SecurityAnalysis;
+using Monica.App.Features.Vault;
 using Monica.App.ViewModels;
 using Monica.Core.Models;
+using Monica.Data.Repositories;
 
 namespace Monica.UiTests;
 
@@ -95,7 +98,7 @@ public sealed class BackgroundMemoryUiTests
         using var services = Monica.App.App.ConfigureServices(window);
         var viewModel = services.GetRequiredService<MainWindowViewModel>();
         PopulateVaultSources(viewModel, itemCount);
-        viewModel.PasswordSearchText = "Memory";
+        viewModel.VaultSearchText = "Memory";
         viewModel.TotpSearchText = "Memory";
         viewModel.WalletSearchText = "Memory";
         viewModel.NoteSearchText = "Memory";
@@ -120,11 +123,12 @@ public sealed class BackgroundMemoryUiTests
             Assert.Empty(viewModel.SecuritySummaryItems);
             Assert.Empty(viewModel.SecurityIssueItems);
             Assert.Empty(viewModel.FilteredSecurityIssueItems);
+            Assert.Empty(viewModel.VaultTreeRows);
             Assert.Equal(itemCount, viewModel.Passwords.Count);
             Assert.Equal(itemCount, viewModel.TotpItems.Count);
             Assert.Equal(itemCount, viewModel.WalletItems.Count);
             Assert.Equal(itemCount, viewModel.NoteItems.Count);
-            Assert.Equal("Memory", viewModel.PasswordSearchText);
+            Assert.Equal("Memory", viewModel.VaultSearchText);
             Assert.Equal("Memory", viewModel.TotpSearchText);
             Assert.Equal("Memory", viewModel.WalletSearchText);
             Assert.Equal("Memory", viewModel.NoteSearchText);
@@ -133,7 +137,7 @@ public sealed class BackgroundMemoryUiTests
             window.WindowState = WindowState.Normal;
             Dispatcher.UIThread.RunJobs();
 
-            Assert.True(viewModel.FilteredPasswordsProjectionBuildCount > initialBuilds.Passwords);
+            Assert.NotEmpty(viewModel.VaultTreeRows);
             Assert.Equal(initialBuilds.Totp, viewModel.FilteredTotpProjectionBuildCount);
             Assert.Equal(initialBuilds.Wallet, viewModel.FilteredWalletProjectionBuildCount);
             Assert.Equal(initialBuilds.NoteTree, viewModel.FilteredNoteProjectionBuildCount);
@@ -155,11 +159,13 @@ public sealed class BackgroundMemoryUiTests
     }
 
     [Fact]
-    public async Task Background_password_search_stays_suspended_until_passwords_restore()
+    public async Task Library_search_narrows_from_memory_immediately_and_adds_the_database_hit_after_return()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+        var repository = DispatchProxy.Create<IMonicaRepository, LibraryMetadataSearchProxy>();
+        var probe = (LibraryMetadataSearchProxy)(object)repository;
         var window = new Monica.App.MainWindow();
-        using var services = Monica.App.App.ConfigureServices(window);
+        using var services = Monica.App.App.ConfigureServices(window, overrides => overrides.AddSingleton(repository));
         var viewModel = services.GetRequiredService<MainWindowViewModel>();
         PopulatePasswordSearchSources(viewModel);
         window.Show();
@@ -168,23 +174,37 @@ public sealed class BackgroundMemoryUiTests
             window.DataContext = viewModel;
             viewModel.IsUnlocked = true;
             viewModel.SelectSectionCommand.Execute("Passwords");
-            Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
-            var initialBuilds = viewModel.FilteredPasswordsProjectionBuildCount;
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(["p:1", "p:2"], VaultEntryKeys(viewModel));
 
-            viewModel.PasswordSearchText = "Target";
+            viewModel.VaultSearchText = "Target";
+            await PumpUntilAsync(
+                () => VaultEntryKeys(viewModel).SequenceEqual(["p:1"]),
+                "the library tree narrowed on the text",
+                cancellationToken);
+
+            // The tree answered from the rows it already holds; the repository pass waits behind its
+            // own debounce, so a search never blocks on MDBX I/O to show what it can already show.
+            Assert.Equal(0, probe.MetadataSearchCalls);
+
             window.WindowState = WindowState.Minimized;
             Dispatcher.UIThread.RunJobs();
-            await Task.Delay(350, cancellationToken);
+            await Task.Delay(400, cancellationToken);
             Dispatcher.UIThread.RunJobs();
-
-            Assert.Empty(viewModel.PasswordSearchQuery);
-            Assert.Equal(initialBuilds, viewModel.FilteredPasswordsProjectionBuildCount);
+            Assert.Empty(viewModel.VaultTreeRows);
+            Assert.Equal(0, probe.MetadataSearchCalls);
 
             window.WindowState = WindowState.Normal;
-            Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(["p:1"], VaultEntryKeys(viewModel));
 
-            Assert.Equal("Target", viewModel.PasswordSearchQuery);
-            Assert.Equal(["Target account"], viewModel.FilteredPasswords.Select(item => item.Title));
+            // The row that only a custom-field hit can produce arrives with the metadata pass the
+            // page asked for as it came back on screen.
+            await PumpUntilAsync(
+                () => VaultEntryKeys(viewModel).SequenceEqual(["p:1", "p:2"]),
+                "the metadata hit to reach the tree",
+                cancellationToken);
+            Assert.Equal(1, probe.MetadataSearchCalls);
         }
         finally
         {
@@ -193,11 +213,13 @@ public sealed class BackgroundMemoryUiTests
     }
 
     [Fact]
-    public async Task Background_password_search_waits_for_inactive_password_workspace()
+    public async Task Library_search_waits_for_the_library_page_before_its_metadata_pass()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+        var repository = DispatchProxy.Create<IMonicaRepository, LibraryMetadataSearchProxy>();
+        var probe = (LibraryMetadataSearchProxy)(object)repository;
         var window = new Monica.App.MainWindow();
-        using var services = Monica.App.App.ConfigureServices(window);
+        using var services = Monica.App.App.ConfigureServices(window, overrides => overrides.AddSingleton(repository));
         var viewModel = services.GetRequiredService<MainWindowViewModel>();
         PopulatePasswordSearchSources(viewModel);
         window.Show();
@@ -205,27 +227,31 @@ public sealed class BackgroundMemoryUiTests
         {
             window.DataContext = viewModel;
             viewModel.IsUnlocked = true;
-            Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
-            var initialBuilds = viewModel.FilteredPasswordsProjectionBuildCount;
+            viewModel.SelectSectionCommand.Execute("Generator");
+            Dispatcher.UIThread.RunJobs();
+            Assert.Empty(viewModel.VaultTreeRows);
 
-            viewModel.SelectSectionCommand.Execute("Cards");
             window.WindowState = WindowState.Minimized;
             Dispatcher.UIThread.RunJobs();
-            viewModel.PasswordSearchText = "Target";
-            await Task.Delay(350, cancellationToken);
+            viewModel.VaultSearchText = "Target";
+            await Task.Delay(400, cancellationToken);
+            window.WindowState = WindowState.Normal;
+            Dispatcher.UIThread.RunJobs();
+            await Task.Delay(400, cancellationToken);
             Dispatcher.UIThread.RunJobs();
 
-            window.WindowState = WindowState.Normal;
-            Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
-
-            Assert.Empty(viewModel.PasswordSearchQuery);
-            Assert.Equal(initialBuilds, viewModel.FilteredPasswordsProjectionBuildCount);
+            // A search the user cannot see must not spend a repository scan behind another page's back.
+            Assert.Equal(0, probe.MetadataSearchCalls);
+            Assert.Empty(viewModel.VaultTreeRows);
 
             viewModel.SelectSectionCommand.Execute("Passwords");
-            Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
-
-            Assert.Equal("Target", viewModel.PasswordSearchQuery);
-            Assert.Equal(["Target account"], viewModel.FilteredPasswords.Select(item => item.Title));
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(["p:1"], VaultEntryKeys(viewModel));
+            await PumpUntilAsync(
+                () => VaultEntryKeys(viewModel).SequenceEqual(["p:1", "p:2"]),
+                "the metadata hit to reach the tree",
+                cancellationToken);
+            Assert.Equal(1, probe.MetadataSearchCalls);
         }
         finally
         {
@@ -286,7 +312,6 @@ public sealed class BackgroundMemoryUiTests
                 new WeakReference(securityIssue)
             ],
             new ProjectionBuildCounts(
-                viewModel.FilteredPasswordsProjectionBuildCount,
                 viewModel.FilteredTotpProjectionBuildCount,
                 viewModel.FilteredWalletProjectionBuildCount,
                 viewModel.FilteredNoteProjectionBuildCount,
@@ -339,6 +364,56 @@ public sealed class BackgroundMemoryUiTests
         });
     }
 
+    // Row order is a sort concern other library tests already cover, so these probes compare the set of
+    // entries a search lets through.
+    private static List<string> VaultEntryKeys(MainWindowViewModel viewModel) =>
+        [.. viewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Select(row => row.Key).Order()];
+
+    // A coalesced tree rebuild and a debounced repository pass both need real dispatcher time, and a bare
+    // sleep would hide which of the two a test is actually waiting for.
+    private static async Task PumpUntilAsync(
+        Func<bool> condition,
+        string description,
+        CancellationToken cancellationToken,
+        int budgetMilliseconds = 2000)
+    {
+        var deadline = Stopwatch.StartNew();
+        while (deadline.ElapsedMilliseconds < budgetMilliseconds)
+        {
+            Dispatcher.UIThread.RunJobs();
+            if (condition())
+            {
+                return;
+            }
+
+            await Task.Delay(20, cancellationToken);
+        }
+
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(condition(), $"{description} did not happen within {deadline.ElapsedMilliseconds} ms.");
+    }
+
+    // The metadata pass is the only half of a library search that leaves the process, so a test that cares
+    // about when the shell may spend it counts these calls instead of watching for a row to appear.
+    public class LibraryMetadataSearchProxy : DispatchProxy
+    {
+        private int _metadataSearchCalls;
+
+        public int MetadataSearchCalls => Volatile.Read(ref _metadataSearchCalls);
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            ArgumentNullException.ThrowIfNull(targetMethod);
+            if (targetMethod.Name == nameof(IMonicaRepository.SearchPasswordMetadataAsync))
+            {
+                Interlocked.Increment(ref _metadataSearchCalls);
+                return Task.FromResult(new PasswordMetadataSearchResult([2], []));
+            }
+
+            throw new NotSupportedException($"Unexpected repository call: {targetMethod.Name}");
+        }
+    }
+
     private static void ForceFullCollection()
     {
         GC.Collect();
@@ -383,7 +458,6 @@ public sealed class BackgroundMemoryUiTests
     }
 
     private sealed record ProjectionBuildCounts(
-        int Passwords,
         int Totp,
         int Wallet,
         int NoteTree,

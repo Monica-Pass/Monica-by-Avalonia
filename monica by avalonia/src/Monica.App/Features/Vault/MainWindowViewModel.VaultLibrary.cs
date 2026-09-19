@@ -137,7 +137,25 @@ public sealed partial class MainWindowViewModel
         _localization.Get(CurrentVaultFilter().IsNarrowing ? "LibraryNoMatchesHint" : "LibraryEmptyHint");
 
     private VaultTreeFilter CurrentVaultFilter() =>
-        new(VaultGroup, VaultSearchText, VaultFavoritesOnly, SelectedPasswordSort, CurrentVaultQuickFilters());
+        new(VaultGroup, VaultSearchText, VaultFavoritesOnly, SelectedPasswordSort, CurrentVaultQuickFilters())
+        {
+            CustomFieldMatchIds = LiveMetadataMatches(VaultSearchText, _passwordCustomFieldSearchQuery,
+                _passwordCustomFieldSearchMatches),
+            AttachmentMatchIds = LiveMetadataMatches(VaultSearchText, _passwordAttachmentSearchQuery,
+                _passwordAttachmentSearchMatches)
+        };
+
+    // The metadata ids arrive a quarter second after the tree has already narrowed on the in-memory
+    // fields, so they only count while they still describe the text that produced them; anything older
+    // would widen a search the user has since continued typing.
+    private static IReadOnlySet<long>? LiveMetadataMatches(
+        string searchText,
+        string publishedQuery,
+        IReadOnlySet<long> matches) =>
+        string.IsNullOrWhiteSpace(searchText) ||
+        !string.Equals(searchText, publishedQuery, StringComparison.Ordinal)
+            ? null
+            : matches;
 
     // The sort order and the quick filters are the vault pages' own state, so the library narrows and
     // reorders exactly as the list it replaced does instead of keeping a second copy of both.
@@ -173,6 +191,10 @@ public sealed partial class MainWindowViewModel
 
     partial void OnVaultSearchTextChanged(string value)
     {
+        // Two different clocks: the tree narrows on the in-memory fields after a 60 ms coalesce, and
+        // the metadata search answers separately once the repository pass over custom fields and
+        // attachments finishes.
+        QueuePasswordSearchQuery(value);
         QueueVaultTreeRefresh();
     }
 
@@ -236,10 +258,34 @@ public sealed partial class MainWindowViewModel
         if (isActive)
         {
             RebuildVaultTree();
+            EnsureVaultMetadataSearch();
         }
         else
         {
             ReleaseVaultTree();
+        }
+    }
+
+    // The tree narrows on the fields it already holds, and only a repository pass can add a
+    // custom-field or attachment hit. A search whose pass never ran — because the shell hibernated
+    // or another section was up when the page left the screen — would otherwise stay half-applied
+    // until the user typed again, so the page asks for it as it arrives.
+    private void EnsureVaultMetadataSearch()
+    {
+        if (_isUnlockedShellHibernated ||
+            !IsUnlocked ||
+            !VaultPresets.IsLibrarySection(SelectedSection) ||
+            string.IsNullOrWhiteSpace(VaultSearchText))
+        {
+            return;
+        }
+
+        // Ids that still describe this text survived the caches they came from, and the rebuild just
+        // ran with them; a second scan would only pay for what the tree already shows.
+        if (!string.Equals(VaultSearchText, _passwordCustomFieldSearchQuery, StringComparison.Ordinal) ||
+            !string.Equals(VaultSearchText, _passwordAttachmentSearchQuery, StringComparison.Ordinal))
+        {
+            QueuePasswordSearchQuery(VaultSearchText);
         }
     }
 

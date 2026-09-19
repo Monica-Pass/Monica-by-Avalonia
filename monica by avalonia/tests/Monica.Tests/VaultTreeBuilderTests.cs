@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Avalonia;
 using Monica.App.Controls;
 using Monica.App.Features.Vault;
@@ -15,6 +16,8 @@ public class VaultTreeBuilderTests
     /// Every fixture timestamp is measured off this one instant, so a test that does not pass a
     /// `…SecondsAgo` cannot drift into a different order when the clock moves.
     private static readonly DateTimeOffset BaseTime = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+
+    private const string Term = "zulu-9f3-search-term";
 
     [Fact]
     public void Entries_filed_in_a_folder_hang_under_it_one_indent_deeper()
@@ -178,6 +181,92 @@ public class VaultTreeBuilderTests
             new VaultTreeFilter(Search: "example.org"));
 
         Assert.Equal(["p:2"], Keys(rows));
+    }
+
+    [Fact]
+    public void Search_reads_every_field_a_credential_carries()
+    {
+        // One field per pass, and the term only ever lands in that field: a field the tree stops
+        // reading drops its own row, and the field name is what the failure has to say.
+        var fields = new (string Name, Action<PasswordEntry> Write)[]
+        {
+            ("title", entry => entry.Title = Term),
+            ("username", entry => entry.Username = Term),
+            ("website", entry => entry.Website = Term),
+            ("notes", entry => entry.Notes = Term),
+            ("authenticatorKey", entry => entry.AuthenticatorKey = Term),
+            ("appName", entry => entry.AppName = Term),
+            ("appPackageName", entry => entry.AppPackageName = Term),
+            ("email", entry => entry.Email = Term),
+            ("phone", entry => entry.Phone = Term),
+            ("addressLine", entry => entry.AddressLine = Term),
+            ("city", entry => entry.City = Term),
+            ("state", entry => entry.State = Term),
+            ("zipCode", entry => entry.ZipCode = Term),
+            ("country", entry => entry.Country = Term),
+            ("creditCardHolder", entry => entry.CreditCardHolder = Term),
+            ("creditCardExpiry", entry => entry.CreditCardExpiry = Term),
+            ("ssoProvider", entry => entry.SsoProvider = Term),
+            ("passkeyBindings", entry => entry.PasskeyBindings = Term),
+            ("wifiMetadata", entry => entry.WifiMetadata = Term),
+            ("sshKeyData", entry => entry.SshKeyData = Term),
+            ("keepassGroupPath", entry => entry.KeepassGroupPath = Term),
+            ("mdbxFolderId", entry => entry.MdbxFolderId = Term),
+            ("bitwardenFolderId", entry => entry.BitwardenFolderId = Term)
+        };
+
+        foreach (var (name, write) in fields)
+        {
+            var tagged = new PasswordEntry { Id = 1, Title = "Untagged" };
+            write(tagged);
+            var rows = VaultTreeBuilder.Build(
+                [],
+                [tagged, Password(2, "Untagged")],
+                [],
+                [],
+                new VaultTreeFilter(Search: Term));
+
+            Assert.True(Keys(rows).SequenceEqual(["p:1"]), $"Search no longer reads {name}.");
+        }
+    }
+
+    [Fact]
+    public void Search_adds_the_metadata_ids_that_arrive_after_the_in_memory_narrowing()
+    {
+        var entries = new[] { Password(1, "Checking"), Password(2, "Posteo") };
+
+        var rows = VaultTreeBuilder.Build(
+            [], entries, [], [],
+            new VaultTreeFilter(Search: "post", CustomFieldMatchIds: new HashSet<long> { 1 }));
+        Assert.Equal(["p:1", "p:2"], Keys(rows));
+
+        rows = VaultTreeBuilder.Build(
+            [], entries, [], [],
+            new VaultTreeFilter(Search: "post", AttachmentMatchIds: new HashSet<long> { 1 }));
+        Assert.Equal(["p:1", "p:2"], Keys(rows));
+    }
+
+    [Fact]
+    public void Searching_a_large_library_rebuilds_the_tree_within_its_budget()
+    {
+        // A term nothing matches is the worst case: every entry walks all 23 fields, and every folder
+        // survives on its subtree count. The ceiling is a cliff detector, not a benchmark.
+        var entries = Enumerable.Range(1, 5_000)
+            .Select(id => Password(id, $"Password {id:D5}", username: $"user{id:D5}"))
+            .ToArray();
+        var filter = new VaultTreeFilter(Search: "no-such-term-anywhere");
+
+        VaultTreeBuilder.Build([], entries, [], [], filter);
+        var stopwatch = Stopwatch.StartNew();
+        for (var pass = 0; pass < 5; pass++)
+        {
+            VaultTreeBuilder.Build([], entries, [], [], filter);
+        }
+
+        var perRebuild = stopwatch.ElapsedMilliseconds / 5.0;
+        Assert.True(
+            perRebuild < 200,
+            $"A 5,000-entry library search rebuild took {perRebuild:0.##} ms.");
     }
 
     [Theory]
