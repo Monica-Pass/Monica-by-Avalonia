@@ -145,14 +145,13 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
-    public async Task Password_workflow_distinguishes_empty_vault_from_empty_search_results()
+    public async Task Vault_empty_state_distinguishes_an_empty_library_from_no_matches()
     {
         var harness = CreateHarness();
         await harness.ViewModel.LoadAsync();
 
-        Assert.False(harness.ViewModel.HasFilteredPasswordRows);
-        Assert.True(harness.ViewModel.ShowAddPasswordInEmptyState);
-        Assert.False(harness.ViewModel.ShowClearPasswordFiltersInEmptyState);
+        Assert.False(harness.ViewModel.HasVaultFilters);
+        Assert.Equal(harness.ViewModel.L.Get("LibraryEmptyHint"), harness.ViewModel.VaultEmptyStateText);
 
         var entry = new PasswordEntry
         {
@@ -164,16 +163,23 @@ public sealed partial class PasswordManagementTests
         await harness.Repository.SavePasswordAsync(entry);
         await harness.ViewModel.LoadAsync();
 
+        harness.ViewModel.VaultSearchText = "no-match";
+
+        Assert.True(harness.ViewModel.HasVaultFilters);
+        Assert.Equal(harness.ViewModel.L.Get("LibraryNoMatchesHint"), harness.ViewModel.VaultEmptyStateText);
+
+        harness.ViewModel.ClearVaultSearchCommand.Execute(null);
+
+        Assert.Equal(harness.ViewModel.L.Get("LibraryEmptyHint"), harness.ViewModel.VaultEmptyStateText);
+
         harness.ViewModel.PasswordSearchText = "no-match";
         harness.ViewModel.PasswordSearchQuery = "no-match";
 
-        Assert.False(harness.ViewModel.ShowAddPasswordInEmptyState);
-        Assert.True(harness.ViewModel.ShowClearPasswordFiltersInEmptyState);
-        Assert.Equal(harness.ViewModel.L.Get("PasswordNoFilteredResults"), harness.ViewModel.PasswordEmptyStateText);
+        Assert.Empty(harness.ViewModel.FilteredPasswords);
 
         harness.ViewModel.ClearPasswordSearchCommand.Execute(null);
 
-        Assert.True(harness.ViewModel.HasFilteredPasswordRows);
+        Assert.NotEmpty(harness.ViewModel.FilteredPasswords);
         Assert.Equal("", harness.ViewModel.PasswordSearchText);
 
         harness.ViewModel.AreAllFilteredPasswordsSelected = true;
@@ -185,7 +191,7 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
-    public async Task Password_list_status_reports_visible_and_total_counts_only_while_filtered()
+    public async Task Library_status_reports_visible_and_total_counts_only_while_filtered()
     {
         var harness = CreateHarness();
         await harness.Repository.SavePasswordAsync(new PasswordEntry
@@ -209,21 +215,20 @@ public sealed partial class PasswordManagementTests
         });
         await harness.ViewModel.LoadAsync();
 
+        Assert.False(harness.ViewModel.HasVaultFilters);
+        Assert.Equal("", harness.ViewModel.VaultFilteredStatusText);
+
+        harness.ViewModel.VaultFavoritesOnly = true;
+
+        Assert.True(harness.ViewModel.HasVaultFilters);
         Assert.Equal(
-            harness.ViewModel.L.Format("PasswordCountFormat", 3),
-            harness.ViewModel.PasswordListStatusText);
+            harness.ViewModel.L.Format("VaultFilteredStatusFormat", 1, 3),
+            harness.ViewModel.VaultFilteredStatusText);
 
-        harness.ViewModel.QuickFilterFavorite = true;
+        harness.ViewModel.ClearVaultFiltersCommand.Execute(null);
 
-        Assert.Equal(
-            harness.ViewModel.L.Format("PasswordFilteredStatusFormat", 1, 3),
-            harness.ViewModel.PasswordListStatusText);
-
-        harness.ViewModel.ClearPasswordFiltersCommand.Execute(null);
-
-        Assert.Equal(
-            harness.ViewModel.L.Format("PasswordCountFormat", 3),
-            harness.ViewModel.PasswordListStatusText);
+        Assert.False(harness.ViewModel.HasVaultFilters);
+        Assert.Equal("", harness.ViewModel.VaultFilteredStatusText);
     }
 
     [Fact]
@@ -246,7 +251,7 @@ public sealed partial class PasswordManagementTests
 
         Assert.Empty(harness.ViewModel.PasswordSearchText);
         Assert.Empty(harness.ViewModel.PasswordSearchQuery);
-        Assert.False(harness.ViewModel.HasPasswordFilters);
+        Assert.False(harness.ViewModel.HasVaultFilters);
 
         var obsoleteGlobalSearch = typeof(MainWindowViewModel).GetProperty("SearchText");
         obsoleteGlobalSearch?.SetValue(harness.ViewModel, "Alpha");
@@ -1905,6 +1910,7 @@ public sealed partial class PasswordManagementTests
                 Username = $"user-{index:000}",
                 Password = $"secret-{index:000}",
                 IsFavorite = index % 5 == 0,
+                AuthenticatorKey = index % 5 == 0 ? "JBSWY3DPEHPK3PXP" : "",
                 UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-index)
             });
         }
@@ -1923,12 +1929,12 @@ public sealed partial class PasswordManagementTests
         Assert.NotSame(firstSnapshot, sortedSnapshot);
         Assert.Same(sortedSnapshot, harness.ViewModel.FilteredPasswords);
 
-        harness.ViewModel.QuickFilterFavorite = true;
-        var favoriteSnapshot = harness.ViewModel.FilteredPasswords;
+        harness.ViewModel.QuickFilter2Fa = true;
+        var narrowedSnapshot = harness.ViewModel.FilteredPasswords;
 
-        Assert.NotSame(sortedSnapshot, favoriteSnapshot);
-        Assert.Same(favoriteSnapshot, harness.ViewModel.FilteredPasswords);
-        Assert.All(favoriteSnapshot, item => Assert.True(item.IsFavorite));
+        Assert.NotSame(sortedSnapshot, narrowedSnapshot);
+        Assert.Same(narrowedSnapshot, harness.ViewModel.FilteredPasswords);
+        Assert.All(narrowedSnapshot, item => Assert.True(item.HasAuthenticator));
     }
 
     [Fact]
@@ -3393,6 +3399,7 @@ public sealed partial class PasswordManagementTests
             Title = "Remote Bitwarden",
             Username = "remote",
             Password = "three",
+            Notes = "second factor kept elsewhere",
             BitwardenVaultId = 7,
             BitwardenCipherId = "cipher"
         };
@@ -3401,16 +3408,17 @@ public sealed partial class PasswordManagementTests
         await harness.Repository.SavePasswordAsync(remoteBitwarden);
         await harness.ViewModel.LoadAsync();
 
-        harness.ViewModel.QuickFilterFavorite = true;
-        Assert.Equal(["Favorite 2FA"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
-
         harness.ViewModel.QuickFilter2Fa = true;
         Assert.Equal(["Favorite 2FA"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
 
-        harness.ViewModel.QuickFilterFavorite = false;
-        harness.ViewModel.QuickFilter2Fa = false;
         harness.ViewModel.QuickFilterNotes = true;
         Assert.Equal(["Favorite 2FA"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
+
+        harness.ViewModel.QuickFilter2Fa = false;
+        harness.ViewModel.QuickFilterNotes = true;
+        Assert.Equal(
+            ["Favorite 2FA", "Remote Bitwarden"],
+            harness.ViewModel.FilteredPasswords.Select(item => item.Title).Order().ToArray());
 
         harness.ViewModel.QuickFilterNotes = false;
         harness.ViewModel.QuickFilterPasskey = true;

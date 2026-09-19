@@ -21,6 +21,7 @@ public sealed partial class MainWindowViewModel
         ReferenceEqualityComparer.Instance);
     private DispatcherTimer? _vaultSearchDebounce;
     private bool _isVaultTreeAttached;
+    private int _vaultTreeRefreshDepth;
     private bool _isRestoringVaultSelection;
 
     public ObservableCollection<IVaultTreeRow> VaultTreeRows { get; } = new();
@@ -48,21 +49,34 @@ public sealed partial class MainWindowViewModel
 
     public string VaultSearchHelpText => _localization.Get("VaultSearchHelp");
 
-    // A screen reader needs the same "what did my search leave behind" announcement the four vault
-    // pages made, counted over the filter rather than the tree: collapsing a folder hides rows on
-    // screen without narrowing what the search matched.
-    public string VaultFilteredStatusText => HasVaultSearchText
-        ? _localization.Format("VaultFilteredStatusFormat", VaultMatchedEntryCount(), VaultTotalEntryCount())
-        : "";
+    public bool HasVaultFilters => CurrentVaultFilter().NarrowsWithinGroup;
 
-    private int VaultMatchedEntryCount()
+    // A screen reader needs the same "what did my filters leave behind" announcement the four vault
+    // pages made, counted over the filter rather than the tree: collapsing a folder hides rows on
+    // screen without narrowing what the filter matched.
+    public string VaultFilteredStatusText
     {
-        var filter = CurrentVaultFilter();
-        return Passwords.Count(entry => filter.MatchesPassword(entry)) +
-               VaultSecureItems().Count(item => filter.MatchesSecureItem(item));
+        get
+        {
+            var filter = CurrentVaultFilter();
+            return filter.NarrowsWithinGroup
+                ? _localization.Format(
+                    "VaultFilteredStatusFormat",
+                    VaultMatchedEntryCount(filter),
+                    VaultGroupEntryCount(filter))
+                : "";
+        }
     }
 
-    private int VaultTotalEntryCount() => Passwords.Count + NoteItems.Count + TotpItems.Count + WalletItems.Count;
+    private int VaultMatchedEntryCount(VaultTreeFilter filter) =>
+        Passwords.Count(entry => filter.MatchesPassword(entry)) +
+        VaultSecureItems().Count(item => filter.MatchesSecureItem(item));
+
+    private int VaultGroupEntryCount(VaultTreeFilter filter)
+    {
+        var scope = filter with { Search = null, FavoritesOnly = false, QuickFilters = null };
+        return VaultMatchedEntryCount(scope);
+    }
 
     // A type filter already says what the user means, so its header button creates that type in one
     // click; with everything in view the page asks instead of silently picking a kind.
@@ -164,7 +178,25 @@ public sealed partial class MainWindowViewModel
 
     partial void OnVaultFavoritesOnlyChanged(bool value)
     {
-        RebuildVaultTree();
+        RaiseVaultTreeState();
+    }
+
+    // One reset flips eight filter fields, and each write would rebuild the whole tree again; a
+    // scope keeps those writes down to the single rebuild its Dispose flushes.
+    private VaultTreeRefreshScope SuppressVaultTreeRefresh() => new(this);
+
+    private readonly struct VaultTreeRefreshScope(MainWindowViewModel owner) : IDisposable
+    {
+        public void Dispose()
+        {
+            if (--owner._vaultTreeRefreshDepth > 0)
+            {
+                return;
+            }
+
+            owner._vaultSearchDebounce?.Stop();
+            owner.RaiseVaultTreeState();
+        }
     }
 
     // A section switch can change the preset while the library stays on screen, because the four
@@ -225,10 +257,12 @@ public sealed partial class MainWindowViewModel
     // A folder rename changes Category.Name in place, so no collection event would reach the tree.
     private void RaiseVaultTreeState()
     {
-        if (_isVaultTreeAttached)
+        if (_vaultTreeRefreshDepth > 0 || !_isVaultTreeAttached)
         {
-            RebuildVaultTree();
+            return;
         }
+
+        RebuildVaultTree();
     }
 
     private IEnumerable<INotifyCollectionChanged> VaultTreeSourceCollections()
@@ -290,6 +324,7 @@ public sealed partial class MainWindowViewModel
         RestoreVaultSelection(selectedKey);
         OnPropertyChanged(nameof(HasVaultRows));
         OnPropertyChanged(nameof(VaultEmptyStateText));
+        OnPropertyChanged(nameof(HasVaultFilters));
         OnPropertyChanged(nameof(VaultFilteredStatusText));
     }
 

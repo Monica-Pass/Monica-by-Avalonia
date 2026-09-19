@@ -415,6 +415,73 @@ public sealed class VaultWorkspaceUiTests
         }
     }
 
+    // The library narrows eight ways and has no other way back to the whole thing, so the reset
+    // entry has to appear exactly when something is applied and undo every dimension at once.
+    [Fact]
+    public void Clear_filters_entry_undoes_every_narrowing_at_once()
+    {
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        window.Show();
+        try
+        {
+            window.DataContext = viewModel;
+            viewModel.IsUnlocked = true;
+            var entries = new[]
+            {
+                Entry(11, "Alpha", 400, twoFactor: true),
+                Entry(12, "Bravo", 300),
+                Entry(13, "Charlie", 200, passkey: true)
+            };
+            entries[0].IsFavorite = true;
+            foreach (var entry in entries)
+            {
+                viewModel.Passwords.Add(entry);
+            }
+            viewModel.SelectSectionCommand.Execute("Passwords");
+            Dispatcher.UIThread.RunJobs();
+
+            var workspace = Assert.Single(window.GetVisualDescendants().OfType<VaultWorkspaceView>());
+            var moreButton = workspace.FindControl<Button>("VaultMoreButton")!;
+            var flyout = Assert.IsType<MenuFlyout>(moreButton.Flyout);
+
+            // A closed flyout has realized nothing, so open it once and keep it open: writing the
+            // view model underneath a live popup is what the user actually does with the chip.
+            flyout.ShowAt(moreButton);
+            Dispatcher.UIThread.RunJobs();
+            var clear = Assert.Single(
+                flyout.Items.OfType<MenuItem>(),
+                item => Equals(item.Command, viewModel.ClearVaultFiltersCommand));
+            Assert.False(clear.IsVisible);
+
+            // Search, the favorites chip and a quick filter are three separate surfaces, and only
+            // Alpha survives all three — a reset that clears just the last one used shows up here.
+            viewModel.VaultSearchText = "Alpha";
+            viewModel.VaultFavoritesOnly = true;
+            viewModel.QuickFilter2Fa = true;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(clear.IsVisible);
+            Assert.Equal(["p:11"], Keys(viewModel.VaultTreeRows));
+
+            clear.Command!.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.False(viewModel.HasVaultFilters);
+            Assert.Empty(viewModel.VaultSearchText);
+            Assert.False(viewModel.VaultFavoritesOnly);
+            Assert.False(viewModel.QuickFilter2Fa);
+            Assert.Equal(["p:13", "p:12", "p:11"], Keys(viewModel.VaultTreeRows));
+            Assert.False(clear.IsVisible);
+            flyout.Hide();
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
     private static List<string> Keys(IEnumerable<Monica.App.Controls.IVaultTreeRow> rows) =>
         rows.Select(row => row.Key).ToList();
 

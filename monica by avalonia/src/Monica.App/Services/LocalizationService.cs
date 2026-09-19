@@ -103,7 +103,6 @@ public interface ILocalizationService : INotifyPropertyChanged
     string ArchivePassword { get; }
     string UnarchivePassword { get; }
     string MoveToRecycleBin { get; }
-    string QuickFilterFavorite { get; }
     string QuickFilter2Fa { get; }
     string QuickFilterNotes { get; }
     string QuickFilterPasskey { get; }
@@ -112,6 +111,7 @@ public interface ILocalizationService : INotifyPropertyChanged
     string QuickFilterLocalOnly { get; }
     string QuickFilterAttachments { get; }
     string PasswordFilters { get; }
+    string ClearFilters { get; }
     string QuickAccessRecent { get; }
     string QuickAccessFrequent { get; }
     string SortPasswords { get; }
@@ -610,7 +610,6 @@ public sealed class LocalizationService : ILocalizationService
     public string ArchivePassword => Text();
     public string UnarchivePassword => Text();
     public string MoveToRecycleBin => Text();
-    public string QuickFilterFavorite => Text();
     public string QuickFilter2Fa => Text();
     public string QuickFilterNotes => Text();
     public string QuickFilterPasskey => Text();
@@ -619,6 +618,7 @@ public sealed class LocalizationService : ILocalizationService
     public string QuickFilterLocalOnly => Text();
     public string QuickFilterAttachments => Text();
     public string PasswordFilters => Text();
+    public string ClearFilters => Text();
     public string QuickAccessRecent => Text();
     public string QuickAccessFrequent => Text();
     public string SortPasswords => Text();
@@ -1135,8 +1135,6 @@ public sealed class LocalizationService : ILocalizationService
         ["SelectAllVisiblePasswords"] = "Select all visible passwords",
         ["DeletedPasswords"] = "Deleted Passwords",
         ["Search"] = "Search...",
-        ["ClearPasswordSearch"] = "Clear password search",
-        ["PasswordSearchHelp"] = "Press Ctrl+F to focus search. Press Esc to clear only the search text; use Clear filters to reset folder and quick filters.",
         ["ClearTotpSearch"] = "Clear authenticator search",
         ["TotpSearchHelp"] = "Press Ctrl+F to focus search. Press Esc to clear only the search text; use Clear filters to reset issuer and quick filters.",
         ["ClearWalletSearch"] = "Clear wallet search",
@@ -1148,7 +1146,6 @@ public sealed class LocalizationService : ILocalizationService
         ["PasswordDetails"] = "Password Details",
         ["PasswordDetailEmptyHint"] = "Select an entry to inspect its credentials, attachments, and history.",
         ["LoadingPasswordDetails"] = "Loading password details...",
-        ["BackToPasswordList"] = "Back to password list",
         ["RetryPasswordDetails"] = "Retry loading details",
         ["Details"] = "Details",
         ["PasswordDetailsLoadFailedFormat"] = "Failed to load password details: {0}",
@@ -1220,7 +1217,7 @@ public sealed class LocalizationService : ILocalizationService
         ["QuickFilterLocalOnly"] = "Local only",
         ["QuickFilterAttachments"] = "Attachments",
         ["PasswordFilters"] = "Filters",
-        ["ClearPasswordFilters"] = "Clear filters",
+        ["ClearFilters"] = "Clear filters",
         ["ClearedPasswordFilters"] = "Cleared password filters",
         ["QuickAccessRecent"] = "Recently opened",
         ["QuickAccessFrequent"] = "Frequently opened",
@@ -2073,7 +2070,6 @@ public sealed class LocalizationService : ILocalizationService
         ["MinuteFormat"] = "{0} min",
         ["SecondFormat"] = "{0} sec",
         ["PasswordCountFormat"] = "{0} items",
-        ["PasswordFilteredStatusFormat"] = "{0} visible · {1} total",
         ["DatabaseSummaryFormat"] = "{0} passwords, {1} notes, {2} authenticators, {3} wallet items",
         ["MdbxDatabaseCountFormat"] = "{0} MDBX metadata record(s)",
         ["MdbxSourceCountFormat"] = "{0} vault(s)",
@@ -2503,8 +2499,6 @@ public sealed class LocalizationService : ILocalizationService
         ["SelectPasswordItems"] = "选择项目",
         ["SelectAllVisiblePasswords"] = "选择当前可见的全部密码",
         ["Search"] = "搜索...",
-        ["ClearPasswordSearch"] = "清除密码搜索",
-        ["PasswordSearchHelp"] = "按 Ctrl+F 聚焦搜索。按 Esc 只清除搜索文字；若要重置文件夹与快速筛选，请使用“清除筛选”。",
         ["ClearTotpSearch"] = "清除身份验证器搜索",
         ["TotpSearchHelp"] = "按 Ctrl+F 聚焦搜索。按 Esc 只清除搜索文字；若要重置签发方与快速筛选，请使用“清除筛选”。",
         ["ClearWalletSearch"] = "清除卡包搜索",
@@ -2516,7 +2510,6 @@ public sealed class LocalizationService : ILocalizationService
         ["PasswordDetails"] = "密码详情",
         ["PasswordDetailEmptyHint"] = "选择一个条目后可查看凭据、附件和历史记录。",
         ["LoadingPasswordDetails"] = "正在加载密码详情...",
-        ["BackToPasswordList"] = "返回密码列表",
         ["RetryPasswordDetails"] = "重新加载详情",
         ["Details"] = "详情",
         ["PasswordDetailsLoadFailedFormat"] = "加载密码详情失败：{0}",
@@ -2703,7 +2696,7 @@ public sealed class LocalizationService : ILocalizationService
         ["NoteImageAttachmentFormat"] = "图片附件：{0}",
         ["NoteImage"] = "图片",
         ["NoteImageNumberFormat"] = "图片 {0}",
-        ["ClearPasswordFilters"] = "清除筛选",
+        ["ClearFilters"] = "清除筛选",
         ["ClearedPasswordFilters"] = "已清除密码筛选",
         ["NoFolder"] = "无文件夹",
         ["NewPassword"] = "新建密码",
@@ -3423,7 +3416,6 @@ public sealed class LocalizationService : ILocalizationService
         ["MinuteFormat"] = "{0} 分钟",
         ["SecondFormat"] = "{0} 秒",
         ["PasswordCountFormat"] = "{0} 项",
-        ["PasswordFilteredStatusFormat"] = "显示 {0} 项，共 {1} 项",
         ["ArchivedPasswordCountFormat"] = "{0} 个已归档密码",
         ["DeletedPasswordCountFormat"] = "{0} 个已删除密码",
         ["TimelineCountFormat"] = "{0} 条事件",

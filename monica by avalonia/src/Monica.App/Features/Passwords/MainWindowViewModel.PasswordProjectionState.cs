@@ -14,7 +14,6 @@ public sealed partial class MainWindowViewModel
     private void RaisePasswordSelectionState()
     {
         OnPropertyChanged(nameof(SelectedPasswordCount));
-        OnPropertyChanged(nameof(SelectedPasswordCountText));
         OnPropertyChanged(nameof(HasSelectedPasswords));
         OnPropertyChanged(nameof(CanStackSelectedPasswords));
         OnPropertyChanged(nameof(AreAllFilteredPasswordsSelected));
@@ -46,15 +45,6 @@ public sealed partial class MainWindowViewModel
         {
             RefreshPasswordSelectionStateFromPasswords();
         }
-    }
-
-    private void RaisePasswordFilterState()
-    {
-        OnPropertyChanged(nameof(HasPasswordFilters));
-        OnPropertyChanged(nameof(PasswordListStatusText));
-        OnPropertyChanged(nameof(PasswordFilterSummaryText));
-        OnPropertyChanged(nameof(PasswordEmptyStateText));
-        OnPropertyChanged(nameof(ShowClearPasswordFiltersInEmptyState));
     }
 
     private void RaisePasswordFolderFilterCollections()
@@ -158,7 +148,6 @@ public sealed partial class MainWindowViewModel
         RaiseFilteredPasswordsChanged();
         OnPropertyChanged(nameof(FilteredArchivedPasswords));
         OnPropertyChanged(nameof(FilteredDeletedPasswords));
-        RaisePasswordFilterState();
         RaisePasswordSelectionState();
         ReconcileSelectedPasswordDetails();
     }

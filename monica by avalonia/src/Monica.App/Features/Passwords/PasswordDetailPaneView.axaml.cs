@@ -8,10 +8,4 @@ public partial class PasswordDetailPaneView : UserControl
     {
         InitializeComponent();
     }
-
-    public bool ShowBackButton
-    {
-        get => BackToPasswordListButton.IsVisible;
-        set => BackToPasswordListButton.IsVisible = value;
-    }
 }

@@ -1,5 +1,4 @@
 using System.Globalization;
-using Avalonia;
 using Avalonia.Data.Converters;
 using FluentIcons.Common;
 
@@ -7,15 +6,8 @@ namespace Monica.App;
 
 public static class StringConverters
 {
-    public static IValueConverter IsPasswords { get; } = new SectionConverter("Passwords");
-    public static IValueConverter IsNotPasswords { get; } = new NotSectionConverter("Passwords");
-    public static IValueConverter IsTotp { get; } = new SectionConverter("Totp");
-    public static IValueConverter IsCards { get; } = new SectionConverter("Cards");
     public static IValueConverter IsBankCard { get; } = new SectionConverter("BankCard");
     public static IValueConverter IsDocument { get; } = new SectionConverter("Document");
-    public static IValueConverter IsBillingAddress { get; } = new SectionConverter("BillingAddress");
-    public static IValueConverter IsPaymentAccount { get; } = new SectionConverter("PaymentAccount");
-    public static IValueConverter IsNotes { get; } = new SectionConverter("Notes");
     public static IValueConverter IsGenerator { get; } = new SectionConverter("Generator");
     public static IValueConverter IsArchive { get; } = new SectionConverter("Archive");
     public static IValueConverter IsRecycleBin { get; } = new SectionConverter("RecycleBin");
@@ -25,57 +17,11 @@ public static class StringConverters
     public static IValueConverter IsDatabaseManagement { get; } = new SectionConverter("DatabaseManagement");
     public static IValueConverter IsSettings { get; } = new SectionConverter("Settings");
     public static IValueConverter IsSync { get; } = new SectionConverter("Sync");
-    public static IValueConverter IsSettingsOrSync { get; } = new SectionSetConverter(new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Settings", "Sync" });
-    public static IValueConverter ManagementDetailWidth { get; } = new AvailableWidthConverter(reservedWidth: 570d, minWidth: 260d, maxWidth: 760d);
 
     private sealed class SectionConverter(string section) : IValueConverter
     {
         public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
             string.Equals(value?.ToString(), section, StringComparison.OrdinalIgnoreCase);
-
-        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-            throw new NotSupportedException();
-    }
-
-    private sealed class NotSectionConverter(string section) : IValueConverter
-    {
-        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-            !string.Equals(value?.ToString(), section, StringComparison.OrdinalIgnoreCase);
-
-        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-            throw new NotSupportedException();
-    }
-
-    private sealed class SectionSetConverter(IReadOnlySet<string> sections) : IValueConverter
-    {
-        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-            value is not null && sections.Contains(value.ToString() ?? "");
-
-        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-            throw new NotSupportedException();
-    }
-
-    private sealed class AvailableWidthConverter(double reservedWidth, double minWidth, double maxWidth) : IValueConverter
-    {
-        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        {
-            var width = value switch
-            {
-                double doubleValue => doubleValue,
-                decimal decimalValue => (double)decimalValue,
-                int intValue => intValue,
-                Rect rectValue => rectValue.Width,
-                Size sizeValue => sizeValue.Width,
-                _ => reservedWidth + 390d
-            };
-
-            if (double.IsNaN(width) || double.IsInfinity(width) || width <= 0)
-            {
-                return 390d;
-            }
-
-            return Math.Clamp(width - reservedWidth, minWidth, maxWidth);
-        }
 
         public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
             throw new NotSupportedException();

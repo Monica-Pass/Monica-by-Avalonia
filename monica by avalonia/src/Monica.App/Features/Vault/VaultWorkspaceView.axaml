@@ -89,6 +89,13 @@
                                         </MenuItem>
                                     </MenuItem.Items>
                                 </MenuItem>
+                                <!-- Every filter lives behind this menu or the chip, so the way back to
+                                     the whole library has to be here too. -->
+                                <MenuItem Header="{Binding L.ClearFilters}"
+                                          IsVisible="{Binding HasVaultFilters}"
+                                          Command="{Binding ClearVaultFiltersCommand}">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="Dismiss" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
                                 <!-- The authenticator page's header owned the scan-a-picture-of-a-code
                                      way in; the preset that replaced it hands it to the one menu it kept. -->
                                 <MenuItem Header="{Binding TotpScanQrText}"
@@ -145,7 +152,7 @@
                          field left, so it inherits the keyboard hint and the spoken result count. -->
                     <TextBlock x:Name="VaultFilteredStatusText"
                                Classes="workspaceMeta"
-                               IsVisible="{Binding HasVaultSearchText}"
+                               IsVisible="{Binding HasVaultFilters}"
                                VerticalAlignment="Center"
                                Text="{Binding VaultFilteredStatusText}"
                                AutomationProperties.LiveSetting="Polite" />

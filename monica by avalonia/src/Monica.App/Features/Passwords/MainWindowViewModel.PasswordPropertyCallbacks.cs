@@ -11,8 +11,6 @@ public sealed partial class MainWindowViewModel
 {
     partial void OnPasswordSearchTextChanged(string value)
     {
-        OnPropertyChanged(nameof(HasPasswordSearchText));
-        RaisePasswordFilterState();
         if (_isApplyingPasswordSearchImmediately)
         {
             return;
@@ -27,7 +25,6 @@ public sealed partial class MainWindowViewModel
         RefreshPasswordFilters();
     }
 
-    partial void OnQuickFilterFavoriteChanged(bool value) => RefreshPasswordFilters();
     partial void OnQuickFilter2FaChanged(bool value) => RefreshPasswordAndVaultFilters();
     partial void OnQuickFilterNotesChanged(bool value) => RefreshPasswordAndVaultFilters();
     partial void OnQuickFilterPasskeyChanged(bool value) => RefreshPasswordAndVaultFilters();
@@ -38,7 +35,6 @@ public sealed partial class MainWindowViewModel
     partial void OnSelectedPasswordFolderFilterChanged(PasswordFolderFilterChoice? value)
     {
         RaiseFilteredPasswordsChanged();
-        RaisePasswordFilterState();
         RaisePasswordSelectionState();
         ReconcileSelectedPasswordDetails();
         OnPropertyChanged(nameof(CanManageSelectedPasswordFolder));

@@ -518,15 +518,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RaiseWebDavBackupHistoryState();
         RaiseBitwardenState();
         RaisePasswordQuickAccessState();
-        RaisePasswordFilterState();
         RefreshNoteCategoryOptions();
-        OnPropertyChanged(nameof(ClearPasswordFiltersText));
-        OnPropertyChanged(nameof(ClearPasswordSearchText));
-        OnPropertyChanged(nameof(PasswordSearchHelpText));
-        OnPropertyChanged(nameof(PasswordEmptyStateText));
         OnPropertyChanged(nameof(SelectPasswordItemsText));
         OnPropertyChanged(nameof(SelectAllVisiblePasswordsText));
-        OnPropertyChanged(nameof(BackToPasswordListText));
         OnPropertyChanged(nameof(RetryPasswordDetailsText));
         RaisePasswordSortText();
         OnPropertyChanged(nameof(TotpScanQrText));
@@ -563,6 +557,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(VaultCreateLabel));
         OnPropertyChanged(nameof(VaultMoreButtonTip));
         OnPropertyChanged(nameof(VaultSearchHelpText));
+        OnPropertyChanged(nameof(HasVaultFilters));
         OnPropertyChanged(nameof(VaultFilteredStatusText));
         if (!_hasCompromisedPasswordCheckResults)
         {

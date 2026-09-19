@@ -20,12 +20,7 @@ public sealed partial class MainWindowViewModel
     {
         OnPropertyChanged(nameof(FilteredPasswords));
         OnPropertyChanged(nameof(FilteredPasswordRows));
-        OnPropertyChanged(nameof(PasswordListStatusText));
         OnPropertyChanged(nameof(VisiblePasswordNavigationEntries));
-        OnPropertyChanged(nameof(HasFilteredPasswordRows));
-        OnPropertyChanged(nameof(PasswordEmptyStateText));
-        OnPropertyChanged(nameof(ShowAddPasswordInEmptyState));
-        OnPropertyChanged(nameof(ShowClearPasswordFiltersInEmptyState));
         SyncSelectedPasswordListRow(SelectedPassword);
     }
 
@@ -45,7 +40,6 @@ public sealed partial class MainWindowViewModel
     {
         OnPropertyChanged(nameof(FilteredPasswordRows));
         OnPropertyChanged(nameof(VisiblePasswordNavigationEntries));
-        OnPropertyChanged(nameof(HasFilteredPasswordRows));
         SyncSelectedPasswordListRow(SelectedPassword);
     }
 

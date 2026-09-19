@@ -492,7 +492,8 @@ public sealed class SecureNoteTests
         Assert.Contains("\"tags\":[\"account\",\"emergency\"]", viewModel.SelectedNote?.ItemData);
         Assert.Equal(viewModel.L.Format("NoteCountFormat", 1), viewModel.NoteCountText);
 
-        await viewModel.ToggleNoteFavoriteCommand.ExecuteAsync(null);
+        viewModel.NoteIsFavorite = true;
+        await viewModel.SaveNoteCommand.ExecuteAsync(null);
         Assert.True(viewModel.SelectedNote?.IsFavorite);
 
         viewModel.NoteContent = "plain content";

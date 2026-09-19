@@ -31,6 +31,10 @@ public sealed record VaultTreeFilter(
     public bool IsNarrowing =>
         HasSearch || FavoritesOnly || Group != VaultEntryGroup.All || (QuickFilters?.IsOn ?? false);
 
+    /// IsNarrowing minus the group: a preset is navigation, not a filter the user applied, so the
+    /// match count reads as "what did I narrow away" only within the slice already on screen.
+    public bool NarrowsWithinGroup => HasSearch || FavoritesOnly || (QuickFilters?.IsOn ?? false);
+
     public bool Matches(VaultEntryKind kind) => Group switch
     {
         VaultEntryGroup.Passwords => kind is VaultEntryKind.Password or VaultEntryKind.Sso or

@@ -82,7 +82,6 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(CanManageSelectedPasswordFolder));
         OnPropertyChanged(nameof(IsAllPasswordFoldersSelected));
         RaisePasswordFolderFilterCollections();
-        RaisePasswordFilterState();
     }
 
     private IReadOnlyList<PasswordFolderTreeNode> BuildPasswordFolderTree(

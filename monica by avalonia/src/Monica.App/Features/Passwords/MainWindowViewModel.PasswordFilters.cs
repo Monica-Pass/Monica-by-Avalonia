@@ -40,11 +40,6 @@ public sealed partial class MainWindowViewModel
 
     private bool MatchesPasswordNonFolderFilters(PasswordEntry item)
     {
-        if (QuickFilterFavorite && !item.IsFavorite)
-        {
-            return false;
-        }
-
         if (QuickFilter2Fa && !item.HasAuthenticator)
         {
             return false;
@@ -54,6 +49,7 @@ public sealed partial class MainWindowViewModel
         {
             return false;
         }
+
         if (QuickFilterPasskey && string.IsNullOrWhiteSpace(item.PasskeyBindings))
         {
             return false;
