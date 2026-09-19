@@ -4,6 +4,7 @@ using Avalonia.Threading;
 using Monica.App.ViewModels;
 using Monica.Core.Models;
 using Monica.Data;
+using Monica.Platform.Services;
 
 namespace Monica.App;
 
@@ -249,6 +250,19 @@ public partial class App
                     $"Smoke UI other pages screenshots result. success={success}, directory={smokeScreenshotDirectory}");
             }
 
+            var keepassProbePath = GetSmokeUiArgument(
+                Environment.GetCommandLineArgs(), "--smoke-ui-keepass-file");
+            if (!string.IsNullOrWhiteSpace(keepassProbePath))
+            {
+                var keepassPassword = GetSmokeUiArgument(
+                    Environment.GetCommandLineArgs(), "--smoke-ui-keepass-password");
+                var probeSuccess = await RunSmokeUiKeePassMemoryProbeAsync(
+                    viewModel,
+                    keepassProbePath,
+                    keepassPassword);
+                smokeSuccess &= probeSuccess;
+            }
+
             var lockCycleSuccess = true;
             if (HasSmokeUiFlag(Environment.GetCommandLineArgs(), "--smoke-ui-lock-after-checks"))
             {
@@ -308,6 +322,85 @@ public partial class App
             $"totp={viewModel.TotpItems.Count}/{expectedTotp}, " +
             $"wallet={viewModel.WalletItems.Count}/{expectedWallet}");
         return locked && restored && memoryWithinBudget;
+    }
+
+    private static async Task<bool> RunSmokeUiKeePassMemoryProbeAsync(
+        MainWindowViewModel viewModel,
+        string filePath,
+        string? password)
+    {
+        // No console harness can answer whether the shipped process gives the decrypted model back,
+        // so this runs the same service the app runs and reports private bytes at every stage. Growth
+        // is measured against this process's own baseline, and the file bytes stay alive for as long
+        // as the session does - the import page holds the picked file the same way.
+        var args = Environment.GetCommandLineArgs();
+        var maxGrowthMb = GetSmokeUiCount(args, "--smoke-ui-keepass-max-growth-mb");
+        var streamDetails = HasSmokeUiFlag(args, "--smoke-ui-keepass-stream-details");
+        // Earlier smoke phases leave uncollected garbage behind, so compact both ends of the
+        // measurement or the growth number would just be reporting the other phases' debris.
+        CompactSmokeUiMemory();
+        var baselineMb = ReportSmokeUiMemory(viewModel, "keepass-before");
+        try
+        {
+            var openStopwatch = System.Diagnostics.Stopwatch.StartNew();
+            byte[]? content = await File.ReadAllBytesAsync(filePath);
+            var fileBytesMb = content.Length / 1048576d;
+            var details = 0;
+            var streamMs = 0L;
+            var streamedMb = 0d;
+            var session = await new KeePassVaultService().OpenAsync(
+                content,
+                Path.GetFileName(filePath),
+                password);
+            openStopwatch.Stop();
+            var entryCount = session.EntryCount;
+            var groupCount = session.GroupCount;
+            var openMb = ReportSmokeUiMemory(viewModel, "keepass-open");
+            if (streamDetails)
+            {
+                var streamStopwatch = System.Diagnostics.Stopwatch.StartNew();
+                await foreach (var detail in session.ReadDetailsAsync())
+                {
+                    details++;
+                }
+
+                streamStopwatch.Stop();
+                streamMs = streamStopwatch.ElapsedMilliseconds;
+                streamedMb = ReportSmokeUiMemory(viewModel, "keepass-streamed");
+            }
+
+            session.Dispose();
+            content = null;
+            var releasedMb = ReportSmokeUiMemory(viewModel, "keepass-released");
+            CompactSmokeUiMemory();
+            var collectedMb = ReportSmokeUiMemory(viewModel, "keepass-collected");
+            var growthMb = collectedMb - baselineMb;
+            var withinBudget = maxGrowthMb <= 0 || growthMb <= maxGrowthMb;
+            AppDiagnostics.Info(
+                $"Smoke UI KeePass probe result. success={withinBudget}, file={Path.GetFileName(filePath)}, " +
+                $"fileMB={fileBytesMb:F2}, entries={entryCount}, groups={groupCount}, " +
+                $"details={details}, openMs={openStopwatch.ElapsedMilliseconds}, streamMs={streamMs}, " +
+                $"baselineMB={baselineMb:F1}, openMB={openMb:F1}, streamedMB={streamedMb:F1}, " +
+                $"releasedMB={releasedMb:F1}, collectedMB={collectedMb:F1}, growthMB={growthMb:F1}, " +
+                $"maxGrowthMB={maxGrowthMb}");
+            return withinBudget;
+        }
+        catch (Exception error)
+        {
+            AppDiagnostics.Error(
+                $"Smoke UI KeePass probe failed. file={Path.GetFileName(filePath)}",
+                error);
+            return false;
+        }
+    }
+
+    private static void CompactSmokeUiMemory()
+    {
+        // A private-bytes sample only means "what this process still holds" once the heap has been
+        // compacted; otherwise it reports whatever the GC had not bothered to collect yet.
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, true);
+        GC.WaitForPendingFinalizers();
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, true);
     }
 
     private static double ReportSmokeUiMemory(MainWindowViewModel viewModel, string stage)

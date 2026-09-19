@@ -68,6 +68,8 @@ list is gone: a locked file now becomes a session that indexes groups and counts
 resolves each entry's secrets, custom fields and attachment bytes one at a time while the
 caller enumerates it.
 
+Console harness, 128 MB working-set sampling:
+
 | entries | file bytes | open | stream every detail | peak private | working set |
 | --- | --- | --- | --- | --- | --- |
 | 2,000 (20 groups) | 123,998 | 676 ms | 72 ms | +21 MB | 55 MB |
@@ -81,15 +83,29 @@ releasing it makes the whole decrypted graph collectable, which
 of this page claimed `KeePassLib` kept ~2.45 KB per entry permanently (49 MB at 20,000
 entries); that was a harness artifact and is wrong.
 
-What is not settled is the memory the process does not give back. In the console harness,
-after close, dispose, drop and an aggressive compacting collect, private bytes sit +8 MB over
-baseline for the 2,000-entry file and +52 MB for the 20,000-entry one, and the same harness
-reports the root group still reachable by weak reference. That harness cannot carry the
-conclusion, because top-level statements keep locals alive to the end of `Main`: the identical
-pattern there refused to release a plain 40 MB array either. The clean-scope test is what
-actually rules out a `KeePassLib` static root. So the open question is not whether the model
-leaks, but whether the real app's working set returns inside the 120 MB gate after a large
-`.kdbx` is opened and closed, which has not been measured on the shipped artifact yet.
+Whether the process gives the memory back is now measured on the shipped artifact rather than
+in a harness. `--smoke-ui-keepass-file` (with `--smoke-ui-keepass-password`,
+`--smoke-ui-keepass-stream-details` and the optional `--smoke-ui-keepass-max-growth-mb` gate)
+runs `KeePassVaultService.OpenAsync` inside the locked app and reports private bytes at every
+stage. Both ends of the growth measurement are compacted first: an earlier draft sampled a
+baseline that still held other smoke phases' uncollected garbage and reported a flattering
+−27 MB. win-x64 jit, unlocked state:
+
+| entries | open ms | stream ms | before | open | streamed | after collect | growth |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 2,000 | 539 | 54 | 75.2 MB | 85.1 | 93.5 | 74.4 | −0.8 MB |
+| 20,000 | 2,297 | 371 | 76.2 MB | 148.4 | 150.1 | 81.6 | +5.4 MB |
+
+Nothing is retained. At 20,000 entries the app costs ~72 MB of private bytes while the file is
+open (working set 167.7 → 244.3 MB, peak 251.4 MB, managed heap 24.1 → 81.3 MB) and `Dispose()`
+is what returns it: the managed heap is back at 26.3 MB and the working set at 180.4 MB, so the
+residual ~5 MB is heap the runtime kept, not a pinned decrypted graph. Streaming all 20,000
+details costs only +1.7 MB over open, which is the one-entry-at-a-time resolution holding in the
+real app. After the probe the same run still passes the 120 MB locked budget (82.6 MB). The
+console harness's "+52 MB and the root group still reachable" is confirmed as its own artifact:
+top-level statements keep locals alive to the end of `Main`, and the identical pattern there
+refused to release a plain 40 MB array. The honest cost of opening a 20,000-entry `.kdbx` is a
+temporary ~150 MB private / ~250 MB working set.
 
 Two `KeePassLib` constraints found while making this green, both of which bind the write-back
 slice:
