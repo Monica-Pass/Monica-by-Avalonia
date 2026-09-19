@@ -61,10 +61,10 @@
                                 <Grid ColumnDefinitions="Auto,*" MinHeight="62" ColumnSpacing="10">
                                     <Border Width="44" Height="44" CornerRadius="8" Background="{DynamicResource AccentFillColorDefaultBrush}" VerticalAlignment="Top">
                                         <Grid>
-                                            <ic:FluentIcon Icon="WalletCreditCard" FontSize="18" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsBankCard}}" />
-                                            <ic:FluentIcon Icon="Document" FontSize="18" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsDocument}}" />
-                                            <ic:FluentIcon Icon="Home" FontSize="18" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsBillingAddress}}" />
-                                            <ic:FluentIcon Icon="Money" FontSize="18" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsPaymentAccount}}" />
+                                            <ic:FluentIcon Icon="WalletCreditCard" FontSize="18" Foreground="{DynamicResource MonicaAvatarForegroundBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsBankCard}}" />
+                                            <ic:FluentIcon Icon="Document" FontSize="18" Foreground="{DynamicResource MonicaAvatarForegroundBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsDocument}}" />
+                                            <ic:FluentIcon Icon="Home" FontSize="18" Foreground="{DynamicResource MonicaAvatarForegroundBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsBillingAddress}}" />
+                                            <ic:FluentIcon Icon="Money" FontSize="18" Foreground="{DynamicResource MonicaAvatarForegroundBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ItemType, Converter={x:Static local:StringConverters.IsPaymentAccount}}" />
                                         </Grid>
                                     </Border>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center" MinWidth="0" Spacing="3">

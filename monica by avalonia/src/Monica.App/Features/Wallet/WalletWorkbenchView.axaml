@@ -26,8 +26,8 @@
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
                     <Border Width="56" Height="56" CornerRadius="10" Background="{DynamicResource AccentFillColorDefaultBrush}">
                         <Grid>
-                            <ic:FluentIcon Icon="WalletCreditCard" FontSize="26" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding SelectedWalletItem.ItemType, Converter={x:Static local:StringConverters.IsBankCard}}" />
-                            <ic:FluentIcon Icon="Document" FontSize="26" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding SelectedWalletItem.ItemType, Converter={x:Static local:StringConverters.IsDocument}}" />
+                            <ic:FluentIcon Icon="WalletCreditCard" FontSize="26" Foreground="{DynamicResource MonicaAvatarForegroundBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding SelectedWalletItem.ItemType, Converter={x:Static local:StringConverters.IsBankCard}}" />
+                            <ic:FluentIcon Icon="Document" FontSize="26" Foreground="{DynamicResource MonicaAvatarForegroundBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding SelectedWalletItem.ItemType, Converter={x:Static local:StringConverters.IsDocument}}" />
                         </Grid>
                     </Border>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" MinWidth="0">

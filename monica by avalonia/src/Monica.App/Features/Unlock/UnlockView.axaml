@@ -47,15 +47,15 @@
             <Setter Property="Padding" Value="14,8" />
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
-            <Setter Property="Foreground" Value="{DynamicResource LayerFillColorAltBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
             <Setter Property="BorderThickness" Value="0" />
         </Style>
         <Style Selector="Button.unlockPrimaryCommand:pointerover, Button.unlockPrimaryCommand:pressed">
             <Setter Property="Background" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
-            <Setter Property="Foreground" Value="{DynamicResource LayerFillColorAltBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
         </Style>
         <Style Selector="Button.unlockPrimaryCommand TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource LayerFillColorAltBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
         </Style>
         <Style Selector="Button.unlockPrimaryCommand:disabled">
             <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />

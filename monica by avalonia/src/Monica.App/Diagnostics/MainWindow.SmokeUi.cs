@@ -368,7 +368,7 @@ public partial class MainWindow
         await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
         var bitmap = new RenderTargetBitmap(new PixelSize(width, height), new Vector(96, 96));
         bitmap.Render(this);
-        bitmap.Save(path);
+        bitmap.Save(path, new PngBitmapEncoderOptions());
         return File.Exists(path) && new FileInfo(path).Length > 0;
     }
 
