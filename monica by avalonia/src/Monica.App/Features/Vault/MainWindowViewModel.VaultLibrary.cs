@@ -24,7 +24,9 @@ public sealed partial class MainWindowViewModel
     private int _vaultTreeRefreshDepth;
     private bool _isRestoringVaultSelection;
 
-    public ObservableCollection<IVaultTreeRow> VaultTreeRows { get; } = new();
+    // Swapped wholesale rather than refilled: refilling a bound collection costs one collection-changed
+    // event per row, and the tree has to re-evaluate the whole extent for each of them.
+    public ObservableCollection<IVaultTreeRow> VaultTreeRows { get; private set; } = new();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedVaultSurface))]
@@ -400,12 +402,15 @@ public sealed partial class MainWindowViewModel
             CurrentVaultFilter());
 
         DetachVaultEntryObservers();
-        VaultTreeRows.Clear();
+        var rebuilt = new ObservableCollection<IVaultTreeRow>();
         foreach (var row in rows)
         {
-            VaultTreeRows.Add(row);
+            rebuilt.Add(row);
             ObserveVaultEntry(row);
         }
+
+        VaultTreeRows = rebuilt;
+        OnPropertyChanged(nameof(VaultTreeRows));
 
         RestoreVaultSelection(selectedKey);
         OnPropertyChanged(nameof(HasVaultRows));

@@ -165,6 +165,83 @@ public sealed class UiPerformanceTests
     }
 
     [Fact]
+    public void Performance_budget_library_rematerializes_a_large_vault_in_one_pass()
+    {
+        // Clearing filters is the widest rebuild the library can be asked for: every row is rebuilt and
+        // handed to the bound tree at once. Warm on this harness the builder costs ~5ms per 5,000 entries
+        // and the view-model publish 10-40ms; the rest is the dispatcher pass that lets the tree take the
+        // rows. Handing the tree a fresh collection measured 197-224ms for that pass against 241-295ms
+        // for refilling the bound one row by row - bands that overlap this harness's noise, so the ceiling
+        // below only catches a real cliff and the one-reset contract is asserted structurally instead.
+        // Best of three rounds decides the verdict, because any single round can be inflated by an
+        // unrelated collection.
+        const int passwordCount = 5_000;
+        const int ceilingMs = 400;
+        var repository = DispatchProxy.Create<IMonicaRepository, VaultLoadRepositoryProxy>();
+        var probe = (VaultLoadRepositoryProxy)(object)repository;
+        probe.PasswordItems = Enumerable.Range(1, passwordCount)
+            .Select(id => new PasswordEntry { Id = id, Title = $"Password {id:D5}" })
+            .ToArray();
+        var window = new Monica.App.MainWindow { Width = 1280, Height = 820 };
+        using var services = Monica.App.App.ConfigureServices(window, overrides =>
+            overrides.AddSingleton(repository));
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        window.Show();
+        try
+        {
+            window.DataContext = viewModel;
+            viewModel.IsUnlocked = true;
+            viewModel.SelectSectionCommand.Execute(VaultPresets.LibrarySection);
+            RunVaultLoad(viewModel);
+            Dispatcher.UIThread.RunJobs();
+
+            var materialized = viewModel.VaultTreeRows.Count;
+            Assert.True(
+                materialized >= passwordCount,
+                $"Expected the library to show {passwordCount} entries, but it published {materialized}.");
+
+            long fastestMs = long.MaxValue;
+            for (var round = 0; round < 3; round++)
+            {
+                CollapseVaultFilters(viewModel);
+                var previousPublication = viewModel.VaultTreeRows;
+                var pass = Stopwatch.StartNew();
+                viewModel.ClearVaultFiltersCommand.Execute(null);
+                Dispatcher.UIThread.RunJobs();
+                pass.Stop();
+                Assert.Equal(materialized, viewModel.VaultTreeRows.Count);
+                // A rebuild that refills the bound collection costs the tree one collection-changed event
+                // per row while the previous rows are still in place; publishing a fresh collection costs
+                // it one reset.
+                Assert.True(
+                    !ReferenceEquals(previousPublication, viewModel.VaultTreeRows),
+                    "The library rebuilt its rows in place instead of handing the tree one reset.");
+                fastestMs = Math.Min(fastestMs, pass.ElapsedMilliseconds);
+            }
+
+            Assert.True(
+                fastestMs < ceilingMs,
+                $"Re-materializing {materialized} library rows took {fastestMs} ms at best.");
+            // The rebuild hands the tree a new collection rather than refilling the old one, so a binding
+            // that stopped following it would keep showing stale rows while the numbers looked healthy.
+            Assert.Contains(
+                window.GetVisualDescendants().OfType<ListBox>(),
+                list => ReferenceEquals(list.ItemsSource, viewModel.VaultTreeRows));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void CollapseVaultFilters(MainWindowViewModel viewModel)
+    {
+        viewModel.VaultFavoritesOnly = true;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Empty(viewModel.VaultTreeRows);
+    }
+
+    [Fact]
     public void Password_detail_source_snapshot_keeps_only_relevant_vault_references()
     {
         const int unrelatedPasswordCount = 10_000;
