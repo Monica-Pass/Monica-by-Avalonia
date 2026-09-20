@@ -6,14 +6,14 @@
              x:Name="DatabaseSourceListRoot"
              x:DataType="vm:MainWindowViewModel">
     <Grid>
-        <StackPanel IsVisible="{Binding !HasVaultSources}"
+        <StackPanel Classes="workspaceEmptyState" IsVisible="{Binding !HasVaultSources}"
                     Spacing="10"
                     Margin="24"
                     Width="240"
                     HorizontalAlignment="Left"
                     VerticalAlignment="Top">
             <ic:FluentIcon Icon="Database" FontSize="32" HorizontalAlignment="Center" />
-            <TextBlock Text="{Binding L.DatabaseSourcesEmptyHint}" TextAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <TextBlock Text="{Binding L.DatabaseSourcesEmptyHint}" />
         </StackPanel>
         <ListBox x:Name="DatabaseSourceList"
                  Classes="databaseSourceList"
@@ -27,7 +27,7 @@
             <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:VaultSourceDisplayItem">
                     <Border Classes="databaseSourceRow">
-                        <Button Classes="databaseSourceButton"
+                        <Button Classes="workspaceListRowButton"
                                 Command="{Binding #DatabaseSourceListRoot.DataContext.ShowVaultSourceDetailsCommand}"
                                 CommandParameter="{Binding}"
                                 ToolTip.Tip="{Binding DisplayName}"

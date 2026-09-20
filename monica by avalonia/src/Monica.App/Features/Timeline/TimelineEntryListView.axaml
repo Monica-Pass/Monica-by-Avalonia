@@ -6,10 +6,10 @@
              x:Name="Root"
              x:DataType="vm:MainWindowViewModel">
     <Grid>
-        <StackPanel IsVisible="{Binding !HasFilteredTimelineEntries}" HorizontalAlignment="Left" VerticalAlignment="Top" Spacing="10" Margin="24" Width="240">
+        <StackPanel Classes="workspaceEmptyState" IsVisible="{Binding !HasFilteredTimelineEntries}" HorizontalAlignment="Left" VerticalAlignment="Top" Spacing="10" Margin="24" Width="240">
             <ic:FluentIcon Icon="Clock" FontSize="32" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
-            <TextBlock Text="{Binding TimelineCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap" />
-            <TextBlock Text="{Binding TimelineEmptyStateText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding TimelineCountText}" />
+            <TextBlock Text="{Binding TimelineEmptyStateText}" />
             <Button x:Name="EmptyTimelineClearSearchButton" Classes="workspaceCommand" Command="{Binding ClearTimelineSearchCommand}" IsVisible="{Binding ShowClearTimelineSearchInEmptyState}" ToolTip.Tip="{Binding L[Clear]}" AutomationProperties.Name="{Binding L[Clear]}" HorizontalAlignment="Center">
                 <StackPanel Orientation="Horizontal" Spacing="8"><ic:FluentIcon Icon="Dismiss" FontSize="12" /><TextBlock Text="{Binding L[Clear]}" /></StackPanel>
             </Button>
@@ -30,7 +30,7 @@
             <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:TimelineEntry">
                     <Border Classes="timelineEventRow">
-                        <Button Classes="timelineEventButton" Command="{Binding #Root.DataContext.ShowTimelineEntryDetailsCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding Title}" AutomationProperties.Name="{Binding Title}">
+                        <Button Classes="workspaceListRowButton" Command="{Binding #Root.DataContext.ShowTimelineEntryDetailsCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding Title}" AutomationProperties.Name="{Binding Title}">
                             <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="2">
                                 <ic:FluentIcon Grid.RowSpan="3" Icon="Clock" FontSize="20" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,2,0,0" />
                                 <TextBlock Grid.Column="1" Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />

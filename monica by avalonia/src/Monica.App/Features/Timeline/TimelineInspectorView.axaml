@@ -21,13 +21,13 @@
                 </Grid>
                 <TextBlock Text="{Binding SelectedTimelineEntry.Description}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                 <WrapPanel Orientation="Horizontal">
-                    <Border Classes="workspaceStatusChip" Margin="0,0,8,8"><TextBlock Text="{Binding SelectedTimelineEntry.OperationType}" FontSize="12" FontWeight="SemiBold" /></Border>
-                    <Border Classes="workspaceStatusChip" Margin="0,0,8,8"><TextBlock Text="{Binding SelectedTimelineEntry.ItemType}" FontSize="12" /></Border>
+                    <Border Classes="workspaceStatusChip" Margin="0,0,8,8"><TextBlock Text="{Binding SelectedTimelineEntry.OperationType}" FontWeight="SemiBold" /></Border>
+                    <Border Classes="workspaceStatusChip" Margin="0,0,8,8"><TextBlock Text="{Binding SelectedTimelineEntry.ItemType}" /></Border>
                 </WrapPanel>
             </StackPanel>
-            <StackPanel IsVisible="{Binding !HasSelectedTimelineEntry}" Spacing="10" Width="260" Margin="24" HorizontalAlignment="Left" VerticalAlignment="Top">
+            <StackPanel Classes="workspaceEmptyState" IsVisible="{Binding !HasSelectedTimelineEntry}" Spacing="10" Width="260" Margin="24" HorizontalAlignment="Left" VerticalAlignment="Top">
                 <ic:FluentIcon Icon="Clock" FontSize="34" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
-                <TextBlock Text="{Binding L.TimelineEmptySelectionHint}" TextWrapping="Wrap" TextAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <TextBlock Text="{Binding L.TimelineEmptySelectionHint}" />
             </StackPanel>
         </Grid>
     </ScrollViewer>

@@ -111,15 +111,14 @@
                                  LineRequested="Inspector_OnLineRequested" />
 
         <StackPanel x:Name="NoteEditorEmptyState"
+                    Classes="workspaceEmptyState"
                     Grid.ColumnSpan="2"
                     IsVisible="{Binding HasOpenNoteTabs, Converter={x:Static local:BoolConverters.Not}}"
                     Width="320"
-                    Spacing="12"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
+                    Spacing="12">
             <ic:FluentIcon Icon="Note" FontSize="38" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
-            <TextBlock Text="{Binding L[NoteEmptyTitle]}" FontSize="20" FontWeight="SemiBold" TextAlignment="Center" />
-            <TextBlock Text="{Binding L[NoteEmptyDescription]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" />
+            <TextBlock Text="{Binding L[NoteEmptyTitle]}" FontSize="20" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding L[NoteEmptyDescription]}" />
             <Button x:Name="EmptyNoteAddButton"
                     Command="{Binding AddNoteCommand}"
                     AutomationProperties.Name="{Binding L.NewSecureNote}"

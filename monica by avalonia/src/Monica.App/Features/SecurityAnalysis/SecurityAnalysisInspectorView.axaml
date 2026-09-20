@@ -21,8 +21,8 @@
                     </StackPanel>
                 </Grid>
                 <WrapPanel>
-                    <Border Classes="workspaceStatusChip" Margin="0,0,8,8"><TextBlock Text="{Binding SelectedSecurityIssue.Category}" FontSize="12" FontWeight="SemiBold" /></Border>
-                    <Border Classes="workspaceStatusChip" Margin="0,0,8,8"><TextBlock Text="{Binding SelectedSecurityIssue.Severity}" FontSize="12" /></Border>
+                    <Border Classes="workspaceStatusChip" Margin="0,0,8,8"><TextBlock Text="{Binding SelectedSecurityIssue.Category}" FontWeight="SemiBold" /></Border>
+                    <Border Classes="workspaceStatusChip" Margin="0,0,8,8"><TextBlock Text="{Binding SelectedSecurityIssue.Severity}" /></Border>
                 </WrapPanel>
                 <WrapPanel>
                     <Button Classes="workspacePrimaryCommand" Command="{Binding ShowPasswordDetailsCommand}" CommandParameter="{Binding SelectedSecurityIssue.Entry}" Margin="0,0,8,8" AutomationProperties.Name="{Binding L.PasswordDetails}" ToolTip.Tip="{Binding L.PasswordDetails}">
@@ -33,9 +33,9 @@
                     </Button>
                 </WrapPanel>
             </StackPanel>
-            <StackPanel IsVisible="{Binding !HasSelectedSecurityIssue}" Spacing="10" Margin="24" Width="260" HorizontalAlignment="Left">
+            <StackPanel Classes="workspaceEmptyState" IsVisible="{Binding !HasSelectedSecurityIssue}" Spacing="10" Margin="24" Width="260" HorizontalAlignment="Left">
                 <ic:FluentIcon Icon="Shield" FontSize="34" HorizontalAlignment="Center" />
-                <TextBlock Text="{Binding SecurityIssueSearchResultText}" TextAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <TextBlock Text="{Binding SecurityIssueSearchResultText}" />
             </StackPanel>
         </Grid>
     </ScrollViewer>
