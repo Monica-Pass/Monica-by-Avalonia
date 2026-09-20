@@ -1,3 +1,4 @@
+using Monica.App.Services.VaultOperations;
 using Monica.Core.ImportExport;
 using Monica.Core.Models;
 
@@ -5,19 +6,9 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
-    private static bool TryDecodeAttachmentContent(string contentBase64, out byte[] content)
-    {
-        try
-        {
-            content = Convert.FromBase64String(contentBase64);
-            return true;
-        }
-        catch (FormatException)
-        {
-            content = [];
-            return false;
-        }
-    }
+    // Delegated to shared ImportExportHelpers for use-case extraction
+    private static bool TryDecodeAttachmentContent(string contentBase64, out byte[] content) =>
+        ImportExportHelpers.TryDecodeAttachmentContent(contentBase64, out content);
 
     private async Task<IReadOnlyList<string>> ImportSecureItemAttachmentsAsync(SecureItem item, IReadOnlyList<SecureItemAttachmentExport> attachments)
     {
@@ -44,130 +35,18 @@ public sealed partial class MainWindowViewModel
         return restoredPaths;
     }
 
-    private static SecureItem CloneSecureItemForExport(SecureItem source, bool includeCategory = true, bool includeImages = true)
-    {
-        var clone = CloneSecureItem(source);
-        if (!includeCategory)
-        {
-            clone.CategoryId = null;
-        }
-
-        if (!includeImages)
-        {
-            StripSecureItemImages(clone);
-        }
-
-        clone.MdbxDatabaseId = null;
-        clone.MdbxFolderId = null;
-        return clone;
-    }
+    private static SecureItem CloneSecureItemForExport(SecureItem source, bool includeCategory = true, bool includeImages = true) =>
+        ImportExportHelpers.CloneSecureItemForExport(source, includeCategory, includeImages);
 
     private static SecureItem CloneSecureItemForImport(
         SecureItem source,
         IReadOnlyDictionary<long, long> passwordIdMap,
-        IReadOnlyDictionary<long, long>? categoryIdMap = null)
-    {
-        var clone = CloneSecureItem(source);
-        clone.Id = 0;
-        clone.MdbxDatabaseId = null;
-        clone.MdbxFolderId = null;
-        if (clone.BoundPasswordId is { } boundPasswordId)
-        {
-            clone.BoundPasswordId = passwordIdMap.TryGetValue(boundPasswordId, out var importedPasswordId)
-                ? importedPasswordId
-                : null;
-        }
+        IReadOnlyDictionary<long, long>? categoryIdMap = null) =>
+        ImportExportHelpers.CloneSecureItemForImport(source, passwordIdMap, categoryIdMap);
 
-        if (clone.CategoryId is { } categoryId)
-        {
-            clone.CategoryId = categoryIdMap?.TryGetValue(categoryId, out var importedCategoryId) == true
-                ? importedCategoryId
-                : null;
-        }
+    private static SecureItem CloneSecureItem(SecureItem source) => ImportExportHelpers.CloneSecureItem(source);
 
-        clone.IsDeleted = false;
-        clone.DeletedAt = null;
-        clone.BitwardenLocalModified = true;
-        clone.SyncStatus = clone.BitwardenVaultId is null ? SyncStatus.None : SyncStatus.Pending;
-        return clone;
-    }
+    private static Category CloneCategory(Category source) => ImportExportHelpers.CloneCategory(source);
 
-    private static SecureItem CloneSecureItem(SecureItem source) => source.CreateDetachedCopy();
-
-    private static Category CloneCategory(Category source)
-    {
-        return new Category
-        {
-            Id = source.Id,
-            Name = source.Name,
-            SortOrder = source.SortOrder
-        };
-    }
-
-    private static void StripSecureItemImages(SecureItem item)
-    {
-        item.ImagePaths = "[]";
-        if (item.ItemType == VaultItemType.Note)
-        {
-            var note = NoteContentCodec.DecodeFromItem(item);
-            item.ItemData = NoteContentCodec.BuildSavePayload(
-                item.Title,
-                note.Content,
-                string.Join(",", note.Tags),
-                note.IsMarkdown,
-                []).ItemData;
-            return;
-        }
-
-        if (item.ItemType == VaultItemType.Document)
-        {
-            var data = WalletItemDataCodec.DecodeDocument(item);
-            data.ImagePaths.Clear();
-            item.ItemData = WalletItemDataCodec.EncodeDocument(data);
-            return;
-        }
-
-        if (item.ItemType == VaultItemType.BankCard)
-        {
-            var data = WalletItemDataCodec.DecodeBankCard(item);
-            data.ImagePaths.Clear();
-            item.ItemData = WalletItemDataCodec.EncodeBankCard(data);
-            return;
-        }
-
-        if (item.ItemType == VaultItemType.BillingAddress)
-        {
-            var data = WalletItemDataCodec.DecodeBillingAddress(item);
-            data.ImagePaths.Clear();
-            item.ItemData = WalletItemDataCodec.EncodeBillingAddress(data);
-            return;
-        }
-
-        if (item.ItemType == VaultItemType.PaymentAccount)
-        {
-            var data = WalletItemDataCodec.DecodePaymentAccount(item);
-            data.ImagePaths.Clear();
-            item.ItemData = WalletItemDataCodec.EncodePaymentAccount(data);
-        }
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    private static void StripSecureItemImages(SecureItem item) => ImportExportHelpers.StripSecureItemImages(item);
 }
