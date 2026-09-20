@@ -53,6 +53,21 @@ public sealed class PasswordSecretResolverTests
         Assert.Empty(result.Value);
     }
 
+    [Fact]
+    public void Read_with_assume_plaintext_bypasses_base64_heuristic_for_keepass_values()
+    {
+        var crypto = CreateUnlockedCrypto();
+        var base64LookingPassword = Convert.ToBase64String(new byte[32]);
+
+        var withoutFlag = PasswordSecretResolver.Read(base64LookingPassword, crypto);
+        var withFlag = PasswordSecretResolver.Read(base64LookingPassword, crypto, assumePlaintext: true);
+
+        Assert.Equal(PasswordSecretState.Unreadable, withoutFlag.State);
+        Assert.Equal(PasswordSecretState.Available, withFlag.State);
+        Assert.Equal(PasswordSecretOrigin.Plaintext, withFlag.Origin);
+        Assert.Equal(base64LookingPassword, withFlag.Value);
+    }
+
     private static CryptoService CreateUnlockedCrypto()
     {
         var crypto = new CryptoService();

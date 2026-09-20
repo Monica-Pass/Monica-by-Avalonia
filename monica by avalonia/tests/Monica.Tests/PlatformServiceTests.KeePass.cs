@@ -182,6 +182,66 @@ public sealed partial class PlatformServiceTests
             service.OpenAsync(fixture.Content, "cancelled.kdbx", fixture.Password, cancellation.Token));
     }
 
+    [Fact]
+    public async Task KeePass_browse_exposes_root_row_and_folder_scoped_entries()
+    {
+        var fixture = KeePassTestVault.Create("password");
+        var service = new KeePassVaultService();
+        using var session = await service.OpenAsync(fixture.Content, "browse.kdbx", fixture.Password);
+
+        Assert.Equal("Business Root", session.RootGroupRow.Name);
+        Assert.Equal(fixture.RootUuid, session.RootGroupRow.Uuid);
+        Assert.Null(session.RootGroupRow.ParentUuid);
+        Assert.False(session.RootGroupRow.HasEntries);
+
+        var rootEntries = await session.ReadGroupRowsAsync(session.RootGroupUuid);
+        Assert.Empty(rootEntries);
+
+        var personal = session.Groups.Single(group => group.Name == "Personal");
+        Assert.True(personal.HasEntries);
+        var personalEntries = await session.ReadGroupRowsAsync(personal.Uuid);
+        var personalRow = Assert.Single(personalEntries);
+        Assert.Equal(KeePassTestVault.ExistingTitle, personalRow.Title);
+        Assert.Equal("existing@example.com", personalRow.UserName);
+
+        var cloud = session.Groups.Single(group => group.Name == "Cloud");
+        Assert.True(cloud.HasEntries);
+        var cloudEntries = await session.ReadGroupRowsAsync(cloud.Uuid);
+        var cloudRow = Assert.Single(cloudEntries);
+        Assert.Equal(KeePassTestVault.CloudTitle, cloudRow.Title);
+    }
+
+    [Fact]
+    public async Task KeePass_browse_resolves_one_entry_secret_on_demand()
+    {
+        var fixture = KeePassTestVault.Create("password");
+        var service = new KeePassVaultService();
+        using var session = await service.OpenAsync(fixture.Content, "browse.kdbx", fixture.Password);
+
+        var cloud = session.Groups.Single(group => group.Name == "Cloud");
+        var cloudEntry = fixture.Entries.Single(entry => entry.Title == KeePassTestVault.CloudTitle);
+        var detail = await session.ReadDetailAsync(cloud.Uuid, cloudEntry.Uuid);
+
+        Assert.NotNull(detail);
+        Assert.Equal(KeePassTestVault.CloudTitle, detail.Row.Title);
+        Assert.Equal(KeePassTestVault.CloudPassword, detail.Password);
+        Assert.Equal("Cloud note", detail.Notes);
+        Assert.Equal(KeePassTestVault.CloudTotp, detail.AuthenticatorKey);
+    }
+
+    [Fact]
+    public async Task KeePass_browse_returns_null_for_a_missing_entry()
+    {
+        var fixture = KeePassTestVault.Create("password");
+        var service = new KeePassVaultService();
+        using var session = await service.OpenAsync(fixture.Content, "browse.kdbx", fixture.Password);
+
+        var cloud = session.Groups.Single(group => group.Name == "Cloud");
+        var detail = await session.ReadDetailAsync(cloud.Uuid, "deadbeef");
+
+        Assert.Null(detail);
+    }
+
     private static async Task<List<KeePassEntryDetail>> CollectDetailsAsync(
         KeePassVaultSession session,
         CancellationToken cancellationToken = default)
