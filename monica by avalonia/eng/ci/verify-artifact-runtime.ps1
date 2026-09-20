@@ -48,6 +48,18 @@ if (-not (Test-Path -LiteralPath (Join-Path $publishRoot $nativeLibraryName))) {
     throw "Published artifact for $RuntimeIdentifier carries no $nativeLibraryName, so it cannot open a vault."
 }
 
+$nativeCryptoName = if ($RuntimeIdentifier -like 'win-*') {
+    'monica_crypto.dll'
+} elseif ($RuntimeIdentifier -like 'osx-*') {
+    'libmonica_crypto.dylib'
+} else {
+    'libmonica_crypto.so'
+}
+
+if (-not (Test-Path -LiteralPath (Join-Path $publishRoot $nativeCryptoName))) {
+    throw "Published artifact for $RuntimeIdentifier carries no $nativeCryptoName, so it cannot derive keys."
+}
+
 $tempRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [System.IO.Path]::GetTempPath() }
 $runRoot = Join-Path $tempRoot ("monica-runtime-smoke-{0}-{1}" -f $RuntimeIdentifier, [guid]::NewGuid().ToString('N'))
 $logDirectory = Join-Path $runRoot 'logs'

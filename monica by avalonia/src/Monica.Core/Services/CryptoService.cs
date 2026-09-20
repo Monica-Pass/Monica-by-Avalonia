@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
-using Konscious.Security.Cryptography;
+using Monica.Core.Native;
 
 namespace Monica.Core.Services;
 
@@ -188,14 +188,21 @@ public sealed class CryptoService : ICryptoService
     private static byte[] DeriveArgon2Key(string password, byte[] salt, int iterations, int memoryKiB, int parallelism)
     {
         var passwordBytes = Encoding.UTF8.GetBytes(password);
-        using var argon2 = new Argon2id(passwordBytes)
+        var output = new byte[KeySize];
+        try
         {
-            Salt = salt,
-            DegreeOfParallelism = parallelism > 0 ? parallelism : ArgonParallelism,
-            Iterations = iterations > 0 ? iterations : ArgonIterations,
-            MemorySize = memoryKiB > 0 ? memoryKiB : ArgonMemoryKiB
-        };
-
-        return argon2.GetBytes(KeySize);
+            MonicaCryptoNative.DeriveArgon2id(
+                passwordBytes,
+                salt,
+                iterations > 0 ? (uint)iterations : ArgonIterations,
+                memoryKiB > 0 ? (uint)memoryKiB : ArgonMemoryKiB,
+                parallelism > 0 ? (uint)parallelism : ArgonParallelism,
+                output);
+            return output;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(passwordBytes);
+        }
     }
 }

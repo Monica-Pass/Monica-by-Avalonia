@@ -4,13 +4,31 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+
+  <PropertyGroup>
+    <MonicaNativeRid Condition="'$(MonicaNativeRid)' == '' and '$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</MonicaNativeRid>
+    <MonicaNativeRid Condition="'$(MonicaNativeRid)' == '' and '$(NETCoreSdkPortableRuntimeIdentifier)' != ''">$(NETCoreSdkPortableRuntimeIdentifier)</MonicaNativeRid>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="Crypto\runtimes\$(MonicaNativeRid)\*.*" Exclude="Crypto\runtimes\$(MonicaNativeRid)\.gitkeep">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>%(Filename)%(Extension)</Link>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Monica.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="CsvHelper" Version="33.1.0" />
-    <PackageReference Include="Konscious.Security.Cryptography.Argon2" Version="1.3.1" />
     <PackageReference Include="Otp.NET" Version="1.4.1" />
     <PackageReference Include="PasswordGenerator" Version="3.0.0" />
     <PackageReference Include="QRCoder" Version="1.8.0" />

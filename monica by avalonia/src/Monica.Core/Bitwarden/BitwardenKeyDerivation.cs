@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
-using Konscious.Security.Cryptography;
+using Monica.Core.Native;
 
 namespace Monica.Core.Bitwarden;
 
@@ -117,16 +117,18 @@ public static class BitwardenKeyDerivation
         var passwordBytes = Encoding.UTF8.GetBytes(password);
         var emailBytes = Encoding.UTF8.GetBytes(canonicalEmail);
         var saltHash = SHA256.HashData(emailBytes);
+        var output = new byte[MasterKeySize];
         try
         {
-            using var argon2 = new Argon2id(passwordBytes)
-            {
-                Salt = saltHash,
-                Iterations = iterations,
-                MemorySize = checked(memoryMb * 1024),
-                DegreeOfParallelism = parallelism
-            };
-            return argon2.GetBytes(MasterKeySize);
+            var memoryKib = checked((uint)(memoryMb * 1024));
+            MonicaCryptoNative.DeriveArgon2id(
+                passwordBytes,
+                saltHash,
+                (uint)iterations,
+                memoryKib,
+                (uint)parallelism,
+                output);
+            return output;
         }
         catch (OverflowException exception)
         {

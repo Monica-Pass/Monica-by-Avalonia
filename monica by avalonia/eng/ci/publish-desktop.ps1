@@ -41,6 +41,11 @@ if (Test-Path -LiteralPath $publishDir) {
     Remove-Item -LiteralPath $publishDir -Recurse -Force
 }
 
+$rustBuild = Join-Path $PSScriptRoot '..\..\crates\monica-crypto\build.ps1'
+if (Test-Path -LiteralPath $rustBuild) {
+    & $rustBuild -Configuration release -RuntimeIdentifier $RuntimeIdentifier
+}
+
 dotnet publish $Project `
     --configuration Release `
     --runtime $RuntimeIdentifier `

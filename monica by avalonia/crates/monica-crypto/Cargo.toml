@@ -1,0 +1,14 @@
+[package]
+name = "monica-crypto"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[lib]
+name = "monica_crypto"
+crate-type = ["cdylib"]
+
+[dependencies]
+argon2 = { version = "0.5.3", default-features = false, features = ["alloc"] }
