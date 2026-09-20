@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text.Json.Nodes;
 using Monica.App.Services;
 using Monica.App.Controls;
+using Monica.App.Features.Vault;
 using Monica.App.ViewModels;
 using Monica.Core.ImportExport;
 using Monica.Core.Models;
@@ -172,21 +173,21 @@ public sealed partial class PasswordManagementTests
 
         Assert.Equal(harness.ViewModel.L.Get("LibraryEmptyHint"), harness.ViewModel.VaultEmptyStateText);
 
-        harness.ViewModel.PasswordSearchText = "no-match";
-        harness.ViewModel.PasswordSearchQuery = "no-match";
+        harness.ViewModel.VaultSearchText = "no-match";
+        harness.ViewModel.FlushVaultTreeRefresh();
 
-        Assert.Empty(harness.ViewModel.FilteredPasswords);
+        Assert.Empty(harness.ViewModel.VaultTreeRows);
 
-        harness.ViewModel.ClearPasswordSearchCommand.Execute(null);
+        harness.ViewModel.ClearVaultFiltersCommand.Execute(null);
 
-        Assert.NotEmpty(harness.ViewModel.FilteredPasswords);
-        Assert.Equal("", harness.ViewModel.PasswordSearchText);
+        Assert.NotEmpty(harness.ViewModel.VaultTreeRows);
+        Assert.Equal("", harness.ViewModel.VaultSearchText);
 
-        harness.ViewModel.AreAllFilteredPasswordsSelected = true;
+        harness.ViewModel.Passwords.Single().IsSelected = true;
         Assert.True(harness.ViewModel.HasSelectedPasswords);
-        Assert.True(harness.ViewModel.Passwords.Single().IsSelected);
+        Assert.Equal(1, harness.ViewModel.SelectedPasswordCount);
 
-        harness.ViewModel.AreAllFilteredPasswordsSelected = false;
+        harness.ViewModel.ClearPasswordSelectionCommand.Execute(null);
         Assert.False(harness.ViewModel.HasSelectedPasswords);
     }
 
@@ -249,14 +250,13 @@ public sealed partial class PasswordManagementTests
         });
         await harness.ViewModel.LoadAsync();
 
-        Assert.Empty(harness.ViewModel.PasswordSearchText);
-        Assert.Empty(harness.ViewModel.PasswordSearchQuery);
+        Assert.Empty(harness.ViewModel.VaultSearchText);
         Assert.False(harness.ViewModel.HasVaultFilters);
 
         var obsoleteGlobalSearch = typeof(MainWindowViewModel).GetProperty("SearchText");
         obsoleteGlobalSearch?.SetValue(harness.ViewModel, "Alpha");
 
-        Assert.Equal(2, harness.ViewModel.FilteredPasswords.Count);
+        Assert.Equal(2, harness.ViewModel.Passwords.Count);
         Assert.Null(obsoleteGlobalSearch);
     }
 
@@ -298,10 +298,8 @@ public sealed partial class PasswordManagementTests
             });
         }
 
-        _ = harness.ViewModel.FilteredPasswords.Count;
         _ = harness.ViewModel.FilteredTotpItems.Count;
         _ = harness.ViewModel.FilteredWalletItems.Count;
-        var passwordProjectionBuilds = harness.ViewModel.FilteredPasswordsProjectionBuildCount;
         var totpProjectionBuilds = harness.ViewModel.FilteredTotpProjectionBuildCount;
         var walletProjectionBuilds = harness.ViewModel.FilteredWalletProjectionBuildCount;
 
@@ -323,7 +321,6 @@ public sealed partial class PasswordManagementTests
         Assert.Equal([NotifyCollectionChangedAction.Add], passwordCollectionChanges);
         Assert.Equal(10_001, harness.ViewModel.Passwords.Count);
         Assert.Equal("New account", harness.ViewModel.Passwords[0].Title);
-        Assert.Equal(passwordProjectionBuilds, harness.ViewModel.FilteredPasswordsProjectionBuildCount);
         Assert.Equal(totpProjectionBuilds, harness.ViewModel.FilteredTotpProjectionBuildCount);
         Assert.Equal(walletProjectionBuilds, harness.ViewModel.FilteredWalletProjectionBuildCount);
         Assert.Equal(1, repositoryRecorder.SavePasswordCallCount);
@@ -580,42 +577,45 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
-    public async Task ViewModel_saves_password_authenticator_as_bound_totp_and_searches_rich_fields()
+    public void ViewModel_saves_password_authenticator_as_bound_totp_and_searches_rich_fields()
     {
-        var harness = CreateHarness();
-        await harness.ViewModel.LoadAsync();
-
-        harness.Dialog.ConfigureNext(editor =>
+        RunOnStaThread(() =>
         {
-            editor.Title = "GitHub";
-            editor.Username = "dev@example.com";
-            editor.PasswordLines = "secret";
-            editor.Notes = "recovery words live elsewhere";
-            editor.AuthenticatorKey = "otpauth://totp/GitHub:dev%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=GitHub&period=45&digits=8";
-            editor.AppName = "GitHub Desktop";
-            editor.Email = "security@example.com";
-            editor.PasskeyBindings = """[{"rpId":"github.com"}]""";
-            editor.CustomFieldsText = "Recovery hint=blue";
+            var harness = CreateHarness();
+            harness.ViewModel.LoadAsync().GetAwaiter().GetResult();
+
+            harness.Dialog.ConfigureNext(editor =>
+            {
+                editor.Title = "GitHub";
+                editor.Username = "dev@example.com";
+                editor.PasswordLines = "secret";
+                editor.Notes = "recovery words live elsewhere";
+                editor.AuthenticatorKey = "otpauth://totp/GitHub:dev%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=GitHub&period=45&digits=8";
+                editor.AppName = "GitHub Desktop";
+                editor.Email = "security@example.com";
+                editor.PasskeyBindings = """[{"rpId":"github.com"}]""";
+                editor.CustomFieldsText = "Recovery hint=blue";
+            });
+
+            harness.ViewModel.AddPasswordCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+
+            var saved = Assert.Single(harness.Repository.GetPasswordsAsync().GetAwaiter().GetResult());
+            Assert.True(saved.HasAuthenticator);
+            var displayed = Assert.Single(harness.ViewModel.Passwords);
+            Assert.Matches("^[0-9]{8}$", displayed.TotpCode);
+            var boundTotp = Assert.Single(harness.Repository.GetSecureItemsByBoundPasswordIdAsync(saved.Id).GetAwaiter().GetResult());
+            Assert.Equal(saved.Id, boundTotp.BoundPasswordId);
+            Assert.Equal("GitHub", boundTotp.Title);
+            Assert.Contains("JBSWY3DPEHPK3PXP", boundTotp.ItemData, StringComparison.Ordinal);
+            Assert.Single(harness.ViewModel.TotpItems, item => item.BoundPasswordId == saved.Id);
+
+            SetPasswordSearch(harness.ViewModel, "blue");
+            WaitForCondition(() => harness.ViewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Where(row => row.Password is not null).Select(row => row.Password!.Id).SequenceEqual([saved.Id]));
+            SetPasswordSearch(harness.ViewModel, "GitHub Desktop");
+            WaitForCondition(() => harness.ViewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Where(row => row.Password is not null).Select(row => row.Password!.Id).SequenceEqual([saved.Id]));
+            SetPasswordSearch(harness.ViewModel, "github.com");
+            WaitForCondition(() => harness.ViewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Where(row => row.Password is not null).Select(row => row.Password!.Id).SequenceEqual([saved.Id]));
         });
-
-        await harness.ViewModel.AddPasswordCommand.ExecuteAsync(null);
-
-        var saved = Assert.Single(await harness.Repository.GetPasswordsAsync());
-        Assert.True(saved.HasAuthenticator);
-        var displayed = Assert.Single(harness.ViewModel.Passwords);
-        Assert.Matches("^[0-9]{8}$", displayed.TotpCode);
-        var boundTotp = Assert.Single(await harness.Repository.GetSecureItemsByBoundPasswordIdAsync(saved.Id));
-        Assert.Equal(saved.Id, boundTotp.BoundPasswordId);
-        Assert.Equal("GitHub", boundTotp.Title);
-        Assert.Contains("JBSWY3DPEHPK3PXP", boundTotp.ItemData, StringComparison.Ordinal);
-        Assert.Single(harness.ViewModel.TotpItems, item => item.BoundPasswordId == saved.Id);
-
-        SetPasswordSearch(harness.ViewModel, "blue");
-        Assert.Equal([saved.Id], harness.ViewModel.FilteredPasswords.Select(item => item.Id).ToArray());
-        SetPasswordSearch(harness.ViewModel, "GitHub Desktop");
-        Assert.Equal([saved.Id], harness.ViewModel.FilteredPasswords.Select(item => item.Id).ToArray());
-        SetPasswordSearch(harness.ViewModel, "github.com");
-        Assert.Equal([saved.Id], harness.ViewModel.FilteredPasswords.Select(item => item.Id).ToArray());
     }
 
     [Fact]
@@ -1042,8 +1042,7 @@ public sealed partial class PasswordManagementTests
         harness.ViewModel.ArchiveSearchText = "github";
         harness.ViewModel.RecycleBinSearchText = "missing";
 
-        Assert.Equal("main vault", harness.ViewModel.PasswordSearchText);
-        Assert.Equal("main vault", harness.ViewModel.PasswordSearchQuery);
+        Assert.Equal("main vault", harness.ViewModel.VaultSearchText);
         Assert.Same(harness.ViewModel.FilteredArchivedPasswords, harness.ViewModel.FilteredArchivedPasswords);
         Assert.Same(harness.ViewModel.FilteredDeletedPasswords, harness.ViewModel.FilteredDeletedPasswords);
         Assert.Single(harness.ViewModel.FilteredArchivedPasswords);
@@ -1921,46 +1920,6 @@ public sealed partial class PasswordManagementTests
             field => field.DisplayValue == "next-secret");
     }
 
-    [Fact]
-    public async Task ViewModel_caches_filtered_passwords_between_filter_changes()
-    {
-        var harness = CreateHarness();
-        const int passwordCount = 200;
-        for (var index = 0; index < passwordCount; index++)
-        {
-            await harness.Repository.SavePasswordAsync(new PasswordEntry
-            {
-                Title = $"Account {index:000}",
-                Website = index % 2 == 0 ? "https://work.example.com" : "https://personal.example.com",
-                Username = $"user-{index:000}",
-                Password = $"secret-{index:000}",
-                IsFavorite = index % 5 == 0,
-                AuthenticatorKey = index % 5 == 0 ? "JBSWY3DPEHPK3PXP" : "",
-                UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-index)
-            });
-        }
-
-        await harness.ViewModel.LoadAsync();
-
-        var firstSnapshot = harness.ViewModel.FilteredPasswords;
-        var secondSnapshot = harness.ViewModel.FilteredPasswords;
-
-        Assert.Same(firstSnapshot, secondSnapshot);
-        Assert.Equal(passwordCount, firstSnapshot.Count);
-
-        harness.ViewModel.SelectedPasswordSort = "title-asc";
-        var sortedSnapshot = harness.ViewModel.FilteredPasswords;
-
-        Assert.NotSame(firstSnapshot, sortedSnapshot);
-        Assert.Same(sortedSnapshot, harness.ViewModel.FilteredPasswords);
-
-        harness.ViewModel.QuickFilter2Fa = true;
-        var narrowedSnapshot = harness.ViewModel.FilteredPasswords;
-
-        Assert.NotSame(sortedSnapshot, narrowedSnapshot);
-        Assert.Same(narrowedSnapshot, harness.ViewModel.FilteredPasswords);
-        Assert.All(narrowedSnapshot, item => Assert.True(item.HasAuthenticator));
-    }
 
     [Fact]
     public async Task ViewModel_batches_password_selection_state_notifications()
@@ -1981,7 +1940,7 @@ public sealed partial class PasswordManagementTests
         await harness.ViewModel.LoadAsync();
 
         var selectedCountNotifications = 0;
-        var allFilteredNotifications = 0;
+        var hasSelectedNotifications = 0;
         harness.ViewModel.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(MainWindowViewModel.SelectedPasswordCount))
@@ -1989,29 +1948,28 @@ public sealed partial class PasswordManagementTests
                 selectedCountNotifications++;
             }
 
-            if (e.PropertyName == nameof(MainWindowViewModel.AreAllFilteredPasswordsSelected))
+            if (e.PropertyName == nameof(MainWindowViewModel.HasSelectedPasswords))
             {
-                allFilteredNotifications++;
+                hasSelectedNotifications++;
             }
         };
 
-        harness.ViewModel.AreAllFilteredPasswordsSelected = true;
+        harness.ViewModel.SelectAllVaultRowsCommand.Execute(null);
 
         Assert.Equal(passwordCount, harness.ViewModel.SelectedPasswordCount);
-        Assert.True(harness.ViewModel.AreAllFilteredPasswordsSelected);
+        Assert.True(harness.ViewModel.HasSelectedPasswords);
         Assert.True(selectedCountNotifications <= 2, $"Selecting all raised {selectedCountNotifications} selected-count notifications.");
-        Assert.True(allFilteredNotifications <= 2, $"Selecting all raised {allFilteredNotifications} all-filtered notifications.");
+        Assert.True(hasSelectedNotifications <= 2, $"Selecting all raised {hasSelectedNotifications} has-selected notifications.");
 
         selectedCountNotifications = 0;
-        allFilteredNotifications = 0;
+        hasSelectedNotifications = 0;
 
         harness.ViewModel.ClearPasswordSelectionCommand.Execute(null);
 
         Assert.Equal(0, harness.ViewModel.SelectedPasswordCount);
         Assert.False(harness.ViewModel.HasSelectedPasswords);
-        Assert.False(harness.ViewModel.AreAllFilteredPasswordsSelected);
         Assert.True(selectedCountNotifications <= 2, $"Clearing selection raised {selectedCountNotifications} selected-count notifications.");
-        Assert.True(allFilteredNotifications <= 2, $"Clearing selection raised {allFilteredNotifications} all-filtered notifications.");
+        Assert.True(hasSelectedNotifications <= 2, $"Clearing selection raised {hasSelectedNotifications} has-selected notifications.");
     }
 
     [Fact]
@@ -2303,8 +2261,7 @@ public sealed partial class PasswordManagementTests
         harness.ViewModel.ClearTotpFiltersCommand.Execute(null);
 
         Assert.Equal("", harness.ViewModel.TotpSearchText);
-        Assert.Equal("password page search", harness.ViewModel.PasswordSearchText);
-        Assert.Equal("password page search", harness.ViewModel.PasswordSearchQuery);
+        Assert.Equal("password page search", harness.ViewModel.VaultSearchText);
         Assert.Equal(3, harness.ViewModel.FilteredTotpItems.Count);
         Assert.Contains(harness.ViewModel.TotpFilterChoices, item => item.Key == "all" && item.IsSelected);
     }
@@ -2487,8 +2444,7 @@ public sealed partial class PasswordManagementTests
         harness.ViewModel.ClearWalletSearchCommand.Execute(null);
 
         Assert.Equal("", harness.ViewModel.WalletSearchText);
-        Assert.Equal("password page search", harness.ViewModel.PasswordSearchText);
-        Assert.Equal("password page search", harness.ViewModel.PasswordSearchQuery);
+        Assert.Equal("password page search", harness.ViewModel.VaultSearchText);
         Assert.Equal(2, harness.ViewModel.FilteredWalletItems.Count);
     }
 
@@ -2706,116 +2662,6 @@ public sealed partial class PasswordManagementTests
         Assert.Equal(personal.Id, movedTotp.CategoryId);
         Assert.Single(harness.ViewModel.TotpItems, item => item.BoundPasswordId == first.Id && item.CategoryId == personal.Id);
         Assert.Equal(harness.ViewModel.L.Format("MovedSelectedPasswordsToFolderFormat", 2, personal.Name), harness.ViewModel.StatusMessage);
-    }
-
-    [Fact]
-    public async Task ViewModel_creates_and_filters_password_folders()
-    {
-        var harness = CreateHarness();
-        var work = new Category { Name = "Work", SortOrder = 1 };
-        await harness.Repository.SaveCategoryAsync(work);
-        await harness.Repository.SavePasswordAsync(new PasswordEntry { Title = "Work Portal", CategoryId = work.Id, Password = "one" });
-        await harness.Repository.SavePasswordAsync(new PasswordEntry { Title = "Personal Portal", Password = "two" });
-        await harness.ViewModel.LoadAsync();
-
-        Assert.Contains(harness.ViewModel.PasswordFolderFilters, item => item.Name == "All folders");
-        Assert.Contains(harness.ViewModel.PasswordFolderFilters, item => item.Name == "Work");
-        Assert.Contains(harness.ViewModel.PasswordFolderFilters, item => item.Name == "No folder");
-        harness.ViewModel.SelectedPasswordFolderFilter = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == work.Id);
-        Assert.Equal(["Work Portal"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
-
-        harness.ViewModel.SelectedPasswordFolderFilter = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == -1);
-        Assert.Equal(["Personal Portal"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
-
-        harness.ViewModel.NewFolderName = "Finance";
-        await harness.ViewModel.CreatePasswordFolderCommand.ExecuteAsync(null);
-
-        var finance = Assert.Single(await harness.Repository.GetCategoriesAsync(), item => item.Name == "Finance");
-        Assert.Equal(finance.Id, harness.ViewModel.SelectedPasswordFolderFilter?.Id);
-        Assert.Empty(harness.ViewModel.NewFolderName);
-        Assert.Equal(harness.ViewModel.L.Format("CreatedFolderFormat", "Finance"), harness.ViewModel.StatusMessage);
-
-        harness.ViewModel.SelectedPasswordFolderFilter =
-            harness.ViewModel.PasswordFolderFilters.Single(item => item.SelectionKey == "system:all");
-        harness.ViewModel.NewFolderName = "work";
-        await harness.ViewModel.CreatePasswordFolderCommand.ExecuteAsync(null);
-
-        Assert.Equal(work.Id, harness.ViewModel.SelectedPasswordFolderFilter?.Id);
-        Assert.Equal(harness.ViewModel.L.Format("SelectedFolderFormat", "Work"), harness.ViewModel.StatusMessage);
-    }
-
-    [Fact]
-    public async Task ViewModel_builds_nested_password_folder_tree_and_counts_current_query_scope()
-    {
-        var harness = CreateHarness();
-        var work = new Category { Name = "Work", SortOrder = 1 };
-        var infra = new Category { Name = "Work/Infra", SortOrder = 2 };
-        var prod = new Category { Name = "Work/Infra/Prod", SortOrder = 3 };
-        var personal = new Category { Name = "Personal", SortOrder = 4 };
-        await harness.Repository.SaveCategoryAsync(work);
-        await harness.Repository.SaveCategoryAsync(infra);
-        await harness.Repository.SaveCategoryAsync(prod);
-        await harness.Repository.SaveCategoryAsync(personal);
-        await harness.Repository.SavePasswordAsync(new PasswordEntry { Title = "Work Root", CategoryId = work.Id, Password = "one" });
-        await harness.Repository.SavePasswordAsync(new PasswordEntry { Title = "Infra Portal", CategoryId = infra.Id, Password = "two" });
-        await harness.Repository.SavePasswordAsync(new PasswordEntry { Title = "Prod Portal", CategoryId = prod.Id, Password = "three" });
-        await harness.Repository.SavePasswordAsync(new PasswordEntry { Title = "Personal Prod", CategoryId = personal.Id, Password = "four" });
-        await harness.ViewModel.LoadAsync();
-
-        var workNode = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == work.Id);
-        var infraNode = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == infra.Id);
-        var prodNode = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == prod.Id);
-
-        Assert.Equal(0, workNode.Level);
-        Assert.Equal(1, infraNode.Level);
-        Assert.Equal(2, prodNode.Level);
-        Assert.True(workNode.HasChildren);
-        Assert.Equal(3, workNode.Count);
-        Assert.Equal(2, infraNode.Count);
-        Assert.Equal(1, prodNode.Count);
-
-        harness.ViewModel.SelectedPasswordFolderFilter = workNode;
-        Assert.Equal(
-            ["Prod Portal", "Infra Portal", "Work Root"],
-            harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
-
-        harness.ViewModel.SelectedPasswordFolderFilter = infraNode;
-        Assert.Equal(
-            ["Prod Portal", "Infra Portal"],
-            harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
-
-        harness.ViewModel.PasswordSearchQuery = "Prod";
-        workNode = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == work.Id);
-        infraNode = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == infra.Id);
-        prodNode = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == prod.Id);
-        var personalNode = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == personal.Id);
-
-        Assert.Equal(1, workNode.Count);
-        Assert.Equal(1, infraNode.Count);
-        Assert.Equal(1, prodNode.Count);
-        Assert.Equal(1, personalNode.Count);
-        Assert.Equal(2, harness.ViewModel.PasswordFolderFilters.Single(item => item.SelectionKey == "system:all").Count);
-    }
-
-    [Fact]
-    public async Task ViewModel_creates_child_folder_under_current_nested_selection()
-    {
-        var harness = CreateHarness();
-        var work = new Category { Name = "Work", SortOrder = 1 };
-        await harness.Repository.SaveCategoryAsync(work);
-        await harness.ViewModel.LoadAsync();
-
-        harness.ViewModel.SelectedPasswordFolderFilter =
-            harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == work.Id);
-        harness.ViewModel.NewFolderName = "Production/Secrets";
-
-        await harness.ViewModel.CreatePasswordFolderCommand.ExecuteAsync(null);
-
-        var child = Assert.Single(
-            await harness.Repository.GetCategoriesAsync(),
-            item => item.Name == "Work/Production/Secrets");
-        Assert.Equal(child.Id, harness.ViewModel.SelectedPasswordFolderFilter?.Id);
-        Assert.Equal(2, harness.ViewModel.SelectedPasswordFolderFilter?.Level);
     }
 
     [Fact]
@@ -3124,145 +2970,6 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
-    public async Task ViewModel_renames_selected_password_folder()
-    {
-        var harness = CreateHarness();
-        var work = new Category { Name = "Work", SortOrder = 1 };
-        var personal = new Category { Name = "Personal", SortOrder = 2 };
-        await harness.Repository.SaveCategoryAsync(work);
-        await harness.Repository.SaveCategoryAsync(personal);
-        await harness.ViewModel.LoadAsync();
-
-        harness.ViewModel.SelectedPasswordFolderFilter = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == work.Id);
-        Assert.True(harness.ViewModel.CanManageSelectedPasswordFolder);
-
-        harness.ViewModel.NewFolderName = "Personal";
-        await harness.ViewModel.RenameSelectedPasswordFolderCommand.ExecuteAsync(null);
-        Assert.Equal(harness.ViewModel.L.Format("FolderAlreadyExistsFormat", "Personal"), harness.ViewModel.StatusMessage);
-
-        harness.ViewModel.NewFolderName = "Engineering";
-        await harness.ViewModel.RenameSelectedPasswordFolderCommand.ExecuteAsync(null);
-
-        var renamed = Assert.Single(await harness.Repository.GetCategoriesAsync(), item => item.Id == work.Id);
-        Assert.Equal("Engineering", renamed.Name);
-        Assert.Equal(work.Id, harness.ViewModel.SelectedPasswordFolderFilter?.Id);
-        Assert.Contains(harness.ViewModel.PasswordFolderFilters, item => item.Id == work.Id && item.Name == "Engineering");
-        Assert.Empty(harness.ViewModel.NewFolderName);
-        Assert.Contains(harness.ViewModel.TimelineEntries, item => item.OperationType == "UPDATE" && item.ItemType == "CATEGORY");
-        Assert.Equal(harness.ViewModel.L.Format("RenamedFolderFormat", "Work", "Engineering"), harness.ViewModel.StatusMessage);
-    }
-
-    [Fact]
-    public async Task ViewModel_renames_selected_password_folder_and_its_descendants()
-    {
-        var harness = CreateHarness();
-        var work = new Category { Name = "Work", SortOrder = 1 };
-        var production = new Category { Name = "Work/Production", SortOrder = 2 };
-        var secrets = new Category { Name = "Work/Production/Secrets", SortOrder = 3 };
-        await harness.Repository.SaveCategoryAsync(work);
-        await harness.Repository.SaveCategoryAsync(production);
-        await harness.Repository.SaveCategoryAsync(secrets);
-        await harness.ViewModel.LoadAsync();
-
-        harness.ViewModel.SelectedPasswordFolderFilter =
-            harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == work.Id);
-        harness.ViewModel.NewFolderName = "Engineering";
-
-        await harness.ViewModel.RenameSelectedPasswordFolderCommand.ExecuteAsync(null);
-
-        var categories = await harness.Repository.GetCategoriesAsync();
-        Assert.Contains(categories, item => item.Id == work.Id && item.Name == "Engineering");
-        Assert.Contains(categories, item => item.Id == production.Id && item.Name == "Engineering/Production");
-        Assert.Contains(categories, item => item.Id == secrets.Id && item.Name == "Engineering/Production/Secrets");
-        Assert.Contains(
-            harness.ViewModel.PasswordFolderFilters,
-            item => item.Id == secrets.Id && item.Level == 2);
-    }
-
-    [Fact]
-    public async Task ViewModel_moves_password_folder_into_the_dropped_folder()
-    {
-        var harness = CreateHarness();
-        var work = new Category { Name = "Work", SortOrder = 1 };
-        var production = new Category { Name = "Work/Production", SortOrder = 2 };
-        var personal = new Category { Name = "Personal", SortOrder = 3 };
-        await harness.Repository.SaveCategoryAsync(work);
-        await harness.Repository.SaveCategoryAsync(production);
-        await harness.Repository.SaveCategoryAsync(personal);
-        await harness.ViewModel.LoadAsync();
-
-        var source = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == work.Id);
-        var target = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == personal.Id);
-        var request = new FolderMoveRequest(source, target);
-
-        Assert.True(harness.ViewModel.MovePasswordFolderCommand.CanExecute(request));
-        await harness.ViewModel.MovePasswordFolderCommand.ExecuteAsync(request);
-
-        var categories = await harness.Repository.GetCategoriesAsync();
-        Assert.Contains(categories, item => item.Id == work.Id && item.Name == "Personal/Work");
-        Assert.Contains(categories, item => item.Id == production.Id && item.Name == "Personal/Work/Production");
-        Assert.Equal(
-            harness.ViewModel.L.Format("RenamedFolderFormat", "Work", "Personal/Work"),
-            harness.ViewModel.StatusMessage);
-    }
-
-    [Fact]
-    public async Task ViewModel_refuses_moving_a_password_folder_into_its_own_descendant()
-    {
-        var harness = CreateHarness();
-        var work = new Category { Name = "Work", SortOrder = 1 };
-        var production = new Category { Name = "Work/Production", SortOrder = 2 };
-        await harness.Repository.SaveCategoryAsync(work);
-        await harness.Repository.SaveCategoryAsync(production);
-        await harness.ViewModel.LoadAsync();
-
-        var source = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == work.Id);
-        var target = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == production.Id);
-        var request = new FolderMoveRequest(source, target);
-
-        Assert.False(harness.ViewModel.MovePasswordFolderCommand.CanExecute(request));
-        await harness.ViewModel.MovePasswordFolderCommand.ExecuteAsync(request);
-
-        var categories = await harness.Repository.GetCategoriesAsync();
-        Assert.Contains(categories, item => item.Id == work.Id && item.Name == "Work");
-        Assert.Contains(categories, item => item.Id == production.Id && item.Name == "Work/Production");
-    }
-
-    [Fact]
-    public async Task ViewModel_deletes_selected_password_folder_and_uncategorizes_items()
-    {
-        var harness = CreateHarness();
-        var work = new Category { Name = "Work", SortOrder = 1 };
-        await harness.Repository.SaveCategoryAsync(work);
-        var password = new PasswordEntry { Title = "Work Portal", CategoryId = work.Id, Password = "one" };
-        await harness.Repository.SavePasswordAsync(password);
-        var boundTotp = new SecureItem
-        {
-            ItemType = VaultItemType.Totp,
-            Title = "Work Portal",
-            BoundPasswordId = password.Id,
-            CategoryId = work.Id,
-            ItemData = """{"secret":"JBSWY3DPEHPK3PXP"}"""
-        };
-        await harness.Repository.SaveSecureItemAsync(boundTotp);
-        await harness.ViewModel.LoadAsync();
-
-        harness.ViewModel.SelectedPasswordFolderFilter = harness.ViewModel.PasswordFolderFilters.Single(item => item.Id == work.Id);
-        await harness.ViewModel.DeleteSelectedPasswordFolderCommand.ExecuteAsync(null);
-
-        Assert.DoesNotContain(await harness.Repository.GetCategoriesAsync(), item => item.Id == work.Id);
-        var storedPassword = Assert.Single(await harness.Repository.GetPasswordsAsync());
-        Assert.Null(storedPassword.CategoryId);
-        var storedTotp = Assert.Single(await harness.Repository.GetSecureItemsByBoundPasswordIdAsync(password.Id));
-        Assert.Null(storedTotp.CategoryId);
-        Assert.Null(harness.ViewModel.Passwords.Single().CategoryId);
-        Assert.Equal(-1, harness.ViewModel.SelectedPasswordFolderFilter?.Id);
-        Assert.False(harness.ViewModel.CanManageSelectedPasswordFolder);
-        Assert.Contains(harness.ViewModel.TimelineEntries, item => item.OperationType == "DELETE" && item.ItemType == "CATEGORY");
-        Assert.Equal(harness.ViewModel.L.Format("DeletedFolderFormat", "Work", 1), harness.ViewModel.StatusMessage);
-    }
-
-    [Fact]
     public async Task ViewModel_sorts_password_list_by_selected_display_order()
     {
         var harness = CreateHarness();
@@ -3300,19 +3007,19 @@ public sealed partial class PasswordManagementTests
         await SetPasswordUpdatedAtAsync(harness.DatabasePath, gamma.Id, DateTimeOffset.UtcNow.AddHours(-2));
         await harness.ViewModel.LoadAsync();
 
-        Assert.Equal(["Alpha", "Gamma", "Beta"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
+        Assert.Equal(["Alpha", "Gamma", "Beta"], harness.ViewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Where(row => row.Password is not null).Select(row => row.Password!.Title).ToArray());
 
         harness.ViewModel.SelectedPasswordSort = "title-asc";
-        Assert.Equal(["Alpha", "Beta", "Gamma"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
+        Assert.Equal(["Alpha", "Beta", "Gamma"], harness.ViewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Where(row => row.Password is not null).Select(row => row.Password!.Title).ToArray());
 
         harness.ViewModel.SelectedPasswordSort = "website-asc";
-        Assert.Equal(["Beta", "Gamma", "Alpha"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
+        Assert.Equal(["Beta", "Gamma", "Alpha"], harness.ViewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Where(row => row.Password is not null).Select(row => row.Password!.Title).ToArray());
 
         harness.ViewModel.SelectedPasswordSort = "username-asc";
-        Assert.Equal(["Beta", "Gamma", "Alpha"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
+        Assert.Equal(["Beta", "Gamma", "Alpha"], harness.ViewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Where(row => row.Password is not null).Select(row => row.Password!.Title).ToArray());
 
         harness.ViewModel.SelectedPasswordSort = "favorites-first";
-        Assert.Equal(["Beta", "Alpha", "Gamma"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
+        Assert.Equal(["Beta", "Alpha", "Gamma"], harness.ViewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Where(row => row.Password is not null).Select(row => row.Password!.Title).ToArray());
     }
 
     [Fact]
@@ -3399,6 +3106,7 @@ public sealed partial class PasswordManagementTests
     public async Task ViewModel_filters_passwords_with_android_style_quick_filters()
     {
         var harness = CreateHarness();
+        harness.ViewModel.SelectedSection = "Passwords";
         var category = new Category { Name = "Work" };
         await harness.Repository.SaveCategoryAsync(category);
         var favoriteWith2Fa = new PasswordEntry
@@ -3434,34 +3142,34 @@ public sealed partial class PasswordManagementTests
         await harness.ViewModel.LoadAsync();
 
         harness.ViewModel.QuickFilter2Fa = true;
-        Assert.Equal(["Favorite 2FA"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
+        Assert.Equal(["Favorite 2FA"], harness.ViewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Where(row => row.Password is not null).Select(row => row.Password!.Title).ToArray());
 
         harness.ViewModel.QuickFilterNotes = true;
-        Assert.Equal(["Favorite 2FA"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
+        Assert.Equal(["Favorite 2FA"], harness.ViewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Where(row => row.Password is not null).Select(row => row.Password!.Title).ToArray());
 
         harness.ViewModel.QuickFilter2Fa = false;
         harness.ViewModel.QuickFilterNotes = true;
         Assert.Equal(
             ["Favorite 2FA", "Remote Bitwarden"],
-            harness.ViewModel.FilteredPasswords.Select(item => item.Title).Order().ToArray());
+            harness.ViewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Where(row => row.Password is not null).Select(row => row.Password!.Title).Order().ToArray());
 
         harness.ViewModel.QuickFilterNotes = false;
         harness.ViewModel.QuickFilterPasskey = true;
-        Assert.Equal(["Favorite 2FA"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
+        Assert.Equal(["Favorite 2FA"], harness.ViewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Where(row => row.Password is not null).Select(row => row.Password!.Title).ToArray());
 
         harness.ViewModel.QuickFilterPasskey = false;
         harness.ViewModel.QuickFilterBoundNote = true;
-        Assert.Equal(["Favorite 2FA"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
+        Assert.Equal(["Favorite 2FA"], harness.ViewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Where(row => row.Password is not null).Select(row => row.Password!.Title).ToArray());
 
         harness.ViewModel.QuickFilterBoundNote = false;
         harness.ViewModel.QuickFilterUncategorized = true;
-        Assert.Equal(["Local No Folder", "Remote Bitwarden"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).Order().ToArray());
+        Assert.Equal(["Local No Folder", "Remote Bitwarden"], harness.ViewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Where(row => row.Password is not null).Select(row => row.Password!.Title).Order().ToArray());
 
         harness.ViewModel.QuickFilterLocalOnly = true;
-        Assert.Equal(["Local No Folder"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
+        Assert.Equal(["Local No Folder"], harness.ViewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Where(row => row.Password is not null).Select(row => row.Password!.Title).ToArray());
 
         SetPasswordSearch(harness.ViewModel, "missing");
-        Assert.Empty(harness.ViewModel.FilteredPasswords);
+        Assert.Empty(harness.ViewModel.VaultTreeRows.OfType<VaultTreeEntryRow>());
     }
 
     [Fact]
@@ -3470,6 +3178,7 @@ public sealed partial class PasswordManagementTests
         RunOnStaThread(() =>
         {
             var harness = CreateHarness();
+            harness.ViewModel.SelectedSection = "Passwords";
             var withAttachment = new PasswordEntry
             {
                 Title = "Passport",
@@ -3500,12 +3209,11 @@ public sealed partial class PasswordManagementTests
             Assert.True(displayed.HasAttachments);
 
             harness.ViewModel.QuickFilterAttachments = true;
-            Assert.Equal(["Passport"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
+            Assert.Equal(["Passport"], harness.ViewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Where(row => row.Password is not null).Select(row => row.Password!.Title).ToArray());
 
             harness.ViewModel.QuickFilterAttachments = false;
-            harness.ViewModel.PasswordSearchText = "passport-scan";
-            WaitForCondition(() => harness.ViewModel.PasswordSearchQuery == "passport-scan");
-            Assert.Equal(["Passport"], harness.ViewModel.FilteredPasswords.Select(item => item.Title).ToArray());
+            SetPasswordSearch(harness.ViewModel, "passport-scan");
+            WaitForCondition(() => harness.ViewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Where(row => row.Password is not null).Select(row => row.Password!.Title).SequenceEqual(["Passport"]));
 
             harness.ViewModel.ShowPasswordDetailsCommand.ExecuteAsync(displayed).GetAwaiter().GetResult();
 
@@ -4638,8 +4346,8 @@ public sealed partial class PasswordManagementTests
 
     private static void SetPasswordSearch(MainWindowViewModel viewModel, string value)
     {
-        viewModel.PasswordSearchText = value;
-        viewModel.PasswordSearchQuery = value;
+        viewModel.VaultSearchText = value;
+        viewModel.FlushVaultTreeRefresh();
     }
 
     private static async Task<string> CreateEncryptedWebDavBackupPackageAsync(string title, string secret)
@@ -4731,6 +4439,7 @@ public sealed partial class PasswordManagementTests
             fileSystemPickerService: fileSystemPickerService,
             exportAuthorizationService: exportAuthorizationService);
 
+        viewModel.SetVaultTreeActive(true);
         return new PasswordHarness(viewModel, repository, crypto, dialog, detailDialog, categoryPicker, totpDialog, walletDialog, clipboard, attachmentFileService, confirmationDialogService, databasePath);
     }
 

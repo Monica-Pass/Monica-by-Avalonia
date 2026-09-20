@@ -85,7 +85,6 @@ public sealed partial class MainWindowViewModel
     {
         ReleaseSensitiveBackgroundDetails();
         ReleaseTransientBackgroundSecrets();
-        SuspendPasswordSearchProjectionUpdates();
         SuspendSecurityAnalysis();
         ReleaseRepositoryVaultItemSnapshots();
         (_pwnedPasswordService as ITransientPwnedPasswordCache)?.ClearCachedRanges();
@@ -166,10 +165,6 @@ public sealed partial class MainWindowViewModel
 
     private void ClearRebuildableProjectionCaches()
     {
-        _filteredPasswords = [];
-        _filteredPasswordRows = [];
-        _filteredPasswordsDirty = true;
-        _filteredPasswordRowsDirty = true;
         _filteredTotpItems = [];
         _filteredTotpItemsDirty = true;
         _filteredWalletItems = [];

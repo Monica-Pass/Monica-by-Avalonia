@@ -167,14 +167,14 @@ public sealed class BackgroundSensitiveDetailUiTests
         try
         {
             viewModel.IsUnlocked = true;
-            viewModel.PasswordSearchText = "stale-search";
+            viewModel.VaultSearchText = "stale-search";
             crypto.Lock();
             viewModel.IsUnlocked = false;
 
             await Task.Delay(350, cancellationToken);
             Dispatcher.UIThread.RunJobs();
 
-            Assert.NotEqual("stale-search", viewModel.PasswordSearchQuery);
+            Assert.NotEqual("stale-search", viewModel.VaultSearchText);
         }
         finally
         {

@@ -32,7 +32,6 @@ public sealed partial class MainWindowViewModel
         ClearItems(Passwords);
         ClearItems(ArchivedPasswords);
         ClearItems(DeletedPasswords);
-        ClearItems(PasswordFolderFilters);
         ClearItems(NoteItems);
         ClearItems(DeletedSecureItems);
         ClearItems(TotpItems);
@@ -55,7 +54,6 @@ public sealed partial class MainWindowViewModel
     {
         SelectedPassword = null;
         SelectedPasswordDetails = null;
-        SelectedPasswordFolderFilter = null;
         SelectedArchivedPassword = null;
         SelectedDeletedPassword = null;
         SelectedNote = null;
@@ -68,7 +66,7 @@ public sealed partial class MainWindowViewModel
         NoteContent = "";
         NoteTagsText = "";
         NewFolderName = "";
-        SetPasswordSearchImmediately("");
+        VaultSearchText = "";
         TotpSearchText = "";
         SelectedTotpFilterKey = TotpFilterAll;
         TotpNarrowShowsList = true;
@@ -147,7 +145,5 @@ public sealed partial class MainWindowViewModel
     private void ClearSensitiveProjectionCaches()
     {
         ClearRebuildableProjectionCaches();
-        _collapsedPasswordFolderKeys.Clear();
-        _expandedPasswordStackKeys.Clear();
     }
 }

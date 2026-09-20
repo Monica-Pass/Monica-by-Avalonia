@@ -119,66 +119,6 @@ public sealed class UiPerformanceTests
     }
 
     [Fact]
-    public void Vault_password_projection_and_folder_publication_are_coalesced_during_load()
-    {
-        const int categoryCount = 500;
-        const int passwordCount = 5000;
-        var repository = DispatchProxy.Create<IMonicaRepository, VaultLoadRepositoryProxy>();
-        var probe = (VaultLoadRepositoryProxy)(object)repository;
-        probe.Categories = Enumerable.Range(1, categoryCount)
-            .Select(id => new Category { Id = id, Name = $"Folder {id:D4}", SortOrder = id })
-            .ToArray();
-        probe.PasswordItems = Enumerable.Range(1, passwordCount)
-            .Select(id => new PasswordEntry
-            {
-                Id = id,
-                Title = $"Password {id:D5}",
-                CategoryId = (id % categoryCount) + 1
-            })
-            .ToArray();
-        var window = new Monica.App.MainWindow();
-        using var services = Monica.App.App.ConfigureServices(window, overrides =>
-            overrides.AddSingleton(repository));
-        var viewModel = services.GetRequiredService<MainWindowViewModel>();
-        var collectionChanges = new List<NotifyCollectionChangedAction>();
-        var filteredPasswordsNotifications = 0;
-        var filteredPasswordRowsNotifications = 0;
-        viewModel.PasswordFolderFilters.CollectionChanged += (_, args) => collectionChanges.Add(args.Action);
-        viewModel.PropertyChanged += (_, args) =>
-        {
-            if (args.PropertyName == nameof(MainWindowViewModel.FilteredPasswords))
-            {
-                filteredPasswordsNotifications++;
-                _ = viewModel.FilteredPasswords.Count;
-            }
-
-            if (args.PropertyName == nameof(MainWindowViewModel.FilteredPasswordRows))
-            {
-                filteredPasswordRowsNotifications++;
-                _ = viewModel.FilteredPasswordRows.Count;
-            }
-        };
-
-        RunVaultLoad(viewModel);
-
-        Assert.Equal([NotifyCollectionChangedAction.Reset], collectionChanges);
-        Assert.True(
-            filteredPasswordsNotifications == 1 && filteredPasswordRowsNotifications == 1,
-            $"Expected one final password projection publication, but observed " +
-            $"FilteredPasswords={filteredPasswordsNotifications} and " +
-            $"FilteredPasswordRows={filteredPasswordRowsNotifications}.");
-        Assert.True(viewModel.LastVaultLoadDurationMilliseconds > 0);
-        Assert.Equal(1, viewModel.FilteredPasswordsProjectionBuildCount);
-        Assert.Equal(passwordCount, viewModel.FilteredPasswords.Count);
-        Assert.Equal(passwordCount, viewModel.FilteredPasswordRows.Count);
-        Assert.Equal(categoryCount + 3, viewModel.PasswordFolderFilters.Count);
-        Assert.Equal(categoryCount, viewModel.RegularPasswordFolderFilters.Count());
-        Assert.All(
-            viewModel.RegularPasswordFolderFilters,
-            folder => Assert.Equal(passwordCount / categoryCount, folder.Count));
-    }
-
-    [Fact]
     public void Library_rematerializes_a_large_vault_with_one_reset()
     {
         RematerializeLargeVault();

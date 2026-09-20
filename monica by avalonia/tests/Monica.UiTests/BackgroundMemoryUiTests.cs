@@ -273,7 +273,6 @@ public sealed class BackgroundMemoryUiTests
     private static (IReadOnlyList<WeakReference> References, ProjectionBuildCounts Builds)
         CaptureRebuildableCacheReferences(MainWindowViewModel viewModel)
     {
-        var passwordRows = viewModel.FilteredPasswordRows;
         var totpItems = viewModel.FilteredTotpItems;
         var walletItems = viewModel.FilteredWalletItems;
         var noteTreeGroups = viewModel.NoteTreeGroups;
@@ -303,7 +302,6 @@ public sealed class BackgroundMemoryUiTests
 
         return (
             [
-                new WeakReference(passwordRows),
                 new WeakReference(totpItems),
                 new WeakReference(walletItems),
                 new WeakReference(noteTreeGroups),

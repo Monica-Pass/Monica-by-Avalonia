@@ -582,7 +582,7 @@ public partial class App
         var success = true;
         var vaultReady = await WaitForSmokeVaultReadyAsync(viewModel, TimeSpan.FromSeconds(10));
         success &= vaultReady;
-        var availablePasswords = viewModel.FilteredPasswords;
+        var availablePasswords = viewModel.Passwords;
         var entries = availablePasswords
             .Take(Math.Min(requestedCount, availablePasswords.Count))
             .ToArray();
@@ -645,7 +645,7 @@ public partial class App
         {
             var vaultReady = await WaitForSmokeVaultReadyAsync(viewModel, TimeSpan.FromSeconds(10));
             Check("vault-ready", vaultReady, $"passwords={viewModel.Passwords.Count}");
-            viewModel.ClearPasswordSearchCommand.Execute(null);
+            viewModel.ClearVaultFiltersCommand.Execute(null);
 
             viewModel.SelectSectionCommand.Execute("Totp");
             await Task.Delay(50);

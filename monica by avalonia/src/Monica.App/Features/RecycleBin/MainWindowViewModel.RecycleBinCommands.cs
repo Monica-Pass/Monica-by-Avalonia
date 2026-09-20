@@ -46,7 +46,6 @@ public sealed partial class MainWindowViewModel
         ReplacePasswordGroup([], siblings);
         RefreshBoundTotpPresentation(siblings);
         RaisePasswordCountState();
-        RaiseFilteredPasswordsChanged();
         RecycleBinNarrowShowsList = true;
         InvalidateSecurityAnalysis();
         StatusMessage = _localization.Format("RestoredPasswordFormat", entry.Title);

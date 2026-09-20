@@ -48,7 +48,6 @@ public sealed partial class MainWindowViewModel
         ReplacePasswordGroup([], siblings);
         RefreshBoundTotpPresentation(siblings);
         RaisePasswordCountState();
-        RaiseFilteredPasswordsChanged();
         ArchiveNarrowShowsList = true;
         InvalidateSecurityAnalysis();
         StatusMessage = _localization.Format("UnarchivedPasswordFormat", entry.Title);

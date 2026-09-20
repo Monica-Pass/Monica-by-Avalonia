@@ -148,7 +148,6 @@ public sealed partial class MainWindowViewModel
 
     private void RefreshCategoryConsumers(long? preferredPasswordCategoryId = null)
     {
-        RefreshPasswordFolderFilters(preferredPasswordCategoryId);
         RefreshNoteCategoryOptions();
         RaiseNoteTreeState();
         RaiseVaultTreeState();

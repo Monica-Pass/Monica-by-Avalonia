@@ -306,7 +306,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ? _vaultSessionService.SessionCancellationToken
             : CancellationToken.None;
         var loadVersion = ++_vaultLoadVersion;
-        BeginPasswordProjectionNotificationDeferral();
         IsLoadingVault = true;
         VaultLoadStageText = _localization.Get("VaultLoadPreparing");
         var loadStopwatch = Stopwatch.StartNew();
@@ -392,7 +391,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             AppDiagnostics.Measure("Replace folder and source collections", () =>
             {
                 ReplaceItems(Categories, snapshot.Categories);
-                RefreshPasswordFolderFilters();
                 RefreshNoteCategoryOptions();
                 RaiseNoteTreeState();
                 ReplaceItems(MdbxDatabases, snapshot.MdbxDatabases);
@@ -407,13 +405,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
             {
                 ReconcileSecureItemSelectionsAfterLoad();
                 RaiseAllCountState();
-                RaiseFilteredPasswordsChanged();
             });
             if (!string.IsNullOrWhiteSpace(VaultSearchText))
             {
                 QueuePasswordSearchQuery(VaultSearchText);
             }
-            EndPasswordProjectionNotificationDeferral();
             StatusMessage = _localization.Get("VaultUnlocked");
             VaultLoadStageText = _localization.Get("VaultLoadReady");
             _ = LoadTimelineDeferredAsync();
@@ -433,7 +429,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             AppDiagnostics.Info("Vault load canceled because the session was locked");
             ClearSensitiveSessionState();
-            EndPasswordProjectionNotificationDeferral();
             VaultLoadStageText = "";
         }
         catch (Exception ex)
@@ -442,13 +437,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
             AppDiagnostics.Error($"Vault load failed after {loadStopwatch.ElapsedMilliseconds} ms", ex);
             IsUnlocked = false;
             ClearSensitiveSessionState();
-            EndPasswordProjectionNotificationDeferral();
             VaultLoadStageText = _localization.Get("VaultLoadFailed");
             StatusMessage = _localization.Get("VaultLoadFailed");
         }
         finally
         {
-            EndPasswordProjectionNotificationDeferral();
             if (loadVersion == _vaultLoadVersion)
             {
                 IsLoadingVault = false;

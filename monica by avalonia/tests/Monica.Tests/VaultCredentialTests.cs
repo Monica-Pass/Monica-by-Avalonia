@@ -32,7 +32,7 @@ public sealed partial class VaultCredentialTests
         viewModel.NoteItems.Add(new SecureItem { Title = "Recovery", ItemData = "backup-code" });
         viewModel.WalletItems.Add(new SecureItem { Title = "Card", ItemData = "4111111111111111" });
         viewModel.TotpItems.Add(new SecureItem { Title = "TOTP", ItemData = "totp-seed" });
-        Assert.Single(viewModel.FilteredPasswords);
+        Assert.Single(viewModel.Passwords);
         Assert.Single(viewModel.FilteredTotpItems);
         Assert.Single(viewModel.FilteredWalletItems);
         var filteredNotesBeforeLock = viewModel.FilteredNoteItems;
@@ -50,8 +50,7 @@ public sealed partial class VaultCredentialTests
         viewModel.IsAegisImportPasswordRequired = true;
         viewModel.ExportPreview = "plain export";
         viewModel.GeneratedPassword = "generated-secret";
-        viewModel.PasswordSearchText = "private account query";
-        viewModel.PasswordSearchQuery = "private account query";
+        viewModel.VaultSearchText = "private account query";
         viewModel.WebDavPassword = "webdav-secret";
         viewModel.CurrentMasterPassword = "old-master-password";
         viewModel.ToggleMasterPasswordVisibilityCommand.Execute(null);
@@ -64,7 +63,6 @@ public sealed partial class VaultCredentialTests
         Assert.Empty(viewModel.NoteItems);
         Assert.Empty(viewModel.WalletItems);
         Assert.Empty(viewModel.TotpItems);
-        Assert.Empty(viewModel.FilteredPasswords);
         Assert.Empty(viewModel.FilteredTotpItems);
         Assert.Empty(viewModel.FilteredWalletItems);
         Assert.Empty(viewModel.FilteredNoteItems);
@@ -82,8 +80,7 @@ public sealed partial class VaultCredentialTests
         Assert.False(viewModel.IsAegisImportPasswordRequired);
         Assert.Equal("", viewModel.ExportPreview);
         Assert.Equal("", viewModel.GeneratedPassword);
-        Assert.Equal("", viewModel.PasswordSearchText);
-        Assert.Equal("", viewModel.PasswordSearchQuery);
+        Assert.Equal("", viewModel.VaultSearchText);
         Assert.Equal("", viewModel.WebDavPassword);
         Assert.Equal("", settings.Current.WebDavPassword);
         Assert.Equal("", viewModel.CurrentMasterPassword);

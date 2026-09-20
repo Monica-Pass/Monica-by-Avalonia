@@ -1,7 +1,4 @@
-using System.Collections.ObjectModel;
 using Avalonia;
-using CommunityToolkit.Mvvm.ComponentModel;
-using Monica.App.Services;
 using Monica.Core.Models;
 
 namespace Monica.App.ViewModels;
@@ -22,7 +19,6 @@ public sealed partial class MainWindowViewModel
     public bool IsSortCreatedSelected => string.Equals(SelectedPasswordSort, "created-desc", StringComparison.Ordinal);
     public bool IsSortFavoritesSelected => string.Equals(SelectedPasswordSort, "favorites-first", StringComparison.Ordinal);
     public bool CanStackSelectedPasswords => SelectedPasswordCount > 1;
-    public bool CanManageSelectedPasswordFolder => SelectedPasswordFolderFilter?.Id is > 0;
     public Thickness PasswordListCardPadding => CompactPasswordList ? new Thickness(12, 8) : new Thickness(16);
     public double PasswordListAvatarSize => CompactPasswordList ? 36 : 48;
     public double PasswordListAvatarFontSize => CompactPasswordList ? 14 : 18;
@@ -48,24 +44,6 @@ public sealed partial class MainWindowViewModel
         IsUnlocked &&
         !IsLoadingVault &&
         IsRecoverableStatusMessage(StatusMessage);
-    public bool AreAllFilteredPasswordsSelected
-    {
-        get
-        {
-            var filtered = FilteredPasswords.ToArray();
-            return filtered.Length > 0 && filtered.All(item => item.IsSelected);
-        }
-        set
-        {
-            UpdatePasswordSelectionsInBatch(() =>
-            {
-                foreach (var item in FilteredPasswords)
-                {
-                    item.IsSelected = value;
-                }
-            });
-        }
-    }
 
     public IEnumerable<PasswordQuickAccessItem> RecentPasswordQuickAccessItems =>
         BuildQuickAccessItems(QuickAccessSort.Recent);
@@ -74,12 +52,4 @@ public sealed partial class MainWindowViewModel
         BuildQuickAccessItems(QuickAccessSort.Frequent);
 
     public bool HasPasswordQuickAccessItems => RecentPasswordQuickAccessItems.Any() || FrequentPasswordQuickAccessItems.Any();
-
-    public IReadOnlyList<PasswordEntry> FilteredPasswords => GetFilteredPasswords();
-    public IReadOnlyList<PasswordListRow> FilteredPasswordRows => GetFilteredPasswordRows();
-    public IReadOnlyList<PasswordEntry> VisiblePasswordNavigationEntries =>
-        FilteredPasswordRows
-            .Where(row => row.IsPasswordEntryRow || row.IsStackHeader)
-            .Select(row => row.Entry)
-            .ToArray();
 }

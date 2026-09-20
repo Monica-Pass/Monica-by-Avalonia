@@ -377,6 +377,12 @@ public sealed partial class MainWindowViewModel
         _vaultSearchDebounce.Start();
     }
 
+    internal void FlushVaultTreeRefresh()
+    {
+        _vaultSearchDebounce?.Stop();
+        RebuildVaultTree();
+    }
+
     private DispatcherTimer CreateVaultSearchDebounce()
     {
         var timer = new DispatcherTimer

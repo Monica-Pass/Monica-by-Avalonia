@@ -69,8 +69,6 @@ public sealed partial class MainWindowViewModel
             _securityQuestionService.PredefinedQuestions
                 .Select(question => new SettingsChoice(question.Id, question.Text))
                 .ToArray());
-
-        RaiseFilteredPasswordsChanged();
     }
 
     private static void ReplaceOptions(ObservableCollection<SettingsChoice> target, params SettingsChoice[] choices)

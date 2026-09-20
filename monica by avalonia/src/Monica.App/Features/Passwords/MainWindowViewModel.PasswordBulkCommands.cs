@@ -40,7 +40,6 @@ public sealed partial class MainWindowViewModel
             }
         });
 
-        RaiseFilteredPasswordsChanged();
         InvalidateSecurityAnalysis();
         StatusMessage = _localization.Format("FavoritedPasswordCountFormat", selected.Length);
     }
@@ -186,8 +185,7 @@ public sealed partial class MainWindowViewModel
         });
 
         RefreshBoundTotpPresentation(selected);
-        RefreshPasswordFolderFilters(choice.Id);
-        RaiseFilteredPasswordsChanged();
+        RaiseVaultTreeState();
         StatusMessage = _localization.Format("MovedSelectedPasswordsToFolderFormat", selected.Length, choice.Name);
     }
     [RelayCommand]
@@ -228,7 +226,7 @@ public sealed partial class MainWindowViewModel
             });
         }
 
-        RaiseFilteredPasswordsChanged();
+        RaiseVaultTreeState();
         InvalidateSecurityAnalysis();
         StatusMessage = _localization.Format("StackedPasswordCountFormat", selected.Length);
     }

@@ -18,17 +18,6 @@ public sealed partial class MainWindowViewModel
         Frequent
     }
 
-    private sealed class PasswordFolderTreeNode(string key, string displayName, int level)
-    {
-        public string Key { get; } = key;
-        public string DisplayName { get; } = displayName;
-        public int Level { get; } = level;
-        public Category? Category { get; set; }
-        public int ExactCount { get; set; }
-        public int DescendantCount { get; set; }
-        public List<PasswordFolderTreeNode> Children { get; } = [];
-    }
-
     private readonly IPasswordAttachmentFileService _passwordAttachmentFileService;
     private readonly IPasswordEditorDialogService _passwordEditorDialogService;
     private readonly IPasswordDetailDialogService _passwordDetailDialogService;
@@ -42,35 +31,14 @@ public sealed partial class MainWindowViewModel
     private string _passwordCustomFieldSearchQuery = "";
     private string _passwordAttachmentSearchQuery = "";
     internal int PasswordQuickAccessRecordCacheCount => _passwordQuickAccessRecords.Count;
-    private IReadOnlyList<PasswordEntry> _filteredPasswords = [];
-    private IReadOnlyList<PasswordListRow> _filteredPasswordRows = [];
-    private bool _filteredPasswordsDirty = true;
-    private bool _filteredPasswordRowsDirty = true;
-    private int _passwordProjectionNotificationDeferralDepth;
-    private bool _filteredPasswordsNotificationPending;
-    private bool _filteredPasswordRowsNotificationPending;
-    private bool _passwordSelectionReconciliationPending;
     private int _selectedPasswordCount;
     private bool _suppressPasswordSelectionStateNotifications;
-    private bool _isSyncingSelectedPasswordListRow;
-    private bool _isApplyingPasswordSearchImmediately;
     private CancellationTokenSource? _passwordSearchDebounceCts;
     private CancellationTokenSource? _selectedPasswordDetailsCts;
     private int _selectedPasswordDetailsVersion;
-    private readonly HashSet<string> _collapsedPasswordFolderKeys = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> _expandedPasswordStackKeys = new(StringComparer.OrdinalIgnoreCase);
-
-    [ObservableProperty]
-    private string _passwordSearchText = "";
-
-    [ObservableProperty]
-    private string _passwordSearchQuery = "";
 
     [ObservableProperty]
     private string _newFolderName = "";
-
-    [ObservableProperty]
-    private PasswordFolderFilterChoice? _selectedPasswordFolderFilter;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PasswordSortButtonTip))]
@@ -86,13 +54,7 @@ public sealed partial class MainWindowViewModel
     public ObservableCollection<PasswordEntry> Passwords { get; } = new ObservableRangeCollection<PasswordEntry>();
     public ObservableCollection<Category> Categories { get; } = new ObservableRangeCollection<Category>();
     public ObservableCollection<SettingsChoice> PasswordSortOptions { get; } = [];
-    public ObservableCollection<PasswordFolderFilterChoice> PasswordFolderFilters { get; } =
-        new ObservableRangeCollection<PasswordFolderFilterChoice>();
-    public IEnumerable<PasswordFolderFilterChoice> SystemPasswordFolderFilters =>
-        PasswordFolderFilters.Where(item => item.IsSystemNode);
-    public IEnumerable<PasswordFolderFilterChoice> RegularPasswordFolderFilters =>
-        PasswordFolderFilters.Where(item => !item.IsSystemNode);
-    public bool HasRegularPasswordFolderFilters => PasswordFolderFilters.Any(item => !item.IsSystemNode);
+
     [ObservableProperty]
     private bool _compactPasswordList;
 
@@ -126,9 +88,6 @@ public sealed partial class MainWindowViewModel
     [NotifyPropertyChangedFor(nameof(HasCurrentSelectedPasswordDetails))]
     [NotifyPropertyChangedFor(nameof(HasSelectedPasswordLoadingState))]
     private PasswordEntry? _selectedPassword;
-
-    [ObservableProperty]
-    private PasswordListRow? _selectedPasswordListRow;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelectedPasswordDetails))]

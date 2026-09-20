@@ -70,7 +70,6 @@ public sealed partial class MainWindowViewModel
         SetPasswordAttachmentOwnerState(entry.Id, hasAttachments: true);
         AddPasswordAttachmentSearchMatch(entry.Id, attachment);
         RefreshPasswordAttachmentState(entry);
-        RaiseFilteredPasswordsChanged();
         await LogOperationAsync(new OperationLog
         {
             ItemType = "PASSWORD",

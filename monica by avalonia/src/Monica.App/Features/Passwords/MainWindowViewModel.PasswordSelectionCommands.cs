@@ -12,26 +12,6 @@ namespace Monica.App.ViewModels;
 public sealed partial class MainWindowViewModel
 {
     [RelayCommand]
-    private void TogglePasswordStackRow(PasswordListRow? row)
-    {
-        if (row is null || !row.IsStackHeader)
-        {
-            return;
-        }
-
-        if (row.IsExpanded)
-        {
-            _expandedPasswordStackKeys.Remove(row.Key);
-        }
-        else
-        {
-            _expandedPasswordStackKeys.Add(row.Key);
-        }
-
-        RaiseFilteredPasswordRowsChanged();
-    }
-
-    [RelayCommand]
     private void TogglePasswordSelection(PasswordEntry? entry)
     {
         if (entry is null)
@@ -40,30 +20,6 @@ public sealed partial class MainWindowViewModel
         }
 
         entry.IsSelected = !entry.IsSelected;
-    }
-
-    [RelayCommand]
-    private void TogglePasswordRowSelection(PasswordListRow? row)
-    {
-        if (row is null)
-        {
-            return;
-        }
-
-        if (row.IsStackHeader)
-        {
-            var nextValue = !row.IsGroupSelected;
-            UpdatePasswordSelectionsInBatch(() =>
-            {
-                foreach (var member in row.Members)
-                {
-                    member.IsSelected = nextValue;
-                }
-            });
-            return;
-        }
-
-        row.Entry.IsSelected = !row.Entry.IsSelected;
     }
 
     [RelayCommand]
@@ -80,18 +36,9 @@ public sealed partial class MainWindowViewModel
     }
 
     [RelayCommand]
-    private void ClearPasswordSearch()
-    {
-        SetPasswordSearchImmediately("");
-    }
-
-    [RelayCommand]
     private void ClearVaultFilters()
     {
-        // Eight writes, one tree rebuild: unscoped, a reset costs as many full rebuilds as there
-        // are dimensions to clear, which measured ~250ms of frozen UI thread on a 5,000-entry vault.
         using var scope = SuppressVaultTreeRefresh();
-        SetPasswordSearchImmediately("");
         VaultSearchText = "";
         VaultFavoritesOnly = false;
         QuickFilter2Fa = false;
@@ -101,29 +48,7 @@ public sealed partial class MainWindowViewModel
         QuickFilterUncategorized = false;
         QuickFilterLocalOnly = false;
         QuickFilterAttachments = false;
-        SelectedPasswordFolderFilter = PasswordFolderFilters.FirstOrDefault(item =>
-            string.Equals(item.SelectionKey, "system:all", StringComparison.OrdinalIgnoreCase)) ??
-            PasswordFolderFilters.FirstOrDefault();
-        RefreshPasswordFilters();
         StatusMessage = _localization.Get("ClearedPasswordFilters");
-    }
-
-    private void SetPasswordSearchImmediately(string value)
-    {
-        CancelPasswordSearchDebounce();
-        PublishPasswordSearchMatches(value, [], []);
-        _isApplyingPasswordSearchImmediately = true;
-        try
-        {
-            PasswordSearchText = value;
-            PasswordSearchQuery = value;
-        }
-        finally
-        {
-            _isApplyingPasswordSearchImmediately = false;
-        }
-
-        RefreshPasswordFilters();
     }
 
     [RelayCommand]
@@ -222,18 +147,6 @@ public sealed partial class MainWindowViewModel
                 ReferenceEquals(_passwordSearchDebounceCts, cts))
             {
                 PublishPasswordSearchMatches(query, customFieldMatches, attachmentMatches);
-                if (string.Equals(PasswordSearchQuery, query, StringComparison.Ordinal))
-                {
-                    RefreshPasswordFilters();
-                }
-                else
-                {
-                    PasswordSearchQuery = query;
-                }
-
-                // The library tree already narrowed on the in-memory fields; this rebuild is the part
-                // that turns a custom-field or attachment hit into a row. Detached, it is a no-op and
-                // the next attach rebuilds with these ids anyway.
                 RaiseVaultTreeState();
             }
         });
@@ -250,15 +163,6 @@ public sealed partial class MainWindowViewModel
         _passwordAttachmentSearchMatches = attachmentMatches.ToHashSet();
     }
 
-    private void ReconcilePasswordSearchQuery(string query)
-    {
-        if (!string.Equals(query, _passwordCustomFieldSearchQuery, StringComparison.Ordinal) ||
-            !string.Equals(query, _passwordAttachmentSearchQuery, StringComparison.Ordinal))
-        {
-            PublishPasswordSearchMatches(query, [], []);
-        }
-    }
-
     private void CancelPasswordSearchDebounce()
     {
         var cts = _passwordSearchDebounceCts;
@@ -270,5 +174,4 @@ public sealed partial class MainWindowViewModel
         _passwordSearchDebounceCts = null;
         cts.Cancel();
     }
-
 }

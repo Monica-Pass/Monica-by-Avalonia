@@ -30,7 +30,6 @@ public sealed partial class MainWindowViewModel
             DeviceName = Environment.MachineName
         });
         InvalidateSecurityAnalysis();
-        RaiseFilteredPasswordsChanged();
     }
 
     [RelayCommand]
@@ -141,7 +140,6 @@ public sealed partial class MainWindowViewModel
         RefreshBoundTotpPresentation(siblings);
         RaisePasswordCountState();
         RefreshPasswordSelectionStateFromPasswords();
-        RaiseFilteredPasswordsChanged();
         InvalidateSecurityAnalysis();
         if (updateStatus)
         {
@@ -190,7 +188,6 @@ public sealed partial class MainWindowViewModel
         RefreshBoundTotpPresentation(siblings);
         RaisePasswordCountState();
         RefreshPasswordSelectionStateFromPasswords();
-        RaiseFilteredPasswordsChanged();
         InvalidateSecurityAnalysis();
         if (updateStatus)
         {
