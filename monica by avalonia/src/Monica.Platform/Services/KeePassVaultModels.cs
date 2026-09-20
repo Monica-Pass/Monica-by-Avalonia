@@ -17,7 +17,8 @@ public sealed record KeePassGroupRow(
     string Name,
     string Path,
     string Uuid,
-    string? ParentUuid);
+    string? ParentUuid,
+    bool HasEntries = false);
 
 public sealed record KeePassEntryRow(
     string EntryUuid,

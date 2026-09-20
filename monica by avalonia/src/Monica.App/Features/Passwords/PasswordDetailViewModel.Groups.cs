@@ -15,7 +15,8 @@ public sealed partial class PasswordDetailViewModel
         Category? category,
         SecureItem? boundNote,
         IReadOnlyList<Attachment> attachments,
-        IReadOnlyList<CustomField> customFields)
+        IReadOnlyList<CustomField> customFields,
+        bool assumePlaintext = false)
     {
         var groups = new List<PasswordDetailGroup>();
 
@@ -29,7 +30,7 @@ public sealed partial class PasswordDetailViewModel
         var passwordFields = new List<PasswordDetailField>();
         for (var index = 0; index < siblings.Count; index++)
         {
-            var password = TryUnprotectPassword(siblings[index].Password, cryptoService);
+            var password = TryUnprotectPassword(siblings[index].Password, cryptoService, assumePlaintext);
             var label = siblings.Count == 1
                 ? localization.Get("Password")
                 : $"{localization.Get("Password")} {index + 1}";

@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using Monica.App.Features.ImportExport;
 using Monica.Core.Models;
 using Monica.Platform.Services;
 
@@ -16,6 +17,10 @@ public sealed partial class MainWindowViewModel
     private KeePassVaultSession? _keePassVaultSession;
     private CancellationTokenSource? _keePassOperationCancellation;
     private int _keePassOperationActive;
+    private readonly HashSet<string> _keePassOpenFolders = new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyList<KeePassTreeRow> _keePassTreeRows = [];
+    private KeePassTreeRow? _selectedKeePassTreeRow;
+    private PasswordDetailViewModel? _keePassEntryDetails;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasKeePassSelectedFile))]
@@ -37,6 +42,15 @@ public sealed partial class MainWindowViewModel
 
     [ObservableProperty]
     private bool _isKeePassImportProgressIndeterminate = true;
+
+    [ObservableProperty]
+    private IReadOnlyList<KeePassTreeRow> _keePassTreeRowsPublic = [];
+
+    [ObservableProperty]
+    private KeePassTreeRow? _selectedKeePassTreeRowPublic;
+
+    [ObservableProperty]
+    private PasswordDetailViewModel? _keePassEntryDetailsPublic;
 
     public bool HasKeePassSelectedFile => !string.IsNullOrWhiteSpace(KeePassSelectedFileName);
     public bool HasKeePassImportPreview => _keePassVaultSession is not null;
@@ -105,8 +119,17 @@ public sealed partial class MainWindowViewModel
     {
         _keePassVaultSession?.Dispose();
         _keePassVaultSession = null;
+        _keePassEntryDetails?.Dispose();
+        _keePassEntryDetails = null;
+        KeePassEntryDetailsPublic = null;
+        _keePassOpenFolders.Clear();
+        _keePassTreeRows = [];
+        KeePassTreeRowsPublic = [];
+        _selectedKeePassTreeRow = null;
+        SelectedKeePassTreeRowPublic = null;
         OnPropertyChanged(nameof(HasKeePassImportPreview));
         OnPropertyChanged(nameof(KeePassPreviewSummaryText));
+        OnPropertyChanged(nameof(HasKeePassImportPreview));
     }
 
     private static string CreateKeePassSourceKey(long databaseId, string entryUuid) =>

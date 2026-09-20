@@ -31,7 +31,10 @@ internal static class PasswordSecretResolver
     private const string ProtectedPrefix = "vault:v1:";
     private const int AesGcmEnvelopeSize = 28;
 
-    public static PasswordSecretReadResult Read(string storedValue, ICryptoService cryptoService)
+    public static PasswordSecretReadResult Read(
+        string storedValue,
+        ICryptoService cryptoService,
+        bool assumePlaintext = false)
     {
         if (string.IsNullOrEmpty(storedValue))
         {
@@ -47,6 +50,17 @@ internal static class PasswordSecretResolver
                 PasswordSecretState.Locked,
                 "",
                 PasswordSecretOrigin.None);
+        }
+
+        // A caller that already knows the value is plaintext (e.g. a KeePass session that
+        // holds the decrypted graph in memory) opts out of the heuristic, because a generated
+        // password that happens to be pure base64 would otherwise be misclassified as encrypted.
+        if (assumePlaintext)
+        {
+            return new PasswordSecretReadResult(
+                PasswordSecretState.Available,
+                storedValue,
+                PasswordSecretOrigin.Plaintext);
         }
 
         if (!LooksLikeEncryptedPayload(storedValue))

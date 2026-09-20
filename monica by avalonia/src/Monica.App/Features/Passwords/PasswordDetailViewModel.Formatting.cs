@@ -44,9 +44,10 @@ public sealed partial class PasswordDetailViewModel
 
     private static (string DisplayValue, string CopyValue, bool CanCopy) TryUnprotectPassword(
         string storedPassword,
-        ICryptoService cryptoService)
+        ICryptoService cryptoService,
+        bool assumePlaintext = false)
     {
-        var result = PasswordSecretResolver.Read(storedPassword, cryptoService);
+        var result = PasswordSecretResolver.Read(storedPassword, cryptoService, assumePlaintext);
         if (result.State == PasswordSecretState.Empty)
         {
             return ("", "", false);

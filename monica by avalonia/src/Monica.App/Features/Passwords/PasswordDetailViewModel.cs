@@ -32,7 +32,8 @@ public sealed partial class PasswordDetailViewModel : ObservableObject, IDisposa
         Func<Attachment, Task<PasswordAttachmentSaveResult>>? saveAttachment = null,
         Func<Attachment, Task<bool>>? deleteAttachment = null,
         Func<PasswordHistoryEntry, Task<bool>>? deletePasswordHistory = null,
-        Func<long, Task<bool>>? clearPasswordHistory = null)
+        Func<long, Task<bool>>? clearPasswordHistory = null,
+        bool secretsAlreadyPlaintext = false)
     {
         L = localization;
         _clipboardService = clipboardService;
@@ -59,7 +60,8 @@ public sealed partial class PasswordDetailViewModel : ObservableObject, IDisposa
             category,
             boundNote,
             attachments,
-            customFields))
+            customFields,
+            secretsAlreadyPlaintext))
         {
             Groups.Add(group);
         }

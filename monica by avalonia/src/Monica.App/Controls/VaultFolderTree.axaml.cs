@@ -82,6 +82,17 @@ public partial class VaultFolderTree : UserControl
     public static readonly StyledProperty<bool> CanManageSelectedProperty =
         AvaloniaProperty.Register<VaultFolderTree, bool>(nameof(CanManageSelected));
 
+    // False for a tree the user can read but not write: an opened file the app cannot save back yet.
+    // Hiding the edit items entirely beats showing a menu full of disabled commands.
+    public static readonly StyledProperty<bool> CanManageRowsProperty =
+        AvaloniaProperty.Register<VaultFolderTree, bool>(nameof(CanManageRows), true);
+
+    public static readonly StyledProperty<bool> ShowsFolderCommandsProperty =
+        AvaloniaProperty.Register<VaultFolderTree, bool>(nameof(ShowsFolderCommands));
+
+    public static readonly StyledProperty<bool> ShowsEntryCommandsProperty =
+        AvaloniaProperty.Register<VaultFolderTree, bool>(nameof(ShowsEntryCommands));
+
     // The context menu is built per row, but its items live in one menu, so the menu group is chosen
     // from the row the pointer last pressed rather than from the item's own data context.
     public static readonly StyledProperty<bool> IsEntrySelectionProperty =
@@ -115,6 +126,7 @@ public partial class VaultFolderTree : UserControl
             InputElement.PointerCaptureLostEvent,
             OnTreePointerCaptureLost,
             RoutingStrategies.Tunnel);
+        RefreshRowCommandVisibility();
     }
 
     public IEnumerable? ItemsSource
@@ -225,6 +237,24 @@ public partial class VaultFolderTree : UserControl
         set => SetValue(CanManageSelectedProperty, value);
     }
 
+    public bool CanManageRows
+    {
+        get => GetValue(CanManageRowsProperty);
+        set => SetValue(CanManageRowsProperty, value);
+    }
+
+    public bool ShowsFolderCommands
+    {
+        get => GetValue(ShowsFolderCommandsProperty);
+        set => SetValue(ShowsFolderCommandsProperty, value);
+    }
+
+    public bool ShowsEntryCommands
+    {
+        get => GetValue(ShowsEntryCommandsProperty);
+        set => SetValue(ShowsEntryCommandsProperty, value);
+    }
+
     public string? FolderName
     {
         get => GetValue(FolderNameProperty);
@@ -252,6 +282,16 @@ public partial class VaultFolderTree : UserControl
             var selected = change.GetNewValue<object?>();
             IsEntrySelection = selected is IFolderTreeRow row && row.IsEntryLeaf();
         }
+        else if (change.Property == IsEntrySelectionProperty || change.Property == CanManageRowsProperty)
+        {
+            RefreshRowCommandVisibility();
+        }
+    }
+
+    private void RefreshRowCommandVisibility()
+    {
+        ShowsFolderCommands = CanManageRows && !IsEntrySelection;
+        ShowsEntryCommands = CanManageRows && IsEntrySelection;
     }
 
     public bool IsTreeFocused => FolderTreeList.IsFocused;
@@ -414,7 +454,7 @@ public partial class VaultFolderTree : UserControl
 
     private void OnTreeKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key == Key.F2 && CanManageSelected && !IsEntrySelection)
+        if (e.Key == Key.F2 && CanManageSelected && CanManageRows && !IsEntrySelection)
         {
             BeginRename();
             e.Handled = true;

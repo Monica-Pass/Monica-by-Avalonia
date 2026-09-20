@@ -13,6 +13,7 @@ public sealed class KeePassVaultSession : IDisposable
     private PwDatabase? _database;
     private PwGroup? _root;
     private readonly List<KeePassGroupRow> _groups = [];
+    private readonly Dictionary<string, PwGroup> _groupsByUuid = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _gate = new(1, 1);
     private bool _disposed;
 
@@ -26,6 +27,12 @@ public sealed class KeePassVaultSession : IDisposable
         DatabaseName = string.IsNullOrWhiteSpace(database.Name)
             ? Path.GetFileNameWithoutExtension(fileName)
             : database.Name.Trim();
+        RootGroupRow = new KeePassGroupRow(
+            KeePassVaultText.NormalizeDisplayText(_root.Name, Path.GetFileNameWithoutExtension(fileName)),
+            "",
+            RootGroupUuid,
+            null,
+            _root.Entries.Any());
         Index(_root, cancellationToken);
     }
 
@@ -36,6 +43,12 @@ public sealed class KeePassVaultSession : IDisposable
     public string SourceFileName { get; }
 
     public string RootGroupUuid { get; }
+
+    /// <summary>
+    /// The root folder as a row. <see cref="Groups"/> leaves it out because it is not a group inside
+    /// the database, but a browser has to show it and to know what an expander would reveal.
+    /// </summary>
+    public KeePassGroupRow RootGroupRow { get; private set; }
 
     public IReadOnlyList<KeePassGroupRow> Groups => _groups;
 
@@ -67,6 +80,65 @@ public sealed class KeePassVaultSession : IDisposable
         }
     }
 
+    /// <summary>
+    /// Lists one folder's entries without resolving a secret, so selecting a folder costs that
+    /// folder rather than the whole file.
+    /// </summary>
+    public async Task<IReadOnlyList<KeePassEntryRow>> ReadGroupRowsAsync(
+        string? groupUuid,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        var root = _root ?? throw new ObjectDisposedException(nameof(KeePassVaultSession));
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var group = ResolveGroup(root, groupUuid);
+            if (group is null)
+            {
+                return [];
+            }
+
+            var path = KeePassVaultText.GroupPathOf(group, root);
+            return group.Entries.Select(entry => CreateRow(entry, path)).ToArray();
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Resolves the secrets, custom fields and attachment bytes of one entry, or null once the
+    /// entry is gone from the model.
+    /// </summary>
+    public async Task<KeePassEntryDetail?> ReadDetailAsync(
+        string groupUuid,
+        string entryUuid,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        var root = _root ?? throw new ObjectDisposedException(nameof(KeePassVaultSession));
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var group = ResolveGroup(root, groupUuid);
+            if (group is null)
+            {
+                return null;
+            }
+
+            var path = KeePassVaultText.GroupPathOf(group, root);
+            var entry = group.Entries.FirstOrDefault(
+                item => string.Equals(item.Uuid.ToHexString(), entryUuid, StringComparison.OrdinalIgnoreCase));
+            return entry is null ? null : CreateDetail(entry, path);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -79,6 +151,7 @@ public sealed class KeePassVaultSession : IDisposable
         _database = null;
         _root = null;
         _groups.Clear();
+        _groupsByUuid.Clear();
         EntryCount = 0;
         if (database is { IsOpen: true })
         {
@@ -124,6 +197,7 @@ public sealed class KeePassVaultSession : IDisposable
     private void IndexGroup(PwGroup root, PwGroup group, string path, IndexState state, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        _groupsByUuid[group.Uuid.ToHexString()] = group;
         if (!ReferenceEquals(group, root))
         {
             if (_groups.Count >= KeePassVaultLimits.MaximumGroupCount)
@@ -135,7 +209,8 @@ public sealed class KeePassVaultSession : IDisposable
                 KeePassVaultText.NormalizeDisplayText(group.Name, "Untitled group"),
                 path,
                 group.Uuid.ToHexString(),
-                group.ParentGroup?.Uuid.ToHexString()));
+                group.ParentGroup?.Uuid.ToHexString(),
+                group.Entries.Any()));
         }
 
         foreach (var entry in group.Entries)
@@ -169,19 +244,7 @@ public sealed class KeePassVaultSession : IDisposable
 
     private static KeePassEntryDetail CreateDetail(PwEntry entry, string groupPath)
     {
-        var attachmentRows = entry.Binaries
-            .Select(binary => new KeePassAttachmentRow(binary.Key, binary.Key, binary.Value.Length))
-            .ToArray();
-        var row = new KeePassEntryRow(
-            entry.Uuid.ToHexString(),
-            entry.ParentGroup?.Uuid.ToHexString() ?? "",
-            groupPath,
-            entry.Strings.ReadSafe(PwDefs.TitleField),
-            entry.Strings.ReadSafe(PwDefs.UserNameField),
-            entry.Strings.ReadSafe(PwDefs.UrlField),
-            KeePassVaultText.ToDateTimeOffset(entry.CreationTime),
-            KeePassVaultText.ToDateTimeOffset(entry.LastModificationTime),
-            attachmentRows);
+        var row = CreateRow(entry, groupPath);
         var customFields = entry.Strings
             .Where(item => KeePassVaultText.IsCustomField(item.Key))
             .Select(item => new KeePassCustomField(item.Key, item.Value.ReadString(), item.Value.IsProtected))
@@ -199,6 +262,34 @@ public sealed class KeePassVaultSession : IDisposable
             KeePassVaultText.ReadTotp(entry),
             customFields,
             attachments);
+    }
+
+    private static KeePassEntryRow CreateRow(PwEntry entry, string groupPath)
+    {
+        var attachmentRows = entry.Binaries
+            .Select(binary => new KeePassAttachmentRow(binary.Key, binary.Key, binary.Value.Length))
+            .ToArray();
+        return new KeePassEntryRow(
+            entry.Uuid.ToHexString(),
+            entry.ParentGroup?.Uuid.ToHexString() ?? "",
+            groupPath,
+            entry.Strings.ReadSafe(PwDefs.TitleField),
+            entry.Strings.ReadSafe(PwDefs.UserNameField),
+            entry.Strings.ReadSafe(PwDefs.UrlField),
+            KeePassVaultText.ToDateTimeOffset(entry.CreationTime),
+            KeePassVaultText.ToDateTimeOffset(entry.LastModificationTime),
+            attachmentRows);
+    }
+
+    private PwGroup? ResolveGroup(PwGroup root, string? groupUuid)
+    {
+        var uuid = groupUuid?.Trim();
+        if (string.IsNullOrEmpty(uuid) || string.Equals(uuid, RootGroupUuid, StringComparison.OrdinalIgnoreCase))
+        {
+            return root;
+        }
+
+        return _groupsByUuid.GetValueOrDefault(uuid);
     }
 
     private void ThrowIfDisposed()

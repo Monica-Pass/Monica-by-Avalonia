@@ -370,6 +370,7 @@ public interface ILocalizationService : INotifyPropertyChanged
     string ClearClipboardDescription { get; }
     string ClearClipboardAfter { get; }
     string ClearClipboardAfterDescription { get; }
+    string CopiedToClipboard { get; }
     string RequirePasswordBeforeExport { get; }
     string RequirePasswordBeforeExportDescription { get; }
     string ChangeMasterPassword { get; }
@@ -449,6 +450,7 @@ public interface ILocalizationService : INotifyPropertyChanged
     string KeePassInspect { get; }
     string KeePassImportNow { get; }
     string KeePassChooseDifferentFile { get; }
+    string KeePassCloseFile { get; }
     string SelectKeePassFile { get; }
     string BitwardenImportTitle { get; }
     string BitwardenImportDescription { get; }
@@ -877,6 +879,7 @@ public sealed class LocalizationService : ILocalizationService
     public string ClearClipboardDescription => Text();
     public string ClearClipboardAfter => Text();
     public string ClearClipboardAfterDescription => Text();
+    public string CopiedToClipboard => Text();
     public string RequirePasswordBeforeExport => Text();
     public string RequirePasswordBeforeExportDescription => Text();
     public string ChangeMasterPassword => Text();
@@ -956,6 +959,7 @@ public sealed class LocalizationService : ILocalizationService
     public string KeePassInspect => Text();
     public string KeePassImportNow => Text();
     public string KeePassChooseDifferentFile => Text();
+    public string KeePassCloseFile => Text();
     public string SelectKeePassFile => Text();
     public string BitwardenImportTitle => Text();
     public string BitwardenImportDescription => Text();
@@ -1717,6 +1721,7 @@ public sealed class LocalizationService : ILocalizationService
         ["ClearClipboardDescription"] = "Remove copied passwords and TOTP codes after a timeout.",
         ["ClearClipboardAfter"] = "Clear after",
         ["ClearClipboardAfterDescription"] = "Set how long copied sensitive values remain on the clipboard.",
+        ["CopiedToClipboard"] = "Copied to clipboard",
         ["RequirePasswordBeforeExport"] = "Require master password before export",
         ["RequirePasswordBeforeExportDescription"] = "Ask for the master password before preparing export data.",
         ["ChangeMasterPassword"] = "Change master password",
@@ -1974,6 +1979,7 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassInspect"] = "Inspect",
         ["KeePassImportNow"] = "Import reviewed entries",
         ["KeePassChooseDifferentFile"] = "Choose a different file",
+        ["KeePassCloseFile"] = "Close file",
         ["SelectBitwardenJsonFile"] = "Select a Bitwarden JSON export",
         ["BitwardenFileSelectedFormat"] = "Selected Bitwarden export: {0}",
         ["BitwardenFileSelectionFailed"] = "The Bitwarden export could not be selected.",
@@ -2954,6 +2960,7 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassInspect"] = "检查",
         ["KeePassImportNow"] = "导入已检查条目",
         ["KeePassChooseDifferentFile"] = "选择其他文件",
+        ["KeePassCloseFile"] = "关闭文件",
         ["SelectBitwardenJsonFile"] = "选择 Bitwarden JSON 导出文件",
         ["BitwardenFileSelectedFormat"] = "已选择 Bitwarden 导出文件：{0}",
         ["BitwardenFileSelectionFailed"] = "无法选择 Bitwarden 导出文件。",
@@ -3126,6 +3133,7 @@ public sealed class LocalizationService : ILocalizationService
         ["ClearClipboardDescription"] = "复制密码或动态口令后，按超时时间清空剪贴板。",
         ["ClearClipboardAfter"] = "清空时间",
         ["ClearClipboardAfterDescription"] = "设置敏感内容在剪贴板中保留多久。",
+        ["CopiedToClipboard"] = "已复制到剪贴板",
         ["RequirePasswordBeforeExport"] = "导出前要求主密码",
         ["RequirePasswordBeforeExportDescription"] = "准备导出数据前再次验证主密码。",
         ["ChangeMasterPassword"] = "修改主密码",
