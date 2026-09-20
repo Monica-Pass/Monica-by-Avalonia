@@ -15,11 +15,11 @@ public partial class VaultWorkspaceView
     internal NoteEditorView? NoteSurface =>
         _surfaces.TryGetValue(VaultSurface.Note, out var surface) ? surface as NoteEditorView : null;
 
-    internal bool IsSearchFocused => VaultSearchBox.IsFocused;
+    internal bool IsSearchFocused => VaultSearchField?.InnerSearchBox?.IsFocused ?? false;
 
     internal bool IsTreeFocused => VaultTree.IsTreeFocused;
 
-    internal void FocusSearch() => VaultSearchBox.Focus();
+    internal void FocusSearch() => VaultSearchField?.InnerSearchBox?.Focus();
 
     internal void HandleSelectedNoteTabChanged()
     {
@@ -36,7 +36,7 @@ public partial class VaultWorkspaceView
     {
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.F)
         {
-            VaultSearchBox.Focus();
+            VaultSearchField?.InnerSearchBox?.Focus();
             e.Handled = true;
             return true;
         }
@@ -311,5 +311,5 @@ public partial class VaultWorkspaceView
     }
 
     private bool IsTypingOutsideSearch(object? source) =>
-        source is TextBox box && !ReferenceEquals(box, VaultSearchBox);
+        source is TextBox box && !ReferenceEquals(box, VaultSearchField?.InnerSearchBox);
 }

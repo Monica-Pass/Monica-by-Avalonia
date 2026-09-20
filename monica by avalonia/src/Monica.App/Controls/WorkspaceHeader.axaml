@@ -1,0 +1,27 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Monica.App.Controls.WorkspaceHeader"
+             x:Name="Root">
+
+    <Border x:Name="RootBorder">
+        <Grid x:Name="RootGrid" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+            <!-- Title section -->
+            <TextBlock Grid.Column="0"
+                       Classes="workspacePageTitle"
+                       Text="{Binding #Root.Title}"
+                       VerticalAlignment="Center" />
+
+            <!-- Optional filter chips section -->
+            <ContentPresenter Grid.Column="1"
+                              Content="{Binding #Root.FilterContent}"
+                              IsVisible="{Binding #Root.HasFilterContent}"
+                              HorizontalAlignment="Left" />
+
+            <!-- Actions/search section -->
+            <ContentPresenter Grid.Column="2"
+                              Content="{Binding #Root.ActionContent}"
+                              IsVisible="{Binding #Root.HasActionContent}"
+                              HorizontalAlignment="Right" />
+        </Grid>
+    </Border>
+</UserControl>

@@ -1,0 +1,26 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             x:Class="Monica.App.Controls.SearchField"
+             x:Name="Root">
+
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+        <TextBox x:Name="SearchBox"
+                 Text="{Binding #Root.Text, Mode=TwoWay}"
+                 PlaceholderText="{Binding #Root.PlaceholderText}"
+                 MinHeight="{DynamicResource ControlHeight}"
+                 VerticalContentAlignment="Center"
+                 AutomationProperties.Name="{Binding #Root.AutomationName}"
+                 AutomationProperties.HelpText="{Binding #Root.AutomationHelpText}" />
+        <Button Grid.Column="1"
+                x:Name="ClearButton"
+                Classes="workspaceCommand"
+                IsVisible="{Binding #Root.HasText}"
+                Command="{Binding #Root.ClearCommand}"
+                ToolTip.Tip="{Binding #Root.ClearTooltip}"
+                AutomationProperties.Name="{Binding #Root.ClearAutomationName}"
+                VerticalAlignment="Center">
+            <ic:FluentIcon Icon="Dismiss" FontSize="14" />
+        </Button>
+    </Grid>
+</UserControl>
