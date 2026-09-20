@@ -50,6 +50,11 @@ class Program
                 return InitEmptySmokeVaultAsync(args).GetAwaiter().GetResult();
             }
 
+            if (args.Length > 0 && string.Equals(args[0], "--seed-smoke-keepass-vault", StringComparison.Ordinal))
+            {
+                return SeedSmokeKeePassVault(args);
+            }
+
             if (args.Length > 0 && string.Equals(args[0], "--benchmark-vault", StringComparison.Ordinal))
             {
                 return RunVaultBenchmarkAsync(args).GetAwaiter().GetResult();
@@ -489,6 +494,32 @@ class Program
             }
 
             Console.WriteLine($"Empty smoke vault initialized: {databasePath}");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex);
+            return 1;
+        }
+    }
+
+    private static int SeedSmokeKeePassVault(string[] args)
+    {
+        try
+        {
+            if (args.Length is < 3 or > 5)
+            {
+                Console.Error.WriteLine(
+                    "Usage: Monica.App --seed-smoke-keepass-vault <filePath> <password> [entries] [groups]");
+                return 2;
+            }
+
+            var entries = args.Length >= 4 && int.TryParse(args[3], out var parsedEntries) ? parsedEntries : 20_000;
+            var groups = args.Length == 5 && int.TryParse(args[4], out var parsedGroups) ? parsedGroups : 20;
+            var info = KeePassSmokeVaultWriter.Write(args[1], args[2], entries, groups);
+            Console.WriteLine(
+                $"Smoke KeePass vault seeded: {args[1]} entries={info.Entries} groups={info.Groups} " +
+                $"fileBytes={info.FileBytes} writeMs={info.WriteMs}");
             return 0;
         }
         catch (Exception ex)

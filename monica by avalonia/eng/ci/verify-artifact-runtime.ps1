@@ -13,6 +13,13 @@ param(
     # Background budget agreed for the locked/minimized process, in private bytes.
     [int] $MaxLockedMemoryMb = 120,
 
+    # Size of the .kdbx the artifact writes for itself, and the private bytes it may still be
+    # holding after the session is disposed. Measured growth is ~5 MB at 20,000 entries; a
+    # retained decrypted graph would show tens of MB, so this catches the regression it is for.
+    [int] $KeePassProbeEntries = 20000,
+    [int] $KeePassProbeGroups = 20,
+    [int] $MaxKeePassGrowthMb = 24,
+
     [int] $UiTimeoutSeconds = 180
 )
 
@@ -177,6 +184,18 @@ try {
             throw 'ui-seed-smoke-vault did not report success.'
         }
 
+        # The memory answer has to come from inside the shipped process, so the artifact writes the
+        # database it will open rather than carrying a fixture nobody can re-derive or resize.
+        $keepassDirectory = Join-Path $runRoot 'keepass'
+        New-Item -ItemType Directory -Force -Path $keepassDirectory | Out-Null
+        $keepassPath = Join-Path $keepassDirectory 'probe.kdbx'
+        $keepassSeed = Invoke-ArtifactCommand -Label 'ui-seed-smoke-keepass-vault' -Arguments @(
+            '--seed-smoke-keepass-vault', $keepassPath, 'keepass-smoke-fixture-not-a-secret',
+            "$KeePassProbeEntries", "$KeePassProbeGroups")
+        if ($keepassSeed -notmatch 'Smoke KeePass vault seeded') {
+            throw 'ui-seed-smoke-keepass-vault did not report success.'
+        }
+
         $null = Invoke-ArtifactCommand -Label 'smoke-ui' -TimeoutSeconds $UiTimeoutSeconds -AppLogPath $uiLog -Arguments @(
             '--smoke-ui-unlock', $MasterPassword,
             '--smoke-ui-width', '1280',
@@ -187,6 +206,10 @@ try {
             '--smoke-ui-keyboard-checks',
             '--smoke-ui-max-vault-load-ms', '4000',
             '--smoke-ui-max-memory-mb', "$MaxLockedMemoryMb",
+            '--smoke-ui-keepass-file', $keepassPath,
+            '--smoke-ui-keepass-password', 'keepass-smoke-fixture-not-a-secret',
+            '--smoke-ui-keepass-stream-details',
+            '--smoke-ui-keepass-max-growth-mb', "$MaxKeePassGrowthMb",
             '--smoke-ui-lock-after-checks',
             '--smoke-ui-exit-after-checks'
         )
@@ -196,7 +219,7 @@ try {
         }
 
         $gateLines = @(Get-Content -LiteralPath $uiLog | Select-String -SimpleMatch `
-            'release gate completed', 'budget result', 'check failed', 'lock cycle result')
+            'release gate completed', 'budget result', 'check failed', 'lock cycle result', 'KeePass probe')
         foreach ($line in $gateLines) { Write-Host ($line.Line -replace '^\[[^\]]+\]\s*', '') }
         $gateLine = $gateLines | Where-Object { $_.Line -match 'release gate completed' } | Select-Object -Last 1
         if ($null -eq $gateLine) {
@@ -205,6 +228,17 @@ try {
 
         if ($gateLine.Line -notmatch 'success=True') {
             throw "smoke-ui release gate reported failure: $($gateLine.Line)"
+        }
+
+        # A probe that silently stopped running would leave the gate green, so its own line is
+        # required and reported with the UI smoke verdict.
+        $keepassLine = @($gateLines | Where-Object { $_.Line -match 'KeePass probe result' }) | Select-Object -Last 1
+        if ($null -eq $keepassLine) {
+            throw "smoke-ui produced no KeePass probe line for $keepassPath."
+        }
+
+        if ($keepassLine.Line -notmatch 'success=True') {
+            throw "KeePass memory probe reported failure: $($keepassLine.Line)"
         }
 
         Write-Host ("UI SMOKE passed. rid={0} mode={1} lockedBudgetMB={2}" -f $RuntimeIdentifier, $Mode, $MaxLockedMemoryMb)

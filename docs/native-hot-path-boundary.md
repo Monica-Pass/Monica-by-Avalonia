@@ -83,29 +83,38 @@ releasing it makes the whole decrypted graph collectable, which
 of this page claimed `KeePassLib` kept ~2.45 KB per entry permanently (49 MB at 20,000
 entries); that was a harness artifact and is wrong.
 
-Whether the process gives the memory back is now measured on the shipped artifact rather than
-in a harness. `--smoke-ui-keepass-file` (with `--smoke-ui-keepass-password`,
-`--smoke-ui-keepass-stream-details` and the optional `--smoke-ui-keepass-max-growth-mb` gate)
-runs `KeePassVaultService.OpenAsync` inside the locked app and reports private bytes at every
-stage. Both ends of the growth measurement are compacted first: an earlier draft sampled a
-baseline that still held other smoke phases' uncollected garbage and reported a flattering
-−27 MB. win-x64 jit, unlocked state:
+Whether the process gives the memory back is measured on the shipped artifact and enforced there.
+The artifact writes its own fixture (`--seed-smoke-keepass-vault <path> <password> [entries]
+[groups]`, 3.2 MB at 20,000 entries over 20 groups, protected password, `otp` and custom field per
+entry and a 2 KiB attachment on every 64th), and `--smoke-ui-keepass-file` (with
+`-password`, `-stream-details` and the `-max-growth-mb` budget) opens it through
+`KeePassVaultService` inside the locked app, streams every detail, disposes and reports private
+bytes at each stage. `verify-artifact-runtime.ps1` runs that with `--smoke-ui-keepass-max-growth-mb
+24`, and requires the probe's own result line, so a probe that stopped running cannot leave the
+gate green. Both ends of the growth measurement are compacted: a first draft sampled a baseline
+that still held other smoke phases' uncollected garbage and reported a flattering −27 MB.
 
-| entries | open ms | stream ms | before | open | streamed | after collect | growth |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 2,000 | 539 | 54 | 75.2 MB | 85.1 | 93.5 | 74.4 | −0.8 MB |
-| 20,000 | 2,297 | 371 | 76.2 MB | 148.4 | 150.1 | 81.6 | +5.4 MB |
+win-x64 jit, whole UI smoke sequence in front of the probe, private / working set / managed heap:
 
-Nothing is retained. At 20,000 entries the app costs ~72 MB of private bytes while the file is
-open (working set 167.7 → 244.3 MB, peak 251.4 MB, managed heap 24.1 → 81.3 MB) and `Dispose()`
-is what returns it: the managed heap is back at 26.3 MB and the working set at 180.4 MB, so the
-residual ~5 MB is heap the runtime kept, not a pinned decrypted graph. Streaming all 20,000
-details costs only +1.7 MB over open, which is the one-entry-at-a-time resolution holding in the
-real app. After the probe the same run still passes the 120 MB locked budget (82.6 MB). The
-console harness's "+52 MB and the root group still reachable" is confirmed as its own artifact:
-top-level statements keep locals alive to the end of `Main`, and the identical pattern there
-refused to release a plain 40 MB array. The honest cost of opening a 20,000-entry `.kdbx` is a
-temporary ~150 MB private / ~250 MB working set.
+| stage | private | working set | managed heap |
+| --- | --- | --- | --- |
+| before | 105.4 MB | 203.4 | 30.4 |
+| open (2,454 ms) | 181.2 | 285.9 | 97.2 |
+| 20,000 details streamed (583 ms) | 183.0 | 288.9 | 106.7 |
+| disposed and compacted | 107.3 | 213.5 | 31.6 |
+
+Growth is +1.9 MB on that profile and the run passes the 120 MB locked budget afterwards (111.3
+MB). The gate itself has recorded +3.6 and +4.3 MB across runs, so 24 MB is a ceiling that is
+real but well clear of noise. Nothing is retained — the managed heap coming back from 106.7 MB
+to 31.6 MB is the decrypted graph being collected, and `Dispose()` is what triggers it, not the
+GC. Streaming all 20,000 details adds 1.7 MB of private bytes over open, so the
+one-entry-at-a-time resolution holds in the app. The honest cost of opening a database that size
+is a peak working set of 295 MB, which is a footprint a background-resident app has to be
+measured against but not one it keeps. The console harness's "+52 MB and the root group still
+reachable" is confirmed as its own artifact: top-level statements keep locals alive to the end
+of `Main`, and the identical pattern there refused to release a plain 40 MB array. The gate
+fixture uses KeePassLib's default AES-KDF round count, so it says nothing about Argon2 KDF
+memory, which is a separate open cost.
 
 Two `KeePassLib` constraints found while making this green, both of which bind the write-back
 slice:
