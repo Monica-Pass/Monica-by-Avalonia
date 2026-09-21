@@ -15,6 +15,12 @@ public partial class WorkspaceHeader : UserControl
     public static readonly StyledProperty<object?> ActionContentProperty =
         AvaloniaProperty.Register<WorkspaceHeader, object?>(nameof(ActionContent));
 
+    public static readonly DirectProperty<WorkspaceHeader, bool> HasFilterContentProperty =
+        AvaloniaProperty.RegisterDirect<WorkspaceHeader, bool>(nameof(HasFilterContent), o => o.HasFilterContent);
+
+    public static readonly DirectProperty<WorkspaceHeader, bool> HasActionContentProperty =
+        AvaloniaProperty.RegisterDirect<WorkspaceHeader, bool>(nameof(HasActionContent), o => o.HasActionContent);
+
     public static readonly StyledProperty<string> ColumnDefinitionsProperty =
         AvaloniaProperty.Register<WorkspaceHeader, string>(nameof(ColumnDefinitions), "Auto,*,Auto");
 
@@ -72,11 +78,38 @@ public partial class WorkspaceHeader : UserControl
         }
     }
 
-    public bool HasFilterContent => FilterContent is not null;
+    private bool _hasFilterContent;
+    private bool _hasActionContent;
 
-    public bool HasActionContent => ActionContent is not null;
+    public bool HasFilterContent
+    {
+        get => _hasFilterContent;
+        private set => SetAndRaise(HasFilterContentProperty, ref _hasFilterContent, value);
+    }
+
+    public bool HasActionContent
+    {
+        get => _hasActionContent;
+        private set => SetAndRaise(HasActionContentProperty, ref _hasActionContent, value);
+    }
 
     private Border? _rootBorder;
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        // The presenters gate IsVisible on Has*Content, which Avalonia can only observe because they
+        // are registered DirectProperties. Re-evaluate them whenever the slot content flips so a
+        // presenter that collapsed before its content arrived is re-measured and adopts the content.
+        if (change.Property == FilterContentProperty)
+        {
+            HasFilterContent = FilterContent is not null;
+        }
+        else if (change.Property == ActionContentProperty)
+        {
+            HasActionContent = ActionContent is not null;
+        }
+    }
 
     protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
     {

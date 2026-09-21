@@ -303,6 +303,10 @@ public sealed partial class MainWindowViewModel
         }
         else
         {
+            // The queued metadata pass belongs to a page that is no longer on screen; releasing it here
+            // stops a search the user cannot see from spending a repository scan behind another page's
+            // back. EnsureVaultMetadataSearch re-arms it as the page comes back, so nothing is lost.
+            CancelPasswordSearchDebounce();
             ReleaseVaultTree();
         }
     }

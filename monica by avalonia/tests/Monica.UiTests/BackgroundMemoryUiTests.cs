@@ -178,13 +178,13 @@ public sealed class BackgroundMemoryUiTests
             Assert.Equal(["p:1", "p:2"], VaultEntryKeys(viewModel));
 
             viewModel.VaultSearchText = "Target";
-            await PumpUntilAsync(
-                () => VaultEntryKeys(viewModel).SequenceEqual(["p:1"]),
-                "the library tree narrowed on the text",
-                cancellationToken);
 
-            // The tree answered from the rows it already holds; the repository pass waits behind its
-            // own debounce, so a search never blocks on MDBX I/O to show what it can already show.
+            // The tree narrows on the rows it already holds. Flushing the in-memory coalesce lands that
+            // answer deterministically rather than racing its 60 ms timer against the 250 ms repository
+            // pass, which is the whole point: a search shows what it can without waiting on MDBX I/O, so
+            // the repository must still be untouched at this moment.
+            viewModel.FlushVaultTreeRefresh();
+            Assert.Equal(["p:1"], VaultEntryKeys(viewModel));
             Assert.Equal(0, probe.MetadataSearchCalls);
 
             window.WindowState = WindowState.Minimized;
