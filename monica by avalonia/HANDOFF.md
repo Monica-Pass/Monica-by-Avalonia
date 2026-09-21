@@ -86,16 +86,16 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
 - 应用打开后停在**解锁页**，需要用户输入主密码才能进入。
 - **主密码不可恢复**：`settings.json` 不存明文，只存派生哈希。我无法"给出密码"。若用户忘记密码，只能清空该测试库另建新库（破坏性，动手前先问）。
 - **安全红线**：解锁后**不要截屏已解密的保险库界面**，不要把条目明文写进任何输出/日志。演示 UI 时保持锁定态或空态。
-- 注：`%LOCALAPPDATA%\Monica by Avalonia\mdbx\` 下堆积了上百个 `onedrive-*.local-conflict-*.mdbx` 冲突副本，是冲突恢复路径 `BuildConflictRecoveryPath` 反复触发的产物，值得排查（见 §7 建议）。
+- 注：历史运行可能已在 `%LOCALAPPDATA%\Monica by Avalonia\mdbx\` 下留下 `onedrive-*.local-conflict-*.mdbx` 冲突副本；冲突恢复路径现已复用同一工作副本的既有备份，后续重试不会继续无限增长。
 
 ## 7. 剩余阻塞项 / 可推进方向（朝"商业级"）
 
 - **Task #43 AOT 产物无法解锁**：Layer 1 已修（private row DTO→internal）。Layer 2 是硬骨头——全库 87 个 Dapper 调用点大多传匿名对象，Dapper.AOT 需要具名类型；`IsAotCompatible` 下 Data/Core/Platform 分别有 IL2026 报警。**AOT 非内存手段**（框架空窗 115MB 在 jit+R2R 下实测，AOT 省不掉 Skia/原生库部分）。CI 目前对 aot `continue-on-error`，**jit 是硬门**。这是多日重构，勿轻启。
 - **Task #55 linux/macOS 原生 MDBX 引擎二进制**：外部依赖，本机无 Linux 工具链（见用户环境记忆），拿不到就卡住。
-- **建议先做的低风险项**（比啃 AOT 更快靠近"可用"）：
-  1. 排查 §6 提到的 OneDrive 冲突副本无限堆积——像是一个真 bug。
-  2. 把 §2 的 use-case 改动提交（build/test 复绿后）。
-  3. 逐屏走查 UI 完成度与空态/错误态，用锁定态截图，别解密。
+- 已完成的低风险项：
+  1. §6 的 OneDrive/WebDAV 冲突副本堆积已修复：重复重试“使用远端”会复用同一 `.local-conflict-*` 备份，不再每次生成 GUID 文件。
+  2. §2 的 use-case 改动已提交（`24d92b0`），冲突备份修复已提交（`957c5af`）。
+- 后续可推进：逐屏走查 UI 完成度与空态/错误态，用锁定态截图，别解密；或继续评估 AOT / Linux-macOS 原生 MDBX 两个高风险阻塞项。
 
 ## 8. 用户协作偏好（务必遵守）
 
