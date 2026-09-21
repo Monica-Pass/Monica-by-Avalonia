@@ -82,7 +82,6 @@ public sealed partial class MainWindowViewModel
         _vaultSessionService.MarkLocked();
         _cryptoService.Lock();
         IsUnlocked = false;
-        ClearSensitiveSessionState();
         await settingsSaveCompletion;
         await ClearSettingsSensitiveCacheAsync();
         await ClearOwnedClipboardAsync();
@@ -104,7 +103,7 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        CancelSensitiveBackgroundWork();
+        ClearSensitiveSessionState();
         CancelBitwardenOperationAndClearSecrets();
         SetShellHibernatedByLock(true);
         _vaultSessionService.MarkLocked();

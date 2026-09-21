@@ -436,7 +436,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             LastVaultLoadDurationMilliseconds = loadStopwatch.ElapsedMilliseconds;
             AppDiagnostics.Error($"Vault load failed after {loadStopwatch.ElapsedMilliseconds} ms", ex);
             IsUnlocked = false;
-            ClearSensitiveSessionState();
             VaultLoadStageText = _localization.Get("VaultLoadFailed");
             StatusMessage = _localization.Get("VaultLoadFailed");
         }
