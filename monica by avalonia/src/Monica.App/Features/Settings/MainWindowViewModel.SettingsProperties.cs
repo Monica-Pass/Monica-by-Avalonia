@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Monica.App.Services;
+using Monica.App.Services.VaultOperations;
 using Monica.Core.Services;
 using Monica.Data.Services;
 
@@ -13,6 +14,19 @@ public sealed partial class MainWindowViewModel
     private readonly IMasterPasswordMaintenanceService _masterPasswordMaintenanceService;
     private readonly IAppSettingsService _settingsService;
     private readonly SecurityQuestionService _securityQuestionService = new();
+
+    private ChangeMasterPasswordUseCase? _changeMasterPasswordUseCase;
+    private ResetMasterPasswordUseCase? _resetMasterPasswordUseCase;
+    private SaveSecurityQuestionsUseCase? _saveSecurityQuestionsUseCase;
+
+    private ChangeMasterPasswordUseCase GetChangeMasterPasswordUseCase() =>
+        _changeMasterPasswordUseCase ??= new ChangeMasterPasswordUseCase(_masterPasswordMaintenanceService);
+
+    private ResetMasterPasswordUseCase GetResetMasterPasswordUseCase() =>
+        _resetMasterPasswordUseCase ??= new ResetMasterPasswordUseCase(_securityQuestionService, _masterPasswordMaintenanceService);
+
+    private SaveSecurityQuestionsUseCase GetSaveSecurityQuestionsUseCase() =>
+        _saveSecurityQuestionsUseCase ??= new SaveSecurityQuestionsUseCase(_securityQuestionService);
     private bool _isApplyingSettings;
     private readonly object _settingsSaveSync = new();
     private bool _isSavingSettings;

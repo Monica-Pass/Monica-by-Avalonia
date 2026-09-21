@@ -15,22 +15,19 @@ public sealed partial class MainWindowViewModel
         StatusMessage = _localization.Get("ResetMasterPasswordInProgress");
         try
         {
-            var answersValid = await Task.Run(() =>
-                _securityQuestionService.VerifyAnswer(answer1, recovery.Question1AnswerHash, recovery.Question1AnswerSalt) &&
-                _securityQuestionService.VerifyAnswer(answer2, recovery.Question2AnswerHash, recovery.Question2AnswerSalt));
-            if (!answersValid)
-            {
-                StatusMessage = _localization.Get("SecurityQuestionAnswersIncorrect");
-                return;
-            }
-
-            var result = await _masterPasswordMaintenanceService.ResetMasterPasswordFromUnlockedVaultAsync(newPassword);
+            var result = await GetResetMasterPasswordUseCase().ExecuteAsync(recovery, answer1, answer2, newPassword);
             if (!result.Success)
             {
+                if (result.IsAnswersIncorrect)
+                {
+                    StatusMessage = _localization.Get("SecurityQuestionAnswersIncorrect");
+                    return;
+                }
+
                 ReportSettingsFailure(
                     "Master password reset reported a failure",
                     "ResetMasterPasswordFailed",
-                    result.Message);
+                    result.FailureMessage ?? "no detail");
                 return;
             }
 
@@ -65,7 +62,7 @@ public sealed partial class MainWindowViewModel
         if (!TryBeginSecurityMaintenance(() => IsSavingSecurityQuestions = true)) return;
         try
         {
-            var setup = await Task.Run(() => _securityQuestionService.CreateSetup(question1, question2));
+            var setup = await GetSaveSecurityQuestionsUseCase().ExecuteAsync(question1, question2);
             _settingsService.Current.SecurityRecovery = setup;
             ApplySecurityRecoverySettings(setup);
             QueueSaveSettings();

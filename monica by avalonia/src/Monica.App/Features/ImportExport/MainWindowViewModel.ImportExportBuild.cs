@@ -7,10 +7,20 @@ namespace Monica.App.ViewModels;
 public sealed partial class MainWindowViewModel
 {
     private MonicaJsonExportUseCase? _monicaJsonExportUseCase;
+    private MonicaJsonImportUseCase? _monicaJsonImportUseCase;
 
     private MonicaJsonExportUseCase GetMonicaJsonExportUseCase()
     {
         return _monicaJsonExportUseCase ??= new MonicaJsonExportUseCase(_repository, _importExportService);
+    }
+
+    private MonicaJsonImportUseCase GetMonicaJsonImportUseCase()
+    {
+        return _monicaJsonImportUseCase ??= new MonicaJsonImportUseCase(
+            _repository,
+            _importExportService,
+            _passwordAttachmentFileService,
+            _cryptoService);
     }
 
     private async Task<string> BuildMonicaJsonExportAsync(
@@ -44,10 +54,31 @@ public sealed partial class MainWindowViewModel
             ? categories.Select(ImportExportHelpers.CloneCategory).ToArray()
             : Array.Empty<Category>();
 
+        var decryptedHistoryByPasswordId = includePasswords && exportPasswords.Length > 0
+            ? await BuildDecryptedPasswordHistoryAsync(exportPasswords)
+            : null;
+
         return await GetMonicaJsonExportUseCase().ExecuteAsync(
             exportPasswords,
             exportSecureItems,
-            exportCategories);
+            exportCategories,
+            precomputedPasswordHistory: decryptedHistoryByPasswordId);
+    }
+
+    private async Task<IReadOnlyDictionary<long, IReadOnlyList<PasswordHistoryEntry>>> BuildDecryptedPasswordHistoryAsync(
+        IReadOnlyList<PasswordEntry> exportPasswords)
+    {
+        var result = new Dictionary<long, IReadOnlyList<PasswordHistoryEntry>>();
+        foreach (var password in exportPasswords.Where(p => p.Id > 0))
+        {
+            var history = await _repository.GetPasswordHistoryAsync(password.Id);
+            if (history.Count > 0)
+            {
+                result[password.Id] = history.Select(ClonePasswordHistoryForExport).ToArray();
+            }
+        }
+
+        return result;
     }
 
     private async Task<string> BuildNoteCsvExportAsync()

@@ -21,17 +21,21 @@ public sealed class MonicaJsonExportUseCase
         PasswordEntry[] exportPasswords,
         SecureItem[] exportSecureItems,
         Category[] exportCategories,
+        IReadOnlyDictionary<long, IReadOnlyList<CustomField>>? precomputedCustomFields = null,
+        IReadOnlyDictionary<long, IReadOnlyList<PasswordHistoryEntry>>? precomputedPasswordHistory = null,
         CancellationToken cancellationToken = default)
     {
         var passwordIds = exportPasswords.Select(item => item.Id).ToArray();
 
-        var customFieldsByPasswordId = exportPasswords.Length > 0
-            ? await _repository.GetCustomFieldsByEntryIdsAsync(passwordIds)
-            : new Dictionary<long, IReadOnlyList<CustomField>>();
+        var customFieldsByPasswordId = precomputedCustomFields
+            ?? (exportPasswords.Length > 0
+                ? await _repository.GetCustomFieldsByEntryIdsAsync(passwordIds)
+                : new Dictionary<long, IReadOnlyList<CustomField>>());
 
-        var passwordHistoryByPasswordId = exportPasswords.Length > 0
-            ? await GetPasswordHistoryForExportAsync(passwordIds)
-            : new Dictionary<long, IReadOnlyList<PasswordHistoryEntry>>();
+        var passwordHistoryByPasswordId = precomputedPasswordHistory
+            ?? (exportPasswords.Length > 0
+                ? await GetPasswordHistoryForExportAsync(passwordIds)
+                : new Dictionary<long, IReadOnlyList<PasswordHistoryEntry>>());
 
         var passwordAttachmentsByPasswordId = exportPasswords.Length > 0
             ? await GetPasswordAttachmentsForExportAsync(passwordIds)

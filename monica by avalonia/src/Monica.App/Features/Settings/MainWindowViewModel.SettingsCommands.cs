@@ -136,12 +136,10 @@ public sealed partial class MainWindowViewModel
         StatusMessage = _localization.Get("ChangeMasterPasswordInProgress");
         try
         {
-            var result = await _masterPasswordMaintenanceService.ChangeMasterPasswordAsync(
-                currentPassword,
-                newPassword);
+            var result = await GetChangeMasterPasswordUseCase().ExecuteAsync(currentPassword, newPassword);
             if (!result.Success)
             {
-                if (result.FailureReason == MasterPasswordMaintenanceFailureReason.CurrentPasswordIncorrect)
+                if (result.IsCurrentPasswordIncorrect)
                 {
                     StatusMessage = _localization.Get("WrongMasterPassword");
                     return;
@@ -150,7 +148,7 @@ public sealed partial class MainWindowViewModel
                 ReportSettingsFailure(
                     "Master password update reported a failure",
                     "ChangeMasterPasswordFailed",
-                    result.Message);
+                    result.FailureMessage ?? "no detail");
                 return;
             }
 

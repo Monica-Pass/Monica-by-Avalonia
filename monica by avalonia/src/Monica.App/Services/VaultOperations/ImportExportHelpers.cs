@@ -249,6 +249,36 @@ public static class ImportExportHelpers
         };
     }
 
+    public static CustomField CloneCustomFieldForImport(CustomField source, long importedPasswordId)
+    {
+        return new CustomField
+        {
+            Id = 0,
+            EntryId = importedPasswordId,
+            Title = source.Title,
+            Value = source.Value,
+            IsProtected = source.IsProtected,
+            SortOrder = source.SortOrder
+        };
+    }
+
+    public static Attachment CloneAttachmentForImport(Attachment source, long importedPasswordId)
+    {
+        return new Attachment
+        {
+            Id = 0,
+            OwnerType = "PASSWORD",
+            OwnerId = importedPasswordId,
+            FileName = source.FileName,
+            ContentType = source.ContentType,
+            StoragePath = "",
+            SizeBytes = source.SizeBytes,
+            CreatedAt = source.CreatedAt == default ? DateTimeOffset.UtcNow : source.CreatedAt,
+            BitwardenVaultId = source.BitwardenVaultId,
+            KeepassBinaryRef = source.KeepassBinaryRef
+        };
+    }
+
     public static PasswordEntry ClonePasswordForExport(PasswordEntry source, bool includeCategory = true)
     {
         var clone = source.CreateDetachedCopy();
