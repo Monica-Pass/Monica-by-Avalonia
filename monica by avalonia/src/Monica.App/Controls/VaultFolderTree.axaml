@@ -46,14 +46,6 @@
         <Style Selector="Button.folderTreeReset.on">
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
         </Style>
-        <!-- A row is 28px tall, so the check mark carries none of the default control padding. -->
-        <Style Selector="CheckBox.treeRowCheck">
-            <Setter Property="MinHeight" Value="0" />
-            <Setter Property="MinWidth" Value="0" />
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="Margin" Value="0" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
     </UserControl.Styles>
 
     <Grid RowDefinitions="Auto,Auto,*" RowSpacing="6">
@@ -191,13 +183,8 @@
                               ColumnSpacing="6"
                               Margin="{Binding Indent}"
                               VerticalAlignment="Center">
-                            <!-- The check mark is the bulk-selection state the host already keeps on the
-                                 entry, so tree and list pages can never disagree about what is selected.
-                                 It takes the chevron's column: a leaf has no expander to make room for. -->
-                            <CheckBox Classes="treeRowCheck"
-                                      IsChecked="{Binding IsSelected}"
-                                      IsVisible="{Binding IsBatchable}"
-                                      AutomationProperties.Name="{Binding Label}" />
+                            <!-- Column 0 stays reserved for the expander so folder and leaf rows keep
+                                 the same indent; a leaf simply leaves it blank. -->
                             <Button Classes="workspaceCommand"
                                     Width="20"
                                     Height="20"

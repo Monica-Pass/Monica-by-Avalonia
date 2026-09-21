@@ -207,7 +207,7 @@ public sealed class VaultFolderTreeUiTests
     }
 
     [Fact]
-    public void Entry_rows_carry_only_the_copy_actions_and_the_check_mark_they_can_answer_to()
+    public void Entry_rows_carry_only_the_copy_actions_and_no_per_row_check_mark()
     {
         var copied = new List<IVaultTreeRow>();
         var credential = new FakeEntryRow("p:1", "Checking")
@@ -237,14 +237,10 @@ public sealed class VaultFolderTreeUiTests
             var credentialItem = RowContainer(list, credential);
             var folderItem = RowContainer(list, folder);
 
-            // A row with no bulk command behind it keeps its check mark out of the layout instead of
-            // showing a box that would check nothing.
-            var credentialCheck = Assert.Single(credentialItem.GetVisualDescendants().OfType<CheckBox>());
-            Assert.True(credentialCheck.IsVisible);
-            Assert.False(Assert.Single(folderItem.GetVisualDescendants().OfType<CheckBox>()).IsVisible);
-
-            credentialCheck.IsChecked = true;
-            Assert.True(credential.IsSelected);
+            // Rows no longer carry a per-row check mark; bulk selection is driven from the batch
+            // flyout (select-all/clear), so neither a leaf nor a folder renders a CheckBox.
+            Assert.Empty(credentialItem.GetVisualDescendants().OfType<CheckBox>());
+            Assert.Empty(folderItem.GetVisualDescendants().OfType<CheckBox>());
 
             window.MouseDown(CenterOf(window, credentialItem), MouseButton.Right);
             window.MouseUp(CenterOf(window, credentialItem), MouseButton.Right);

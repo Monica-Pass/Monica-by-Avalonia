@@ -50,6 +50,14 @@ internal sealed class LibraryUiHarness : IDisposable
 
     public void Settle() => Dispatcher.UIThread.RunJobs();
 
+    /// The search box lives inside the shared SearchField control, so it is no longer a direct named
+    /// element of the workspace; reach it through the control's own inner text box.
+    public static TextBox SearchBoxIn(VaultWorkspaceView workspace) =>
+        workspace.FindControl<SearchField>("VaultSearchField")!.InnerSearchBox!;
+
+    public static Button ClearButtonIn(VaultWorkspaceView workspace) =>
+        workspace.FindControl<SearchField>("VaultSearchField")!.InnerClearButton!;
+
     /// A search rebuild is coalesced behind a timer, so a test that wants the tree rather than the
     /// filter has to let real time pass before it drains the dispatcher.
     public async Task AwaitTreeRefresh()

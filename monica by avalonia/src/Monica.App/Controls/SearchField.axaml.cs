@@ -36,6 +36,8 @@ public partial class SearchField : UserControl
 
     internal TextBox? InnerSearchBox => this.FindControl<TextBox>("SearchBox");
 
+    internal Button? InnerClearButton => this.FindControl<Button>("ClearButton");
+
     public SearchField()
     {
         InitializeComponent();

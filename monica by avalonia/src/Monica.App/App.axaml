@@ -1,10 +1,18 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sys="using:System"
              xmlns:styling="using:FluentAvalonia.Styling"
              x:Class="Monica.App.App"
              RequestedThemeVariant="Default">
     <Application.Resources>
         <ResourceDictionary>
+            <!-- FluentAvalonia reads these sizing knobs at runtime, so overriding them here slims
+                 every scrollbar in the app (nav rail, vault tree, lists) without retemplating it:
+                 a thin floating bar with no arrow buttons eating the corner. -->
+            <sys:Double x:Key="ScrollBarSize">10</sys:Double>
+            <sys:Double x:Key="ScrollBarArrowSize">0</sys:Double>
+            <sys:Double x:Key="ScrollBarThumbBoxSize">30</sys:Double>
+
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="/Styles/DesignTokens.axaml" />
             </ResourceDictionary.MergedDictionaries>

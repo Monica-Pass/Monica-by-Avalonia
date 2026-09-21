@@ -44,9 +44,9 @@ public sealed class PasswordWorkflowUiTests
         });
         library.Settle();
 
-        var searchBox = library.Workspace.FindControl<TextBox>("VaultSearchBox")!;
+        var searchBox = LibraryUiHarness.SearchBoxIn(library.Workspace);
         var status = library.Workspace.FindControl<TextBlock>("VaultFilteredStatusText")!;
-        var clear = library.Workspace.FindControl<Button>("VaultSearchClearButton")!;
+        var clear = LibraryUiHarness.ClearButtonIn(library.Workspace);
         var localization = library.Services.GetRequiredService<ILocalizationService>();
 
         Assert.True(searchBox.IsVisible);

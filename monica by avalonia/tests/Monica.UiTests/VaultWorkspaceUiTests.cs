@@ -127,7 +127,7 @@ public sealed class VaultWorkspaceUiTests
             Dispatcher.UIThread.RunJobs();
 
             var workspace = Assert.Single(window.GetVisualDescendants().OfType<VaultWorkspaceView>());
-            var searchBox = workspace.FindControl<TextBox>("VaultSearchBox")!;
+            var searchBox = LibraryUiHarness.SearchBoxIn(workspace);
             searchBox.Focus();
 
             Assert.True(TryLibraryKey(workspace, viewModel, searchBox, Key.Escape));
@@ -155,7 +155,7 @@ public sealed class VaultWorkspaceUiTests
     public void Library_ctrl_f_hands_the_caret_to_the_search_field()
     {
         using var library = LibraryUiHarness.Open();
-        var searchBox = library.Workspace.FindControl<TextBox>("VaultSearchBox")!;
+        var searchBox = LibraryUiHarness.SearchBoxIn(library.Workspace);
         var headerButton = library.Workspace.FindControl<Button>("VaultCreateMenuButton")!;
 
         headerButton.Focus();
@@ -232,7 +232,7 @@ public sealed class VaultWorkspaceUiTests
             Dispatcher.UIThread.RunJobs();
 
             var workspace = Assert.Single(window.GetVisualDescendants().OfType<VaultWorkspaceView>());
-            var searchBox = workspace.FindControl<TextBox>("VaultSearchBox")!;
+            var searchBox = LibraryUiHarness.SearchBoxIn(workspace);
 
             Assert.True(TryLibraryKey(workspace, viewModel, searchBox, Key.A, KeyModifiers.Control));
             // The note answers to no bulk command, so select-all cannot invent a check mark for it.
@@ -249,50 +249,6 @@ public sealed class VaultWorkspaceUiTests
             searchBox.Focus();
             Assert.False(TryLibraryKey(workspace, viewModel, searchBox, Key.A, KeyModifiers.Control));
             Assert.False(viewModel.HasVaultBatchSelection);
-        }
-        finally
-        {
-            window.Close();
-        }
-    }
-
-    // Select-all deliberately leaves the rows in place, so the ones already on screen have to be told
-    // to read the check mark again. Reading the container rather than the view-model is the point: a
-    // selection that only moves the header count looks exactly like this test failing.
-    [Fact]
-    public void Bulk_selection_repaints_the_check_marks_already_on_screen()
-    {
-        var window = new Monica.App.MainWindow();
-        using var services = Monica.App.App.ConfigureServices(window);
-        var viewModel = services.GetRequiredService<MainWindowViewModel>();
-        window.Show();
-        try
-        {
-            window.DataContext = viewModel;
-            viewModel.IsUnlocked = true;
-            viewModel.Passwords.Add(Entry(1, "Alpha", 200));
-            viewModel.Passwords.Add(Entry(2, "Bravo", 100));
-            viewModel.SelectSectionCommand.Execute("Vault");
-            Dispatcher.UIThread.RunJobs();
-
-            var workspace = Assert.Single(window.GetVisualDescendants().OfType<VaultWorkspaceView>());
-            var tree = Assert.Single(workspace.GetVisualDescendants().OfType<VaultFolderTree>());
-            var list = tree.FindControl<ListBox>("FolderTreeList")!;
-            var boxes = viewModel.VaultTreeRows.OfType<VaultTreeEntryRow>()
-                .Select(row => Assert.Single(
-                    RowContainer(list, row).GetVisualDescendants().OfType<CheckBox>()))
-                .ToArray();
-
-            Assert.Equal(2, boxes.Length);
-            Assert.All(boxes, box => Assert.False(box.IsChecked));
-
-            viewModel.SelectAllVaultRowsCommand.Execute(null);
-            Dispatcher.UIThread.RunJobs();
-            Assert.All(boxes, box => Assert.True(box.IsChecked == true));
-
-            viewModel.ClearVaultBatchSelectionCommand.Execute(null);
-            Dispatcher.UIThread.RunJobs();
-            Assert.All(boxes, box => Assert.False(box.IsChecked));
         }
         finally
         {
@@ -341,9 +297,6 @@ public sealed class VaultWorkspaceUiTests
             window.Close();
         }
     }
-
-    private static ListBoxItem RowContainer(ListBox list, IFolderTreeRow row) =>
-        (ListBoxItem)list.ContainerFromItem(row)!;
 
     [Fact]
     public void More_menu_sort_and_quick_filters_move_the_tree()
