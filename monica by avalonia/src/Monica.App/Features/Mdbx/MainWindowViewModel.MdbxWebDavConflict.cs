@@ -71,8 +71,7 @@ public sealed partial class MainWindowViewModel
         string? recoveryPath = null;
         if (File.Exists(workingCopyPath))
         {
-            recoveryPath = BuildConflictRecoveryPath(workingCopyPath);
-            File.Copy(workingCopyPath, recoveryPath, overwrite: false);
+            recoveryPath = GetOrCreateConflictRecoveryPath(workingCopyPath);
         }
 
         if (database.StorageLocation == MdbxStorageLocation.RemoteOneDrive)
@@ -117,5 +116,24 @@ public sealed partial class MainWindowViewModel
         return Path.Combine(
             directory,
             $"{name}.local-conflict-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}{extension}");
+    }
+
+    private static string GetOrCreateConflictRecoveryPath(string workingCopyPath)
+    {
+        var directory = Path.GetDirectoryName(workingCopyPath) ?? Environment.CurrentDirectory;
+        var name = Path.GetFileNameWithoutExtension(workingCopyPath);
+        var extension = Path.GetExtension(workingCopyPath);
+        var prefix = $"{name}.local-conflict-";
+        var existing = Directory.EnumerateFiles(directory, $"{prefix}*{extension}")
+            .OrderByDescending(File.GetLastWriteTimeUtc)
+            .FirstOrDefault();
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        var recoveryPath = BuildConflictRecoveryPath(workingCopyPath);
+        File.Copy(workingCopyPath, recoveryPath, overwrite: false);
+        return recoveryPath;
     }
 }
