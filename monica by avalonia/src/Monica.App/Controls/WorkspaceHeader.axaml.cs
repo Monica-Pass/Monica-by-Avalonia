@@ -116,12 +116,12 @@ public partial class WorkspaceHeader : UserControl
         base.OnApplyTemplate(e);
         _rootBorder = this.FindControl<Border>("RootBorder");
         var rootGrid = this.FindControl<Grid>("RootGrid");
-        
+
         if (_rootBorder is not null && !string.IsNullOrWhiteSpace(BorderClasses))
         {
             _rootBorder.Classes.Replace(BorderClasses.Split(' ', StringSplitOptions.RemoveEmptyEntries));
         }
-        
+
         if (rootGrid is not null)
         {
             rootGrid.ColumnDefinitions = Avalonia.Controls.ColumnDefinitions.Parse(ColumnDefinitions);
