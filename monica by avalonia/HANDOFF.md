@@ -16,7 +16,7 @@
 
 ## 2. 当前状态（工作树干净）
 
-分支 `main`，`git status` 无未提交改动。功能 HEAD = `ffdac87`（其后只可能有给本节自身标提交号的文档提交），近几轮：
+分支 `main`，`git status` 无未提交改动。功能 HEAD = `69a44e1`（其后只可能有给本节自身标提交号的文档提交），近几轮：
 
 | commit | 立住了什么 |
 |---|---|
@@ -28,6 +28,8 @@
 | `7acef4a` | 状态消息按语义分类：`StatusMessage` 取消 setter，原先散在 65 个文件的 229 处属性直写全部收进唯一漏斗 `MainWindowViewModel.StatusMessaging.cs`（`SetStatusMessage`/`SetStatusFailure`/`ClearStatusMessage`），顶部琥珀横幅改由**产生处声明的意图**决定，不再回读已翻译文案猜关键词 |
 | `b54a040` | 界面信息密度与命名瑕疵：先用一次性探针在真渲染树上量出重复（13 屏 × 可见文本 / 同命令按钮 / 左栏裸路径扫描），再逐条删 12 处——左栏 `%TEMP%\…` 绝对路径改 tooltip、SQLite 来源行"本地路径"栏里塞的其实是一句说明、四屏左栏标题逐字重印页面标题、Generator 结果卡重印头部策略摘要、Timeline / Mdbx / DatabaseManagement 三处"同一命令实例 + 同一标签"的第二个按钮、Settings 侧栏标题重印应用导航当前项、Mdbx 检查器重印左栏空态句（改用已存在的 `SelectItemToInspectHint`）、SecurityAnalysis 唯一"空查询仍显示禁用清除键"；新增 `WorkspaceDensityGuardUiTests` 四条守卫，植入三类假缺陷实测三条同时点名转红（守卫 1 上线即在 Settings 抓到真实重字）；门禁：单测 9+713、UI 17+183 全绿，重新 publish 后产物门 loadMs=525、锁定私有 119.3MB（预算 120，余量仅 0.7MB）、KeePass 20000 条增长 4.7MB |
 | `ffdac87` | ① 瞬态回执自己退场：180 处信息写入按 key 逐条判成三种寿命（122 notice／58 standing／52 failure），notice 落地 8 秒后清除、离开产生它的那一屏立即清除，判据是产生处的动作语义而不是文案关键词；计时器按仓库既有的自动锁定范式放在窗口侧（`MainWindow.StatusNotice.cs`），VM 只声明意图 + 可注入 `TimeProvider`，换屏路径不依赖计时器。新守卫 `StatusNoticeRetirementUiTests` 四条（假时钟、零 sleep），四类假缺陷 A/B/C/D 分别把 1、3／3／1、2／4 打红，撤销后 4/4 绿；真产物再加 `--smoke-ui-status-notice` 探针补上无头测不到的 `DispatcherTimer` tick，把驻留改成 60 秒后产物里 `retired=False`、门即红。② 顺带查清锁定态内存门为什么反复假红：同一二进制八次跑出 116.7–131.0，实测锁定后约 30 秒私有字节仍在从 ~123 衰减到 ~114（线程 37→31、托管堆一直 25–28MB），旧门取的是衰减途中的瞬时值；改为每 5 秒压缩后采样共 10 拍、按尾 5 拍中位数判定（阈值仍是 120，未放松），在压缩处根住 15MB 后中位数 133.4、门红，撤销后两次绿 113.9／115.1。门禁：格式 0 改动、Release 0 warning、单测 9+713、UI 17+187 全绿，重新 publish 后产物门 loadMs=597、KeePass 20000 条增长 3.9MB、锁定尾窗中位 113.9MB |
+
+| `69a44e1` | 切语言时把**屏幕上已经停着的那句**也重译（补 #78 留下的缺口）：状态漏斗改存 key + 参数、`StatusMessage` 读取时才解析，语言刷新处顺手重发状态通知。新增 3 条单测（失败句／带参句／已清空句）+ 1 条走 `SettingsLanguage` 真链路的渲染带测试；证伪：只把刷新调用注掉时单测仍全绿、UI 测试在 `"Enter a folder name."` 处转红，说明无头测不到的那一半确实由 UI 测试守着。门禁：格式 0 改动、Release 0 warning、单测 9+716、UI 17+188 全绿；重新 publish 后产物门 loadMs=186、KeePass 20000 条增长 3.4MB、锁定尾窗中位 110.6MB（尾区间 109.2–112.8） |
 
 §3 的 use-case 抽取改动已提交（`24d92b0`），OneDrive/WebDAV 冲突副本复用修复已提交（`957c5af`）。
 
@@ -79,6 +81,14 @@ dotnet test tests/Monica.Tests/Monica.Tests.csproj --no-restore # 约 8-9 分钟
   -AssemblyVersion 0.1.0.0 -FileVersion 0.1.0.0 -InformationalVersion 0.1.0-ci.0   # 六个版本参数都是 Mandatory
 # 产物落 artifacts/publish/win-x64/jit（脚本会先清空该目录，并顺带 release 构建 crates/monica-crypto）
 ./eng/ci/verify-artifact-runtime.ps1 -PublishDirectory <dir> -RuntimeIdentifier win-x64 -Mode jit
+
+# .ps1 必须显式交给 powershell：在 Git Bash 里直接 `./x.ps1` 会被 bash 当 shell 脚本解释，
+# 报 `syntax error near unexpected token 'newline'` 而退出码仍为 0（假绿，实测踩过）。
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File eng/ci/verify-artifact-runtime.ps1 ...
+
+# 只跑一条 UI 测试：UI 套是 xUnit v3，用简单过滤器 `-method`（不是 `dotnet test --filter`）。
+# 查询式 `-filter "/fullyQualifiedName~X"` 会静默匹配 0 条并打印 Total: 0，别当成通过。
+dotnet tests/Monica.UiTests/bin/Release/net10.0/Monica.UiTests.dll -method "*NameFragment*"
 ```
 
 实测数字（本轮 #78 后）：单测 9 perf + 713 functional、UI 17 perf + 179 functional；重新 publish 后
@@ -230,6 +240,43 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
     master-detail 折叠属过度设计，本轮不做。
   - `CanonicalVault` 两表各删一条：来源行不再往"远端地址"栏塞句子后它就没有引用者了，
     key 覆盖守卫仍绿（两表各 1381 条）。
+
+- **走查第 2 项的续集已修（#82）：切语言会把屏幕上已停着的那句一起重译**。#78 当时明写"故意没做"，
+  这轮补上。形状：状态漏斗不再存已翻译句子，改存 `key + args`，`StatusMessage` 在**读取时**才解析；
+  语言刷新（`RefreshLocalizedProperties`，由 `LocalizationService.SetLanguage` 的
+  `PropertyChanged` 驱动）顺手调用 `RaiseStatusMessageState()`。三种寿命、琥珀横幅判定、退场计时器
+  都不受影响——判定用的还是意图，不是文案。
+  - 覆盖：单测 3 条（失败句重译且 tone 不丢／带参句重译后参数仍是写入时的值／清空后重译不得把裸
+    key 印回屏），UI 1 条走 `SettingsLanguage` 真链路并读**渲染带里的文本**，不走 `viewModel.L.SetLanguage`
+    近路，所以设置回调→本地化通知→VM 刷新三段接线都在断言路径里。
+  - 证伪（守卫必须真的会红）：改动前两条重译单测红在 `"Enter a folder name."`、渲染带测试红在同一句；
+    实现后全绿。再单独把 `RaiseStatusMessageState()` 一行注掉：**三条单测仍全绿、只有渲染带测试转红**
+    （Expected 请输入文件夹名称。/ Actual "Enter a folder name."），这正是无头 VM 测试看不到绑定刷新的
+    证据，也是这条 UI 测试存在的理由。
+- **用户点名的必须功能（2026-09-22 拍板，下一轮从这两条开始，别再回头挑小瑕疵）**：
+  1. **最小化到托盘：链路早就完整，但默认是关的**。实测现状：`AvaloniaTrayService`（`TrayIcon` +
+     `NativeMenu`，菜单 显示／锁定／退出，图标取 `avares://Monica.App/Assets/AppIcon.ico`）；最小化→
+     `Hide()` 在 `MainWindow.DesktopIntegrations.cs:45-53`，关窗拦截在 `MainWindow.NoteLifecycle.cs:28-41`，
+     真窗口路径已有测试 `DesktopIntegrationUiTests.cs:65-90`。**但 `AppSettingsService.cs:24` 的
+     `MinimizeToTray` 默认 `false`，`DesktopIntegrationCoordinator.cs:87` 是
+     `SetVisible(_viewModel?.MinimizeToTray == true)`——所以默认安装下托盘图标根本不出现**，用户看到的
+     就是"最小化没反应/找不到 Monica"。决定：**改为默认开启**。待解决：老用户已存盘 `false` 的迁移写法
+     （别把真实偏好当成默认值覆盖掉），以及仍缺的双击唤起、气泡通知、`App.axaml` 里的 `<TrayIcons>` 声明
+     （现在是运行期手动挂）。**未验证项（必须补）**：真实 Windows 会话里图标是否真的出现在通知区、
+     菜单文案是否双语正确——无头测试换的是 `ITrayService` 假实现，证明不了这一条。
+  2. **自动填充：桌面端目前零实现，选定"热键把凭据输入到当前前台应用"**。实测：全仓无
+     `SendInput`/`AutoType`/`keybd_event`。地基已在跑：`WindowsGlobalHotkeyService`
+     （`RegisterHotKey` + 独立消息泵线程）、`Ctrl+Shift+Space` 唤起快速搜索、`SecureClipboardService`
+     （带归属校验的自动清理）。安卓真源只做参考不反向：它靠系统 Autofill 框架（inline + 需解锁的
+     delayed dataset）+ 无障碍服务的"临时写剪贴板→粘贴→500ms 后还原"，**没有 overlay、没有
+     dispatchGesture**；Windows 侧对应物就是 SendInput 级别的一次性注入。另一半已存在但本轮不做：
+     `WindowsBrowserBridgeService` 是回环 TCP 上的 HTTP（`/v1/session/check`、`/v1/credentials/query`，
+     默认端口 49152，扩展 Origin 校验 + Bearer 会话令牌），**缺的是扩展本体**（安卓 README 说
+     Monica for Browser 已归档、新扩展重写中）。
+     - 说清风险再动手：注入式自动输入要"记住前一个前台窗口→隐藏自己→注入→还原剪贴板"，它会和
+       `WindowCaptureProtection`／隐私屏（`Deactivated` 触发）、自动锁定计时、剪贴板自动清理三条既有
+       安全路径交叉，顺序错了就会出现"输进 Monica 自己的窗口"或"密码留在剪贴板"。无头测能覆盖的只有
+       编排层（把注入收进接口后面），**真机注入必须实测一次并把观察结果写回这里**，不许用接口测试冒充。
 
 ## 8. 用户协作偏好（务必遵守）
 
