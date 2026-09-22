@@ -16,7 +16,7 @@
 
 ## 2. 当前状态（工作树干净）
 
-分支 `main`，`git status` 无未提交改动。功能 HEAD = `f700bcc`（其后只可能有给本节自身标提交号的文档提交），近几轮：
+分支 `main`，`git status` 无未提交改动。功能 HEAD = `1d8c3a4`（其后只可能有给本节自身标提交号的文档提交），近几轮：
 
 | commit | 立住了什么 |
 |---|---|
@@ -31,6 +31,7 @@
 
 | `69a44e1` | 切语言时把**屏幕上已经停着的那句**也重译（补 #78 留下的缺口）：状态漏斗改存 key + 参数、`StatusMessage` 读取时才解析，语言刷新处顺手重发状态通知。新增 3 条单测（失败句／带参句／已清空句）+ 1 条走 `SettingsLanguage` 真链路的渲染带测试；证伪：只把刷新调用注掉时单测仍全绿、UI 测试在 `"Enter a folder name."` 处转红，说明无头测不到的那一半确实由 UI 测试守着。门禁：格式 0 改动、Release 0 warning、单测 9+716、UI 17+188 全绿；重新 publish 后产物门 loadMs=186、KeePass 20000 条增长 3.4MB、锁定尾窗中位 110.6MB（尾区间 109.2–112.8） |
 | `f700bcc` | 最小化到托盘改为**出厂即开**：`MinimizeToTray` 默认 `true` + `SettingsSchemaVersion` 升到 2，老配置文件里那个"当年没人问过就写下去的 false"只被升级一次，之后用户主动关掉的能守住。UI 测试改成走 `InitializeAsync()` 真链路（设置→VM→协调器→托盘），不再靠手工赋值假装默认值生效。真机验证见 §7 第 1 条。门禁：单测 9+718、UI 17+188 全绿；重新 publish 后产物门全绿（loadMs=347、KeePass 增长 4.6MB、锁定尾窗中位 113.3MB/120）——证明托盘默认开没有把 `--smoke-ui-exit-after-checks` 的退出路径拖成挂死 |
+| `1d8c3a4` | 桌面端自动输入（#84，走查后用户点名的第二条必须功能）：全局热键 `Ctrl+Shift+Enter` 把"用户名 → Tab → 密码"用 `SendInput(KEYEVENTF_UNICODE)` 打进**当前前台的别人家窗口**——不碰剪贴板（因此不必和 `SecureClipboardService` 的自动清理抢时序），且**从不发 Enter**，提交留给用户；开关默认关，因为"会往别的窗口打字"不该由我们替用户打开；`WindowsGlobalHotkeyService` 槽位化（快速搜索／自动输入各自 `RegisterHotKey` + 各自消息泵线程），两槽填同一组合时先判冲突并说清"快速搜索已占用"，而不是留一条说不清的注册失败。匹配只信前台标题：标题含 host 形状就按 host 判（条目存 `github.com`、标题 `github.com.phishing.test` → 不打），命中 0 条或多于 1 条一律拒打并给原因。**查清的一个假象**：判"前台是不是我自己"原本用 Avalonia 的 `Window.IsActive` + 缓存自身 hwnd，实测进程**零顶层窗口**的时刻它仍读回 `True`（那个缓存 handle 的 pid=0、`IsWindow=False`）→ 会永远误拒，改成问操作系统（`GetWindowThreadProcessId` 比对自身 pid），单测用**真 message-only 窗口**跑通 true 分支。真机正反两例都在**发布产物**上量过（`outcome=Typed`、落点 15/19 字符分别匹配；钓鱼标题 `NoMatch` 且两个框都空），跑法与未覆盖项见 §7 第 2 条。顺带：设置页为过 300 行门把浏览器配对区块拆成 `SettingsBrowserPairingSectionView`，并修掉门禁脚本用 `[IO.Path]::GetRelativePath`（5.1 上不存在）导致行数违规既不变红也不点名的坑。门禁：格式 0 改动、Release 0 warning、单测 9+747、UI 17+191 全绿；重新 publish 后产物门 loadMs=536/4000、KeePass 增长 2.9MB/24、锁定尾窗中位 114.4MB/120 |
 
 §3 的 use-case 抽取改动已提交（`24d92b0`），OneDrive/WebDAV 冲突副本复用修复已提交（`957c5af`）。
 
@@ -90,6 +91,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File eng/ci/verify-artifact-r
 # 只跑一条 UI 测试：UI 套是 xUnit v3，用简单过滤器 `-method`（不是 `dotnet test --filter`）。
 # 查询式 `-filter "/fullyQualifiedName~X"` 会静默匹配 0 条并打印 Total: 0，别当成通过。
 dotnet tests/Monica.UiTests/bin/Release/net10.0/Monica.UiTests.dll -method "*NameFragment*"
+
+# UI 测试方法名用下划线分词，所以片段要写 "*Auto_type*"；写成 "*AutoType*" 会静默匹配 0 条。
+
+# 门禁脚本自身也受 5.1 约束：`[IO.Path]::GetRelativePath` 在 .NET Framework 上不存在，
+# 所以"文件超行数"那条违规原先在这里抛 MethodNotFound，既不变红也不点名超线文件（已改回字符串拼接）。
 ```
 
 真机 GUI 驱动（本轮验证托盘时踩到的四个坑，写脚本前先读）：
@@ -106,10 +112,22 @@ dotnet tests/Monica.UiTests/bin/Release/net10.0/Monica.UiTests.dll -method "*Nam
 # 4. Avalonia 的托盘菜单项不支持 UIA InvokePattern（抛"不支持的模式"）——只能按 rect 中心真实点击；
 #    点击前先 Aim()（含重试），光标落点与目标差 >2px 就 throw 不点，这是仓库记忆里既有的规则。
 
-实测数字（本轮 #78 后）：单测 9 perf + 713 functional、UI 17 perf + 179 functional；重新 publish 后
-产物门 loadMs=191/642（预算 4000）、锁定态私有字节 112.4MB（预算 120）、KeePass 20000 条增长
-3.6MB（预算 24），`release gate completed success=True`。上一次记录（`4e91326`）为单测 716、UI 193、
-loadMs=355、113.2MB、5.9MB。
+实测数字（本轮 #84 后）：单测 9 perf + 747 functional、UI 17 perf + 191 functional；重新 publish 后
+产物门 loadMs=536（预算 4000）、锁定态私有字节尾窗中位 114.4MB（区间 112.3–115.7，预算 120）、
+KeePass 20000 条增长 2.9MB（预算 24）、`release gate completed success=True, loadMs=142`。
+上一次记录（`f700bcc`）为单测 718、UI 188、loadMs=347、113.3MB、4.6MB。
+
+真机自动输入门（**不在 CI 里**，需要交互桌面 + 外部目标窗口 + 真实按键）：
+
+```powershell
+# 正例：默认标题命中 seeded 的 github 条目，脚本自己敲 Ctrl+Shift+Enter，再看两个输入框落成什么
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File artifacts/autotype/verify-autotype-injection.ps1 `
+  -ExePath <publish>\Monica.App.exe -AppDataDirectory <空临时目录> -ExpectedOutcome Typed
+# 反例：标题含 host 但是钓鱼域，必须拒打且两个框都空
+... -WindowTitle "Sign in - github.com.phishing.test" -ExpectedOutcome NoMatch
+```
+
+脚本 ASCII-only、只打印长度与布尔（凭据明文一律不落日志），退出码 0 表示观察到的 `outcome` 与预期一致。
 
 Windows 发布链路（本轮已端到端验过，见 §7）：
 
@@ -268,7 +286,8 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
     实现后全绿。再单独把 `RaiseStatusMessageState()` 一行注掉：**三条单测仍全绿、只有渲染带测试转红**
     （Expected 请输入文件夹名称。/ Actual "Enter a folder name."），这正是无头 VM 测试看不到绑定刷新的
     证据，也是这条 UI 测试存在的理由。
-- **用户点名的必须功能（2026-09-22 拍板，下一轮从这两条开始，别再回头挑小瑕疵）**：
+- **用户点名的必须功能（2026-09-22 拍板）：两条都已出厂**（托盘 `f700bcc`／自动输入见下）。
+  下一轮从各自条目末尾那份"仍未做/仍未验证"清单里挑，别再回头补已经量过的部分：
   1. **最小化到托盘：已出厂即开，并在真机 Windows 会话里逐项量过（`f700bcc`）**。
      - 改了什么：`AppSettingsService.cs` 的 `MinimizeToTray` 默认 `true`，`SettingsSchemaVersion`
        1→2，`Migrate()` 里 `version < 2` 时把 `MinimizeToTray` 置真一次。理由：托盘默认关的那些年，
@@ -300,19 +319,49 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
        - **没有单实例守卫**（全仓无 `Mutex`/`SingleInstance`/命名管道）。托盘默认开之后这变成用户可见问题：
          双击两次桌面图标=两个进程+两个托盘图标，且都指向同一个 `monica.db`。第二实例的行为**未实测**，
          别按"应该会报错"处理。
-  2. **自动填充：桌面端目前零实现，选定"热键把凭据输入到当前前台应用"**。实测：全仓无
-     `SendInput`/`AutoType`/`keybd_event`。地基已在跑：`WindowsGlobalHotkeyService`
-     （`RegisterHotKey` + 独立消息泵线程）、`Ctrl+Shift+Space` 唤起快速搜索、`SecureClipboardService`
-     （带归属校验的自动清理）。安卓真源只做参考不反向：它靠系统 Autofill 框架（inline + 需解锁的
-     delayed dataset）+ 无障碍服务的"临时写剪贴板→粘贴→500ms 后还原"，**没有 overlay、没有
-     dispatchGesture**；Windows 侧对应物就是 SendInput 级别的一次性注入。另一半已存在但本轮不做：
-     `WindowsBrowserBridgeService` 是回环 TCP 上的 HTTP（`/v1/session/check`、`/v1/credentials/query`，
-     默认端口 49152，扩展 Origin 校验 + Bearer 会话令牌），**缺的是扩展本体**（安卓 README 说
-     Monica for Browser 已归档、新扩展重写中）。
-     - 说清风险再动手：注入式自动输入要"记住前一个前台窗口→隐藏自己→注入→还原剪贴板"，它会和
-       `WindowCaptureProtection`／隐私屏（`Deactivated` 触发）、自动锁定计时、剪贴板自动清理三条既有
-       安全路径交叉，顺序错了就会出现"输进 Monica 自己的窗口"或"密码留在剪贴板"。无头测能覆盖的只有
-       编排层（把注入收进接口后面），**真机注入必须实测一次并把观察结果写回这里**，不许用接口测试冒充。
+  2. **自动填充：桌面端已出厂（#84），正反两例都在发布产物上真机量过**。选定路线＝全局热键把凭据
+     输入到**当前前台的别人家窗口**。形状：
+     - 开关 `AutoTypeEnabled` **默认关**（opt-in，无 schema 迁移）：它会往别的窗口打字，不该由我们替用户打开。
+       手势默认 `Ctrl+Shift+Enter`。`WindowsGlobalHotkeyService` 改成 **slot 化**（`QuickSearch`／`AutoType`
+       各自 `RegisterHotKey` + 各自消息泵线程）；两槽填了同一组合时直接判冲突并说"快速搜索已占用这个快捷键"，
+       而不是让第二次注册失败成一个说不清的报错。
+     - 注入＝`SendInput(KEYEVENTF_UNICODE)`，**完全不碰剪贴板**，因此不必和 `SecureClipboardService` 的
+       自动清理抢时序（安卓那套"写剪贴板→粘贴→500ms 还原"在桌面端没有对应需求）。token 序列固定
+       用户名 → `Tab` → 密码，**从不发 Enter**，提交留给用户。
+     - 匹配（`AutoTypeMatcher`）只看前台窗口标题：标题里出现 host 形状时一律按 host 判，条目存 `github.com`
+       而标题是 `github.com.phishing.test` 就**不算匹配**；标题不含 host 才退回整词标签匹配。命中 0 条或多于
+       1 条都拒打并说清原因（`NoMatch`／`Ambiguous`）。
+     - **真机实测**（`artifacts/publish/win-x64/jit/Monica.App.exe`，`MONICA_APPDATA_DIR` 指向空临时目录，
+       WinForms 目标窗体两个输入框 + 外部真实按键），脚本 `artifacts/autotype/verify-autotype-injection.ps1`
+       （gitignore 目录；只报布尔和长度，绝不打印凭据明文）：
+       1. 正例（标题 `Sign in to GitHub - github.com`）：`armed=True, gesture=Ctrl+Shift+Enter,
+          registrationError=False` → `outcome=Typed matches=1`，落点
+          `firstLength=15 firstMatchesUsername=True secondLength=19 secondMatchesPassword=True`，`appExit=0`；
+          `owner check: targetPid=58400 harnessPid=58400 appPid=11504` 证实字确实落在**别人的**窗口。
+       2. 反例（钓鱼标题 `Sign in - github.com.phishing.test`）：`outcome=NoMatch matches=0`，两个框都空
+          （`firstLength=0 secondLength=0`）。
+     - **查清的一个假象，下一轮别退回旧写法**：协调器最初用 Avalonia 的 `Window.IsActive` + 缓存自身 hwnd
+       判断"前台是不是我自己"，实测在进程**一个顶层窗口都没有**的时刻 `IsActive` 仍读回 `True`
+       （`totalTopLevel=434 owned=`，那个缓存 handle 的 `GetWindowThreadProcessId` 返回 pid=0、`IsWindow=False`）
+       → 真按快捷键会被误判成"焦点在 Monica"、永远拒打。改成问操作系统：
+       `IAutoTypeService.IsWindowOwnedByThisProcess(hwnd)`（比对自身 pid）。单测用**真的 message-only 窗口**
+       跑通 true 分支，不是只测 false 分支。
+     - 门禁：格式 0 改动、Release 0 warning、单测 9+747、UI 17+191；产物侧 `--smoke-ui-autotype` 探针走设置页
+       同一条链路（`AutoTypeEnabled=true`→协调器→`RegisterHotKey`），只报 armed/pressed/outcome。
+     - **仍未做/仍未验证（别当成已完事）**：
+       1. `--smoke-ui-autotype` **没有接进 `verify-artifact-runtime.ps1`**：它要交互桌面会话、一个外部目标窗口
+          和一次真按键，CI 里跑不起来，所以现在是"手动真机门"，跑法见上面的脚本与两个场景。
+       2. "Monica 真在前台 → 拒打"这一支：单测验了谓词本身（真窗口），UI 测试验了回调→服务→VM 的接线，但
+          **端到端没有人在 Monica 获得焦点时按过一次快捷键**。诚实记录一个弱点：把 `window.IsActive ||`
+          重新加回去，那条 UI 测试**仍然绿**——它钉的是接线不是这个回归，该回归的实际守卫在真机 harness。
+       3. 只覆盖了 WinForms 目标。浏览器登录框、`Tab` 顺序不同的表单、需要 `Ctrl+Enter` 提交的应用未测；
+          非 ASCII 用户名／密码（`KEYEVENTF_UNICODE` 走 UTF-16，理论支持）未实测。
+       4. "唤起快速搜索→就地送进刚才那个窗口"没做，两条路径目前彼此独立。
+       5. 与隐私屏／`WindowCaptureProtection` 并发下的行为未测（自动输入路径刻意不 raise、不 focus Monica 的
+          任何窗口，因此既没触发那条路径，也就没验证过它不受影响）。
+       6. 浏览器扩展本体仍缺：`WindowsBrowserBridgeService` 的回环 HTTP（`/v1/session/check`、
+          `/v1/credentials/query`，默认端口 49152，Origin 校验 + Bearer 会话令牌）在跑，扩展没有
+          （安卓 README 说 Monica for Browser 已归档、新扩展重写中）。
 
 ## 8. 用户协作偏好（务必遵守）
 
@@ -323,5 +372,5 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
 - 面对从别处 fork 进来的代码，先问"到底要不要"，再谈"怎么维护"。
 
 ---
-接手第一步建议：工作树已干净、两套 Windows 门（源码级 + 产物级）实测全绿，直接从 §7 的未做项挑一条推进，
-不必再花时间复验已绿的部分。
+接手第一步建议：工作树已干净、两套 Windows 门（源码级 + 产物级）实测全绿，用户点名的两条必须功能（托盘、自动输入）
+也已出厂。下一轮从 §7 各条末尾的"仍未做/仍未验证"清单里挑，不必再花时间复验已绿的部分。
