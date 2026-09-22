@@ -63,8 +63,8 @@ OutputBaseFilename=$installerBaseName
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-ArchitecturesAllowed=x64
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#AppExeName}
 SetupIconFile=$iconPath
 
@@ -84,3 +84,16 @@ Filename: "{app}\{#AppExeName}"; Description: "Launch Monica"; Flags: nowait pos
 
 Set-Content -LiteralPath $scriptPath -Value $script -Encoding UTF8
 & $isccPath $scriptPath
+# $ErrorActionPreference does not act on a native exit code, so without this check a failed
+# compile would leave the CI "Build installer" step green with no installer produced.
+if ($LASTEXITCODE -ne 0) {
+    throw "Inno Setup compilation failed with exit code $LASTEXITCODE."
+}
+
+$installerPath = Join-Path $resolvedOutput "$installerBaseName.exe"
+if (-not (Test-Path -LiteralPath $installerPath)) {
+    throw "Inno Setup reported success but produced no installer at $installerPath."
+}
+
+Write-Host ("Installer built: {0} ({1:N1} MB)" -f `
+    $installerPath, ((Get-Item -LiteralPath $installerPath).Length / 1MB))
