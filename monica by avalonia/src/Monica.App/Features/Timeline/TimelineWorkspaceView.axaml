@@ -17,11 +17,11 @@
             <Grid x:Name="TimelineHeaderGrid" ColumnDefinitions="*,320,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" MinHeight="56">
                 <StackPanel MinWidth="0" VerticalAlignment="Center">
                     <TextBlock Classes="workspacePageTitle" Text="{Binding L.Timeline}" />
-                    <TextBlock Text="{Binding TimelineCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding TimelineCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" AutomationProperties.LiveSetting="Polite" />
                 </StackPanel>
                 <Grid x:Name="TimelineSearchRegion" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="6" VerticalAlignment="Center">
                     <TextBox x:Name="TimelineSearchBox" PlaceholderText="{Binding L.Search}" Text="{Binding TimelineSearchText}" AutomationProperties.Name="{Binding L.Search}" />
-                    <Button x:Name="TimelineSearchClearButton" Grid.Column="1" Classes="workspaceCommand" Command="{Binding ClearTimelineSearchCommand}" IsVisible="{Binding HasTimelineSearchText}" ToolTip.Tip="{Binding L[Clear]}" AutomationProperties.Name="{Binding L[Clear]}" Width="40" Height="40" Padding="0">
+                    <Button x:Name="TimelineSearchClearButton" Grid.Column="1" Classes="workspaceCommand" Command="{Binding ClearTimelineSearchCommand}" IsVisible="{Binding HasTimelineSearchText}" ToolTip.Tip="{Binding L[ClearSearch]}" AutomationProperties.Name="{Binding L[ClearSearch]}" Width="40" Height="40" Padding="0">
                         <ic:FluentIcon Icon="Dismiss" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Button>
                 </Grid>
@@ -32,10 +32,7 @@
         <Grid x:Name="TimelineMasterDetailGrid" Grid.Row="1" ColumnDefinitions="440,*" MinWidth="0">
             <Border x:Name="TimelineListRegion" Classes="timelineFilterRail" ClipToBounds="True">
                 <Grid RowDefinitions="Auto,*">
-                    <StackPanel Margin="14,12,14,8" Spacing="3">
-                        <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.Timeline}" />
-                        <TextBlock Text="{Binding TimelineCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" AutomationProperties.LiveSetting="Polite" />
-                    </StackPanel>
+                    <TextBlock Margin="14,12,14,8" Classes="workspaceSectionLabel" Text="{Binding L.Timeline}" />
                     <views:TimelineEntryListView x:Name="TimelineEntryListView" Grid.Row="1" />
                 </Grid>
             </Border>

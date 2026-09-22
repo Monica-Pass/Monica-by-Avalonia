@@ -21,7 +21,6 @@ public sealed partial class MainWindowViewModel
         RaiseSyncPageState();
         RefreshVaultSources();
         RefreshMdbxVaultState();
-        RaiseShellStatus();
     }
 
     partial void OnWebDavServerUrlChanged(string value)

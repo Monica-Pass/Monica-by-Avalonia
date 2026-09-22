@@ -199,29 +199,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    public string ShellVaultText => SelectedSection switch
-    {
-        "Mdbx" => "MDBX",
-        "DatabaseManagement" => "Database",
-        "Sync" => WebDavEnabled ? "WebDAV" : "Local",
-        "Settings" => "Monica",
-        "Archive" => "Archive",
-        "RecycleBin" => "Recycle Bin",
-        _ => "Monica Local"
-    };
-    public string ShellSyncText => SelectedSection switch
-    {
-        "Mdbx" => MdbxDatabases.Count > 0 ? "Vaults Ready" : "Metadata",
-        "DatabaseManagement" => "Sources Ready",
-        "Sync" => WebDavEnabled ? "Sync Ready" : "Local Only",
-        "Settings" => "Ready",
-        _ => StatusMessage
-    };
-
     partial void OnSelectedSectionChanged(string value)
     {
         RefreshVaultPreset();
-        RaiseShellStatus();
         RestoreActiveWorkspaceState();
         RefreshSecurityAnalysisIfNeeded();
         if (!string.Equals(value, "Settings", StringComparison.OrdinalIgnoreCase))
@@ -248,7 +228,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     partial void OnStatusMessageChanged(string value)
     {
-        RaiseShellStatus();
         OnPropertyChanged(nameof(HasUnlockStatusMessage));
     }
 
@@ -266,12 +245,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             value.Contains("无法", StringComparison.Ordinal) ||
             value.Contains("失败", StringComparison.Ordinal) ||
             value.Contains("错误", StringComparison.Ordinal);
-    }
-
-    private void RaiseShellStatus()
-    {
-        OnPropertyChanged(nameof(ShellVaultText));
-        OnPropertyChanged(nameof(ShellSyncText));
     }
 
     private async Task LoadAfterUnlockAsync()

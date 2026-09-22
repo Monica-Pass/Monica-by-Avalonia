@@ -24,6 +24,7 @@
 | `c962fb8` | 上一步引入的 `dotnet format` 空白违规 |
 | `22f018c` | 内存门改为"先压缩再采样"，消除锁定态私有字节采样的竞态假红（阈值仍 120MB，产品运行时未动） |
 | `4e91326` | 打包脚本断言产物真实存在（`$ErrorActionPreference` 管不了原生命令退出码，ISCC/tar 失败原本会让 CI 变绿且零产物）；Inno 改用 `x64compatible` |
+| 本轮（逐屏走查） | 本地化与空态/错误态：10 个引用了但两张表都没有的 key、3 个只作为裸参数传给失败上报辅助函数的 KeePass key、密码强度文案尾随标点、SecurityAnalysis 空态重复提示、回收站等四屏的裸 `Clear` 标签；`LocalizationParityTests` 加第 4 道引用守卫；新增首条锁屏错误横幅渲染测试 |
 
 §3 的 use-case 抽取改动已提交（`24d92b0`），OneDrive/WebDAV 冲突副本复用修复已提交（`957c5af`）。
 
@@ -99,6 +100,15 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
 - **主密码不可恢复**：`settings.json` 不存明文，只存派生哈希。我无法"给出密码"。若用户忘记密码，只能清空该测试库另建新库（破坏性，动手前先问）。
 - **安全红线**：解锁后**不要截屏已解密的保险库界面**，不要把条目明文写进任何输出/日志。演示 UI 时保持锁定态或空态。
 - 注：历史运行可能已在 `%LOCALAPPDATA%\Monica by Avalonia\mdbx\` 下留下 `onedrive-*.local-conflict-*.mdbx` 冲突副本；冲突恢复路径现已复用同一工作副本的既有备份，后续重试不会继续无限增长。
+- **空态截图矩阵（逐屏走查用的安全姿势）**：在一个全新的 `MONICA_APPDATA_DIR` 里
+  `--init-empty-smoke-vault <一次性口令>`，再
+  `--smoke-ui-unlock-env <口令所在环境变量名> --smoke-ui-other-pages-checks --smoke-ui-screenshot-dir <目录> --smoke-ui-exit-after-checks`
+  → 13 帧 `<Section>_1280x800.png`，全程不碰真实库。
+  - 口令走环境变量而不是 argv；`--smoke-ui-screenshot-dir` 的值**必须整体加引号**，
+    因为仓库路径含空格，`cygpath -m $PWD/...` 不加引号会被截断成不存在的目录（实测 0 帧）。
+  - 空库是故意的：就绪检查要求 `Passwords.Count > 0`，所以进程**退出码 1 是预期**，13 帧照样落盘。
+  - **约束**：Generator 那一帧必然含一个实时生成的口令。它是空态一次性库里的产物、且 `artifacts/`
+    已被 gitignore 提交不进去，但这意味着**矩阵只能在一次性库上跑**，绝不能在真实库目录上跑。
 
 ## 7. 剩余阻塞项 / 可推进方向（朝"商业级"）
 
@@ -128,7 +138,26 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
 - 已完成的低风险项：
   1. §6 的 OneDrive/WebDAV 冲突副本堆积已修复：重复重试“使用远端”会复用同一 `.local-conflict-*` 备份，不再每次生成 GUID 文件。
   2. §2 的 use-case 改动已提交（`24d92b0`），冲突备份修复已提交（`957c5af`）。
-- 后续可推进：逐屏走查 UI 完成度与空态/错误态，用锁定态截图，别解密。
+- **逐屏走查已完成一轮**（13 屏空态截图 + 全量 key 审计）。根因只有一条：
+  `LocalizationService.Get` 找不到 key 时**回退返回 key 本身**，所以缺翻译从不报错，只在屏幕上印出标识符。
+  现在由 `LocalizationParityTests` 四道守卫钉住（双语互覆盖 / 类型化访问器 / 源码与 XAML 引用扫描 /
+  裸参数形状），植入假 key 实测会红、还原即绿；两表各 1382 条，零单边 key。
+- **走查查出但故意没修的两项**（都不是能靠加关键词解决的小补丁，需要产品判断）：
+  1. `MainWindowViewModel.IsRecoverableStatusMessage` 靠**已翻译文本里的子串**
+     （failed/failure/error/unavailable/无法/失败/错误）判断要不要弹顶部琥珀横幅。实测
+     161 个写进 `StatusMessage` 的 key 里只有 9 个触发横幅，**零误报**，但**语言不对称**：
+     `AttachmentAddFailed`、`ExportAuthorizationFailed`、`ImportMarkdownFailed`、
+     `InsertNoteImageFailed`、`OpenReferenceFailed`、`ReferenceCannotOpen`、
+     `SettingsSaveFailed`、`WrongMasterPassword` 这 8 个中文有横幅、英文只有底部小灰字，
+     因为英文写作 "Could not …" 而关键词表没这条。另有 `VaultLoadFailed`
+     （"The vault could not finish loading…"）**两种语言都没有横幅**——它是最该醒目的一条。
+     补英文关键词会把 `ClearVaultCancelled` 这类**用户主动取消**误判成失败，所以正确修法是
+     在产生消息处显式分类（失败/取消/信息），而不是继续猜文案。
+  2. 成功文案不清除：`ClearKeePassImportState` 不重置 `StatusMessage`，于是预览已空、
+     底部仍挂着上一句"已打开 N 条"。同理 WebDAV 测试/备份成功文案也不会被清。
+- 其余已记录未修的低优先项：`DatabaseManagement` 把注册来源副标题直接印成裸 `%TEMP%\…` 路径且来源命名不一致
+  （"本地数据库 / Monica v64 SQLite 主保险库" vs "Monica"）；"MDBX 保险库"同时出现在头部 chip 和检查器按钮；
+  Generator 头部副标题在结果卡片里逐字重复；Archive/RecycleBin/Timeline 的检查器空态是大面积近空白板。
 
 ## 8. 用户协作偏好（务必遵守）
 

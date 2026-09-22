@@ -1,3 +1,5 @@
+using Monica.Core.Services;
+
 namespace Monica.App.Services;
 
 internal static class PasswordStrengthLocalization
@@ -11,6 +13,16 @@ internal static class PasswordStrengthLocalization
         "Very weak" => localization.Get("PasswordStrengthVeryWeak"),
         _ => label
     };
+
+    public static string Summarize(ILocalizationService localization, PasswordStrengthResult strength)
+    {
+        var label = Label(localization, strength.Label);
+        var warnings = Warnings(localization, strength.Warnings);
+
+        return warnings.Length == 0
+            ? localization.Format("GeneratedPasswordStrengthOnlyFormat", label, strength.Score)
+            : localization.Format("GeneratedPasswordStrengthFormat", label, strength.Score, warnings);
+    }
 
     public static string Warnings(ILocalizationService localization, IEnumerable<string> warnings) =>
         string.Join(" ", warnings.Select(warning => Warning(localization, warning)));

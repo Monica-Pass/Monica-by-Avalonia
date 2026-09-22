@@ -6,7 +6,6 @@
              x:Name="Root"
              x:DataType="vm:MainWindowViewModel">
     <StackPanel Margin="14,12,14,8" Spacing="8">
-        <TextBlock Classes="workspaceSectionLabel" Text="{Binding L[SecurityIssueSeverityFilter]}" />
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
             <TextBox x:Name="SecurityIssueSearchBox"
                      Text="{Binding SecurityIssueSearchText}"
@@ -20,8 +19,8 @@
                     Width="40"
                     Height="40"
                     Padding="0"
-                    ToolTip.Tip="{Binding L[Clear]}"
-                    AutomationProperties.Name="{Binding L[Clear]}">
+                    ToolTip.Tip="{Binding L[ClearSearch]}"
+                    AutomationProperties.Name="{Binding L[ClearSearch]}">
                 <ic:FluentIcon Icon="Dismiss" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Button>
         </Grid>
@@ -52,6 +51,7 @@
         </StackPanel>
         <TextBlock x:Name="SecurityIssueSearchResultText"
                    Text="{Binding SecurityIssueSearchResultText}"
+                   IsVisible="{Binding HasSecurityIssueFilters}"
                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                    FontSize="12"
                    AutomationProperties.LiveSetting="Polite" />

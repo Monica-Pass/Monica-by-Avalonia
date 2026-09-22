@@ -35,7 +35,7 @@
             </StackPanel>
             <StackPanel Classes="workspaceEmptyState" IsVisible="{Binding !HasSelectedSecurityIssue}" Spacing="10" Margin="24" Width="260" HorizontalAlignment="Left">
                 <ic:FluentIcon Icon="Shield" FontSize="34" HorizontalAlignment="Center" />
-                <TextBlock Text="{Binding SecurityIssueSearchResultText}" />
+                <TextBlock Text="{Binding L[SelectItemToInspectHint]}" />
             </StackPanel>
         </Grid>
     </ScrollViewer>

@@ -13,7 +13,8 @@
                     HorizontalAlignment="Left"
                     VerticalAlignment="Top">
             <ic:FluentIcon Icon="Shield" FontSize="32" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
-            <TextBlock Text="{Binding SecurityIssueSearchResultText}" />
+            <TextBlock Text="{Binding L[LibraryNoMatchesHint]}" IsVisible="{Binding HasSecurityIssueFilters}" />
+            <TextBlock Text="{Binding L[SecurityAnalysisNoIssuesHint]}" IsVisible="{Binding !HasSecurityIssueFilters}" />
             <Button x:Name="EmptySecurityIssueClearFiltersButton" Command="{Binding ClearSecurityIssueFiltersCommand}" IsVisible="{Binding HasSecurityIssueFilters}" ToolTip.Tip="{Binding L[ClearSecurityIssueFilters]}" AutomationProperties.Name="{Binding L[ClearSecurityIssueFilters]}" HorizontalAlignment="Center">
                 <TextBlock Text="{Binding L[ClearSecurityIssueFilters]}" />
             </Button>

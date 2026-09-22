@@ -144,12 +144,9 @@ public sealed partial class MainWindowViewModel
                 return _localization.Get("GeneratorNoPassword");
             }
 
-            var strength = _passwordGenerator.Analyze(GeneratedPassword);
-            return _localization.Format(
-                "GeneratedPasswordStrengthFormat",
-                PasswordStrengthLocalization.Label(_localization, strength.Label),
-                strength.Score,
-                PasswordStrengthLocalization.Warnings(_localization, strength.Warnings));
+            return PasswordStrengthLocalization.Summarize(
+                _localization,
+                _passwordGenerator.Analyze(GeneratedPassword));
         }
     }
 

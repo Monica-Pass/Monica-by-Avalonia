@@ -18,12 +18,7 @@ public sealed partial class PasswordEditorViewModel
                 return L.Get("GeneratorNoPassword");
             }
 
-            var strength = _passwordGenerator.Analyze(rows[0]);
-            return L.Format(
-                "GeneratedPasswordStrengthFormat",
-                PasswordStrengthLocalization.Label(L, strength.Label),
-                strength.Score,
-                PasswordStrengthLocalization.Warnings(L, strength.Warnings));
+            return PasswordStrengthLocalization.Summarize(L, _passwordGenerator.Analyze(rows[0]));
         }
     }
 

@@ -23,7 +23,7 @@
                                TextWrapping="Wrap"
                                MaxLines="2" />
                 </StackPanel>
-                <Border Grid.Column="1" Classes="generatorStatusChip" VerticalAlignment="Center">
+                <Border Grid.Column="1" Classes="generatorStatusChip" VerticalAlignment="Center" IsVisible="{Binding !ShowGeneratorStrengthSummaryCard}">
                     <TextBlock Text="{Binding GeneratedPasswordStrengthText}"
                                FontWeight="SemiBold"
                                TextTrimming="CharacterEllipsis" />

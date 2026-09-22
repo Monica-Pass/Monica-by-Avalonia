@@ -35,7 +35,7 @@ public sealed class MasterPasswordExportAuthorizationService(
         {
             Width = 420,
             PasswordChar = '●',
-            PlaceholderText = localization.Get("MasterPassword")
+            PlaceholderText = localization.Get("MasterPasswordWatermark")
         };
         var dialog = CreateDialog(passwordInput);
         var result = await dialog.ShowAsync(ownerProvider());

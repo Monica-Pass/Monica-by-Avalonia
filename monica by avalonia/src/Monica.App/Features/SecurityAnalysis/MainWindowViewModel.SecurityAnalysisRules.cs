@@ -42,27 +42,30 @@ public sealed partial class MainWindowViewModel
             missingTwoFactorCount * 2 +
             staleCount;
         var score = Math.Clamp(100 - totalPenalty, 0, 100);
+        var analyzed = snapshots.Count > 0;
         var summaries = new[]
         {
             new SecuritySummaryItem(
                 _localization.SecurityScore,
-                _localization.Format("SecurityScoreFormat", score),
-                _localization.Format("SecurityAnalyzedPasswordCountFormat", snapshots.Count)),
+                analyzed ? _localization.Format("SecurityScoreFormat", score) : "-",
+                analyzed
+                    ? _localization.Format("SecurityAnalyzedPasswordCountFormat", snapshots.Count)
+                    : _localization.Get("SecurityNotAnalyzed")),
             new SecuritySummaryItem(
                 _localization.CompromisedPasswords,
                 hasCompromisedResults ? compromisedCount.ToString(_localization.Culture) : "-",
                 _localization.Get("CompromisedPasswordsSummary")),
             new SecuritySummaryItem(
                 _localization.WeakPasswords,
-                weakCount.ToString(_localization.Culture),
+                Value(analyzed, weakCount),
                 _localization.Get("WeakPasswordsSummary")),
             new SecuritySummaryItem(
                 _localization.DuplicatePasswords,
-                duplicatePasswordCount.ToString(_localization.Culture),
+                Value(analyzed, duplicatePasswordCount),
                 _localization.Get("DuplicatePasswordsSummary")),
             new SecuritySummaryItem(
                 _localization.MissingTwoFactor,
-                missingTwoFactorCount.ToString(_localization.Culture),
+                Value(analyzed, missingTwoFactorCount),
                 _localization.Get("MissingTwoFactorSummary"))
         };
         cancellationToken.ThrowIfCancellationRequested();
@@ -72,6 +75,9 @@ public sealed partial class MainWindowViewModel
             .ToArray();
         return new SecurityAnalysisResult(summaries, orderedIssues);
     }
+
+    private string Value(bool analyzed, int count) =>
+        analyzed ? count.ToString(_localization.Culture) : "-";
 
     private int AddCompromisedPasswordIssues(
         IReadOnlyList<SecurityPasswordSnapshot> snapshots,
