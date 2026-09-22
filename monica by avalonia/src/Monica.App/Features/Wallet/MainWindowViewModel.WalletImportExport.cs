@@ -24,7 +24,7 @@ public sealed partial class MainWindowViewModel
         }
 
         ExportWalletCsvPreview = await BuildWalletCsvExportAsync();
-        SetStatusMessage("ExportedWalletCsv");
+        SetStatusNotice("ExportedWalletCsv");
     }
 
     [RelayCommand(CanExecute = nameof(CanUseFilePicker))]

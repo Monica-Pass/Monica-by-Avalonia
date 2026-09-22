@@ -26,7 +26,7 @@ public sealed partial class MainWindowViewModel
             RefreshPasswordAttachmentState(entry);
         }
 
-        SetStatusMessage("DeletedAttachmentFormat", attachment.FileName);
+        SetStatusNotice("DeletedAttachmentFormat", attachment.FileName);
         return true;
     }
 }

@@ -28,11 +28,11 @@ public sealed partial class MainWindowViewModel
             ClearKeePassImportPreview();
             _keePassPendingFile = file;
             KeePassSelectedFileName = file.FileName;
-            SetStatusMessage("KeePassFileSelectedFormat", file.FileName);
+            SetStatusNotice("KeePassFileSelectedFormat", file.FileName);
         }
         catch (OperationCanceledException)
         {
-            SetStatusMessage("KeePassImportCanceled");
+            SetStatusNotice("KeePassImportCanceled");
         }
         catch (Exception error)
         {
@@ -71,11 +71,11 @@ public sealed partial class MainWindowViewModel
             await RebuildKeePassTreeAsync(session, cancellationToken);
             OnPropertyChanged(nameof(HasKeePassImportPreview));
             OnPropertyChanged(nameof(KeePassPreviewSummaryText));
-            SetStatusMessage("KeePassPreviewReadyFormat", session.DatabaseName, session.EntryCount, session.GroupCount);
+            SetStatusNotice("KeePassPreviewReadyFormat", session.DatabaseName, session.EntryCount, session.GroupCount);
         }
         catch (OperationCanceledException)
         {
-            SetStatusMessage("KeePassImportCanceled");
+            SetStatusNotice("KeePassImportCanceled");
         }
         catch (KeePassVaultException error)
         {
@@ -207,11 +207,11 @@ public sealed partial class MainWindowViewModel
             });
             ClearKeePassImportState(cancelActiveOperation: false);
             await LoadAsync();
-            SetStatusMessage("KeePassImportedFormat", imported, skipped);
+            SetStatusNotice("KeePassImportedFormat", imported, skipped);
         }
         catch (OperationCanceledException)
         {
-            SetStatusMessage("KeePassImportCanceledAfterFormat", imported, skipped);
+            SetStatusNotice("KeePassImportCanceledAfterFormat", imported, skipped);
         }
         catch (Exception error)
         {
@@ -229,7 +229,7 @@ public sealed partial class MainWindowViewModel
     {
         _keePassOperationCancellation?.Cancel();
         KeePassImportPassword = "";
-        SetStatusMessage("KeePassImportCanceled");
+        SetStatusNotice("KeePassImportCanceled");
     }
 
     [RelayCommand]

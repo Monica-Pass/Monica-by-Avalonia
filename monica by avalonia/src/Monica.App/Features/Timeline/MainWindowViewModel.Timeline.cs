@@ -184,7 +184,7 @@ public sealed partial class MainWindowViewModel
         }
 
         ExportTimelinePreview = string.Join(Environment.NewLine, lines);
-        SetStatusMessage("ExportedTimelineFormat", TimelineEntries.Count);
+        SetStatusNotice("ExportedTimelineFormat", TimelineEntries.Count);
         await Task.CompletedTask;
     }
 

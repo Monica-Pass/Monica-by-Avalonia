@@ -97,7 +97,7 @@ public sealed partial class MainWindowViewModel
                 account.Id,
                 BitwardenSyncTrigger.Manual,
                 cancellationToken);
-            SetStatusMessage("BitwardenSyncedFormat", account.DisplayName);
+            SetStatusNotice("BitwardenSyncedFormat", account.DisplayName);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -144,7 +144,7 @@ public sealed partial class MainWindowViewModel
             }
 
             ClearBitwardenAuthenticationFields(preserveIdentity: false);
-            SetStatusMessage("BitwardenDisconnectedFormat", account.DisplayName);
+            SetStatusNotice("BitwardenDisconnectedFormat", account.DisplayName);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

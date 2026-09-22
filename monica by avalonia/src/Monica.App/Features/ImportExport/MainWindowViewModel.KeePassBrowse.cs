@@ -180,7 +180,7 @@ public sealed partial class MainWindowViewModel
         }
 
         await _clipboardService.SetTextAsync(row.Entry.UserName);
-        SetStatusMessage("CopiedToClipboard");
+        SetStatusNotice("CopiedToClipboard");
     }
 
     [RelayCommand]
@@ -201,7 +201,7 @@ public sealed partial class MainWindowViewModel
             }
 
             await _clipboardService.SetTextAsync(detail.Password);
-            SetStatusMessage("CopiedToClipboard");
+            SetStatusNotice("CopiedToClipboard");
         }
         catch (Exception error)
         {

@@ -88,7 +88,7 @@ public sealed partial class MainWindowViewModel
             return false;
         }
 
-        SetStatusMessage("ExportPrepared");
+        SetStatusNotice("ExportPrepared");
         return true;
     }
 
@@ -114,7 +114,7 @@ public sealed partial class MainWindowViewModel
         }
 
         ExportCsvPreview = await Task.Run(() => _importExportService.ExportPasswordCsv(exportPasswords));
-        SetStatusMessage("ExportedPasswordCsv");
+        SetStatusNotice("ExportedPasswordCsv");
         return true;
     }
 
@@ -126,7 +126,7 @@ public sealed partial class MainWindowViewModel
         }
 
         ExportNoteCsvPreview = await BuildNoteCsvExportAsync();
-        SetStatusMessage("ExportedNoteCsv");
+        SetStatusNotice("ExportedNoteCsv");
         return true;
     }
 
@@ -146,7 +146,7 @@ public sealed partial class MainWindowViewModel
             var fileName = await _fileSystemPickerService.SaveTextFileAsync(title, suggestedFileName, content, fileTypes);
             if (fileName is not null)
             {
-                SetStatusMessage("SavedExportFileFormat", fileName);
+                SetStatusNotice("SavedExportFileFormat", fileName);
             }
         }
         catch (Exception ex)

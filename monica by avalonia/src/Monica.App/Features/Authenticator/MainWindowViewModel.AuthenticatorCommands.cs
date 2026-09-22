@@ -31,7 +31,7 @@ public sealed partial class MainWindowViewModel
         TotpSearchText = "";
         SelectedTotpFilterKey = TotpFilterAll;
         RaiseTotpFilterState();
-        SetStatusMessage("ClearedTotpFilters");
+        SetStatusNotice("ClearedTotpFilters");
     }
 
     [RelayCommand]
@@ -59,7 +59,7 @@ public sealed partial class MainWindowViewModel
 
         RefreshTotpDisplay(item);
         await _clipboardService.SetSensitiveTextAsync(item.TotpCode);
-        SetStatusMessage("CopiedTotpFormat", item.Title);
+        SetStatusNotice("CopiedTotpFormat", item.Title);
     }
 
     private static bool CanAdvanceTotp(SecureItem? item)
@@ -90,7 +90,7 @@ public sealed partial class MainWindowViewModel
         RefreshTotpDisplay(item);
         await _repository.SaveSecureItemAsync(item);
         SelectedTotpDetails = new TotpItemDetailsViewModel(_localization, item);
-        SetStatusMessage("GeneratedNextTotpFormat", item.Title);
+        SetStatusNotice("GeneratedNextTotpFormat", item.Title);
     }
 
     [RelayCommand]
@@ -144,7 +144,7 @@ public sealed partial class MainWindowViewModel
             DeviceName = Environment.MachineName
         });
         ClearTotpSelection();
-        SetStatusMessage("SavedTotpFormat", editor.Title.Trim());
+        SetStatusNotice("SavedTotpFormat", editor.Title.Trim());
     }
 
     [RelayCommand]
@@ -163,7 +163,7 @@ public sealed partial class MainWindowViewModel
         }
 
         RaiseTotpFilterState();
-        SetStatusMessage(next ? "FavoritedTotpFormat" : "UnfavoritedTotpFormat", item.Title);
+        SetStatusNotice(next ? "FavoritedTotpFormat" : "UnfavoritedTotpFormat", item.Title);
     }
 
     [RelayCommand]
@@ -234,7 +234,7 @@ public sealed partial class MainWindowViewModel
 
         RaiseTotpFilterState();
         RaiseTotpSelectionState();
-        SetStatusMessage("FavoritedTotpCountFormat", selected.Length);
+        SetStatusNotice("FavoritedTotpCountFormat", selected.Length);
     }
 
     [RelayCommand]
@@ -257,6 +257,6 @@ public sealed partial class MainWindowViewModel
         }
 
         RaiseTotpSelectionState();
-        SetStatusMessage("MovedSelectedTotpToRecycleBinFormat", selected.Length);
+        SetStatusNotice("MovedSelectedTotpToRecycleBinFormat", selected.Length);
     }
 }

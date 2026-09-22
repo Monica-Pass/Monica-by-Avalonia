@@ -665,7 +665,7 @@ public sealed partial class MainWindowViewModel
 
         // CategoryId is a plain property, so no change notification reaches the tree on its own.
         RebuildVaultTree();
-        SetStatusMessage("MovedSelectedPasswordsToFolderFormat", 1, choice.Name);
+        SetStatusNotice("MovedSelectedPasswordsToFolderFormat", 1, choice.Name);
     }
 
     private Task LogVaultCategoryMoveAsync(string itemType, long itemId, string itemTitle) =>

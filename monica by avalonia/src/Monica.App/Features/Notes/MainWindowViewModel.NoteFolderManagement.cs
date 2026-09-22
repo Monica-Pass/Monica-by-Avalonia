@@ -46,7 +46,7 @@ public sealed partial class MainWindowViewModel
 
         SelectedNoteFolderKey = string.IsNullOrWhiteSpace(parentPath) ? "" : $"folder:{parentPath}";
         NewNoteFolderName = "";
-        SetStatusMessage("DeletedFolderItemsFormat", result.Name, result.AffectedCount);
+        SetStatusNotice("DeletedFolderItemsFormat", result.Name, result.AffectedCount);
     }
 
     private void SelectAndExpandNoteFolder(string path)

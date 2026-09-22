@@ -20,7 +20,7 @@ public sealed partial class MainWindowViewModel
         try
         {
             await _externalLinkService.OpenAsync(uri);
-            SetStatusMessage("OpenedReferenceFormat", uri.Host);
+            SetStatusNotice("OpenedReferenceFormat", uri.Host);
         }
         catch (Exception ex)
         {
@@ -38,6 +38,6 @@ public sealed partial class MainWindowViewModel
         }
 
         await _clipboardService.SetSensitiveTextAsync(item.Target);
-        SetStatusMessage("CopiedReference");
+        SetStatusNotice("CopiedReference");
     }
 }

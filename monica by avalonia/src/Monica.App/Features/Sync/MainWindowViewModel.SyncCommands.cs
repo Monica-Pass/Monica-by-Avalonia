@@ -35,7 +35,7 @@ public sealed partial class MainWindowViewModel
 
             SelectedWebDavBackupHistoryItem = WebDavBackupHistory.FirstOrDefault();
             RaiseWebDavBackupHistoryState();
-            SetStatusMessage("LoadedWebDavBackupsFormat", WebDavBackupHistory.Count);
+            SetStatusNotice("LoadedWebDavBackupsFormat", WebDavBackupHistory.Count);
         }
         catch (Exception ex)
         {
@@ -64,7 +64,7 @@ public sealed partial class MainWindowViewModel
         {
             WebDavOperationStageText = _localization.Get("WebDavTestingConnection");
             var entries = await _webDavBackupService.ListAsync(profile, "");
-            SetStatusMessage("WebDavConnectionTestSucceededFormat", entries.Count);
+            SetStatusNotice("WebDavConnectionTestSucceededFormat", entries.Count);
         }
         catch (Exception ex)
         {
@@ -139,7 +139,7 @@ public sealed partial class MainWindowViewModel
             WebDavBackupHistory.Insert(0, backupItem);
             SelectedWebDavBackupHistoryItem = backupItem;
             RaiseWebDavBackupHistoryState();
-            SetStatusMessage("CreatedWebDavBackupFormat", fileName);
+            SetStatusNotice("CreatedWebDavBackupFormat", fileName);
         }
         catch (WebDavTextPayloadTooLargeException ex)
         {
@@ -192,7 +192,7 @@ public sealed partial class MainWindowViewModel
 
             WebDavOperationStageText = _localization.Get("WebDavRestoringBackup");
             var result = await ImportMonicaJsonAsync(json);
-            SetStatusMessage("RestoredWebDavBackupFormat", item.FileName, result.Passwords, result.SecureItems, result.Categories);
+            SetStatusNotice("RestoredWebDavBackupFormat", item.FileName, result.Passwords, result.SecureItems, result.Categories);
         }
         catch (WebDavTextPayloadTooLargeException ex)
         {
@@ -252,7 +252,7 @@ public sealed partial class MainWindowViewModel
             }
 
             RaiseWebDavBackupHistoryState();
-            SetStatusMessage("DeletedWebDavBackupFormat", item.FileName);
+            SetStatusNotice("DeletedWebDavBackupFormat", item.FileName);
         }
         catch (Exception ex)
         {

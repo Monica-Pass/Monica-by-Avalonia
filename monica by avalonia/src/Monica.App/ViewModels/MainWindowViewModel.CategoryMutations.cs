@@ -33,7 +33,7 @@ public sealed partial class MainWindowViewModel
         Categories.Add(category);
         await LogCategoryOperationAsync(category, "CREATE");
         RefreshCategoryConsumers();
-        SetStatusMessage("CreatedFolderFormat", category.Name);
+        SetStatusNotice("CreatedFolderFormat", category.Name);
         return new LocalCategoryCreateResult(category);
     }
 
@@ -70,7 +70,7 @@ public sealed partial class MainWindowViewModel
 
         await LogCategoryOperationAsync(category, "UPDATE");
         RefreshCategoryConsumers();
-        SetStatusMessage("RenamedFolderFormat", oldPath, renamePlan.DestinationPath);
+        SetStatusNotice("RenamedFolderFormat", oldPath, renamePlan.DestinationPath);
         return new LocalCategoryRenameResult(category, oldPath, renamePlan.DestinationPath);
     }
 
@@ -105,7 +105,7 @@ public sealed partial class MainWindowViewModel
 
         await LogCategoryOperationAsync(category, "UPDATE");
         RefreshCategoryConsumers(category.Id);
-        SetStatusMessage("RenamedFolderFormat", oldPath, movePlan.DestinationPath);
+        SetStatusNotice("RenamedFolderFormat", oldPath, movePlan.DestinationPath);
         return new LocalCategoryRenameResult(category, oldPath, movePlan.DestinationPath);
     }
 

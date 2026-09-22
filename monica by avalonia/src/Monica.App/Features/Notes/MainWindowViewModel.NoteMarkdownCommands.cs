@@ -89,7 +89,7 @@ public sealed partial class MainWindowViewModel
 
             var markdown = NoteContentCodec.BuildInlineImageMarkdown(draft.StoragePath);
             stagedStoragePath = "";
-            SetStatusMessage("InsertedNoteImageFormat", draft.FileName);
+            SetStatusNotice("InsertedNoteImageFormat", draft.FileName);
             return markdown;
         }
         catch (AttachmentTooLargeException ex)

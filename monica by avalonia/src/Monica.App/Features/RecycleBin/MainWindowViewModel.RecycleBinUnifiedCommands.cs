@@ -41,7 +41,7 @@ public sealed partial class MainWindowViewModel
                 OperationType = "RESTORE",
                 DeviceName = Environment.MachineName
             });
-            SetStatusMessage("RestoredRecycleBinItemFormat", secure.Title);
+            SetStatusNotice("RestoredRecycleBinItemFormat", secure.Title);
             RaiseRecycleBinCountStateForUnifiedItems();
         }
 
@@ -58,7 +58,7 @@ public sealed partial class MainWindowViewModel
         SelectedRecycleBinItem = null;
         RecycleBinNarrowShowsList = true;
         RaiseRecycleBinCountStateForUnifiedItems();
-        SetStatusMessage("DeletedRecycleBinItemPermanentlyFormat", item.Title);
+        SetStatusNotice("DeletedRecycleBinItemPermanentlyFormat", item.Title);
     }
 
     [RelayCommand]
@@ -137,7 +137,7 @@ public sealed partial class MainWindowViewModel
             if (expired.Length > 0)
             {
                 RaiseRecycleBinCountStateForUnifiedItems();
-                SetStatusMessage("RecycleBinAutoCleanedFormat", expired.Length);
+                SetStatusNotice("RecycleBinAutoCleanedFormat", expired.Length);
             }
         }
         catch (Exception ex)

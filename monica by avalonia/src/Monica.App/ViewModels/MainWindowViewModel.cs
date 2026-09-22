@@ -198,6 +198,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     partial void OnSelectedSectionChanged(string value)
     {
+        RetireNoticeOnNavigation();
         RefreshVaultPreset();
         RestoreActiveWorkspaceState();
         RefreshSecurityAnalysisIfNeeded();

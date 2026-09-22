@@ -29,7 +29,7 @@ public sealed partial class MainWindowViewModel
         }
 
         await _clipboardService.SetSensitiveTextAsync(password.Value);
-        SetStatusMessage("CopiedPasswordFormat", entry.Title);
+        SetStatusNotice("CopiedPasswordFormat", entry.Title);
     }
 
     [RelayCommand]
@@ -41,7 +41,7 @@ public sealed partial class MainWindowViewModel
         }
 
         await _clipboardService.SetSensitiveTextAsync(entry.Username);
-        SetStatusMessage("CopiedUsernameFormat", entry.Title);
+        SetStatusNotice("CopiedUsernameFormat", entry.Title);
     }
 
     [RelayCommand]
@@ -53,7 +53,7 @@ public sealed partial class MainWindowViewModel
         }
 
         await _clipboardService.SetSensitiveTextAsync(entry.Website);
-        SetStatusMessage("CopiedWebsiteFormat", entry.Title);
+        SetStatusNotice("CopiedWebsiteFormat", entry.Title);
     }
 
 
@@ -67,7 +67,7 @@ public sealed partial class MainWindowViewModel
 
         RefreshPasswordTotpDisplay(entry);
         await _clipboardService.SetSensitiveTextAsync(entry.TotpCode);
-        SetStatusMessage("CopiedTotpFormat", entry.Title);
+        SetStatusNotice("CopiedTotpFormat", entry.Title);
     }
 
 }

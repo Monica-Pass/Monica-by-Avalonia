@@ -216,6 +216,7 @@ try {
             '--smoke-ui-note-editor-checks',
             '--smoke-ui-other-pages-checks',
             '--smoke-ui-keyboard-checks',
+            '--smoke-ui-status-notice',
             '--smoke-ui-max-vault-load-ms', '4000',
             '--smoke-ui-max-memory-mb', "$MaxLockedMemoryMb",
             '--smoke-ui-keepass-file', $keepassPath,
@@ -231,7 +232,8 @@ try {
         }
 
         $gateLines = @(Get-Content -LiteralPath $uiLog | Select-String -SimpleMatch `
-            'release gate completed', 'budget result', 'check failed', 'lock cycle result', 'KeePass probe')
+            'release gate completed', 'budget result', 'check failed', 'lock cycle result',
+            'KeePass probe', 'status notice retirement', 'locked settle result')
         foreach ($line in $gateLines) { Write-Host ($line.Line -replace '^\[[^\]]+\]\s*', '') }
         $gateLine = $gateLines | Where-Object { $_.Line -match 'release gate completed' } | Select-Object -Last 1
         if ($null -eq $gateLine) {
@@ -251,6 +253,17 @@ try {
 
         if ($keepassLine.Line -notmatch 'success=True') {
             throw "KeePass memory probe reported failure: $($keepassLine.Line)"
+        }
+
+        # Same reason: the dispatcher timer that retires status acknowledgements only exists in a
+        # running app, so a build where it stopped ticking has to be caught here.
+        $noticeLine = @($gateLines | Where-Object { $_.Line -match 'status notice retirement result' }) | Select-Object -Last 1
+        if ($null -eq $noticeLine) {
+            throw 'smoke-ui produced no status notice retirement probe line.'
+        }
+
+        if ($noticeLine.Line -notmatch 'success=True') {
+            throw "status notice retirement probe reported failure: $($noticeLine.Line)"
         }
 
         Write-Host ("UI SMOKE passed. rid={0} mode={1} lockedBudgetMB={2}" -f $RuntimeIdentifier, $Mode, $MaxLockedMemoryMb)

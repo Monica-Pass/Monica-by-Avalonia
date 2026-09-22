@@ -41,7 +41,7 @@ public sealed partial class MainWindowViewModel
         });
 
         InvalidateSecurityAnalysis();
-        SetStatusMessage("FavoritedPasswordCountFormat", selected.Length);
+        SetStatusNotice("FavoritedPasswordCountFormat", selected.Length);
     }
 
     [RelayCommand]
@@ -88,7 +88,7 @@ public sealed partial class MainWindowViewModel
         }
 
         RefreshPasswordSelectionStateFromPasswords();
-        SetStatusMessage("MovedSelectedPasswordsToRecycleBinFormat", selected.Length);
+        SetStatusNotice("MovedSelectedPasswordsToRecycleBinFormat", selected.Length);
     }
 
     [RelayCommand]
@@ -126,7 +126,7 @@ public sealed partial class MainWindowViewModel
         }
 
         RefreshPasswordSelectionStateFromPasswords();
-        SetStatusMessage("ArchivedSelectedPasswordsFormat", selected.Length);
+        SetStatusNotice("ArchivedSelectedPasswordsFormat", selected.Length);
     }
 
     [RelayCommand]
@@ -186,7 +186,7 @@ public sealed partial class MainWindowViewModel
 
         RefreshBoundTotpPresentation(selected);
         RaiseVaultTreeState();
-        SetStatusMessage("MovedSelectedPasswordsToFolderFormat", selected.Length, choice.Name);
+        SetStatusNotice("MovedSelectedPasswordsToFolderFormat", selected.Length, choice.Name);
     }
     [RelayCommand]
     private async Task StackSelectedPasswordsAsync()
@@ -228,7 +228,7 @@ public sealed partial class MainWindowViewModel
 
         RaiseVaultTreeState();
         InvalidateSecurityAnalysis();
-        SetStatusMessage("StackedPasswordCountFormat", selected.Length);
+        SetStatusNotice("StackedPasswordCountFormat", selected.Length);
     }
 
 }

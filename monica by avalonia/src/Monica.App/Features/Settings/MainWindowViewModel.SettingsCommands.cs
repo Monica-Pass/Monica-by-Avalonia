@@ -32,7 +32,7 @@ public sealed partial class MainWindowViewModel
         try
         {
             await _externalLinkService.OpenAsync(new Uri(GitHubRepositoryUrl, UriKind.Absolute));
-            SetStatusMessage("GitHubRepositoryOpened");
+            SetStatusNotice("GitHubRepositoryOpened");
         }
         catch (Exception ex)
         {
@@ -73,14 +73,14 @@ public sealed partial class MainWindowViewModel
                 _localization.Cancel);
             if (!confirmed)
             {
-                SetStatusMessage("ClearVaultCancelled");
+                SetStatusNotice("ClearVaultCancelled");
                 return;
             }
 
             await _repository.ClearVaultDataAsync(clearScope);
             DangerZoneConfirmationText = "";
             await LoadAsync();
-            SetStatusMessage("ClearedVaultDataFormat", LocalizeVaultClearScope(clearScope));
+            SetStatusNotice("ClearedVaultDataFormat", LocalizeVaultClearScope(clearScope));
         }
         catch (Exception ex)
         {
@@ -157,7 +157,7 @@ public sealed partial class MainWindowViewModel
             ConfirmNewMasterPassword = "";
             MasterPassword = "";
             ConfirmMasterPassword = "";
-            SetStatusMessage("MasterPasswordChangedFormat", result.TotalSecretsReencrypted);
+            SetStatusNotice("MasterPasswordChangedFormat", result.TotalSecretsReencrypted);
         }
         catch (Exception ex)
         {

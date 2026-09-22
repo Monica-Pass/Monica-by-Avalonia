@@ -44,7 +44,7 @@ public sealed partial class MainWindowViewModel
         }
 
         ExportTotpCsvPreview = await BuildTotpCsvExportAsync();
-        SetStatusMessage("ExportedTotpCsv");
+        SetStatusNotice("ExportedTotpCsv");
     }
 
     [RelayCommand]
@@ -56,7 +56,7 @@ public sealed partial class MainWindowViewModel
         }
 
         ExportAegisPreview = await BuildAegisJsonExportAsync();
-        SetStatusMessage("ExportedAegisJson");
+        SetStatusNotice("ExportedAegisJson");
     }
 
     [RelayCommand(CanExecute = nameof(CanUseFilePicker))]

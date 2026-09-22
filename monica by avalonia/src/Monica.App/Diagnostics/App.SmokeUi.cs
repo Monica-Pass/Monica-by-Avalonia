@@ -183,6 +183,11 @@ public partial class App
                     $"actualMs={viewModel.LastVaultLoadDurationMilliseconds}, maxMs={smokeMaxVaultLoadMilliseconds}");
             }
 
+            if (HasSmokeUiFlag(Environment.GetCommandLineArgs(), "--smoke-ui-status-notice"))
+            {
+                smokeSuccess &= await RunSmokeUiStatusNoticeRetirementAsync(viewModel);
+            }
+
             if (!string.IsNullOrWhiteSpace(smokeSection) &&
                 viewModel.SelectSectionCommand.CanExecute(smokeSection))
             {
@@ -281,6 +286,10 @@ public partial class App
         }, DispatcherPriority.Background);
     }
 
+    private const int LockedSettleIntervalSeconds = 5;
+    private const int LockedSettleRounds = 10;
+    private const int LockedSettleTailRounds = 5;
+
     private static async Task<bool> RunSmokeUiPostLockMemorySampleAsync(
         MainWindowViewModel viewModel,
         string password)
@@ -292,24 +301,50 @@ public partial class App
         var expectedWallet = viewModel.WalletItems.Count;
         viewModel.LockCommand.Execute(null);
         var locked = await WaitForSmokeConditionAsync(() => !viewModel.IsUnlocked, TimeSpan.FromSeconds(10));
-        // The lock handler schedules its own blocking compaction one second later; give it time to land,
-        // then compact again before reading. A private-bytes budget is a claim about the retained set -
-        // what survives a full compaction and so is what a locked user actually settles to - so the
-        // sample must be taken post-compaction like the KeePass probe. Without this the reading races
-        // whatever the GC had not collected yet and swings tens of MB run to run, turning the gate red
-        // on lucky timing rather than on a real leak. Forcing it here still surfaces rooted leaks,
-        // because those survive the compaction and stay in the number.
+        // The lock handler schedules its own blocking compaction one second later; give it time to
+        // land before reading anything. Every sample below compacts first, like the KeePass probe, so
+        // a rooted leak still shows up - it is the only thing that can survive a full compaction.
         await Task.Delay(2500);
         CompactSmokeUiMemory();
-        var lockedPrivateMb = ReportSmokeUiMemory(viewModel, "locked");
         var maxLockedMemoryMb = GetSmokeUiCount(
             Environment.GetCommandLineArgs(), "--smoke-ui-max-memory-mb");
-        var memoryWithinBudget = maxLockedMemoryMb <= 0 || lockedPrivateMb <= maxLockedMemoryMb;
+        // A locked private-bytes budget is a claim about what the shell keeps, but the locked process
+        // is not readable the moment it locks. Measured on the shipped build, after the phases above
+        // pushed this process past 300 MB, the number decayed for half a minute while the thread pool
+        // shed workers - 123.8/120.2/120.8/119.3/121.2 and 121.3/123.4/117.2/115.7/118.2/113.4/113.7
+        // at five second intervals, two runs of the same binary - while the managed heap stayed level
+        // at 25-28 MB. A single early sample therefore graded whichever transient it landed on, and
+        // the gate went red on runs where nothing had changed. A stop-when-two-readings-agree rule
+        // does not fix it either: with jitter of this size two samples agree by luck (the first run
+        // above "converged" at 121.2). So sample a fixed window past the decay and judge the median
+        // of its second half, which is a number the next run can be expected to reproduce.
+        var settleSamples = new List<double>();
+        for (var round = 0; round < LockedSettleRounds; round++)
+        {
+            if (round > 0)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(LockedSettleIntervalSeconds));
+            }
+
+            CompactSmokeUiMemory();
+            settleSamples.Add(ReportSmokeUiMemory(viewModel, $"locked-settling-{round + 1}"));
+        }
+
+        var tail = settleSamples.Skip(settleSamples.Count - LockedSettleTailRounds).ToList();
+        tail.Sort();
+        var settledPrivateMb = tail[tail.Count / 2];
+        AppDiagnostics.Info(
+            $"Smoke UI locked settle result. rounds={settleSamples.Count}, " +
+            $"intervalSeconds={LockedSettleIntervalSeconds}, " +
+            $"trajectory={string.Join("/", settleSamples.ConvertAll(sample => sample.ToString("F1")))}, " +
+            $"tailRounds={LockedSettleTailRounds}, tailMinMB={tail[0]:F1}, " +
+            $"tailMedianMB={settledPrivateMb:F1}, tailMaxMB={tail[^1]:F1}");
+        var memoryWithinBudget = maxLockedMemoryMb <= 0 || settledPrivateMb <= maxLockedMemoryMb;
         if (maxLockedMemoryMb > 0)
         {
             AppDiagnostics.Info(
                 $"Smoke UI memory budget result. success={memoryWithinBudget}, " +
-                $"lockedPrivateMB={lockedPrivateMb:F1}, maxMB={maxLockedMemoryMb}");
+                $"lockedPrivateMB={settledPrivateMb:F1}, maxMB={maxLockedMemoryMb}");
         }
 
         // The shell caches are released on lock, so re-unlocking must rebuild them from the vault.
@@ -630,6 +665,32 @@ public partial class App
             $"Smoke UI password selection details {(detailsReady ? "ready" : "timeout")} in {stopwatch.ElapsedMilliseconds} ms. " +
             $"id={entry.Id}, reason={reason}, hasCurrent={viewModel.HasCurrentSelectedPasswordDetails}");
         return detailsReady;
+    }
+
+    // The status bar's self-clearing is driven by a dispatcher timer, and a dispatcher timer is the
+    // one thing a headless test cannot show ticking. This is that proof, on the build that ships.
+    // It runs before every other phase and raises nothing but a filter reset, so the shell stays on
+    // the page it landed on and the memory readings after this point measure the same set.
+    private static async Task<bool> RunSmokeUiStatusNoticeRetirementAsync(MainWindowViewModel viewModel)
+    {
+        // Whatever the load sequence left in the bar is a standing line - a title or a prompt the
+        // user still has to act on - and those must never be put on the retirement clock.
+        var standingHeld = viewModel.StatusMessage;
+        var standingArmed = viewModel.IsStatusNoticePending;
+
+        viewModel.ClearTotpFiltersCommand.Execute(null);
+        var raised = !string.IsNullOrWhiteSpace(viewModel.StatusMessage);
+        var armedForNotice = viewModel.IsStatusNoticePending;
+        var retired = await WaitForSmokeConditionAsync(
+            () => string.IsNullOrWhiteSpace(viewModel.StatusMessage),
+            TimeSpan.FromSeconds(15));
+
+        var success = raised && armedForNotice && retired && !standingArmed;
+        AppDiagnostics.Info(
+            $"Smoke UI status notice retirement result. success={success}, raised={raised}, " +
+            $"armedForNotice={armedForNotice}, retired={retired}, standingArmed={standingArmed}, " +
+            $"standingLength={standingHeld.Length}");
+        return success;
     }
 
     private static async Task<bool> RunSmokeUiH04ListInteractionsAsync(MainWindowViewModel viewModel)

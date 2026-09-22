@@ -143,7 +143,7 @@ public sealed partial class MainWindowViewModel
         InvalidateSecurityAnalysis();
         if (updateStatus)
         {
-            SetStatusMessage("ArchivedPasswordFormat", entry.Title);
+            SetStatusNotice("ArchivedPasswordFormat", entry.Title);
         }
     }
 
@@ -191,7 +191,7 @@ public sealed partial class MainWindowViewModel
         InvalidateSecurityAnalysis();
         if (updateStatus)
         {
-            SetStatusMessage("MovedToRecycleBinFormat", entry.Title);
+            SetStatusNotice("MovedToRecycleBinFormat", entry.Title);
         }
     }
 

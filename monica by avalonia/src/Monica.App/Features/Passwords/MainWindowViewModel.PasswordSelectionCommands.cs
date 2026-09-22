@@ -48,7 +48,7 @@ public sealed partial class MainWindowViewModel
         QuickFilterUncategorized = false;
         QuickFilterLocalOnly = false;
         QuickFilterAttachments = false;
-        SetStatusMessage("ClearedPasswordFilters");
+        SetStatusNotice("ClearedPasswordFilters");
     }
 
     [RelayCommand]

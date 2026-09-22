@@ -46,7 +46,7 @@ public sealed partial class MainWindowViewModel
                 : RemoteWriteCondition.Match(currentRemote);
             await UploadWebDavMdbxWorkingCopyAsync(database, profile, condition);
         }
-        SetStatusMessage("MdbxKeepLocalSucceededFormat", database.Name);
+        SetStatusNotice("MdbxKeepLocalSucceededFormat", database.Name);
     }
 
     private async Task UseRemoteWebDavMdbxCoreAsync(MdbxDatabaseDisplayItem? item)
@@ -90,11 +90,11 @@ public sealed partial class MainWindowViewModel
         }
         if (recoveryPath is null)
         {
-            SetStatusMessage("MdbxUseRemoteSucceededFormat", database.Name);
+            SetStatusNotice("MdbxUseRemoteSucceededFormat", database.Name);
             return;
         }
 
-        SetStatusMessage("MdbxUseRemoteWithBackupSucceededFormat", database.Name, recoveryPath);
+        SetStatusNotice("MdbxUseRemoteWithBackupSucceededFormat", database.Name, recoveryPath);
     }
 
     private async Task<LocalMdbxDatabase?> GetConflictedRemoteDatabaseAsync(MdbxDatabaseDisplayItem? item)

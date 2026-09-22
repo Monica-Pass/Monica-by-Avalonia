@@ -37,7 +37,7 @@ public sealed partial class MainWindowViewModel
             }
 
             await LoadAsync();
-            SetStatusMessage("ImportedPasswordCsvFormat", importedPasswords);
+            SetStatusNotice("ImportedPasswordCsvFormat", importedPasswords);
         }
         catch (CsvImportException error)
         {
@@ -94,7 +94,7 @@ public sealed partial class MainWindowViewModel
             }
 
             await LoadAsync();
-            SetStatusMessage("ImportedNoteCsvFormat", importedNotes, skippedNotes);
+            SetStatusNotice("ImportedNoteCsvFormat", importedNotes, skippedNotes);
         }
         catch (CsvImportException error)
         {

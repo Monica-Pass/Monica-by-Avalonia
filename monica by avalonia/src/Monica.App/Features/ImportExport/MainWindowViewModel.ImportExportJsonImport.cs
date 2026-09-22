@@ -85,7 +85,7 @@ public sealed partial class MainWindowViewModel
     {
         if (result.Categories > 0)
         {
-            SetStatusMessage(
+            SetStatusNotice(
                 "ImportedMonicaJsonWithCategoriesFormat",
                 result.Passwords,
                 result.SecureItems,
@@ -93,6 +93,6 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        SetStatusMessage("ImportedMonicaJsonFormat", result.Passwords, result.SecureItems);
+        SetStatusNotice("ImportedMonicaJsonFormat", result.Passwords, result.SecureItems);
     }
 }

@@ -23,6 +23,6 @@ public sealed partial class MainWindowViewModel
         }
 
         ClearArchivedPasswordSelection();
-        SetStatusMessage("UnarchivedSelectedPasswordsFormat", selected.Length);
+        SetStatusNotice("UnarchivedSelectedPasswordsFormat", selected.Length);
     }
 }

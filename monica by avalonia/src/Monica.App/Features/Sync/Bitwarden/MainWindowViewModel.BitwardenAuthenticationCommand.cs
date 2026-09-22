@@ -56,7 +56,7 @@ public sealed partial class MainWindowViewModel
             connectedAccountId = savedAccount.Id;
             ClearBitwardenAuthenticationFields(preserveIdentity: true);
             IsBitwardenConnectionEditorVisible = false;
-            SetStatusMessage("BitwardenConnectedFormat", savedAccount.Email);
+            SetStatusNotice("BitwardenConnectedFormat", savedAccount.Email);
 
             try
             {

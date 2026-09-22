@@ -56,7 +56,7 @@ public sealed partial class MainWindowViewModel
         RefreshBoundTotpPresentation(entries);
         InvalidateSecurityAnalysis();
         RaisePasswordCountState();
-        SetStatusMessage("CreatedPasswordFormat", entries[0].Title);
+        SetStatusNotice("CreatedPasswordFormat", entries[0].Title);
     }
 
     [RelayCommand]
@@ -135,7 +135,7 @@ public sealed partial class MainWindowViewModel
         RefreshBoundTotpPresentation(siblings.Concat(updatedEntries));
         InvalidateSecurityAnalysis();
         RaisePasswordCountState();
-        SetStatusMessage("UpdatedPasswordFormat", updatedEntries[0].Title);
+        SetStatusNotice("UpdatedPasswordFormat", updatedEntries[0].Title);
     }
 
 }

@@ -23,7 +23,7 @@ public sealed partial class MainWindowViewModel
             var savedNote = await SaveNoteTabAsync(SelectedNoteTab);
             SelectedNote = savedNote;
             RaiseNoteCountState();
-            SetStatusMessage("SavedNoteFormat", savedNote.Title);
+            SetStatusNotice("SavedNoteFormat", savedNote.Title);
             return;
         }
 
@@ -81,7 +81,7 @@ public sealed partial class MainWindowViewModel
 
         SelectedNote = item;
         RaiseNoteCountState();
-        SetStatusMessage("SavedNoteFormat", item.Title);
+        SetStatusNotice("SavedNoteFormat", item.Title);
     }
 
     [RelayCommand]
@@ -125,7 +125,7 @@ public sealed partial class MainWindowViewModel
 
         if (skippedCount == 0)
         {
-            SetStatusMessage("SavedNotesFormat", savedCount);
+            SetStatusNotice("SavedNotesFormat", savedCount);
             return;
         }
 

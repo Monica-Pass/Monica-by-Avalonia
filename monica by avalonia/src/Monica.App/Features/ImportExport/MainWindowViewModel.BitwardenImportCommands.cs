@@ -28,11 +28,11 @@ public sealed partial class MainWindowViewModel
             ClearBitwardenImportPreview();
             _bitwardenPendingJson = file.Content;
             BitwardenSelectedFileName = file.FileName;
-            SetStatusMessage("BitwardenFileSelectedFormat", file.FileName);
+            SetStatusNotice("BitwardenFileSelectedFormat", file.FileName);
         }
         catch (OperationCanceledException)
         {
-            SetStatusMessage("BitwardenImportCanceled");
+            SetStatusNotice("BitwardenImportCanceled");
         }
         catch (Exception error)
         {
@@ -73,7 +73,7 @@ public sealed partial class MainWindowViewModel
             OnPropertyChanged(nameof(HasBitwardenImportPreview));
             OnPropertyChanged(nameof(BitwardenPreviewSummaryText));
             OnPropertyChanged(nameof(BitwardenAttachmentNoticeText));
-            SetStatusMessage(
+            SetStatusNotice(
                 "BitwardenPreviewReadyFormat",
                 BitwardenPreviewPasswordCount,
                 BitwardenPreviewSecureItemCount,
@@ -82,7 +82,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (OperationCanceledException)
         {
-            SetStatusMessage("BitwardenImportCanceled");
+            SetStatusNotice("BitwardenImportCanceled");
         }
         catch (BitwardenJsonImportException error)
         {
@@ -154,11 +154,11 @@ public sealed partial class MainWindowViewModel
             });
             ClearBitwardenImportState(cancelActiveOperation: false);
             await LoadAsync();
-            SetStatusMessage("BitwardenImportedFormat", progress.Imported, progress.Skipped, preview.UnsupportedItemCount);
+            SetStatusNotice("BitwardenImportedFormat", progress.Imported, progress.Skipped, preview.UnsupportedItemCount);
         }
         catch (OperationCanceledException)
         {
-            SetStatusMessage("BitwardenImportCanceledAfterFormat", progress.Imported, progress.Skipped);
+            SetStatusNotice("BitwardenImportCanceledAfterFormat", progress.Imported, progress.Skipped);
         }
         catch (Exception error)
         {
@@ -175,7 +175,7 @@ public sealed partial class MainWindowViewModel
     private void CancelBitwardenImport()
     {
         _bitwardenOperationCancellation?.Cancel();
-        SetStatusMessage("BitwardenImportCanceled");
+        SetStatusNotice("BitwardenImportCanceled");
     }
 
     [RelayCommand]

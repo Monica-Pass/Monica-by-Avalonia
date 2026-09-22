@@ -83,7 +83,7 @@ public sealed partial class MainWindowViewModel
         SelectedTotpItem = item;
         TotpNarrowShowsList = false;
         RaiseTotpCountState(reconcileSelection: false);
-        SetStatusMessage("SavedTotpFormat", item.Title);
+        SetStatusNotice("SavedTotpFormat", item.Title);
     }
 
     private static string BuildScannedTotpTitle(TotpData data) =>

@@ -48,7 +48,7 @@ public sealed partial class MainWindowViewModel
         RaisePasswordCountState();
         RecycleBinNarrowShowsList = true;
         InvalidateSecurityAnalysis();
-        SetStatusMessage("RestoredPasswordFormat", entry.Title);
+        SetStatusNotice("RestoredPasswordFormat", entry.Title);
     }
 
     [RelayCommand]
@@ -70,7 +70,7 @@ public sealed partial class MainWindowViewModel
         RaisePasswordCountState();
         InvalidateSecurityAnalysis();
         RecycleBinNarrowShowsList = true;
-        SetStatusMessage("DeletedPasswordPermanentlyFormat", entry.Title);
+        SetStatusNotice("DeletedPasswordPermanentlyFormat", entry.Title);
     }
 
     private async Task<IReadOnlyList<PasswordEntry>> PurgeDeletedPasswordGroupAsync(PasswordEntry entry)
@@ -124,7 +124,7 @@ public sealed partial class MainWindowViewModel
         RefreshBoundTotpPresentation(items.Where(item => item.Password is not null).Select(item => item.Password!).ToArray());
         RaisePasswordCountState();
         InvalidateSecurityAnalysis();
-        SetStatusMessage("EmptiedRecycleBinFormat", items.Length);
+        SetStatusNotice("EmptiedRecycleBinFormat", items.Length);
     }
 
     [RelayCommand]

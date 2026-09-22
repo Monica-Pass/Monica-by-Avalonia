@@ -112,7 +112,7 @@ public sealed partial class MainWindowViewModel
         }
 
         await _repository.DeletePasswordHistoryAsync(entry.Id);
-        SetStatusMessage("DeletedPasswordHistoryEntry");
+        SetStatusNotice("DeletedPasswordHistoryEntry");
         return true;
     }
 
@@ -124,7 +124,7 @@ public sealed partial class MainWindowViewModel
         }
 
         await _repository.ClearPasswordHistoryAsync(entryId);
-        SetStatusMessage("ClearedPasswordHistory");
+        SetStatusNotice("ClearedPasswordHistory");
         return true;
     }
 

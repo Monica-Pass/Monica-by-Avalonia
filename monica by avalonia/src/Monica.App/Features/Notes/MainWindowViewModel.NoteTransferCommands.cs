@@ -41,7 +41,7 @@ public sealed partial class MainWindowViewModel
             OpenNoteTabs.Add(tab);
             NotifyNoteTabsChanged();
             SelectedNoteTab = tab;
-            SetStatusMessage("ImportedMarkdownDraftFormat", file.FileName);
+            SetStatusNotice("ImportedMarkdownDraftFormat", file.FileName);
         }
         catch (Exception ex)
         {

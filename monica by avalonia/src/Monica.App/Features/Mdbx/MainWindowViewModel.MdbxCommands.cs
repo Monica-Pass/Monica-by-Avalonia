@@ -30,7 +30,7 @@ public sealed partial class MainWindowViewModel
         MdbxDatabases.Add(metadata);
         RefreshMdbxVaultState();
         RefreshVaultSources();
-        SetStatusMessage("CreatedMdbxMetadata");
+        SetStatusNotice("CreatedMdbxMetadata");
     }
 
     [RelayCommand]
@@ -53,7 +53,7 @@ public sealed partial class MainWindowViewModel
             if (existing.LastSyncStatus == SyncStatus.PendingUpload)
             {
                 await UploadWebDavMdbxWorkingCopyAsync(existing, profile);
-                SetStatusMessage("MdbxWebDavUploadSucceededFormat", existing.Name);
+                SetStatusNotice("MdbxWebDavUploadSucceededFormat", existing.Name);
                 return;
             }
 
@@ -72,7 +72,7 @@ public sealed partial class MainWindowViewModel
         await _repository.SaveMdbxDatabaseAsync(metadata);
         MdbxDatabases.Add(metadata);
         await UploadWebDavMdbxWorkingCopyAsync(metadata, profile);
-        SetStatusMessage("CreatedMdbxWebDavMetadata");
+        SetStatusNotice("CreatedMdbxWebDavMetadata");
     }
 
     [RelayCommand]
@@ -112,7 +112,7 @@ public sealed partial class MainWindowViewModel
         await _repository.SaveMdbxDatabaseAsync(metadata);
         MdbxDatabases.Add(metadata);
         await UploadOneDriveMdbxWorkingCopyAsync(metadata);
-        SetStatusMessage("CreatedMdbxOneDriveMetadata");
+        SetStatusNotice("CreatedMdbxOneDriveMetadata");
     }
 
     [RelayCommand]
@@ -122,7 +122,7 @@ public sealed partial class MainWindowViewModel
     private async Task RefreshMdbxVaultsCoreAsync()
     {
         await ReloadMdbxVaultStateAsync();
-        SetStatusMessage("MdbxVaultsRefreshed");
+        SetStatusNotice("MdbxVaultsRefreshed");
     }
 
     [RelayCommand]
@@ -181,7 +181,7 @@ public sealed partial class MainWindowViewModel
         database.LastAccessedAt = DateTimeOffset.UtcNow;
         await _repository.SaveMdbxDatabaseAsync(database);
         await ReloadMdbxVaultStateAsync();
-        SetStatusMessage("OpenedMdbxDatabaseFormat", item.Name, stream.Length);
+        SetStatusNotice("OpenedMdbxDatabaseFormat", item.Name, stream.Length);
     }
 
     [RelayCommand]
@@ -233,7 +233,7 @@ public sealed partial class MainWindowViewModel
         if (database.LastSyncStatus == SyncStatus.PendingUpload)
         {
             await UploadWebDavMdbxWorkingCopyAsync(database, profile);
-            SetStatusMessage("MdbxWebDavUploadSucceededFormat", item.Name);
+            SetStatusNotice("MdbxWebDavUploadSucceededFormat", item.Name);
             return;
         }
 
@@ -244,7 +244,7 @@ public sealed partial class MainWindowViewModel
         }
 
         await DownloadWebDavMdbxWorkingCopyAsync(database, profile);
-        SetStatusMessage("MdbxWebDavDownloadSucceededFormat", item.Name);
+        SetStatusNotice("MdbxWebDavDownloadSucceededFormat", item.Name);
     }
 
     [RelayCommand]

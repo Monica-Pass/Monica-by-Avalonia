@@ -34,7 +34,7 @@ public sealed partial class MainWindowViewModel
             ClearRecoveryResetInputs();
             MasterPassword = "";
             ConfirmMasterPassword = "";
-            SetStatusMessage("ResetMasterPasswordChangedFormat", result.TotalSecretsReencrypted);
+            SetStatusNotice("ResetMasterPasswordChangedFormat", result.TotalSecretsReencrypted);
         }
         catch (Exception ex)
         {
@@ -54,7 +54,7 @@ public sealed partial class MainWindowViewModel
             _settingsService.Current.SecurityRecovery.IsEnabled = false;
             QueueSaveSettings();
             RaiseSecurityRecoveryState();
-            SetStatusMessage("SecurityQuestionsDisabled");
+            SetStatusNotice("SecurityQuestionsDisabled");
             return;
         }
 
@@ -67,7 +67,7 @@ public sealed partial class MainWindowViewModel
             ApplySecurityRecoverySettings(setup);
             QueueSaveSettings();
             RaiseSecurityRecoveryState();
-            SetStatusMessage("SecurityQuestionsSaved");
+            SetStatusNotice("SecurityQuestionsSaved");
         }
         catch (Exception ex)
         {

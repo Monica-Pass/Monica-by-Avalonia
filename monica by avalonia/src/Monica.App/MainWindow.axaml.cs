@@ -25,6 +25,7 @@ public partial class MainWindow : Window
         };
         DataContextChanged += OnDataContextChanged;
         InitializeSecurityLifecycle();
+        InitializeStatusNoticeLifecycle();
         InitializeBackgroundMemoryLifecycle();
     }
 

@@ -183,7 +183,7 @@ public sealed partial class MainWindowViewModel
         RaiseTotpCountState();
         if (updateStatus)
         {
-            SetStatusMessage("MovedToRecycleBinFormat", item.Title);
+            SetStatusNotice("MovedToRecycleBinFormat", item.Title);
         }
     }
 

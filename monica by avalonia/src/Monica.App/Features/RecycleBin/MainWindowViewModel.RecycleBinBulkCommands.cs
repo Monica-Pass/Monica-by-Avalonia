@@ -20,7 +20,7 @@ public sealed partial class MainWindowViewModel
         }
 
         ClearDeletedPasswordSelection();
-        SetStatusMessage(
+        SetStatusNotice(
             selected.All(item => item.Password is not null)
                 ? "RestoredSelectedPasswordsFormat"
                 : "RestoredSelectedRecycleBinItemsFormat",
@@ -45,7 +45,7 @@ public sealed partial class MainWindowViewModel
         RaiseRecycleBinCountStateForUnifiedItems();
         InvalidateSecurityAnalysis();
         RecycleBinNarrowShowsList = true;
-        SetStatusMessage(
+        SetStatusNotice(
             selected.All(item => item.Password is not null)
                 ? "DeletedSelectedPasswordsPermanentlyFormat"
                 : "DeletedSelectedRecycleBinItemsPermanentlyFormat",

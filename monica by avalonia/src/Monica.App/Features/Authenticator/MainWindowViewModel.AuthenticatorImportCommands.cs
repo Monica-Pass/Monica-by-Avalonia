@@ -60,7 +60,7 @@ public sealed partial class MainWindowViewModel
             ImportAegisJsonText = "";
             IsAegisImportPasswordRequired = false;
             await LoadAsync();
-            SetStatusMessage("ImportedAegisJsonFormat", importedTotps, skippedTotps);
+            SetStatusNotice("ImportedAegisJsonFormat", importedTotps, skippedTotps);
         }
         catch (AegisImportException ex)
         {
@@ -126,7 +126,7 @@ public sealed partial class MainWindowViewModel
 
             ImportTotpCsvText = "";
             await LoadAsync();
-            SetStatusMessage("ImportedTotpCsvFormat", importedTotps, skippedTotps);
+            SetStatusNotice("ImportedTotpCsvFormat", importedTotps, skippedTotps);
         }
         catch (CsvImportException error)
         {

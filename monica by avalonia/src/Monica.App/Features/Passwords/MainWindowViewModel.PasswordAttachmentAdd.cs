@@ -78,7 +78,7 @@ public sealed partial class MainWindowViewModel
             OperationType = "ATTACHMENT",
             DeviceName = Environment.MachineName
         }, cancellationToken);
-        SetStatusMessage("AddedAttachmentFormat", attachment.FileName, entry.Title);
+        SetStatusNotice("AddedAttachmentFormat", attachment.FileName, entry.Title);
         return attachment;
     }
 
