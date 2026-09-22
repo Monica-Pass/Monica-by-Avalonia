@@ -292,8 +292,15 @@ public partial class App
         var expectedWallet = viewModel.WalletItems.Count;
         viewModel.LockCommand.Execute(null);
         var locked = await WaitForSmokeConditionAsync(() => !viewModel.IsUnlocked, TimeSpan.FromSeconds(10));
-        // The lock handler schedules its compaction one second later, so sample only after it lands.
+        // The lock handler schedules its own blocking compaction one second later; give it time to land,
+        // then compact again before reading. A private-bytes budget is a claim about the retained set -
+        // what survives a full compaction and so is what a locked user actually settles to - so the
+        // sample must be taken post-compaction like the KeePass probe. Without this the reading races
+        // whatever the GC had not collected yet and swings tens of MB run to run, turning the gate red
+        // on lucky timing rather than on a real leak. Forcing it here still surfaces rooted leaks,
+        // because those survive the compaction and stay in the number.
         await Task.Delay(2500);
+        CompactSmokeUiMemory();
         var lockedPrivateMb = ReportSmokeUiMemory(viewModel, "locked");
         var maxLockedMemoryMb = GetSmokeUiCount(
             Environment.GetCommandLineArgs(), "--smoke-ui-max-memory-mb");
