@@ -23,7 +23,7 @@ public sealed partial class MainWindowViewModel
         OpenNoteTabs.Add(tab);
         NotifyNoteTabsChanged();
         SelectedNoteTab = tab;
-        StatusMessage = _localization.Get("EditingNewSecureNote");
+        SetStatusMessage("EditingNewSecureNote");
     }
 
     [RelayCommand]

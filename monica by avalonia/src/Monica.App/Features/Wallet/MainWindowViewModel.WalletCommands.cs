@@ -31,7 +31,7 @@ public sealed partial class MainWindowViewModel
         SelectedWalletItem = item;
         WalletNarrowShowsList = false;
         RaiseWalletCountState();
-        StatusMessage = _localization.Format("SavedWalletItemFormat", item.Title);
+        SetStatusMessage("SavedWalletItemFormat", item.Title);
     }
 
     [RelayCommand]
@@ -62,7 +62,7 @@ public sealed partial class MainWindowViewModel
         SelectedWalletItem = item;
         SelectedWalletDetails = new WalletItemDetailsViewModel(_localization, item);
         RaiseWalletCountState();
-        StatusMessage = _localization.Format("SavedWalletItemFormat", item.Title);
+        SetStatusMessage("SavedWalletItemFormat", item.Title);
     }
 
     [RelayCommand]
@@ -87,7 +87,7 @@ public sealed partial class MainWindowViewModel
         }
 
         WalletSearchText = "";
-        StatusMessage = _localization.Get("ClearedWalletSearch");
+        SetStatusMessage("ClearedWalletSearch");
     }
 
     [RelayCommand]
@@ -99,7 +99,7 @@ public sealed partial class MainWindowViewModel
         }
 
         await _clipboardService.SetSensitiveTextAsync(field.Value);
-        StatusMessage = _localization.Format("CopiedWalletFieldFormat", field.Label);
+        SetStatusMessage("CopiedWalletFieldFormat", field.Label);
     }
 
     [RelayCommand]
@@ -169,6 +169,6 @@ public sealed partial class MainWindowViewModel
         }
 
         RaiseWalletSelectionState();
-        StatusMessage = _localization.Format("MovedSelectedWalletItemsToRecycleBinFormat", selected.Length);
+        SetStatusMessage("MovedSelectedWalletItemsToRecycleBinFormat", selected.Length);
     }
 }

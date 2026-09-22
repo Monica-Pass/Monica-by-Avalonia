@@ -1243,39 +1243,76 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
-    public void ViewModel_recoverable_status_requires_unlocked_failed_nonloading_state()
+    public async Task ViewModel_failure_status_shows_the_strip_in_english_and_chinese_alike()
+    {
+        // The whole point of classifying at the producing site: the same failed operation must
+        // earn the strip in every language, not only in whichever wording happens to contain
+        // words like "failed" or "无法".
+        foreach (var language in new[] { "en-US", "zh-CN" })
+        {
+            var harness = CreateHarness();
+            harness.ViewModel.IsUnlocked = true;
+            harness.ViewModel.IsLoadingVault = false;
+            harness.ViewModel.L.SetLanguage(language);
+            harness.ViewModel.NewFolderName = "   ";
+
+            await harness.ViewModel.CreateVaultFolderCommand.ExecuteAsync(null);
+
+            Assert.True(harness.ViewModel.HasFailedStatusMessage, language);
+            Assert.Equal(harness.ViewModel.L.Get("FolderNameRequired"), harness.ViewModel.StatusMessage);
+        }
+    }
+
+    [Fact]
+    public async Task ViewModel_failure_status_strip_needs_unlocked_and_not_loading_state()
     {
         var harness = CreateHarness();
+        harness.ViewModel.NewFolderName = "";
 
-        harness.ViewModel.StatusMessage = "Vault load failed";
+        await harness.ViewModel.CreateVaultFolderCommand.ExecuteAsync(null);
 
-        Assert.False(harness.ViewModel.HasRecoverableStatusMessage);
+        Assert.True(harness.ViewModel.IsStatusMessageFailure);
+        Assert.False(harness.ViewModel.HasFailedStatusMessage);
 
         harness.ViewModel.IsUnlocked = true;
         harness.ViewModel.IsLoadingVault = true;
 
-        Assert.False(harness.ViewModel.HasRecoverableStatusMessage);
+        Assert.False(harness.ViewModel.HasFailedStatusMessage);
 
         harness.ViewModel.IsLoadingVault = false;
 
-        Assert.True(harness.ViewModel.HasRecoverableStatusMessage);
-
-        harness.ViewModel.StatusMessage = "Vault unlocked";
-
-        Assert.False(harness.ViewModel.HasRecoverableStatusMessage);
+        Assert.True(harness.ViewModel.HasFailedStatusMessage);
     }
 
     [Fact]
-    public void ViewModel_legacy_data_notice_is_not_a_global_recoverable_status()
+    public async Task ViewModel_success_status_clears_a_previous_failure_strip()
     {
         var harness = CreateHarness();
-
         harness.ViewModel.IsUnlocked = true;
-        harness.ViewModel.IsLoadingVault = false;
-        harness.ViewModel.HasPendingLegacyBusinessData = true;
-        harness.ViewModel.StatusMessage = harness.ViewModel.L.Get("VaultUnlockedLegacyBusinessDataPending");
+        harness.ViewModel.NewFolderName = "";
 
-        Assert.False(harness.ViewModel.HasRecoverableStatusMessage);
+        await harness.ViewModel.CreateVaultFolderCommand.ExecuteAsync(null);
+        Assert.True(harness.ViewModel.HasFailedStatusMessage);
+
+        harness.ViewModel.NewFolderName = "Strip clearance";
+        harness.ViewModel.HasPendingLegacyBusinessData = true;
+
+        await harness.ViewModel.CreateVaultFolderCommand.ExecuteAsync(null);
+
+        Assert.False(harness.ViewModel.IsStatusMessageFailure);
+        Assert.False(harness.ViewModel.HasFailedStatusMessage);
+        Assert.Equal(
+            harness.ViewModel.L.Format("CreatedFolderFormat", "Strip clearance"),
+            harness.ViewModel.StatusMessage);
+    }
+
+    [Fact]
+    public void ViewModel_status_message_exposes_no_setter_so_writes_cannot_skip_classification()
+    {
+        var property = typeof(MainWindowViewModel).GetProperty("StatusMessage");
+
+        Assert.NotNull(property);
+        Assert.Null(property!.SetMethod);
     }
 
     [Fact]

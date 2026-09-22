@@ -150,10 +150,7 @@ public sealed partial class MainWindowViewModel
         await MoveVaultBatchCoreAsync(passwords, items, choice);
         RebuildVaultTree();
         RaiseVaultBatchState();
-        StatusMessage = _localization.Format(
-            "MovedSelectedPasswordsToFolderFormat",
-            passwords.Length + items.Length,
-            choice.Name);
+        SetStatusMessage("MovedSelectedPasswordsToFolderFormat", passwords.Length + items.Length, choice.Name);
     }
 
     private async Task MoveVaultBatchCoreAsync(PasswordEntry[] passwords, SecureItem[] items, PasswordCategoryChoice choice)

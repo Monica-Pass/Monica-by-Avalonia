@@ -16,7 +16,7 @@ public sealed partial class MainWindowViewModel
     {
         if (Interlocked.CompareExchange(ref _mdbxOperationActive, 1, 0) != 0)
         {
-            StatusMessage = _localization.Get("MdbxOperationInProgress");
+            SetStatusMessage("MdbxOperationInProgress");
             return;
         }
 
@@ -28,7 +28,7 @@ public sealed partial class MainWindowViewModel
         catch (OneDriveAccountUnavailableException ex)
         {
             AppDiagnostics.Error($"MDBX OneDrive account unavailable: {operationKey}", ex);
-            StatusMessage = _localization.Get("MdbxOneDriveAccountRequired");
+            SetStatusFailure("MdbxOneDriveAccountRequired");
         }
         catch (Exception ex)
         {

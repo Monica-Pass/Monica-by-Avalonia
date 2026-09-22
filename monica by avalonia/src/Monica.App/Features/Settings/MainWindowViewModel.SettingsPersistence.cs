@@ -165,7 +165,7 @@ public sealed partial class MainWindowViewModel
             AppDiagnostics.Error("Settings save failed", ex);
             if (string.Equals(StatusMessage, statusBeforeSave, StringComparison.Ordinal))
             {
-                StatusMessage = _localization.Get("SettingsSaveFailed");
+                SetStatusFailure("SettingsSaveFailed");
             }
         }
         finally

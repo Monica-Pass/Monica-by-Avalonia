@@ -16,20 +16,20 @@ public sealed partial class MainWindowViewModel
             CaptureNoteEditorState(SelectedNoteTab, markDirty: SelectedNoteTab.IsDirty);
             if (!CanSaveNoteTab(SelectedNoteTab))
             {
-                StatusMessage = _localization.Get("NoteRequiresContent");
+                SetStatusMessage("NoteRequiresContent");
                 return;
             }
 
             var savedNote = await SaveNoteTabAsync(SelectedNoteTab);
             SelectedNote = savedNote;
             RaiseNoteCountState();
-            StatusMessage = _localization.Format("SavedNoteFormat", savedNote.Title);
+            SetStatusMessage("SavedNoteFormat", savedNote.Title);
             return;
         }
 
         if (string.IsNullOrWhiteSpace(NoteTitle) && string.IsNullOrWhiteSpace(NoteContent))
         {
-            StatusMessage = _localization.Get("NoteRequiresContent");
+            SetStatusMessage("NoteRequiresContent");
             return;
         }
 
@@ -81,7 +81,7 @@ public sealed partial class MainWindowViewModel
 
         SelectedNote = item;
         RaiseNoteCountState();
-        StatusMessage = _localization.Format("SavedNoteFormat", item.Title);
+        SetStatusMessage("SavedNoteFormat", item.Title);
     }
 
     [RelayCommand]
@@ -95,7 +95,7 @@ public sealed partial class MainWindowViewModel
         var dirtyTabs = OpenNoteTabs.Where(tab => tab.IsDirty).ToArray();
         if (dirtyTabs.Length == 0)
         {
-            StatusMessage = _localization.Get("NoNotesToSave");
+            SetStatusMessage("NoNotesToSave");
             return;
         }
 
@@ -123,9 +123,13 @@ public sealed partial class MainWindowViewModel
             RaiseNoteCountState();
         }
 
-        StatusMessage = skippedCount == 0
-            ? _localization.Format("SavedNotesFormat", savedCount)
-            : _localization.Format("SavedNotesWithSkippedFormat", savedCount, skippedCount);
+        if (skippedCount == 0)
+        {
+            SetStatusMessage("SavedNotesFormat", savedCount);
+            return;
+        }
+
+        SetStatusMessage("SavedNotesWithSkippedFormat", savedCount, skippedCount);
     }
 
 }

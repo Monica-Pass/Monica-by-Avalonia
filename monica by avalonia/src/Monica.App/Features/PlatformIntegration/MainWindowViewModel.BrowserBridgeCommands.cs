@@ -13,7 +13,7 @@ public sealed partial class MainWindowViewModel
         }
 
         await _clipboardService.SetSensitiveTextAsync(BrowserIntegrationSessionToken);
-        StatusMessage = _localization.Get("BrowserBridgeTokenCopied");
+        SetStatusMessage("BrowserBridgeTokenCopied");
     }
 
     private bool CanCopyBrowserIntegrationToken() =>

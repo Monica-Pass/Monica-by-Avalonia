@@ -28,11 +28,11 @@ public sealed partial class MainWindowViewModel
             ClearKeePassImportPreview();
             _keePassPendingFile = file;
             KeePassSelectedFileName = file.FileName;
-            StatusMessage = _localization.Format("KeePassFileSelectedFormat", file.FileName);
+            SetStatusMessage("KeePassFileSelectedFormat", file.FileName);
         }
         catch (OperationCanceledException)
         {
-            StatusMessage = _localization.Get("KeePassImportCanceled");
+            SetStatusMessage("KeePassImportCanceled");
         }
         catch (Exception error)
         {
@@ -45,7 +45,7 @@ public sealed partial class MainWindowViewModel
     {
         if (_keePassPendingFile is null)
         {
-            StatusMessage = _localization.Get("KeePassFileRequired");
+            SetStatusFailure("KeePassFileRequired");
             return;
         }
 
@@ -59,7 +59,7 @@ public sealed partial class MainWindowViewModel
         {
             ClearKeePassImportPreview();
             IsKeePassImportProgressIndeterminate = true;
-            StatusMessage = _localization.Get("KeePassPreviewLoading");
+            SetStatusMessage("KeePassPreviewLoading");
             var session = await _keePassVaultService.OpenAsync(
                 _keePassPendingFile.Content,
                 _keePassPendingFile.FileName,
@@ -71,19 +71,15 @@ public sealed partial class MainWindowViewModel
             await RebuildKeePassTreeAsync(session, cancellationToken);
             OnPropertyChanged(nameof(HasKeePassImportPreview));
             OnPropertyChanged(nameof(KeePassPreviewSummaryText));
-            StatusMessage = _localization.Format(
-                "KeePassPreviewReadyFormat",
-                session.DatabaseName,
-                session.EntryCount,
-                session.GroupCount);
+            SetStatusMessage("KeePassPreviewReadyFormat", session.DatabaseName, session.EntryCount, session.GroupCount);
         }
         catch (OperationCanceledException)
         {
-            StatusMessage = _localization.Get("KeePassImportCanceled");
+            SetStatusMessage("KeePassImportCanceled");
         }
         catch (KeePassVaultException error)
         {
-            StatusMessage = _localization.Get(error.Error switch
+            SetStatusFailure(error.Error switch
             {
                 KeePassVaultError.UnsupportedFormat => "KeePassUnsupportedFormat",
                 KeePassVaultError.ResourceLimitExceeded => "KeePassResourceLimitExceeded",
@@ -108,7 +104,7 @@ public sealed partial class MainWindowViewModel
         var session = _keePassVaultSession;
         if (session is null)
         {
-            StatusMessage = _localization.Get("KeePassPreviewRequired");
+            SetStatusFailure("KeePassPreviewRequired");
             return;
         }
 
@@ -211,16 +207,16 @@ public sealed partial class MainWindowViewModel
             });
             ClearKeePassImportState(cancelActiveOperation: false);
             await LoadAsync();
-            StatusMessage = _localization.Format("KeePassImportedFormat", imported, skipped);
+            SetStatusMessage("KeePassImportedFormat", imported, skipped);
         }
         catch (OperationCanceledException)
         {
-            StatusMessage = _localization.Format("KeePassImportCanceledAfterFormat", imported, skipped);
+            SetStatusMessage("KeePassImportCanceledAfterFormat", imported, skipped);
         }
         catch (Exception error)
         {
             RecordImportExportFailure("Importing KeePass vault failed", error);
-            StatusMessage = _localization.Format("KeePassImportPartialFailureFormat", imported, skipped);
+            SetStatusMessage("KeePassImportPartialFailureFormat", imported, skipped);
         }
         finally
         {
@@ -233,7 +229,7 @@ public sealed partial class MainWindowViewModel
     {
         _keePassOperationCancellation?.Cancel();
         KeePassImportPassword = "";
-        StatusMessage = _localization.Get("KeePassImportCanceled");
+        SetStatusMessage("KeePassImportCanceled");
     }
 
     [RelayCommand]

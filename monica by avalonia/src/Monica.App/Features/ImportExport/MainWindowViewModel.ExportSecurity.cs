@@ -9,14 +9,14 @@ public sealed partial class MainWindowViewModel
     {
         if (_vaultSessionService.IsExplicitlyLocked)
         {
-            StatusMessage = _localization.Get("VaultLocked");
+            SetStatusMessage("VaultLocked");
             return false;
         }
 
         var authorized = await _exportAuthorizationService.AuthorizeAsync(RequirePasswordBeforeExport);
         if (!authorized)
         {
-            StatusMessage = _localization.Get("ExportAuthorizationFailed");
+            SetStatusFailure("ExportAuthorizationFailed");
         }
         else if (grantFileExport)
         {

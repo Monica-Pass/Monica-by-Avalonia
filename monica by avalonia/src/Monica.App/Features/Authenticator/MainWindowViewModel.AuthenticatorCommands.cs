@@ -31,7 +31,7 @@ public sealed partial class MainWindowViewModel
         TotpSearchText = "";
         SelectedTotpFilterKey = TotpFilterAll;
         RaiseTotpFilterState();
-        StatusMessage = _localization.Get("ClearedTotpFilters");
+        SetStatusMessage("ClearedTotpFilters");
     }
 
     [RelayCommand]
@@ -59,7 +59,7 @@ public sealed partial class MainWindowViewModel
 
         RefreshTotpDisplay(item);
         await _clipboardService.SetSensitiveTextAsync(item.TotpCode);
-        StatusMessage = _localization.Format("CopiedTotpFormat", item.Title);
+        SetStatusMessage("CopiedTotpFormat", item.Title);
     }
 
     private static bool CanAdvanceTotp(SecureItem? item)
@@ -90,7 +90,7 @@ public sealed partial class MainWindowViewModel
         RefreshTotpDisplay(item);
         await _repository.SaveSecureItemAsync(item);
         SelectedTotpDetails = new TotpItemDetailsViewModel(_localization, item);
-        StatusMessage = _localization.Format("GeneratedNextTotpFormat", item.Title);
+        SetStatusMessage("GeneratedNextTotpFormat", item.Title);
     }
 
     [RelayCommand]
@@ -113,7 +113,7 @@ public sealed partial class MainWindowViewModel
                 ?? (await _repository.GetPasswordsAsync()).FirstOrDefault(entry => entry.Id == passwordId);
             if (password is null)
             {
-                StatusMessage = _localization.Get("BoundPasswordMissing");
+                SetStatusFailure("BoundPasswordMissing");
                 return;
             }
 
@@ -144,7 +144,7 @@ public sealed partial class MainWindowViewModel
             DeviceName = Environment.MachineName
         });
         ClearTotpSelection();
-        StatusMessage = _localization.Format("SavedTotpFormat", editor.Title.Trim());
+        SetStatusMessage("SavedTotpFormat", editor.Title.Trim());
     }
 
     [RelayCommand]
@@ -163,7 +163,7 @@ public sealed partial class MainWindowViewModel
         }
 
         RaiseTotpFilterState();
-        StatusMessage = _localization.Format(next ? "FavoritedTotpFormat" : "UnfavoritedTotpFormat", item.Title);
+        SetStatusMessage(next ? "FavoritedTotpFormat" : "UnfavoritedTotpFormat", item.Title);
     }
 
     [RelayCommand]
@@ -234,7 +234,7 @@ public sealed partial class MainWindowViewModel
 
         RaiseTotpFilterState();
         RaiseTotpSelectionState();
-        StatusMessage = _localization.Format("FavoritedTotpCountFormat", selected.Length);
+        SetStatusMessage("FavoritedTotpCountFormat", selected.Length);
     }
 
     [RelayCommand]
@@ -257,6 +257,6 @@ public sealed partial class MainWindowViewModel
         }
 
         RaiseTotpSelectionState();
-        StatusMessage = _localization.Format("MovedSelectedTotpToRecycleBinFormat", selected.Length);
+        SetStatusMessage("MovedSelectedTotpToRecycleBinFormat", selected.Length);
     }
 }

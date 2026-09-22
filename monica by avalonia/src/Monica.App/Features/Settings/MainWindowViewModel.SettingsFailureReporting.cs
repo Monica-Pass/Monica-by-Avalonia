@@ -8,7 +8,7 @@ public sealed partial class MainWindowViewModel
         Exception exception)
     {
         AppDiagnostics.Error(diagnosticMessage, exception);
-        StatusMessage = _localization.Get(userMessageKey);
+        SetStatusFailure(userMessageKey);
     }
 
     private void ReportSettingsFailure(

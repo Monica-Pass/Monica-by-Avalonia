@@ -13,7 +13,7 @@ public sealed partial class MainWindowViewModel
         {
             AegisImportPassword = "";
             IsAegisImportPasswordRequired = false;
-            StatusMessage = _localization.Get("ImportAegisJsonRequired");
+            SetStatusFailure("ImportAegisJsonRequired");
             return;
         }
 
@@ -21,7 +21,7 @@ public sealed partial class MainWindowViewModel
         IsAegisImportPasswordRequired = encrypted;
         if (encrypted && string.IsNullOrWhiteSpace(AegisImportPassword))
         {
-            StatusMessage = _localization.AegisImportPasswordRequired;
+            SetStatusFailure("AegisImportPasswordRequired");
             return;
         }
 
@@ -60,12 +60,12 @@ public sealed partial class MainWindowViewModel
             ImportAegisJsonText = "";
             IsAegisImportPasswordRequired = false;
             await LoadAsync();
-            StatusMessage = _localization.Format("ImportedAegisJsonFormat", importedTotps, skippedTotps);
+            SetStatusMessage("ImportedAegisJsonFormat", importedTotps, skippedTotps);
         }
         catch (AegisImportException ex)
         {
             IsAegisImportPasswordRequired = ex.Reason == AegisImportFailureReason.PasswordRequired || encrypted;
-            StatusMessage = LocalizeAegisImportFailure(ex.Reason);
+            SetStatusFailure(AegisImportFailureKey(ex.Reason));
         }
         catch (Exception ex)
         {
@@ -77,13 +77,13 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    private string LocalizeAegisImportFailure(AegisImportFailureReason reason) => reason switch
+    private static string AegisImportFailureKey(AegisImportFailureReason reason) => reason switch
     {
-        AegisImportFailureReason.PasswordRequired => _localization.AegisImportPasswordRequired,
-        AegisImportFailureReason.DecryptionFailed => _localization.AegisImportDecryptionFailed,
-        AegisImportFailureReason.UnsupportedKeySlot => _localization.AegisImportUnsupportedKeySlot,
-        AegisImportFailureReason.UnsafeKeyDerivationParameters => _localization.AegisImportUnsafeParameters,
-        _ => _localization.AegisImportInvalidFormat
+        AegisImportFailureReason.PasswordRequired => "AegisImportPasswordRequired",
+        AegisImportFailureReason.DecryptionFailed => "AegisImportDecryptionFailed",
+        AegisImportFailureReason.UnsupportedKeySlot => "AegisImportUnsupportedKeySlot",
+        AegisImportFailureReason.UnsafeKeyDerivationParameters => "AegisImportUnsafeParameters",
+        _ => "AegisImportInvalidFormat"
     };
 
     [RelayCommand]
@@ -91,7 +91,7 @@ public sealed partial class MainWindowViewModel
     {
         if (string.IsNullOrWhiteSpace(ImportTotpCsvText))
         {
-            StatusMessage = _localization.Get("ImportTotpCsvRequired");
+            SetStatusFailure("ImportTotpCsvRequired");
             return;
         }
 
@@ -126,11 +126,11 @@ public sealed partial class MainWindowViewModel
 
             ImportTotpCsvText = "";
             await LoadAsync();
-            StatusMessage = _localization.Format("ImportedTotpCsvFormat", importedTotps, skippedTotps);
+            SetStatusMessage("ImportedTotpCsvFormat", importedTotps, skippedTotps);
         }
         catch (CsvImportException error)
         {
-            StatusMessage = _localization.Get(error.Error switch
+            SetStatusFailure(error.Error switch
             {
                 CsvImportError.ResourceLimitExceeded => "ImportResourceLimitExceeded",
                 _ => "ImportCsvInvalidFormat"

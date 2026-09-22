@@ -44,13 +44,13 @@ public sealed partial class MainWindowViewModel
 
         RefreshMdbxVaultState();
         RefreshVaultSources();
-        StatusMessage = _localization.Format("SelectedMdbxDefaultFormat", item.Name);
+        SetStatusMessage("SelectedMdbxDefaultFormat", item.Name);
     }
 
     [RelayCommand]
     private void ConfigureMdbxRemoteSources()
     {
         SelectedSection = "Sync";
-        StatusMessage = _localization.Get("ConfigureMdbxRemoteSourcesHint");
+        SetStatusMessage("ConfigureMdbxRemoteSourcesHint");
     }
 }

@@ -87,6 +87,6 @@ public sealed partial class MainWindowViewModel
         }
 
         RaiseNoteCountState();
-        StatusMessage = _localization.Format("MovedToRecycleBinFormat", item.Title);
+        SetStatusMessage("MovedToRecycleBinFormat", item.Title);
     }
 }

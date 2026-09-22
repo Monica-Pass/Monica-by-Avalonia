@@ -23,11 +23,11 @@ public sealed partial class MainWindowViewModel
         try
         {
             var account = await EnsureOneDriveAccountAsync();
-            StatusMessage = _localization.Format("OneDriveConnectedFormat", account.DisplayName);
+            SetStatusMessage("OneDriveConnectedFormat", account.DisplayName);
         }
         catch (OperationCanceledException)
         {
-            StatusMessage = _localization.Get("OneDriveSignInCanceled");
+            SetStatusMessage("OneDriveSignInCanceled");
         }
         catch (Exception ex)
         {
@@ -56,7 +56,7 @@ public sealed partial class MainWindowViewModel
             HasOneDriveAccount = false;
             OneDriveAccountDisplayName = "";
             OneDriveEnabled = false;
-            StatusMessage = _localization.Get("OneDriveDisconnected");
+            SetStatusMessage("OneDriveDisconnected");
         }
         catch (Exception ex)
         {

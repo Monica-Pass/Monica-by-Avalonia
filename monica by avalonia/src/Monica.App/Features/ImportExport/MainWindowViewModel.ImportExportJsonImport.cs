@@ -10,7 +10,7 @@ public sealed partial class MainWindowViewModel
     {
         if (string.IsNullOrWhiteSpace(json))
         {
-            StatusMessage = _localization.Get("ImportJsonRequired");
+            SetStatusFailure("ImportJsonRequired");
             return;
         }
 
@@ -22,15 +22,15 @@ public sealed partial class MainWindowViewModel
                 ImportJsonText = "";
             }
 
-            StatusMessage = FormatMonicaJsonImportStatus(result);
+            ReportMonicaJsonImportResult(result);
         }
         catch (PasswordSecretUnavailableException error)
         {
-            StatusMessage = GetPasswordSecretUnavailableMessage(error);
+            SetStatusFailure(PasswordSecretUnavailableKey(error));
         }
         catch (MonicaJsonImportException error)
         {
-            StatusMessage = _localization.Get(error.Error switch
+            SetStatusFailure(error.Error switch
             {
                 MonicaJsonImportError.ResourceLimitExceeded => "ImportResourceLimitExceeded",
                 _ => "ImportInvalidFormat"
@@ -81,8 +81,18 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    private string FormatMonicaJsonImportStatus(MonicaJsonImportResult result) =>
-        result.Categories > 0
-            ? _localization.Format("ImportedMonicaJsonWithCategoriesFormat", result.Passwords, result.SecureItems, result.Categories)
-            : _localization.Format("ImportedMonicaJsonFormat", result.Passwords, result.SecureItems);
+    private void ReportMonicaJsonImportResult(MonicaJsonImportResult result)
+    {
+        if (result.Categories > 0)
+        {
+            SetStatusMessage(
+                "ImportedMonicaJsonWithCategoriesFormat",
+                result.Passwords,
+                result.SecureItems,
+                result.Categories);
+            return;
+        }
+
+        SetStatusMessage("ImportedMonicaJsonFormat", result.Passwords, result.SecureItems);
+    }
 }

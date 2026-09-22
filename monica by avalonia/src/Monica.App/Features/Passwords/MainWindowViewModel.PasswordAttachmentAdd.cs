@@ -78,7 +78,7 @@ public sealed partial class MainWindowViewModel
             OperationType = "ATTACHMENT",
             DeviceName = Environment.MachineName
         }, cancellationToken);
-        StatusMessage = _localization.Format("AddedAttachmentFormat", attachment.FileName, entry.Title);
+        SetStatusMessage("AddedAttachmentFormat", attachment.FileName, entry.Title);
         return attachment;
     }
 
@@ -107,7 +107,7 @@ public sealed partial class MainWindowViewModel
             pickedContent = draft.Content;
             if (_vaultSessionService.IsExplicitlyLocked)
             {
-                StatusMessage = _localization.Get("VaultLocked");
+                SetStatusMessage("VaultLocked");
                 return new PasswordAttachmentAddResult(
                     PasswordAttachmentAddOutcome.VaultLocked,
                     StatusText: StatusMessage);
@@ -127,7 +127,7 @@ public sealed partial class MainWindowViewModel
             {
                 await DeleteStagedAttachmentAfterFailureAsync(stagedStoragePath);
                 stagedStoragePath = "";
-                StatusMessage = _localization.Get("VaultLocked");
+                SetStatusMessage("VaultLocked");
                 return new PasswordAttachmentAddResult(
                     PasswordAttachmentAddOutcome.VaultLocked,
                     StatusText: StatusMessage);
@@ -148,10 +148,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (AttachmentTooLargeException ex)
         {
-            StatusMessage = _localization.Format(
-                "AttachmentTooLargeFormat",
-                FormatByteSize(ex.ActualBytes),
-                FormatByteSize(ex.MaximumBytes));
+            SetStatusMessage("AttachmentTooLargeFormat", FormatByteSize(ex.ActualBytes), FormatByteSize(ex.MaximumBytes));
             return new PasswordAttachmentAddResult(
                 PasswordAttachmentAddOutcome.TooLarge,
                 StatusText: StatusMessage);
@@ -165,7 +162,7 @@ public sealed partial class MainWindowViewModel
             await DeleteStagedAttachmentAfterFailureAsync(stagedStoragePath);
             stagedStoragePath = "";
             AppDiagnostics.Error("Password attachment add failed", ex);
-            StatusMessage = _localization.Get("AttachmentAddFailed");
+            SetStatusFailure("AttachmentAddFailed");
             return new PasswordAttachmentAddResult(
                 PasswordAttachmentAddOutcome.Failed,
                 StatusText: StatusMessage);

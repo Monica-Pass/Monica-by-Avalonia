@@ -36,7 +36,7 @@ public sealed partial class MainWindowViewModel
         NoteIsMarkdown = decoded.IsMarkdown;
         NoteIsFavorite = item.IsFavorite;
         NotePreviewMode = decoded.IsMarkdown;
-        StatusMessage = _localization.Format("EditingNoteFormat", item.Title);
+        SetStatusMessage("EditingNoteFormat", item.Title);
     }
 
     private void OpenNoteTab(SecureItem item)
@@ -120,9 +120,13 @@ public sealed partial class MainWindowViewModel
         NoteIsFavorite = tab.DraftIsFavorite;
         NotePreviewMode = tab.DraftPreviewMode;
         NoteSplitPreviewMode = tab.DraftSplitPreviewMode;
-        StatusMessage = tab.Source is null
-            ? _localization.Get("EditingNewSecureNote")
-            : _localization.Format("EditingNoteFormat", tab.Title);
+        if (tab.Source is null)
+        {
+            SetStatusMessage("EditingNewSecureNote");
+            return;
+        }
+
+        SetStatusMessage("EditingNoteFormat", tab.Title);
     }
 
     private void CaptureSelectedNoteTabViewState()

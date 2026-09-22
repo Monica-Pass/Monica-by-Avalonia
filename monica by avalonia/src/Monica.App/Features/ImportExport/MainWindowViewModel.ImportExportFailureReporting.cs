@@ -13,13 +13,13 @@ public sealed partial class MainWindowViewModel
         Exception exception)
     {
         RecordImportExportFailure(diagnosticMessage, exception);
-        StatusMessage = _localization.Get(userMessageKey);
+        SetStatusFailure(userMessageKey);
     }
 
-    private string GetPasswordSecretUnavailableMessage(PasswordSecretUnavailableException error) =>
-        _localization.Get(error.Reason switch
+    private static string PasswordSecretUnavailableKey(PasswordSecretUnavailableException error) =>
+        error.Reason switch
         {
             PasswordSecretUnavailableReason.VaultLocked => "VaultLocked",
             _ => "PasswordSecretUnavailable"
-        });
+        };
 }

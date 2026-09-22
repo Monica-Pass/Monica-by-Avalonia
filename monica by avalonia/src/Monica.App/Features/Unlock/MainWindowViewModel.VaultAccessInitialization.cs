@@ -17,7 +17,7 @@ public sealed partial class MainWindowViewModel
     {
         IsVaultAccessInitializing = true;
         HasUnlockError = false;
-        StatusMessage = "";
+        ClearStatusMessage();
         try
         {
             AppDiagnostics.Info("Initialize started");
@@ -33,14 +33,14 @@ public sealed partial class MainWindowViewModel
             if (_legacyVaultDetection.RequiresImport)
             {
                 IsVaultInitialized = false;
-                SetUnlockError(_localization.Get("LegacyVaultImportRequired"));
+                SetUnlockError("LegacyVaultImportRequired");
                 return;
             }
 
             IsVaultInitialized = initialization.IsVaultInitialized;
-            StatusMessage = IsVaultInitialized
-                ? _localization.Get("VaultLocked")
-                : _localization.Get("FirstRunCreateMasterPassword");
+            SetStatusMessage(IsVaultInitialized
+                ? "VaultLocked"
+                : "FirstRunCreateMasterPassword");
             AppDiagnostics.Info(
                 $"Initialize completed. initialized={IsVaultInitialized}, " +
                 $"legacyImportRequired={_legacyVaultDetection.RequiresImport}");
@@ -50,7 +50,7 @@ public sealed partial class MainWindowViewModel
             AppDiagnostics.Error("Initialize failed", ex);
             IsVaultInitialized = DefaultVaultDatabaseExists();
             ClearVaultAccessSecrets();
-            SetUnlockError(_localization.Get("VaultAccessInitializationFailed"));
+            SetUnlockError("VaultAccessInitializationFailed");
         }
         finally
         {

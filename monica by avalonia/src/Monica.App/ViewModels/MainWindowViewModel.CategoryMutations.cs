@@ -12,7 +12,7 @@ public sealed partial class MainWindowViewModel
         var path = LocalCategoryPath.Build(parentPath, input);
         if (string.IsNullOrWhiteSpace(path))
         {
-            StatusMessage = _localization.Get("FolderNameRequired");
+            SetStatusFailure("FolderNameRequired");
             return null;
         }
 
@@ -20,7 +20,7 @@ public sealed partial class MainWindowViewModel
             LocalCategoryPath.Normalize(category.Name).Equals(path, StringComparison.OrdinalIgnoreCase));
         if (existing is not null)
         {
-            StatusMessage = _localization.Format("SelectedFolderFormat", existing.Name);
+            SetStatusMessage("SelectedFolderFormat", existing.Name);
             return new LocalCategoryCreateResult(existing);
         }
 
@@ -33,7 +33,7 @@ public sealed partial class MainWindowViewModel
         Categories.Add(category);
         await LogCategoryOperationAsync(category, "CREATE");
         RefreshCategoryConsumers();
-        StatusMessage = _localization.Format("CreatedFolderFormat", category.Name);
+        SetStatusMessage("CreatedFolderFormat", category.Name);
         return new LocalCategoryCreateResult(category);
     }
 
@@ -43,21 +43,21 @@ public sealed partial class MainWindowViewModel
     {
         if (category is null)
         {
-            StatusMessage = _localization.Get("SelectFolderToManage");
+            SetStatusMessage("SelectFolderToManage");
             return null;
         }
 
         var leafName = LocalCategoryPath.LeafName(input);
         if (string.IsNullOrWhiteSpace(leafName))
         {
-            StatusMessage = _localization.Get("FolderNameRequired");
+            SetStatusFailure("FolderNameRequired");
             return null;
         }
 
         var renamePlan = LocalCategoryPath.PlanSubtreeRename(Categories, category, leafName);
         if (renamePlan.HasConflict)
         {
-            StatusMessage = _localization.Format("FolderAlreadyExistsFormat", renamePlan.ConflictPath ?? leafName);
+            SetStatusMessage("FolderAlreadyExistsFormat", renamePlan.ConflictPath ?? leafName);
             return null;
         }
 
@@ -70,7 +70,7 @@ public sealed partial class MainWindowViewModel
 
         await LogCategoryOperationAsync(category, "UPDATE");
         RefreshCategoryConsumers();
-        StatusMessage = _localization.Format("RenamedFolderFormat", oldPath, renamePlan.DestinationPath);
+        SetStatusMessage("RenamedFolderFormat", oldPath, renamePlan.DestinationPath);
         return new LocalCategoryRenameResult(category, oldPath, renamePlan.DestinationPath);
     }
 
@@ -80,7 +80,7 @@ public sealed partial class MainWindowViewModel
     {
         if (category is null)
         {
-            StatusMessage = _localization.Get("SelectFolderToManage");
+            SetStatusMessage("SelectFolderToManage");
             return null;
         }
 
@@ -92,9 +92,7 @@ public sealed partial class MainWindowViewModel
 
         if (movePlan.HasConflict)
         {
-            StatusMessage = _localization.Format(
-                "FolderAlreadyExistsFormat",
-                movePlan.ConflictPath ?? destinationParentPath ?? string.Empty);
+            SetStatusMessage("FolderAlreadyExistsFormat", movePlan.ConflictPath ?? destinationParentPath ?? string.Empty);
             return null;
         }
 
@@ -107,7 +105,7 @@ public sealed partial class MainWindowViewModel
 
         await LogCategoryOperationAsync(category, "UPDATE");
         RefreshCategoryConsumers(category.Id);
-        StatusMessage = _localization.Format("RenamedFolderFormat", oldPath, movePlan.DestinationPath);
+        SetStatusMessage("RenamedFolderFormat", oldPath, movePlan.DestinationPath);
         return new LocalCategoryRenameResult(category, oldPath, movePlan.DestinationPath);
     }
 
@@ -115,7 +113,7 @@ public sealed partial class MainWindowViewModel
     {
         if (category is null)
         {
-            StatusMessage = _localization.Get("SelectFolderToManage");
+            SetStatusMessage("SelectFolderToManage");
             return null;
         }
 

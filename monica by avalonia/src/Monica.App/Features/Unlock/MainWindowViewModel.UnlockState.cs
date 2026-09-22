@@ -13,7 +13,7 @@ public sealed partial class MainWindowViewModel
     private string _pendingLegacyBusinessDataSignature = "";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasRecoverableStatusMessage))]
+    [NotifyPropertyChangedFor(nameof(HasFailedStatusMessage))]
     private bool _isUnlocked;
 
     public MainWindowViewModel? UnlockedShellContent =>
@@ -141,10 +141,10 @@ public sealed partial class MainWindowViewModel
             settings.LegacyBusinessDataNoticeAcknowledgedSignature = _pendingLegacyBusinessDataSignature);
     }
 
-    private void SetUnlockError(string message)
+    private void SetUnlockError(string messageKey, params object[] args)
     {
         HasUnlockError = true;
-        StatusMessage = message;
+        SetStatusFailure(messageKey, args);
     }
 
     private void ClearUnlockErrorForCorrectedInput()
@@ -155,7 +155,7 @@ public sealed partial class MainWindowViewModel
         }
 
         HasUnlockError = false;
-        StatusMessage = "";
+        ClearStatusMessage();
     }
 
     private void ClearVaultAccessSecrets()
@@ -183,7 +183,7 @@ public sealed partial class MainWindowViewModel
                 MasterPassword = sanitized;
             }
 
-            SetUnlockError(_localization.Get("UnsupportedMasterPasswordCharactersRemoved"));
+            SetUnlockError("UnsupportedMasterPasswordCharactersRemoved");
             UnlockCommand.NotifyCanExecuteChanged();
             return;
         }

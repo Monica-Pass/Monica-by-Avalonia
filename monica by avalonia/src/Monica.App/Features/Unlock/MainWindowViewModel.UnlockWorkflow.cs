@@ -38,14 +38,14 @@ public sealed partial class MainWindowViewModel
                 case VaultUnlockStatus.PasswordTooShort:
                 case VaultUnlockStatus.ConfirmationMismatch:
                     IsVaultInitialized = result.IsVaultInitialized;
-                    SetUnlockError(_localization.Get(result.MessageKey));
+                    SetUnlockError(result.MessageKey);
                     return;
                 case VaultUnlockStatus.WrongPassword:
                     IsVaultInitialized = result.IsVaultInitialized;
                     _cryptoService.Lock();
                     IsUnlocked = false;
                     ClearVaultAccessSecrets();
-                    SetUnlockError(_localization.Get(result.MessageKey));
+                    SetUnlockError(result.MessageKey);
                     return;
                 case VaultUnlockStatus.StorageEngineUnavailable:
                     // The vault on disk is neither gone nor creatable until the engine loads, so the
@@ -60,7 +60,7 @@ public sealed partial class MainWindowViewModel
                     }
 
                     ClearVaultAccessSecrets();
-                    SetUnlockError(_localization.Get("VaultStorageEngineUnavailable"));
+                    SetUnlockError("VaultStorageEngineUnavailable");
                     return;
                 case VaultUnlockStatus.Failed:
                     IsVaultInitialized = result.IsVaultInitialized || DefaultVaultDatabaseExists();
@@ -72,7 +72,7 @@ public sealed partial class MainWindowViewModel
                     }
 
                     ClearVaultAccessSecrets();
-                    SetUnlockError(_localization.Get("VaultAccessUnlockFailed"));
+                    SetUnlockError("VaultAccessUnlockFailed");
                     return;
                 case VaultUnlockStatus.CreatedAndUnlocked:
                 case VaultUnlockStatus.Unlocked:
@@ -82,16 +82,14 @@ public sealed partial class MainWindowViewModel
                     _pendingLegacyBusinessDataSignature = result.LegacyBusinessDataSignature;
                     HasPendingLegacyBusinessData = ShouldShowLegacyBusinessDataNotice(result);
                     ClearVaultAccessSecrets();
-                    StatusMessage = _localization.Format(
-                        "VaultUnlockedLoadingFormat",
-                        _localization.Get(HasPendingLegacyBusinessData ? result.MessageKey : "VaultUnlocked"));
+                    SetStatusMessage("VaultUnlockedLoadingFormat", _localization.Get(HasPendingLegacyBusinessData ? result.MessageKey : "VaultUnlocked"));
                     _ = LoadAfterUnlockAsync();
                     return;
                 default:
                     _cryptoService.Lock();
                     IsUnlocked = false;
                     ClearVaultAccessSecrets();
-                    SetUnlockError(_localization.Get("VaultAccessUnlockFailed"));
+                    SetUnlockError("VaultAccessUnlockFailed");
                     return;
             }
         }
@@ -101,7 +99,7 @@ public sealed partial class MainWindowViewModel
             IsUnlocked = false;
             AppDiagnostics.Error("Unlock workflow failed", exception);
             ClearVaultAccessSecrets();
-            SetUnlockError(_localization.Get("VaultAccessUnlockFailed"));
+            SetUnlockError("VaultAccessUnlockFailed");
         }
         finally
         {

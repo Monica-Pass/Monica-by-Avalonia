@@ -8,7 +8,7 @@ public sealed partial class MainWindowViewModel
     {
         if (Interlocked.CompareExchange(ref _securityMaintenanceOperationActive, 1, 0) != 0)
         {
-            StatusMessage = _localization.Get("SecurityMaintenanceInProgress");
+            SetStatusMessage("SecurityMaintenanceInProgress");
             return false;
         }
 

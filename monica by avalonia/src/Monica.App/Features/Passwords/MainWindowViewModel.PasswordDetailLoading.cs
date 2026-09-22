@@ -196,7 +196,7 @@ public sealed partial class MainWindowViewModel
                 {
                     IsLoadingSelectedPasswordDetails = false;
                     SelectedPasswordDetailsError = _localization.Format("PasswordDetailsLoadFailedFormat", ex.Message);
-                    StatusMessage = SelectedPasswordDetailsError;
+                    SetStatusFailure("PasswordDetailsLoadFailedFormat", ex.Message);
                 }
             }, DispatcherPriority.Background);
             AppDiagnostics.Error($"Password selection details failed after {stopwatch.ElapsedMilliseconds} ms. id={entry.Id}, version={version}", ex);

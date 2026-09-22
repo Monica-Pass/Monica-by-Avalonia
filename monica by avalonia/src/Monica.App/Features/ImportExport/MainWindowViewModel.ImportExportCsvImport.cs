@@ -9,7 +9,7 @@ public sealed partial class MainWindowViewModel
     {
         if (string.IsNullOrWhiteSpace(csv))
         {
-            StatusMessage = _localization.Get("ImportCsvRequired");
+            SetStatusFailure("ImportCsvRequired");
             return;
         }
 
@@ -37,11 +37,11 @@ public sealed partial class MainWindowViewModel
             }
 
             await LoadAsync();
-            StatusMessage = _localization.Format("ImportedPasswordCsvFormat", importedPasswords);
+            SetStatusMessage("ImportedPasswordCsvFormat", importedPasswords);
         }
         catch (CsvImportException error)
         {
-            StatusMessage = _localization.Get(error.Error switch
+            SetStatusFailure(error.Error switch
             {
                 CsvImportError.ResourceLimitExceeded => "ImportResourceLimitExceeded",
                 _ => "ImportCsvInvalidFormat"
@@ -57,7 +57,7 @@ public sealed partial class MainWindowViewModel
     {
         if (string.IsNullOrWhiteSpace(csv))
         {
-            StatusMessage = _localization.Get("ImportNoteCsvRequired");
+            SetStatusFailure("ImportNoteCsvRequired");
             return;
         }
 
@@ -94,11 +94,11 @@ public sealed partial class MainWindowViewModel
             }
 
             await LoadAsync();
-            StatusMessage = _localization.Format("ImportedNoteCsvFormat", importedNotes, skippedNotes);
+            SetStatusMessage("ImportedNoteCsvFormat", importedNotes, skippedNotes);
         }
         catch (CsvImportException error)
         {
-            StatusMessage = _localization.Get(error.Error switch
+            SetStatusFailure(error.Error switch
             {
                 CsvImportError.ResourceLimitExceeded => "ImportResourceLimitExceeded",
                 _ => "ImportCsvInvalidFormat"

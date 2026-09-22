@@ -41,7 +41,7 @@ public sealed partial class MainWindowViewModel
                 : TotpDataResolver.FromAuthenticatorKey(payload);
             if (data is null || string.IsNullOrWhiteSpace(data.Secret))
             {
-                StatusMessage = _localization.Get("TotpQrInvalidImage");
+                SetStatusMessage("TotpQrInvalidImage");
                 return;
             }
 
@@ -83,7 +83,7 @@ public sealed partial class MainWindowViewModel
         SelectedTotpItem = item;
         TotpNarrowShowsList = false;
         RaiseTotpCountState(reconcileSelection: false);
-        StatusMessage = _localization.Format("SavedTotpFormat", item.Title);
+        SetStatusMessage("SavedTotpFormat", item.Title);
     }
 
     private static string BuildScannedTotpTitle(TotpData data) =>

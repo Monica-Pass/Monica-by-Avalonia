@@ -56,7 +56,7 @@ public sealed partial class MainWindowViewModel
         RefreshBoundTotpPresentation(entries);
         InvalidateSecurityAnalysis();
         RaisePasswordCountState();
-        StatusMessage = _localization.Format("CreatedPasswordFormat", entries[0].Title);
+        SetStatusMessage("CreatedPasswordFormat", entries[0].Title);
     }
 
     [RelayCommand]
@@ -75,7 +75,7 @@ public sealed partial class MainWindowViewModel
             var unavailable = !entryPassword.IsReadable
                 ? entryPassword
                 : siblingPasswords.First(item => !item.IsReadable);
-            StatusMessage = _localization.Get(unavailable.State == PasswordSecretState.Locked
+            SetStatusFailure(unavailable.State == PasswordSecretState.Locked
                 ? "VaultLocked"
                 : "PasswordSecretUnavailable");
             return;
@@ -135,7 +135,7 @@ public sealed partial class MainWindowViewModel
         RefreshBoundTotpPresentation(siblings.Concat(updatedEntries));
         InvalidateSecurityAnalysis();
         RaisePasswordCountState();
-        StatusMessage = _localization.Format("UpdatedPasswordFormat", updatedEntries[0].Title);
+        SetStatusMessage("UpdatedPasswordFormat", updatedEntries[0].Title);
     }
 
 }

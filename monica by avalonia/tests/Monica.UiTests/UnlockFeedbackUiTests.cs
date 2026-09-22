@@ -15,8 +15,8 @@ public sealed class UnlockFeedbackUiTests
         AvaloniaUiThreadTestContext.VerifyAccess();
     }
 
-    // The unlock workflow reports every failure through StatusMessage, and the lock screen is the
-    // only surface that turns it into a banner. Nothing but this renders that chain.
+    // The unlock workflow reports every failure through StatusMessage, and while locked the banner
+    // below the password box is the only surface that renders it. Nothing else covers that chain.
     [Fact]
     public async Task Unlock_failure_renders_the_error_banner_and_corrected_input_clears_it()
     {
@@ -69,4 +69,51 @@ public sealed class UnlockFeedbackUiTests
     private static Border Banner(Visual root) =>
         Feedback(root).Parent as Border
             ?? throw new InvalidOperationException("Unlock feedback banner is not in the visual tree.");
+
+    // Once unlocked, the same status line earns an amber strip above the workspace. Nothing else
+    // in the suite reaches that binding, so a mistyped style class or property name would keep the
+    // strip permanently hidden and every test would still be green.
+    [Theory]
+    [InlineData("en-US")]
+    [InlineData("zh-CN")]
+    public async Task Failed_operation_renders_the_workspace_strip_and_an_information_clears_it(
+        string language)
+    {
+        using var library = LibraryUiHarness.Open();
+        library.ViewModel.L.SetLanguage(language);
+        library.Settle();
+        var strip = Strip(library.Window);
+
+        Assert.False(strip.IsVisible);
+
+        library.ViewModel.NewFolderName = "";
+        await library.ViewModel.CreateVaultFolderCommand.ExecuteAsync(null);
+        library.Settle();
+
+        Assert.True(strip.IsVisible, language);
+        // The class and the style selector can drift apart without affecting IsVisible, which would
+        // leave an unstyled strip that reads as ordinary content.
+        Assert.Equal(1d, strip.BorderThickness.Bottom);
+        Assert.NotNull(strip.BorderBrush);
+        Assert.Equal(library.ViewModel.L.Get("FolderNameRequired"), Message(strip));
+        Assert.NotEqual("FolderNameRequired", Message(strip));
+
+        await library.ViewModel.RenameSelectedVaultFolderCommand.ExecuteAsync(null);
+        library.Settle();
+
+        Assert.False(strip.IsVisible);
+        Assert.Equal(library.ViewModel.L.Get("SelectFolderToManage"), Message(strip));
+    }
+
+    private static Border Strip(Visual root) =>
+        root.GetVisualDescendants()
+            .OfType<Border>()
+            .FirstOrDefault(border => border.Classes.Contains("workspaceFailureStatus"))
+        ?? throw new InvalidOperationException("Workspace failure strip is not in the visual tree.");
+
+    private static string Message(Border strip) =>
+        strip.GetVisualDescendants()
+            .OfType<TextBlock>()
+            .FirstOrDefault()?.Text
+            ?? throw new InvalidOperationException("Workspace failure strip carries no message text.");
 }

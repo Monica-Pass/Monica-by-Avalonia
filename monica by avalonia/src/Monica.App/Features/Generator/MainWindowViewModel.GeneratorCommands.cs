@@ -10,7 +10,7 @@ public sealed partial class MainWindowViewModel
     private void GeneratePassword()
     {
         RegeneratePassword(addToHistory: true);
-        StatusMessage = _localization.Get("GeneratedPassword");
+        SetStatusMessage("GeneratedPassword");
     }
 
     [RelayCommand]
@@ -30,7 +30,7 @@ public sealed partial class MainWindowViewModel
     private void ClearGeneratedPasswordHistory()
     {
         ClearGeneratedPasswordHistorySecrets();
-        StatusMessage = _localization.Get("GeneratedPasswordHistoryCleared");
+        SetStatusMessage("GeneratedPasswordHistoryCleared");
     }
 
     [RelayCommand]
@@ -42,7 +42,7 @@ public sealed partial class MainWindowViewModel
         }
 
         GeneratedPassword = item.Value;
-        StatusMessage = _localization.Get("GeneratedPasswordRestoredFromHistory");
+        SetStatusMessage("GeneratedPasswordRestoredFromHistory");
     }
 
     [RelayCommand]
@@ -54,14 +54,14 @@ public sealed partial class MainWindowViewModel
         }
 
         await _clipboardService.SetSensitiveTextAsync(item.Value);
-        StatusMessage = _localization.Get("CopiedGeneratedPassword");
+        SetStatusMessage("CopiedGeneratedPassword");
     }
 
     [RelayCommand(CanExecute = nameof(CanCopyGeneratedPassword))]
     private async Task CopyGeneratedPasswordAsync()
     {
         await _clipboardService.SetSensitiveTextAsync(GeneratedPassword);
-        StatusMessage = _localization.Get("CopiedGeneratedPassword");
+        SetStatusMessage("CopiedGeneratedPassword");
     }
 
     private void EnsureGeneratedPassword()

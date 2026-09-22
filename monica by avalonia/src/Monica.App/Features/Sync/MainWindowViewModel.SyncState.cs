@@ -12,7 +12,7 @@ public sealed partial class MainWindowViewModel
     {
         if (Interlocked.CompareExchange(ref _webDavOperationActive, 1, 0) != 0)
         {
-            StatusMessage = _localization.Get("WebDavOperationInProgress");
+            SetStatusMessage("WebDavOperationInProgress");
             return false;
         }
 
@@ -93,13 +93,13 @@ public sealed partial class MainWindowViewModel
         profile = new WebDavProfile();
         if (!WebDavEnabled)
         {
-            StatusMessage = _localization.Get("EnableWebDavFirst");
+            SetStatusMessage("EnableWebDavFirst");
             return false;
         }
 
         if (!Uri.TryCreate(WebDavServerUrl, UriKind.Absolute, out var baseUri))
         {
-            StatusMessage = _localization.Get("WebDavServerUrlRequired");
+            SetStatusFailure("WebDavServerUrlRequired");
             return false;
         }
 
@@ -109,7 +109,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (InvalidOperationException)
         {
-            StatusMessage = _localization.Get("WebDavHttpsRequired");
+            SetStatusFailure("WebDavHttpsRequired");
             return false;
         }
 
@@ -180,9 +180,7 @@ public sealed partial class MainWindowViewModel
 
     private void SetWebDavBackupSizeLimitError(WebDavTextPayloadTooLargeException exception)
     {
-        StatusMessage = _localization.Format(
-            "WebDavBackupSizeLimitExceededFormat",
-            FormatByteSize(exception.MaximumBytes));
+        SetStatusMessage("WebDavBackupSizeLimitExceededFormat", FormatByteSize(exception.MaximumBytes));
     }
 
     private void SetWebDavBackupCryptoError(WebDavBackupCryptoException exception)
@@ -199,7 +197,7 @@ public sealed partial class MainWindowViewModel
             WebDavBackupCryptoFailureReason.DecryptionFailed => "WebDavBackupDecryptionFailed",
             _ => "RestoreWebDavBackupFailed"
         };
-        StatusMessage = _localization.Get(messageKey);
+        SetStatusFailure(messageKey);
     }
 
     private string BuildWebDavSourceStatus()

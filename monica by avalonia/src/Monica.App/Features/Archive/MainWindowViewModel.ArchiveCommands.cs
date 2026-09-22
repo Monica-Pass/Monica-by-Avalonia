@@ -50,7 +50,7 @@ public sealed partial class MainWindowViewModel
         RaisePasswordCountState();
         ArchiveNarrowShowsList = true;
         InvalidateSecurityAnalysis();
-        StatusMessage = _localization.Format("UnarchivedPasswordFormat", entry.Title);
+        SetStatusMessage("UnarchivedPasswordFormat", entry.Title);
     }
 
     [RelayCommand]

@@ -41,12 +41,12 @@ public sealed partial class MainWindowViewModel
             OpenNoteTabs.Add(tab);
             NotifyNoteTabsChanged();
             SelectedNoteTab = tab;
-            StatusMessage = _localization.Format("ImportedMarkdownDraftFormat", file.FileName);
+            SetStatusMessage("ImportedMarkdownDraftFormat", file.FileName);
         }
         catch (Exception ex)
         {
             AppDiagnostics.Error("Importing secure note Markdown failed", ex);
-            StatusMessage = _localization.Get("ImportMarkdownFailed");
+            SetStatusFailure("ImportMarkdownFailed");
         }
     }
 

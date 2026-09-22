@@ -69,7 +69,7 @@ public sealed partial class MainWindowViewModel
             pickedContent = file.Content;
             if (_vaultSessionService.IsExplicitlyLocked)
             {
-                StatusMessage = _localization.Get("VaultLocked");
+                SetStatusMessage("VaultLocked");
                 return null;
             }
 
@@ -83,21 +83,18 @@ public sealed partial class MainWindowViewModel
             {
                 await DeleteStagedNoteImageAsync(stagedStoragePath);
                 stagedStoragePath = "";
-                StatusMessage = _localization.Get("VaultLocked");
+                SetStatusMessage("VaultLocked");
                 return null;
             }
 
             var markdown = NoteContentCodec.BuildInlineImageMarkdown(draft.StoragePath);
             stagedStoragePath = "";
-            StatusMessage = _localization.Format("InsertedNoteImageFormat", draft.FileName);
+            SetStatusMessage("InsertedNoteImageFormat", draft.FileName);
             return markdown;
         }
         catch (AttachmentTooLargeException ex)
         {
-            StatusMessage = _localization.Format(
-                "AttachmentTooLargeFormat",
-                FormatByteSize(ex.ActualBytes),
-                FormatByteSize(ex.MaximumBytes));
+            SetStatusMessage("AttachmentTooLargeFormat", FormatByteSize(ex.ActualBytes), FormatByteSize(ex.MaximumBytes));
             return null;
         }
         catch (OperationCanceledException)
@@ -109,7 +106,7 @@ public sealed partial class MainWindowViewModel
             await DeleteStagedNoteImageAsync(stagedStoragePath);
             stagedStoragePath = "";
             AppDiagnostics.Error("Secure note image insertion failed", ex);
-            StatusMessage = _localization.Get("InsertNoteImageFailed");
+            SetStatusFailure("InsertNoteImageFailed");
             return null;
         }
         finally

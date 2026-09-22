@@ -44,7 +44,7 @@ public sealed partial class MainWindowViewModel
         }
 
         ExportTotpCsvPreview = await BuildTotpCsvExportAsync();
-        StatusMessage = _localization.Get("ExportedTotpCsv");
+        SetStatusMessage("ExportedTotpCsv");
     }
 
     [RelayCommand]
@@ -56,7 +56,7 @@ public sealed partial class MainWindowViewModel
         }
 
         ExportAegisPreview = await BuildAegisJsonExportAsync();
-        StatusMessage = _localization.Get("ExportedAegisJson");
+        SetStatusMessage("ExportedAegisJson");
     }
 
     [RelayCommand(CanExecute = nameof(CanUseFilePicker))]
@@ -96,7 +96,7 @@ public sealed partial class MainWindowViewModel
             {
                 SelectedSection = "Sync";
                 SelectedSyncPage = "Import";
-                StatusMessage = _localization.AegisImportPasswordRequired;
+                SetStatusFailure("AegisImportPasswordRequired");
                 return;
             }
 

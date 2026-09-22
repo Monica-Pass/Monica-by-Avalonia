@@ -22,14 +22,14 @@ public sealed partial class MainWindowViewModel
         var password = ReadPasswordSecret(entry.Password);
         if (!password.IsReadable)
         {
-            StatusMessage = _localization.Get(password.State == PasswordSecretState.Locked
+            SetStatusFailure(password.State == PasswordSecretState.Locked
                 ? "VaultLocked"
                 : "PasswordSecretUnavailable");
             return;
         }
 
         await _clipboardService.SetSensitiveTextAsync(password.Value);
-        StatusMessage = _localization.Format("CopiedPasswordFormat", entry.Title);
+        SetStatusMessage("CopiedPasswordFormat", entry.Title);
     }
 
     [RelayCommand]
@@ -41,7 +41,7 @@ public sealed partial class MainWindowViewModel
         }
 
         await _clipboardService.SetSensitiveTextAsync(entry.Username);
-        StatusMessage = _localization.Format("CopiedUsernameFormat", entry.Title);
+        SetStatusMessage("CopiedUsernameFormat", entry.Title);
     }
 
     [RelayCommand]
@@ -53,7 +53,7 @@ public sealed partial class MainWindowViewModel
         }
 
         await _clipboardService.SetSensitiveTextAsync(entry.Website);
-        StatusMessage = _localization.Format("CopiedWebsiteFormat", entry.Title);
+        SetStatusMessage("CopiedWebsiteFormat", entry.Title);
     }
 
 
@@ -67,7 +67,7 @@ public sealed partial class MainWindowViewModel
 
         RefreshPasswordTotpDisplay(entry);
         await _clipboardService.SetSensitiveTextAsync(entry.TotpCode);
-        StatusMessage = _localization.Format("CopiedTotpFormat", entry.Title);
+        SetStatusMessage("CopiedTotpFormat", entry.Title);
     }
 
 }

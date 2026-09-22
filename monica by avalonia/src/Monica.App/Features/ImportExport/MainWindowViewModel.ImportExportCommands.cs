@@ -84,11 +84,11 @@ public sealed partial class MainWindowViewModel
         catch (PasswordSecretUnavailableException ex)
         {
             ExportPreview = "";
-            StatusMessage = GetPasswordSecretUnavailableMessage(ex);
+            SetStatusFailure(PasswordSecretUnavailableKey(ex));
             return false;
         }
 
-        StatusMessage = _localization.Get("ExportPrepared");
+        SetStatusMessage("ExportPrepared");
         return true;
     }
 
@@ -109,12 +109,12 @@ public sealed partial class MainWindowViewModel
         catch (PasswordSecretUnavailableException ex)
         {
             ExportCsvPreview = "";
-            StatusMessage = GetPasswordSecretUnavailableMessage(ex);
+            SetStatusFailure(PasswordSecretUnavailableKey(ex));
             return false;
         }
 
         ExportCsvPreview = await Task.Run(() => _importExportService.ExportPasswordCsv(exportPasswords));
-        StatusMessage = _localization.Get("ExportedPasswordCsv");
+        SetStatusMessage("ExportedPasswordCsv");
         return true;
     }
 
@@ -126,7 +126,7 @@ public sealed partial class MainWindowViewModel
         }
 
         ExportNoteCsvPreview = await BuildNoteCsvExportAsync();
-        StatusMessage = _localization.Get("ExportedNoteCsv");
+        SetStatusMessage("ExportedNoteCsv");
         return true;
     }
 
@@ -146,7 +146,7 @@ public sealed partial class MainWindowViewModel
             var fileName = await _fileSystemPickerService.SaveTextFileAsync(title, suggestedFileName, content, fileTypes);
             if (fileName is not null)
             {
-                StatusMessage = _localization.Format("SavedExportFileFormat", fileName);
+                SetStatusMessage("SavedExportFileFormat", fileName);
             }
         }
         catch (Exception ex)

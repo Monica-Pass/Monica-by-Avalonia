@@ -40,10 +40,6 @@ public sealed partial class MainWindowViewModel
     public bool HasSelectedPasswordDetailsError =>
         SelectedPassword is not null &&
         !string.IsNullOrWhiteSpace(SelectedPasswordDetailsError);
-    public bool HasRecoverableStatusMessage =>
-        IsUnlocked &&
-        !IsLoadingVault &&
-        IsRecoverableStatusMessage(StatusMessage);
 
     public IEnumerable<PasswordQuickAccessItem> RecentPasswordQuickAccessItems =>
         BuildQuickAccessItems(QuickAccessSort.Recent);

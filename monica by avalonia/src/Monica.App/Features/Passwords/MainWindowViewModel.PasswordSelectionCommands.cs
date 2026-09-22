@@ -48,7 +48,7 @@ public sealed partial class MainWindowViewModel
         QuickFilterUncategorized = false;
         QuickFilterLocalOnly = false;
         QuickFilterAttachments = false;
-        StatusMessage = _localization.Get("ClearedPasswordFilters");
+        SetStatusMessage("ClearedPasswordFilters");
     }
 
     [RelayCommand]

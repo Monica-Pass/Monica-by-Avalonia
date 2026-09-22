@@ -20,7 +20,7 @@
                              SelectionChanged="NavigationView_OnSelectionChanged"
                              ItemInvoked="NavigationView_OnItemInvoked">
             <Grid Margin="16" RowDefinitions="Auto,*">
-                <Border Grid.Row="0" Classes="workspaceRecoverableStatus" IsVisible="{Binding HasRecoverableStatusMessage}">
+                <Border Grid.Row="0" Classes="workspaceFailureStatus" IsVisible="{Binding HasFailedStatusMessage}">
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
                         <ic:FluentIcon Icon="Warning" FontSize="16" Foreground="{DynamicResource SystemFillColorCautionBrush}" VerticalAlignment="Top" Margin="0,2,0,0" />
                         <TextBlock Grid.Column="1" Text="{Binding StatusMessage}" TextWrapping="Wrap" VerticalAlignment="Center" />

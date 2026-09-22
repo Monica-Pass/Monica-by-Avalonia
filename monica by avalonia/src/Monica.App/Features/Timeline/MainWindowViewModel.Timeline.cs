@@ -159,7 +159,7 @@ public sealed partial class MainWindowViewModel
     {
         if (TimelineEntries.Count == 0)
         {
-            StatusMessage = _localization.Get("TimelineExportEmpty");
+            SetStatusMessage("TimelineExportEmpty");
             return;
         }
 
@@ -184,7 +184,7 @@ public sealed partial class MainWindowViewModel
         }
 
         ExportTimelinePreview = string.Join(Environment.NewLine, lines);
-        StatusMessage = _localization.Format("ExportedTimelineFormat", TimelineEntries.Count);
+        SetStatusMessage("ExportedTimelineFormat", TimelineEntries.Count);
         await Task.CompletedTask;
     }
 
@@ -204,7 +204,7 @@ public sealed partial class MainWindowViewModel
     {
         if (TimelineEntries.Count == 0)
         {
-            StatusMessage = _localization.Get("TimelineExportEmpty");
+            SetStatusMessage("TimelineExportEmpty");
             return;
         }
 

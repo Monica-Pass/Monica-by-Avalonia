@@ -16,7 +16,7 @@
 
 ## 2. 当前状态（工作树干净）
 
-分支 `main`，`git status` 无未提交改动。HEAD = `4e91326`，近几轮：
+分支 `main`，`git status` 无未提交改动。HEAD = `39f725a`，近几轮：
 
 | commit | 立住了什么 |
 |---|---|
@@ -24,7 +24,8 @@
 | `c962fb8` | 上一步引入的 `dotnet format` 空白违规 |
 | `22f018c` | 内存门改为"先压缩再采样"，消除锁定态私有字节采样的竞态假红（阈值仍 120MB，产品运行时未动） |
 | `4e91326` | 打包脚本断言产物真实存在（`$ErrorActionPreference` 管不了原生命令退出码，ISCC/tar 失败原本会让 CI 变绿且零产物）；Inno 改用 `x64compatible` |
-| 本轮（逐屏走查） | 本地化与空态/错误态：10 个引用了但两张表都没有的 key、3 个只作为裸参数传给失败上报辅助函数的 KeePass key、密码强度文案尾随标点、SecurityAnalysis 空态重复提示、回收站等四屏的裸 `Clear` 标签；`LocalizationParityTests` 加第 4 道引用守卫；新增首条锁屏错误横幅渲染测试 |
+| `39f725a` | 逐屏走查（#77）：10 个引用了但两张表都没有的 key、3 个只作为裸参数传给失败上报辅助函数的 KeePass key、密码强度文案尾随标点、SecurityAnalysis 空态重复提示、回收站等四屏的裸 `Clear` 标签；`LocalizationParityTests` 加第 4 道引用守卫；新增首条锁屏错误横幅渲染测试 |
+| 本轮（#78） | 状态消息按语义分类：`StatusMessage` 取消 setter，原先散在 65 个文件的 229 处属性直写全部收进唯一漏斗 `MainWindowViewModel.StatusMessaging.cs`（`SetStatusMessage`/`SetStatusFailure`/`ClearStatusMessage`），顶部琥珀横幅改由**产生处声明的意图**决定，不再回读已翻译文案猜关键词 |
 
 §3 的 use-case 抽取改动已提交（`24d92b0`），OneDrive/WebDAV 冲突副本复用修复已提交（`957c5af`）。
 
@@ -72,13 +73,16 @@ dotnet test tests/Monica.Tests/Monica.Tests.csproj --no-restore # 约 8-9 分钟
 ./eng/ci/verify-commercial-release.ps1 -Configuration Release     # 全绿，退出 0
 # 产物级真跑门（先 publish 再验，报内存/加载数字前必须重跑 publish，否则测的是旧二进制）
 ./eng/ci/publish-desktop.ps1 -Project src/Monica.App/Monica.App.csproj -RuntimeIdentifier win-x64 `
-  -Mode jit -Version ... -VersionPrefix ... -PackageVersion ... -AssemblyVersion ... `
-  -FileVersion ... -InformationalVersion ...                        # 六个版本参数都是 Mandatory
+  -Mode jit -Version 0.1.0-ci.0 -VersionPrefix 0.1.0 -PackageVersion 0.1.0-ci.0 `
+  -AssemblyVersion 0.1.0.0 -FileVersion 0.1.0.0 -InformationalVersion 0.1.0-ci.0   # 六个版本参数都是 Mandatory
+# 产物落 artifacts/publish/win-x64/jit（脚本会先清空该目录，并顺带 release 构建 crates/monica-crypto）
 ./eng/ci/verify-artifact-runtime.ps1 -PublishDirectory <dir> -RuntimeIdentifier win-x64 -Mode jit
 ```
 
-实测数字：单测 716/716、UI 193/193；产物门 loadMs=355（预算 4000）、锁定态私有字节
-113.2MB（预算 120）、KeePass 20000 条增长 5.9MB（预算 24），`release gate completed success=True`。
+实测数字（本轮 #78 后）：单测 9 perf + 713 functional、UI 17 perf + 179 functional；重新 publish 后
+产物门 loadMs=191/642（预算 4000）、锁定态私有字节 112.4MB（预算 120）、KeePass 20000 条增长
+3.6MB（预算 24），`release gate completed success=True`。上一次记录（`4e91326`）为单测 716、UI 193、
+loadMs=355、113.2MB、5.9MB。
 
 Windows 发布链路（本轮已端到端验过，见 §7）：
 
@@ -142,19 +146,36 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
   `LocalizationService.Get` 找不到 key 时**回退返回 key 本身**，所以缺翻译从不报错，只在屏幕上印出标识符。
   现在由 `LocalizationParityTests` 四道守卫钉住（双语互覆盖 / 类型化访问器 / 源码与 XAML 引用扫描 /
   裸参数形状），植入假 key 实测会红、还原即绿；两表各 1382 条，零单边 key。
-- **走查查出但故意没修的两项**（都不是能靠加关键词解决的小补丁，需要产品判断）：
-  1. `MainWindowViewModel.IsRecoverableStatusMessage` 靠**已翻译文本里的子串**
-     （failed/failure/error/unavailable/无法/失败/错误）判断要不要弹顶部琥珀横幅。实测
-     161 个写进 `StatusMessage` 的 key 里只有 9 个触发横幅，**零误报**，但**语言不对称**：
-     `AttachmentAddFailed`、`ExportAuthorizationFailed`、`ImportMarkdownFailed`、
-     `InsertNoteImageFailed`、`OpenReferenceFailed`、`ReferenceCannotOpen`、
-     `SettingsSaveFailed`、`WrongMasterPassword` 这 8 个中文有横幅、英文只有底部小灰字，
-     因为英文写作 "Could not …" 而关键词表没这条。另有 `VaultLoadFailed`
-     （"The vault could not finish loading…"）**两种语言都没有横幅**——它是最该醒目的一条。
-     补英文关键词会把 `ClearVaultCancelled` 这类**用户主动取消**误判成失败，所以正确修法是
-     在产生消息处显式分类（失败/取消/信息），而不是继续猜文案。
-  2. 成功文案不清除：`ClearKeePassImportState` 不重置 `StatusMessage`，于是预览已空、
-     底部仍挂着上一句"已打开 N 条"。同理 WebDAV 测试/备份成功文案也不会被清。
+- **走查第 1 项已修（#78）**：横幅判定不再回读已翻译文案。
+  - 形状：`StatusMessage` **没有 setter**（get-only），写入只能走
+    `MainWindowViewModel.StatusMessaging.cs` 里的 `SetStatusMessage` / `SetStatusFailure` /
+    `ClearStatusMessage`；同一 partial class 内部也编译不过越界写法，所以新调用点不可能漏分类。
+  - 计数（对 `39f725a` 重测）：改造前 `StatusMessage = ` 属性直写 **229** 处，散在 **65** 个文件；
+    改造后漏斗外直写 **0**。
+  - 语言不对称（把旧关键字规则回放到 HEAD 的 161 个 key 上实测）：双语都命中 **1** 个，
+    **只在中文命中 11 个**（英文失败只留底部小灰字）：`AttachmentAddFailed`、
+    `ExportAuthorizationFailed`、`ImportMarkdownFailed`、`InsertNoteImageFailed`、
+    `OpenReferenceFailed`、`ReferenceCannotOpen`、`SettingsSaveFailed`、
+    `VaultAccessInitializationFailed`、`VaultAccessUnlockFailed`、`VaultStorageEngineUnavailable`、
+    `WrongMasterPassword`；两语言都不命中 149 个（其中含信息语，也含最该醒目的 `VaultLoadFailed`）。
+    现在这 **12 个失败全部在产生处声明为 `SetStatusFailure`/`SetUnlockError`**，判定与文案、语言无关。
+  - 诚实命名：`HasRecoverableStatusMessage` → `HasFailedStatusMessage`（样式类同步改名）。
+    "可恢复"从来不成立——横幅上的 Refresh 治不了 `WrongMasterPassword`；正是这个名字让关键词
+    猜法显得合理。
+  - 植入实测（守卫必须真的会红）：① 把旧关键字判定塞回 `HasFailedStatusMessage` → 3 条新单测
+    全红，且红在 **en-US**（正是原缺陷：英语失败只剩底部小灰字）；② 给 `StatusMessage` 加回
+    setter → 反射守卫红；③ 删掉样式的 `BorderThickness` setter → UI 双语两红。三次还原后全绿。
+  - 新增覆盖：单测 4 条（双语对称 / 锁定与加载态压制 / 成功后清除 / 无 setter），UI 1 条 theory×2
+    （真实可视树里渲染出琥珀条 + 文案不是裸 key + 样式确实命中）。
+  - 门禁实测：源码门全绿（格式 0 改动、Release `--warnaserror` 0 warning、单测 9 perf + 713
+    functional、UI 17 perf + 179 functional）；重新 publish 后产物门 loadMs=191/642（预算 4000）、
+    锁定私有字节 112.4MB（预算 120）、KeePass 20000 条增长 3.6MB（预算 24）。
+  - **故意没做**：切换语言时不把当前已显示的那句重译（漏斗现在存的是 key，做得到，留作后续）；
+    锁屏期间 `SetUnlockError` 写下的失败不点亮琥珀条（`HasFailedStatusMessage` 要求 `IsUnlocked`），
+    由锁屏自己的横幅承载。
+- **走查第 2 项仍未修**：成功文案不清除。`ClearKeePassImportState` 不重置 `StatusMessage`，
+  于是预览已空、底部仍挂着上一句"已打开 N 条"；WebDAV 测试/备份成功文案同理。
+  `ClearStatusMessage()` 现在已就位，缺的是逐个判断"哪句该在什么时候消失"的产品决定。
 - 其余已记录未修的低优先项：`DatabaseManagement` 把注册来源副标题直接印成裸 `%TEMP%\…` 路径且来源命名不一致
   （"本地数据库 / Monica v64 SQLite 主保险库" vs "Monica"）；"MDBX 保险库"同时出现在头部 chip 和检查器按钮；
   Generator 头部副标题在结果卡片里逐字重复；Archive/RecycleBin/Timeline 的检查器空态是大面积近空白板。

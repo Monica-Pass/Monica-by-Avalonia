@@ -124,6 +124,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _settingsService = settingsService;
         _localization = localization;
         _localization.PropertyChanged += (_, _) => RefreshLocalizedProperties();
+        SetStatusMessage("Locked");
         _sourceCapabilities = platformCapabilityService.GetCapabilities();
         _sourcePlatformIntegrationCapabilities = platformIntegrationService.GetCapabilities();
         _externalLinkService = externalLinkService ?? new SystemExternalLinkService(platformIntegrationService);
@@ -151,11 +152,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _selectedSection = "Vault";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasRecoverableStatusMessage))]
-    private string _statusMessage = "Locked";
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasRecoverableStatusMessage))]
+    [NotifyPropertyChangedFor(nameof(HasFailedStatusMessage))]
     private bool _isLoadingVault;
 
     [ObservableProperty]
@@ -226,27 +223,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    partial void OnStatusMessageChanged(string value)
-    {
-        OnPropertyChanged(nameof(HasUnlockStatusMessage));
-    }
-
-    private static bool IsRecoverableStatusMessage(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return false;
-        }
-
-        return value.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
-            value.Contains("failure", StringComparison.OrdinalIgnoreCase) ||
-            value.Contains("error", StringComparison.OrdinalIgnoreCase) ||
-            value.Contains("unavailable", StringComparison.OrdinalIgnoreCase) ||
-            value.Contains("无法", StringComparison.Ordinal) ||
-            value.Contains("失败", StringComparison.Ordinal) ||
-            value.Contains("错误", StringComparison.Ordinal);
-    }
-
     private async Task LoadAfterUnlockAsync()
     {
         await Task.Yield();
@@ -285,12 +261,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         AppDiagnostics.Info("Vault load started");
         try
         {
-            StatusMessage = _localization.Get("VaultLoadTitle");
+            SetStatusMessage("VaultLoadTitle");
             SelectedPassword = null;
             SelectedPasswordDetails = null;
             _selectedPasswordCount = 0;
 
-            StatusMessage = _localization.Get("VaultLoadReadingData");
+            SetStatusMessage("VaultLoadReadingData");
             VaultLoadStageText = _localization.Get("VaultLoadReadingCoreItems");
             if (SmokeVaultLoadDelayMilliseconds > 0)
             {
@@ -383,7 +359,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             {
                 QueuePasswordSearchQuery(VaultSearchText);
             }
-            StatusMessage = _localization.Get("VaultUnlocked");
+            SetStatusMessage("VaultUnlocked");
             VaultLoadStageText = _localization.Get("VaultLoadReady");
             _ = LoadTimelineDeferredAsync();
             if (deferSecurityAnalysis)
@@ -410,7 +386,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             AppDiagnostics.Error($"Vault load failed after {loadStopwatch.ElapsedMilliseconds} ms", ex);
             IsUnlocked = false;
             VaultLoadStageText = _localization.Get("VaultLoadFailed");
-            StatusMessage = _localization.Get("VaultLoadFailed");
+            SetStatusFailure("VaultLoadFailed");
         }
         finally
         {

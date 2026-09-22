@@ -13,19 +13,19 @@ public sealed partial class MainWindowViewModel
     {
         if (!TryCreateExternalReferenceUri(item?.Target, out var uri))
         {
-            StatusMessage = _localization.Get("ReferenceCannotOpen");
+            SetStatusFailure("ReferenceCannotOpen");
             return;
         }
 
         try
         {
             await _externalLinkService.OpenAsync(uri);
-            StatusMessage = _localization.Format("OpenedReferenceFormat", uri.Host);
+            SetStatusMessage("OpenedReferenceFormat", uri.Host);
         }
         catch (Exception ex)
         {
             AppDiagnostics.Error("Opening secure note reference failed", ex);
-            StatusMessage = _localization.Get("OpenReferenceFailed");
+            SetStatusFailure("OpenReferenceFailed");
         }
     }
 
@@ -38,6 +38,6 @@ public sealed partial class MainWindowViewModel
         }
 
         await _clipboardService.SetSensitiveTextAsync(item.Target);
-        StatusMessage = _localization.Get("CopiedReference");
+        SetStatusMessage("CopiedReference");
     }
 }

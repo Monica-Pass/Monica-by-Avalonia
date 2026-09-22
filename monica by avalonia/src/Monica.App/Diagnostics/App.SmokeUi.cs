@@ -147,7 +147,7 @@ public partial class App
     {
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(MonicaAppDataPaths.OverrideEnvironmentVariable)))
         {
-            viewModel.StatusMessage = "--smoke-ui-unlock requires MONICA_APPDATA_DIR.";
+            AppDiagnostics.Info("--smoke-ui-unlock requires MONICA_APPDATA_DIR.");
             if (smokeExitAfterChecks)
             {
                 desktop.Shutdown(2);

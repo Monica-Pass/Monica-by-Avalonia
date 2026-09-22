@@ -85,7 +85,7 @@ public sealed partial class MainWindowViewModel
         await settingsSaveCompletion;
         await ClearSettingsSensitiveCacheAsync();
         await ClearOwnedClipboardAsync();
-        StatusMessage = _localization.Get("VaultLocked");
+        SetStatusMessage("VaultLocked");
         IsPrivacyScreenVisible = !_isWindowActive;
     }
 

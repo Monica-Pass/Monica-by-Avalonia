@@ -32,7 +32,7 @@ public sealed partial class MainWindowViewModel
         try
         {
             await _externalLinkService.OpenAsync(new Uri(GitHubRepositoryUrl, UriKind.Absolute));
-            StatusMessage = _localization.Get("GitHubRepositoryOpened");
+            SetStatusMessage("GitHubRepositoryOpened");
         }
         catch (Exception ex)
         {
@@ -45,7 +45,7 @@ public sealed partial class MainWindowViewModel
     {
         if (!IsUnlocked)
         {
-            StatusMessage = _localization.Get("VaultLocked");
+            SetStatusMessage("VaultLocked");
             return;
         }
 
@@ -73,14 +73,14 @@ public sealed partial class MainWindowViewModel
                 _localization.Cancel);
             if (!confirmed)
             {
-                StatusMessage = _localization.Get("ClearVaultCancelled");
+                SetStatusMessage("ClearVaultCancelled");
                 return;
             }
 
             await _repository.ClearVaultDataAsync(clearScope);
             DangerZoneConfirmationText = "";
             await LoadAsync();
-            StatusMessage = _localization.Format("ClearedVaultDataFormat", LocalizeVaultClearScope(clearScope));
+            SetStatusMessage("ClearedVaultDataFormat", LocalizeVaultClearScope(clearScope));
         }
         catch (Exception ex)
         {
@@ -97,31 +97,31 @@ public sealed partial class MainWindowViewModel
     {
         if (!IsUnlocked)
         {
-            StatusMessage = _localization.Get("VaultLocked");
+            SetStatusMessage("VaultLocked");
             return;
         }
 
         if (string.IsNullOrWhiteSpace(CurrentMasterPassword))
         {
-            StatusMessage = _localization.Get("EnterCurrentMasterPassword");
+            SetStatusMessage("EnterCurrentMasterPassword");
             return;
         }
 
         if (string.IsNullOrWhiteSpace(NewMasterPassword))
         {
-            StatusMessage = _localization.Get("EnterNewMasterPassword");
+            SetStatusMessage("EnterNewMasterPassword");
             return;
         }
 
         if (!VaultMasterPasswordPolicy.MeetsMinimumLength(NewMasterPassword))
         {
-            StatusMessage = _localization.Get("MasterPasswordMinLength");
+            SetStatusMessage("MasterPasswordMinLength");
             return;
         }
 
         if (!string.Equals(NewMasterPassword, ConfirmNewMasterPassword, StringComparison.Ordinal))
         {
-            StatusMessage = _localization.Get("ConfirmationMismatch");
+            SetStatusFailure("ConfirmationMismatch");
             return;
         }
 
@@ -133,7 +133,7 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        StatusMessage = _localization.Get("ChangeMasterPasswordInProgress");
+        SetStatusMessage("ChangeMasterPasswordInProgress");
         try
         {
             var result = await GetChangeMasterPasswordUseCase().ExecuteAsync(currentPassword, newPassword);
@@ -141,7 +141,7 @@ public sealed partial class MainWindowViewModel
             {
                 if (result.IsCurrentPasswordIncorrect)
                 {
-                    StatusMessage = _localization.Get("WrongMasterPassword");
+                    SetStatusFailure("WrongMasterPassword");
                     return;
                 }
 
@@ -157,7 +157,7 @@ public sealed partial class MainWindowViewModel
             ConfirmNewMasterPassword = "";
             MasterPassword = "";
             ConfirmMasterPassword = "";
-            StatusMessage = _localization.Format("MasterPasswordChangedFormat", result.TotalSecretsReencrypted);
+            SetStatusMessage("MasterPasswordChangedFormat", result.TotalSecretsReencrypted);
         }
         catch (Exception ex)
         {

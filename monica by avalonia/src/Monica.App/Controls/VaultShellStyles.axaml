@@ -92,7 +92,7 @@
         <Setter Property="TextAlignment" Value="Center" />
     </Style>
 
-    <Style Selector="Border.workspaceRecoverableStatus">
+    <Style Selector="Border.workspaceFailureStatus">
         <Setter Property="Padding" Value="12,8" />
         <Setter Property="Margin" Value="0,0,0,12" />
         <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />

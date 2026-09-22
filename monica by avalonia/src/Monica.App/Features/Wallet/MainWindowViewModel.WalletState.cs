@@ -159,7 +159,7 @@ public sealed partial class MainWindowViewModel
         RaiseWalletCountState();
         if (updateStatus)
         {
-            StatusMessage = _localization.Format("MovedToRecycleBinFormat", item.Title);
+            SetStatusMessage("MovedToRecycleBinFormat", item.Title);
         }
     }
 }

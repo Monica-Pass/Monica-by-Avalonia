@@ -12,7 +12,7 @@ public sealed partial class MainWindowViewModel
         if (!TryValidateSecurityRecoveryReset(out var recovery, out var answer1, out var answer2, out var newPassword)) return;
         if (!TryBeginSecurityMaintenance(() => IsResettingMasterPassword = true)) return;
 
-        StatusMessage = _localization.Get("ResetMasterPasswordInProgress");
+        SetStatusMessage("ResetMasterPasswordInProgress");
         try
         {
             var result = await GetResetMasterPasswordUseCase().ExecuteAsync(recovery, answer1, answer2, newPassword);
@@ -20,7 +20,7 @@ public sealed partial class MainWindowViewModel
             {
                 if (result.IsAnswersIncorrect)
                 {
-                    StatusMessage = _localization.Get("SecurityQuestionAnswersIncorrect");
+                    SetStatusMessage("SecurityQuestionAnswersIncorrect");
                     return;
                 }
 
@@ -34,7 +34,7 @@ public sealed partial class MainWindowViewModel
             ClearRecoveryResetInputs();
             MasterPassword = "";
             ConfirmMasterPassword = "";
-            StatusMessage = _localization.Format("ResetMasterPasswordChangedFormat", result.TotalSecretsReencrypted);
+            SetStatusMessage("ResetMasterPasswordChangedFormat", result.TotalSecretsReencrypted);
         }
         catch (Exception ex)
         {
@@ -54,7 +54,7 @@ public sealed partial class MainWindowViewModel
             _settingsService.Current.SecurityRecovery.IsEnabled = false;
             QueueSaveSettings();
             RaiseSecurityRecoveryState();
-            StatusMessage = _localization.Get("SecurityQuestionsDisabled");
+            SetStatusMessage("SecurityQuestionsDisabled");
             return;
         }
 
@@ -67,7 +67,7 @@ public sealed partial class MainWindowViewModel
             ApplySecurityRecoverySettings(setup);
             QueueSaveSettings();
             RaiseSecurityRecoveryState();
-            StatusMessage = _localization.Get("SecurityQuestionsSaved");
+            SetStatusMessage("SecurityQuestionsSaved");
         }
         catch (Exception ex)
         {
@@ -90,19 +90,19 @@ public sealed partial class MainWindowViewModel
 
         if (string.IsNullOrWhiteSpace(question1Text) || string.IsNullOrWhiteSpace(question2Text))
         {
-            StatusMessage = _localization.Get("SecurityQuestionTextRequired");
+            SetStatusFailure("SecurityQuestionTextRequired");
             return false;
         }
 
         if (string.IsNullOrWhiteSpace(SecurityQuestion1Answer) || string.IsNullOrWhiteSpace(SecurityQuestion2Answer))
         {
-            StatusMessage = _localization.Get("SecurityQuestionAnswersRequired");
+            SetStatusFailure("SecurityQuestionAnswersRequired");
             return false;
         }
 
         if (string.Equals(question1Text.Trim(), question2Text.Trim(), StringComparison.OrdinalIgnoreCase))
         {
-            StatusMessage = _localization.Get("SecurityQuestionsMustDiffer");
+            SetStatusMessage("SecurityQuestionsMustDiffer");
             return false;
         }
 
@@ -131,7 +131,7 @@ public sealed partial class MainWindowViewModel
 
     private bool FailRecoveryReset(string messageKey)
     {
-        StatusMessage = _localization.Get(messageKey);
+        SetStatusFailure(messageKey);
         return false;
     }
 

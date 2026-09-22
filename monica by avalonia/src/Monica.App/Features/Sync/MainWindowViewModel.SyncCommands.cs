@@ -35,7 +35,7 @@ public sealed partial class MainWindowViewModel
 
             SelectedWebDavBackupHistoryItem = WebDavBackupHistory.FirstOrDefault();
             RaiseWebDavBackupHistoryState();
-            StatusMessage = _localization.Format("LoadedWebDavBackupsFormat", WebDavBackupHistory.Count);
+            SetStatusMessage("LoadedWebDavBackupsFormat", WebDavBackupHistory.Count);
         }
         catch (Exception ex)
         {
@@ -64,7 +64,7 @@ public sealed partial class MainWindowViewModel
         {
             WebDavOperationStageText = _localization.Get("WebDavTestingConnection");
             var entries = await _webDavBackupService.ListAsync(profile, "");
-            StatusMessage = _localization.Format("WebDavConnectionTestSucceededFormat", entries.Count);
+            SetStatusMessage("WebDavConnectionTestSucceededFormat", entries.Count);
         }
         catch (Exception ex)
         {
@@ -86,13 +86,13 @@ public sealed partial class MainWindowViewModel
 
         if (!HasSelectedWebDavBackupOptions())
         {
-            StatusMessage = _localization.Get("SelectWebDavBackupContent");
+            SetStatusMessage("SelectWebDavBackupContent");
             return;
         }
 
         if (string.IsNullOrWhiteSpace(WebDavBackupEncryptionPassword))
         {
-            StatusMessage = _localization.Get("WebDavEncryptionPasswordRequired");
+            SetStatusFailure("WebDavEncryptionPasswordRequired");
             return;
         }
 
@@ -139,7 +139,7 @@ public sealed partial class MainWindowViewModel
             WebDavBackupHistory.Insert(0, backupItem);
             SelectedWebDavBackupHistoryItem = backupItem;
             RaiseWebDavBackupHistoryState();
-            StatusMessage = _localization.Format("CreatedWebDavBackupFormat", fileName);
+            SetStatusMessage("CreatedWebDavBackupFormat", fileName);
         }
         catch (WebDavTextPayloadTooLargeException ex)
         {
@@ -165,7 +165,7 @@ public sealed partial class MainWindowViewModel
 
         if (IsEncryptedWebDavBackup(item.FileName) && string.IsNullOrWhiteSpace(WebDavBackupEncryptionPassword))
         {
-            StatusMessage = _localization.Get("WebDavEncryptionPasswordRequired");
+            SetStatusFailure("WebDavEncryptionPasswordRequired");
             return;
         }
 
@@ -192,7 +192,7 @@ public sealed partial class MainWindowViewModel
 
             WebDavOperationStageText = _localization.Get("WebDavRestoringBackup");
             var result = await ImportMonicaJsonAsync(json);
-            StatusMessage = _localization.Format("RestoredWebDavBackupFormat", item.FileName, result.Passwords, result.SecureItems, result.Categories);
+            SetStatusMessage("RestoredWebDavBackupFormat", item.FileName, result.Passwords, result.SecureItems, result.Categories);
         }
         catch (WebDavTextPayloadTooLargeException ex)
         {
@@ -252,7 +252,7 @@ public sealed partial class MainWindowViewModel
             }
 
             RaiseWebDavBackupHistoryState();
-            StatusMessage = _localization.Format("DeletedWebDavBackupFormat", item.FileName);
+            SetStatusMessage("DeletedWebDavBackupFormat", item.FileName);
         }
         catch (Exception ex)
         {

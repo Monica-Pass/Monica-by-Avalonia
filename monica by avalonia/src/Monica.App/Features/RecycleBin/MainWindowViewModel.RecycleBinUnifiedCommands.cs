@@ -41,7 +41,7 @@ public sealed partial class MainWindowViewModel
                 OperationType = "RESTORE",
                 DeviceName = Environment.MachineName
             });
-            StatusMessage = _localization.Format("RestoredRecycleBinItemFormat", secure.Title);
+            SetStatusMessage("RestoredRecycleBinItemFormat", secure.Title);
             RaiseRecycleBinCountStateForUnifiedItems();
         }
 
@@ -58,7 +58,7 @@ public sealed partial class MainWindowViewModel
         SelectedRecycleBinItem = null;
         RecycleBinNarrowShowsList = true;
         RaiseRecycleBinCountStateForUnifiedItems();
-        StatusMessage = _localization.Format("DeletedRecycleBinItemPermanentlyFormat", item.Title);
+        SetStatusMessage("DeletedRecycleBinItemPermanentlyFormat", item.Title);
     }
 
     [RelayCommand]
@@ -137,13 +137,13 @@ public sealed partial class MainWindowViewModel
             if (expired.Length > 0)
             {
                 RaiseRecycleBinCountStateForUnifiedItems();
-                StatusMessage = _localization.Format("RecycleBinAutoCleanedFormat", expired.Length);
+                SetStatusMessage("RecycleBinAutoCleanedFormat", expired.Length);
             }
         }
         catch (Exception ex)
         {
             AppDiagnostics.Error("Recycle bin automatic cleanup failed", ex);
-            StatusMessage = _localization.Get("RecycleBinAutoCleanupFailed");
+            SetStatusFailure("RecycleBinAutoCleanupFailed");
         }
         finally
         {
