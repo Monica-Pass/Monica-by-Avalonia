@@ -22,6 +22,9 @@ public sealed class DesktopAppSettings
     public string LegacyBusinessDataNoticeAcknowledgedSignature { get; set; } = "";
     public SecurityRecoverySettings SecurityRecovery { get; set; } = new();
     public bool MinimizeToTray { get; set; } = true;
+    // False means "this install has never been told where the window went", which is the state a
+    // settings file from before the tray shipped is also in. It flips once, on the first hide.
+    public bool TrayHintShown { get; set; }
     public bool QuickSearchEnabled { get; set; } = true;
     public string QuickSearchHotkey { get; set; } = "Ctrl+Shift+Space";
     public bool AutoTypeEnabled { get; set; }

@@ -1,0 +1,36 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Monica.App.TrayHintWindow"
+        Title="Monica tray hint"
+        Width="340"
+        SizeToContent="Height"
+        WindowDecorations="None"
+        WindowStartupLocation="Manual"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Topmost="True"
+        CanResize="False"
+        Focusable="False"
+        IsTabStop="False"
+        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
+    <Border BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            Padding="14,11">
+        <StackPanel Spacing="6">
+            <TextBlock x:Name="HintTitle"
+                       FontWeight="SemiBold"
+                       TextTrimming="CharacterEllipsis"
+                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+            <TextBlock x:Name="HintBody"
+                       FontSize="12"
+                       LineHeight="17"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Button x:Name="HintShowButton"
+                    HorizontalAlignment="Left"
+                    MinHeight="32"
+                    Padding="12,4"
+                    Click="OnShowButtonClicked" />
+        </StackPanel>
+    </Border>
+</Window>

@@ -146,6 +146,7 @@ public sealed partial class AppSettingsService
         LegacyBusinessDataNoticeAcknowledgedSignature = source.LegacyBusinessDataNoticeAcknowledgedSignature,
         SecurityRecovery = source.SecurityRecovery,
         MinimizeToTray = source.MinimizeToTray,
+        TrayHintShown = source.TrayHintShown,
         QuickSearchEnabled = source.QuickSearchEnabled,
         QuickSearchHotkey = source.QuickSearchHotkey,
         AutoTypeEnabled = source.AutoTypeEnabled,

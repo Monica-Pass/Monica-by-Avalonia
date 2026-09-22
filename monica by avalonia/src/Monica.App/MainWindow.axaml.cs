@@ -27,6 +27,7 @@ public partial class MainWindow : Window
         InitializeSecurityLifecycle();
         InitializeStatusNoticeLifecycle();
         InitializeBackgroundMemoryLifecycle();
+        InitializeTrayHintLifecycle();
     }
 
     private async void OnOpened(object? sender, EventArgs e)

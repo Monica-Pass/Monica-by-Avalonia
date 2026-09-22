@@ -37,6 +37,7 @@ public partial class MainWindow
         {
             e.Cancel = true;
             Hide();
+            SurfaceTrayHintAfterHide();
             return;
         }
 

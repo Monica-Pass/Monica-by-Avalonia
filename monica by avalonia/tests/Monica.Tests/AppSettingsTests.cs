@@ -107,6 +107,27 @@ public sealed partial class AppSettingsTests
     }
 
     [Fact]
+    public async Task App_settings_remembers_that_the_tray_was_already_explained()
+    {
+        // The tray hint is once per install, so the flag has to outlive a restart. Saving clones the
+        // settings object on the way out, which drops any field the clone forgets to copy - this is the
+        // test that notices.
+        var path = GetTempPath();
+        var first = new AppSettingsService(path);
+        await first.LoadAsync();
+
+        Assert.False(first.Current.TrayHintShown);
+
+        first.Current.TrayHintShown = true;
+        await first.SaveAsync();
+
+        var second = new AppSettingsService(path);
+        await second.LoadAsync();
+
+        Assert.True(second.Current.TrayHintShown);
+    }
+
+    [Fact]
     public async Task App_settings_protects_persisted_secret_values()
     {
         var path = GetTempPath();

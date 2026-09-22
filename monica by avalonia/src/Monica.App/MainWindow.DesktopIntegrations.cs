@@ -12,6 +12,7 @@ public partial class MainWindow
     internal void ShowFromDesktopIntegration()
     {
         AppDiagnostics.Info("Desktop integration surfaced the main window.");
+        CloseTrayHint();
         Show();
         WindowState = WindowState.Normal;
         Activate();
@@ -50,6 +51,7 @@ public partial class MainWindow
             DataContext is MainWindowViewModel { MinimizeToTray: true })
         {
             Hide();
+            SurfaceTrayHintAfterHide();
         }
     }
 }

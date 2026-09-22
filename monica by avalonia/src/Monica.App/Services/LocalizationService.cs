@@ -386,6 +386,8 @@ public interface ILocalizationService : INotifyPropertyChanged
     string DesktopSettingsDescription { get; }
     string MinimizeToTray { get; }
     string MinimizeToTrayDescription { get; }
+    string TrayHintTitle { get; }
+    string TrayHintBody { get; }
     string QuickSearch { get; }
     string QuickSearchDescription { get; }
     string QuickSearchHotkey { get; }
@@ -895,6 +897,8 @@ public sealed class LocalizationService : ILocalizationService
     public string DesktopSettingsDescription => Text();
     public string MinimizeToTray => Text();
     public string MinimizeToTrayDescription => Text();
+    public string TrayHintTitle => Text();
+    public string TrayHintBody => Text();
     public string QuickSearch => Text();
     public string QuickSearchDescription => Text();
     public string QuickSearchHotkey => Text();
@@ -1774,6 +1778,8 @@ public sealed class LocalizationService : ILocalizationService
         ["MinimizeToTrayDescription"] = "Keep Monica available from the system tray when the window is closed or minimized.",
         ["DesktopTrayActiveStatus"] = "Monica remains available from the notification area when its window is closed.",
         ["DesktopTrayInactiveStatus"] = "Closing Monica follows the normal window behavior and does not keep a tray entry.",
+        ["TrayHintTitle"] = "Monica is still running",
+        ["TrayHintBody"] = "The window moved to the notification area at the bottom-right of your screen. Click the Monica icon there, or start Monica again, to bring it back.",
         ["ShowMonica"] = "Show Monica",
         ["ExitApplication"] = "Exit Monica",
         ["QuickSearch"] = "Quick search overlay",
@@ -3224,6 +3230,8 @@ public sealed class LocalizationService : ILocalizationService
         ["MinimizeToTrayDescription"] = "关闭窗口时保留后台托盘入口。",
         ["DesktopTrayActiveStatus"] = "关闭窗口后，Monica 仍会保留在通知区域。",
         ["DesktopTrayInactiveStatus"] = "关闭 Monica 时遵循普通窗口行为，不保留托盘入口。",
+        ["TrayHintTitle"] = "Monica 仍在运行",
+        ["TrayHintBody"] = "窗口已收进屏幕右下角的通知区域。点击那里的 Monica 图标，或再次启动 Monica，即可回到窗口。",
         ["ShowMonica"] = "显示 Monica",
         ["ExitApplication"] = "退出 Monica",
         ["QuickSearch"] = "快速搜索浮层",
