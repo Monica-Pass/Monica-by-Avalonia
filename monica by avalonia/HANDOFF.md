@@ -16,7 +16,7 @@
 
 ## 2. 当前状态（工作树干净）
 
-分支 `main`，`git status` 无未提交改动。功能 HEAD = `541069c`（其后只可能有给本节自身标提交号的文档提交），近几轮：
+分支 `main`，`git status` 无未提交改动。功能 HEAD = `aaa698b`（其后只可能有给本节自身标提交号的文档提交），近几轮：
 
 | commit | 立住了什么 |
 |---|---|
@@ -34,9 +34,9 @@
 | `1d8c3a4` | 桌面端自动输入（#84，走查后用户点名的第二条必须功能）：全局热键 `Ctrl+Shift+Enter` 把"用户名 → Tab → 密码"用 `SendInput(KEYEVENTF_UNICODE)` 打进**当前前台的别人家窗口**——不碰剪贴板（因此不必和 `SecureClipboardService` 的自动清理抢时序），且**从不发 Enter**，提交留给用户；开关默认关，因为"会往别的窗口打字"不该由我们替用户打开；`WindowsGlobalHotkeyService` 槽位化（快速搜索／自动输入各自 `RegisterHotKey` + 各自消息泵线程），两槽填同一组合时先判冲突并说清"快速搜索已占用"，而不是留一条说不清的注册失败。匹配只信前台标题：标题含 host 形状就按 host 判（条目存 `github.com`、标题 `github.com.phishing.test` → 不打），命中 0 条或多于 1 条一律拒打并给原因。**查清的一个假象**：判"前台是不是我自己"原本用 Avalonia 的 `Window.IsActive` + 缓存自身 hwnd，实测进程**零顶层窗口**的时刻它仍读回 `True`（那个缓存 handle 的 pid=0、`IsWindow=False`）→ 会永远误拒，改成问操作系统（`GetWindowThreadProcessId` 比对自身 pid），单测用**真 message-only 窗口**跑通 true 分支。真机正反两例都在**发布产物**上量过（`outcome=Typed`、落点 15/19 字符分别匹配；钓鱼标题 `NoMatch` 且两个框都空），跑法与未覆盖项见 §7 第 2 条。顺带：设置页为过 300 行门把浏览器配对区块拆成 `SettingsBrowserPairingSectionView`，并修掉门禁脚本用 `[IO.Path]::GetRelativePath`（5.1 上不存在）导致行数违规既不变红也不点名的坑。门禁：格式 0 改动、Release 0 warning、单测 9+747、UI 17+191 全绿；重新 publish 后产物门 loadMs=536/4000、KeePass 增长 2.9MB/24、锁定尾窗中位 114.4MB/120 |
 | `541069c` | 单实例守卫（#86，托盘默认开引出的用户可见问题）：同一个数据目录只允许一个实例，第二次启动不再自己开第二个窗口，而是**把还活着的那一个叫回前台**后退出 0；锁按数据目录取键（各自 `MONICA_APPDATA_DIR` 的独立实例、CI 顺序跑法都不受影响），接力事件在拿到锁的同一瞬间命名，因此双击发生在 UI 订阅之前也不会丢。顺带修掉守卫的取证工具本身：诊断日志的 append 流只在打开时定位一次末尾，两个进程写同一个 `runtime.log` 会从中间互相盖掉——实测出现过一条记录被拼进另一条的句子中间、接力证据消失；现在每批写之前重新求末尾并整批一次写。真机正反两例都在发布产物上量过（见 §7 第 3 条），门禁：格式 0 改动、Release 0 warning、单测 9+754、UI 17+191 全绿；重新 publish 后产物门 loadMs=1082/4000、KeePass 20000 条增长 8.8MB/24、锁定尾窗中位 107.1MB/120 |
 | `61080f6` | 首次收进托盘的可发现性提示（#85，托盘默认开欠下的那一条）：窗口 `Hide()` 进托盘后桌面上**一点痕迹都没有**，图标还大概率在通知区域的溢出区里，所以每个安装的**第一次**收起，会在托盘那一角画一个气泡（标题 + "窗口去哪了、怎么回来" + 一个"显示 Monica"按钮），8 秒后自己退场。Avalonia 12.0.4 的 `TrayIcon`/`NotifyIcon` 都没有 `ShowBalloonTip`（在产物上量过），只能自绘：无边框 + `Topmost` + `Focusable=False` + `ShowActivated=False`，不抢焦点也不夺激活。**"每个安装一次"必须记两层**（本轮会话一个布尔 + 落盘 `TrayHintShown`），这不是审美是被实测逼出来的：`Show()` 之后再 `Hide()` 会重走 `OnOpened`→`InitializeAsync`→`LoadAsync`，内存里的标记被文件里那份（写盘防抖 150ms，还没落）盖掉，只信落盘就会在同一轮里第二次弹。锚点用 `ClientSize` 不用 `Bounds`（实测这个窗口的 `Bounds.Height` 一辈子停在 `SizeToContent` 之前的 707.33，而 client 是 121.33）。覆盖：UI 6 条 + 单测 1 条，两条证伪（注掉会话守卫→第 5 条红；`TrayHintDwell` 改 60 秒→第 4 条在 20.3 秒红）。四阶段真机门在**发布产物**上全绿（§7 第 4 条），单实例探针在同一产物上重跑仍正反两例全绿（§7 第 3 条）。门禁：格式 0 改动、Release 0 warning、单测 9+755、UI 17+197 全绿；重新 publish 后产物门 loadMs=934/4000、KeePass 20000 条增长 4.0MB/24、锁定尾窗中位 114.7MB/120 |
+| `aaa698b` | 接力回来的窗口真的浮到用户在看的应用之上（#87，#85 那句文案欠下的另一半）：退出前的那次启动把自己持有的前台权限交给活着的那一份（按数据目录键查到 owner PID → `AllowSetForegroundWindow` → 再发接力信号），owner 由命名 `MemoryMappedFile` 在持锁期间公布 PID。**先量后修**：未修产物上 `windowBack=0.01` 秒窗口就回到桌面，但 `foregroundMonica=-1`、`aboveRival=-1`，Monica 停在 z=150 而 rival 在 z=18，6.6 秒都没浮起来——"再次启动就能回来"当时只有一半是真的。修后同一条门 `foregroundMonica=0.15 aboveRival=0.15`、之后每点都是 z=18<19。反证：把 grant 换成常量 `false` 重新构建，门立刻回红（同样 -1、z=150<18）。顺序由单测钉住（`GrantIndex==0/SignalIndex==1`），非 Windows 返回 `false` 且接力照旧送达。探针演化掉三条死路（注入 ALT 会把 rival 的 WinForms 线程 park 进菜单模态循环、`SwitchToThisWindow` 与 `AttachThreadInput` 都拿不到前台），跑法与判读见 §5。门禁：格式 0 改动、Release 0 warning、单测 9+758 全绿；重新 publish 后产物门 loadMs=261、锁定尾窗中位 108.0MB/120（区间 107.8–109.0）、锁/解循环 25/14/1/4 全数回读，单实例正反两例与托盘提示四阶段在同一产物上重跑仍全绿 |
 
 §3 的 use-case 抽取改动已提交（`24d92b0`），OneDrive/WebDAV 冲突副本复用修复已提交（`957c5af`）。
-
 ## 3. Task #27（ViewModel 抽 use-case）状态 — 已可判定完成
 
 四子阶段全部处理完毕：
@@ -125,10 +125,12 @@ dotnet tests/Monica.UiTests/bin/Release/net10.0/Monica.UiTests.dll -method "*Nam
 # 9. 存盘有 150ms 防抖：气泡刚出现就 Kill 进程时 `settings.json` 还不存在（实测 `<no settings.json>`），
 #    必须先轮询到落盘再杀，不然测的是探针的手速而不是持久化。
 
-实测数字（本轮 `61080f6` 后）：单测 9 perf + 755 functional、UI 17 perf + 197 functional；重新 publish 后
-产物门 loadMs=934（预算 4000）、锁定态私有字节尾窗中位 114.7MB（区间 114.6–115.6，预算 120）、
-KeePass 20000 条增长 4.0MB（预算 24）、`release gate completed success=True, loadMs=198`。
-上一次记录（`541069c`）为单测 754、UI 191、loadMs=1082、107.1MB、8.8MB。
+实测数字（本轮接力浮窗门之后）：源码门全绿（单测 9 perf + 758 functional、`--warnaserror` 0 warning）；
+重新 publish 后产物门 `loadMs=261`、锁定态私有字节尾窗中位 108.0MB（区间 107.8–109.0，预算 120）、
+锁/解循环 25/25 密码 + 14/14 笔记 + 1/1 TOTP + 4/4 钱包、`release gate completed success=True, loadMs=198`。
+上一次记录（`61080f6`）为 loadMs=934、114.7MB（区间 114.6–115.6）。
+注意：perf-budget 通道在整串门里紧跟 `dotnet build` 起跑时读到过 483ms（预算 400），单独复跑三次为
+9/9 全绿；这是冷启动+构建负载的单次读数，按仓库规则先复跑取分布，不要调阈值。
 
 真机自动输入门（**不在 CI 里**，需要交互桌面 + 外部目标窗口 + 真实按键）：
 
@@ -159,6 +161,36 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File artifacts/autotype/verif
 用 6 秒证明"没人管时它一直藏着"。**不要**改回"窗口不再最小化"这种判法——最小化会把窗口 `Hide()` 进托盘，
 进程处于零可见窗口状态，此时 `IsIconic(IntPtr.Zero)` 返回 `False`，实测就这样假绿过一次。两个目录要各
 自播种（`prepare-probe-appdata.ps1` 跑两遍，第二遍换 `-AppDataDirectory`）。
+
+接力浮窗真机门（**同样不在 CI 里**，量的是托盘提示文案那句"或再次启动 Monica，即可回到窗口"）：
+
+```powershell
+# 需要交互桌面 + 一个已播种目录；探针只打印 hwnd/pid/z 序与秒数，不打印任何凭据材料
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File artifacts/autotype/verify-handoff-foreground.ps1 `
+  -ExePath <publish>\Monica.App.exe -AppDataDirectory "<A>"
+```
+
+与上一条单实例门的分工：单实例门只证明"窗口回到桌面上"，而它启动第二份副本时前台是探针自己的控制台，
+所以它读到的 `first restored is foreground: False` 是**该场景的应有值**、不是缺陷；只有这条门会去问
+"用户正在看的那个应用还挡在上面吗"。判据：`rival-window.ps1` 画一个盖住 Monica 原位置的窗口，探针把
+前台权限交给它（`AllowSetForegroundWindow`），它自己抬自己 → 最小化 Monica → 由这个前台窗口启动第二份
+副本 → 按 ~110ms 采样 2.1 秒，要求 `foregroundMonica` 与 `aboveRival` 都在 2 秒预算内落到非负、且 Monica
+的 z 序索引小于 rival（`EnumWindows` 从前到后走，索引小=更靠上；前台≠z 序，两个都要读）。
+
+踩过的坑（都在这条门的演化里）：
+
+```powershell
+# 1. 不要用 keybd_event 注入 ALT 来绕过前台锁。实测：ALT 确实让 rival 拿到了前台，但那次注入的 ALT
+#    在激活之后才落进 rival（WinForms）自己的消息队列，把它停在 user32 的菜单模态循环里——
+#    1.5~2.2 秒后 `Application::DoEvents()` 再也不返回，进程活着、stderr 空、窗口冻结，第二份副本永不启动。
+# 2. `SwitchToThisWindow` 单独用不够（读不到前台），`AttachThreadInput` 挂到当前前台线程再
+#    `SetForegroundWindow` 也不够（那条前台线程是探针自己的控制台）。可行的是"权限传递"：探针由前台
+#    控制台启动，因此持有该权限，`AllowSetForegroundWindow(rivalPid)` 后由 rival 自己抬自己。
+# 3. 传递的是**一次性**权限：用了就没了。所以 grant 文件里写的是递增序号而不是"存在即真"，最小化 Monica
+#    之后探针再 grant 一次，rival 在同一个消息泵里同时盯 grant 序号和 relaunch 标记。
+# 4. 后台静默 helper 不可归因：rival 必须留面包屑（步骤+循环计数+CPU 秒），并且用
+#    `-RedirectStandardOutput/-RedirectStandardError` 起进程，否则"没启动"和"启动时抛异常"打印得一模一样。
+```
 
 托盘提示真机门（**同样不在 CI 里**，判据是桌面上气泡的位置、渲染与退场）：
 
@@ -417,9 +449,10 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
      - **一个只在启动窗口里可见的竞态**：接力事件原本等到外壳订阅时才命名，双击发生在"已拿锁、未订阅"
        之间就没人接收。改成拿锁成功的同一瞬间命名该事件，信号便停在事件上等订阅者来取；
        单测 `A_reopen_that_arrives_before_anyone_is_listening_is_still_delivered` 钉住这一条。
-     - 覆盖：单测 7 条（同一目录的两种写法算一个键 / 不同目录各自判定 / 第二个 gate 不是主实例并能接力 /
+     - 覆盖：单测 10 条（同一目录的两种写法算一个键 / 不同目录各自判定 / 第二个 gate 不是主实例并能接力 /
        没有监听者时握手失败如实上报 / 用**真的命名 `Mutex`+`EventWaitHandle`** 跑通"第二次上锁被拒、
-       信号送到第一个监听者" / 订阅前到的信号仍会送达）。命名原语**跨进程**那一半另用
+       信号送到第一个监听者" / 订阅前到的信号仍会送达 / 前台权限**先于**接力信号交出 / 交不出权限时接力
+       仍然如实送达 / 持有锁期间能用 PID 找到 owner、释放后找不到）。命名原语**跨进程**那一半另用
        `artifacts/autotype/probe-named-primitives.ps1` 起两个进程证过（`owner: mutexCreatedNew=True` /
        `sender: signalled=True`），同进程内的同名对象不足以证明这点。
      - **真机实测**（`artifacts/publish/win-x64/jit/Monica.App.exe`，跑法见 §5）：
@@ -435,12 +468,26 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
        拼进另一条的句子中间、并且接力证据整个消失（这就是正例一度 `success=False` 的原因）。现在每批写之前
        重新求末尾、整批一次写；修复后同一次运行里两个进程的四个标记逐条完整。
      - **仍未做/仍未验证（别当成已完事）**：
-       1. 接力回来的窗口 `foreground=False`（探针在窗口重新可见的那一刻量的）：从后台进程 `Activate()`
-          不保证抢到前台。用户是否真的看见窗口浮起、还是只看到任务栏有动静，**没有量过**。
+       1. ~~接力回来的窗口 `foreground=False`，用户是否真的看见窗口浮起**没有量过**~~ →
+          **已量清并已修（#87）**。量出来不是"大概抢不到"，是**完全抢不到**：
+          - 红基线（未修产物，`artifacts/autotype/run-21/25-handoff-*.log`）：
+            `windowBack=0.01~0.13` 秒窗口就回到桌面上，但 `foregroundMonica=-1`、`aboveRival=-1`，
+            Monica 停在 z=150、rival 在 z=18，**整整 6.6 秒没有浮到用户在看的那个应用之上**。
+            也就是说托盘提示那句"或再次启动 Monica，即可回到窗口"当时只有一半是真的。
+          - 修法：退出前的那次启动把它本来就持有的前台权限交给活着的那一份——`SingleInstanceGate`
+            在 `Signal` **之前**调 `AllowSetForegroundWindow(ownerPid)`，owner 由一块命名
+            `MemoryMappedFile`（`Monica.SingleInstance.Owner.<key>`，只在持锁期间存在）按 PID 公布。
+            顺序是被单测钉住的（`GrantIndex==0 / SignalIndex==1`），因为权限属于这个即将退出的进程，
+            而 owner 只在听到信号后才抬窗口；把两行调换，实测这条单测会红。
+          - 绿（同一探针、同一产物，只换二进制）：`windowBack=0.01 foregroundMonica=0.15 aboveRival=0.15`，
+            之后每个采样点都是 Monica z=18 < rival z=19。反证也做了：把 `TryGrantForegroundToOwner`
+            换成常量 `false` 重新构建，同一条门立刻回红（`foregroundMonica=-1`、z=150<18）。
+          - 非 Windows 上 `TryGrantForegroundToOwner` 直接返回 `false`，接力照旧送达（单测覆盖），
+            所以这条修的是 Windows 行为，没有给别的平台加依赖。
        2. 跨会话/以管理员身份运行的两份 Monica 分属不同命名空间，锁拦不住彼此——未测，也未按产品缺陷处理。
        3. 接力失败（`handoff did not land`）时**没有任何用户可见反馈**，只有日志一行。
-       4. 这条探针**没接进 `verify-artifact-runtime.ps1`**：它需要交互桌面（判据是"窗口回到桌面上"），
-          CI 无头会话跑不出可信结果。
+       4. 这两条探针（单实例、接力浮窗）**都没接进 `verify-artifact-runtime.ps1`**：它们需要交互桌面
+          （判据是"窗口回到桌面上"、"回到桌面上并且盖在别的应用之上"），CI 无头会话跑不出可信结果。
        5. 守卫只在**窗口化启动路径**上生效；命令行冒烟分支（`--seed-smoke-vault` 等）在取锁之前就已返回，
           所以并行的两个 CLI 调用不受约束——这是有意的（它们是短命的读写会话），但没有测试钉住这个边界。
   4. **首次收进托盘的可发现性提示：已出厂（#85）**。托盘默认开之后，第一次点最小化的人面对的是"窗口凭空
