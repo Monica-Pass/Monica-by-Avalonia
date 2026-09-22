@@ -21,7 +21,7 @@ public sealed class DesktopAppSettings
     public int RecycleBinRetentionDays { get; set; } = 30;
     public string LegacyBusinessDataNoticeAcknowledgedSignature { get; set; } = "";
     public SecurityRecoverySettings SecurityRecovery { get; set; } = new();
-    public bool MinimizeToTray { get; set; }
+    public bool MinimizeToTray { get; set; } = true;
     public bool QuickSearchEnabled { get; set; } = true;
     public string QuickSearchHotkey { get; set; } = "Ctrl+Shift+Space";
     public bool BrowserIntegrationEnabled { get; set; }
@@ -63,7 +63,7 @@ public interface IAppSettingsService
 
 public sealed partial class AppSettingsService : IAppSettingsService
 {
-    private const int CurrentSettingsSchemaVersion = 1;
+    private const int CurrentSettingsSchemaVersion = 2;
     private const string ProtectedSettingPrefix = "secret:v1:";
 
     private static readonly IReadOnlyDictionary<string, bool> DefaultFeatureToggles =
@@ -149,6 +149,15 @@ public sealed partial class AppSettingsService : IAppSettingsService
             // that legacy value as an unset preference so upgrades do not
             // silently hide the app from the desktop capture surface.
             settings.WindowCaptureProtectionEnabled = false;
+        }
+
+        if (settings.SettingsSchemaVersion < 2)
+        {
+            // The tray ships on by default. Saved settings from before that
+            // decision cannot tell "turned off on purpose" from "never
+            // offered the choice", so the first upgrade turns it on once and
+            // the new default then sticks for every later save.
+            settings.MinimizeToTray = true;
         }
 
         if (settings.SettingsSchemaVersion < CurrentSettingsSchemaVersion)

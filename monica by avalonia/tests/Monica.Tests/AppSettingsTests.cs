@@ -26,6 +26,42 @@ public sealed partial class AppSettingsTests
     }
 
     [Fact]
+    public async Task App_settings_ships_with_the_tray_enabled()
+    {
+        var path = GetTempPath();
+        var settings = new AppSettingsService(path);
+
+        await settings.LoadAsync();
+
+        Assert.True(settings.Current.MinimizeToTray);
+    }
+
+    [Fact]
+    public async Task App_settings_enables_the_tray_once_for_installs_that_never_chose_it()
+    {
+        // Minimize-to-tray shipped default-off, so every settings.json written before it was turned
+        // on carries an explicit false that is a leftover default, not a decision. The version bump
+        // upgrades those exactly once, and a deliberate off written afterwards survives every load —
+        // otherwise the toggle on the Settings page would silently stop sticking.
+        var path = GetTempPath();
+        await File.WriteAllTextAsync(path, "{\"SettingsSchemaVersion\":1,\"MinimizeToTray\":false}");
+
+        var settings = new AppSettingsService(path);
+        await settings.LoadAsync();
+
+        Assert.True(settings.Current.MinimizeToTray);
+        Assert.Equal(2, settings.Current.SettingsSchemaVersion);
+
+        settings.Current.MinimizeToTray = false;
+        await settings.SaveAsync();
+
+        var reloaded = new AppSettingsService(path);
+        await reloaded.LoadAsync();
+
+        Assert.False(reloaded.Current.MinimizeToTray);
+    }
+
+    [Fact]
     public async Task App_settings_roundtrip_interactive_values()
     {
         var path = GetTempPath();

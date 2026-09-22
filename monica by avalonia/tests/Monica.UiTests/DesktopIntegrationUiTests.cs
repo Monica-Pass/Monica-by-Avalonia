@@ -34,9 +34,15 @@ public sealed class DesktopIntegrationUiTests
         Assert.Equal("Ctrl+Shift+Space", hotkey.RegisteredGesture);
         Assert.False(tray.IsVisible);
 
-        viewModel.MinimizeToTray = true;
+        await viewModel.InitializeAsync();
+        Dispatcher.UIThread.RunJobs();
 
+        Assert.True(viewModel.MinimizeToTray);
         Assert.True(tray.IsVisible);
+
+        viewModel.MinimizeToTray = false;
+
+        Assert.False(tray.IsVisible);
 
         viewModel.QuickSearchEnabled = false;
         await PumpDebounceAsync();
