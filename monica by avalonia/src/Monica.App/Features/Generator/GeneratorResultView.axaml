@@ -16,9 +16,6 @@
                     <Grid RowDefinitions="Auto,*" RowSpacing="14">
                         <StackPanel Spacing="4">
                             <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.GeneratedPasswordLabel}" />
-                            <TextBlock Text="{Binding GeneratorStrategySummaryText}"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       TextWrapping="Wrap" />
                             <TextBlock x:Name="GeneratorValidationMessage"
                                        Text="{Binding GeneratorValidationMessage}"
                                        Foreground="{DynamicResource SystemFillColorCriticalBrush}"

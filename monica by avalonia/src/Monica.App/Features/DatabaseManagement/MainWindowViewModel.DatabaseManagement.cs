@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Monica.Data;
 
 namespace Monica.App.ViewModels;
 
@@ -61,7 +62,7 @@ public sealed partial class MainWindowViewModel
         VaultSources.Add(new VaultSourceDisplayItem(
             _localization.LocalDatabase,
             "SQLite",
-            _localization.Get("CanonicalVault"),
+            MonicaAppDataPaths.GetDatabasePath(),
             _localization.Get("LocalOnly"),
             _localization.Get("Available")));
 

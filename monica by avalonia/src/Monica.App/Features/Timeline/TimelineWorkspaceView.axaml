@@ -31,9 +31,8 @@
 
         <Grid x:Name="TimelineMasterDetailGrid" Grid.Row="1" ColumnDefinitions="440,*" MinWidth="0">
             <Border x:Name="TimelineListRegion" Classes="timelineFilterRail" ClipToBounds="True">
-                <Grid RowDefinitions="Auto,*">
-                    <TextBlock Margin="14,12,14,8" Classes="workspaceSectionLabel" Text="{Binding L.Timeline}" />
-                    <views:TimelineEntryListView x:Name="TimelineEntryListView" Grid.Row="1" />
+                <Grid RowDefinitions="*">
+                    <views:TimelineEntryListView x:Name="TimelineEntryListView" />
                 </Grid>
             </Border>
             <Border x:Name="TimelineDetailRegion" Grid.Column="1" Classes="timelineInspector" Padding="28,22" MinWidth="0" Focusable="True">

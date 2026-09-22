@@ -14,10 +14,7 @@
             <Border x:Name="MdbxListRegion" Classes="mdbxSourceRail" ClipToBounds="True">
                 <Grid RowDefinitions="Auto,*">
                     <Grid Margin="14,12,14,8" ColumnDefinitions="*" ColumnSpacing="8">
-                        <StackPanel Spacing="3">
-                            <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.MdbxWorkingCopiesSection}" />
-                            <TextBlock Text="{Binding MdbxWorkingCopySummaryText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" MaxLines="2" />
-                        </StackPanel>
+                        <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.MdbxWorkingCopiesSection}" />
                     </Grid>
                     <mdbx:MdbxDatabaseListView x:Name="MdbxDatabaseListView" Grid.Row="1" />
                 </Grid>
@@ -25,7 +22,6 @@
             <ScrollViewer x:Name="MdbxContentRegion" Grid.Column="1" HorizontalScrollBarVisibility="Disabled" ClipToBounds="True">
                 <Grid x:Name="MdbxWorkbenchLayoutGrid" ColumnDefinitions="176,*" RowDefinitions="Auto" Margin="16,16,20,20" ColumnSpacing="20">
                     <StackPanel x:Name="MdbxSectionNavigator" Spacing="4">
-                        <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.MdbxDiagnostics}" Margin="12,0,0,6" />
                         <Button Classes="mdbxPivotButton" Classes.selected="{Binding IsMdbxHealthSelected}" Command="{Binding SelectMdbxWorkspacePageCommand}" CommandParameter="Health">
                             <TextBlock Text="{Binding L.MdbxHealthSection}" TextTrimming="CharacterEllipsis" />
                         </Button>

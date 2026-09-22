@@ -15,7 +15,7 @@
                     Grid.Column="1"
                     Classes="workspaceCommand"
                     Command="{Binding ClearSecurityIssueSearchCommand}"
-                    IsEnabled="{Binding HasSecurityIssueSearchText}"
+                    IsVisible="{Binding HasSecurityIssueSearchText}"
                     Width="40"
                     Height="40"
                     Padding="0"

@@ -68,9 +68,6 @@
         <Border x:Name="RecycleBinListRegion" Classes="recycleFilterRail" ClipToBounds="True">
             <Grid RowDefinitions="Auto,Auto,*">
                 <Grid Margin="14,12,14,8" ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                    <StackPanel Spacing="3">
-                        <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.RecycleBin}" />
-                    </StackPanel>
                     <CheckBox x:Name="RecycleBinSelectAllCheckBox"
                               Grid.Column="1"
                               IsChecked="{Binding AreAllFilteredDeletedPasswordsSelected}"

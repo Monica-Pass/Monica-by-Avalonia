@@ -65,7 +65,7 @@
                 </StackPanel>
                 <StackPanel IsVisible="{Binding !HasSelectedMdbxDatabaseItem}" Spacing="10" Margin="24" Width="260" HorizontalAlignment="Left">
                     <ic:FluentIcon Icon="Database" FontSize="34" HorizontalAlignment="Center" />
-                    <TextBlock Text="{Binding L.NoMdbxVaults}" TextAlignment="Center" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding L[SelectItemToInspectHint]}" TextAlignment="Center" TextWrapping="Wrap" />
                 </StackPanel>
             </Grid>
         </Border>

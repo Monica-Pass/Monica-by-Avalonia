@@ -12,20 +12,13 @@
         </Border>
         <Grid x:Name="DatabaseWorkspaceLayoutGrid" Grid.Row="1" ColumnDefinitions="340,*" RowDefinitions="*" MinWidth="0">
             <Border x:Name="DatabaseListRegion" Classes="databaseSourceRail" ClipToBounds="True">
-                <Grid RowDefinitions="Auto,*">
-                    <Grid Margin="14,12,14,8" ColumnDefinitions="*">
-                        <StackPanel Spacing="3">
-                            <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.RegisteredDatabases}" />
-                            <TextBlock Text="{Binding VaultSourceCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
-                        </StackPanel>
-                    </Grid>
-                    <db:DatabaseSourceListView x:Name="DatabaseSourceListView" Grid.Row="1" />
+                <Grid RowDefinitions="*">
+                    <db:DatabaseSourceListView x:Name="DatabaseSourceListView" />
                 </Grid>
             </Border>
             <ScrollViewer x:Name="DatabaseContentRegion" Grid.Column="1" HorizontalScrollBarVisibility="Disabled" ClipToBounds="True">
                 <StackPanel Spacing="14" Margin="24,16,20,20">
                     <StackPanel Spacing="6">
-                        <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.DatabaseManagement}" />
                         <Grid x:Name="DatabaseOperationNavigator" ColumnDefinitions="*,*,*,*" ColumnSpacing="4">
                         <Button Classes="databasePivotButton" Classes.selected="{Binding IsDatabaseSourceSelected}" Command="{Binding SelectDatabaseManagementPageCommand}" CommandParameter="Source">
                             <TextBlock Text="{Binding L.RegisteredDatabases}" TextTrimming="CharacterEllipsis" />
