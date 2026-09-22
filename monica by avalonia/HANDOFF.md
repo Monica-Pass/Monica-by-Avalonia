@@ -33,6 +33,7 @@
 | `f700bcc` | 最小化到托盘改为**出厂即开**：`MinimizeToTray` 默认 `true` + `SettingsSchemaVersion` 升到 2，老配置文件里那个"当年没人问过就写下去的 false"只被升级一次，之后用户主动关掉的能守住。UI 测试改成走 `InitializeAsync()` 真链路（设置→VM→协调器→托盘），不再靠手工赋值假装默认值生效。真机验证见 §7 第 1 条。门禁：单测 9+718、UI 17+188 全绿；重新 publish 后产物门全绿（loadMs=347、KeePass 增长 4.6MB、锁定尾窗中位 113.3MB/120）——证明托盘默认开没有把 `--smoke-ui-exit-after-checks` 的退出路径拖成挂死 |
 | `1d8c3a4` | 桌面端自动输入（#84，走查后用户点名的第二条必须功能）：全局热键 `Ctrl+Shift+Enter` 把"用户名 → Tab → 密码"用 `SendInput(KEYEVENTF_UNICODE)` 打进**当前前台的别人家窗口**——不碰剪贴板（因此不必和 `SecureClipboardService` 的自动清理抢时序），且**从不发 Enter**，提交留给用户；开关默认关，因为"会往别的窗口打字"不该由我们替用户打开；`WindowsGlobalHotkeyService` 槽位化（快速搜索／自动输入各自 `RegisterHotKey` + 各自消息泵线程），两槽填同一组合时先判冲突并说清"快速搜索已占用"，而不是留一条说不清的注册失败。匹配只信前台标题：标题含 host 形状就按 host 判（条目存 `github.com`、标题 `github.com.phishing.test` → 不打），命中 0 条或多于 1 条一律拒打并给原因。**查清的一个假象**：判"前台是不是我自己"原本用 Avalonia 的 `Window.IsActive` + 缓存自身 hwnd，实测进程**零顶层窗口**的时刻它仍读回 `True`（那个缓存 handle 的 pid=0、`IsWindow=False`）→ 会永远误拒，改成问操作系统（`GetWindowThreadProcessId` 比对自身 pid），单测用**真 message-only 窗口**跑通 true 分支。真机正反两例都在**发布产物**上量过（`outcome=Typed`、落点 15/19 字符分别匹配；钓鱼标题 `NoMatch` 且两个框都空），跑法与未覆盖项见 §7 第 2 条。顺带：设置页为过 300 行门把浏览器配对区块拆成 `SettingsBrowserPairingSectionView`，并修掉门禁脚本用 `[IO.Path]::GetRelativePath`（5.1 上不存在）导致行数违规既不变红也不点名的坑。门禁：格式 0 改动、Release 0 warning、单测 9+747、UI 17+191 全绿；重新 publish 后产物门 loadMs=536/4000、KeePass 增长 2.9MB/24、锁定尾窗中位 114.4MB/120 |
 | `541069c` | 单实例守卫（#86，托盘默认开引出的用户可见问题）：同一个数据目录只允许一个实例，第二次启动不再自己开第二个窗口，而是**把还活着的那一个叫回前台**后退出 0；锁按数据目录取键（各自 `MONICA_APPDATA_DIR` 的独立实例、CI 顺序跑法都不受影响），接力事件在拿到锁的同一瞬间命名，因此双击发生在 UI 订阅之前也不会丢。顺带修掉守卫的取证工具本身：诊断日志的 append 流只在打开时定位一次末尾，两个进程写同一个 `runtime.log` 会从中间互相盖掉——实测出现过一条记录被拼进另一条的句子中间、接力证据消失；现在每批写之前重新求末尾并整批一次写。真机正反两例都在发布产物上量过（见 §7 第 3 条），门禁：格式 0 改动、Release 0 warning、单测 9+754、UI 17+191 全绿；重新 publish 后产物门 loadMs=1082/4000、KeePass 20000 条增长 8.8MB/24、锁定尾窗中位 107.1MB/120 |
+| `61080f6` | 首次收进托盘的可发现性提示（#85，托盘默认开欠下的那一条）：窗口 `Hide()` 进托盘后桌面上**一点痕迹都没有**，图标还大概率在通知区域的溢出区里，所以每个安装的**第一次**收起，会在托盘那一角画一个气泡（标题 + "窗口去哪了、怎么回来" + 一个"显示 Monica"按钮），8 秒后自己退场。Avalonia 12.0.4 的 `TrayIcon`/`NotifyIcon` 都没有 `ShowBalloonTip`（在产物上量过），只能自绘：无边框 + `Topmost` + `Focusable=False` + `ShowActivated=False`，不抢焦点也不夺激活。**"每个安装一次"必须记两层**（本轮会话一个布尔 + 落盘 `TrayHintShown`），这不是审美是被实测逼出来的：`Show()` 之后再 `Hide()` 会重走 `OnOpened`→`InitializeAsync`→`LoadAsync`，内存里的标记被文件里那份（写盘防抖 150ms，还没落）盖掉，只信落盘就会在同一轮里第二次弹。锚点用 `ClientSize` 不用 `Bounds`（实测这个窗口的 `Bounds.Height` 一辈子停在 `SizeToContent` 之前的 707.33，而 client 是 121.33）。覆盖：UI 6 条 + 单测 1 条，两条证伪（注掉会话守卫→第 5 条红；`TrayHintDwell` 改 60 秒→第 4 条在 20.3 秒红）。四阶段真机门在**发布产物**上全绿（§7 第 4 条），单实例探针在同一产物上重跑仍正反两例全绿（§7 第 3 条）。门禁：格式 0 改动、Release 0 warning、单测 9+755、UI 17+197 全绿；重新 publish 后产物门 loadMs=934/4000、KeePass 20000 条增长 4.0MB/24、锁定尾窗中位 114.7MB/120 |
 
 §3 的 use-case 抽取改动已提交（`24d92b0`），OneDrive/WebDAV 冲突副本复用修复已提交（`957c5af`）。
 
@@ -112,11 +113,22 @@ dotnet tests/Monica.UiTests/bin/Release/net10.0/Monica.UiTests.dll -method "*Nam
 #    对策：只取中心点落在目标托盘图标 420px 以内的窗口。
 # 4. Avalonia 的托盘菜单项不支持 UIA InvokePattern（抛"不支持的模式"）——只能按 rect 中心真实点击；
 #    点击前先 Aim()（含重试），光标落点与目标差 >2px 就 throw 不点，这是仓库记忆里既有的规则。
+# 5. Avalonia 窗口 GDI 截屏读不到：`CopyFromScreen` 只拿到壁纸，加 `CaptureBlt` 变纯黑（合成表面不被
+#    BitBlt 覆盖）。对策：`PrintWindow(hwnd, hdc, PW_RENDERFULLCONTENT=2)`，并用亮度极差断言"真的画了"。
+# 6. 探针进程要自己 `SetProcessDPIAware()`：unaware 下 PrintWindow 把窗口按真实像素画进按虚拟尺寸开的
+#    bitmap，正文右/下边缘被切——实测就这样把一次正常的渲染读成了"文字溢出气泡"的布局缺陷。
+# 7. 注入点击的 DOWN/UP 之间必须停 ~80ms：同一轮事件循环里的 0ms 点击 Avalonia 按钮不认（实测：点在建
+#    议按钮自己的 UIA 矩形内却没反应，停 80ms 再点立刻把窗口叫回来）。
+# 8. 点最小化前先等应用自己写下 `Initialize completed`：`MinimizeToTray` 是设置加载完才赋给 VM 的，早于
+#    那一刻的最小化只是普通最小化，气泡不会来（实测假红一次）；而"这次不该有气泡"的两个阶段也会因此
+#    假绿。判据用 `runtime.log` 的偏移量，否则复用同一目录的第二次启动会读到上一轮的标记。
+# 9. 存盘有 150ms 防抖：气泡刚出现就 Kill 进程时 `settings.json` 还不存在（实测 `<no settings.json>`），
+#    必须先轮询到落盘再杀，不然测的是探针的手速而不是持久化。
 
-实测数字（本轮 `541069c` 后）：单测 9 perf + 754 functional、UI 17 perf + 191 functional；重新 publish 后
-产物门 loadMs=1082（预算 4000）、锁定态私有字节尾窗中位 107.1MB（区间 106.8–107.6，预算 120）、
-KeePass 20000 条增长 8.8MB（预算 24）、`release gate completed success=True, loadMs=270`。
-上一次记录（`1d8c3a4`）为单测 747、UI 191、loadMs=536、114.4MB、2.9MB。
+实测数字（本轮 `61080f6` 后）：单测 9 perf + 755 functional、UI 17 perf + 197 functional；重新 publish 后
+产物门 loadMs=934（预算 4000）、锁定态私有字节尾窗中位 114.7MB（区间 114.6–115.6，预算 120）、
+KeePass 20000 条增长 4.0MB（预算 24）、`release gate completed success=True, loadMs=198`。
+上一次记录（`541069c`）为单测 754、UI 191、loadMs=1082、107.1MB、8.8MB。
 
 真机自动输入门（**不在 CI 里**，需要交互桌面 + 外部目标窗口 + 真实按键）：
 
@@ -147,6 +159,20 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File artifacts/autotype/verif
 用 6 秒证明"没人管时它一直藏着"。**不要**改回"窗口不再最小化"这种判法——最小化会把窗口 `Hide()` 进托盘，
 进程处于零可见窗口状态，此时 `IsIconic(IntPtr.Zero)` 返回 `False`，实测就这样假绿过一次。两个目录要各
 自播种（`prepare-probe-appdata.ps1` 跑两遍，第二遍换 `-AppDataDirectory`）。
+
+托盘提示真机门（**同样不在 CI 里**，判据是桌面上气泡的位置、渲染与退场）：
+
+```powershell
+# 四个阶段一次跑完。-ClickOffsetX/-ClickOffsetY 是"显示 Monica"按钮中心相对气泡左上角的 dip 偏移，
+# 不传就跳过点击阶段。探针只用空数据目录、从不解锁，所以截图与日志不可能带上凭据材料。
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File artifacts/autotype/verify-tray-hint.ps1 `
+  -ExePath <exe> -ProbeRoot "<空临时目录>" -ClickOffsetX 68 -ClickOffsetY 93
+```
+
+判读要点：阶段 1 量气泡在不在托盘那一角（`rightGap/bottomGap` 是真实设备像素，16dip 在 150% 下应是 24）
+并用 `PrintWindow` 断言它真的画出了内容；阶段 2 用一次真点击把窗口叫回来，并确认**同一轮里第二次最小化
+不再欠一次说明**；阶段 3 先看 `settings.json` 里的标记再重启，证明"每个安装一次"不是"每次启动一次"；
+阶段 4 换一个全新目录，只用真时钟等它自己退场（`visibleWindowsAfterRetire=0`）。四个阶段任一不符即退出码 1。
 
 Windows 发布链路（本轮已端到端验过，见 §7）：
 
@@ -305,7 +331,8 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
     实现后全绿。再单独把 `RaiseStatusMessageState()` 一行注掉：**三条单测仍全绿、只有渲染带测试转红**
     （Expected 请输入文件夹名称。/ Actual "Enter a folder name."），这正是无头 VM 测试看不到绑定刷新的
     证据，也是这条 UI 测试存在的理由。
-- **用户点名的必须功能（2026-09-22 拍板）：三条都已出厂**（托盘 `f700bcc`／自动输入 `1d8c3a4`／单实例守卫 `541069c`）。
+- **用户点名的必须功能（2026-09-22 拍板）：四条都已出厂**（托盘 `f700bcc`／自动输入 `1d8c3a4`／单实例守卫
+  `541069c`／首次收进托盘的一次性提示，见第 4 条）。
   下一轮从各自条目末尾那份"仍未做/仍未验证"清单里挑，别再回头补已经量过的部分：
   1. **最小化到托盘：已出厂即开，并在真机 Windows 会话里逐项量过（`f700bcc`）**。
      - 改了什么：`AppSettingsService.cs` 的 `MinimizeToTray` 默认 `true`，`SettingsSchemaVersion`
@@ -330,8 +357,8 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
        真跑门拖成挂死。
      - **仍未做/仍未验证（下一轮别当成已完事）**：
        - 图标落在**"显示隐藏的图标"溢出区**，不在常驻通知区——这是 Windows 的决定，程序无法强制置顶。
-         商业级需要的是首次隐藏时的一次性提示（气泡或状态栏文案"Monica 已收进托盘"），目前**没有**，
-         用户第一次关窗仍可能找不到入口。
+         首次隐藏的一次性提示已作为第 4 条出厂（#85），但**溢出区本身没有验证过**：气泡是绕开"找不到图标"
+         的路子，不是把图标拉出溢出区。
        - "锁定保险库"菜单项只在**已锁定**状态下点过一次（无可见变化，等于没验证）；解锁态下它是否真的
          锁上并留在托盘，未测。
        - 双击唤起、气泡通知、`App.axaml` 里的 `<TrayIcons>` 声明（现在是运行期手动挂）仍未做。
@@ -416,6 +443,43 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
           CI 无头会话跑不出可信结果。
        5. 守卫只在**窗口化启动路径**上生效；命令行冒烟分支（`--seed-smoke-vault` 等）在取锁之前就已返回，
           所以并行的两个 CLI 调用不受约束——这是有意的（它们是短命的读写会话），但没有测试钉住这个边界。
+  4. **首次收进托盘的可发现性提示：已出厂（#85）**。托盘默认开之后，第一次点最小化的人面对的是"窗口凭空
+     没了"，而图标大概率在通知区域的溢出区里。形状：`TrayHintWindow`（无边框、`ShowActivated=False`、
+     `Topmost`、`Focusable=False`，不抢焦点也不夺激活）钉在托盘那一角 16dip 处，说清"窗口收进了右下角的
+     通知区域，点那里的图标或再次启动 Monica 就能回来"，外加一个"显示 Monica"按钮。
+     - **为什么是自己画的窗口**：Avalonia 12.0.4 的 `TrayIcon`/`NotifyIcon` 都没有 `ShowBalloonTip`
+       （在产物上量过），系统气泡这条路根本不存在。
+     - **"每个安装一次"记两层**：本轮会话一个布尔 + 落盘的 `TrayHintShown`。这个拆分不是审美，是被实测
+       逼出来的：`Show()` 之后再 `Hide()` 会重走 `OnOpened`→`InitializeAsync`→`LoadAsync`，`Current` 被
+       文件里那份（防抖 150ms，标记还没写进去）盖掉，只信落盘标记就会在同一轮里第二次弹出来。证伪：拿掉
+       会话守卫，`A_settings_reload_mid_run_does_not_earn_the_explanation_back` 红在 `ShouldSurfaceTrayHint()`。
+     - 锚点用 `ClientSize` 不用 `Bounds`：这个窗口的 `Bounds.Height` 一辈子停在 `SizeToContent` 之前的值
+       （实测 bounds 340x707.33 而 client 340x121.33），照 `Bounds` 算气泡会挂在离托盘 603px 高的地方。
+     - 覆盖：UI 6 条（第一次最小化会解释／关到托盘也解释／点按钮把窗口叫回并关掉气泡／真时钟等它自己退场／
+       设置重载赢不回一次说明／托盘关着就不该解释）+ 单测 1 条（标记往返落盘）。两条证伪：注掉会话守卫→
+       第 5 条红；`TrayHintDwell` 改 60 秒→第 4 条在 20.3 秒红。
+     - **真机实测**（`artifacts/autotype/verify-tray-hint.ps1` 跑 `artifacts/publish/win-x64/jit/Monica.App.exe`，
+       跑法见 §5，四阶段全绿）：气泡 `rect=2026,1322,2536,1504`、`rightGap=24 bottomGap=24`（16dip×150%）、
+       `510x182` px、`PrintWindow` 亮度极差 600（确实画出了东西），此时进程只剩这一个窗口；真点击按钮中心
+       （68,93 dip → 2128,1462）后 `mainBack=True hintStillThere=False`，窗口回到原位 `228,228,1750,1259`，
+       同一轮第二次最小化不再欠一次说明；`settings.json TrayHintShown=True`（进程还活着时就已落盘，
+       `flushed while running=True`）且重启后不再出气泡（`relaunch explains the tray again=False`、
+       `appHidden=True`）；换全新目录后只用真时钟等它退场，`visibleWindowsAfterRetire=0`。
+     - 门禁：格式 0 改动、Release 0 warning、单测 9+755、UI 17+197 全绿；重新 publish 后产物门
+       loadMs=934/4000、KeePass 20000 条增长 4.0MB/24、锁定尾窗中位 114.7MB/120。
+     - **与单实例守卫并存已在同一产物上复验**：守卫探针正例重跑仍 `success=True`
+       （`exit/handoffSent/reopenLog/surfacedLog/windowBack` 全在 0.29 秒）。静置 6 秒那一段桌面上可见的窗口
+       恰好就是 `[Monica tray hint]`，守卫探针按标题精确取 `Monica`，因此气泡既没被算成"窗口自己回来了"，
+       也没挡住宿主的接力——两条默认开启的托盘功能互不干扰这点是量出来的，不是推出来的。
+     - **仍未做/仍未验证（别当成已完事）**：
+       1. 与 `WindowCaptureProtectionEnabled`（隐私屏）同时开时气泡会怎样，没测过——这条路径两者从没在同一
+          会话里同时打开。
+       2. 显示期间显示拓扑变了（拔显示器/改分辨率）不会重新锚点：实测一次分辨率抖动下气泡落在工作区外
+          （`rightGap=-193`），产品没监听 `Screens.Changed`。它 8 秒后自己退场，所以危害有限但确实存在。
+       3. 设置写入的通用弱点仍在：任何"写入后 150ms 内被 `LoadAsync` 覆盖"的设置都可能丢，本轮只让托盘提示
+          这一条靠会话守卫免疫，没有把落盘改成同步写。
+       4. 退场只有"到期"一条路：8 秒内点别处、或把主窗口叫回来之外都不会让它提前消失（设计如此，但没验证
+          过用户不会把它读成"关不掉的窗口"）。
 
 ## 8. 用户协作偏好（务必遵守）
 
@@ -426,5 +490,6 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
 - 面对从别处 fork 进来的代码，先问"到底要不要"，再谈"怎么维护"。
 
 ---
-接手第一步建议：工作树已干净、两套 Windows 门（源码级 + 产物级）实测全绿，用户点名的三条必须功能（托盘、
-自动输入、单实例守卫）也已出厂。下一轮从 §7 各条末尾的"仍未做/仍未验证"清单里挑，不必再花时间复验已绿的部分。
+接手第一步建议：工作树已干净、两套 Windows 门（源码级 + 产物级）实测全绿，用户点名的四条必须功能（托盘、
+自动输入、单实例守卫、首次收进托盘的一次性提示）都已出厂，且每一条都在**发布产物**上真机量过。下一轮从 §7
+各条末尾的"仍未做/仍未验证"清单里挑，不必再花时间复验已绿的部分。
