@@ -66,12 +66,14 @@ class Program
             var singleInstance = SingleInstanceGate.TryStartAsPrimary(dataRootDirectory);
             if (singleInstance is null)
             {
-                // This launch shows nothing, so the log line is the only trace it leaves. False means
-                // the owner released its handle between the two calls, i.e. it had just exited; the
+                // This launch shows nothing, so the log line is the only trace it leaves. HandedOff=false
+                // means the owner released its handle between the two calls, i.e. it had just exited; the
                 // next launch gets in, and opening a rival window here would not help.
-                var handoffLanded = SingleInstanceGate.NotifyExistingInstance(dataRootDirectory);
-                AppDiagnostics.Info(handoffLanded
-                    ? "Single instance handoff sent to the running copy; exiting."
+                // GrantedForeground=false only says the running copy has to raise itself the hard way, which
+                // is what it did before the handover existed.
+                var handoff = SingleInstanceGate.NotifyExistingInstance(dataRootDirectory);
+                AppDiagnostics.Info(handoff.HandedOff
+                    ? $"Single instance handoff sent to the running copy (foreground right handed over={handoff.GrantedForeground}); exiting."
                     : "Single instance handoff did not land; exiting.");
 
                 return 0;

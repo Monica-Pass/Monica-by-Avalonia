@@ -22,7 +22,7 @@ public class SingleInstanceGateTests
         Assert.NotNull(first);
         Assert.Null(second);
         Assert.Equal(SingleInstanceGate.BuildInstanceKey(@"C:\Vaults\Personal"), channel.AcquiredKey);
-        Assert.True(SingleInstanceGate.NotifyExistingInstance(@"C:\Vaults\Personal", channel));
+        Assert.True(SingleInstanceGate.NotifyExistingInstance(@"C:\Vaults\Personal", channel).HandedOff);
         Assert.Equal(channel.AcquiredKey, channel.SignalledKey);
         Assert.True(channel.Signalled);
 
@@ -77,7 +77,46 @@ public class SingleInstanceGateTests
     public void A_handoff_with_no_listener_reports_itself_instead_of_looking_successful()
     {
         var channel = new FakeChannel { AcceptsSignal = false };
-        Assert.False(SingleInstanceGate.NotifyExistingInstance(@"C:\Vaults\Personal", channel));
+        Assert.False(SingleInstanceGate.NotifyExistingInstance(@"C:\Vaults\Personal", channel).HandedOff);
+    }
+
+    /// <summary>
+    /// The right to come forward only exists while the launch the user acted on is alive, and it has to be
+    /// handed over before that launch signals the owner to move - the other way round is a race the owner
+    /// loses whenever it is quick.
+    /// </summary>
+    [Fact]
+    public void The_foreground_right_is_handed_over_before_the_owner_is_told_to_move()
+    {
+        var channel = new FakeChannel();
+
+        var handoff = SingleInstanceGate.NotifyExistingInstance(@"C:\Vaults\Personal", channel);
+
+        Assert.True(handoff.HandedOff);
+        Assert.True(handoff.GrantedForeground);
+        Assert.Equal(0, channel.GrantIndex);
+        Assert.Equal(1, channel.SignalIndex);
+
+        // The right has to go to whoever owns *this* directory, so the key it is looked up by matters.
+        var key = SingleInstanceGate.BuildInstanceKey(@"C:\Vaults\Personal");
+        Assert.Equal(key, channel.GrantedKey);
+        Assert.Equal(key, channel.SignalledKey);
+    }
+
+    /// <summary>
+    /// A refused grant is a window that comes back underneath, which is worth having; a grant that throws
+    /// and takes the handoff down with it is a window that does not come back at all.
+    /// </summary>
+    [Fact]
+    public void A_handoff_still_lands_when_the_foreground_right_cannot_be_handed_over()
+    {
+        var channel = new FakeChannel { GrantsForeground = false };
+
+        var handoff = SingleInstanceGate.NotifyExistingInstance(@"C:\Vaults\Personal", channel);
+
+        Assert.True(handoff.HandedOff);
+        Assert.False(handoff.GrantedForeground);
+        Assert.True(channel.Signalled);
     }
 
     /// <summary>
@@ -128,6 +167,32 @@ public class SingleInstanceGateTests
         Assert.True(delivered.Wait(TimeSpan.FromSeconds(5)));
     }
 
+    /// <summary>
+    /// The tests above stub the handover, which is the part that can be stubbed. Who owns a directory is
+    /// not: in real use the reader is a different process from the writer, so this runs the named store.
+    /// Whether the handover then puts the window on top of what the user was looking at is a desktop
+    /// question, and artifacts/autotype/verify-handoff-foreground.ps1 is what answers it.
+    /// </summary>
+    [Fact]
+    public void The_owner_is_findable_by_process_id_and_only_while_it_holds_the_lock()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var key = "test." + Guid.NewGuid().ToString("N");
+        using var owner = new NamedSyncSingleInstanceChannel();
+        Assert.True(owner.TryAcquire(key));
+        Assert.Equal(Environment.ProcessId, NamedSyncSingleInstanceChannel.ReadOwnerPid(key));
+
+        // A directory nobody owns must not answer with a process id, or the grant would go to a stranger.
+        Assert.Equal(0, NamedSyncSingleInstanceChannel.ReadOwnerPid("test." + Guid.NewGuid().ToString("N")));
+
+        owner.Release();
+        Assert.Equal(0, NamedSyncSingleInstanceChannel.ReadOwnerPid(key));
+    }
+
     private sealed class FakeChannel : ISingleInstanceChannel
     {
         public string? AcquiredKey { get; private set; }
@@ -141,6 +206,17 @@ public class SingleInstanceGateTests
         public bool ListenerDisposed { get; private set; }
 
         public bool AcceptsSignal { get; init; } = true;
+
+        public bool GrantsForeground { get; init; } = true;
+
+        public string? GrantedKey { get; private set; }
+
+        /// <summary>Position in the order the handoff made its calls, so the sequence is assertable.</summary>
+        public int GrantIndex { get; private set; } = -1;
+
+        public int SignalIndex { get; private set; } = -1;
+
+        private int _callCount;
 
         private Action? _onReopen;
 
@@ -160,8 +236,16 @@ public class SingleInstanceGateTests
         public bool Signal(string key)
         {
             SignalledKey = key;
+            SignalIndex = _callCount++;
             Signalled = AcceptsSignal;
             return AcceptsSignal;
+        }
+
+        public bool TryGrantForegroundToOwner(string key)
+        {
+            GrantedKey = key;
+            GrantIndex = _callCount++;
+            return GrantsForeground;
         }
 
         public IDisposable Listen(string key, Action onReopen)

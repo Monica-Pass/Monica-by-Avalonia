@@ -1,3 +1,5 @@
+using System.IO.MemoryMappedFiles;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -18,6 +20,12 @@ internal interface ISingleInstanceChannel : IDisposable
     bool Signal(string key);
 
     IDisposable Listen(string key, Action onSignal);
+
+    /// <summary>
+    /// Asks Windows to let the instance that owns <paramref name="key"/> raise its own window. Has to be
+    /// done by the launch the user acted on, and before the signal, so the owner can act on it.
+    /// </summary>
+    bool TryGrantForegroundToOwner(string key);
 }
 
 /// <summary>
@@ -57,18 +65,33 @@ internal sealed class SingleInstanceGate(ISingleInstanceChannel channel, string 
     /// listener is there to hear it, which is the caller's cue to say something rather than exit
     /// into silence.
     /// </summary>
-    public static bool NotifyExistingInstance(string dataRootDirectory, ISingleInstanceChannel? channel = null)
+    public static HandoffResult NotifyExistingInstance(string dataRootDirectory, ISingleInstanceChannel? channel = null)
     {
         var ownedChannel = channel ?? new NamedSyncSingleInstanceChannel();
         try
         {
-            return ownedChannel.Signal(BuildInstanceKey(dataRootDirectory));
+            var key = BuildInstanceKey(dataRootDirectory);
+
+            // Grant first, and here rather than at the call site, because there is no ordering a caller
+            // could get wrong: the right belongs to this process alone, this process is about to exit with
+            // it, and the owner only raises its window once it hears the signal. Reversing these two lines
+            // is what the ordering test above catches.
+            var granted = ownedChannel.TryGrantForegroundToOwner(key);
+            var signalled = ownedChannel.Signal(key);
+            return new HandoffResult(signalled, granted);
         }
         finally
         {
             ownedChannel.Dispose();
         }
     }
+
+    /// <param name="HandedOff">Whether the running instance was told to come forward.</param>
+    /// <param name="GrantedForeground">
+    /// Whether the running instance was handed the right to put itself on top. A handoff without it still
+    /// brings the window back, just underneath whatever the user was looking at.
+    /// </param>
+    public readonly record struct HandoffResult(bool HandedOff, bool GrantedForeground);
 
     public static string BuildInstanceKey(string dataRootDirectory)
     {
@@ -103,8 +126,11 @@ internal sealed class SingleInstanceGate(ISingleInstanceChannel channel, string 
 
 internal sealed class NamedSyncSingleInstanceChannel : ISingleInstanceChannel
 {
+    private const int OwnerPidBytes = sizeof(int);
+
     private Mutex? _mutex;
     private EventWaitHandle? _reopenEvent;
+    private MemoryMappedFile? _ownerPidStore;
 
     public bool TryAcquire(string key)
     {
@@ -120,6 +146,11 @@ internal sealed class NamedSyncSingleInstanceChannel : ISingleInstanceChannel
         // round to listening. A double-click during startup would otherwise find no event at all
         // and be dropped; held here, the set signal waits for the registration to arrive.
         _reopenEvent = new EventWaitHandle(initialState: false, EventResetMode.AutoReset, EventName(key));
+
+        // And publish which process that is, the same way: a second launch cannot raise the first one's
+        // window itself, but it can hand over the right to do so, and for that it needs to know who.
+        _ownerPidStore = TryCreateOwnerPidStore(key);
+        WriteOwnerPid();
         return true;
     }
 
@@ -129,6 +160,8 @@ internal sealed class NamedSyncSingleInstanceChannel : ISingleInstanceChannel
         _mutex = null;
         _reopenEvent?.Dispose();
         _reopenEvent = null;
+        _ownerPidStore?.Dispose();
+        _ownerPidStore = null;
     }
 
     public bool Signal(string key)
@@ -141,6 +174,26 @@ internal sealed class NamedSyncSingleInstanceChannel : ISingleInstanceChannel
             initialState: false, EventResetMode.AutoReset, EventName(key), out var createdWhileNobodyListened);
 
         return !createdWhileNobodyListened && reopenEvent.Set();
+    }
+
+    public bool TryGrantForegroundToOwner(string key)
+    {
+        // Windows refuses SetForegroundWindow to a process the user did not act on, and the instance that
+        // stayed running is not the one they double-clicked. Measured on the published artifact: the
+        // window came back in 0.01-0.13s but sat at z-order 150 behind the app the user was looking at,
+        // and never took the foreground in 6.6s of watching - so it stayed their "nothing happened".
+        //
+        // A process that holds the right can pass it on, and this launch does hold it (it was started by
+        // the foreground process, which is the whole reason the rival has to be the one starting it).
+        // A recycled pid could in principle get the right by mistake; the window is raised either way,
+        // and the alternative is to leave the promise unkept whenever the owner is slow to die.
+        if (!OperatingSystem.IsWindows())
+        {
+            return false;
+        }
+
+        var ownerPid = ReadOwnerPid(key);
+        return ownerPid > 0 && AllowSetForegroundWindow(ownerPid);
     }
 
     public IDisposable Listen(string key, Action onReopen)
@@ -166,9 +219,66 @@ internal sealed class NamedSyncSingleInstanceChannel : ISingleInstanceChannel
 
     public void Dispose() => Release();
 
+    private static MemoryMappedFile? TryCreateOwnerPidStore(string key)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return null;
+        }
+
+        try
+        {
+            return MemoryMappedFile.CreateOrOpen(OwnerPidStoreName(key), OwnerPidBytes);
+        }
+        catch (IOException)
+        {
+            // A mapping left behind at a different size than this build asks for. Losing the foreground
+            // handover is the cost; refusing to start would be a worse one.
+            return null;
+        }
+    }
+
+    private void WriteOwnerPid()
+    {
+        if (_ownerPidStore is null)
+        {
+            return;
+        }
+
+        using var view = _ownerPidStore.CreateViewStream(0, OwnerPidBytes, MemoryMappedFileAccess.Write);
+        view.Write(BitConverter.GetBytes(Environment.ProcessId));
+    }
+
+    internal static int ReadOwnerPid(string key)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return 0;
+        }
+
+        try
+        {
+            using var store = MemoryMappedFile.OpenExisting(OwnerPidStoreName(key));
+            using var view = store.CreateViewStream(0, OwnerPidBytes, MemoryMappedFileAccess.Read);
+
+            Span<byte> buffer = stackalloc byte[OwnerPidBytes];
+            return view.Read(buffer) == buffer.Length ? BitConverter.ToInt32(buffer) : 0;
+        }
+        catch (Exception ex) when (ex is IOException or PlatformNotSupportedException)
+        {
+            // No store means nobody published one, which is the same answer as no owner.
+            return 0;
+        }
+    }
+
     private static string MutexName(string key) => $"Monica.SingleInstance.{key}";
 
     private static string EventName(string key) => $"Monica.SingleInstance.Reopen.{key}";
+
+    private static string OwnerPidStoreName(string key) => $"Monica.SingleInstance.Owner.{key}";
+
+    [DllImport("user32.dll")]
+    private static extern bool AllowSetForegroundWindow(int dwProcessId);
 
     private sealed class Listener(RegisteredWaitHandle registration) : IDisposable
     {
