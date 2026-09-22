@@ -105,6 +105,34 @@ public sealed class UnlockFeedbackUiTests
         Assert.Equal(library.ViewModel.L.Get("SelectFolderToManage"), Message(strip));
     }
 
+    // Switching language in Settings must retranslate the sentence that is already on screen, not
+    // just the chrome around it. Driven through SettingsLanguage so the production wiring — the
+    // settings callback, the localization service notification and the view model refresh — is all
+    // in the path, and read off the rendered strip rather than the view model property.
+    [Fact]
+    public async Task Language_switch_retranslates_the_status_line_rendered_in_the_strip()
+    {
+        using var library = LibraryUiHarness.Open();
+        library.ViewModel.NewFolderName = "";
+
+        await library.ViewModel.CreateVaultFolderCommand.ExecuteAsync(null);
+        library.Settle();
+
+        var strip = Strip(library.Window);
+        Assert.True(strip.IsVisible);
+        var english = Message(strip);
+        Assert.Equal(library.ViewModel.L.Get("FolderNameRequired"), english);
+
+        library.ViewModel.SettingsLanguage = "zh-CN";
+        library.Settle();
+
+        var chinese = library.ViewModel.L.Get("FolderNameRequired");
+        Assert.NotEqual(english, chinese);
+        Assert.Equal(chinese, Message(strip));
+        // The tone is a fact about the operation, not about the wording, so it survives the flip.
+        Assert.True(strip.IsVisible);
+    }
+
     private static Border Strip(Visual root) =>
         root.GetVisualDescendants()
             .OfType<Border>()

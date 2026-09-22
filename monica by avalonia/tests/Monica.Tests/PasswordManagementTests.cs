@@ -1307,12 +1307,90 @@ public sealed partial class PasswordManagementTests
     }
 
     [Fact]
-    public void ViewModel_status_message_exposes_no_setter_so_writes_cannot_skip_classification()
+    public async Task ViewModel_status_message_exposes_no_setter_so_writes_cannot_skip_classification()
     {
         var property = typeof(MainWindowViewModel).GetProperty("StatusMessage");
 
         Assert.NotNull(property);
         Assert.Null(property!.SetMethod);
+    }
+
+    [Fact]
+    public async Task ViewModel_retranslates_the_status_line_already_on_screen_when_language_changes()
+    {
+        // The funnel stores intent, not a sentence: a user who switches language in Settings while a
+        // message is up must not be left reading the old language until something replaces it.
+        var harness = CreateHarness();
+        harness.ViewModel.IsUnlocked = true;
+        harness.ViewModel.NewFolderName = "";
+
+        await harness.ViewModel.CreateVaultFolderCommand.ExecuteAsync(null);
+        var english = harness.ViewModel.StatusMessage;
+        Assert.Equal(harness.ViewModel.L.Get("FolderNameRequired"), english);
+
+        harness.ViewModel.L.SetLanguage("zh-CN");
+
+        Assert.NotEqual(english, harness.ViewModel.StatusMessage);
+        Assert.Equal(harness.ViewModel.L.Get("FolderNameRequired"), harness.ViewModel.StatusMessage);
+        Assert.DoesNotContain("Enter a folder name", harness.ViewModel.StatusMessage, StringComparison.Ordinal);
+        // Retranslating must not quietly downgrade the tone that earns the amber strip.
+        Assert.True(harness.ViewModel.IsStatusMessageFailure);
+        Assert.True(harness.ViewModel.HasFailedStatusMessage);
+    }
+
+    [Fact]
+    public async Task ViewModel_retranslated_status_line_keeps_the_values_it_was_written_with()
+    {
+        // Args are captured at write time. Re-reading the template after the language flips has to
+        // substitute the same values, not the state the view model has moved on to.
+        var harness = CreateHarness();
+        harness.ViewModel.IsUnlocked = true;
+        harness.ViewModel.NewFolderName = "Quarterly notes";
+        harness.ViewModel.HasPendingLegacyBusinessData = true;
+
+        await harness.ViewModel.CreateVaultFolderCommand.ExecuteAsync(null);
+        Assert.Equal(
+            harness.ViewModel.L.Format("CreatedFolderFormat", "Quarterly notes"),
+            harness.ViewModel.StatusMessage);
+
+        harness.ViewModel.L.SetLanguage("zh-CN");
+
+        Assert.Equal(
+            harness.ViewModel.L.Format("CreatedFolderFormat", "Quarterly notes"),
+            harness.ViewModel.StatusMessage);
+        Assert.Contains("Quarterly notes", harness.ViewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Cleared_status_line_survives_a_language_switch_as_still_being_cleared()
+    {
+        var harness = CreateHarness();
+        harness.ViewModel.IsUnlocked = true;
+        var clock = new SteadyStatusClock();
+        harness.ViewModel.StatusTimeProvider = clock;
+        harness.ViewModel.ClearTotpFiltersCommand.Execute(null);
+        Assert.Equal(harness.ViewModel.L.Get("ClearedTotpFilters"), harness.ViewModel.StatusMessage);
+
+        clock.Advance(TimeSpan.FromSeconds(9));
+        harness.ViewModel.RetireExpiredStatusNotice();
+        Assert.Equal(string.Empty, harness.ViewModel.StatusMessage);
+
+        harness.ViewModel.L.SetLanguage("zh-CN");
+
+        // Nothing is on the bar, so the read path has nothing to re-translate. It must not fall back
+        // to printing the stored key, which is exactly what a bare _localization.Get("") would do.
+        Assert.Equal(string.Empty, harness.ViewModel.StatusMessage);
+    }
+
+    private sealed class SteadyStatusClock : TimeProvider
+    {
+        private long _timestamp;
+
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+        public override long GetTimestamp() => _timestamp;
+
+        public void Advance(TimeSpan duration) => _timestamp += duration.Ticks;
     }
 
     [Fact]

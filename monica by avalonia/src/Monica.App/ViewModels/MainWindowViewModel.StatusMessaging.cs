@@ -24,11 +24,20 @@ public sealed partial class MainWindowViewModel
 
     internal TimeProvider StatusTimeProvider { get; set; } = TimeProvider.System;
 
-    private string _statusMessage = string.Empty;
+    private string _statusMessageKey = string.Empty;
+    private object[] _statusMessageArgs = [];
     private bool _isStatusMessageFailure;
     private long _statusNoticeStartedAt;
 
-    public string StatusMessage => _statusMessage;
+    // Resolved at read time, so switching language in Settings retranslates the line that is
+    // already on screen instead of leaving a sentence in the previous language until something
+    // happens to replace it. Storing the key is also what keeps the funnel free of translated
+    // text it would otherwise have to reverse-engineer to decide anything about the message.
+    public string StatusMessage => _statusMessageKey.Length == 0
+        ? string.Empty
+        : _statusMessageArgs.Length == 0
+            ? _localization.Get(_statusMessageKey)
+            : _localization.Format(_statusMessageKey, _statusMessageArgs);
 
     // Failure used to be guessed by re-reading the already-translated sentence for words like
     // "failed"/"无法", which made one error prominent in Chinese and invisible in English. Intent
@@ -92,17 +101,19 @@ public sealed partial class MainWindowViewModel
 
     private void WriteStatus(StatusTone tone, string messageKey, object[] args)
     {
-        _statusMessage = string.IsNullOrEmpty(messageKey)
-            ? string.Empty
-            : args.Length == 0
-                ? _localization.Get(messageKey)
-                : _localization.Format(messageKey, args);
+        _statusMessageKey = messageKey;
+        _statusMessageArgs = args;
         _isStatusMessageFailure = tone == StatusTone.Failure;
         IsStatusNoticePending = tone == StatusTone.Notice;
         if (IsStatusNoticePending) _statusNoticeStartedAt = StatusTimeProvider.GetTimestamp();
+        RaiseStatusMessageState();
+        StatusNoticeScheduleChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void RaiseStatusMessageState()
+    {
         OnPropertyChanged(nameof(StatusMessage));
         OnPropertyChanged(nameof(HasUnlockStatusMessage));
         OnPropertyChanged(nameof(HasFailedStatusMessage));
-        StatusNoticeScheduleChanged?.Invoke(this, EventArgs.Empty);
     }
 }

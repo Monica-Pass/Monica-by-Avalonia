@@ -435,6 +435,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void RefreshLocalizedProperties()
     {
         RefreshChoiceLabels();
+        RaiseStatusMessageState();
         RefreshPlatformIntegrationCapabilities();
         RefreshCapabilities();
         OnPropertyChanged(nameof(PlatformIntegrationsTitle));
