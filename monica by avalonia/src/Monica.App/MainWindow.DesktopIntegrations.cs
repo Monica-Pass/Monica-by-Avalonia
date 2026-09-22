@@ -11,6 +11,7 @@ public partial class MainWindow
 
     internal void ShowFromDesktopIntegration()
     {
+        AppDiagnostics.Info("Desktop integration surfaced the main window.");
         Show();
         WindowState = WindowState.Normal;
         Activate();

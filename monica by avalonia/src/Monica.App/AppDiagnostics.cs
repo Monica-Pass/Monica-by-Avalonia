@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using System.Threading.Channels;
 using Monica.Data;
 
@@ -133,9 +134,22 @@ internal static class AppDiagnostics
 
         while (await LogEvents.Reader.WaitToReadAsync().ConfigureAwait(false))
         {
+            var batch = new StringBuilder();
             while (LogEvents.Reader.TryRead(out var diagnosticEvent))
             {
-                await writer.WriteAsync(Format(diagnosticEvent)).ConfigureAwait(false);
+                batch.Append(Format(diagnosticEvent));
+            }
+
+            if (batch.Length > 0)
+            {
+                // This handle stays open for the life of the process, and an append stream only
+                // seeks to the end once - so any line another process wrote in between gets
+                // overwritten from the middle. Measured: a refused second launch and the instance
+                // it handed off to produced one record spliced into another's sentence, and the
+                // handoff evidence disappeared. Re-ask for the end, then write the batch in one
+                // piece so the two writers cannot land inside each other's line.
+                stream.Seek(0, SeekOrigin.End);
+                await writer.WriteAsync(batch.ToString()).ConfigureAwait(false);
             }
 
             await writer.FlushAsync().ConfigureAwait(false);

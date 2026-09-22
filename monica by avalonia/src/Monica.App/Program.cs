@@ -60,7 +60,31 @@ class Program
                 return RunVaultBenchmarkAsync(args).GetAwaiter().GetResult();
             }
 
-            return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            // One data directory, one running instance. A second window would hold its own
+            // decrypted copy of the same vault and never see the first one's writes.
+            var dataRootDirectory = MonicaAppDataPaths.GetRootDirectory();
+            var singleInstance = SingleInstanceGate.TryStartAsPrimary(dataRootDirectory);
+            if (singleInstance is null)
+            {
+                // This launch shows nothing, so the log line is the only trace it leaves. False means
+                // the owner released its handle between the two calls, i.e. it had just exited; the
+                // next launch gets in, and opening a rival window here would not help.
+                var handoffLanded = SingleInstanceGate.NotifyExistingInstance(dataRootDirectory);
+                AppDiagnostics.Info(handoffLanded
+                    ? "Single instance handoff sent to the running copy; exiting."
+                    : "Single instance handoff did not land; exiting.");
+
+                return 0;
+            }
+
+            try
+            {
+                return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            }
+            finally
+            {
+                singleInstance.Dispose();
+            }
         }
         catch (Exception ex)
         {

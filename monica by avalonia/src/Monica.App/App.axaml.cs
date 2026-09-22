@@ -46,6 +46,14 @@ public partial class App : Application
             desktop.MainWindow = _mainWindow;
             desktop.Exit += OnDesktopExit;
 
+            // A second launch exits as soon as it asks for this window, so the handoff callback is
+            // the only notice there is that the user wants Monica in front. It arrives off the UI thread.
+            SingleInstanceGate.Active?.ListenForReopen(() =>
+            {
+                AppDiagnostics.Info("Single instance reopen received; surfacing the window.");
+                Dispatcher.UIThread.Post(() => _mainWindow?.ShowFromDesktopIntegration());
+            });
+
             var smokePassword = GetSmokeUiUnlockPassword(desktop.Args);
             var smokeSection = GetSmokeUiSection(desktop.Args);
             var smokePasswordSelectionCount = GetSmokeUiSelectPasswordCount(desktop.Args);
