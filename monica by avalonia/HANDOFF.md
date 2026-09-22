@@ -16,7 +16,7 @@
 
 ## 2. 当前状态（工作树干净）
 
-分支 `main`，`git status` 无未提交改动。功能 HEAD = `69a44e1`（其后只可能有给本节自身标提交号的文档提交），近几轮：
+分支 `main`，`git status` 无未提交改动。功能 HEAD = `f700bcc`（其后只可能有给本节自身标提交号的文档提交），近几轮：
 
 | commit | 立住了什么 |
 |---|---|
@@ -30,6 +30,7 @@
 | `ffdac87` | ① 瞬态回执自己退场：180 处信息写入按 key 逐条判成三种寿命（122 notice／58 standing／52 failure），notice 落地 8 秒后清除、离开产生它的那一屏立即清除，判据是产生处的动作语义而不是文案关键词；计时器按仓库既有的自动锁定范式放在窗口侧（`MainWindow.StatusNotice.cs`），VM 只声明意图 + 可注入 `TimeProvider`，换屏路径不依赖计时器。新守卫 `StatusNoticeRetirementUiTests` 四条（假时钟、零 sleep），四类假缺陷 A/B/C/D 分别把 1、3／3／1、2／4 打红，撤销后 4/4 绿；真产物再加 `--smoke-ui-status-notice` 探针补上无头测不到的 `DispatcherTimer` tick，把驻留改成 60 秒后产物里 `retired=False`、门即红。② 顺带查清锁定态内存门为什么反复假红：同一二进制八次跑出 116.7–131.0，实测锁定后约 30 秒私有字节仍在从 ~123 衰减到 ~114（线程 37→31、托管堆一直 25–28MB），旧门取的是衰减途中的瞬时值；改为每 5 秒压缩后采样共 10 拍、按尾 5 拍中位数判定（阈值仍是 120，未放松），在压缩处根住 15MB 后中位数 133.4、门红，撤销后两次绿 113.9／115.1。门禁：格式 0 改动、Release 0 warning、单测 9+713、UI 17+187 全绿，重新 publish 后产物门 loadMs=597、KeePass 20000 条增长 3.9MB、锁定尾窗中位 113.9MB |
 
 | `69a44e1` | 切语言时把**屏幕上已经停着的那句**也重译（补 #78 留下的缺口）：状态漏斗改存 key + 参数、`StatusMessage` 读取时才解析，语言刷新处顺手重发状态通知。新增 3 条单测（失败句／带参句／已清空句）+ 1 条走 `SettingsLanguage` 真链路的渲染带测试；证伪：只把刷新调用注掉时单测仍全绿、UI 测试在 `"Enter a folder name."` 处转红，说明无头测不到的那一半确实由 UI 测试守着。门禁：格式 0 改动、Release 0 warning、单测 9+716、UI 17+188 全绿；重新 publish 后产物门 loadMs=186、KeePass 20000 条增长 3.4MB、锁定尾窗中位 110.6MB（尾区间 109.2–112.8） |
+| `f700bcc` | 最小化到托盘改为**出厂即开**：`MinimizeToTray` 默认 `true` + `SettingsSchemaVersion` 升到 2，老配置文件里那个"当年没人问过就写下去的 false"只被升级一次，之后用户主动关掉的能守住。UI 测试改成走 `InitializeAsync()` 真链路（设置→VM→协调器→托盘），不再靠手工赋值假装默认值生效。真机验证见 §7 第 1 条。门禁：单测 9+718、UI 17+188 全绿；重新 publish 后产物门全绿（loadMs=347、KeePass 增长 4.6MB、锁定尾窗中位 113.3MB/120）——证明托盘默认开没有把 `--smoke-ui-exit-after-checks` 的退出路径拖成挂死 |
 
 §3 的 use-case 抽取改动已提交（`24d92b0`），OneDrive/WebDAV 冲突副本复用修复已提交（`957c5af`）。
 
@@ -90,6 +91,20 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File eng/ci/verify-artifact-r
 # 查询式 `-filter "/fullyQualifiedName~X"` 会静默匹配 0 条并打印 Total: 0，别当成通过。
 dotnet tests/Monica.UiTests/bin/Release/net10.0/Monica.UiTests.dll -method "*NameFragment*"
 ```
+
+真机 GUI 驱动（本轮验证托盘时踩到的四个坑，写脚本前先读）：
+
+```powershell
+# 1. Windows PowerShell 5.1 按 ANSI 读无 BOM 的 .ps1：脚本里写中文字面量会解析成乱码并直接语法崩。
+#    对策：脚本一律 ASCII-only，需要匹配本地化文案时改用几何/类名定位（ClassName、AutomationId、rect）。
+# 2. 日志别用 Write-Output：`if (-not (Aim ...)) { throw }` 会把函数里 Write-Output 的内容吸进返回值，
+#    非空数组恒为真 → 守卫被静默吃掉（实测就这样让三次"瞄准失败"的点击照样发了出去）。
+#    对策：函数内日志用 [Console]::WriteLine，函数只 return 严格布尔。
+# 3. 枚举菜单项必须锚定：按"任意窗口里有 >=2 个 MenuItem"来找，会抓到别的应用的菜单栏
+#    （本轮点到了 IDE 的"编辑"标题，只是开了个菜单、没触发命令，属侥幸）。
+#    对策：只取中心点落在目标托盘图标 420px 以内的窗口。
+# 4. Avalonia 的托盘菜单项不支持 UIA InvokePattern（抛"不支持的模式"）——只能按 rect 中心真实点击；
+#    点击前先 Aim()（含重试），光标落点与目标差 >2px 就 throw 不点，这是仓库记忆里既有的规则。
 
 实测数字（本轮 #78 后）：单测 9 perf + 713 functional、UI 17 perf + 179 functional；重新 publish 后
 产物门 loadMs=191/642（预算 4000）、锁定态私有字节 112.4MB（预算 120）、KeePass 20000 条增长
@@ -254,16 +269,37 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
     （Expected 请输入文件夹名称。/ Actual "Enter a folder name."），这正是无头 VM 测试看不到绑定刷新的
     证据，也是这条 UI 测试存在的理由。
 - **用户点名的必须功能（2026-09-22 拍板，下一轮从这两条开始，别再回头挑小瑕疵）**：
-  1. **最小化到托盘：链路早就完整，但默认是关的**。实测现状：`AvaloniaTrayService`（`TrayIcon` +
-     `NativeMenu`，菜单 显示／锁定／退出，图标取 `avares://Monica.App/Assets/AppIcon.ico`）；最小化→
-     `Hide()` 在 `MainWindow.DesktopIntegrations.cs:45-53`，关窗拦截在 `MainWindow.NoteLifecycle.cs:28-41`，
-     真窗口路径已有测试 `DesktopIntegrationUiTests.cs:65-90`。**但 `AppSettingsService.cs:24` 的
-     `MinimizeToTray` 默认 `false`，`DesktopIntegrationCoordinator.cs:87` 是
-     `SetVisible(_viewModel?.MinimizeToTray == true)`——所以默认安装下托盘图标根本不出现**，用户看到的
-     就是"最小化没反应/找不到 Monica"。决定：**改为默认开启**。待解决：老用户已存盘 `false` 的迁移写法
-     （别把真实偏好当成默认值覆盖掉），以及仍缺的双击唤起、气泡通知、`App.axaml` 里的 `<TrayIcons>` 声明
-     （现在是运行期手动挂）。**未验证项（必须补）**：真实 Windows 会话里图标是否真的出现在通知区、
-     菜单文案是否双语正确——无头测试换的是 `ITrayService` 假实现，证明不了这一条。
+  1. **最小化到托盘：已出厂即开，并在真机 Windows 会话里逐项量过（`f700bcc`）**。
+     - 改了什么：`AppSettingsService.cs` 的 `MinimizeToTray` 默认 `true`，`SettingsSchemaVersion`
+       1→2，`Migrate()` 里 `version < 2` 时把 `MinimizeToTray` 置真一次。理由：托盘默认关的那些年，
+       存盘的 `false` 是**遗留默认值**而不是用户决定；升级一次之后，用户在设置页主动关掉的值会正常
+       持久（新守卫 `App_settings_enables_the_tray_once_for_installs_that_never_chose_it` 就是测这条
+       往返：旧文件→翻真→主动关→存盘→重载仍为假）。先红后绿：两条新单测改前都红。
+     - UI 测试不再靠手工赋值假装默认值生效：`DesktopIntegrationUiTests` 改走 `await viewModel.InitializeAsync()`
+       真链路（设置→`ApplySettings`→`DesktopIntegrationCoordinator.ApplyTraySetting`→托盘），并补了
+       "关掉后托盘应随之隐藏"的反向断言。
+     - **真机实测（Debug 产物 + `MONICA_APPDATA_DIR` 指向空临时目录，即"全新安装"）**，用 UI Automation
+       读任务栏树 + 全屏截图，逐项观察：
+       1. 托盘图标**确实注册**：`TopLevelWindowForOverflowXamlIsland` 下出现
+          `NotifyItemIcon name='Monica'`；截图里渲染的是应用自己的锁+钥匙图标，不是占位方块。
+       2. 最小化→窗口从桌面窗口列表消失（`windows=0`）、进程仍在（`procs=1`）。
+       3. 点 X 关窗→同样只隐藏不退出（`windows=0 procs=1`）。
+       4. 左键单击托盘图标→窗口回来（`windows=1`）。
+       5. 右键菜单出现且是中文三项：显示 Monica／锁定保险库／退出 Monica（菜单窗口 class `TrayPopupRoot`，
+          条目 rect 197×49 起于 1786,1357）。
+       6. 点"显示 Monica"→`windows` 由 0 变 1；点"退出 Monica"→`procs=0`，进程真的结束。
+       7. 产物门在默认开启下仍全绿（含 `--smoke-ui-exit-after-checks` 的退出路径），说明托盘隐藏没有把
+       真跑门拖成挂死。
+     - **仍未做/仍未验证（下一轮别当成已完事）**：
+       - 图标落在**"显示隐藏的图标"溢出区**，不在常驻通知区——这是 Windows 的决定，程序无法强制置顶。
+         商业级需要的是首次隐藏时的一次性提示（气泡或状态栏文案"Monica 已收进托盘"），目前**没有**，
+         用户第一次关窗仍可能找不到入口。
+       - "锁定保险库"菜单项只在**已锁定**状态下点过一次（无可见变化，等于没验证）；解锁态下它是否真的
+         锁上并留在托盘，未测。
+       - 双击唤起、气泡通知、`App.axaml` 里的 `<TrayIcons>` 声明（现在是运行期手动挂）仍未做。
+       - **没有单实例守卫**（全仓无 `Mutex`/`SingleInstance`/命名管道）。托盘默认开之后这变成用户可见问题：
+         双击两次桌面图标=两个进程+两个托盘图标，且都指向同一个 `monica.db`。第二实例的行为**未实测**，
+         别按"应该会报错"处理。
   2. **自动填充：桌面端目前零实现，选定"热键把凭据输入到当前前台应用"**。实测：全仓无
      `SendInput`/`AutoType`/`keybd_event`。地基已在跑：`WindowsGlobalHotkeyService`
      （`RegisterHotKey` + 独立消息泵线程）、`Ctrl+Shift+Space` 唤起快速搜索、`SecureClipboardService`
