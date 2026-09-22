@@ -40,7 +40,8 @@ public partial class App : Application
             _services = ConfigureServices(_mainWindow);
             var viewModel = _services.GetRequiredService<MainWindowViewModel>();
             _mainWindow.DataContext = viewModel;
-            _services.GetRequiredService<DesktopIntegrationCoordinator>().Initialize(viewModel);
+            var desktopIntegration = _services.GetRequiredService<DesktopIntegrationCoordinator>();
+            desktopIntegration.Initialize(viewModel);
             _mainWindow.ShutdownRequestedAsync = () => EnsureShutdownAsync(viewModel);
             desktop.MainWindow = _mainWindow;
             desktop.Exit += OnDesktopExit;
@@ -68,6 +69,7 @@ public partial class App : Application
                     desktop,
                     _mainWindow,
                     viewModel,
+                    desktopIntegration,
                     smokePassword,
                     smokeSection,
                     smokePasswordSelectionCount,
@@ -203,6 +205,9 @@ public partial class App : Application
         services.AddSingleton<IGlobalHotkeyService>(provider => OperatingSystem.IsWindows()
             ? new WindowsGlobalHotkeyService(provider.GetRequiredService<IPlatformIntegrationService>())
             : new CapabilityOnlyGlobalHotkeyService(provider.GetRequiredService<IPlatformIntegrationService>()));
+        services.AddSingleton<IAutoTypeService>(provider => OperatingSystem.IsWindows()
+            ? new WindowsAutoTypeService(provider.GetRequiredService<IPlatformIntegrationService>())
+            : new CapabilityOnlyAutoTypeService(provider.GetRequiredService<IPlatformIntegrationService>()));
         services.AddSingleton<IExternalLinkService, SystemExternalLinkService>();
         services.AddSingleton<IWebDavBackupService, WebDavBackupService>();
         services.AddSingleton<IWebDavBackupCryptoService, WebDavBackupCryptoService>();
@@ -262,7 +267,8 @@ public partial class App : Application
             mainWindow,
             provider.GetRequiredService<ITrayService>(),
             provider.GetRequiredService<IGlobalHotkeyService>(),
-            provider.GetRequiredService<IBrowserBridgeService>()));
+            provider.GetRequiredService<IBrowserBridgeService>(),
+            provider.GetRequiredService<IAutoTypeService>()));
         configureOverrides?.Invoke(services);
         return services.BuildServiceProvider();
     }

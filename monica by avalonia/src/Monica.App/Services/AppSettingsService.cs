@@ -24,6 +24,8 @@ public sealed class DesktopAppSettings
     public bool MinimizeToTray { get; set; } = true;
     public bool QuickSearchEnabled { get; set; } = true;
     public string QuickSearchHotkey { get; set; } = "Ctrl+Shift+Space";
+    public bool AutoTypeEnabled { get; set; }
+    public string AutoTypeHotkey { get; set; } = "Ctrl+Shift+Enter";
     public bool BrowserIntegrationEnabled { get; set; }
     public int BrowserIntegrationPort { get; set; } = 49152;
     public bool CompactPasswordList { get; set; }
@@ -136,6 +138,18 @@ public sealed partial class AppSettingsService : IAppSettingsService
         if (string.IsNullOrWhiteSpace(settings.QuickSearchHotkey))
         {
             settings.QuickSearchHotkey = "Ctrl+Shift+Space";
+        }
+
+        if (string.IsNullOrWhiteSpace(settings.AutoTypeHotkey))
+        {
+            settings.AutoTypeHotkey = "Ctrl+Shift+Enter";
+        }
+
+        // Two slots cannot register the same gesture: the second registration is rejected by the
+        // desktop, which would leave auto-type silently dead behind a confusing error line.
+        if (string.Equals(settings.AutoTypeHotkey, settings.QuickSearchHotkey, StringComparison.OrdinalIgnoreCase))
+        {
+            settings.AutoTypeHotkey = "Ctrl+Shift+Enter";
         }
 
         NormalizeFeatureToggles(settings);

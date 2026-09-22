@@ -148,6 +148,8 @@ public sealed partial class AppSettingsService
         MinimizeToTray = source.MinimizeToTray,
         QuickSearchEnabled = source.QuickSearchEnabled,
         QuickSearchHotkey = source.QuickSearchHotkey,
+        AutoTypeEnabled = source.AutoTypeEnabled,
+        AutoTypeHotkey = source.AutoTypeHotkey,
         BrowserIntegrationEnabled = source.BrowserIntegrationEnabled,
         BrowserIntegrationPort = source.BrowserIntegrationPort,
         CompactPasswordList = source.CompactPasswordList,

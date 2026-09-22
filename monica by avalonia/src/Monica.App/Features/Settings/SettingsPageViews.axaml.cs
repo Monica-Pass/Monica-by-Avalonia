@@ -7,6 +7,7 @@ public partial class SettingsSecurityView : UserControl { public SettingsSecurit
 public partial class SettingsRecoveryView : UserControl { public SettingsRecoveryView() => InitializeComponent(); }
 public partial class SettingsDataView : UserControl { public SettingsDataView() => InitializeComponent(); }
 public partial class SettingsDesktopView : UserControl { public SettingsDesktopView() => InitializeComponent(); }
+public partial class SettingsBrowserPairingSectionView : UserControl { public SettingsBrowserPairingSectionView() => InitializeComponent(); }
 public partial class SettingsIntegrationsView : UserControl { public SettingsIntegrationsView() => InitializeComponent(); }
 public partial class SettingsAboutView : UserControl { public SettingsAboutView() => InitializeComponent(); }
 public partial class SettingsDangerView : UserControl { public SettingsDangerView() => InitializeComponent(); }

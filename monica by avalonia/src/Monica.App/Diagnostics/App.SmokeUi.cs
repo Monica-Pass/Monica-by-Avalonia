@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
+using Monica.App.Services;
 using Monica.App.ViewModels;
 using Monica.Core.Models;
 using Monica.Data;
@@ -129,6 +130,7 @@ public partial class App
         IClassicDesktopStyleApplicationLifetime desktop,
         MainWindow mainWindow,
         MainWindowViewModel viewModel,
+        DesktopIntegrationCoordinator desktopIntegration,
         string password,
         string? smokeSection,
         int smokePasswordSelectionCount,
@@ -266,6 +268,11 @@ public partial class App
                     keepassProbePath,
                     keepassPassword);
                 smokeSuccess &= probeSuccess;
+            }
+
+            if (HasSmokeUiFlag(Environment.GetCommandLineArgs(), "--smoke-ui-autotype"))
+            {
+                smokeSuccess &= await RunSmokeUiAutoTypeProbeAsync(viewModel, desktopIntegration);
             }
 
             var lockCycleSuccess = true;
@@ -434,6 +441,42 @@ public partial class App
                 error);
             return false;
         }
+    }
+
+    // Whether the shipped build really hands keystrokes to a foreign window is not something an
+    // interface test can answer: RegisterHotKey, the message pump, the foreground-window lookup and
+    // SendInput all only exist on a desktop. This flips the setting on through the same path the
+    // settings page uses, confirms the desktop accepted the gesture, and then waits for a key press
+    // driven from outside the process. The external observer — not this log — decides what landed in
+    // the target, so no credential material is ever written here.
+    private static async Task<bool> RunSmokeUiAutoTypeProbeAsync(
+        MainWindowViewModel viewModel,
+        DesktopIntegrationCoordinator desktopIntegration)
+    {
+        var args = Environment.GetCommandLineArgs();
+        var timeoutSeconds = GetSmokeUiCount(args, "--smoke-ui-autotype-timeout");
+        if (timeoutSeconds <= 0)
+        {
+            timeoutSeconds = 120;
+        }
+
+        viewModel.AutoTypeEnabled = true;
+        var armed = await WaitForSmokeConditionAsync(
+            () => desktopIntegration.IsAutoTypeHotkeyRegistered,
+            TimeSpan.FromSeconds(15));
+        AppDiagnostics.Info(
+            $"Smoke UI auto type armed. armed={armed}, " +
+            $"gesture={viewModel.AutoTypeHotkey}, " +
+            $"registrationError={viewModel.AutoTypeRegistrationError.Length > 0}");
+        var pressed = await WaitForSmokeConditionAsync(
+            () => viewModel.LastAutoTypeOutcome != MainWindowViewModel.AutoTypeOutcome.None,
+            TimeSpan.FromSeconds(timeoutSeconds));
+        var success = armed && pressed &&
+            viewModel.LastAutoTypeOutcome == MainWindowViewModel.AutoTypeOutcome.Typed;
+        AppDiagnostics.Info(
+            $"Smoke UI auto type result. success={success}, armed={armed}, pressed={pressed}, " +
+            $"outcome={viewModel.LastAutoTypeOutcome}, matches={viewModel.LastAutoTypeMatches.Count}");
+        return success;
     }
 
     private static void CompactSmokeUiMemory()

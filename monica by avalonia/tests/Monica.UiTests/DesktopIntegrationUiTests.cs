@@ -30,8 +30,8 @@ public sealed class DesktopIntegrationUiTests
 
         coordinator.Initialize(viewModel);
 
-        Assert.True(hotkey.IsRegistered);
-        Assert.Equal("Ctrl+Shift+Space", hotkey.RegisteredGesture);
+        Assert.True(hotkey.IsRegistered(GlobalHotkeySlot.QuickSearch));
+        Assert.Equal("Ctrl+Shift+Space", hotkey.RegisteredGesture(GlobalHotkeySlot.QuickSearch));
         Assert.False(tray.IsVisible);
 
         await viewModel.InitializeAsync();
@@ -47,15 +47,172 @@ public sealed class DesktopIntegrationUiTests
         viewModel.QuickSearchEnabled = false;
         await PumpDebounceAsync();
 
-        Assert.False(hotkey.IsRegistered);
+        Assert.False(hotkey.IsRegistered(GlobalHotkeySlot.QuickSearch));
 
         hotkey.RegistrationSucceeds = false;
         viewModel.QuickSearchEnabled = true;
         viewModel.QuickSearchHotkey = "Ctrl+Alt+K";
         await PumpDebounceAsync();
 
-        Assert.False(hotkey.IsRegistered);
-        Assert.Contains(hotkey.LastError, viewModel.GlobalHotkeyIntegrationStatusText, StringComparison.Ordinal);
+        Assert.False(hotkey.IsRegistered(GlobalHotkeySlot.QuickSearch));
+        Assert.Contains(hotkey.LastError(GlobalHotkeySlot.QuickSearch), viewModel.GlobalHotkeyIntegrationStatusText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Auto_type_registers_its_own_slot_and_refuses_a_shared_gesture()
+    {
+        var hotkey = new RecordingGlobalHotkeyService();
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window, collection =>
+        {
+            collection.AddSingleton<ITrayService>(new RecordingTrayService());
+            collection.AddSingleton<IGlobalHotkeyService>(hotkey);
+        });
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        var coordinator = services.GetRequiredService<DesktopIntegrationCoordinator>();
+        coordinator.Initialize(viewModel);
+
+        viewModel.AutoTypeEnabled = true;
+        await PumpDebounceAsync();
+
+        Assert.True(hotkey.IsRegistered(GlobalHotkeySlot.QuickSearch));
+        Assert.True(hotkey.IsRegistered(GlobalHotkeySlot.AutoType));
+        Assert.Equal("Ctrl+Shift+Enter", hotkey.RegisteredGesture(GlobalHotkeySlot.AutoType));
+        Assert.Empty(viewModel.AutoTypeRegistrationError);
+
+        viewModel.AutoTypeHotkey = "Ctrl+Shift+Space";
+        await PumpDebounceAsync();
+
+        Assert.True(hotkey.IsRegistered(GlobalHotkeySlot.QuickSearch));
+        Assert.False(hotkey.IsRegistered(GlobalHotkeySlot.AutoType));
+        Assert.Contains("Ctrl+Shift+Space", viewModel.QuickSearchHotkey, StringComparison.Ordinal);
+        Assert.False(string.IsNullOrWhiteSpace(viewModel.AutoTypeRegistrationError));
+        Assert.Contains(viewModel.AutoTypeRegistrationError, viewModel.AutoTypeIntegrationStatusText, StringComparison.Ordinal);
+
+        viewModel.AutoTypeEnabled = false;
+        await PumpDebounceAsync();
+
+        Assert.False(hotkey.IsRegistered(GlobalHotkeySlot.AutoType));
+        Assert.True(hotkey.IsRegistered(GlobalHotkeySlot.QuickSearch));
+        Assert.Empty(viewModel.AutoTypeRegistrationError);
+    }
+
+    [Fact]
+    public void Auto_type_types_the_single_matching_entry_and_refuses_to_guess()
+    {
+        var autoType = new RecordingAutoTypeService();
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window, collection =>
+            collection.AddSingleton<IAutoTypeService>(autoType));
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+
+        viewModel.IsUnlocked = true;
+        viewModel.Passwords.Add(new Monica.Core.Models.PasswordEntry
+        {
+            Title = "GitHub",
+            Website = "https://github.com",
+            Username = "octocat",
+            Password = "hunter2"
+        });
+        viewModel.Passwords.Add(new Monica.Core.Models.PasswordEntry
+        {
+            Title = "Mail",
+            Website = "https://mail.smoke.local",
+            Username = "me",
+            Password = "other-secret"
+        });
+
+        viewModel.RunAutoTypeIntoForeground(autoType.ForegroundHandle, "Sign in to GitHub · GitHub", false);
+
+        Assert.Equal(MainWindowViewModel.AutoTypeOutcome.Typed, viewModel.LastAutoTypeOutcome);
+        Assert.Collection(
+            autoType.LastTokens,
+            token =>
+            {
+                Assert.Equal(AutoTypeTokenKind.Text, token.Kind);
+                Assert.Equal("octocat", token.Value);
+            },
+            token => Assert.Equal(AutoTypeTokenKind.Tab, token.Kind),
+            token =>
+            {
+                Assert.Equal(AutoTypeTokenKind.Text, token.Kind);
+                Assert.Equal("hunter2", token.Value);
+            });
+
+        autoType.Reset();
+        viewModel.Passwords.Add(new Monica.Core.Models.PasswordEntry
+        {
+            Title = "GitHub Work",
+            Website = "github.com",
+            Username = "work",
+            Password = "work-secret"
+        });
+        viewModel.RunAutoTypeIntoForeground(autoType.ForegroundHandle, "Sign in to GitHub · GitHub", false);
+
+        Assert.Equal(MainWindowViewModel.AutoTypeOutcome.Ambiguous, viewModel.LastAutoTypeOutcome);
+        Assert.Equal(0, autoType.TypeCallCount);
+        Assert.Equal(2, viewModel.LastAutoTypeMatches.Count);
+
+        autoType.Reset();
+        viewModel.RunAutoTypeIntoForeground(autoType.ForegroundHandle, "Local Console", false);
+
+        Assert.Equal(MainWindowViewModel.AutoTypeOutcome.NoMatch, viewModel.LastAutoTypeOutcome);
+        Assert.Equal(0, autoType.TypeCallCount);
+
+        viewModel.RunAutoTypeIntoForeground(autoType.ForegroundHandle, "Sign in to GitHub · GitHub", true);
+
+        Assert.Equal(MainWindowViewModel.AutoTypeOutcome.MonicaIsForeground, viewModel.LastAutoTypeOutcome);
+        Assert.Equal(0, autoType.TypeCallCount);
+    }
+
+    [Fact]
+    public async Task Auto_type_press_asks_the_operating_system_who_owns_the_foreground_window()
+    {
+        var hotkey = new RecordingGlobalHotkeyService();
+        var autoType = new RecordingAutoTypeService
+        {
+            ForegroundTitle = "Sign in to GitHub - github.com"
+        };
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window, collection =>
+        {
+            collection.AddSingleton<ITrayService>(new RecordingTrayService());
+            collection.AddSingleton<IGlobalHotkeyService>(hotkey);
+            collection.AddSingleton<IAutoTypeService>(autoType);
+        });
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        var coordinator = services.GetRequiredService<DesktopIntegrationCoordinator>();
+        coordinator.Initialize(viewModel);
+
+        viewModel.IsUnlocked = true;
+        viewModel.Passwords.Add(new Monica.Core.Models.PasswordEntry
+        {
+            Title = "GitHub",
+            Website = "https://github.com",
+            Username = "octocat",
+            Password = "hunter2"
+        });
+        viewModel.AutoTypeEnabled = true;
+        await PumpDebounceAsync();
+
+        var press = hotkey.Callback(GlobalHotkeySlot.AutoType);
+        Assert.NotNull(press);
+
+        // A window this process does not own receives the credential, whatever the shell window reports
+        // about itself; living off that report is what used to refuse every real auto-type.
+        press!.Invoke();
+        await PumpDebounceAsync();
+
+        Assert.Equal(MainWindowViewModel.AutoTypeOutcome.Typed, viewModel.LastAutoTypeOutcome);
+        Assert.Equal(1, autoType.TypeCallCount);
+
+        autoType.Reset();
+        autoType.ForegroundIsOwned = true;
+        press.Invoke();
+        await PumpDebounceAsync();
+
+        Assert.Equal(MainWindowViewModel.AutoTypeOutcome.MonicaIsForeground, viewModel.LastAutoTypeOutcome);
+        Assert.Equal(0, autoType.TypeCallCount);
     }
 
     [Fact]
@@ -173,25 +330,70 @@ public sealed class DesktopIntegrationUiTests
         public PlatformIntegrationCapability Capability { get; } =
             PlatformIntegrationService.Available(PlatformFeatureKeys.GlobalHotkey, "Test hotkey");
         public bool RegistrationSucceeds { get; set; } = true;
-        public bool IsRegistered { get; private set; }
-        public string RegisteredGesture { get; private set; } = "";
-        public string LastError { get; private set; } = "";
+        public string LastError(GlobalHotkeySlot slot) => "Hotkey already used.";
+        public bool IsRegistered(GlobalHotkeySlot slot) => _registered[(int)slot];
+        public string RegisteredGesture(GlobalHotkeySlot slot) => _gestures[(int)slot];
+        public Action? Callback(GlobalHotkeySlot slot) => _callbacks[(int)slot];
+        private readonly bool[] _registered = new bool[2];
+        private readonly string[] _gestures = ["", ""];
+        private readonly Action?[] _callbacks = new Action?[2];
 
-        public bool TryRegister(string gesture, Action activated)
+        public bool TryRegister(GlobalHotkeySlot slot, string gesture, Action activated)
         {
-            IsRegistered = RegistrationSucceeds;
-            RegisteredGesture = RegistrationSucceeds ? gesture : "";
-            LastError = RegistrationSucceeds ? "" : "Hotkey already used.";
+            var index = (int)slot;
+            _registered[index] = RegistrationSucceeds;
+            _gestures[index] = RegistrationSucceeds ? gesture : "";
+            _callbacks[index] = RegistrationSucceeds ? activated : null;
             return RegistrationSucceeds;
         }
 
-        public void Unregister()
+        public void Unregister(GlobalHotkeySlot slot)
         {
-            IsRegistered = false;
-            RegisteredGesture = "";
+            var index = (int)slot;
+            _registered[index] = false;
+            _gestures[index] = "";
+            _callbacks[index] = null;
         }
 
-        public void Dispose() => Unregister();
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class RecordingAutoTypeService : IAutoTypeService
+    {
+        public PlatformIntegrationCapability Capability { get; } =
+            PlatformIntegrationService.Available(PlatformFeatureKeys.AutoType, "Test auto-type");
+        public string LastError { get; private set; } = "";
+        public IntPtr ForegroundHandle { get; set; } = new(0x1234);
+        public string ForegroundTitle { get; set; } = "";
+        public bool ForegroundIsOwned { get; set; }
+        public IReadOnlyList<AutoTypeToken> LastTokens { get; private set; } = [];
+        public int TypeCallCount { get; private set; }
+        public bool InjectionSucceeds { get; set; } = true;
+
+        public IntPtr GetForegroundWindow() => ForegroundHandle;
+
+        public void Reset()
+        {
+            TypeCallCount = 0;
+            LastTokens = [];
+            LastError = "";
+        }
+
+        public string GetWindowTitle(IntPtr windowHandle) =>
+            windowHandle == ForegroundHandle ? ForegroundTitle : "";
+
+        public bool IsWindowOwnedByThisProcess(IntPtr windowHandle) =>
+            ForegroundIsOwned && windowHandle == ForegroundHandle;
+
+        public bool TryType(IReadOnlyList<AutoTypeToken> tokens)
+        {
+            TypeCallCount++;
+            LastTokens = tokens;
+            LastError = InjectionSucceeds ? "" : "The keystrokes were refused.";
+            return InjectionSucceeds;
+        }
     }
 
     private sealed class RecordingBrowserBridgeService : IBrowserBridgeService

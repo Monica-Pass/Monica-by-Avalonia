@@ -5,13 +5,12 @@ namespace Monica.Platform.Services;
 
 public sealed class WindowsGlobalHotkeyService : IGlobalHotkeyService
 {
-    private const int HotkeyId = 0x4D4F;
+    private const int SlotCount = 2;
+    private const int FirstHotkeyId = 0x4D4F;
     private const uint WmHotkey = 0x0312;
     private const uint WmQuit = 0x0012;
-    private readonly object _sync = new();
     private readonly IPlatformIntegrationService _platformIntegrationService;
-    private Thread? _messageThread;
-    private uint _messageThreadId;
+    private readonly Registration?[] _slots = new Registration?[SlotCount];
 
     public WindowsGlobalHotkeyService(IPlatformIntegrationService platformIntegrationService)
     {
@@ -20,34 +19,39 @@ public sealed class WindowsGlobalHotkeyService : IGlobalHotkeyService
 
     public PlatformIntegrationCapability Capability =>
         _platformIntegrationService.GetCapability(PlatformFeatureKeys.GlobalHotkey);
-    public bool IsRegistered { get; private set; }
-    public string RegisteredGesture { get; private set; } = "";
-    public string LastError { get; private set; } = "";
 
-    public bool TryRegister(string gesture, Action activated)
+    public string LastError(GlobalHotkeySlot slot) => Slot(slot).LastError;
+
+    public bool IsRegistered(GlobalHotkeySlot slot) => Slot(slot).IsRegistered;
+
+    public string RegisteredGesture(GlobalHotkeySlot slot) => Slot(slot).Gesture;
+
+    public bool TryRegister(GlobalHotkeySlot slot, string gesture, Action activated)
     {
         ArgumentNullException.ThrowIfNull(activated);
-        Unregister();
+        var registration = Slot(slot);
+        registration.Unregister();
 
         if (!OperatingSystem.IsWindows())
         {
-            LastError = Capability.UnsupportedReason ?? "Global hotkeys require Windows.";
+            registration.LastError = Capability.UnsupportedReason ?? "Global hotkeys require Windows.";
             return false;
         }
 
         if (!TryParseGesture(gesture, out var modifiers, out var virtualKey, out var normalized, out var error))
         {
-            LastError = error;
+            registration.LastError = error;
             return false;
         }
 
+        var hotkeyId = FirstHotkeyId + (int)slot;
         var ready = new ManualResetEventSlim();
         var registered = false;
         var registrationError = "";
         var thread = new Thread(() =>
         {
-            _messageThreadId = GetCurrentThreadId();
-            registered = RegisterHotKey(IntPtr.Zero, HotkeyId, modifiers, virtualKey);
+            registration.SetThreadId(GetCurrentThreadId());
+            registered = RegisterHotKey(IntPtr.Zero, hotkeyId, modifiers, virtualKey);
             if (!registered)
             {
                 registrationError = new Win32Exception(Marshal.GetLastWin32Error()).Message;
@@ -60,7 +64,7 @@ public sealed class WindowsGlobalHotkeyService : IGlobalHotkeyService
             {
                 while (GetMessage(out var message, IntPtr.Zero, 0, 0) > 0)
                 {
-                    if (message.Message == WmHotkey && message.WParam == (nuint)HotkeyId)
+                    if (message.Message == WmHotkey && message.WParam == (nuint)hotkeyId)
                     {
                         try
                         {
@@ -74,19 +78,15 @@ public sealed class WindowsGlobalHotkeyService : IGlobalHotkeyService
             }
             finally
             {
-                UnregisterHotKey(IntPtr.Zero, HotkeyId);
+                UnregisterHotKey(IntPtr.Zero, hotkeyId);
             }
         })
         {
             IsBackground = true,
-            Name = "Monica global hotkey"
+            Name = $"Monica global hotkey {slot}"
         };
 
-        lock (_sync)
-        {
-            _messageThread = thread;
-        }
-
+        registration.Thread = thread;
         thread.Start();
         var registrationCompleted = ready.Wait(TimeSpan.FromSeconds(3));
         if (registrationCompleted)
@@ -96,46 +96,39 @@ public sealed class WindowsGlobalHotkeyService : IGlobalHotkeyService
 
         if (!registrationCompleted || !registered)
         {
-            LastError = string.IsNullOrWhiteSpace(registrationError)
+            registration.LastError = string.IsNullOrWhiteSpace(registrationError)
                 ? "Global hotkey registration timed out."
                 : registrationError;
-            Unregister();
+            registration.Unregister();
             return false;
         }
 
-        IsRegistered = true;
-        RegisteredGesture = normalized;
-        LastError = "";
+        registration.IsRegistered = true;
+        registration.Gesture = normalized;
+        registration.LastError = "";
         return true;
     }
 
-    public void Unregister()
+    public void Unregister(GlobalHotkeySlot slot) => Slot(slot).Unregister();
+
+    public void Dispose()
     {
-        Thread? thread;
-        uint threadId;
-        lock (_sync)
+        foreach (var registration in _slots)
         {
-            thread = _messageThread;
-            threadId = _messageThreadId;
-            _messageThread = null;
-            _messageThreadId = 0;
+            registration?.Unregister();
         }
-
-        if (threadId != 0)
-        {
-            PostThreadMessage(threadId, WmQuit, 0, 0);
-        }
-
-        if (thread is { IsAlive: true } && !ReferenceEquals(thread, Thread.CurrentThread))
-        {
-            thread.Join(TimeSpan.FromSeconds(2));
-        }
-
-        IsRegistered = false;
-        RegisteredGesture = "";
     }
 
-    public void Dispose() => Unregister();
+    private Registration Slot(GlobalHotkeySlot slot)
+    {
+        var index = (int)slot;
+        if (index is < 0 or >= SlotCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(slot));
+        }
+
+        return _slots[index] ??= new Registration();
+    }
 
     public static bool TryParseGesture(
         string gesture,
@@ -236,6 +229,55 @@ public sealed class WindowsGlobalHotkeyService : IGlobalHotkeyService
             _ => char.ToUpperInvariant(normalized[0]) + normalized[1..].ToLowerInvariant()
         };
         return virtualKey != 0;
+    }
+
+    private sealed class Registration
+    {
+        private readonly object _sync = new();
+        private Thread? _thread;
+        private uint _threadId;
+
+        public bool IsRegistered;
+        public string Gesture = "";
+        public string LastError = "";
+
+        public Thread? Thread
+        {
+            get { lock (_sync) return _thread; }
+            set { lock (_sync) _thread = value; }
+        }
+
+        public void SetThreadId(uint threadId)
+        {
+            lock (_sync)
+            {
+                _threadId = threadId;
+            }
+        }
+
+        public void Unregister()
+        {
+            Thread? thread;
+            lock (_sync)
+            {
+                thread = _thread;
+                _thread = null;
+
+                if (_threadId != 0)
+                {
+                    PostThreadMessage(_threadId, WmQuit, 0, 0);
+                    _threadId = 0;
+                }
+            }
+
+            if (thread is { IsAlive: true } && !ReferenceEquals(thread, Thread.CurrentThread))
+            {
+                thread.Join(TimeSpan.FromSeconds(2));
+            }
+
+            IsRegistered = false;
+            Gesture = "";
+        }
     }
 
     [StructLayout(LayoutKind.Sequential)]

@@ -1,4 +1,4 @@
-using Avalonia.Automation;
+﻿using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -26,23 +26,32 @@ public sealed class DesktopSettingsUiTests
 
         Assert.NotNull(view.FindControl<StackPanel>("DesktopBackgroundBehaviorSection"));
         Assert.NotNull(view.FindControl<StackPanel>("DesktopQuickAccessSection"));
-        Assert.NotNull(view.FindControl<StackPanel>("BrowserExtensionPairingSection"));
+        Assert.NotNull(view.FindControl<SettingsBrowserPairingSectionView>("BrowserPairingSectionHost"));
         Assert.NotNull(view.FindControl<StackPanel>("DesktopAppearanceSection"));
+
+        // The pairing section is a view of its own, which gives it its own name scope, so its
+        // controls are reached through that view rather than through the page that hosts it.
+        var pairing = new SettingsBrowserPairingSectionView();
 
         var trayToggle = view.FindControl<ToggleSwitch>("MinimizeToTrayToggle")!;
         var quickSearchToggle = view.FindControl<ToggleSwitch>("QuickSearchToggle")!;
         var hotkeyBox = view.FindControl<TextBox>("QuickSearchHotkeyBox")!;
-        var browserToggle = view.FindControl<ToggleSwitch>("BrowserIntegrationToggle")!;
-        var copyButton = view.FindControl<Button>("CopyBrowserPairingTokenButton")!;
+        var autoTypeToggle = view.FindControl<ToggleSwitch>("AutoTypeToggle")!;
+        var autoTypeHotkeyBox = view.FindControl<TextBox>("AutoTypeHotkeyBox")!;
+        var browserToggle = pairing.FindControl<ToggleSwitch>("BrowserIntegrationToggle")!;
+        var copyButton = pairing.FindControl<Button>("CopyBrowserPairingTokenButton")!;
 
         Assert.True(trayToggle.Focusable);
         Assert.True(quickSearchToggle.Focusable);
         Assert.True(hotkeyBox.Focusable);
+        Assert.True(autoTypeToggle.Focusable);
+        Assert.True(autoTypeHotkeyBox.Focusable);
         Assert.True(browserToggle.Focusable);
         Assert.True(copyButton.Focusable);
+        Assert.False(autoTypeToggle.IsChecked!.Value);
         Assert.Equal(
             AutomationLiveSetting.Assertive,
-            AutomationProperties.GetLiveSetting(view.FindControl<FAInfoBar>("BrowserBridgeErrorStatus")!));
+            AutomationProperties.GetLiveSetting(pairing.FindControl<FAInfoBar>("BrowserBridgeErrorStatus")!));
     }
 
     [Fact]
@@ -58,7 +67,7 @@ public sealed class DesktopSettingsUiTests
         });
         var viewModel = services.GetRequiredService<MainWindowViewModel>();
         var coordinator = services.GetRequiredService<DesktopIntegrationCoordinator>();
-        var view = new SettingsDesktopView { DataContext = viewModel };
+        var view = new SettingsBrowserPairingSectionView { DataContext = viewModel };
         coordinator.Initialize(viewModel);
         Dispatcher.UIThread.RunJobs();
 
@@ -110,7 +119,7 @@ public sealed class DesktopSettingsUiTests
             collection.AddSingleton<IBrowserBridgeService>(bridge));
         var viewModel = services.GetRequiredService<MainWindowViewModel>();
         var coordinator = services.GetRequiredService<DesktopIntegrationCoordinator>();
-        var view = new SettingsDesktopView { DataContext = viewModel };
+        var view = new SettingsBrowserPairingSectionView { DataContext = viewModel };
         coordinator.Initialize(viewModel);
 
         viewModel.BrowserIntegrationEnabled = true;
@@ -140,7 +149,7 @@ public sealed class DesktopSettingsUiTests
         using var services = Monica.App.App.ConfigureServices(window, collection =>
             collection.AddSingleton<IPlatformIntegrationService>(platform));
         var viewModel = services.GetRequiredService<MainWindowViewModel>();
-        var view = new SettingsDesktopView { DataContext = viewModel };
+        var view = new SettingsBrowserPairingSectionView { DataContext = viewModel };
         var host = new Window { Content = view };
         viewModel.SelectedSettingsPage = "Desktop";
         host.Show();

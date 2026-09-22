@@ -1,0 +1,147 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:fa="using:FluentAvalonia.UI.Controls"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Settings.SettingsBrowserPairingSectionView"
+             x:DataType="vm:MainWindowViewModel">
+    <StackPanel x:Name="BrowserExtensionPairingSection" Spacing="10">
+        <Grid Classes="settingsSectionHeader" ColumnDefinitions="Auto,*" ColumnSpacing="12">
+            <Border Classes="settingsSectionIcon">
+                <ic:FluentIcon Icon="Link" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel Grid.Column="1" Spacing="2">
+                <TextBlock Classes="settingsSectionTitle" Text="{Binding L[BrowserExtensionPairing]}" />
+                <TextBlock Classes="settingsSectionDescription"
+                           Text="{Binding L[BrowserExtensionPairingDescription]}" />
+            </StackPanel>
+        </Grid>
+
+        <fa:FAInfoBar x:Name="BrowserBridgeUnavailableStatus"
+                      IsOpen="True"
+                      IsVisible="{Binding IsBrowserBridgeUnavailableState}"
+                      Severity="Warning"
+                      Title="{Binding BrowserBridgeStatusTitleText}"
+                      Message="{Binding BrowserBridgeStatusDescriptionText}"
+                      AutomationProperties.LiveSetting="Polite" />
+        <fa:FAInfoBar x:Name="BrowserBridgeDisabledStatus"
+                      IsOpen="True"
+                      IsVisible="{Binding IsBrowserBridgeDisabledState}"
+                      Severity="Informational"
+                      Title="{Binding BrowserBridgeStatusTitleText}"
+                      Message="{Binding BrowserBridgeStatusDescriptionText}"
+                      AutomationProperties.LiveSetting="Polite" />
+        <fa:FAInfoBar x:Name="BrowserBridgeWaitingStatus"
+                      IsOpen="True"
+                      IsVisible="{Binding IsBrowserBridgeWaitingForUnlockState}"
+                      Severity="Warning"
+                      Title="{Binding BrowserBridgeStatusTitleText}"
+                      Message="{Binding BrowserBridgeStatusDescriptionText}"
+                      AutomationProperties.LiveSetting="Polite" />
+        <fa:FAInfoBar x:Name="BrowserBridgeStartingStatus"
+                      IsOpen="True"
+                      IsVisible="{Binding IsBrowserBridgeStartingState}"
+                      Severity="Informational"
+                      Title="{Binding BrowserBridgeStatusTitleText}"
+                      Message="{Binding BrowserBridgeStatusDescriptionText}"
+                      AutomationProperties.LiveSetting="Polite" />
+        <fa:FAInfoBar x:Name="BrowserBridgeRunningStatus"
+                      IsOpen="True"
+                      IsVisible="{Binding IsBrowserBridgeRunningState}"
+                      Severity="Success"
+                      Title="{Binding BrowserBridgeStatusTitleText}"
+                      Message="{Binding BrowserBridgeStatusDescriptionText}"
+                      AutomationProperties.LiveSetting="Polite" />
+        <fa:FAInfoBar x:Name="BrowserBridgeErrorStatus"
+                      IsOpen="True"
+                      IsVisible="{Binding IsBrowserBridgeErrorState}"
+                      Severity="Error"
+                      Title="{Binding BrowserBridgeStatusTitleText}"
+                      Message="{Binding BrowserBridgeStatusDescriptionText}"
+                      AutomationProperties.LiveSetting="Assertive" />
+
+        <Border Classes="settingsFlatGroup">
+            <StackPanel>
+                <fa:FASettingsExpanderItem Content="{Binding L.BrowserIntegration}"
+                                           Description="{Binding L.BrowserIntegrationDescription}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <ToggleSwitch x:Name="BrowserIntegrationToggle"
+                                      IsChecked="{Binding BrowserIntegrationEnabled}"
+                                      IsEnabled="{Binding CanUseBrowserBridgeIntegration}"
+                                      OnContent="{Binding L.FeatureEnabled}"
+                                      OffContent="{Binding L.FeatureDisabled}"
+                                      ToolTip.Tip="{Binding BrowserBridgeStatusDescriptionText}"
+                                      AutomationProperties.Name="{Binding L.BrowserIntegration}"
+                                      AutomationProperties.HelpText="{Binding BrowserBridgeStatusDescriptionText}" />
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+                <fa:FASettingsExpanderItem Content="{Binding L.BrowserIntegrationPort}"
+                                           Description="{Binding L.BrowserIntegrationPortDescription}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <NumericUpDown x:Name="BrowserIntegrationPortInput"
+                                       MinWidth="180"
+                                       MaxWidth="320"
+                                       Minimum="1024"
+                                       Maximum="65535"
+                                       Increment="1"
+                                       Value="{Binding BrowserIntegrationPort}"
+                                       IsEnabled="{Binding CanUseBrowserBridgeIntegration}"
+                                       ToolTip.Tip="{Binding BrowserBridgeStatusDescriptionText}"
+                                       AutomationProperties.Name="{Binding L.BrowserIntegrationPort}"
+                                       AutomationProperties.HelpText="{Binding L.BrowserIntegrationPortDescription}" />
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+            </StackPanel>
+        </Border>
+
+        <fa:FAInfoBar x:Name="BrowserPairingSecurityNotice"
+                      IsOpen="True"
+                      Severity="Informational"
+                      Title="{Binding L[BrowserPairingSecurityNoticeTitle]}"
+                      Message="{Binding L[BrowserPairingSecurityNoticeMessage]}" />
+
+        <Border x:Name="BrowserPairingTokenPanel"
+                Classes="settingsPairingTokenSurface"
+                IsVisible="{Binding HasBrowserIntegrationSessionToken}">
+            <StackPanel Spacing="14">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                    <ic:FluentIcon Icon="Key" FontSize="19" VerticalAlignment="Top" Margin="0,2,0,0" />
+                    <StackPanel Grid.Column="1" Spacing="3">
+                        <TextBlock FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Text="{Binding L[BrowserPairingAccessTitle]}" />
+                        <TextBlock Text="{Binding L[BrowserPairingAccessDescription]}"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Text="{Binding BrowserBridgeEndpointText}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <Border Classes="settingsTokenMask">
+                        <TextBlock x:Name="BrowserPairingTokenMask"
+                                   Text="{Binding BrowserIntegrationMaskedSessionToken}"
+                                   FontFamily="Consolas"
+                                   FontSize="16"
+                                   LetterSpacing="2"
+                                   VerticalAlignment="Center"
+                                   AutomationProperties.Name="{Binding L[BrowserPairingHiddenToken]}"
+                                   AutomationProperties.HelpText="{Binding L[BrowserPairingCopyHelp]}" />
+                    </Border>
+                    <Button x:Name="CopyBrowserPairingTokenButton"
+                            Grid.Column="1"
+                            Command="{Binding CopyBrowserIntegrationTokenCommand}"
+                            ToolTip.Tip="{Binding L[BrowserPairingCopyHelp]}"
+                            AutomationProperties.Name="{Binding L[CopyBrowserPairingToken]}"
+                            AutomationProperties.HelpText="{Binding L[BrowserPairingCopyHelp]}">
+                        <StackPanel Orientation="Horizontal" Spacing="7">
+                            <ic:FluentIcon Icon="Copy" FontSize="17" />
+                            <TextBlock Text="{Binding L.Copy}" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

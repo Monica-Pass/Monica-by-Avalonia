@@ -24,7 +24,7 @@ public static class FeatureCatalog
         new("mdbx", "MDBX", "Vault create/open/sync metadata and local file-stream management.", PlatformFeatureStatus.DesktopEquivalent),
         new("webdav", "WebDAV", "Remote backup and sync path handling.", PlatformFeatureStatus.Available),
         new("onedrive", "OneDrive", "Microsoft Graph/MSAL service boundary.", PlatformFeatureStatus.DesktopEquivalent),
-        new("autofill", "Desktop Autofill", "Android Autofill/IME/Accessibility becomes quick search, clipboard, tray and browser-extension bridge.", PlatformFeatureStatus.PlatformLimited),
+        new("autofill", "Desktop Autofill", "Android Autofill/IME/Accessibility becomes a global auto-type shortcut that fills the focused app, plus quick search and clipboard.", PlatformFeatureStatus.PlatformLimited),
         new("credential-provider", "Credential Provider", "Android Credential Provider equivalent is platform-specific and exposed as limited status.", PlatformFeatureStatus.PlatformLimited)
     ];
 }

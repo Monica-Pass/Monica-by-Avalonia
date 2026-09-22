@@ -64,10 +64,13 @@ public sealed class PlatformCapabilityService(IPlatformIntegrationService? platf
 
     private PlatformCapability ApplyAutofillStatus(PlatformCapability capability)
     {
-        var browserBridge = _platformIntegrationService.GetCapability(PlatformFeatureKeys.BrowserBridge);
+        // The desktop route is the auto-type shortcut, not the browser extension: the bridge still
+        // needs an extension nobody has shipped, while typing into the focused window is a working
+        // end-to-end path on its own.
+        var autoType = _platformIntegrationService.GetCapability(PlatformFeatureKeys.AutoType);
         var globalHotkey = _platformIntegrationService.GetCapability(PlatformFeatureKeys.GlobalHotkey);
 
-        if (browserBridge.IsUsable && globalHotkey.IsUsable)
+        if (autoType.IsUsable && globalHotkey.IsUsable)
         {
             return capability with
             {
@@ -79,7 +82,7 @@ public sealed class PlatformCapabilityService(IPlatformIntegrationService? platf
         return capability with
         {
             Status = PlatformFeatureStatus.PlatformLimited,
-            UnsupportedReason = browserBridge.UnsupportedReason ?? globalHotkey.UnsupportedReason ?? capability.UnsupportedReason
+            UnsupportedReason = autoType.UnsupportedReason ?? globalHotkey.UnsupportedReason ?? capability.UnsupportedReason
         };
     }
 

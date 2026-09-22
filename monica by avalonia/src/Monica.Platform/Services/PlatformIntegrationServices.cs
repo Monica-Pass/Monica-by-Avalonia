@@ -9,6 +9,7 @@ public static class PlatformFeatureKeys
     public const string SecretProtection = "secret-protection";
     public const string Tray = "tray";
     public const string GlobalHotkey = "global-hotkey";
+    public const string AutoType = "auto-type";
     public const string BrowserBridge = "browser-bridge";
     public const string NativePasskey = "native-passkey";
     public const string NativeNotification = "native-notification";
@@ -80,14 +81,54 @@ public interface ITrayService : IDisposable
     void SetVisible(bool isVisible);
 }
 
+public enum GlobalHotkeySlot
+{
+    QuickSearch,
+    AutoType
+}
+
 public interface IGlobalHotkeyService : IDisposable
 {
     PlatformIntegrationCapability Capability { get; }
-    bool IsRegistered { get; }
-    string RegisteredGesture { get; }
+    string LastError(GlobalHotkeySlot slot);
+    bool IsRegistered(GlobalHotkeySlot slot);
+    string RegisteredGesture(GlobalHotkeySlot slot);
+    bool TryRegister(GlobalHotkeySlot slot, string gesture, Action activated);
+    void Unregister(GlobalHotkeySlot slot);
+}
+
+public enum AutoTypeTokenKind
+{
+    Text,
+    Tab,
+    Enter,
+    Delay
+}
+
+public sealed record AutoTypeToken(AutoTypeTokenKind Kind, string Value = "", int DelayMilliseconds = 0)
+{
+    public static AutoTypeToken Text(string value) => new(AutoTypeTokenKind.Text, value);
+
+    public static AutoTypeToken Tab { get; } = new(AutoTypeTokenKind.Tab);
+
+    public static AutoTypeToken Enter { get; } = new(AutoTypeTokenKind.Enter);
+
+    public static AutoTypeToken Delay(int milliseconds) =>
+        new(AutoTypeTokenKind.Delay, DelayMilliseconds: Math.Max(0, milliseconds));
+}
+
+public interface IAutoTypeService
+{
+    PlatformIntegrationCapability Capability { get; }
     string LastError { get; }
-    bool TryRegister(string gesture, Action activated);
-    void Unregister();
+    IntPtr GetForegroundWindow();
+    string GetWindowTitle(IntPtr windowHandle);
+
+    // The guard must key on the OS view: measured live on Windows, the framework's activation flag read
+    // true at a moment when the process owned no top-level window at all.
+    bool IsWindowOwnedByThisProcess(IntPtr windowHandle);
+
+    bool TryType(IReadOnlyList<AutoTypeToken> tokens);
 }
 
 public interface IExternalLinkService
@@ -151,6 +192,7 @@ public sealed class PlatformIntegrationService : IPlatformIntegrationService
                 Available(PlatformFeatureKeys.SecretProtection, "Windows secret protection will use a DPAPI-backed adapter."),
                 Available(PlatformFeatureKeys.Tray, "Windows tray integration is available for desktop builds."),
                 Available(PlatformFeatureKeys.GlobalHotkey, "Windows global hotkeys can be registered by a platform adapter."),
+                Available(PlatformFeatureKeys.AutoType, "Windows auto-typing can send keystrokes to the focused application."),
                 Available(PlatformFeatureKeys.BrowserBridge, "An authenticated loopback browser bridge is available for Windows desktop builds."),
                 Available(PlatformFeatureKeys.ExternalLinks, "External links can be opened through the Windows shell."),
                 WindowsNativePasskeyService.CreateCapability(),
@@ -167,6 +209,7 @@ public sealed class PlatformIntegrationService : IPlatformIntegrationService
                 PlatformLimited(PlatformFeatureKeys.SecretProtection, "Keychain-backed secret protection needs a macOS adapter."),
                 PlatformLimited(PlatformFeatureKeys.Tray, "Menu bar integration needs a macOS adapter."),
                 PlatformLimited(PlatformFeatureKeys.GlobalHotkey, "Global hotkeys require a macOS accessibility-aware adapter."),
+                PlatformLimited(PlatformFeatureKeys.AutoType, "Auto-typing requires a macOS input adapter."),
                 PlatformLimited(PlatformFeatureKeys.BrowserBridge, "The authenticated local browser bridge adapter is not implemented yet."),
                 Available(PlatformFeatureKeys.ExternalLinks, "External links can be opened through the macOS desktop shell."),
                 Unsupported(PlatformFeatureKeys.NativePasskey, "Android Credential Provider behavior is not available on macOS."),
@@ -183,6 +226,7 @@ public sealed class PlatformIntegrationService : IPlatformIntegrationService
                 PlatformLimited(PlatformFeatureKeys.SecretProtection, "Secret Service or keyring support needs a Linux adapter."),
                 PlatformLimited(PlatformFeatureKeys.Tray, "Tray behavior depends on the active Linux desktop environment."),
                 PlatformLimited(PlatformFeatureKeys.GlobalHotkey, "Global hotkeys depend on the compositor and desktop environment."),
+                PlatformLimited(PlatformFeatureKeys.AutoType, "Auto-typing depends on the compositor input APIs."),
                 PlatformLimited(PlatformFeatureKeys.BrowserBridge, "The authenticated local browser bridge adapter is not implemented yet."),
                 Available(PlatformFeatureKeys.ExternalLinks, "External links can be opened through the Linux desktop shell."),
                 Unsupported(PlatformFeatureKeys.NativePasskey, "Android Credential Provider behavior is not available on Linux."),
@@ -197,6 +241,7 @@ public sealed class PlatformIntegrationService : IPlatformIntegrationService
             Unsupported(PlatformFeatureKeys.SecretProtection, "No secret protection adapter is available for this platform."),
             Unsupported(PlatformFeatureKeys.Tray, "No tray adapter is available for this platform."),
             Unsupported(PlatformFeatureKeys.GlobalHotkey, "No global hotkey adapter is available for this platform."),
+            Unsupported(PlatformFeatureKeys.AutoType, "No auto-typing adapter is available for this platform."),
             PlatformLimited(PlatformFeatureKeys.BrowserBridge, "The authenticated local browser bridge adapter is not implemented yet."),
             PlatformLimited(PlatformFeatureKeys.ExternalLinks, "External link launching depends on the current desktop shell."),
             Unsupported(PlatformFeatureKeys.NativePasskey, "Native passkey integration is not available for this platform."),
@@ -283,12 +328,27 @@ public sealed class CapabilityOnlyTrayService(IPlatformIntegrationService platfo
 public sealed class CapabilityOnlyGlobalHotkeyService(IPlatformIntegrationService platformIntegrationService) : IGlobalHotkeyService
 {
     public PlatformIntegrationCapability Capability => platformIntegrationService.GetCapability(PlatformFeatureKeys.GlobalHotkey);
-    public bool IsRegistered => false;
-    public string RegisteredGesture => "";
-    public string LastError => Capability.UnsupportedReason ?? "Global hotkeys are unavailable.";
-    public bool TryRegister(string gesture, Action activated) => false;
-    public void Unregister() { }
+    public string LastError(GlobalHotkeySlot slot) => Capability.UnsupportedReason ?? "Global hotkeys are unavailable.";
+    public bool IsRegistered(GlobalHotkeySlot slot) => false;
+    public string RegisteredGesture(GlobalHotkeySlot slot) => "";
+    public bool TryRegister(GlobalHotkeySlot slot, string gesture, Action activated) => false;
+    public void Unregister(GlobalHotkeySlot slot) { }
     public void Dispose() { }
+}
+
+public sealed class CapabilityOnlyAutoTypeService(IPlatformIntegrationService platformIntegrationService) : IAutoTypeService
+{
+    public PlatformIntegrationCapability Capability => platformIntegrationService.GetCapability(PlatformFeatureKeys.AutoType);
+    public string LastError { get; private set; } = "";
+    public IntPtr GetForegroundWindow() => IntPtr.Zero;
+    public string GetWindowTitle(IntPtr windowHandle) => "";
+    public bool IsWindowOwnedByThisProcess(IntPtr windowHandle) => false;
+
+    public bool TryType(IReadOnlyList<AutoTypeToken> tokens)
+    {
+        LastError = Capability.UnsupportedReason ?? "Auto-typing is unavailable on this platform.";
+        return false;
+    }
 }
 
 public sealed class SystemExternalLinkService(IPlatformIntegrationService platformIntegrationService) : IExternalLinkService

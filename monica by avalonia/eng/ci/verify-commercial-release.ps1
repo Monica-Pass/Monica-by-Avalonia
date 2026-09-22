@@ -92,7 +92,10 @@ function Assert-FocusedFeatureFileSizes {
         foreach ($sourceFile in $sourceFiles) {
             $lineCount = (Get-Content -LiteralPath $sourceFile.FullName).Count
             if ($lineCount -gt $maximumLines) {
-                $relativePath = [IO.Path]::GetRelativePath($projectRoot, $sourceFile.FullName)
+                # Not [IO.Path]::GetRelativePath: Windows PowerShell 5.1 runs on .NET Framework, which
+                # does not have that method, so a size violation used to die here reporting
+                # MethodNotFound instead of naming the oversized file.
+                $relativePath = "$featurePath/$($sourceFile.Name)"
                 $oversizedFiles += "$relativePath ($lineCount lines)"
             }
         }

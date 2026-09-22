@@ -34,6 +34,24 @@ public sealed partial class MainWindowViewModel
         RaiseDesktopIntegrationPresentationState();
     }
 
+    partial void OnAutoTypeEnabledChanged(bool value)
+    {
+        if (value && !CanUseAutoTypeIntegration)
+        {
+            AutoTypeEnabled = false;
+            return;
+        }
+
+        UpdateSettings(settings => settings.AutoTypeEnabled = value);
+        RaiseDesktopIntegrationPresentationState();
+    }
+
+    partial void OnAutoTypeHotkeyChanged(string value)
+    {
+        UpdateSettings(settings => settings.AutoTypeHotkey = value);
+        RaiseDesktopIntegrationPresentationState();
+    }
+
     partial void OnBrowserIntegrationEnabledChanged(bool value)
     {
         if (value && !CanUseBrowserBridgeIntegration)
@@ -76,11 +94,13 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(PlatformIntegrationSummaryText));
         OnPropertyChanged(nameof(CanUseTrayIntegration));
         OnPropertyChanged(nameof(CanUseGlobalHotkeyIntegration));
+        OnPropertyChanged(nameof(CanUseAutoTypeIntegration));
         OnPropertyChanged(nameof(CanUseBrowserBridgeIntegration));
         OnPropertyChanged(nameof(CanOpenExternalLinks));
         OnPropertyChanged(nameof(CanUseFilePicker));
         OnPropertyChanged(nameof(TrayIntegrationStatusText));
         OnPropertyChanged(nameof(GlobalHotkeyIntegrationStatusText));
+        OnPropertyChanged(nameof(AutoTypeIntegrationStatusText));
         OnPropertyChanged(nameof(BrowserBridgeIntegrationStatusText));
         OnPropertyChanged(nameof(ExternalLinksIntegrationStatusText));
         OnPropertyChanged(nameof(FilePickerIntegrationStatusText));
@@ -160,6 +180,12 @@ public sealed partial class MainWindowViewModel
             !string.IsNullOrWhiteSpace(GlobalHotkeyRegistrationError))
         {
             return $"{baseStatus} — {GlobalHotkeyRegistrationError}";
+        }
+
+        if (string.Equals(key, PlatformFeatureKeys.AutoType, StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(AutoTypeRegistrationError))
+        {
+            return $"{baseStatus} — {AutoTypeRegistrationError}";
         }
 
         if (string.Equals(key, PlatformFeatureKeys.BrowserBridge, StringComparison.OrdinalIgnoreCase))

@@ -355,15 +355,53 @@ public sealed partial class PlatformServiceTests
         var integration = new PlatformIntegrationService();
         using var service = new WindowsGlobalHotkeyService(integration);
 
-        var registered = service.TryRegister("Ctrl+Shift+F24", () => { });
+        var registered = service.TryRegister(GlobalHotkeySlot.QuickSearch, "Ctrl+Shift+F24", () => { });
+        var autoTypeRegistered = service.TryRegister(GlobalHotkeySlot.AutoType, "Ctrl+Shift+F23", () => { });
 
-        Assert.True(registered, service.LastError);
-        Assert.True(service.IsRegistered);
-        Assert.Equal("Ctrl+Shift+F24", service.RegisteredGesture);
+        Assert.True(registered, service.LastError(GlobalHotkeySlot.QuickSearch));
+        Assert.True(autoTypeRegistered, service.LastError(GlobalHotkeySlot.AutoType));
+        Assert.True(service.IsRegistered(GlobalHotkeySlot.QuickSearch));
+        Assert.Equal("Ctrl+Shift+F24", service.RegisteredGesture(GlobalHotkeySlot.QuickSearch));
+        Assert.Equal("Ctrl+Shift+F23", service.RegisteredGesture(GlobalHotkeySlot.AutoType));
 
-        service.Unregister();
+        // Re-registering one slot must not drop the other: the settings page re-applies the
+        // quick-search gesture every time its text box loses focus.
+        service.TryRegister(GlobalHotkeySlot.QuickSearch, "Ctrl+Shift+F24", () => { });
 
-        Assert.False(service.IsRegistered);
+        Assert.True(service.IsRegistered(GlobalHotkeySlot.QuickSearch));
+        Assert.True(service.IsRegistered(GlobalHotkeySlot.AutoType));
+
+        service.Unregister(GlobalHotkeySlot.AutoType);
+
+        Assert.True(service.IsRegistered(GlobalHotkeySlot.QuickSearch));
+        Assert.False(service.IsRegistered(GlobalHotkeySlot.AutoType));
+        Assert.Empty(service.RegisteredGesture(GlobalHotkeySlot.AutoType));
+
+        service.Unregister(GlobalHotkeySlot.QuickSearch);
+
+        Assert.False(service.IsRegistered(GlobalHotkeySlot.QuickSearch));
+    }
+
+    [Fact]
+    public void Windows_global_hotkey_service_rejects_a_gesture_already_taken_by_the_other_slot()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var integration = new PlatformIntegrationService();
+        using var service = new WindowsGlobalHotkeyService(integration);
+
+        Assert.True(service.TryRegister(GlobalHotkeySlot.QuickSearch, "Ctrl+Shift+F22", () => { }));
+
+        var duplicate = service.TryRegister(GlobalHotkeySlot.AutoType, "Ctrl+Shift+F22", () => { });
+
+        Assert.False(duplicate);
+        Assert.False(string.IsNullOrWhiteSpace(service.LastError(GlobalHotkeySlot.AutoType)));
+        Assert.True(service.IsRegistered(GlobalHotkeySlot.QuickSearch));
+
+        service.Unregister(GlobalHotkeySlot.QuickSearch);
     }
 
     [Fact]
@@ -372,7 +410,7 @@ public sealed partial class PlatformServiceTests
         var integration = new PlatformIntegrationService(
             "TestOS",
             [
-                PlatformIntegrationService.DesktopEquivalent(PlatformFeatureKeys.BrowserBridge, "Bridge works."),
+                PlatformIntegrationService.DesktopEquivalent(PlatformFeatureKeys.AutoType, "Auto-typing works."),
                 PlatformIntegrationService.DesktopEquivalent(PlatformFeatureKeys.GlobalHotkey, "Hotkey works."),
                 PlatformIntegrationService.Unsupported(PlatformFeatureKeys.NativePasskey, "Credential provider unavailable.")
             ]);
@@ -384,6 +422,26 @@ public sealed partial class PlatformServiceTests
         Assert.Equal(PlatformFeatureStatus.DesktopEquivalent, autofill.Status);
         Assert.Equal(PlatformFeatureStatus.Unsupported, credentialProvider.Status);
         Assert.Equal("Credential provider unavailable.", credentialProvider.UnsupportedReason);
+    }
+
+    [Fact]
+    public void Platform_capability_service_keeps_autofill_limited_without_auto_typing()
+    {
+        var integration = new PlatformIntegrationService(
+            "TestOS",
+            [
+                PlatformIntegrationService.DesktopEquivalent(PlatformFeatureKeys.BrowserBridge, "Bridge works."),
+                PlatformIntegrationService.DesktopEquivalent(PlatformFeatureKeys.GlobalHotkey, "Hotkey works."),
+                PlatformIntegrationService.PlatformLimited(PlatformFeatureKeys.AutoType, "No input adapter.")
+            ]);
+        var service = new PlatformCapabilityService(integration);
+
+        var autofill = service.GetCapability("autofill");
+
+        // The bridge alone is not autofill: without an extension to talk to it, nothing reaches a
+        // live form, so the catalog must not claim the Android behaviour is covered.
+        Assert.Equal(PlatformFeatureStatus.PlatformLimited, autofill.Status);
+        Assert.Equal("No input adapter.", autofill.UnsupportedReason);
     }
 
     [Fact]

@@ -29,6 +29,8 @@ public sealed partial class MainWindowViewModel
             MinimizeToTray = settings.MinimizeToTray && CanUseTrayIntegration;
             QuickSearchEnabled = settings.QuickSearchEnabled && CanUseGlobalHotkeyIntegration;
             QuickSearchHotkey = settings.QuickSearchHotkey;
+            AutoTypeEnabled = settings.AutoTypeEnabled && CanUseAutoTypeIntegration;
+            AutoTypeHotkey = settings.AutoTypeHotkey;
             BrowserIntegrationEnabled = settings.BrowserIntegrationEnabled && CanUseBrowserBridgeIntegration;
             BrowserIntegrationPort = settings.BrowserIntegrationPort;
             CompactPasswordList = settings.CompactPasswordList;

@@ -11,6 +11,7 @@ public sealed partial class MainWindowViewModel
     private readonly IReadOnlyList<PlatformIntegrationCapability> _sourcePlatformIntegrationCapabilities;
     private readonly IExternalLinkService _externalLinkService;
     private readonly IFileSystemPickerService _fileSystemPickerService;
+    private readonly IAutoTypeService _autoTypeService;
 
     public ObservableCollection<LocalizedPlatformIntegrationCapability> PlatformIntegrationCapabilities { get; } = [];
     public ObservableCollection<LocalizedPlatformCapability> Capabilities { get; } = [];
@@ -25,10 +26,13 @@ public sealed partial class MainWindowViewModel
     public bool CanUseTrayIntegration => IsPlatformIntegrationUsable(PlatformFeatureKeys.Tray);
     public bool CanUseGlobalHotkeyIntegration => IsPlatformIntegrationUsable(PlatformFeatureKeys.GlobalHotkey);
     public bool CanUseBrowserBridgeIntegration => IsPlatformIntegrationUsable(PlatformFeatureKeys.BrowserBridge);
+    public bool CanUseAutoTypeIntegration =>
+        IsPlatformIntegrationUsable(PlatformFeatureKeys.AutoType) && CanUseGlobalHotkeyIntegration;
     public bool CanOpenExternalLinks => IsPlatformIntegrationUsable(PlatformFeatureKeys.ExternalLinks);
     public bool CanUseFilePicker => _fileSystemPickerService.Capability.IsUsable;
     public string TrayIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.Tray);
     public string GlobalHotkeyIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.GlobalHotkey);
+    public string AutoTypeIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.AutoType);
     public string BrowserBridgeIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.BrowserBridge);
     public string ExternalLinksIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.ExternalLinks);
     public string FilePickerIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.FilePicker);
@@ -41,6 +45,16 @@ public sealed partial class MainWindowViewModel
 
     [ObservableProperty]
     private string _quickSearchHotkey = "Ctrl+Shift+Space";
+
+    [ObservableProperty]
+    private bool _autoTypeEnabled;
+
+    [ObservableProperty]
+    private string _autoTypeHotkey = "Ctrl+Shift+Enter";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AutoTypeIntegrationStatusText))]
+    private string _autoTypeRegistrationError = "";
 
     [ObservableProperty]
     private bool _browserIntegrationEnabled;
@@ -67,6 +81,17 @@ public sealed partial class MainWindowViewModel
     {
         GlobalHotkeyRegistrationError = error;
         RaiseDesktopIntegrationPresentationState();
+    }
+
+    internal void SetAutoTypeRegistrationError(string error)
+    {
+        AutoTypeRegistrationError = error;
+        RaiseDesktopIntegrationPresentationState();
+    }
+
+    internal void ReportAutoTypeGestureConflict()
+    {
+        SetAutoTypeRegistrationError(_localization.Get("AutoTypeGestureConflict"));
     }
 
     internal void SetBrowserBridgeRuntimeState(bool isRunning, string sessionToken, string error)

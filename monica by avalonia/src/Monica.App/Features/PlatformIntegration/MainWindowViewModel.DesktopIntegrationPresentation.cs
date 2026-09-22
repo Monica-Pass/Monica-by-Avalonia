@@ -59,6 +59,49 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    public bool HasAutoTypeRegistrationError =>
+        !string.IsNullOrWhiteSpace(AutoTypeRegistrationError);
+
+    public string AutoTypeStatusTitleText
+    {
+        get
+        {
+            if (!CanUseAutoTypeIntegration)
+            {
+                return _localization.Get("AutoTypeStatusUnavailableTitle");
+            }
+
+            if (!AutoTypeEnabled)
+            {
+                return _localization.Get("AutoTypeStatusDisabledTitle");
+            }
+
+            return HasAutoTypeRegistrationError
+                ? _localization.Get("AutoTypeStatusErrorTitle")
+                : _localization.Get("AutoTypeStatusActiveTitle");
+        }
+    }
+
+    public string AutoTypeStatusDescriptionText
+    {
+        get
+        {
+            if (!CanUseAutoTypeIntegration)
+            {
+                return AutoTypeIntegrationStatusText;
+            }
+
+            if (!AutoTypeEnabled)
+            {
+                return _localization.Get("AutoTypeStatusDisabledDescription");
+            }
+
+            return HasAutoTypeRegistrationError
+                ? AutoTypeRegistrationError
+                : _localization.Format("AutoTypeStatusActiveDescriptionFormat", AutoTypeHotkey);
+        }
+    }
+
     public BrowserBridgeDesktopState BrowserBridgeDesktopStatus
     {
         get
@@ -146,6 +189,9 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(HasGlobalHotkeyRegistrationError));
         OnPropertyChanged(nameof(GlobalQuickSearchStatusTitleText));
         OnPropertyChanged(nameof(GlobalQuickSearchStatusDescriptionText));
+        OnPropertyChanged(nameof(HasAutoTypeRegistrationError));
+        OnPropertyChanged(nameof(AutoTypeStatusTitleText));
+        OnPropertyChanged(nameof(AutoTypeStatusDescriptionText));
         OnPropertyChanged(nameof(BrowserBridgeDesktopStatus));
         OnPropertyChanged(nameof(IsBrowserBridgeUnavailableState));
         OnPropertyChanged(nameof(IsBrowserBridgeDisabledState));

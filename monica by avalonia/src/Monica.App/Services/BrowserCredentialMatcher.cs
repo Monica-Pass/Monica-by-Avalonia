@@ -30,12 +30,19 @@ internal static class BrowserCredentialMatcher
             return false;
         }
 
-        return websites.Split(WebsiteSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(TryGetWebHost)
-            .Any(storedHost => storedHost is not null &&
-                (string.Equals(requestedHost, storedHost, StringComparison.OrdinalIgnoreCase) ||
-                 requestedHost.EndsWith('.' + storedHost, StringComparison.OrdinalIgnoreCase)));
+        return GetWebHosts(websites)
+            .Any(storedHost => string.Equals(requestedHost, storedHost, StringComparison.OrdinalIgnoreCase) ||
+                requestedHost.EndsWith('.' + storedHost, StringComparison.OrdinalIgnoreCase));
     }
+
+    internal static IReadOnlyList<string> GetWebHosts(string websites) =>
+        string.IsNullOrWhiteSpace(websites)
+            ? []
+            : websites.Split(WebsiteSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(TryGetWebHost)
+                .Where(host => host is not null)
+                .Select(host => host!)
+                .ToArray();
 
     private static string? TryGetWebHost(string value)
     {

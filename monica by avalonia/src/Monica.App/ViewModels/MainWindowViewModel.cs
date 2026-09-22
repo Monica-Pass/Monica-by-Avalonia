@@ -80,7 +80,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IBitwardenSessionManager? bitwardenSessionManager = null,
         IBitwardenPendingOperationStore? bitwardenPendingOperationStore = null,
         IBitwardenConflictBackupStore? bitwardenConflictBackupStore = null,
-        IBitwardenDeviceIdentityProvider? bitwardenDeviceIdentityProvider = null)
+        IBitwardenDeviceIdentityProvider? bitwardenDeviceIdentityProvider = null,
+        IAutoTypeService? autoTypeService = null)
     {
         _viewModelDispatcher = Dispatcher.CurrentDispatcher;
         _repository = repository;
@@ -129,6 +130,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _sourcePlatformIntegrationCapabilities = platformIntegrationService.GetCapabilities();
         _externalLinkService = externalLinkService ?? new SystemExternalLinkService(platformIntegrationService);
         _fileSystemPickerService = fileSystemPickerService ?? new CapabilityOnlyFileSystemPickerService(platformIntegrationService);
+        _autoTypeService = autoTypeService ?? new CapabilityOnlyAutoTypeService(platformIntegrationService);
         PlatformName = platformIntegrationService.PlatformName;
         CompromisedPasswordStatus = _localization.Get("CompromisedPasswordNotChecked");
         RefreshPlatformIntegrationCapabilities();

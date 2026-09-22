@@ -10,7 +10,8 @@ internal sealed class DesktopIntegrationCoordinator(
     MainWindow window,
     ITrayService trayService,
     IGlobalHotkeyService globalHotkeyService,
-    IBrowserBridgeService browserBridgeService) : IDisposable
+    IBrowserBridgeService browserBridgeService,
+    IAutoTypeService autoTypeService) : IDisposable
 {
     private MainWindowViewModel? _viewModel;
     private readonly DispatcherTimer _hotkeyRegistrationTimer = new()
@@ -21,6 +22,11 @@ internal sealed class DesktopIntegrationCoordinator(
     {
         Interval = TimeSpan.FromMilliseconds(350)
     };
+
+    // Only the desktop knows whether RegisterHotKey actually accepted the gesture, and the published
+    // artifact probe needs that to tell "the key is live" apart from "nobody has pressed it yet".
+    internal bool IsAutoTypeHotkeyRegistered =>
+        globalHotkeyService.IsRegistered(GlobalHotkeySlot.AutoType);
 
     public void Initialize(MainWindowViewModel viewModel)
     {
@@ -39,6 +45,7 @@ internal sealed class DesktopIntegrationCoordinator(
         viewModel.PropertyChanged += ViewModel_OnPropertyChanged;
         ApplyTraySetting();
         ApplyGlobalHotkeySetting();
+        ApplyAutoTypeSetting();
         ApplyBrowserBridgeSetting();
     }
 
@@ -68,7 +75,9 @@ internal sealed class DesktopIntegrationCoordinator(
             ApplyTraySetting();
         }
         else if (e.PropertyName is nameof(MainWindowViewModel.QuickSearchEnabled) or
-                 nameof(MainWindowViewModel.QuickSearchHotkey))
+                 nameof(MainWindowViewModel.QuickSearchHotkey) or
+                 nameof(MainWindowViewModel.AutoTypeEnabled) or
+                 nameof(MainWindowViewModel.AutoTypeHotkey))
         {
             _hotkeyRegistrationTimer.Stop();
             _hotkeyRegistrationTimer.Start();
@@ -91,12 +100,13 @@ internal sealed class DesktopIntegrationCoordinator(
         var viewModel = _viewModel;
         if (viewModel is null || !viewModel.QuickSearchEnabled)
         {
-            globalHotkeyService.Unregister();
+            globalHotkeyService.Unregister(GlobalHotkeySlot.QuickSearch);
             viewModel?.SetGlobalHotkeyRegistrationError("");
             return;
         }
 
         if (globalHotkeyService.TryRegister(
+                GlobalHotkeySlot.QuickSearch,
                 viewModel.QuickSearchHotkey,
                 () => Dispatcher.UIThread.Post(ShowQuickSearch)))
         {
@@ -104,7 +114,39 @@ internal sealed class DesktopIntegrationCoordinator(
         }
         else
         {
-            viewModel.SetGlobalHotkeyRegistrationError(globalHotkeyService.LastError);
+            viewModel.SetGlobalHotkeyRegistrationError(globalHotkeyService.LastError(GlobalHotkeySlot.QuickSearch));
+        }
+    }
+
+    private void ApplyAutoTypeSetting()
+    {
+        var viewModel = _viewModel;
+        if (viewModel is null || !viewModel.AutoTypeEnabled)
+        {
+            globalHotkeyService.Unregister(GlobalHotkeySlot.AutoType);
+            viewModel?.SetAutoTypeRegistrationError("");
+            return;
+        }
+
+        if (string.Equals(viewModel.AutoTypeHotkey, viewModel.QuickSearchHotkey, StringComparison.OrdinalIgnoreCase))
+        {
+            // Both slots would ask the desktop for the same key combination and the second request
+            // would be refused, so say which one is in the way instead of reporting a mystery error.
+            globalHotkeyService.Unregister(GlobalHotkeySlot.AutoType);
+            viewModel.ReportAutoTypeGestureConflict();
+            return;
+        }
+
+        if (globalHotkeyService.TryRegister(
+                GlobalHotkeySlot.AutoType,
+                viewModel.AutoTypeHotkey,
+                () => Dispatcher.UIThread.Post(RunAutoType)))
+        {
+            viewModel.SetAutoTypeRegistrationError("");
+        }
+        else
+        {
+            viewModel.SetAutoTypeRegistrationError(globalHotkeyService.LastError(GlobalHotkeySlot.AutoType));
         }
     }
 
@@ -112,6 +154,7 @@ internal sealed class DesktopIntegrationCoordinator(
     {
         _hotkeyRegistrationTimer.Stop();
         ApplyGlobalHotkeySetting();
+        ApplyAutoTypeSetting();
     }
 
     private void BrowserRegistrationTimer_OnTick(object? sender, EventArgs e)
@@ -178,6 +221,30 @@ internal sealed class DesktopIntegrationCoordinator(
     {
         window.ShowFromDesktopIntegration();
         window.FocusDesktopQuickSearch();
+    }
+
+    // Runs on the UI thread, and deliberately does not touch Monica's own windows: raising or
+    // focusing anything here would take the focus the target application still needs.
+    private void RunAutoType()
+    {
+        var viewModel = _viewModel;
+        if (viewModel is null)
+        {
+            return;
+        }
+
+        var foreground = autoTypeService.GetForegroundWindow();
+        var foregroundIsMonicaWindow = autoTypeService.IsWindowOwnedByThisProcess(foreground);
+        if (foregroundIsMonicaWindow)
+        {
+            // The one refusal a user cannot explain from the screen, because nothing appears to happen.
+            AppDiagnostics.Info($"Auto type refused: Monica owns the foreground window {foreground}.");
+        }
+
+        viewModel.RunAutoTypeIntoForeground(
+            foreground,
+            autoTypeService.GetWindowTitle(foreground),
+            foregroundIsMonicaWindow);
     }
 
     private void LockVault()
