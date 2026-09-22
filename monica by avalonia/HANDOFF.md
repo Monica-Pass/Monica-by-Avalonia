@@ -16,7 +16,7 @@
 
 ## 2. 当前状态（工作树干净）
 
-分支 `main`，`git status` 无未提交改动。功能 HEAD = `1d8c3a4`（其后只可能有给本节自身标提交号的文档提交），近几轮：
+分支 `main`，`git status` 无未提交改动。功能 HEAD = `541069c`（其后只可能有给本节自身标提交号的文档提交），近几轮：
 
 | commit | 立住了什么 |
 |---|---|
@@ -32,6 +32,7 @@
 | `69a44e1` | 切语言时把**屏幕上已经停着的那句**也重译（补 #78 留下的缺口）：状态漏斗改存 key + 参数、`StatusMessage` 读取时才解析，语言刷新处顺手重发状态通知。新增 3 条单测（失败句／带参句／已清空句）+ 1 条走 `SettingsLanguage` 真链路的渲染带测试；证伪：只把刷新调用注掉时单测仍全绿、UI 测试在 `"Enter a folder name."` 处转红，说明无头测不到的那一半确实由 UI 测试守着。门禁：格式 0 改动、Release 0 warning、单测 9+716、UI 17+188 全绿；重新 publish 后产物门 loadMs=186、KeePass 20000 条增长 3.4MB、锁定尾窗中位 110.6MB（尾区间 109.2–112.8） |
 | `f700bcc` | 最小化到托盘改为**出厂即开**：`MinimizeToTray` 默认 `true` + `SettingsSchemaVersion` 升到 2，老配置文件里那个"当年没人问过就写下去的 false"只被升级一次，之后用户主动关掉的能守住。UI 测试改成走 `InitializeAsync()` 真链路（设置→VM→协调器→托盘），不再靠手工赋值假装默认值生效。真机验证见 §7 第 1 条。门禁：单测 9+718、UI 17+188 全绿；重新 publish 后产物门全绿（loadMs=347、KeePass 增长 4.6MB、锁定尾窗中位 113.3MB/120）——证明托盘默认开没有把 `--smoke-ui-exit-after-checks` 的退出路径拖成挂死 |
 | `1d8c3a4` | 桌面端自动输入（#84，走查后用户点名的第二条必须功能）：全局热键 `Ctrl+Shift+Enter` 把"用户名 → Tab → 密码"用 `SendInput(KEYEVENTF_UNICODE)` 打进**当前前台的别人家窗口**——不碰剪贴板（因此不必和 `SecureClipboardService` 的自动清理抢时序），且**从不发 Enter**，提交留给用户；开关默认关，因为"会往别的窗口打字"不该由我们替用户打开；`WindowsGlobalHotkeyService` 槽位化（快速搜索／自动输入各自 `RegisterHotKey` + 各自消息泵线程），两槽填同一组合时先判冲突并说清"快速搜索已占用"，而不是留一条说不清的注册失败。匹配只信前台标题：标题含 host 形状就按 host 判（条目存 `github.com`、标题 `github.com.phishing.test` → 不打），命中 0 条或多于 1 条一律拒打并给原因。**查清的一个假象**：判"前台是不是我自己"原本用 Avalonia 的 `Window.IsActive` + 缓存自身 hwnd，实测进程**零顶层窗口**的时刻它仍读回 `True`（那个缓存 handle 的 pid=0、`IsWindow=False`）→ 会永远误拒，改成问操作系统（`GetWindowThreadProcessId` 比对自身 pid），单测用**真 message-only 窗口**跑通 true 分支。真机正反两例都在**发布产物**上量过（`outcome=Typed`、落点 15/19 字符分别匹配；钓鱼标题 `NoMatch` 且两个框都空），跑法与未覆盖项见 §7 第 2 条。顺带：设置页为过 300 行门把浏览器配对区块拆成 `SettingsBrowserPairingSectionView`，并修掉门禁脚本用 `[IO.Path]::GetRelativePath`（5.1 上不存在）导致行数违规既不变红也不点名的坑。门禁：格式 0 改动、Release 0 warning、单测 9+747、UI 17+191 全绿；重新 publish 后产物门 loadMs=536/4000、KeePass 增长 2.9MB/24、锁定尾窗中位 114.4MB/120 |
+| `541069c` | 单实例守卫（#86，托盘默认开引出的用户可见问题）：同一个数据目录只允许一个实例，第二次启动不再自己开第二个窗口，而是**把还活着的那一个叫回前台**后退出 0；锁按数据目录取键（各自 `MONICA_APPDATA_DIR` 的独立实例、CI 顺序跑法都不受影响），接力事件在拿到锁的同一瞬间命名，因此双击发生在 UI 订阅之前也不会丢。顺带修掉守卫的取证工具本身：诊断日志的 append 流只在打开时定位一次末尾，两个进程写同一个 `runtime.log` 会从中间互相盖掉——实测出现过一条记录被拼进另一条的句子中间、接力证据消失；现在每批写之前重新求末尾并整批一次写。真机正反两例都在发布产物上量过（见 §7 第 3 条），门禁：格式 0 改动、Release 0 warning、单测 9+754、UI 17+191 全绿；重新 publish 后产物门 loadMs=1082/4000、KeePass 20000 条增长 8.8MB/24、锁定尾窗中位 107.1MB/120 |
 
 §3 的 use-case 抽取改动已提交（`24d92b0`），OneDrive/WebDAV 冲突副本复用修复已提交（`957c5af`）。
 
@@ -112,10 +113,10 @@ dotnet tests/Monica.UiTests/bin/Release/net10.0/Monica.UiTests.dll -method "*Nam
 # 4. Avalonia 的托盘菜单项不支持 UIA InvokePattern（抛"不支持的模式"）——只能按 rect 中心真实点击；
 #    点击前先 Aim()（含重试），光标落点与目标差 >2px 就 throw 不点，这是仓库记忆里既有的规则。
 
-实测数字（本轮 #84 后）：单测 9 perf + 747 functional、UI 17 perf + 191 functional；重新 publish 后
-产物门 loadMs=536（预算 4000）、锁定态私有字节尾窗中位 114.4MB（区间 112.3–115.7，预算 120）、
-KeePass 20000 条增长 2.9MB（预算 24）、`release gate completed success=True, loadMs=142`。
-上一次记录（`f700bcc`）为单测 718、UI 188、loadMs=347、113.3MB、4.6MB。
+实测数字（本轮 `541069c` 后）：单测 9 perf + 754 functional、UI 17 perf + 191 functional；重新 publish 后
+产物门 loadMs=1082（预算 4000）、锁定态私有字节尾窗中位 107.1MB（区间 106.8–107.6，预算 120）、
+KeePass 20000 条增长 8.8MB（预算 24）、`release gate completed success=True, loadMs=270`。
+上一次记录（`1d8c3a4`）为单测 747、UI 191、loadMs=536、114.4MB、2.9MB。
 
 真机自动输入门（**不在 CI 里**，需要交互桌面 + 外部目标窗口 + 真实按键）：
 
@@ -128,6 +129,24 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File artifacts/autotype/verif
 ```
 
 脚本 ASCII-only、只打印长度与布尔（凭据明文一律不落日志），退出码 0 表示观察到的 `outcome` 与预期一致。
+
+单实例守卫真机门（**同样不在 CI 里**，判据是"窗口回到桌面上"，需要交互桌面会话）：
+
+```powershell
+# 1. 先建/重播种探针库（会删重建目录；口令只走环境变量，脚本不回显）
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File artifacts/autotype/prepare-probe-appdata.ps1 `
+  -ExePath <publish>\Monica.App.exe -AppDataDirectory "<空临时目录 A>"
+# 2. 正例：同一目录的第二次启动必须接力并退出 0
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File artifacts/autotype/verify-single-instance.ps1 `
+  -ExePath <publish>\Monica.App.exe -AppDataDirectory "<A>"
+# 3. 反向对照：换第二个已播种目录=第二个保险库，第一个窗口必须不自己回来
+... -AppDataDirectory "<A>" -SecondAppDataDirectory "<B>"
+```
+
+判读要点：探针按 250ms 时间轴采样 `handoff sent → reopen received → surfaced → 窗口重新可见`，并且先
+用 6 秒证明"没人管时它一直藏着"。**不要**改回"窗口不再最小化"这种判法——最小化会把窗口 `Hide()` 进托盘，
+进程处于零可见窗口状态，此时 `IsIconic(IntPtr.Zero)` 返回 `False`，实测就这样假绿过一次。两个目录要各
+自播种（`prepare-probe-appdata.ps1` 跑两遍，第二遍换 `-AppDataDirectory`）。
 
 Windows 发布链路（本轮已端到端验过，见 §7）：
 
@@ -286,7 +305,7 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
     实现后全绿。再单独把 `RaiseStatusMessageState()` 一行注掉：**三条单测仍全绿、只有渲染带测试转红**
     （Expected 请输入文件夹名称。/ Actual "Enter a folder name."），这正是无头 VM 测试看不到绑定刷新的
     证据，也是这条 UI 测试存在的理由。
-- **用户点名的必须功能（2026-09-22 拍板）：两条都已出厂**（托盘 `f700bcc`／自动输入见下）。
+- **用户点名的必须功能（2026-09-22 拍板）：三条都已出厂**（托盘 `f700bcc`／自动输入 `1d8c3a4`／单实例守卫 `541069c`）。
   下一轮从各自条目末尾那份"仍未做/仍未验证"清单里挑，别再回头补已经量过的部分：
   1. **最小化到托盘：已出厂即开，并在真机 Windows 会话里逐项量过（`f700bcc`）**。
      - 改了什么：`AppSettingsService.cs` 的 `MinimizeToTray` 默认 `true`，`SettingsSchemaVersion`
@@ -316,9 +335,6 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
        - "锁定保险库"菜单项只在**已锁定**状态下点过一次（无可见变化，等于没验证）；解锁态下它是否真的
          锁上并留在托盘，未测。
        - 双击唤起、气泡通知、`App.axaml` 里的 `<TrayIcons>` 声明（现在是运行期手动挂）仍未做。
-       - **没有单实例守卫**（全仓无 `Mutex`/`SingleInstance`/命名管道）。托盘默认开之后这变成用户可见问题：
-         双击两次桌面图标=两个进程+两个托盘图标，且都指向同一个 `monica.db`。第二实例的行为**未实测**，
-         别按"应该会报错"处理。
   2. **自动填充：桌面端已出厂（#84），正反两例都在发布产物上真机量过**。选定路线＝全局热键把凭据
      输入到**当前前台的别人家窗口**。形状：
      - 开关 `AutoTypeEnabled` **默认关**（opt-in，无 schema 迁移）：它会往别的窗口打字，不该由我们替用户打开。
@@ -362,6 +378,44 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
        6. 浏览器扩展本体仍缺：`WindowsBrowserBridgeService` 的回环 HTTP（`/v1/session/check`、
           `/v1/credentials/query`，默认端口 49152，Origin 校验 + Bearer 会话令牌）在跑，扩展没有
           （安卓 README 说 Monica for Browser 已归档、新扩展重写中）。
+  3. **单实例守卫：已出厂（#86 / `541069c`），正反两例都在发布产物上真机量过**。它是托盘默认开直接
+     引出的问题：窗口收进托盘后看不出"已经有一个在跑"，双击两次图标就是两个进程指着同一个 `monica.db`。
+     - **先实测再设计**（守卫之前的双实例行为）：2 个进程、2 个窗口、各自私有字节 98.4 / 95.7MB、
+       不崩溃、也没有任何损坏信号——危害是**两份互不知情的解密副本**（后写的那份会整库盖掉前者），
+       不是报错。所以别按"第二实例应该会失败"来理解这条。
+     - 形状：`Services/SingleInstanceGate.cs`。锁**按数据目录取键**（目录规范成全路径＋小写后取 SHA-256
+       前 8 字节），所以不同的 `MONICA_APPDATA_DIR` 仍是各自独立的实例——CI 与开发用的隔离目录、
+       并排的探针库都不受影响（反向对照就是靠这一点跑的）。`Mutex` 句柄的存活期就是锁，进程被杀/崩溃
+       时操作系统关句柄即释放，因此不等待所有权；接力用命名 `EventWaitHandle` + 线程池等待注册。
+     - **一个只在启动窗口里可见的竞态**：接力事件原本等到外壳订阅时才命名，双击发生在"已拿锁、未订阅"
+       之间就没人接收。改成拿锁成功的同一瞬间命名该事件，信号便停在事件上等订阅者来取；
+       单测 `A_reopen_that_arrives_before_anyone_is_listening_is_still_delivered` 钉住这一条。
+     - 覆盖：单测 7 条（同一目录的两种写法算一个键 / 不同目录各自判定 / 第二个 gate 不是主实例并能接力 /
+       没有监听者时握手失败如实上报 / 用**真的命名 `Mutex`+`EventWaitHandle`** 跑通"第二次上锁被拒、
+       信号送到第一个监听者" / 订阅前到的信号仍会送达）。命名原语**跨进程**那一半另用
+       `artifacts/autotype/probe-named-primitives.ps1` 起两个进程证过（`owner: mutexCreatedNew=True` /
+       `sender: signalled=True`），同进程内的同名对象不足以证明这点。
+     - **真机实测**（`artifacts/publish/win-x64/jit/Monica.App.exe`，跑法见 §5）：
+       1. 正例（同一目录）：`timeline s: exit=0.27 handoffSent=0.27 reopenLog=0.27 surfacedLog=0.27 windowBack=0.27`、
+          `second: exitCode=0 stillRunning=False visibleWindowPeak=0` → `success=True`。在此之前探针先证明
+          第一个窗口**没人管的情况下 6 秒一直藏着**，否则"窗口回来了"可以是它自己回来的。
+       2. 反向对照（第二个目录=第二个保险库）：`windowBack=-1`、第二实例 `stillRunning=True visibleWindowPeak=1`
+          → `success=True`。这一条是判据本身：不接力时窗口不会自己回来。
+       3. 记账（守卫之后同一探针库）：`procs=1/2 namedWindows=1 privateMB=101.4`，即第二次启动不再留下
+          第二份 ~95MB 的解密副本。
+     - **顺带修掉取证工具自身的真缺陷**：`runtime.log` 曾被两个进程从中间互相盖掉——`AppDiagnostics` 的
+       append 流只在打开时定位一次末尾，第二个进程写完后，第一个进程按自己的旧偏移续写，实测一条记录被
+       拼进另一条的句子中间、并且接力证据整个消失（这就是正例一度 `success=False` 的原因）。现在每批写之前
+       重新求末尾、整批一次写；修复后同一次运行里两个进程的四个标记逐条完整。
+     - **仍未做/仍未验证（别当成已完事）**：
+       1. 接力回来的窗口 `foreground=False`（探针在窗口重新可见的那一刻量的）：从后台进程 `Activate()`
+          不保证抢到前台。用户是否真的看见窗口浮起、还是只看到任务栏有动静，**没有量过**。
+       2. 跨会话/以管理员身份运行的两份 Monica 分属不同命名空间，锁拦不住彼此——未测，也未按产品缺陷处理。
+       3. 接力失败（`handoff did not land`）时**没有任何用户可见反馈**，只有日志一行。
+       4. 这条探针**没接进 `verify-artifact-runtime.ps1`**：它需要交互桌面（判据是"窗口回到桌面上"），
+          CI 无头会话跑不出可信结果。
+       5. 守卫只在**窗口化启动路径**上生效；命令行冒烟分支（`--seed-smoke-vault` 等）在取锁之前就已返回，
+          所以并行的两个 CLI 调用不受约束——这是有意的（它们是短命的读写会话），但没有测试钉住这个边界。
 
 ## 8. 用户协作偏好（务必遵守）
 
@@ -372,5 +426,5 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
 - 面对从别处 fork 进来的代码，先问"到底要不要"，再谈"怎么维护"。
 
 ---
-接手第一步建议：工作树已干净、两套 Windows 门（源码级 + 产物级）实测全绿，用户点名的两条必须功能（托盘、自动输入）
-也已出厂。下一轮从 §7 各条末尾的"仍未做/仍未验证"清单里挑，不必再花时间复验已绿的部分。
+接手第一步建议：工作树已干净、两套 Windows 门（源码级 + 产物级）实测全绿，用户点名的三条必须功能（托盘、
+自动输入、单实例守卫）也已出厂。下一轮从 §7 各条末尾的"仍未做/仍未验证"清单里挑，不必再花时间复验已绿的部分。
