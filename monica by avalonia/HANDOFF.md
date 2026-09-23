@@ -213,6 +213,23 @@ Windows 发布链路（本轮已端到端验过，见 §7）：
 ./eng/package/package-windows-inno.ps1 -PublishDirectory <publish> -OutputDirectory artifacts/package -Version "<ver>" -Mode jit
 ```
 
+安装链路真机门（**gitignored，只在一次性目录上跑**；跑之前务必确认发布产物是当轮重编的）：
+
+```powershell
+# 1. 出一份只改 AppId 的测试 setup。AppId 在 .iss 里写作 AppId={{GUID}（两个开括号是 Inno 的转义），
+#    替换值也必须带这个转义，否则 ISCC 报 Unknown constant；脚本对"替换没命中"直接 throw。
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File artifacts/autotype/build-install-test-setup.ps1
+# 2. 装到一次性目录 → 对账载荷 → 读回 exe 版本/ARP/快捷方式 → 卸载 → 查残留
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File artifacts/autotype/verify-windows-install.ps1 -Phase install
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File artifacts/autotype/verify-windows-install.ps1 -Phase uninstall
+# 3. 量"某个真安装目录是否自洽"（载荷齐不齐、ARP 是否指向该目录、快捷方式在不在）。
+#    -CheckOnly 只量不装，用来先拿红基线再拿绿。
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File artifacts/autotype/reinstall-on-d.ps1 -CheckOnly
+```
+
+判读要点：install 阶段那条 `untouched-check` 是**真的红过**的（它抓到过一次 AppId 撞车把机器上另一份
+安装的 ARP 键抢走），别因为"我这次没碰那份"就删掉它；`extra` 只允许 `unins000.dat`/`unins000.exe`。
+
 墙钟类断言历史上确有负载抖动（Task #53 一类）；但锁定态内存采样那个"超预算"已被根因定位为
 harness 竞态并修好（锁后 1s 才做的压缩要先落地再采样），不是产品回归，也不要靠调阈值变绿。
 
@@ -249,12 +266,37 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
     `Program Files`（标准用户只读）不需要写自己旁边；
   - Inno：92.5MB setup，编译日志 315 条 `Compressing` 与发布目录 315 文件一一对账，
     `mdbx_ffi.dll`/`monica_crypto.dll`/`Monica.App.exe`/`AppIcon.ico` 均在载荷内，改 `x64compatible` 后无告警。
-- **未做的（要说清）**：没有真的执行一次安装。setup 默认 `PrivilegesRequired=admin`，装进
-  `Program Files` 需要用户点 UAC；`.iss` 未开 `PrivilegesRequiredOverridesAllowed`，所以
-  `/CURRENTUSER` 静默装不了。是否给标准用户留一条免提权安装路径，是一个产品决定，待用户拍。
+- **安装链路本轮真跑过一次**（用户 2026-09-22 拍"装 d 盘"，2026-09-23 又拍"本机统一放 D 盘"）：
+  - 换掉 AppId 的测试 setup → `D:\Monica Install Test`：exit 0 / 14.3s、落地 317 文件 386.5MB、与发布
+    目录 315 文件对账 `missing=0`（`extra` 只有 `unins000.dat`/`unins000.exe`）、`FileVersion=0.1.0.0`、
+    `ProductVersion=0.1.0-ci.0`、ARP 与开始菜单快捷方式都在；
+  - 对**已安装目录**而不是构建目录跑 `verify-artifact-runtime`：`CANONICAL VAULT passed`、loadMs=238/4000、
+    锁定态 112.0MB/120、KeePass 增长 3.7MB/24、锁/解 25 passwords、14 notes、1 totp、4 wallet；
+  - 静默卸载：exit 0 / 26.4s、目录与 ARP 键和快捷方式全部消失、`clean=True`、`C:\Program Files\Monica`
+    全程 317→317 未动；
+  - 官方 setup 装到 `D:\Monica`：9.1s、315/315、运行时门 `RUNTIME SMOKE passed`、loadMs=269、
+    锁定态 114.6MB/120。**这条之前先踩到一个坑**：`artifacts/package` 里那份 09/22 11:00 的 setup 载荷
+    比 `aaa698b`（09/23 02:27）旧，装上后读回的是 `ProductVersion=0.1.0-ci.0+HEAD` 而不是含 #87 修复那份。
+    setup 编译本身不会告诉你这件事——必须先有当轮的 `publish-desktop` 产物，再 `package-windows-inno`。
+- **Inno 的"一条键、一个快捷方式"语义（不装第二次不会知道）**：① 一台机器上一个 AppId 只有**一条**
+  Add/Remove Programs 键（`<AppId>_is1`）。往第二个目录再装一次同 AppId，这条键会被改指到第二处，第一处
+  立刻失去卸载入口——它的文件都在、磁盘上的 `unins000.exe` 也都在，只是"设置 → 应用"里那扇门没了。
+  ② 开始菜单快捷方式路径 `{autoprograms}\Monica\Monica.lnk` 同样是**共享**的：卸载任一份安装会把另一份
+  的启动路径一起删掉（本轮实测删出来过一次：目录 540 文件完好而 `shortcut exists=False`）。所以"验证安装"
+  必须用**不同 AppId** 的副本，`build-install-test-setup.ps1` 就是为此存在的。
+- **`/DIR` 带空格时引号的位置**：Inno 只认 `/DIR="D:\a b"`。`Start-Process -ArgumentList` 传数组时把引号
+  加在整个 token 外面（`"/DIR=D:\a b"`），Inno 在空格处截断后**照装别的目录**：实测 exit 0、14.3 秒、目标
+  目录 0 文件。传单个字符串而不是数组才是文档要的形式。
+- **标准用户免提权安装**：用户 2026-09-23 拍**保持 admin-only**，`.iss` 继续不开
+  `PrivilegesRequiredOverridesAllowed`；装进 `Program Files` 需要点 UAC 是预期行为。
+- **本轮遗留的机器状态（不是代码问题）**：`C:\Program Files\Monica` 现在是 317 文件 386.4MB 的**孤儿目录**
+  ——ARP 键按用户意愿指到 `D:\Monica`，所以 C 那份没有卸载入口但功能正常，删不删等用户点头。
+  `D:\Monica` 里另有 225 个不属于本次载荷的文件，是用户 2025-12 那次旧安装留下的。
 - **两条探针死路（别再试）**：① Inno 的 `/EXTRACT` 退出 0 但零文件落地，不可信；
   ② 用 `icacls /deny *S-1-5-32-545:(OI)(CI)W` 模拟"只读安装目录"无效——deny 继承到镜像文件上，
-  连 `where.exe` 都起不来（实测同样 Access is denied），它测的是加载器不是产品。
+  连 `where.exe` 都起不来（实测同样 Access is denied），它测的是加载器不是产品；
+  ③ 用"最近 N 小时被写入的文件"判断安装器把载荷落到哪了不可信——Inno 复制时**保留源时间戳**，
+    实测整份 315 文件里只有它自己生成的 `unins001.exe`/`.dat` 显示为新。要判落点只能按名字对账载荷。
 - **Task #55 linux/macOS 原生 MDBX 引擎二进制**：用户 2026-09-22 决定**先不做 Linux，把 Windows 做透**。
   实测环境约束：本机 WSL（`homoos`，内核 6.18.33.2）有 gcc 14.2 但**无 rustc/cargo**，而两个原生库都是
   Rust（`crates/monica-crypto` 纯 Rust 零 build.rs；引擎在同级 `../../mdbx/crates/mdbx-ffi`，uniffi 0.31 cdylib）；
