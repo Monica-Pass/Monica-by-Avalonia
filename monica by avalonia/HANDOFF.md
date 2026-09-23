@@ -16,7 +16,7 @@
 
 ## 2. 当前状态（工作树干净）
 
-分支 `main`，`git status` 无未提交改动。功能 HEAD = `45f01ef`（其后只可能有给本节自身标提交号的文档提交），近几轮：
+分支 `main`，`git status` 无未提交改动。功能 HEAD = `6613df6`（其后只可能有给本节自身标提交号的文档提交），近几轮：
 
 | commit | 立住了什么 |
 |---|---|
@@ -37,6 +37,7 @@
 | `aaa698b` | 接力回来的窗口真的浮到用户在看的应用之上（#87，#85 那句文案欠下的另一半）：退出前的那次启动把自己持有的前台权限交给活着的那一份（按数据目录键查到 owner PID → `AllowSetForegroundWindow` → 再发接力信号），owner 由命名 `MemoryMappedFile` 在持锁期间公布 PID。**先量后修**：未修产物上 `windowBack=0.01` 秒窗口就回到桌面，但 `foregroundMonica=-1`、`aboveRival=-1`，Monica 停在 z=150 而 rival 在 z=18，6.6 秒都没浮起来——"再次启动就能回来"当时只有一半是真的。修后同一条门 `foregroundMonica=0.15 aboveRival=0.15`、之后每点都是 z=18<19。反证：把 grant 换成常量 `false` 重新构建，门立刻回红（同样 -1、z=150<18）。顺序由单测钉住（`GrantIndex==0/SignalIndex==1`），非 Windows 返回 `false` 且接力照旧送达。探针演化掉三条死路（注入 ALT 会把 rival 的 WinForms 线程 park 进菜单模态循环、`SwitchToThisWindow` 与 `AttachThreadInput` 都拿不到前台），跑法与判读见 §5。门禁：格式 0 改动、Release 0 warning、单测 9+758 全绿；重新 publish 后产物门 loadMs=261、锁定尾窗中位 108.0MB/120（区间 107.8–109.0）、锁/解循环 25/14/1/4 全数回读，单实例正反两例与托盘提示四阶段在同一产物上重跑仍全绿 |
 | `49560f5` | 自动填充弹窗（#89）＋两处只在出货平台上现形的缺陷：① **一键智能分派**取代"多解就拒打"（唯一匹配直接输入／多条匹配弹候选列表／零匹配弹全库并把键盘交给筛选框；枚举里 `NoMatch`／`Ambiguous` 已不存在），列表弹出期间目标窗口一个字符都不提前收到（`typedWhileOpen=False`），确认那一步先退场再把前台交回目标，退场一律带 `reason` 并写日志。② `IsDocumentControl` 窗口在 `Opened` **之前**投递焦点会丢——表现就是用户那句"这是填充不上吗？？？"：列表出来了、字母打不进去。③ **中文输入法把组合中每一次 KeyDown（含确认候选词的那一下回车）都报成 `ImeProcessed`**，写在 KeyDown 上的确认在真机上是死的；确认移到 KeyUp（实测仍带真实键）并**推迟到下一次 `ApplyFilter`**——那一下回车提交的文本还没落进筛选框，当场取行会发出筛选前显示的条目。诚实记录：这条只有无头证据，探针机器上没有组合态的输入法。④ 设置页录制的手势不再被加载层偷换：两槽撞车时保留用户录的那一下、由桌面集成如实报冲突（同目录同产物对照：修复前 `armed=True, gesture=Ctrl+Shift+Enter`，修复后 `armed=False, gesture=Ctrl+Shift+Space, registrationError=True`；钉子先按旧实现跑出红再转绿）。真机侧在**发布产物**上量全：弹窗 `Pick`/`Escape`/`SecondPress` 三式、注入正例 `matches=1 pickerSurfaced=False`、自定义手势 `Ctrl+Alt+F9` 从 `settings.json` 落盘读回并 armed。门禁：格式 0 改动、Release 0 warning、单测 9+759、UI 17+218 全绿；重新 publish 后产物门 loadMs=556/4000、KeePass 20000 条增长 3.7MB/24、锁/解循环 25/14/1/4。**一个不利信号如实记下**：同一份产物连跑四次锁定态尾窗中位 108.9/115.1/116.9/118.0MB（预算 120，最近的一次只剩 2.0MB，上一轮区间 107.8–109.0），该门路径根本不打开弹窗，没有证据指向 #89 也没有证据排除，下一轮先复跑取分布再归因、不要调阈值 |
 | `45f01ef` | 滚动条压成 Win11 细条（#90，用户对上一轮外观的直接反馈）。**先证伪了"这里已经修好"**：`App.axaml` 里那三个看着对症的资源键（`ScrollBarSize=10`／`ScrollBarArrowSize=0`／`ScrollBarThumbBoxSize=30`）在真渲染树上一个数字都改不动，实测仍是 `bar bounds=…,14,200` 加两个可见的 `14x10` 箭头按钮；反射查到这三个名字归 `FluentAvalonia.Interop.WinRT.IUISettings`（Windows UISettings COM 互操作），应用资源从来不是它的入口——所以那三个键连同为它们编的注释一起删掉，改为在 `VaultShellStyles` 自持 `ScrollBar` 模板：12px 命中条、4px 居中圆角滑块（hover 时 8px）、轨道不着色、无线条按钮，分页按钮留着因此点通道仍然翻页；三个主题各配一根滑块画刷（`#73000000`／`#73FFFFFF`／高对比纯黑）。新增 `SlimScrollBarStyleUiTests` 3 条钉几何与"拖动仍然滚"（`bar.Value=120` → `ScrollViewer.Offset.Y=120`）；负控：把 `VaultShellStyles` 的 StyleInclude 注掉，两条立刻红在 `Expected: 12 / Actual: 14` 与"箭头 RepeatButton 存在"，恢复后全绿。**没有视觉证据**（截图口味门这轮两条路都不通，见 §7 最后一条），好看与否待用户在运行中的应用里确认。门禁：格式 0 改动、Release 0 warning、单测 9+759、UI 17+221 全绿；重新 publish 后产物门 loadMs=211/4000（库加载 actualMs=1366/4000）、KeePass 20000 条增长 4.9MB/24、锁定尾窗中位 110.5MB/120（同一产物共跑三次：110.5／113.9／104.6，上一轮四次的 108.9–118.0 没有继续上移，绝对水位仍未归因，见 §5）、锁/解循环 25/14/1/4 |
+| `6613df6` | 忘记密码这条路的第一半：应急包（#91，用户拍"备份/应急包优先"）。**先量清为什么原有那半不够**：设置页的密保问题区块确实能设问题，但它那条"重设主密码"要求 `IsUnlocked`（`MainWindowViewModel.SettingsRecoveryCommands.cs:122`），也就是恰好"忘记密码时"走不通；而锁定态没有任何入口（`MainWindow.axaml:25` 锁定时只挂 `UnlockViewHost`，Settings 整个不可达）。本轮只做非破坏的一半：用一次性口令封存的加密快照，**Monica 从不保存该口令**（用忘记的主密码封存的备份在忘记主密码时一文不值），写盘前强制回读自检、不通过就不落盘，口令错的失败只说"打不开"、不外泄加密层原因也不回显口令，两个命令在锁定态一律 `VaultLocked` 拒绝，三个口令框打码且离屏/锁定时清空。**顺手抓到一个静默数据缺陷**：`AppSettingsService` 的 `Clone()` 是手写的属性清单，新增设置没在里面登记就会**无声**地从 `settings.json` 里消失——应急包元数据就是这么丢的；新守卫 `App_settings_file_carries_every_declared_setting` 把每个普通设置打上自身名字的标记后落盘重读逐值比对，实测先红在 `2 setting(s) did not survive the save: EmergencyKitLastExportedAtUtc, EmergencyKitLastFileName`（第一版守卫是**空的**：只比"是否变过"，而被丢的字符串序列化后仍是 `""`，改成比期望值才抓到）。③ 走查自己新写的文案又抓到一条：恢复流程复用了"正在加密保险库快照……"，改为独立的 `EmergencyKitRestoreInProgress`。覆盖：单测 9 条（密封性／跨库往返／口令错不导入且不泄密／弱口令不写盘／锁定拒绝／元数据落盘往返／进度文案／设置完整性／瞬态输入清理）+ UI 1 条（三个口令框 `PasswordChar='*'`、两个按钮的命令绑定与 `CanRunEmergencyKit` 随锁定态和维护态联动，并真按一次"口令为空"走到失败文案）。负控三条：去掉 `PasswordChar` 红在打码断言、去掉 `IsEnabled` 绑定红在锁定态禁用、进度 key 改回加密字样红在进度断言。**UI 侧两条新坑**：`dotnet test` 跑 `Monica.UiTests` 现在直接报 `Testing with VSTest target is no longer supported by Microsoft.Testing.Platform on .NET 10`（只能跑产物 exe，见 §5）；设置页的绑定要生效，必须先把 `SelectedSettingsPage` 指到该页并 `Window.Show()`——根 `StackPanel` 的 `IsVisible=false` 会让整棵子树不被度量，`button.Command` 读回来是 `null`（差点写成"UI 测不到绑定"的假结论）。门禁：格式 0 改动、Release 0 warning、单测 9+769、UI 17+222 全绿；重新 publish 后产物门 `CANONICAL VAULT passed`、loadMs=190/4000（库加载 757/4000）、KeePass 20000 条增长 3.9MB/24、锁定尾窗中位 106.4MB/120（区间 105.7–107.8）、锁/解循环 25/14/1/4 |
 
 §3 的 use-case 抽取改动已提交（`24d92b0`），OneDrive/WebDAV 冲突副本复用修复已提交（`957c5af`）。
 
@@ -77,7 +78,7 @@ dotnet build src/Monica.App/Monica.App.csproj --no-restore      # 期望 0 error
 dotnet test tests/Monica.Tests/Monica.Tests.csproj --no-restore # 约 8-9 分钟
 ```
 
-最近实测（`4e91326`）：
+最近实测（`6613df6`，两套门全绿）：
 
 ```bash
 # 源码级商业门（不启动产物：文件行数/格式化/NuGet 漏洞/Release --warnaserror/两套测试）
@@ -96,6 +97,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File eng/ci/verify-artifact-r
 # 只跑一条 UI 测试：UI 套是 xUnit v3，用简单过滤器 `-method`（不是 `dotnet test --filter`）。
 # 查询式 `-filter "/fullyQualifiedName~X"` 会静默匹配 0 条并打印 Total: 0，别当成通过。
 dotnet tests/Monica.UiTests/bin/Release/net10.0/Monica.UiTests.dll -method "*NameFragment*"
+
+# `dotnet test` 只对 Monica.Tests 有效；对 Monica.UiTests 会直接报
+# `Testing with VSTest target is no longer supported by Microsoft.Testing.Platform on .NET 10 SDK`
+# ——UI 套只能跑上面那个产物 exe。整类跑用 `-class Monica.UiTests.SettingsSecurityWorkflowUiTests`
+# （`--filter` 这个选项在 v3 in-process runner 上不存在，会报 unknown option 后什么都不跑）。
 
 # UI 测试方法名用下划线分词，所以片段要写 "*Auto_type*"；写成 "*AutoType*" 会静默匹配 0 条。
 
@@ -128,15 +134,19 @@ dotnet tests/Monica.UiTests/bin/Release/net10.0/Monica.UiTests.dll -method "*Nam
 # 9. 存盘有 150ms 防抖：气泡刚出现就 Kill 进程时 `settings.json` 还不存在（实测 `<no settings.json>`），
 #    必须先轮询到落盘再杀，不然测的是探针的手速而不是持久化。
 
-实测数字（本轮 #90 滚动条之后）：门禁全绿——`dotnet format --verify-no-changes` 0 改动、
-`--warnaserror` 0 warning、单测 9 perf + 759 functional、UI 17 + 221；重新 publish 后产物门
-`loadMs=211/4000`（库加载 `actualMs=1366/4000`）、KeePass 20000 条增长 `4.9MB/24`、锁/解循环 25/25 密码 + 14/14 笔记 + 1/1 TOTP + 4/4 钱包。
-**上一轮那个"锁定态内存连跑四次 108.9–118.0"的不利信号按"先复跑取分布"处理了**：本轮同一份产物跑三次，
-尾窗中位 `110.5 / 113.9 / 104.6`MB（预算 120，三次全绿；run1 尾区间 110.4–119.9、run3 轨迹里出现过
-`112.7→104.5` 的一步下降，说明尾窗仍在等一次原生释放落地）。分布与上一轮同量级、没有继续上移，
-一根滚动条模板也解释不了 10MB。**但绝对水位仍然偏高、归因仍未做**（锁定态只有 26–28MB 是托管的，其余是
+实测数字（本轮 #91 应急包之后）：门禁全绿——`dotnet format --verify-no-changes` 0 改动、
+`--warnaserror` 0 warning、单测 9 perf + 769 functional、UI 17 + 222；重新 publish 后产物门
+`CANONICAL VAULT passed`、`loadMs=190/4000`（库加载 `actualMs=757/4000`）、KeePass 20000 条增长
+`3.9MB/24`、锁定尾窗中位 `106.4MB/120`（尾区间 105.7–107.8，十拍轨迹 113.6→107.3 一路向下）、
+锁/解循环 25/25 密码 + 14/14 笔记 + 1/1 TOTP + 4/4 钱包。**应急包没有真机侧证据**：无头/单测覆盖了
+密封性、跨库往返与失败不泄密，但"用户在文件对话框里真的存下这个文件、再选回来恢复"这条只在测试替身上
+跑过，真实 shell 对话框未点过。
+
+上一轮（#90 滚动条）记录：单测 9+759、UI 17+221，产物门 loadMs=211/4000（库加载 1366/4000）、
+KeePass 4.9MB/24、同一产物三次锁定尾窗中位 `110.5 / 113.9 / 104.6`MB（预算 120，三次全绿；run1 尾区间 110.4–119.9、
+run3 轨迹里出现过 `112.7→104.5` 的一步下降，说明尾窗仍在等一次原生释放落地）。分布与更上一轮
+（`49560f5`：四次 108.9–118.0）同量级、没有继续上移，一根滚动条模板也解释不了 10MB。**但绝对水位仍然偏高、归因仍未做**（锁定态只有 26–28MB 是托管的，其余是
 自包含运行时镜像映射 + Skia/GPU 表面 + 线程栈，往下压要走 trimming/AOT `#43`），别把这条当已解决。
-上一轮（`49560f5`）记录：loadMs=556/4000、KeePass 3.7MB/24、四次锁定尾窗中位 108.9–118.0（本轮已复跑，见上）。
 注意：perf-budget 通道在整串门里紧跟 `dotnet build` 起跑时读到过 483ms（预算 400），单独复跑三次为
 9/9 全绿；这是冷启动+构建负载的单次读数，按仓库规则先复跑取分布，不要调阈值。
 
@@ -655,6 +665,25 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
           这一条靠会话守卫免疫，没有把落盘改成同步写。
        4. 退场只有"到期"一条路：8 秒内点别处、或把主窗口叫回来之外都不会让它提前消失（设计如此，但没验证
           过用户不会把它读成"关不掉的窗口"）。
+- **#91 忘记密码：本轮只出厂了非破坏的那一半（应急包），破坏的一半先停下来等用户拍板**。
+  - 已出厂的：`MainWindowViewModel.EmergencyKit.cs` + 设置→安全与恢复页两行 UI + 单测 9 条 / UI 1 条，
+    读数与负控见 §2 的 `6613df6` 行。
+  - **为什么另一半不能顺手做**：用户给的硬约束是"重置空库只是本地，keepass／mdbx／bitwarden 不要动"。
+    实测对不上：现成的"清空全部"语句 `MonicaRepository.GetClearVaultStatements(VaultClearScope.All)`
+    （`src/Monica.Data/Repositories/MonicaRepository.cs:1455-1469`）里带着 `local_mdbx_databases`、
+    `mdbx_remote_sources`、`bitwarden_vaults` 三张表的 DELETE，直接复用它必然违反约束；当前软删除路径是
+    `MdbxBackedMonicaRepository.ClearVaultDataAsync`（同目录 :727-748），Danger 页入口在
+    `MainWindowViewModel.SettingsCommands.cs:44-84`。
+  - **更根本的矛盾没解决，下一轮先问、不要自己选**：本地规范库本身就是 `mdbx/local.mdbx`，
+    "把本地库重置为空"在任何实现下都必然动 mdbx。那句约束要么读作"只清本地规范库、不碰 KeePass 会话与
+    Bitwarden 挂载"，要么要新增一条范围更窄的清空——这是产品语义决定，不是实现细节。
+  - 还欠一条**非破坏**的入口：锁定态的解锁页没有任何"忘记密码？"出口（`MainWindow.axaml:25` 锁定时只挂
+    `UnlockViewHost`，Settings 整页不可达），所以真正忘记口令的人现在看不到应急包。只做"把话说清楚 +
+    指向恢复页"不需要任何破坏性动作，可以先做。
+  - 应急包恢复目前要求已解锁（导入要有一个能重新封存明文的会话密钥），所以忘记口令的完整旅程是
+    "重置 → 新主密码 → 恢复应急包"，缺的正是上面那条重置。
+  - **未验证**：真实 shell 文件对话框的存/选往返（测试里是替身）；口令正确但文件被改名/截断的部分读
+    只覆盖了"口令错"这一类失败。
 - **外观类改动欠一台"截图口味门"机器（#90 把这个缺口撞出来了）**。"这个滚动条有点丑了"这类判断按老规矩
   应该是"探一屏 + 截图过口味门"再铺开，但这轮两条路都不通，只能拿几何数字交差：
   1. **`--smoke-ui-screenshot-dir` 矩阵不可信**：13 帧**内容完全相同**（`distinctFrames=1`、
@@ -679,6 +708,8 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
 ---
 接手第一步建议：工作树已干净、两套 Windows 门（源码级 + 产物级）实测全绿，用户点名的必须功能（托盘、
 自动输入、自动填充弹窗与快捷键录制、单实例守卫、首次收进托盘的一次性提示）都已出厂，且每一条都在
-**发布产物**上真机量过。用户已经排到队里、尚未动工的两条：滚动条压成 Win11 细条（#90）、忘记密码走
-备份/应急包 + 密保问题只作重置空库的闸门（#91，硬约束：**重置只动本地库，KeePass／MDBX／Bitwarden 不碰**）。
+**发布产物**上真机量过。用户排队点名的两条现在只剩一半：滚动条压成 Win11 细条已出厂（`45f01ef`，但只有
+几何证据、没有视觉证据）；忘记密码只出厂了非破坏的那一半（应急包 `6613df6`），
+**破坏的那一半（锁定态重置为空库）不要自己开工**——它卡在 §7 那条"只是本地"与"mdbx 不要动"的语义矛盾上，
+下一轮第一件事是拿这个问题问用户，第二步才是那条不需要任何破坏动作的锁定态"忘记密码？"入口。
 其余可挑的活在各条末尾那份"仍未做/仍未验证"清单里，不必再花时间复验已绿的部分。
