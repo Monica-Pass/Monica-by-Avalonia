@@ -15,9 +15,15 @@ public interface IBitwardenMutationProcessor
         CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// Uploads the changes the drift scan queued. It deliberately writes no conflict backup: a rejected push
+/// destroys nothing local, so the edit stays on screen and stays owed, and the pull that follows in the
+/// same synchronization is the single place content is backed up right before remote overwrites it.
+/// Backing up here too would add one copy per failed sync, in the outgoing server-cipher shape that a
+/// restore keyed on item_kind cannot read.
+/// </summary>
 public sealed class BitwardenMutationProcessor(
     IBitwardenPendingOperationStore operationStore,
-    IBitwardenConflictBackupStore conflictStore,
     IBitwardenSyncStateStore syncStateStore,
     IMonicaRepository repository) : IBitwardenMutationProcessor
 {
@@ -64,13 +70,12 @@ public sealed class BitwardenMutationProcessor(
                     var failureClass = response.HttpStatusCode is { } status
                         ? BitwardenRetryPolicy.ClassifyHttpStatus((HttpStatusCode)status)
                         : BitwardenFailureClass.Permanent;
-                    var statusResult = await RecordFailureAsync(
-                        operation,
+                    var statusResult = await operationStore.RecordFailureAsync(
+                        operation.Id,
                         failureClass,
                         response.ErrorMessage,
-                        response.RetryAfter,
                         now,
-                        local,
+                        response.RetryAfter,
                         cancellationToken);
                     Count(statusResult, ref deferred, ref conflicts, ref failed);
                 }
@@ -81,13 +86,12 @@ public sealed class BitwardenMutationProcessor(
                 catch (Exception exception)
                 {
                     var failureClass = BitwardenRetryPolicy.ClassifyException(exception);
-                    var statusResult = await RecordFailureAsync(
-                        operation,
+                    var statusResult = await operationStore.RecordFailureAsync(
+                        operation.Id,
                         failureClass,
                         exception.Message,
-                        null,
                         now,
-                        local,
+                        null,
                         cancellationToken);
                     Count(statusResult, ref deferred, ref conflicts, ref failed);
                 }
@@ -104,53 +108,6 @@ public sealed class BitwardenMutationProcessor(
         {
             gate.Release();
         }
-    }
-
-    private async Task<BitwardenMutationStatus> RecordFailureAsync(
-        BitwardenPendingOperation operation,
-        BitwardenFailureClass failureClass,
-        string? error,
-        TimeSpan? retryAfter,
-        DateTimeOffset now,
-        LocalItems local,
-        CancellationToken cancellationToken)
-    {
-        if (failureClass == BitwardenFailureClass.Conflict)
-        {
-            await SaveConflictAsync(operation, local, error, cancellationToken);
-        }
-
-        return await operationStore.RecordFailureAsync(
-            operation.Id,
-            failureClass,
-            error,
-            now,
-            retryAfter,
-            cancellationToken);
-    }
-
-    private async Task SaveConflictAsync(
-        BitwardenPendingOperation operation,
-        LocalItems local,
-        string? error,
-        CancellationToken cancellationToken)
-    {
-        if (!local.TryFind(operation.CipherId, out var localId, out var itemKind))
-        {
-            return;
-        }
-
-        await conflictStore.SaveAsync(new BitwardenConflictBackup(
-            0,
-            operation.VaultId,
-            operation.CipherId,
-            itemKind,
-            localId,
-            operation.ExpectedRemoteRevision,
-            null,
-            operation.PayloadJson,
-            string.IsNullOrWhiteSpace(error) ? "Remote revision conflict." : error,
-            DateTimeOffset.UtcNow), cancellationToken);
     }
 
     private async Task ApplySuccessAsync(
@@ -233,27 +190,5 @@ public sealed class BitwardenMutationProcessor(
 
     private sealed record LocalItems(
         IReadOnlyDictionary<string, PasswordEntry> Passwords,
-        IReadOnlyDictionary<string, SecureItem> SecureItems)
-    {
-        public bool TryFind(string cipherId, out long localId, out string itemKind)
-        {
-            if (Passwords.TryGetValue(cipherId, out var password))
-            {
-                localId = password.Id;
-                itemKind = "password";
-                return true;
-            }
-
-            if (SecureItems.TryGetValue(cipherId, out var secureItem))
-            {
-                localId = secureItem.Id;
-                itemKind = "secure-item";
-                return true;
-            }
-
-            localId = 0;
-            itemKind = "unknown";
-            return false;
-        }
-    }
+        IReadOnlyDictionary<string, SecureItem> SecureItems);
 }

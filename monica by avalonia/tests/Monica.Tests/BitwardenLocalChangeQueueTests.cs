@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 using Monica.Core.Bitwarden;
 using Monica.Core.Models;
 using Monica.Core.Services;
@@ -286,6 +287,64 @@ public sealed class BitwardenLocalChangeQueueTests
             $"A 2,000-item drift scan over an unchanged vault took {stopwatch.ElapsedMilliseconds:0.##} ms.");
     }
 
+    [Fact]
+    public async Task Rejected_pushes_do_not_stack_conflict_backups_for_content_nothing_destroyed()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = BaselineCipher();
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([remote]), [remote]);
+        await RenameAsync(harness, "Renamed on this device");
+
+        for (var sync = 1; sync <= 3; sync++)
+        {
+            await harness.Queue.EnqueueDriftedAsync(
+                harness.VaultId,
+                harness.VaultKey,
+                DateTimeOffset.UtcNow);
+            var batch = await harness.Processor.ProcessReadyAsync(
+                harness.VaultId,
+                DateTimeOffset.UtcNow,
+                new AcceptedTransport(NextRevision, reject: true));
+            Assert.Equal(1, batch.Conflicts);
+        }
+
+        // A rejected upload destroys nothing local - the edit is still on screen and still owed - so
+        // there is nothing to recover. Keeping the backup here would append one copy per sync forever.
+        Assert.Empty(await harness.ConflictStore.GetUnresolvedAsync(harness.VaultId));
+    }
+
+    [Fact]
+    public async Task The_backup_a_restore_reads_is_the_one_the_pull_writes_before_overwriting()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = BaselineCipher();
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([remote]), [remote]);
+        await RenameAsync(harness, "Renamed on this device");
+        await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow);
+        await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            new AcceptedTransport(NextRevision, reject: true));
+
+        // The pull that follows the failed push finds local content differing at the remote revision
+        // and backs it up right before overwriting it.
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([remote]), [remote]);
+
+        // A restore list is keyed on item_kind, so one destroyed edit has to yield exactly one row of
+        // the entry shape this app stores - not a second copy of the outgoing ciphertext.
+        var backup = Assert.Single(await harness.ConflictStore.GetUnresolvedAsync(harness.VaultId));
+        Assert.Equal("password", backup.ItemKind);
+        var root = JsonDocument.Parse(backup.PayloadJson).RootElement;
+        Assert.Equal(
+            ["customFields", "password", "passwordHistory"],
+            root.EnumerateObject().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal)
+                .ToArray());
+        Assert.Equal("Renamed on this device", root.GetProperty("password").GetProperty("Title").GetString());
+    }
+
     private static async Task<PasswordEntry> RenameAsync(Harness harness, string title)
     {
         var stored = (await harness.Repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true))
@@ -361,9 +420,10 @@ public sealed class BitwardenLocalChangeQueueTests
             repository,
             syncState,
             pending,
+            conflictStore,
             new BitwardenPullMergeService(repository, folderStore, conflictStore, syncState),
             new BitwardenLocalChangeQueue(repository, syncState, pending),
-            new BitwardenMutationProcessor(pending, conflictStore, syncState, repository),
+            new BitwardenMutationProcessor(pending, syncState, repository),
             new BitwardenSymmetricKey(
                 Enumerable.Repeat((byte)1, 32).ToArray(),
                 Enumerable.Repeat((byte)2, 32).ToArray()),
@@ -376,6 +436,7 @@ public sealed class BitwardenLocalChangeQueueTests
         IMonicaRepository Repository,
         IBitwardenSyncStateStore SyncState,
         IBitwardenPendingOperationStore Pending,
+        IBitwardenConflictBackupStore ConflictStore,
         BitwardenPullMergeService Pull,
         IBitwardenLocalChangeQueue Queue,
         IBitwardenMutationProcessor Processor,

@@ -11,7 +11,7 @@ namespace Monica.Tests;
 public sealed class BitwardenMutationProcessorTests
 {
     [Fact]
-    public async Task ProcessorCompletesDefersAndBacksUpConflictsWithoutDuplicateClaims()
+    public async Task ProcessorCompletesAndDefersOperationsWithoutDuplicateClaims()
     {
         var harness = await CreateHarnessAsync();
         var success = await SavePasswordAsync(harness, "cipher-success", "Success item");
@@ -62,8 +62,9 @@ public sealed class BitwardenMutationProcessorTests
         Assert.False(savedSuccess.BitwardenLocalModified);
         Assert.Equal("2026-07-22T06:00:01Z", savedSuccess.BitwardenRevisionDate);
         Assert.True(passwords.Single(item => item.Id == conflict.Id).BitwardenLocalModified);
-        var backup = Assert.Single(await harness.ConflictStore.GetUnresolvedAsync(harness.VaultId));
-        Assert.Contains("Conflict secret", backup.PayloadJson, StringComparison.Ordinal);
+        // The rejected push destroyed nothing, so the edit is still on screen and still owed; writing a
+        // backup for it would store the outgoing ciphertext the restore cannot read, once per failed sync.
+        Assert.Empty(await harness.ConflictStore.GetUnresolvedAsync(harness.VaultId));
         Assert.Equal(3, transport.RequestCount);
     }
 
@@ -202,7 +203,7 @@ public sealed class BitwardenMutationProcessorTests
             operationStore,
             conflictStore,
             syncState,
-            new BitwardenMutationProcessor(operationStore, conflictStore, syncState, repository),
+            new BitwardenMutationProcessor(operationStore, syncState, repository),
             account.Id);
     }
 
