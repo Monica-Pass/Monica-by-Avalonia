@@ -68,7 +68,7 @@ internal sealed partial class BitwardenCipherDecoder(BitwardenSymmetricKey vault
                 revision,
                 cipher.Type,
                 true,
-                $"deleted:{revision}",
+                BitwardenPayloadFingerprint.ForRemoteDeletion(revision),
                 updatedAt);
             return new BitwardenDecodedCipher(deletedMetadata, null, null, [], []);
         }

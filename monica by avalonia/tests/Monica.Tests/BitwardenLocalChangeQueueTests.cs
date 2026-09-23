@@ -194,6 +194,262 @@ public sealed class BitwardenLocalChangeQueueTests
     }
 
     [Fact]
+    public async Task A_trashed_entry_is_queued_as_a_delete_and_stays_trashed_through_a_whole_sync()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = BaselineCipher();
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([remote]), [remote]);
+        var trashed = await ReadAsync(harness);
+        trashed.IsDeleted = true;
+        trashed.DeletedAt = new DateTimeOffset(2026, 7, 22, 3, 30, 0, TimeSpan.Zero);
+        await harness.Repository.SavePasswordAsync(trashed);
+
+        Assert.Equal(1, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+        var queued = Assert.Single(await harness.Pending.GetAsync(harness.VaultId));
+        Assert.Equal(BitwardenMutationOperationType.SoftDelete, queued.OperationType);
+        // The trash has to guard the revision it deleted, or a server-side edit that landed first would
+        // be erased by a delete the user aimed at the version they were looking at.
+        Assert.Equal(BaselineRevision, queued.ExpectedRemoteRevision);
+
+        var batch = await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            new AcceptedTransport(NextRevision));
+
+        Assert.Equal(1, batch.Completed);
+        Assert.True((await ReadAsync(harness)).IsDeleted);
+        Assert.Equal(0, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+
+        // The pull that follows carries the server's side of that deletion, and the server keeps a
+        // trashed cipher's payload as it was - so its fingerprint is the local trashed one.
+        var deletedRemote = TrashedCopyOf(await ReadAsync(harness), remote);
+
+        var result = await harness.Pull.ApplyAsync(
+            harness.VaultId,
+            Snapshot([deletedRemote]),
+            [deletedRemote]);
+
+        Assert.Equal(1, result.Unchanged);
+        Assert.Equal(0, result.ConflictsBackedUp);
+        Assert.True((await ReadAsync(harness)).IsDeleted);
+        Assert.Empty(await harness.ConflictStore.GetUnresolvedAsync(harness.VaultId));
+    }
+
+    // Undoing a trash has to travel too. The delete push left the baseline holding the trashed
+    // fingerprint, so a restore is drift again and this time the owed work is an update carrying the
+    // entry back - without that the server would keep the cipher in its trash and the next pull would
+    // quietly delete it here again.
+    [Fact]
+    public async Task Restoring_a_trashed_entry_from_the_vault_trash_uploads_it_again()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = BaselineCipher();
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([remote]), [remote]);
+        var trashed = await ReadAsync(harness);
+        trashed.IsDeleted = true;
+        trashed.DeletedAt = new DateTimeOffset(2026, 7, 22, 3, 30, 0, TimeSpan.Zero);
+        await harness.Repository.SavePasswordAsync(trashed);
+        await harness.Queue.EnqueueDriftedAsync(harness.VaultId, harness.VaultKey, DateTimeOffset.UtcNow);
+        await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            new AcceptedTransport(NextRevision));
+
+        var restored = await ReadAsync(harness);
+        restored.IsDeleted = false;
+        restored.DeletedAt = null;
+        await harness.Repository.SavePasswordAsync(restored);
+
+        Assert.Equal(1, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+        var queued = (await harness.Pending.GetAsync(harness.VaultId))
+            .Single(operation => operation.OperationType == BitwardenMutationOperationType.Update);
+        Assert.Equal(NextRevision, queued.ExpectedRemoteRevision);
+
+        var batch = await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            new AcceptedTransport("2026-07-22T05:00:00Z"));
+
+        Assert.Equal(1, batch.Completed);
+        Assert.False((await ReadAsync(harness)).IsDeleted);
+        Assert.Equal(0, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+    }
+
+    // The pull that confirms a deletion also rewrites the sync baseline, and the trashed row has to stay
+    // in that rewrite. Drop it and a later restore has no baseline left to be drift against, so the
+    // resurrection never leaves the device - while every following pull re-trashes it here and leaves
+    // another conflict backup behind.
+    [Fact]
+    public async Task A_restore_after_the_pull_that_confirmed_the_delete_still_uploads()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = BaselineCipher();
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([remote]), [remote]);
+        var trashed = await ReadAsync(harness);
+        trashed.IsDeleted = true;
+        trashed.DeletedAt = new DateTimeOffset(2026, 7, 22, 3, 30, 0, TimeSpan.Zero);
+        await harness.Repository.SavePasswordAsync(trashed);
+        await harness.Queue.EnqueueDriftedAsync(harness.VaultId, harness.VaultKey, DateTimeOffset.UtcNow);
+        await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            new AcceptedTransport(NextRevision));
+        var afterPush = await ReadAsync(harness);
+        await harness.Pull.ApplyAsync(
+            harness.VaultId,
+            Snapshot([TrashedCopyOf(afterPush, remote)]),
+            [TrashedCopyOf(afterPush, remote)]);
+
+        var restored = await ReadAsync(harness);
+        restored.IsDeleted = false;
+        restored.DeletedAt = null;
+        await harness.Repository.SavePasswordAsync(restored);
+
+        Assert.Equal(1, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+        var queued = (await harness.Pending.GetAsync(harness.VaultId))
+            .Single(operation => operation.OperationType == BitwardenMutationOperationType.Update);
+        Assert.Equal(NextRevision, queued.ExpectedRemoteRevision);
+
+        var revivedRevision = "2026-07-22T05:00:00Z";
+        var batch = await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            new AcceptedTransport(revivedRevision));
+
+        Assert.Equal(1, batch.Completed);
+        Assert.False((await ReadAsync(harness)).IsDeleted);
+        Assert.Equal(0, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+    }
+
+    // What the decoder really hands over for a cipher the server keeps in its trash: no payload at all,
+    // and a `deleted:` marker where a content fingerprint would be. Comparing that marker with the local
+    // row's fingerprint can never match, so a second pull re-decided the very same trash as a conflict and
+    // the drift scan kept owing a delete that the server had already granted.
+    [Fact]
+    public async Task A_remote_trash_lands_once_and_stays_quiet_afterwards()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = BaselineCipher();
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([remote]), [remote]);
+        var trashed = new BitwardenDecodedCipher(
+            remote.Metadata with
+            {
+                RevisionDate = NextRevision,
+                IsDeleted = true,
+                PayloadHash = BitwardenPayloadFingerprint.ForRemoteDeletion(NextRevision)
+            },
+            null,
+            null,
+            [],
+            []);
+
+        var first = await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([trashed]), [trashed]);
+        Assert.Equal(1, first.Deleted);
+        Assert.True((await ReadAsync(harness)).IsDeleted);
+
+        Assert.Equal(0, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+
+        var second = await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([trashed]), [trashed]);
+        Assert.Equal(1, second.Unchanged);
+        Assert.Equal(0, second.ConflictsBackedUp);
+        Assert.Empty(await harness.ConflictStore.GetUnresolvedAsync(harness.VaultId));
+    }
+
+    // The write-back encoder only carries login ciphers, but a deletion is decided by the route alone and
+    // travels no payload at all. Without this a trashed note is handed back by the next pull and leaves
+    // another conflict backup behind, on every synchronization, for as long as the vault exists.
+    [Fact]
+    public async Task A_trashed_secure_item_owes_a_delete_even_though_no_encoder_carries_its_content()
+    {
+        var harness = await CreateHarnessAsync();
+        var note = BoundNoteCipher();
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([note]), [note]);
+        var trashed = await ReadNoteAsync(harness);
+        trashed.IsDeleted = true;
+        trashed.DeletedAt = new DateTimeOffset(2026, 7, 22, 3, 30, 0, TimeSpan.Zero);
+        await harness.Repository.SaveSecureItemAsync(trashed);
+
+        Assert.Equal(1, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+        var queued = Assert.Single(await harness.Pending.GetAsync(harness.VaultId));
+        Assert.Equal(BitwardenMutationOperationType.SoftDelete, queued.OperationType);
+        Assert.Equal("{}", queued.PayloadJson);
+        Assert.Equal(BaselineRevision, queued.ExpectedRemoteRevision);
+
+        var batch = await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            new AcceptedTransport(NextRevision));
+
+        Assert.Equal(1, batch.Completed);
+        Assert.True((await ReadNoteAsync(harness)).IsDeleted);
+        Assert.Equal(0, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+    }
+
+    [Fact]
+    public async Task A_delete_the_user_undid_before_it_left_the_device_is_never_sent()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = BaselineCipher();
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([remote]), [remote]);
+        var trashed = await ReadAsync(harness);
+        trashed.IsDeleted = true;
+        trashed.DeletedAt = new DateTimeOffset(2026, 7, 22, 3, 30, 0, TimeSpan.Zero);
+        await harness.Repository.SavePasswordAsync(trashed);
+        await harness.Queue.EnqueueDriftedAsync(harness.VaultId, harness.VaultKey, DateTimeOffset.UtcNow);
+
+        var restored = await ReadAsync(harness);
+        restored.IsDeleted = false;
+        restored.DeletedAt = null;
+        await harness.Repository.SavePasswordAsync(restored);
+
+        var transport = new AcceptedTransport(NextRevision);
+        var batch = await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            transport);
+
+        Assert.Equal(1, batch.Completed);
+        Assert.Equal(0, transport.Sends);
+        Assert.False((await ReadAsync(harness)).IsDeleted);
+        // The row is settled, not retried: a second attempt would trash it after all.
+        Assert.Equal(
+            BitwardenMutationStatus.Completed,
+            Assert.Single(await harness.Pending.GetAsync(harness.VaultId)).Status);
+        // The baseline still holds the live content the user restored, so nothing is owed any more.
+        Assert.Equal(0, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+    }
+
+    [Fact]
     public async Task A_shape_bitwarden_cannot_carry_is_counted_rather_than_failing_the_scan()
     {
         var harness = await CreateHarnessAsync();
@@ -556,6 +812,23 @@ public sealed class BitwardenLocalChangeQueueTests
         "Remote baseline",
         "baseline-user");
 
+    // What the server reports about a cipher it moved to its own trash: the payload it kept, now marked
+    // deleted at the revision the delete returned.
+    private static BitwardenDecodedCipher TrashedCopyOf(
+        PasswordEntry localTrashed,
+        BitwardenDecodedCipher remote) =>
+        new(
+            remote.Metadata with
+            {
+                RevisionDate = NextRevision,
+                IsDeleted = true,
+                PayloadHash = BitwardenPayloadFingerprint.ForPassword(localTrashed, [], [])
+            },
+            remote.Password,
+            null,
+            [],
+            []);
+
     private static BitwardenDecodedCipher BoundCipher(string cipherId, string title, string username)
     {
         var password = new PasswordEntry
@@ -575,6 +848,32 @@ public sealed class BitwardenLocalChangeQueueTests
             false,
             BitwardenPayloadFingerprint.ForPassword(password, [], []));
         return new BitwardenDecodedCipher(metadata, password, null, [], []);
+    }
+
+    private static async Task<SecureItem> ReadNoteAsync(Harness harness) =>
+        (await harness.Repository.GetSecureItemsAsync(itemType: null, includeDeleted: true))
+            .Single(item => item.BitwardenCipherId == "cipher-note");
+
+    // What the pull leaves behind for a note: Monica's own item type, the server's cipher number for it,
+    // and a fingerprint computed the same way the stored row will be read back.
+    private static BitwardenDecodedCipher BoundNoteCipher()
+    {
+        var item = new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = "Remote note",
+            Notes = "written on another device",
+            BitwardenCipherId = "cipher-note",
+            BitwardenRevisionDate = BaselineRevision
+        };
+        var metadata = new BitwardenRemoteCipherMetadata(
+            "cipher-note",
+            null,
+            BaselineRevision,
+            2,
+            false,
+            BitwardenPayloadFingerprint.ForSecureItem(item));
+        return new BitwardenDecodedCipher(metadata, null, item, [], []);
     }
 
     private static BitwardenPullSnapshot Snapshot(IReadOnlyList<BitwardenDecodedCipher> ciphers) =>
@@ -649,11 +948,16 @@ public sealed class BitwardenLocalChangeQueueTests
         bool reject = false,
         string? assignedCipherId = null) : IBitwardenMutationTransport
     {
+        public int Sends { get; private set; }
+
         public Task<BitwardenMutationResponse> SendAsync(
             BitwardenMutationRequest request,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(reject
+            CancellationToken cancellationToken = default)
+        {
+            Sends++;
+            return Task.FromResult(reject
                 ? new BitwardenMutationResponse(false, request.CipherId, null, 409, "revision conflict")
                 : new BitwardenMutationResponse(true, assignedCipherId ?? request.CipherId, revision));
+        }
     }
 }

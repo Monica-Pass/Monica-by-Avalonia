@@ -68,6 +68,19 @@ public sealed class BitwardenMutationProcessor(
                         continue;
                     }
 
+                    if (operation.OperationType is BitwardenMutationOperationType.Delete
+                            or BitwardenMutationOperationType.SoftDelete &&
+                        local.IsHeldAlive(operation.CipherId))
+                    {
+                        // The entry came back out of the trash before this delete left the device.
+                        // Trashing the remote copy anyway would take an item away from every other client
+                        // that the user kept here; completing the row lets the next scan re-decide from
+                        // the content that actually stands.
+                        await operationStore.CompleteAsync(operation.Id, cancellationToken);
+                        completed++;
+                        continue;
+                    }
+
                     var response = await transport.SendAsync(ToRequest(operation), cancellationToken);
                     BitwardenMutationGuard.ValidateResponse(operation, response);
                     if (response.Succeeded)
@@ -217,5 +230,14 @@ public sealed class BitwardenMutationProcessor(
     {
         public bool HasPublishableEntry(string localIdentity) =>
             UnboundPasswords.ContainsKey(localIdentity);
+
+        /// <summary>
+        /// A bound row the user has since put back on the shelf. The dictionaries are loaded with
+        /// deleted rows on purpose, so a missing key means the entry is gone for good locally and the
+        /// remote copy really is the last one standing.
+        /// </summary>
+        public bool IsHeldAlive(string cipherId) =>
+            (Passwords.TryGetValue(cipherId, out var password) && !password.IsDeleted) ||
+            (SecureItems.TryGetValue(cipherId, out var secureItem) && !secureItem.IsDeleted);
     }
 }

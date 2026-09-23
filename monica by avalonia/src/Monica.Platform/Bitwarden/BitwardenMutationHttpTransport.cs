@@ -59,7 +59,9 @@ internal sealed class BitwardenMutationHttpTransport : IBitwardenOwnedMutationTr
         }
 
         ValidatePayload(request);
-        if (request.OperationType is BitwardenMutationOperationType.Update or BitwardenMutationOperationType.Delete)
+        if (request.OperationType is BitwardenMutationOperationType.Update
+                or BitwardenMutationOperationType.Delete
+                or BitwardenMutationOperationType.SoftDelete)
         {
             var preflight = await ReadRevisionAsync(request.CipherId, cancellationToken);
             if (!preflight.Succeeded)
@@ -86,10 +88,14 @@ internal sealed class BitwardenMutationHttpTransport : IBitwardenOwnedMutationTr
                 (HttpMethod.Put, CipherUri(request.CipherId)),
             BitwardenMutationOperationType.Delete =>
                 (HttpMethod.Delete, CipherUri(request.CipherId)),
+            // The official clients move a cipher to the trash with this route and reserve DELETE for
+            // erasing it, which is the pair Monica's own recoverable trash and permanent purge map onto.
+            BitwardenMutationOperationType.SoftDelete =>
+                (HttpMethod.Put, TrashUri(request.CipherId)),
             _ => throw new BitwardenProtocolException("Unsupported Bitwarden mutation operation.")
         };
         using var message = CreateRequest(method, uri, request.IdempotencyKey);
-        if (request.OperationType != BitwardenMutationOperationType.Delete)
+        if (!WritesNoBody(request.OperationType))
         {
             message.Content = new StringContent(request.PayloadJson, Encoding.UTF8, "application/json");
         }
@@ -146,7 +152,7 @@ internal sealed class BitwardenMutationHttpTransport : IBitwardenOwnedMutationTr
             return Failure(response);
         }
 
-        if (request.OperationType == BitwardenMutationOperationType.Delete)
+        if (WritesNoBody(request.OperationType))
         {
             return new BitwardenMutationResponse(true, request.CipherId, request.ExpectedRemoteRevision);
         }
@@ -201,7 +207,7 @@ internal sealed class BitwardenMutationHttpTransport : IBitwardenOwnedMutationTr
             throw new BitwardenProtocolException("Bitwarden mutation payload exceeds the supported size.");
         }
 
-        if (request.OperationType != BitwardenMutationOperationType.Delete)
+        if (!WritesNoBody(request.OperationType))
         {
             try
             {
@@ -227,4 +233,14 @@ internal sealed class BitwardenMutationHttpTransport : IBitwardenOwnedMutationTr
 
         return new Uri(_account.Endpoints.Api, $"ciphers/{Uri.EscapeDataString(cipherId)}");
     }
+
+    private Uri TrashUri(string cipherId) =>
+        new($"{CipherUri(cipherId).AbsoluteUri}/delete", UriKind.Absolute);
+
+    /// <summary>
+    /// Both deletions are decided by the route alone, so the queued payload is not sent and the empty
+    /// response body must not be read as a cipher.
+    /// </summary>
+    private static bool WritesNoBody(BitwardenMutationOperationType operation) =>
+        operation is BitwardenMutationOperationType.Delete or BitwardenMutationOperationType.SoftDelete;
 }

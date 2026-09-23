@@ -59,7 +59,13 @@ public static class BitwardenPullSafetyEvaluator
                 snapshot.ActiveCipherCount);
         }
 
-        if (localCipherCount > 0 && snapshot.ActiveCipherCount == 0)
+        // A complete sync response names every cipher the server still holds, including the ones it is
+        // only keeping in its trash, so "no rows at all" is what says the payload went missing. Rows that
+        // all carry a deletion date are the user trashing their vault from another client, and the merge
+        // can only move the matching local copies into Monica's own recoverable trash. Blocking that
+        // reading used to fail every later synchronization of such a vault - measured as a protocol
+        // exception on a snapshot whose single cipher was trashed while one local item was still live.
+        if (localCipherCount > 0 && snapshot.Ciphers.Count == 0)
         {
             return Block(
                 BitwardenPullBlockReason.EmptyRemoteVault,
@@ -69,7 +75,7 @@ public static class BitwardenPullSafetyEvaluator
         }
 
         if (localCipherCount >= MinimumCountForReductionGuard &&
-            snapshot.ActiveCipherCount * 2 < localCipherCount)
+            snapshot.Ciphers.Count * 2 < localCipherCount)
         {
             return Block(
                 BitwardenPullBlockReason.SharpDataReduction,

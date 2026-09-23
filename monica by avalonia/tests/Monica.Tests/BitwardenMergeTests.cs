@@ -46,6 +46,46 @@ public sealed class BitwardenMergeTests
             BitwardenPullSafetyEvaluator.Evaluate(unsupported, 0).BlockReason);
     }
 
+    // The guard is there for a payload that went silent, not for a vault the user cleaned out: a complete
+    // response still names every trashed cipher, and the merge can only move the matching local rows into
+    // Monica's own recoverable trash. Blocking those snapshots failed every later synchronization.
+    [Fact]
+    public void SafetyAllowsRemoteDeletionsAndStillBlocksSilentPayloads()
+    {
+        var allTrashed = Snapshot(
+            [Remote("a", isDeleted: true, payloadHash: "deleted:2026-07-22T00:00:00Z")],
+            true);
+        Assert.True(BitwardenPullSafetyEvaluator.Evaluate(allTrashed, 5).CanApply);
+
+        Assert.Equal(
+            BitwardenPullBlockReason.EmptyRemoteVault,
+            BitwardenPullSafetyEvaluator.Evaluate(Snapshot([], true), 1).BlockReason);
+
+        var sharpReduction = Snapshot(
+            Enumerable.Range(0, 4)
+                .Select(value => Remote($"remote-{value}", isDeleted: true))
+                .ToArray(),
+            true);
+        Assert.Equal(
+            BitwardenPullBlockReason.SharpDataReduction,
+            BitwardenPullSafetyEvaluator.Evaluate(sharpReduction, 10).BlockReason);
+    }
+
+    [Fact]
+    public void BothSidesHoldingTheSameTrashIsNoChange()
+    {
+        var remote = Remote(
+            "a",
+            revision: "2026-07-22T00:00:01Z",
+            isDeleted: true,
+            payloadHash: "deleted:2026-07-22T00:00:01Z");
+        var trashedLocal = Local(1, "a", revision: "2026-07-22T00:00:01Z") with { IsDeleted = true };
+
+        var decision = Assert.Single(BitwardenMergeEngine.Plan(Snapshot([remote], true), [trashedLocal]));
+
+        Assert.Equal(BitwardenMergeAction.NoChange, decision.Action);
+    }
+
     [Fact]
     public void MergePlanIsStableAndPreservesDirtyLocalDataThroughConflictBackup()
     {

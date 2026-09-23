@@ -88,6 +88,32 @@ public sealed class BitwardenMutationHttpTransportTests
 
         Assert.True(response.Succeeded);
         Assert.Equal(HttpMethod.Delete, handler.Requests[1].Method);
+        Assert.Equal("https://api.example.test/ciphers/cipher-id", handler.Requests[1].Uri.AbsoluteUri);
+        Assert.Null(handler.Requests[1].Body);
+    }
+
+    // Monica's own trash is recoverable, so what a local delete owes the server is the route that moves
+    // the cipher to the server's trash. Erasing it outright would take away an undo the user can still
+    // reach here, and no local action asks for that yet.
+    [Fact]
+    public async Task SoftDelete_PreflightsThenWritesTheTrashRouteWithoutABody()
+    {
+        var handler = new CaptureHandler(request => request.Method == HttpMethod.Get
+            ? Json(HttpStatusCode.OK, new { Id = "cipher-id", RevisionDate = "rev-1" })
+            : new HttpResponseMessage(HttpStatusCode.NoContent));
+        using var transport = CreateTransport(handler);
+
+        var response = await transport.SendAsync(Request(
+            BitwardenMutationOperationType.SoftDelete,
+            "cipher-id",
+            "rev-1"));
+
+        Assert.True(response.Succeeded);
+        Assert.Equal("rev-1", response.RemoteRevision);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Equal(HttpMethod.Get, handler.Requests[0].Method);
+        Assert.Equal(HttpMethod.Put, handler.Requests[1].Method);
+        Assert.Equal("https://api.example.test/ciphers/cipher-id/delete", handler.Requests[1].Uri.AbsoluteUri);
         Assert.Null(handler.Requests[1].Body);
     }
 

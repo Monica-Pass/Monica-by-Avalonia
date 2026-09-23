@@ -6,6 +6,17 @@ namespace Monica.Core.Bitwarden;
 
 public static class BitwardenPayloadFingerprint
 {
+    // A sync response names a cipher the server keeps in its trash without carrying its content, so the
+    // decoder writes this marker where a fingerprint would stand. It is not a fingerprint: comparing one
+    // with a local row can never match, so both the merge and the upload scan ask instead of hashing.
+    public const string RemoteDeletionMarkerPrefix = "deleted:";
+
+    public static string ForRemoteDeletion(string revision) =>
+        $"{RemoteDeletionMarkerPrefix}{revision}";
+
+    public static bool IsRemoteDeletionMarker(string payloadHash) =>
+        payloadHash.StartsWith(RemoteDeletionMarkerPrefix, StringComparison.Ordinal);
+
     public static string ForPassword(
         PasswordEntry entry,
         IReadOnlyList<CustomField> customFields,

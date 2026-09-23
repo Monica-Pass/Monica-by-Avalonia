@@ -123,11 +123,13 @@ public sealed partial class BitwardenPullMergeService(
 
         // Local state now mirrors the remote payload, so these fingerprints become the baseline that
         // the next upload pass compares against. ValidateDecodedPayload already guarantees that the
-        // fingerprint of a decoded cipher equals its metadata hash.
+        // fingerprint of a decoded cipher equals its metadata hash. Ciphers the server is only holding
+        // in its trash belong in that baseline too: the local copy mirrors that trash, and without the
+        // row a later restore has nothing to be drift against, so the resurrection could never be
+        // uploaded while every following pull re-trashed it here and left another conflict backup.
         await syncStateStore.ReplaceForVaultAsync(
             vaultId,
             snapshot.Ciphers
-                .Where(cipher => !cipher.IsDeleted)
                 .Select(cipher => new BitwardenSyncedCipher(cipher.CipherId, cipher.PayloadHash))
                 .ToList(),
             snapshot.ReceivedAt,

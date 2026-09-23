@@ -4,7 +4,17 @@ public enum BitwardenMutationOperationType
 {
     Create = 0,
     Update,
-    Delete
+    /// <summary>
+    /// Erases the remote cipher outright. Nothing in Monica produces this yet, because the vault's
+    /// recoverable delete is <see cref="SoftDelete"/>; it is the shape a permanent purge would need.
+    /// Kept at this ordinal because the queue persists it.
+    /// </summary>
+    Delete,
+    /// <summary>
+    /// Moves the remote cipher into the server's trash, which is what Monica's own trash means: the
+    /// entry stays recoverable there, exactly as it stays recoverable here.
+    /// </summary>
+    SoftDelete
 }
 
 public enum BitwardenMutationStatus
@@ -87,8 +97,10 @@ public static class BitwardenMutationGuard
             throw new BitwardenProtocolException("Bitwarden mutation identity is incomplete.");
         }
 
-        if (operation.OperationType is BitwardenMutationOperationType.Update or BitwardenMutationOperationType.Delete &&
-            string.IsNullOrWhiteSpace(operation.ExpectedRemoteRevision))
+        if (operation.OperationType is BitwardenMutationOperationType.Update
+                or BitwardenMutationOperationType.Delete
+                or BitwardenMutationOperationType.SoftDelete
+            && string.IsNullOrWhiteSpace(operation.ExpectedRemoteRevision))
         {
             throw new BitwardenProtocolException(
                 "Bitwarden update and delete mutations require an expected remote revision.");
@@ -112,7 +124,8 @@ public static class BitwardenMutationGuard
             return;
         }
 
-        if (operation.OperationType != BitwardenMutationOperationType.Delete &&
+        if (operation.OperationType is not (BitwardenMutationOperationType.Delete
+                or BitwardenMutationOperationType.SoftDelete) &&
             string.IsNullOrWhiteSpace(response.RemoteRevision))
         {
             throw new BitwardenProtocolException(

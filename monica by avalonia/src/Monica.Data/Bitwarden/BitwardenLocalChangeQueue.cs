@@ -23,7 +23,10 @@ public interface IBitwardenLocalChangeQueue
 /// baseline written by the last completed synchronization, because ordinary editor saves do not set
 /// the dirty flag and a content hash is the only signal that survives a restart. An entry bound to this
 /// vault by identity alone - published here, never confirmed by the server - is the other kind of work,
-/// and it is queued as a create so the next pull cannot mistake it for a resurrected cipher.
+/// and it is queued as a create so the next pull cannot mistake it for a resurrected cipher. The third
+/// kind is a trashed entry the server still holds live: the pull treats that difference as a local edit
+/// it is about to overwrite, so without a queued delete every synchronization hands the entry back and
+/// leaves another conflict backup behind.
 /// </summary>
 public sealed class BitwardenLocalChangeQueue(
     IMonicaRepository repository,
@@ -49,50 +52,65 @@ public sealed class BitwardenLocalChangeQueue(
             // An entry with no identity at all is the other case: it was published here and the
             // server has never seen it, so the remote snapshot cannot speak for it either way.
             if (!isNew && (!baseline.TryGetValue(candidate.CipherId!, out var syncedHash) ||
-                           string.Equals(syncedHash, candidate.PayloadHash, StringComparison.Ordinal)))
+                           string.Equals(syncedHash, candidate.PayloadHash, StringComparison.Ordinal) ||
+                           // The baseline carries the server's marker, not content, for a cipher it is only
+                           // keeping in its trash. A row we trashed too is therefore settled, however the
+                           // hashes differ; without this a quiet vault owed one delete per synchronization.
+                           (candidate.Deleted && BitwardenPayloadFingerprint.IsRemoteDeletionMarker(syncedHash))))
             {
                 continue;
             }
 
-            if (candidate.Entry is null || (!isNew && string.IsNullOrWhiteSpace(candidate.ExpectedRemoteRevision)))
+            if (!isNew && string.IsNullOrWhiteSpace(candidate.ExpectedRemoteRevision))
             {
                 refused++;
                 continue;
             }
 
-            string payload;
-            try
+            // The route decides a deletion, so no cipher payload travels; the store still requires
+            // something parseable in that column. That is also why a trashed note or card can reach the
+            // server even though no encoder carries its content yet.
+            var deletion = !isNew && candidate.Deleted;
+            if (candidate.Entry is null && !deletion)
             {
-                payload = BitwardenCipherPayloadBuilder.BuildLoginCipher(
-                    candidate.Entry,
-                    vaultKey,
-                    candidate.CustomFields,
-                    candidate.History);
+                // A secure item whose content changed has no encoder to carry it yet.
+                refused++;
+                continue;
             }
-            catch (BitwardenProtocolException)
+
+            var payload = deletion ? "{}" : BuildPayload(candidate, vaultKey);
+            if (payload is null)
             {
                 // Local shapes Bitwarden cannot carry stay local rather than failing the whole sync.
                 refused++;
                 continue;
             }
 
-            var identity = candidate.CipherId ?? BitwardenLocalCipherIdentity.ForPassword(candidate.Entry.Id);
+            // The loader only builds a candidate without a local row from a secure item the server
+            // already named, so an identity is guaranteed exactly where the entry is not.
+            var identity = candidate.CipherId
+                ?? BitwardenLocalCipherIdentity.ForPassword(candidate.Entry!.Id);
             await operationStore.EnqueueAsync(new BitwardenPendingOperation(
                 Id: 0,
                 VaultId: vaultId,
                 CipherId: identity,
                 OperationType: isNew
                     ? BitwardenMutationOperationType.Create
-                    : BitwardenMutationOperationType.Update,
+                    : deletion
+                        ? BitwardenMutationOperationType.SoftDelete
+                        : BitwardenMutationOperationType.Update,
                 // A create has no remote state to guard against, and a revision there would make the
                 // queue guard reject it as an update.
                 ExpectedRemoteRevision: isNew ? null : candidate.ExpectedRemoteRevision,
                 PayloadJson: payload,
                 // Deliberately content-free: an entry edited three times before its first upload is one
                 // cipher owed, not three, and each of those creates would have been posted separately.
+                // A deletion keys the same way, because trashing an entry twice is one trash, not two.
                 IdempotencyKey: isNew
                     ? $"local-create:{vaultId}:{identity}"
-                    : $"local-update:{vaultId}:{identity}:{candidate.PayloadHash}",
+                    : deletion
+                        ? $"local-delete:{vaultId}:{identity}"
+                        : $"local-update:{vaultId}:{identity}:{candidate.PayloadHash}",
                 Status: BitwardenMutationStatus.Pending,
                 LastFailureClass: BitwardenFailureClass.None,
                 AttemptCount: 0,
@@ -106,6 +124,22 @@ public sealed class BitwardenLocalChangeQueue(
         }
 
         return new BitwardenLocalChangeQueueResult(enqueued, refused);
+    }
+
+    private static string? BuildPayload(Candidate candidate, BitwardenSymmetricKey vaultKey)
+    {
+        try
+        {
+            return BitwardenCipherPayloadBuilder.BuildLoginCipher(
+                candidate.Entry!,
+                vaultKey,
+                candidate.CustomFields,
+                candidate.History);
+        }
+        catch (BitwardenProtocolException)
+        {
+            return null;
+        }
     }
 
     private async Task<IReadOnlyList<Candidate>> LoadCandidatesAsync(
@@ -145,6 +179,7 @@ public sealed class BitwardenLocalChangeQueue(
                 entry.BitwardenRevisionDate,
                 BitwardenPayloadFingerprint.ForPassword(entry, fields, history),
                 entry,
+                entry.IsDeleted,
                 fields,
                 history));
         }
@@ -152,12 +187,13 @@ public sealed class BitwardenLocalChangeQueue(
         foreach (var item in secureItems)
         {
             // Secure items are listed so the count of owed-but-unable uploads stays honest; the
-            // write-back encoder only carries login ciphers today.
+            // write-back encoder only carries login ciphers today, though a deletion needs no encoder.
             candidates.Add(new(
                 item.BitwardenCipherId,
                 item.BitwardenRevisionDate,
                 BitwardenPayloadFingerprint.ForSecureItem(item),
                 null,
+                item.IsDeleted,
                 [],
                 []));
         }
@@ -170,6 +206,7 @@ public sealed class BitwardenLocalChangeQueue(
         string? ExpectedRemoteRevision,
         string PayloadHash,
         PasswordEntry? Entry,
+        bool Deleted,
         IReadOnlyList<CustomField> CustomFields,
         IReadOnlyList<PasswordHistoryEntry> History);
 }

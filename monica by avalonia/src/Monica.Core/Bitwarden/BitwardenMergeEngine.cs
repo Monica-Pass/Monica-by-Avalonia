@@ -63,10 +63,15 @@ public static class BitwardenMergeEngine
     {
         var sameRevision = string.Equals(local.RevisionDate, remote.RevisionDate, StringComparison.Ordinal);
         var samePayload = string.Equals(local.PayloadHash, remote.PayloadHash, StringComparison.Ordinal);
+        // Both sides holding the same deletion is the end of the story: the remote carries no content to
+        // adopt, so the marker it does carry cannot be compared with the local fingerprint. Reading it as a
+        // content difference made every later pull re-decide the identical trash as a conflict and back the
+        // same row up again.
+        var bothTrashed = local.IsDeleted && remote.IsDeleted;
         var sameState = local.IsDeleted == remote.IsDeleted &&
                         local.CipherType == remote.CipherType &&
                         string.Equals(local.FolderId, remote.FolderId, StringComparison.Ordinal) &&
-                        samePayload;
+                        (bothTrashed || samePayload);
 
         if (sameRevision && sameState)
         {
