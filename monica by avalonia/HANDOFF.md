@@ -16,7 +16,7 @@
 
 ## 2. 当前状态（工作树干净）
 
-分支 `main`，`git status` 无未提交改动。功能 HEAD = `aaa698b`（其后只可能有给本节自身标提交号的文档提交），近几轮：
+分支 `main`，`git status` 无未提交改动。功能 HEAD = `49560f5`（其后只可能有给本节自身标提交号的文档提交），近几轮：
 
 | commit | 立住了什么 |
 |---|---|
@@ -35,6 +35,7 @@
 | `541069c` | 单实例守卫（#86，托盘默认开引出的用户可见问题）：同一个数据目录只允许一个实例，第二次启动不再自己开第二个窗口，而是**把还活着的那一个叫回前台**后退出 0；锁按数据目录取键（各自 `MONICA_APPDATA_DIR` 的独立实例、CI 顺序跑法都不受影响），接力事件在拿到锁的同一瞬间命名，因此双击发生在 UI 订阅之前也不会丢。顺带修掉守卫的取证工具本身：诊断日志的 append 流只在打开时定位一次末尾，两个进程写同一个 `runtime.log` 会从中间互相盖掉——实测出现过一条记录被拼进另一条的句子中间、接力证据消失；现在每批写之前重新求末尾并整批一次写。真机正反两例都在发布产物上量过（见 §7 第 3 条），门禁：格式 0 改动、Release 0 warning、单测 9+754、UI 17+191 全绿；重新 publish 后产物门 loadMs=1082/4000、KeePass 20000 条增长 8.8MB/24、锁定尾窗中位 107.1MB/120 |
 | `61080f6` | 首次收进托盘的可发现性提示（#85，托盘默认开欠下的那一条）：窗口 `Hide()` 进托盘后桌面上**一点痕迹都没有**，图标还大概率在通知区域的溢出区里，所以每个安装的**第一次**收起，会在托盘那一角画一个气泡（标题 + "窗口去哪了、怎么回来" + 一个"显示 Monica"按钮），8 秒后自己退场。Avalonia 12.0.4 的 `TrayIcon`/`NotifyIcon` 都没有 `ShowBalloonTip`（在产物上量过），只能自绘：无边框 + `Topmost` + `Focusable=False` + `ShowActivated=False`，不抢焦点也不夺激活。**"每个安装一次"必须记两层**（本轮会话一个布尔 + 落盘 `TrayHintShown`），这不是审美是被实测逼出来的：`Show()` 之后再 `Hide()` 会重走 `OnOpened`→`InitializeAsync`→`LoadAsync`，内存里的标记被文件里那份（写盘防抖 150ms，还没落）盖掉，只信落盘就会在同一轮里第二次弹。锚点用 `ClientSize` 不用 `Bounds`（实测这个窗口的 `Bounds.Height` 一辈子停在 `SizeToContent` 之前的 707.33，而 client 是 121.33）。覆盖：UI 6 条 + 单测 1 条，两条证伪（注掉会话守卫→第 5 条红；`TrayHintDwell` 改 60 秒→第 4 条在 20.3 秒红）。四阶段真机门在**发布产物**上全绿（§7 第 4 条），单实例探针在同一产物上重跑仍正反两例全绿（§7 第 3 条）。门禁：格式 0 改动、Release 0 warning、单测 9+755、UI 17+197 全绿；重新 publish 后产物门 loadMs=934/4000、KeePass 20000 条增长 4.0MB/24、锁定尾窗中位 114.7MB/120 |
 | `aaa698b` | 接力回来的窗口真的浮到用户在看的应用之上（#87，#85 那句文案欠下的另一半）：退出前的那次启动把自己持有的前台权限交给活着的那一份（按数据目录键查到 owner PID → `AllowSetForegroundWindow` → 再发接力信号），owner 由命名 `MemoryMappedFile` 在持锁期间公布 PID。**先量后修**：未修产物上 `windowBack=0.01` 秒窗口就回到桌面，但 `foregroundMonica=-1`、`aboveRival=-1`，Monica 停在 z=150 而 rival 在 z=18，6.6 秒都没浮起来——"再次启动就能回来"当时只有一半是真的。修后同一条门 `foregroundMonica=0.15 aboveRival=0.15`、之后每点都是 z=18<19。反证：把 grant 换成常量 `false` 重新构建，门立刻回红（同样 -1、z=150<18）。顺序由单测钉住（`GrantIndex==0/SignalIndex==1`），非 Windows 返回 `false` 且接力照旧送达。探针演化掉三条死路（注入 ALT 会把 rival 的 WinForms 线程 park 进菜单模态循环、`SwitchToThisWindow` 与 `AttachThreadInput` 都拿不到前台），跑法与判读见 §5。门禁：格式 0 改动、Release 0 warning、单测 9+758 全绿；重新 publish 后产物门 loadMs=261、锁定尾窗中位 108.0MB/120（区间 107.8–109.0）、锁/解循环 25/14/1/4 全数回读，单实例正反两例与托盘提示四阶段在同一产物上重跑仍全绿 |
+| `49560f5` | 自动填充弹窗（#89）＋两处只在出货平台上现形的缺陷：① **一键智能分派**取代"多解就拒打"（唯一匹配直接输入／多条匹配弹候选列表／零匹配弹全库并把键盘交给筛选框；枚举里 `NoMatch`／`Ambiguous` 已不存在），列表弹出期间目标窗口一个字符都不提前收到（`typedWhileOpen=False`），确认那一步先退场再把前台交回目标，退场一律带 `reason` 并写日志。② `IsDocumentControl` 窗口在 `Opened` **之前**投递焦点会丢——表现就是用户那句"这是填充不上吗？？？"：列表出来了、字母打不进去。③ **中文输入法把组合中每一次 KeyDown（含确认候选词的那一下回车）都报成 `ImeProcessed`**，写在 KeyDown 上的确认在真机上是死的；确认移到 KeyUp（实测仍带真实键）并**推迟到下一次 `ApplyFilter`**——那一下回车提交的文本还没落进筛选框，当场取行会发出筛选前显示的条目。诚实记录：这条只有无头证据，探针机器上没有组合态的输入法。④ 设置页录制的手势不再被加载层偷换：两槽撞车时保留用户录的那一下、由桌面集成如实报冲突（同目录同产物对照：修复前 `armed=True, gesture=Ctrl+Shift+Enter`，修复后 `armed=False, gesture=Ctrl+Shift+Space, registrationError=True`；钉子先按旧实现跑出红再转绿）。真机侧在**发布产物**上量全：弹窗 `Pick`/`Escape`/`SecondPress` 三式、注入正例 `matches=1 pickerSurfaced=False`、自定义手势 `Ctrl+Alt+F9` 从 `settings.json` 落盘读回并 armed。门禁：格式 0 改动、Release 0 warning、单测 9+759、UI 17+218 全绿；重新 publish 后产物门 loadMs=556/4000、KeePass 20000 条增长 3.7MB/24、锁/解循环 25/14/1/4。**一个不利信号如实记下**：同一份产物连跑四次锁定态尾窗中位 108.9/115.1/116.9/118.0MB（预算 120，最近的一次只剩 2.0MB，上一轮区间 107.8–109.0），该门路径根本不打开弹窗，没有证据指向 #89 也没有证据排除，下一轮先复跑取分布再归因、不要调阈值 |
 
 §3 的 use-case 抽取改动已提交（`24d92b0`），OneDrive/WebDAV 冲突副本复用修复已提交（`957c5af`）。
 ## 3. Task #27（ViewModel 抽 use-case）状态 — 已可判定完成
@@ -125,10 +126,15 @@ dotnet tests/Monica.UiTests/bin/Release/net10.0/Monica.UiTests.dll -method "*Nam
 # 9. 存盘有 150ms 防抖：气泡刚出现就 Kill 进程时 `settings.json` 还不存在（实测 `<no settings.json>`），
 #    必须先轮询到落盘再杀，不然测的是探针的手速而不是持久化。
 
-实测数字（本轮接力浮窗门之后）：源码门全绿（单测 9 perf + 758 functional、`--warnaserror` 0 warning）；
-重新 publish 后产物门 `loadMs=261`、锁定态私有字节尾窗中位 108.0MB（区间 107.8–109.0，预算 120）、
-锁/解循环 25/25 密码 + 14/14 笔记 + 1/1 TOTP + 4/4 钱包、`release gate completed success=True, loadMs=198`。
-上一次记录（`61080f6`）为 loadMs=934、114.7MB（区间 114.6–115.6）。
+实测数字（本轮 #89 自动填充弹窗之后）：门禁全绿——`dotnet format --verify-no-changes` 0 改动、
+`--warnaserror` 0 warning、单测 9 perf + 759 functional、UI 17 + 218；重新 publish 后产物门
+`loadMs=556/4000`、KeePass 20000 条增长 `3.7MB/24`、锁/解循环 25/25 密码 + 14/14 笔记 + 1/1 TOTP + 4/4 钱包。
+**锁定态内存要如实报一个不利信号**：同一份产物连跑四次，尾窗中位分别
+108.9 / 115.1 / 116.9 / 118.0MB（预算 120，最小的一次余量 11.1MB、最大的一次只剩 2.0MB），
+上一轮记录的区间是 107.8–109.0。该门的路径**根本不打开弹窗、也不跑 `--smoke-ui-autotype`**（要交互桌面），
+所以没有证据说明是 #89 带进来的抬升，但也没有证据排除。下一轮**先复跑取分布**再看是否需要归因，
+不要靠调阈值变绿。
+上一轮（`aaa698b`）记录：loadMs=261、锁定尾窗中位 108.0MB（区间 107.8–109.0）。
 注意：perf-budget 通道在整串门里紧跟 `dotnet build` 起跑时读到过 483ms（预算 400），单独复跑三次为
 9/9 全绿；这是冷启动+构建负载的单次读数，按仓库规则先复跑取分布，不要调阈值。
 
@@ -138,8 +144,27 @@ dotnet tests/Monica.UiTests/bin/Release/net10.0/Monica.UiTests.dll -method "*Nam
 # 正例：默认标题命中 seeded 的 github 条目，脚本自己敲 Ctrl+Shift+Enter，再看两个输入框落成什么
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File artifacts/autotype/verify-autotype-injection.ps1 `
   -ExePath <publish>\Monica.App.exe -AppDataDirectory <空临时目录> -ExpectedOutcome Typed
-# 反例：标题含 host 但是钓鱼域，必须拒打且两个框都空
-... -WindowTitle "Sign in - github.com.phishing.test" -ExpectedOutcome NoMatch
+# 弹窗四式：筛到一条→回车打；Escape→退不打；列表还开着再按一次手势→"算了"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File artifacts/autotype/verify-autotype-picker.ps1 `
+  -ExePath <publish>\Monica.App.exe -AppDataDirectory <空临时目录> -Action Pick
+... -Action Escape
+... -Action SecondPress
+# 录制自定义手势（模拟设置页落盘后重启）：把组合写进该目录 settings.json 再按那组键
+... -Action Pick -Gesture "Ctrl+Alt+F9"
+```
+
+坑（都是踩过一次的）：
+
+```powershell
+# 1. -ExpectedOutcome 的合法值只剩 Typed／PickerForAllEntries／PickerForMatches／MonicaIsForeground，
+#    智能分派之后 NoMatch／Ambiguous 已不存在，传旧值只会得到一条说不清的红。
+# 2. settings.json 只有 GUI 首启才会写出来，--init-empty-smoke-vault 与 --seed-smoke-vault 都不写。
+#    所以 -Gesture 必须落在一个"已经被 GUI 跑过一次"的目录上，探针找不到文件就直接 throw，不自己造默认值。
+# 3. 探针宿主必须 SetProcessDPIAware()（本机 150%），否则点/量到的是缩放后的错位坐标。
+# 4. keybd_event 必须带 MapVirtualKey 的真实 scan code：RegisterHotKey 不在乎，但 WM_CHAR 是系统按
+#    scan code 造的，0 scan code 打不进筛选框。
+# 5. 从 Git Bash 传路径给 -File 脚本时别写 "$env:TEMP\..." —— bash 会先把 $env 吃掉变成空串，
+#    PowerShell 收到的就是字面量；要传绝对 Windows 路径。
 ```
 
 脚本 ASCII-only、只打印长度与布尔（凭据明文一律不落日志），退出码 0 表示观察到的 `outcome` 与预期一致。
@@ -405,8 +430,8 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
     实现后全绿。再单独把 `RaiseStatusMessageState()` 一行注掉：**三条单测仍全绿、只有渲染带测试转红**
     （Expected 请输入文件夹名称。/ Actual "Enter a folder name."），这正是无头 VM 测试看不到绑定刷新的
     证据，也是这条 UI 测试存在的理由。
-- **用户点名的必须功能（2026-09-22 拍板）：四条都已出厂**（托盘 `f700bcc`／自动输入 `1d8c3a4`／单实例守卫
-  `541069c`／首次收进托盘的一次性提示，见第 4 条）。
+- **用户点名的必须功能：五条都已出厂**（托盘 `f700bcc`／自动输入 `1d8c3a4`／自动填充弹窗与快捷键录制 #89、
+  见第 2 条／单实例守卫 `541069c`／首次收进托盘的一次性提示，见第 4 条；2026-09-22 拍板的前四条在此列）。
   下一轮从各自条目末尾那份"仍未做/仍未验证"清单里挑，别再回头补已经量过的部分：
   1. **最小化到托盘：已出厂即开，并在真机 Windows 会话里逐项量过（`f700bcc`）**。
      - 改了什么：`AppSettingsService.cs` 的 `MinimizeToTray` 默认 `true`，`SettingsSchemaVersion`
@@ -446,8 +471,10 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
        自动清理抢时序（安卓那套"写剪贴板→粘贴→500ms 还原"在桌面端没有对应需求）。token 序列固定
        用户名 → `Tab` → 密码，**从不发 Enter**，提交留给用户。
      - 匹配（`AutoTypeMatcher`）只看前台窗口标题：标题里出现 host 形状时一律按 host 判，条目存 `github.com`
-       而标题是 `github.com.phishing.test` 就**不算匹配**；标题不含 host 才退回整词标签匹配。命中 0 条或多于
-       1 条都拒打并说清原因（`NoMatch`／`Ambiguous`）。
+       而标题是 `github.com.phishing.test` 就**不算匹配**；标题不含 host 才退回整词标签匹配。**一键智能分派**
+       （#89 拍板的形状，取代了早期"命中 0 条或多于 1 条一律拒打"）：唯一匹配→直接打（`Typed`）；多条匹配→
+       弹带筛选项的列表（`PickerForMatches`）；零匹配→弹全库列表并把键盘交给筛选框（`PickerForAllEntries`）。
+       枚举里**已经没有** `NoMatch`／`Ambiguous`，别再照旧文档传这两个值。
      - **真机实测**（`artifacts/publish/win-x64/jit/Monica.App.exe`，`MONICA_APPDATA_DIR` 指向空临时目录，
        WinForms 目标窗体两个输入框 + 外部真实按键），脚本 `artifacts/autotype/verify-autotype-injection.ps1`
        （gitignore 目录；只报布尔和长度，绝不打印凭据明文）：
@@ -455,19 +482,66 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
           registrationError=False` → `outcome=Typed matches=1`，落点
           `firstLength=15 firstMatchesUsername=True secondLength=19 secondMatchesPassword=True`，`appExit=0`；
           `owner check: targetPid=58400 harnessPid=58400 appPid=11504` 证实字确实落在**别人的**窗口。
-       2. 反例（钓鱼标题 `Sign in - github.com.phishing.test`）：`outcome=NoMatch matches=0`，两个框都空
-          （`firstLength=0 secondLength=0`）。
+       2. 反例（钓鱼标题 `Sign in - github.com.phishing.test`）：智能分派出厂前量到的是 `outcome=NoMatch matches=0`、
+          两个框都空（`firstLength=0 secondLength=0`）。**该分支已被上面的分派取代，这条反例现在会走
+          `PickerForAllEntries`（标题里的 host 被钓鱼域判掉→零匹配→弹全库），本轮没有重量钓鱼专项**，
+          下一轮要按新形状重跑一次再引用。
+     - **弹窗（#89 已出厂，四条手势都在发布产物上真机量过）**：`AutoTypePickerWindow` 是一棵
+         `IsDocumentControl=true` 的裸窗口（安卓侧的"无阴影、无标题栏"形状），锚在屏幕水平居中、
+         `ScreenVerticalRatio=0.28`，列表 + 筛选框 + 计数。三个必须功能点在代码里都有钉：
+        - **键盘交给谁**：`FocusForMode(filterFirst)` 必须等 `Opened` 之后再投递焦点（`_isOpen` +
+          `DeliverFocusRequest()`），否则在 `IsDocumentControl` 窗口上焦点投递会丢，弹窗只是一张图片。
+          这是本轮查到的第一个缺陷（表现：列表出来了、字母打不进去）。
+        - **打字之前把键盘还回去**：弹窗自己拿过前台，所以确认那一步先关掉自己、再让协调器把前台交回
+          目标窗口（`TypedWithoutRestoringForeground` 是 UI 测试里的硬断言）。列表弹出期间目标框保持全空
+          （`typedWhileOpen=False`），一个字符都不许提前漏出去。
+        - **中文输入法下的 Enter（本轮查到的第二个缺陷，也是"这是填充不上吗"的真因）**：装配中的 IME 会把
+          每一次组合键的 **KeyDown**（含确认候选词那一下回车）都报成 `Key.ImeProcessed`，被组合吞掉的 Enter
+          永远不是 `Key.Enter`，于是 `KeyDown` 上写的确认 handler 在出货平台上是死的——筛选框 narrows 到一行、
+          行也是高亮的，按 Enter 却什么都没发生。修复放在 **KeyUp**（实测那一下仍带真实键）+ **推迟到下一次
+          `ApplyFilter`**：Enter 提交的那段文本在 KeyUp 之后才落到筛选框，当场取行会打出筛选前那一刻显示的
+          条目。钉子：`The_Enter_that_commits_an_input_method_composition_picks_the_row_it_narrowed_to`
+          （先断 `TypeCallCount==0` 证明没抢跑，再喂文本证明它选中的是窄化后的那一行）。
+          **诚实记录**：这条只有无头证据。真机探针用 `keybd_event` 打 ASCII、机器上没有装配中的中文输入法在
+          组合态，所以 IME 的 KeyDown/KeyUp 形状是在无头里复现的，出货前应在带输入法的人机上再按一次。
+        - 退场原因全部走 `CloseAutoTypePicker(reason)` 并写日志（`EntryPicked`／`DismissKey`／
+          `SecondHotkeyPress`／`VaultLocked`／`MainWindowClosed`／`ReplacedByFreshList`），真机侧靠这些行判定。
+     - **设置里录制自定义手势（#89 的另一半）：已出厂并在发布产物上量过**。`SettingsDesktopView.axaml` 里
+       `AutoTypeHotkeyBox` 双向绑到 `AutoTypeHotkey`，录制→写盘→协调器 debounce→`RegisterHotKey` 是同一条链。
+       真机测法：探针 `-Gesture` 参数直接把组合写进该目录的 `settings.json`（模拟设置页落盘），再按那组键。
+       实测（产物 `artifacts/publish/win-x64/jit/Monica.App.exe`）：
+       `recorded gesture into settings: Ctrl+Alt+F9` → `armed=True, gesture=Ctrl+Alt+F9, registrationError=False`
+       → `outcome=Typed`、`firstLength=15 secondLength=19` 两个框各自命中。
+     - **查清并修掉的一个静默行为（本轮）**：`AppSettingsService` 的归一化原来在"两槽填了同一组合"时把
+       `AutoTypeHotkey` 直接改回 `Ctrl+Shift+Enter` 并落盘。用户录制的那一下**当场是看得见报错的**
+       （协调器 `ReportAutoTypeGestureConflict` → "快速搜索已占用该快捷键，请换一个。"），但**下一次启动**
+       存盘值被悄悄换掉、错误提示也不来了——录进去的键永久丢失，而且把快捷搜索改开后原值也不会再回来。
+       现在这一条不再由加载层改写用户记录值：保留原值，启动时若仍冲突就由协调器照旧报冲突，另一槽一改
+       录制值立刻生效。**同一目录同一产物的真机对照**：修复前 `armed=True, gesture=Ctrl+Shift+Enter,
+       registrationError=False`（偷换），修复后 `armed=False, gesture=Ctrl+Shift+Space, registrationError=True`
+       （如实拒注册并保留用户那一下）。钉子：`App_settings_keeps_a_recorded_gesture_even_when_it_collides`
+       （先按旧实现跑红：`Assert.Equal() Failure: Strings differ`，再按新实现跑绿）。
+     - **弹窗真机实测**（`artifacts/autotype/verify-autotype-picker.ps1`，同一个目标窗体 + 外部真实按键）：
+       1. `Pick`（默认手势）：`rows=25 typedWhileOpen=False pickerAboveRival=True pickerExit=0 success=True`，
+          应用侧 `outcome=Typed, matches=0`，落点 `firstLength=15 firstMatchesUsername=True
+          secondLength=19 secondMatchesPassword=True`（`matches=0` 指的是**弹出时**零匹配，全库列表靠筛选定位）。
+       2. `Escape`：`pickerExit=1 success=True`、两个框 `0/0` 全空、`taken down. reason=DismissKey`。
+       3. `SecondPress`（列表还开着再按一次手势＝"不是这个，算了"）：`appWindowCount 2→1`、
+          `taken down. reason=SecondHotkeyPress`、两个框全空。
+       4. 唯一匹配不走弹窗：`pickerSurfaced=False, outcome=Typed, matches=1`。
      - **查清的一个假象，下一轮别退回旧写法**：协调器最初用 Avalonia 的 `Window.IsActive` + 缓存自身 hwnd
        判断"前台是不是我自己"，实测在进程**一个顶层窗口都没有**的时刻 `IsActive` 仍读回 `True`
        （`totalTopLevel=434 owned=`，那个缓存 handle 的 `GetWindowThreadProcessId` 返回 pid=0、`IsWindow=False`）
        → 真按快捷键会被误判成"焦点在 Monica"、永远拒打。改成问操作系统：
        `IAutoTypeService.IsWindowOwnedByThisProcess(hwnd)`（比对自身 pid）。单测用**真的 message-only 窗口**
        跑通 true 分支，不是只测 false 分支。
-     - 门禁：格式 0 改动、Release 0 warning、单测 9+747、UI 17+191；产物侧 `--smoke-ui-autotype` 探针走设置页
-       同一条链路（`AutoTypeEnabled=true`→协调器→`RegisterHotKey`），只报 armed/pressed/outcome。
+     - 门禁（本轮 #89 收尾时重量）：`--warnaserror` 0 warning、单测 9 perf + 759 functional、UI 17 + 218 全绿，
+       `verify-commercial-release.ps1` 通过；产物侧 `--smoke-ui-autotype` 探针走设置页同一条链路
+       （`AutoTypeEnabled=true`→协调器→`RegisterHotKey`），只报 armed/pressed/outcome。
      - **仍未做/仍未验证（别当成已完事）**：
        1. `--smoke-ui-autotype` **没有接进 `verify-artifact-runtime.ps1`**：它要交互桌面会话、一个外部目标窗口
-          和一次真按键，CI 里跑不起来，所以现在是"手动真机门"，跑法见上面的脚本与两个场景。
+          和一次真按键，CI 里跑不起来，所以现在是"手动真机门"，跑法见上面 §5 的脚本（注入正例 + 弹窗四式 +
+          录制自定义手势）。
        2. "Monica 真在前台 → 拒打"这一支：单测验了谓词本身（真窗口），UI 测试验了回调→服务→VM 的接线，但
           **端到端没有人在 Monica 获得焦点时按过一次快捷键**。诚实记录一个弱点：把 `window.IsActive ||`
           重新加回去，那条 UI 测试**仍然绿**——它钉的是接线不是这个回归，该回归的实际守卫在真机 harness。
@@ -479,6 +553,14 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
        6. 浏览器扩展本体仍缺：`WindowsBrowserBridgeService` 的回环 HTTP（`/v1/session/check`、
           `/v1/credentials/query`，默认端口 49152，Origin 校验 + Bearer 会话令牌）在跑，扩展没有
           （安卓 README 说 Monica for Browser 已归档、新扩展重写中）。
+       7. **输入法组合态的那一下 Enter 只有无头证据**。真机探针用 `keybd_event` 打 ASCII，机器上没有装配中的
+          中文输入法处在组合态，所以 `ImeProcessed` KeyDown + 真实 KeyUp 的形状是在无头里复现的。
+          出货前必须在带输入法的人机上按一次（打字→候选→Enter→再 Enter）。
+       8. 真机量过的分派是**两端**：零匹配→全库列表（`matches=0` 弹出、靠筛选定位）、唯一匹配→直接打
+          （`matches=1`、`pickerSurfaced=False`）。中间的 **`PickerForMatches`（多条命中直接弹出候选列表）
+          没有真机样本**——探针标题故意取"谁都不含"的形状。UI 侧有钉，真机侧缺一条。
+       9. 弹窗的鼠标路径未测：双击确认行、滚轮浏览长列表（25 行不到一屏，长库才溢出）、点行不确认只选中。
+           键盘只测过 Enter/Escape 与筛选框打字，上下键换行未测。
   3. **单实例守卫：已出厂（#86 / `541069c`），正反两例都在发布产物上真机量过**。它是托盘默认开直接
      引出的问题：窗口收进托盘后看不出"已经有一个在跑"，双击两次图标就是两个进程指着同一个 `monica.db`。
      - **先实测再设计**（守卫之前的双实例行为）：2 个进程、2 个窗口、各自私有字节 98.4 / 95.7MB、
@@ -579,6 +661,8 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
 - 面对从别处 fork 进来的代码，先问"到底要不要"，再谈"怎么维护"。
 
 ---
-接手第一步建议：工作树已干净、两套 Windows 门（源码级 + 产物级）实测全绿，用户点名的四条必须功能（托盘、
-自动输入、单实例守卫、首次收进托盘的一次性提示）都已出厂，且每一条都在**发布产物**上真机量过。下一轮从 §7
-各条末尾的"仍未做/仍未验证"清单里挑，不必再花时间复验已绿的部分。
+接手第一步建议：工作树已干净、两套 Windows 门（源码级 + 产物级）实测全绿，用户点名的必须功能（托盘、
+自动输入、自动填充弹窗与快捷键录制、单实例守卫、首次收进托盘的一次性提示）都已出厂，且每一条都在
+**发布产物**上真机量过。用户已经排到队里、尚未动工的两条：滚动条压成 Win11 细条（#90）、忘记密码走
+备份/应急包 + 密保问题只作重置空库的闸门（#91，硬约束：**重置只动本地库，KeePass／MDBX／Bitwarden 不碰**）。
+其余可挑的活在各条末尾那份"仍未做/仍未验证"清单里，不必再花时间复验已绿的部分。
