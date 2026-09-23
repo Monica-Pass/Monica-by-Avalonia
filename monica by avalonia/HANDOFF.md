@@ -16,7 +16,7 @@
 
 ## 2. 当前状态（工作树干净）
 
-分支 `main`，`git status` 无未提交改动。功能 HEAD = `6613df6`（其后只可能有给本节自身标提交号的文档提交），近几轮：
+分支 `main`，`git status` 无未提交改动。功能 HEAD = `dda2766`（其后只可能有给本节自身标提交号的文档提交），近几轮：
 
 | commit | 立住了什么 |
 |---|---|
@@ -38,6 +38,8 @@
 | `49560f5` | 自动填充弹窗（#89）＋两处只在出货平台上现形的缺陷：① **一键智能分派**取代"多解就拒打"（唯一匹配直接输入／多条匹配弹候选列表／零匹配弹全库并把键盘交给筛选框；枚举里 `NoMatch`／`Ambiguous` 已不存在），列表弹出期间目标窗口一个字符都不提前收到（`typedWhileOpen=False`），确认那一步先退场再把前台交回目标，退场一律带 `reason` 并写日志。② `IsDocumentControl` 窗口在 `Opened` **之前**投递焦点会丢——表现就是用户那句"这是填充不上吗？？？"：列表出来了、字母打不进去。③ **中文输入法把组合中每一次 KeyDown（含确认候选词的那一下回车）都报成 `ImeProcessed`**，写在 KeyDown 上的确认在真机上是死的；确认移到 KeyUp（实测仍带真实键）并**推迟到下一次 `ApplyFilter`**——那一下回车提交的文本还没落进筛选框，当场取行会发出筛选前显示的条目。诚实记录：这条只有无头证据，探针机器上没有组合态的输入法。④ 设置页录制的手势不再被加载层偷换：两槽撞车时保留用户录的那一下、由桌面集成如实报冲突（同目录同产物对照：修复前 `armed=True, gesture=Ctrl+Shift+Enter`，修复后 `armed=False, gesture=Ctrl+Shift+Space, registrationError=True`；钉子先按旧实现跑出红再转绿）。真机侧在**发布产物**上量全：弹窗 `Pick`/`Escape`/`SecondPress` 三式、注入正例 `matches=1 pickerSurfaced=False`、自定义手势 `Ctrl+Alt+F9` 从 `settings.json` 落盘读回并 armed。门禁：格式 0 改动、Release 0 warning、单测 9+759、UI 17+218 全绿；重新 publish 后产物门 loadMs=556/4000、KeePass 20000 条增长 3.7MB/24、锁/解循环 25/14/1/4。**一个不利信号如实记下**：同一份产物连跑四次锁定态尾窗中位 108.9/115.1/116.9/118.0MB（预算 120，最近的一次只剩 2.0MB，上一轮区间 107.8–109.0），该门路径根本不打开弹窗，没有证据指向 #89 也没有证据排除，下一轮先复跑取分布再归因、不要调阈值 |
 | `45f01ef` | 滚动条压成 Win11 细条（#90，用户对上一轮外观的直接反馈）。**先证伪了"这里已经修好"**：`App.axaml` 里那三个看着对症的资源键（`ScrollBarSize=10`／`ScrollBarArrowSize=0`／`ScrollBarThumbBoxSize=30`）在真渲染树上一个数字都改不动，实测仍是 `bar bounds=…,14,200` 加两个可见的 `14x10` 箭头按钮；反射查到这三个名字归 `FluentAvalonia.Interop.WinRT.IUISettings`（Windows UISettings COM 互操作），应用资源从来不是它的入口——所以那三个键连同为它们编的注释一起删掉，改为在 `VaultShellStyles` 自持 `ScrollBar` 模板：12px 命中条、4px 居中圆角滑块（hover 时 8px）、轨道不着色、无线条按钮，分页按钮留着因此点通道仍然翻页；三个主题各配一根滑块画刷（`#73000000`／`#73FFFFFF`／高对比纯黑）。新增 `SlimScrollBarStyleUiTests` 3 条钉几何与"拖动仍然滚"（`bar.Value=120` → `ScrollViewer.Offset.Y=120`）；负控：把 `VaultShellStyles` 的 StyleInclude 注掉，两条立刻红在 `Expected: 12 / Actual: 14` 与"箭头 RepeatButton 存在"，恢复后全绿。**没有视觉证据**（截图口味门这轮两条路都不通，见 §7 最后一条），好看与否待用户在运行中的应用里确认。门禁：格式 0 改动、Release 0 warning、单测 9+759、UI 17+221 全绿；重新 publish 后产物门 loadMs=211/4000（库加载 actualMs=1366/4000）、KeePass 20000 条增长 4.9MB/24、锁定尾窗中位 110.5MB/120（同一产物共跑三次：110.5／113.9／104.6，上一轮四次的 108.9–118.0 没有继续上移，绝对水位仍未归因，见 §5）、锁/解循环 25/14/1/4 |
 | `6613df6` | 忘记密码这条路的第一半：应急包（#91，用户拍"备份/应急包优先"）。**先量清为什么原有那半不够**：设置页的密保问题区块确实能设问题，但它那条"重设主密码"要求 `IsUnlocked`（`MainWindowViewModel.SettingsRecoveryCommands.cs:122`），也就是恰好"忘记密码时"走不通；而锁定态没有任何入口（`MainWindow.axaml:25` 锁定时只挂 `UnlockViewHost`，Settings 整个不可达）。本轮只做非破坏的一半：用一次性口令封存的加密快照，**Monica 从不保存该口令**（用忘记的主密码封存的备份在忘记主密码时一文不值），写盘前强制回读自检、不通过就不落盘，口令错的失败只说"打不开"、不外泄加密层原因也不回显口令，两个命令在锁定态一律 `VaultLocked` 拒绝，三个口令框打码且离屏/锁定时清空。**顺手抓到一个静默数据缺陷**：`AppSettingsService` 的 `Clone()` 是手写的属性清单，新增设置没在里面登记就会**无声**地从 `settings.json` 里消失——应急包元数据就是这么丢的；新守卫 `App_settings_file_carries_every_declared_setting` 把每个普通设置打上自身名字的标记后落盘重读逐值比对，实测先红在 `2 setting(s) did not survive the save: EmergencyKitLastExportedAtUtc, EmergencyKitLastFileName`（第一版守卫是**空的**：只比"是否变过"，而被丢的字符串序列化后仍是 `""`，改成比期望值才抓到）。③ 走查自己新写的文案又抓到一条：恢复流程复用了"正在加密保险库快照……"，改为独立的 `EmergencyKitRestoreInProgress`。覆盖：单测 9 条（密封性／跨库往返／口令错不导入且不泄密／弱口令不写盘／锁定拒绝／元数据落盘往返／进度文案／设置完整性／瞬态输入清理）+ UI 1 条（三个口令框 `PasswordChar='*'`、两个按钮的命令绑定与 `CanRunEmergencyKit` 随锁定态和维护态联动，并真按一次"口令为空"走到失败文案）。负控三条：去掉 `PasswordChar` 红在打码断言、去掉 `IsEnabled` 绑定红在锁定态禁用、进度 key 改回加密字样红在进度断言。**UI 侧两条新坑**：`dotnet test` 跑 `Monica.UiTests` 现在直接报 `Testing with VSTest target is no longer supported by Microsoft.Testing.Platform on .NET 10`（只能跑产物 exe，见 §5）；设置页的绑定要生效，必须先把 `SelectedSettingsPage` 指到该页并 `Window.Show()`——根 `StackPanel` 的 `IsVisible=false` 会让整棵子树不被度量，`button.Command` 读回来是 `null`（差点写成"UI 测不到绑定"的假结论）。门禁：格式 0 改动、Release 0 warning、单测 9+769、UI 17+222 全绿；重新 publish 后产物门 `CANONICAL VAULT passed`、loadMs=190/4000（库加载 757/4000）、KeePass 20000 条增长 3.9MB/24、锁定尾窗中位 106.4MB/120（区间 105.7–107.8）、锁/解循环 25/14/1/4 |
+| `bda943f` | 用户点名三片里的**片1**：passkey 存储 + 自证 relying-party 引擎。`Monica.Core/Passkeys/*` 是 Monica 自己的软件认证器与校验器（ES256/RS256 生成、authData 布局、CBOR 子集、clientDataJSON、`none` 证明，全部照抄 Android 的 `passkey/` 包），私钥改走**保险库会话密钥**加密后落新表 `passkey_private_keys`（schema 75→76），`passkeys` 行只留 `passkey_private_key_v1_` 引用，清库语句同步加 `DELETE FROM passkey_private_keys`。写的时候抓到并修掉一处真缺陷：`PasskeyStore.Validate` 把 `PasskeyRpId.Normalize(...)!` 直接赋回 `entry.RpId`，遇到 `".."`／纯点会归一化成 null 再写库，报的是 SQLite `NOT NULL constraint failed` 而不是参数错误——**`!` 把"归一化可能失败"吃掉了，只有真喂一条脏输入才暴露**。边界要说清：引擎目前是**纯库**，`App.axaml.cs` 注册了 3 个 singleton 而没人解析，所以 UI/产物门并不替 passkey 背书，背书的是那 42 条单测；细节见 §7 的"Passkey 三片"。门禁：格式 0 改动、Release 0 warning、该轮 820 条单测全绿；重新 publish 后产物门 loadMs=595/4000、KeePass 20000 条增长 5.7MB/24、锁定尾窗中位 112.9MB/120、锁/解 25/14/1/4 |
+| `dda2766` | 三片里的**片3：自动输入序列可配置**。原来那条流程写死"用户名 Tab 密码"，回车和不太规矩的登录框都得用户手动补。新增 `src/Monica.App/Services/AutoTypeSequenceParser.cs`（文件名带 Parser 是**没办法**：设置属性和 VM 都叫 `AutoTypeSequence`，同名 class 会被遮蔽），token 拼写用 KeePass 的 `{USERNAME}{TAB}{PASSWORD}{ENTER}{DELAY:ms}`。**为什么是这个拼写而不是 Android 的**——量过 Android 现状：那边根本没有序列解析器，`{USERNAME}{TAB}{PASSWORD}` 只是 `res/values/strings.xml:4605` 的一条 UI 提示，KDBX 的 `AutoTypeData` 读了存了但没有任何人消费，IME 填充写死、从不发回车、没有 `{DELAY}`、也没有按条目一列。所以贴齐的是**数据形状**（同一条语法，将来加按条目覆盖不用换语言），而"全局一条设置、不加 DB 列"是当前的诚实边界，按条目覆盖仍是待办。规则：整条模板要么全解析要么整体拒绝，未知 token／未闭合／非法延时都原样回显用户打的那个 token，**绝不部分生效**；缺字段的行会把它相邻的那一串 Tab 一起丢掉（两遍 `dropped[]` + `IsNextToDroppedField`），免得把光标敲飞；延时上限 5000ms 抽成 `AutoTypeLimits`，解析器和注入服务共用同一个数，不再是两处各写一份。**按下时再解析一次**：`settings.json` 可能在关闭期间被手改，设置页那个绿色勾不构成按下的许可证，新增 `SequenceInvalid`／`NothingToType` 两个结局都保证零按键。文案坑：`L[key]`/`Get` 返回原文所以花括号安全，但**带 `{...}` 的字符串绝不能当 `Format` 模板**，错误提示走 `AutoTypeSequenceInvalidFormat`（"……：{0}"）把 token 当**参数**传。设置持久化按上一轮的教训在 `Clone()` 里登记了，且 normalize 只补**空**值——解析不了的序列原样保留并报错，不静默改写用户输入。覆盖：单测 20 条（默认不发回车／缺字段与相邻 Tab 规则／字面量／大小写／10 行拒绝表含 `{DELAY:5001}` 与 `-1`／不成形 keystroke 序列／超长）+ UI 3 条（序列原样到达注入器、坏序列零按键且报出 token、设置页字段与错误行的绑定联动）；UI 门从 222→225。**两条负控里有一条打了脸**：去掉 `Mode=TwoWay` 测试**不红**——Avalonia 的 `TextBox.Text` 默认就是 TwoWay，这条得记下来；第二条（把错误行写死 `IsVisible="True"`）红在开头那句 `Assert.False`，所以测试有牙。**又踩了一次已知坑**：新 UI 测试读回 `null`，就是因为没先 `SelectedSettingsPage = "Desktop"`（§2 上一行已经写过）。产物真跑（发布 exe，每次一份全新 `MONICA_APPDATA_DIR`，只报布尔值和长度）5 次：默认→Typed 且 submitClicks=0/431ms、`{...}{DELAY:2000}{ENTER}`→submitClicks=1/2211ms、纯字面量→两个框 21/24 字符逐字相符、`{capslock}` 与 `{DELAY:9000}`→SequenceInvalid 且零按键。探针侧新事实：`--init`/`--seed` **不会**写 `settings.json`，要改序列得自己建那个文件（`appExit=1` 是 `--smoke-ui-exit-after-checks` 的既有退出码约定，不是失败）。门禁：格式 0 改动、Release 0 warning、单测 9+835、UI 17+225 全绿；产物门（本轮 publish，其后只加了一条 UI 测试、产品代码未再改动）`CANONICAL VAULT passed`、loadMs=197/4000、KeePass 增长 5.1MB/24、锁定尾窗中位 107.1MB/120（区间 106.5–108.4）。**仍留一条老实话**：切语言时序列错误文案会重译，但 `AutoTypeStatusDescriptionText` 不会——那是本轮之前就有的，没有一起改 |
 
 §3 的 use-case 抽取改动已提交（`24d92b0`），OneDrive/WebDAV 冲突副本复用修复已提交（`957c5af`）。
 
@@ -737,8 +739,8 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
      下一轮要做的是：在真的 workspace 视图里读 `ScrollBar.Bounds` / `Thumb.Bounds`，而不是再加一条合成用例。
   5. **仍未拿到的**：滚动条"好不好看"还是要用户在运行的应用里自己看一眼；本轮只多了一张 800x844 的
      `DatabaseManagement` 真帧可看（`artifacts/` 已 gitignore，图不入库）。
-- **Passkey 三片：片1 已落地，片2/片3 排队（用户 2026-09-23 点名"应该再支持一下 passkey 这些还有 Windows Hello 解锁客户端"，并选了"片1 Passkey 存储+自证引擎"先做）**。
-  1. **片1 已完（本轮）**：`Monica.Core/Passkeys/*` 是 Monica 自己的软件认证器 +  relying-party 校验器
+- **Passkey 三片：片1、片3 已落地，只剩片2（用户 2026-09-23 点名"应该再支持一下 passkey 这些还有 Windows Hello 解锁客户端"，并选了"片1 Passkey 存储+自证引擎"先做）**。
+  1. **片1 已完（上一轮 `bda943f`）**：`Monica.Core/Passkeys/*` 是 Monica 自己的软件认证器 +  relying-party 校验器
      （ES256/RS256 生成、authData 布局、CBOR 子集、clientDataJSON、none 证明、`passkey_private_key_v1_` 引用方案
      全部照抄 Android 的 `passkey/` 包）；`Monica.Data/Passkeys/*` 是落地面：新表 `passkey_private_keys`
      （schema 75→76）用保险库会话密钥加密 PKCS#8，凭据行只留引用，清库语句同步加了 `DELETE FROM passkey_private_keys`。
@@ -763,8 +765,44 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
      - 真实 P/Invoke 名字是 `WebAuthNAuthenticatorMakeCredential` / `WebAuthNGetAssertion`（不是 `WebAuthNMakeCredential`
        / `WebAuthNGetAssertion` 这种直觉拼法），外加 `hmac-secret` 扩展才能走"passkey 解保险库"这条路。
      - 需要升级现有的 `NativePasskey` 能力上报，并对齐 Android 的 `biometric_enabled` / `auto_lock_timeout` 语义。
-  5. **片3 = 自动输入（Auto-Type）序列可配置（未开始）**：现在是写死的 `<tab>` 流程，要按 Android 那样支持
-     `<username><tab><password><enter><delay:N>` 并且让非密码条目也能参与。
+  5. **片3 = 自动输入（Auto-Type）序列可配置（`dda2766` 已完）**：
+     - **先纠一处我上一轮写下的错**：Android **没有**自动输入序列解析器，也没有 `<username>` 这种尖括号拼写。
+       `{USERNAME}{TAB}{PASSWORD}` 在 Android 侧只是一句 UI 提示（`keepass_native_auto_type_tokens_hint`，
+       `res/values/strings.xml:4605`）加一个 KDBX `AutoTypeData` 字段（读得到、改得了、存得回，但没人消费它）；
+       真正的 IME 填充是写死的、从不发 ENTER、没有等待、条目表里也没有 per-entry 的序列列，全局设置里同样没有。
+       所以：标记拼写跟 KeePass 的 `{...}`、**不加数据库列**、序列是桌面端的一条全局设置，解析器是桌面端自己的
+       能力，不是"补齐 Android 已有的东西"。
+     - 落地：`Services/AutoTypeSequenceParser.cs` 支持 `{USERNAME} {PASSWORD} {TAB} {ENTER} {DELAY:毫秒}` +
+       原样文字，大小写不敏感、≤256 字符；`{DELAY}` 的上限直接复用注入器的 `AutoTypeLimits.MaxDelayMilliseconds`
+       （5000），所以超长的等待是响亮地拒绝而不是被静默截断。`AutoTypeMatcher.BuildTokens` 已删——写死的流程没了，
+       默认序列 `{USERNAME}{TAB}{PASSWORD}` 逐字复刻今天的行为，**仍然只有用户自己写了 `{ENTER}` 才会提交表单**。
+     - 条目缺某字段时，那个字段和**紧挨着它的 Tab 一起去掉**（Tab 只为在两个值之间走路，留着会让光标离开用户
+       已经点进去的框）；连续 Tab 成段判定，所以没用户名时 `{USERNAME}{TAB}{TAB}{PASSWORD}` 只剩密码。这条规则
+       是被一条真红逼出来的：第一版只吃掉"后面"的 Tab，`{("octocat","")}` 那行拿 2 个键。
+     - 设置页新增一行即时校验：错误文案点名用户写错的那个标记。解析不了的序列**按原样存着**（`AppSettingsService`
+       只把**空**序列填回默认值）——载入时偷偷改写会删掉用户输入还不吭声，正是当年自动输入热键冲突那个修复踩过的坑。
+       按热键时**再判一次**（设置文件可能在关闭期间被手改），三条退路分别是 `SequenceInvalid`（点名标记）／
+       `NothingToType`（序列能解析，但这条条目没内容可发）／`Typed`。新设置已登记进 `Clone()`，另有
+       `App_settings_file_carries_every_declared_setting` 那条反射守卫兜底。
+     - 覆盖：单测 20 条（默认序列不发 ENTER、缺字段的成对 Tab、字面文字、延迟、大小写、九种拒绝行、坏序列落盘
+       不被改写）+ UI 3 条（配置好的序列原样到达注入器、坏序列一个键都不发且状态栏点名 `{capslock}`、设置页
+       那一行在真渲染树上双向绑定＋错误行随 `HasAutoTypeSequenceError` 显隐）。负控两条：把错误 `TextBlock` 的
+       `IsVisible` 改成常量 `True` → 新 UI 测红在开头的 `Assert.False`；把 `Mode=TwoWay` 去掉 → **仍然绿**，
+       因为 Avalonia 的 `TextBox.Text` 默认就是双向（`Mode=TwoWay` 是写下来表意的，不是功能必需的）。
+     - **真机实测**（发布产物 `artifacts/publish/win-x64/jit/Monica.App.exe`，每轮一个全新
+       `MONICA_APPDATA_DIR`，WinForms 目标窗体两个输入框 + 一个 `AcceptButton`，序列写进产物自己读取的
+       `settings.json`，脚本 `artifacts/autotype/verify-autotype-injection.ps1` 只报布尔和长度）：
+       1. 默认序列：`outcome=Typed`，两个框逐字对上口令条目，**`submitClicks=0`、pressToVerdict=431ms**——
+          出厂默认仍然不会提交表单。
+       2. `{USERNAME}{TAB}{PASSWORD}{DELAY:2000}{ENTER}`：`Typed`、两框都对、**`submitClicks=1`、2211ms**
+          ——ENTER 真发出去了，DELAY 真的等满了 2 秒。
+       3. `smoke-{USERNAME}{TAB}{PASSWORD}@mail`：第一框 21 字符、第二框 24 字符且都匹配预期——字面文字原样进框。
+       4. `{capslock}`：`SequenceInvalid`，两个框**长度 0**，一个键都没发。
+       5. `{USERNAME}{DELAY:9000}{TAB}{PASSWORD}`：同样 `SequenceInvalid`、零按键——5000ms 上限在产物上生效。
+       副作用记录：4/5 两轮的进程退出码是 1，因为 `--smoke-ui-autotype` 自检把"outcome 不是 Typed"记成
+       `success=False`；这不是本轮引入的（弹列表的探针一直如此），别按失败读。
+     - 仍未做：把 `AutoTypeData`（KDBX 里那条 per-entry 序列）读进来。Android 存了但不用它，桌面端现在也不读；
+       要做的话得先决定"条目级序列"和"全局序列"谁优先，那是新范围，不是缺口。
 
 ## 8. 用户协作偏好（务必遵守）
 
