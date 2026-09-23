@@ -84,6 +84,21 @@ public static class BitwardenMergeEngine
                     : "Remote revision and content match local state.");
         }
 
+        if (sameRevision && !sameState)
+        {
+            // The server has not moved past the revision we already hold, so a content difference can
+            // only be ours: an edit, move or delete this client made and never uploaded. Back it up
+            // before remote wins instead of dropping it - no upload path exists to reconcile it with.
+            return new(
+                BitwardenMergeAction.CreateConflictBackupThenApplyRemote,
+                remote.CipherId,
+                local.LocalId,
+                remote.CipherType,
+                local.RevisionDate,
+                remote.RevisionDate,
+                "Local state differs at the remote revision; keep the local change recoverable, then apply remote.");
+        }
+
         if (local.LocalModified)
         {
             return new(
