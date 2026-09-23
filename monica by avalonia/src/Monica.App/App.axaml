@@ -1,17 +1,10 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:sys="using:System"
              xmlns:styling="using:FluentAvalonia.Styling"
              x:Class="Monica.App.App"
              RequestedThemeVariant="Default">
     <Application.Resources>
         <ResourceDictionary>
-            <!-- FluentAvalonia reads these sizing knobs at runtime, so overriding them here slims
-                 every scrollbar in the app (nav rail, vault tree, lists) without retemplating it:
-                 a thin floating bar with no arrow buttons eating the corner. -->
-            <sys:Double x:Key="ScrollBarSize">10</sys:Double>
-            <sys:Double x:Key="ScrollBarArrowSize">0</sys:Double>
-            <sys:Double x:Key="ScrollBarThumbBoxSize">30</sys:Double>
 
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="/Styles/DesignTokens.axaml" />
@@ -40,6 +33,7 @@
                     <SolidColorBrush x:Key="TextFillColorPrimaryBrush" Color="#191919" />
                     <SolidColorBrush x:Key="TextFillColorSecondaryBrush" Color="#464646" />
                     <SolidColorBrush x:Key="TextFillColorTertiaryBrush" Color="#5E5E5E" />
+                    <SolidColorBrush x:Key="SlimScrollBarThumbBrush" Color="#73000000" />
                     <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#0067C2" />
                     <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#0F6CBD" />
                     <SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#D7EBF8" />
@@ -73,6 +67,7 @@
                     <SolidColorBrush x:Key="TextFillColorPrimaryBrush" Color="#F3F3F3" />
                     <SolidColorBrush x:Key="TextFillColorSecondaryBrush" Color="#C9C9C9" />
                     <SolidColorBrush x:Key="TextFillColorTertiaryBrush" Color="#9D9D9D" />
+                    <SolidColorBrush x:Key="SlimScrollBarThumbBrush" Color="#73FFFFFF" />
                     <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#60CDFF" />
                     <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#3AADE2" />
                     <SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#275A70" />
@@ -106,6 +101,7 @@
                     <SolidColorBrush x:Key="TextFillColorPrimaryBrush" Color="#000000" />
                     <SolidColorBrush x:Key="TextFillColorSecondaryBrush" Color="#000000" />
                     <SolidColorBrush x:Key="TextFillColorTertiaryBrush" Color="#1A1A1A" />
+                    <SolidColorBrush x:Key="SlimScrollBarThumbBrush" Color="#000000" />
                     <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#FFFF00" />
                     <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#00FFFF" />
                     <SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#E6F7FF" />

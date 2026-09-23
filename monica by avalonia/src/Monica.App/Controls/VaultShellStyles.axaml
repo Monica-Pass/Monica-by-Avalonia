@@ -227,4 +227,82 @@
         <Setter Property="Background" Value="{DynamicResource AccentFillColorTertiaryBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
     </Style>
+
+    <!-- Win11-shaped scrollbars: a slim floating thumb over no track and no arrow buttons.
+         FluentAvalonia sizes its bars from the Windows UISettings COM interop rather than from
+         application resources, so the only way to change the shape is to own the template.
+         Measured before this: a vertical bar rendered 14px wide with two visible 14x10 arrow
+         buttons, and the app-level ScrollBarSize/ScrollBarArrowSize knobs changed nothing. -->
+    <Style Selector="ScrollBar:vertical">
+        <Setter Property="Width" Value="12" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="Transparent">
+                    <Track Name="PART_Track"
+                           IsDirectionReversed="True"
+                           Maximum="{TemplateBinding Maximum}"
+                           Minimum="{TemplateBinding Minimum}"
+                           Orientation="Vertical"
+                           Value="{TemplateBinding Value, Mode=TwoWay}"
+                           ViewportSize="{TemplateBinding ViewportSize}">
+                        <Track.DecreaseButton>
+                            <RepeatButton Name="PART_PageUpButton" Classes="slimScrollBarPage" Focusable="False" />
+                        </Track.DecreaseButton>
+                        <Track.IncreaseButton>
+                            <RepeatButton Name="PART_PageDownButton" Classes="slimScrollBarPage" Focusable="False" />
+                        </Track.IncreaseButton>
+                        <Thumb Name="slimThumb" Margin="4,0" MinHeight="28" />
+                    </Track>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="ScrollBar:horizontal">
+        <Setter Property="Height" Value="12" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="Transparent">
+                    <Track Name="PART_Track"
+                           Maximum="{TemplateBinding Maximum}"
+                           Minimum="{TemplateBinding Minimum}"
+                           Orientation="Horizontal"
+                           Value="{TemplateBinding Value, Mode=TwoWay}"
+                           ViewportSize="{TemplateBinding ViewportSize}">
+                        <Track.DecreaseButton>
+                            <RepeatButton Name="PART_PageUpButton" Classes="slimScrollBarPage" Focusable="False" />
+                        </Track.DecreaseButton>
+                        <Track.IncreaseButton>
+                            <RepeatButton Name="PART_PageDownButton" Classes="slimScrollBarPage" Focusable="False" />
+                        </Track.IncreaseButton>
+                        <Thumb Name="slimThumb" Margin="0,4" MinWidth="28" />
+                    </Track>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <!-- The page buttons stay live (clicking the channel still pages) but paint nothing, which is
+         what removes the grey trough the old bar drew behind the thumb. -->
+    <Style Selector="ScrollBar /template/ RepeatButton.slimScrollBarPage">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="Transparent" />
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="ScrollBar /template/ Thumb#slimThumb">
+        <Setter Property="Background" Value="{DynamicResource SlimScrollBarThumbBrush}" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="{TemplateBinding Background}" CornerRadius="2" />
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="ScrollBar:vertical /template/ Thumb#slimThumb:pointerover">
+        <Setter Property="Margin" Value="2,0" />
+    </Style>
+    <Style Selector="ScrollBar:horizontal /template/ Thumb#slimThumb:pointerover">
+        <Setter Property="Margin" Value="0,2" />
+    </Style>
 </Styles>
