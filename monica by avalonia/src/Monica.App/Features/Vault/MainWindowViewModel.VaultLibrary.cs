@@ -518,6 +518,24 @@ public sealed partial class MainWindowViewModel
         _isRestoringVaultSelection = false;
     }
 
+    /// After a reload, not a rebuild: RestoreVaultSelection has already put the highlight back with
+    /// opens suppressed, so the editor has to be handed over through the same path a click takes.
+    /// The entry may be gone (removed on another device), and then there is nothing to reopen.
+    private void ReopenVaultRowAfterReload(string? selectedKey)
+    {
+        if (string.IsNullOrEmpty(selectedKey))
+        {
+            return;
+        }
+
+        var match = VaultTreeRows.FirstOrDefault(row =>
+            string.Equals(row.Key, selectedKey, StringComparison.Ordinal));
+        if (match is not null)
+        {
+            OpenVaultEntry(match);
+        }
+    }
+
     /// The row only decides *which* editor opens; the editor's own page keeps owning the selection
     /// state, so the library never has to duplicate a load path.
     private void OpenVaultEntry(IVaultTreeRow? row)

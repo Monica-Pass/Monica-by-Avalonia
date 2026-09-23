@@ -100,6 +100,11 @@ public sealed partial class MainWindowViewModel
                     account.Id,
                     conflict.BackupId,
                     _bitwardenSyncOperationCancellation!.Token);
+
+                // The restore writes through the repository, so until the vault is read again the row on
+                // screen still carries the title the pull overwrote it with, and "restored" would only be
+                // true after another lock and unlock.
+                await ReloadVaultKeepingSelectionAsync();
             }
             else
             {

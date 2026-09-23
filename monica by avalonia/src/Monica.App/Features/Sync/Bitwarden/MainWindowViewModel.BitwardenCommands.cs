@@ -93,11 +93,14 @@ public sealed partial class MainWindowViewModel
         var cancellationToken = _bitwardenSyncOperationCancellation!.Token;
         try
         {
-            await _bitwardenSyncCoordinator.SyncAsync(
+            var result = await _bitwardenSyncCoordinator.SyncAsync(
                 account.Id,
                 BitwardenSyncTrigger.Manual,
                 cancellationToken);
-            SetStatusNotice("BitwardenSyncedFormat", account.DisplayName);
+            if (!await ApplyBitwardenPullToVaultAsync(result))
+            {
+                SetStatusNotice("BitwardenSyncedFormat", account.DisplayName);
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

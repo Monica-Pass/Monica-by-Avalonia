@@ -1,12 +1,17 @@
+using System.Diagnostics;
+using System.Reflection;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.App.Features.Sync.Bitwarden;
+using Monica.App.Features.Vault;
 using Monica.App.Services;
 using Monica.App.ViewModels;
 using Monica.Core.Bitwarden;
+using Monica.Core.Models;
 using Monica.Data.Bitwarden;
+using Monica.Data.Repositories;
 
 namespace Monica.UiTests;
 
@@ -223,7 +228,12 @@ public sealed class BitwardenSyncWorkflowUiTests
             Assert.True(restore.Command!.CanExecute(restore.CommandParameter));
 
             restore.Command.Execute(restore.CommandParameter);
-            Dispatcher.UIThread.RunJobs();
+            // Execute returns before the resolve has run to the end, and a restore now reloads the
+            // vault, so the dispatcher has to move several passes before the list is refreshed. One
+            // RunJobs pass was only ever enough while restoring wrote nothing the screen showed.
+            RunJobsUntil(
+                () => viewModel.BitwardenConflicts.Count == 0,
+                "the resolved conflict never left the list");
 
             Assert.Equal([(7L, row.BackupId)], conflicts.Restored);
             Assert.Empty(viewModel.BitwardenConflicts);
@@ -300,14 +310,209 @@ public sealed class BitwardenSyncWorkflowUiTests
         Assert.Empty(viewModel.BitwardenOperationError);
     }
 
+    // A pull writes straight into the database while every on-screen collection keeps its old copies,
+    // so a change from another device used to stay invisible until the vault was locked and unlocked
+    // again. This runs the user's own path: the library is open, one entry is up in the editor, "Sync
+    // now" is pressed - and the renamed row has to read differently without another click.
+    [Fact]
+    public async Task A_pull_lands_in_the_library_the_user_is_reading()
+    {
+        var account = CreateAccount(id: 7, connected: true);
+        var authentication = new FakeAuthenticationService(_ => new BitwardenAuthenticationResult(
+            true,
+            account,
+            CreateSecrets(),
+            BitwardenLoginChallengeKind.None));
+        var repository = DispatchProxy.Create<IMonicaRepository, PulledVaultRepositoryProxy>();
+        var vault = (PulledVaultRepositoryProxy)(object)repository;
+        vault.Write(
+            new PasswordEntry { Id = 901, Title = "Bank", Username = "person" });
+        var pull = new FakePull(
+            new BitwardenPullMergeResult(1, 1, 0, 0, 0, 0, 0),
+            () => vault.Write(
+                new PasswordEntry { Id = 901, Title = "Bank (work)", Username = "person" },
+                new PasswordEntry { Id = 902, Title = "Written elsewhere", Username = "other" }));
+        using var fixture = CreateFixture(authentication, repository: repository, pull: pull);
+        var viewModel = fixture.ViewModel;
+        fixture.Window.Show();
+        fixture.Window.DataContext = viewModel;
+        viewModel.IsUnlocked = true;
+        viewModel.SelectSectionCommand.Execute(VaultPresets.LibrarySection);
+        Dispatcher.UIThread.RunJobs();
+        fixture.AccountStore.Accounts.Add(account);
+
+        // The load has to run the way the shell runs it: LoadAsync yields back to the dispatcher
+        // between passes, and those continuations only move when the queue is drained.
+        RunOnUiThread(() => viewModel.LoadAsync());
+        await viewModel.LoadBitwardenAccountsCommand.ExecuteAsync(null);
+        var entryRow = Assert.Single(viewModel.VaultTreeRows.OfType<VaultTreeEntryRow>());
+        viewModel.SelectedVaultRow = entryRow;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("Bank", viewModel.SelectedPassword?.Title);
+        var readsBeforeSync = vault.PasswordReads;
+
+        RunOnUiThread(() => viewModel.SyncBitwardenAccountCommand.ExecuteAsync(null));
+
+        Assert.Equal(
+            ["Bank (work)", "Written elsewhere"],
+            viewModel.Passwords.Select(item => item.Title).ToArray());
+        // Every entry object was replaced under the editor, so this is a fresh instance carrying the
+        // remote title - the entry the user was reading, not the one they were reading before.
+        Assert.Equal(901, viewModel.SelectedPassword?.Id);
+        Assert.Equal("Bank (work)", viewModel.SelectedPassword?.Title);
+        Assert.True(vault.PasswordReads > readsBeforeSync, "the library was not re-read");
+        Assert.Equal(
+            viewModel.L.Format("BitwardenPullAppliedFormat", 1, 1, 0),
+            viewModel.StatusMessage);
+    }
+
+    // The reload is a full vault read with a visible cost, so an idle sync must not pay for it. The
+    // counts come from the merge, and a sync that found nothing to write leaves the screen alone.
+    [Fact]
+    public async Task A_pull_that_changed_nothing_leaves_the_loaded_vault_alone()
+    {
+        var account = CreateAccount(id: 7, connected: true);
+        var authentication = new FakeAuthenticationService(_ => new BitwardenAuthenticationResult(
+            true,
+            account,
+            CreateSecrets(),
+            BitwardenLoginChallengeKind.None));
+        var repository = DispatchProxy.Create<IMonicaRepository, PulledVaultRepositoryProxy>();
+        var vault = (PulledVaultRepositoryProxy)(object)repository;
+        vault.Write(new PasswordEntry { Id = 901, Title = "Bank", Username = "person" });
+        using var fixture = CreateFixture(authentication, repository: repository);
+        var viewModel = fixture.ViewModel;
+        viewModel.IsUnlocked = true;
+        fixture.AccountStore.Accounts.Add(account);
+        RunOnUiThread(() => viewModel.LoadAsync());
+        await viewModel.LoadBitwardenAccountsCommand.ExecuteAsync(null);
+        var readsBeforeSync = vault.PasswordReads;
+
+        RunOnUiThread(() => viewModel.SyncBitwardenAccountCommand.ExecuteAsync(null));
+
+        Assert.Equal(readsBeforeSync, vault.PasswordReads);
+        Assert.Equal(
+            viewModel.L.Format("BitwardenSyncedFormat", viewModel.BitwardenAccounts.Single().DisplayName),
+            viewModel.StatusMessage);
+    }
+
+    // Connecting for the first time is the biggest pull there is, and the vault the account owns has
+    // to be the one on screen right after - not one the user only sees after locking and unlocking.
+    [Fact]
+    public void The_first_pull_of_a_new_connection_shows_up_in_the_vault()
+    {
+        var account = CreateAccount(id: 7, connected: true);
+        var authentication = new FakeAuthenticationService(_ => new BitwardenAuthenticationResult(
+            true,
+            account,
+            CreateSecrets(),
+            BitwardenLoginChallengeKind.None));
+        var repository = DispatchProxy.Create<IMonicaRepository, PulledVaultRepositoryProxy>();
+        var vault = (PulledVaultRepositoryProxy)(object)repository;
+        var pull = new FakePull(
+            new BitwardenPullMergeResult(3, 0, 0, 0, 0, 0, 0),
+            () => vault.Write(new PasswordEntry { Id = 903, Title = "From the server", Username = "person" }));
+        using var fixture = CreateFixture(authentication, repository: repository, pull: pull);
+        var viewModel = fixture.ViewModel;
+        viewModel.IsUnlocked = true;
+        viewModel.BitwardenEmail = account.Email;
+        viewModel.BitwardenMasterPassword = "master password";
+        Assert.Empty(viewModel.Passwords);
+
+        RunOnUiThread(() => viewModel.AuthenticateBitwardenCommand.ExecuteAsync(null));
+
+        var pulled = Assert.Single(viewModel.Passwords);
+        Assert.Equal("From the server", pulled.Title);
+        Assert.Equal(
+            viewModel.L.Format("BitwardenPullAppliedFormat", 3, 0, 0),
+            viewModel.StatusMessage);
+    }
+
+    // Restoring is the conflict action that changes an entry the user can see, and the write goes to the
+    // database: without reading the vault back the row keeps the title the pull overwrote theirs with, so
+    // the button would report "restored" over a screen that still says otherwise.
+    [Fact]
+    public void Restoring_a_conflict_brings_the_local_edit_back_on_screen()
+    {
+        var account = CreateAccount(id: 7, connected: true);
+        var authentication = new FakeAuthenticationService(_ => new BitwardenAuthenticationResult(
+            true,
+            account,
+            CreateSecrets(),
+            BitwardenLoginChallengeKind.None));
+        var repository = DispatchProxy.Create<IMonicaRepository, PulledVaultRepositoryProxy>();
+        var vault = (PulledVaultRepositoryProxy)(object)repository;
+        vault.Write(new PasswordEntry { Id = 901, Title = "Renamed by the remote", Username = "person" });
+        var conflicts = new FakeConflictRestoreService
+        {
+            OnRestore = () => vault.Write(
+                new PasswordEntry { Id = 901, Title = "Renamed on this device", Username = "person" })
+        };
+        using var fixture = CreateFixture(authentication, conflictRestore: conflicts, repository: repository);
+        var viewModel = fixture.ViewModel;
+        viewModel.IsUnlocked = true;
+        viewModel.BitwardenEmail = account.Email;
+        viewModel.BitwardenMasterPassword = "master password";
+        RunOnUiThread(() => viewModel.AuthenticateBitwardenCommand.ExecuteAsync(null));
+        RunOnUiThread(() => viewModel.LoadAsync());
+        var row = Assert.Single(viewModel.BitwardenConflicts);
+        Assert.Equal("Renamed by the remote", Assert.Single(viewModel.Passwords).Title);
+
+        RunOnUiThread(() => viewModel.RestoreBitwardenConflictCommand.ExecuteAsync(row));
+
+        Assert.Equal("Renamed on this device", Assert.Single(viewModel.Passwords).Title);
+        Assert.Empty(viewModel.BitwardenConflicts);
+    }
+
+    private static void RunOnUiThread(Func<Task> work)
+    {
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Dispatcher.UIThread.Post(async () =>
+        {
+            try
+            {
+                await work();
+                done.TrySetResult();
+            }
+            catch (Exception exception)
+            {
+                done.TrySetException(exception);
+            }
+        });
+
+        var timeout = Stopwatch.StartNew();
+        while (!done.Task.IsCompleted && timeout.Elapsed < TimeSpan.FromSeconds(20))
+        {
+            Dispatcher.UIThread.RunJobs();
+            Thread.Sleep(1);
+        }
+
+        Assert.True(done.Task.IsCompleted, "The work did not finish before the pump timeout.");
+        done.Task.GetAwaiter().GetResult();
+    }
+
+    private static void RunJobsUntil(Func<bool> condition, string because)
+    {
+        var timeout = Stopwatch.StartNew();
+        while (!condition() && timeout.Elapsed < TimeSpan.FromSeconds(20))
+        {
+            Dispatcher.UIThread.RunJobs();
+            Thread.Sleep(1);
+        }
+
+        Assert.True(condition(), because);
+    }
+
     private static Fixture CreateFixture(
         IBitwardenAuthenticationService authentication,
         bool failSynchronization = false,
-        IBitwardenConflictRestoreService? conflictRestore = null)
+        IBitwardenConflictRestoreService? conflictRestore = null,
+        IMonicaRepository? repository = null,
+        FakePull? pull = null)
     {
         var accountStore = new FakeAccountStore();
         var sessionManager = new FakeSessionManager();
-        var coordinator = new FakeSyncCoordinator(accountStore, failSynchronization);
+        var coordinator = new FakeSyncCoordinator(accountStore, failSynchronization, pull);
         var window = new Monica.App.MainWindow();
         var services = Monica.App.App.ConfigureServices(window, collection =>
         {
@@ -316,6 +521,11 @@ public sealed class BitwardenSyncWorkflowUiTests
             collection.AddSingleton<IBitwardenSyncCoordinator>(coordinator);
             collection.AddSingleton<IBitwardenSessionManager>(sessionManager);
             collection.AddSingleton<IBitwardenDeviceIdentityProvider>(new FakeDeviceIdentityProvider());
+            if (repository is not null)
+            {
+                collection.AddSingleton(repository);
+            }
+
             if (conflictRestore is not null)
             {
                 collection.AddSingleton(conflictRestore);
@@ -452,7 +662,8 @@ public sealed class BitwardenSyncWorkflowUiTests
 
     private sealed class FakeSyncCoordinator(
         FakeAccountStore accountStore,
-        bool failSynchronization) : IBitwardenSyncCoordinator
+        bool failSynchronization,
+        FakePull? pull) : IBitwardenSyncCoordinator
     {
         private BitwardenSyncState _state = new(
             0,
@@ -481,10 +692,60 @@ public sealed class BitwardenSyncWorkflowUiTests
                 DateTimeOffset.UtcNow);
             StateChanged?.Invoke(this, _state);
             var account = accountStore.Accounts.Single(item => item.Id == accountId);
+            pull?.Apply();
             return Task.FromResult(new BitwardenSyncResult(
                 account,
                 new BitwardenMutationBatchResult(0, 0, 0, 0, 0),
-                new BitwardenPullMergeResult(0, 0, 0, 0, 0, 0, 0)));
+                pull?.Merge ?? new BitwardenPullMergeResult(0, 0, 0, 0, 0, 0, 0)));
+        }
+    }
+
+    /// Stands in for a merge that reached the database: the write itself is covered by the pull
+    /// service's own tests, so what the fake owes here is the counts and a repository that answers
+    /// differently once the sync has run.
+    private sealed record FakePull(BitwardenPullMergeResult Merge, Action Apply);
+
+    private class PulledVaultRepositoryProxy : DispatchProxy
+    {
+        private IReadOnlyList<PasswordEntry> _passwordItems = [];
+        private int _passwordReads;
+
+        public int PasswordReads => _passwordReads;
+
+        public void Write(params PasswordEntry[] entries) => _passwordItems = entries;
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            ArgumentNullException.ThrowIfNull(targetMethod);
+            return targetMethod.Name switch
+            {
+                nameof(IMonicaRepository.GetPasswordsAsync) => Task.FromResult(ReadPasswords()),
+                nameof(IMonicaRepository.GetCustomFieldsByEntryIdsAsync) =>
+                    Task.FromResult<IReadOnlyDictionary<long, IReadOnlyList<CustomField>>>(
+                        new Dictionary<long, IReadOnlyList<CustomField>>()),
+                nameof(IMonicaRepository.GetAttachmentsByOwnerIdsAsync) =>
+                    Task.FromResult<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>>(
+                        new Dictionary<long, IReadOnlyList<Attachment>>()),
+                nameof(IMonicaRepository.GetAttachmentOwnerIdsAsync) =>
+                    Task.FromResult<IReadOnlyList<long>>([]),
+                nameof(IMonicaRepository.GetSecureItemsAsync) =>
+                    Task.FromResult<IReadOnlyList<SecureItem>>([]),
+                nameof(IMonicaRepository.GetCategoriesAsync) =>
+                    Task.FromResult<IReadOnlyList<Category>>([]),
+                nameof(IMonicaRepository.GetPasswordQuickAccessRecordsAsync) =>
+                    Task.FromResult<IReadOnlyList<PasswordQuickAccessRecord>>([]),
+                nameof(IMonicaRepository.GetMdbxDatabasesAsync) =>
+                    Task.FromResult<IReadOnlyList<LocalMdbxDatabase>>([]),
+                nameof(IMonicaRepository.GetOperationLogsAsync) =>
+                    Task.FromResult<IReadOnlyList<OperationLog>>([]),
+                _ => throw new NotSupportedException($"Unexpected repository call: {targetMethod.Name}")
+            };
+        }
+
+        private IReadOnlyList<PasswordEntry> ReadPasswords()
+        {
+            Interlocked.Increment(ref _passwordReads);
+            return _passwordItems;
         }
     }
 
@@ -526,6 +787,10 @@ public sealed class BitwardenSyncWorkflowUiTests
 
         public Task? Gate { get; set; }
 
+        /// Stands in for the write the real service makes against the repository, so a test can see the
+        /// entry change value the way the database does.
+        public Action? OnRestore { get; set; }
+
         public List<Task> Landed { get; } = [];
 
         public async Task<IReadOnlyList<BitwardenConflictSummary>> GetSummariesAsync(
@@ -551,6 +816,7 @@ public sealed class BitwardenSyncWorkflowUiTests
         {
             Restored.Add((vaultId, backupId));
             Remove(backupId);
+            OnRestore?.Invoke();
             return Task.CompletedTask;
         }
 

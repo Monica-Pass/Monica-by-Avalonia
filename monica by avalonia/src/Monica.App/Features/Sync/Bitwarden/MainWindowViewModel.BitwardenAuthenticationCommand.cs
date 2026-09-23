@@ -60,10 +60,14 @@ public sealed partial class MainWindowViewModel
 
             try
             {
-                await _bitwardenSyncCoordinator.SyncAsync(
+                var syncResult = await _bitwardenSyncCoordinator.SyncAsync(
                     savedAccount.Id,
                     BitwardenSyncTrigger.Manual,
                     cancellationToken);
+
+                // The first pull of a connected vault is usually its biggest, and the account card
+                // already says it is connected, so the line is spent on what landed in the library.
+                await ApplyBitwardenPullToVaultAsync(syncResult);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
