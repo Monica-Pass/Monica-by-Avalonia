@@ -289,8 +289,17 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
   - 空库是故意的：就绪检查要求 `Passwords.Count > 0`，所以进程**退出码 1 是预期**，13 帧照样落盘。
   - **约束**：Generator 那一帧必然含一个实时生成的口令。它是空态一次性库里的产物、且 `artifacts/`
     已被 gitignore 提交不进去，但这意味着**矩阵只能在一次性库上跑**，绝不能在真实库目录上跑。
-  - **但这条路由当前出不了可用的图**（#90 实测）：13 帧内容完全相同、都是锁屏，而同轮日志写着已解锁。
-    跑法本身没错，是矩阵坏了；在修好之前不要拿它当"逐屏看过了"的证据，详见 §7 最后一条。
+  - **抓取会冻结，但矩阵本身是好的**（#92 实测）：修之前 7 次真跑里 **1 次** 13 帧全同（`distinctFrames=1`、
+    都是解锁前的那一帧），另外 6 次含两次 9-22 的历史运行都是 **13/13 帧帧不同**。冻结与启动方式
+    （bash / `Start-Process` / 是否带 `--smoke-ui-exit-after-checks`）无关，也与窗口可见性无关
+    （外部每 60ms `ShowWindow(SW_MINIMIZE)`  hammer 仍然 13/13），**根因未定位**。
+  - 现在 `RunSmokeUiOtherPagesScreenshotsAsync` 先跑 `WaitForLiveSmokeCaptureAsync`：切一次 section、
+    连抓两帧比对，4 次都不重绘就记 `failures=capture-stale` 并**一帧都不写**。
+    实测：正向 5/5 次 `liveness proved attempt=1` + `distinctFrames=13`；
+    负向（临时用环境变量掐掉那次切换）`did not repaint attempt=1..4` → `capture-stale`、`frames=0`。
+    抓取同时改成 `bitmap.Render((Visual)Content!)`（渲染 Window 自身会拿到它的顶层绘制组）。
+    改后 5/5 次都是活的，但冻结本来 7 次才复现 1 次，**所以这条改动的因果还没被证明**，
+    真正兜底的是上面那道 liveness 门。
 
 ## 7. 剩余阻塞项 / 可推进方向（朝"商业级"）
 
@@ -684,18 +693,50 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
     "重置 → 新主密码 → 恢复应急包"，缺的正是上面那条重置。
   - **未验证**：真实 shell 文件对话框的存/选往返（测试里是替身）；口令正确但文件被改名/截断的部分读
     只覆盖了"口令错"这一类失败。
-- **外观类改动欠一台"截图口味门"机器（#90 把这个缺口撞出来了）**。"这个滚动条有点丑了"这类判断按老规矩
-  应该是"探一屏 + 截图过口味门"再铺开，但这轮两条路都不通，只能拿几何数字交差：
-  1. **`--smoke-ui-screenshot-dir` 矩阵不可信**：13 帧**内容完全相同**（`distinctFrames=1`、
-     `failures=Passwords:duplicate-of-Vault,…`），而同一轮日志明确写着 `status=保险库已解锁`。
-     所以这个矩阵**不能当作"每一屏都看到了"的证据**——它把同一张锁屏图落了 13 次。
+- **Bitwarden 接入审计（用户 2026-09-23 问："能不能正常接入、能不能当完善的第三方客户端、会不会出现同步问题"）**。
+  结论：**现在只能当"只读拉取 + JSON 导入"用，不能当完善客户端；修之前它会在下一次拉取时静默吃掉用户对绑定条目的本地改动。**
+  - 实测（`tests/Monica.Tests/BitwardenLocalEditSurvivalTests.cs`：走真实编辑器 `PasswordEditorViewModel.BuildEntryFrom`
+    + 真实 `MonicaRepository`，再用一份**未变化**的远端快照重放 `BitwardenPullMergeService.ApplyAsync`）：
+    - 修前量到的红：`titleAfterPull=Remote baseline, updated=1, conflictsBackedUp=0, unresolvedBackups=0`；
+      第二条同时量到 `localModified=False, pendingOperations=0` —— 改动既没了、也没留下任何备份，
+      而账户卡照旧显示"已连接 / 无待处理更改 / 无冲突"（`MainWindowViewModel.BitwardenAccountProjection.cs:41-46`）。
+    - 对照组（先把夹具钉住）：本地内容与远端一致、revision 一致时 `Unchanged=1` —— 所以上面那条不是
+      指纹对不上的假红，是真覆盖。
+    - 修后 3/3 绿；整套 Bitwarden 59/59 绿。
+  - **修法**（`BitwardenMergeEngine.PlanExisting`）：revision 相同但状态不同 ⇒ 判为"这台设备改了、从没上传过"，
+    改走 `CreateConflictBackupThenApplyRemote`。备份载荷经 `VaultDataProtector` 加密入库，实测
+    `GetUnresolvedAsync` 能原样读回被改掉的标题。这条**故意不依赖** `BitwardenLocalModified`：实测 src/ 里
+    没有任何编辑路径会把它置 true（只有克隆/导入会），逐处补 8 个写入口不如让合并引擎自己看出差异。
+  - **仍然开着的缺口（按严重度，别当成已完事）**：
+    1. **完全没有写回通道**：`IBitwardenPendingOperationStore.EnqueueAsync` 在 src/ 里零调用点（只有它自己的
+       定义与 7 处测试），所以下游 `BitwardenMutationProcessor` 永远在抽一个空队列；仓库里也没有把条目编成
+       远端 cipher 载荷的代码（`BitwardenCipherStringCrypto` 只被 decoder/auth 用作字段级加解密）。新建条目
+       连 `BitwardenVaultId` 都不会被赋值（grep `BitwardenVaultId = ` 只命中克隆/导入）。⇒ **在 Monica 里改密码，
+       Bitwarden 服务器和其他客户端永远不会知道。**
+    2. **冲突备份有表、有计数、没有界面**：`IBitwardenConflictBackupStore` 在 Monica.App 里唯一消费者是账户卡
+       那一行计数（`...BitwardenAccountProjection.cs:20-23`），没有任何页面能列出或还原备份。所以第 1 条修法
+       买到的是"数据没被销毁"，不是"用户能自己拿回来"。
+    3. **远端同时改过的场景仍会盖掉本地**（revision 比本地新 ⇒ 判不出本地也改过）。要区分必须存"上次同步时的
+       载荷指纹"，那是新增列 + 迁移，本轮没做。
+    4. **真服务器从未验过**：全仓 grep `vaultwarden` 0 命中，`eng/ci` 只有 4 个脚本，没有任何集成测试痕迹。
+       登录 / prelogin / KDF / 2FA / captcha / 设备 OTP 只在替身 HTTP 下绿过。要接真账号或本地起 Vaultwarden，
+       得先拿用户点头。
+- **外观类改动欠一台"截图口味门"机器（#90 把这个缺口撞出来了，#92 修好了其中一条路）**。
+  "这个滚动条有点丑了"这类判断按老规矩应该是"探一屏 + 截图过口味门"再铺开，当时两条路都不通、只能拿几何数字交差：
+  1. **`--smoke-ui-screenshot-dir` 矩阵已经可用**（#92 修完）：7 次真跑里 1 次全帧相同，现在抓取前先验
+     活性，冻结时直接 `failures=capture-stale` 且不写文件。正向 5/5 次 `distinctFrames=13`。
   2. **无头自己画图也不通**：UI 测试里 `RenderTargetBitmap.Render(window)` / `Render(list)` 之后
      `Save(path)` 与 `Save(stream)` 两种写法都写出 **0 字节 PNG**（不抛异常，静默空文件）。
-  3. **本轮实际用的证据**只有渲染树数字（14px 条 + 两个可见 `14x10` 箭头 → 12px 条 + 4px 居中滑块 +
-     不着色轨道）加一条负控（注掉样式包含后 2 条测试红在 `Expected: 12 / Actual: 14`）。
-     滚动条到底好不好看**没有视觉证据**，要用户在运行的应用里自己看一眼。
-  4. **下一轮先修哪个**：优先查 1（矩阵为什么全帧相同）——它已经是现成的 13 屏走查工具，修好比再画一个新
-     探针值钱；2 只有在 1 也修不动时才值得碰。修好之前，任何"看起来对"的外观改动都只有几何证据。
+     但**应用内**的抓取（真窗口 + `Render(Content)`）是好的，所以要看图就跑矩阵，不要在测试里画。
+  3. **矩阵真的能拍到滚动条**：`--smoke-ui-width 640 --height 900`（实际被 MinWidth/MinHeight 夹到
+     800x844）那一轮，`DatabaseManagement_800x844.png` 右侧 x=775..776、y=431..722 有一条 2px 的滑块
+     （RGB 107 压在背景 40 上），同页 1000x650 那一帧没有（内容没溢出）。
+  4. **这条测量把 #90 的几何结论打了个洞**：样式声明的是 12px 命中条里 4px 居中滑块
+     （`SlimScrollBarStyleUiTests` 绿），真页面上量出来只有 **2px**、亮度也只到 107（按 `#73FFFFFF`
+     压在 40 上应该到 ~137）。测试用的是一个裸 `Window + ListBox`，**它证明不了真实工作区里的样式优先级**。
+     下一轮要做的是：在真的 workspace 视图里读 `ScrollBar.Bounds` / `Thumb.Bounds`，而不是再加一条合成用例。
+  5. **仍未拿到的**：滚动条"好不好看"还是要用户在运行的应用里自己看一眼；本轮只多了一张 800x844 的
+     `DatabaseManagement` 真帧可看（`artifacts/` 已 gitignore，图不入库）。
 
 ## 8. 用户协作偏好（务必遵守）
 
@@ -708,8 +749,10 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
 ---
 接手第一步建议：工作树已干净、两套 Windows 门（源码级 + 产物级）实测全绿，用户点名的必须功能（托盘、
 自动输入、自动填充弹窗与快捷键录制、单实例守卫、首次收进托盘的一次性提示）都已出厂，且每一条都在
-**发布产物**上真机量过。用户排队点名的两条现在只剩一半：滚动条压成 Win11 细条已出厂（`45f01ef`，但只有
-几何证据、没有视觉证据）；忘记密码只出厂了非破坏的那一半（应急包 `6613df6`），
+**发布产物**上真机量过。用户排队点名的两条现在只剩一半：忘记密码只出厂了非破坏的那一半（应急包 `6613df6`），
 **破坏的那一半（锁定态重置为空库）不要自己开工**——它卡在 §7 那条"只是本地"与"mdbx 不要动"的语义矛盾上，
 下一轮第一件事是拿这个问题问用户，第二步才是那条不需要任何破坏动作的锁定态"忘记密码？"入口。
+滚动条那条（`45f01ef`）现在**有了真帧，但真帧在打脸**：矩阵修好后（#92）在 800x844 的
+`DatabaseManagement` 上量到滑块只有 2px，而样式声明的是 4px，测试那条 4px 是在裸 ListBox 上量的——
+下一轮先按 §7 第 4 条在真实 workspace 里读渲染树，再谈外观。
 其余可挑的活在各条末尾那份"仍未做/仍未验证"清单里，不必再花时间复验已绿的部分。
