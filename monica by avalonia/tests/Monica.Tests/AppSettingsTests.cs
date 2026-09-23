@@ -1,3 +1,4 @@
+using System.Reflection;
 using Monica.App.Services;
 using Monica.App.ViewModels;
 using Monica.Core.ImportExport;
@@ -114,6 +115,68 @@ public sealed partial class AppSettingsTests
         Assert.True(second.Current.WebDavEnabled);
         Assert.Equal("https://dav.example.com", second.Current.WebDavServerUrl);
         Assert.Equal("local-wins", second.Current.SyncConflictStrategy);
+    }
+
+    [Fact]
+    public async Task App_settings_file_carries_every_declared_setting()
+    {
+        // Clone() in the persistence layer is a hand-written property list, so a setting added to
+        // DesktopAppSettings without a matching line there vanishes from the saved file without a word.
+        // That is exactly how the emergency-kit metadata disappeared. Each setting is tagged with its own
+        // name, and the expectation is what the live cache holds *after* the save has normalized it, so
+        // choice whitelists and clamps cannot make this red for the wrong reason.
+        var path = GetTempPath();
+        var settings = new AppSettingsService(path);
+        var touched = TagEveryPlainSetting(settings.Current);
+
+        await settings.SaveAsync();
+
+        var reloaded = new AppSettingsService(path);
+        await reloaded.LoadAsync();
+        var lost = touched
+            .Where(property => !Equals(
+                property.GetValue(reloaded.Current),
+                property.GetValue(settings.Current)))
+            .Select(property => property.Name)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.True(
+            lost.Length == 0,
+            $"{lost.Length} setting(s) did not survive the save: {string.Join(", ", lost)}");
+    }
+
+    // The two WebDAV secret fields are encrypted through the operating-system protector, which this
+    // harness does not have, and nested objects and dictionaries cannot carry a scalar tag.
+    private static IReadOnlyList<PropertyInfo> TagEveryPlainSetting(DesktopAppSettings settings)
+    {
+        var skipped = new HashSet<string>(StringComparer.Ordinal)
+        {
+            nameof(DesktopAppSettings.WebDavPassword),
+            nameof(DesktopAppSettings.WebDavBackupEncryptionPassword),
+        };
+        var touched = new List<PropertyInfo>();
+        foreach (var property in typeof(DesktopAppSettings)
+                     .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                     .Where(property => property.CanWrite && !skipped.Contains(property.Name)))
+        {
+            object? tag = property.PropertyType switch
+            {
+                var type when type == typeof(string) => property.Name,
+                var type when type == typeof(bool) => true,
+                var type when type == typeof(int) => 12,
+                _ => null,
+            };
+            if (tag is null)
+            {
+                continue;
+            }
+
+            property.SetValue(settings, tag);
+            touched.Add(property);
+        }
+
+        return touched;
     }
 
     [Fact]
@@ -1222,6 +1285,9 @@ public sealed partial class AppSettingsTests
         viewModel.SecurityRecoveryAnswer2 = "two";
         viewModel.RecoveryNewMasterPassword = "new password";
         viewModel.RecoveryConfirmNewMasterPassword = "new password";
+        viewModel.EmergencyKitPassphrase = "kit passphrase";
+        viewModel.EmergencyKitPassphraseConfirm = "kit passphrase";
+        viewModel.EmergencyKitRestorePassphrase = "kit passphrase";
 
         viewModel.SelectedSettingsPage = "General";
 
@@ -1231,6 +1297,9 @@ public sealed partial class AppSettingsTests
         Assert.Empty(viewModel.SecurityRecoveryAnswer2);
         Assert.Empty(viewModel.RecoveryNewMasterPassword);
         Assert.Empty(viewModel.RecoveryConfirmNewMasterPassword);
+        Assert.Empty(viewModel.EmergencyKitPassphrase);
+        Assert.Empty(viewModel.EmergencyKitPassphraseConfirm);
+        Assert.Empty(viewModel.EmergencyKitRestorePassphrase);
 
         viewModel.SelectedSection = "Settings";
         viewModel.SelectedSettingsPage = "Security";
@@ -1244,6 +1313,9 @@ public sealed partial class AppSettingsTests
         viewModel.SecurityRecoveryAnswer2 = "two";
         viewModel.RecoveryNewMasterPassword = "new password";
         viewModel.RecoveryConfirmNewMasterPassword = "new password";
+        viewModel.EmergencyKitPassphrase = "kit passphrase";
+        viewModel.EmergencyKitPassphraseConfirm = "kit passphrase";
+        viewModel.EmergencyKitRestorePassphrase = "kit passphrase";
 
         viewModel.SelectedSection = "Passwords";
 
@@ -1256,6 +1328,9 @@ public sealed partial class AppSettingsTests
         Assert.Empty(viewModel.SecurityRecoveryAnswer2);
         Assert.Empty(viewModel.RecoveryNewMasterPassword);
         Assert.Empty(viewModel.RecoveryConfirmNewMasterPassword);
+        Assert.Empty(viewModel.EmergencyKitPassphrase);
+        Assert.Empty(viewModel.EmergencyKitPassphraseConfirm);
+        Assert.Empty(viewModel.EmergencyKitRestorePassphrase);
     }
 
     private static MainWindowViewModel CreateViewModel(
@@ -1465,11 +1540,13 @@ public sealed partial class AppSettingsTests
         public IReadOnlyList<PlatformFilePickerFileType> SaveFileTypes { get; private set; } = [];
         public string SuggestedFileName { get; private set; } = "";
         public string SavedContent { get; private set; } = "";
+        public Action? OnOpenText { get; set; }
         public PlatformIntegrationCapability Capability => platformIntegrationService.GetCapability(PlatformFeatureKeys.FilePicker);
 
         public Task<PickedTextFile?> OpenTextFileAsync(string title, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default)
         {
             OpenFileTypes = fileTypes;
+            OnOpenText?.Invoke();
             return Task.FromResult(openFile);
         }
 

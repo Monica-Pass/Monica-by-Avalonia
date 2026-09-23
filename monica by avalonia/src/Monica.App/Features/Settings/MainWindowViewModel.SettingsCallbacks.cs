@@ -19,6 +19,9 @@ public sealed partial class MainWindowViewModel
             SecurityRecoveryAnswer2 = "";
             RecoveryNewMasterPassword = "";
             RecoveryConfirmNewMasterPassword = "";
+            EmergencyKitPassphrase = "";
+            EmergencyKitPassphraseConfirm = "";
+            EmergencyKitRestorePassphrase = "";
         }
 
         if (!IsWorkspacePageSelected(value, "Danger"))
@@ -38,6 +41,9 @@ public sealed partial class MainWindowViewModel
         SecurityRecoveryAnswer2 = "";
         RecoveryNewMasterPassword = "";
         RecoveryConfirmNewMasterPassword = "";
+        EmergencyKitPassphrase = "";
+        EmergencyKitPassphraseConfirm = "";
+        EmergencyKitRestorePassphrase = "";
         DangerZoneConfirmationText = "";
     }
 

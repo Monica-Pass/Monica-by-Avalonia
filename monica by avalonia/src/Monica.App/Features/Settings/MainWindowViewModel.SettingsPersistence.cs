@@ -89,6 +89,7 @@ public sealed partial class MainWindowViewModel
             OnPropertyChanged(nameof(SecurityRecoveryQuestion2PromptText));
             OnPropertyChanged(nameof(CanResetMasterPasswordWithSecurityQuestions));
             OnPropertyChanged(nameof(CanRunResetMasterPassword));
+            OnPropertyChanged(nameof(EmergencyKitStatusText));
             OnPropertyChanged(nameof(IsSecurityQuestion1Custom));
             OnPropertyChanged(nameof(IsSecurityQuestion2Custom));
         }

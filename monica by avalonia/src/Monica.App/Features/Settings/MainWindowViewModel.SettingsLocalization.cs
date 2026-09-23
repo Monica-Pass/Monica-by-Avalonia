@@ -148,6 +148,14 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SecurityRecoveryQuestion2PromptText));
         OnPropertyChanged(nameof(CanResetMasterPasswordWithSecurityQuestions));
         OnPropertyChanged(nameof(CanRunResetMasterPassword));
+        OnPropertyChanged(nameof(EmergencyKitTitle));
+        OnPropertyChanged(nameof(EmergencyKitDescription));
+        OnPropertyChanged(nameof(EmergencyKitStatusText));
+        OnPropertyChanged(nameof(EmergencyKitPassphraseText));
+        OnPropertyChanged(nameof(EmergencyKitPassphraseConfirmText));
+        OnPropertyChanged(nameof(EmergencyKitCreateActionText));
+        OnPropertyChanged(nameof(EmergencyKitRestoreActionText));
+        OnPropertyChanged(nameof(EmergencyKitRestoreDescription));
     }
 
     private string LocalizeVaultClearScope(VaultClearScope scope) => scope switch

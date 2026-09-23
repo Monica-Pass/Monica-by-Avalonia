@@ -115,6 +115,58 @@ public sealed class SettingsSecurityWorkflowUiTests
     }
 
     [Fact]
+    public void Emergency_kit_rows_mask_their_inputs_and_track_the_unlock_state()
+    {
+        var appWindow = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(appWindow);
+        var viewModel = services.GetRequiredService<Monica.App.ViewModels.MainWindowViewModel>();
+        var view = new SettingsRecoveryView { DataContext = viewModel };
+        var window = new Window { Width = 1200, Height = 800, Content = view };
+        viewModel.SelectedSettingsPage = "SecurityRecovery";
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        try
+        {
+            Assert.Equal('*', view.FindControl<TextBox>("EmergencyKitPassphraseBox")!.PasswordChar);
+            Assert.Equal('*', view.FindControl<TextBox>("EmergencyKitConfirmPassphraseBox")!.PasswordChar);
+            Assert.Equal('*', view.FindControl<TextBox>("EmergencyKitRestorePassphraseBox")!.PasswordChar);
+
+            var create = view.FindControl<Button>("CreateEmergencyKitButton")!;
+            var restore = view.FindControl<Button>("RestoreEmergencyKitButton")!;
+            Assert.Same(viewModel.CreateEmergencyKitCommand, create.Command);
+            Assert.Same(viewModel.RestoreEmergencyKitCommand, restore.Command);
+
+            Assert.False(viewModel.IsUnlocked);
+            Assert.False(create.IsEnabled);
+            Assert.False(restore.IsEnabled);
+
+            viewModel.IsUnlocked = true;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(create.IsEnabled);
+            Assert.True(restore.IsEnabled);
+
+            viewModel.IsCreatingEmergencyKit = true;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.False(create.IsEnabled);
+            Assert.False(restore.IsEnabled);
+
+            viewModel.IsCreatingEmergencyKit = false;
+            Dispatcher.UIThread.RunJobs();
+
+            restore.Command!.Execute(null);
+            Assert.Equal(viewModel.L.Get("EmergencyKitPassphraseRequired"), viewModel.StatusMessage);
+        }
+        finally
+        {
+            window.Close();
+            Dispatcher.UIThread.RunJobs();
+        }
+    }
+
+    [Fact]
     public void Security_analysis_exposes_search_cancel_and_single_pane_layout()
     {
         var view = new SecurityAnalysisWorkspaceView();

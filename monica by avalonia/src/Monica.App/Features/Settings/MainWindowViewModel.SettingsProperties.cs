@@ -87,7 +87,8 @@ public sealed partial class MainWindowViewModel
     public bool CanResetMasterPasswordWithSecurityQuestions =>
         _settingsService.Current.SecurityRecovery is { IsEnabled: true, HasCompleteSetup: true };
     public bool IsSecurityMaintenanceBusy =>
-        IsChangingMasterPassword || IsResettingMasterPassword || IsSavingSecurityQuestions || IsClearingVaultData;
+        IsChangingMasterPassword || IsResettingMasterPassword || IsSavingSecurityQuestions || IsClearingVaultData
+        || IsCreatingEmergencyKit || IsRestoringEmergencyKit;
     public bool CanRunResetMasterPassword => CanResetMasterPasswordWithSecurityQuestions && !IsSecurityMaintenanceBusy;
     public bool CanChangeMasterPassword => IsUnlocked && !IsSecurityMaintenanceBusy;
     public bool CanClearVaultData => IsUnlocked && !IsSecurityMaintenanceBusy;

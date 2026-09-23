@@ -67,6 +67,33 @@
                     </StackPanel>
                 </fa:FASettingsExpanderItem.Footer>
             </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding EmergencyKitTitle}" Description="{Binding EmergencyKitDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <StackPanel Spacing="8" Margin="16,0,0,0" MinWidth="260" MaxWidth="440">
+                        <TextBlock Text="{Binding EmergencyKitStatusText}" TextWrapping="Wrap" Opacity="0.8" />
+                        <TextBox x:Name="EmergencyKitPassphraseBox" PasswordChar="*" PlaceholderText="{Binding EmergencyKitPassphraseText}" Text="{Binding EmergencyKitPassphrase}" IsEnabled="{Binding CanRunEmergencyKit}" AutomationProperties.Name="{Binding EmergencyKitPassphraseText}" />
+                        <TextBox x:Name="EmergencyKitConfirmPassphraseBox" PasswordChar="*" PlaceholderText="{Binding EmergencyKitPassphraseConfirmText}" Text="{Binding EmergencyKitPassphraseConfirm}" IsEnabled="{Binding CanRunEmergencyKit}" AutomationProperties.Name="{Binding EmergencyKitPassphraseConfirmText}" />
+                        <Button x:Name="CreateEmergencyKitButton" Command="{Binding CreateEmergencyKitCommand}" IsEnabled="{Binding CanRunEmergencyKit}" HorizontalAlignment="Right">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="Vault" FontSize="18" />
+                                <TextBlock Text="{Binding EmergencyKitCreateActionText}" />
+                            </StackPanel>
+                        </Button>
+                        <ProgressBar IsVisible="{Binding IsCreatingEmergencyKit}" IsIndeterminate="True" />
+                    </StackPanel>
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
+            <fa:FASettingsExpanderItem Content="{Binding EmergencyKitRestoreActionText}" Description="{Binding EmergencyKitRestoreDescription}">
+                <fa:FASettingsExpanderItem.Footer>
+                    <StackPanel Spacing="8" Margin="16,0,0,0" MinWidth="260" MaxWidth="440">
+                        <TextBox x:Name="EmergencyKitRestorePassphraseBox" PasswordChar="*" PlaceholderText="{Binding EmergencyKitPassphraseText}" Text="{Binding EmergencyKitRestorePassphrase}" IsEnabled="{Binding CanRunEmergencyKit}" AutomationProperties.Name="{Binding EmergencyKitPassphraseText}" />
+                        <Button x:Name="RestoreEmergencyKitButton" Command="{Binding RestoreEmergencyKitCommand}" IsEnabled="{Binding CanRunEmergencyKit}" HorizontalAlignment="Right">
+                            <TextBlock Text="{Binding EmergencyKitRestoreActionText}" />
+                        </Button>
+                        <ProgressBar IsVisible="{Binding IsRestoringEmergencyKit}" IsIndeterminate="True" />
+                    </StackPanel>
+                </fa:FASettingsExpanderItem.Footer>
+            </fa:FASettingsExpanderItem>
         </StackPanel>
     </Border>
     </StackPanel>

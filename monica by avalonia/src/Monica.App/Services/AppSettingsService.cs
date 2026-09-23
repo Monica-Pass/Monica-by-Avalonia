@@ -49,6 +49,10 @@ public sealed class DesktopAppSettings
     public bool WebDavBackupIncludeCategories { get; set; } = true;
     public bool WebDavBackupEncryptionEnabled { get; set; } = true;
     public string WebDavBackupEncryptionPassword { get; set; } = "";
+    // Metadata only: which kit file the user last wrote and when. The passphrase that seals the kit is
+    // never stored here, because a kit guarded by a secret on this machine is no way out.
+    public string EmergencyKitLastExportedAtUtc { get; set; } = "";
+    public string EmergencyKitLastFileName { get; set; } = "";
     public string SyncConflictStrategy { get; set; } = "ask";
     public bool OneDriveEnabled { get; set; }
     public bool MdbxLocalCacheEnabled { get; set; } = true;
@@ -130,6 +134,8 @@ public sealed partial class AppSettingsService : IAppSettingsService
         settings.BrowserIntegrationPort = Clamp(settings.BrowserIntegrationPort, 1024, 65535);
         settings.WebDavBackupEncryptionEnabled = true;
         settings.LegacyBusinessDataNoticeAcknowledgedSignature ??= "";
+        settings.EmergencyKitLastExportedAtUtc ??= "";
+        settings.EmergencyKitLastFileName ??= "";
         settings.SecurityRecovery ??= new SecurityRecoverySettings();
         NormalizeSecurityRecovery(settings.SecurityRecovery);
 

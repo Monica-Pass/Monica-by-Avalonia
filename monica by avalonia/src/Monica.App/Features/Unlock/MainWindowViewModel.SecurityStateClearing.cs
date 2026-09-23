@@ -100,6 +100,9 @@ public sealed partial class MainWindowViewModel
         SecurityRecoveryAnswer2 = "";
         RecoveryNewMasterPassword = "";
         RecoveryConfirmNewMasterPassword = "";
+        EmergencyKitPassphrase = "";
+        EmergencyKitPassphraseConfirm = "";
+        EmergencyKitRestorePassphrase = "";
         DangerZoneConfirmationText = "";
         ClearCachedRemoteCredentials();
     }

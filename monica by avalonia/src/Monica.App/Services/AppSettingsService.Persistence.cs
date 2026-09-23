@@ -144,6 +144,8 @@ public sealed partial class AppSettingsService
         RequirePasswordBeforeExport = source.RequirePasswordBeforeExport,
         WindowCaptureProtectionEnabled = source.WindowCaptureProtectionEnabled,
         LegacyBusinessDataNoticeAcknowledgedSignature = source.LegacyBusinessDataNoticeAcknowledgedSignature,
+        EmergencyKitLastExportedAtUtc = source.EmergencyKitLastExportedAtUtc,
+        EmergencyKitLastFileName = source.EmergencyKitLastFileName,
         SecurityRecovery = source.SecurityRecovery,
         MinimizeToTray = source.MinimizeToTray,
         TrayHintShown = source.TrayHintShown,

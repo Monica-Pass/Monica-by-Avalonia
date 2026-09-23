@@ -28,5 +28,6 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(CanRunResetMasterPassword));
         OnPropertyChanged(nameof(CanChangeMasterPassword));
         OnPropertyChanged(nameof(CanClearVaultData));
+        OnPropertyChanged(nameof(CanRunEmergencyKit));
     }
 }
