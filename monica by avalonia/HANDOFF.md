@@ -16,7 +16,7 @@
 
 ## 2. 当前状态（工作树干净）
 
-分支 `main`，`git status` 只剩给本节标提交号的文档改动。功能 HEAD = `73c89bc`（其后只可能有给本节自身标提交号的文档提交），近几轮：
+分支 `main`，`git status` 只剩给本节标提交号的文档改动。功能 HEAD = `5868a1a`（其后只可能有给本节自身标提交号的文档提交），近几轮：
 
 下面这张表**不是按时间排的**：同一条线的行挨在一起（例如 Bitwarden 写回的两行 `94adacd` → `5cf27c9`），
 读某一件事的来龙去脉时按主题往下连，不要按行号当时间线。
@@ -49,6 +49,8 @@
 | `49431a6` | 细滚动条滑块被主题压扁的真因与修法（#93，接 `08c3adb` 记下那个 2px 打脸读数）。**读数不是采样错，是真缺陷**：在真 workspace 的渲染树里读到滑块带一个 FluentAvalonia ScrollBar 主题给的 `scaleX(0.35) translateX(-2px)`——它按模板里 `Thumb` 的**精确类型**命中，用来伪造 WinUI 细条，而这个值的优先级既压过应用层 `Style` setter 也压过 `ControlTemplate` 上的属性值（`RenderTransform="{x:Null}"` 与 `Value="scale(1)"` 两条试法都被实测否掉）。落地的办法是派生 `Monica.App.Controls.SlimScrollBarThumb`：类型选择器只匹配精确类型，派生类因此逃出钳制。修后离屏 1.0/1.5 两次采样都是 4 DIP→6 设备像素、亮度 137（`#73FFFFFF` 压在 40 上应有的值），真屏抓取 `span=1164..1169 maxRun=6` 一致，`:pointerover` 加宽规则确认仍生效（margin 2,0 → 8 DIP → 12 像素），矩阵回到 `distinctFrames=13`。**纠一处 §7 第 4 条的旧解释**：那句"测试是在裸 ListBox 上量的所以证明不了"只是部分对——裸 ListBox 同样吃应用层样式，几何 4 DIP 布局宽是真的，`Bounds` 不含 `RenderTransform`，所以纯几何断言看不见这次钳制；换掉的像素断言在无头下永远量不到（帧缓冲全零），现在正向钉机制（模板滑块必须是 `SlimScrollBarThumb` 且 `RenderTransform` 为 null）。负控：模板改回裸 `Thumb` 后该 4 条里 2 条立刻红在类型与几何上，恢复后全绿。门禁：格式 0 改动、单测 844、UI 243 全绿，重新 publish 后 commercial-release 与 jit 产物真跑门（loadMs=143/4000、KeePass 20000 条增长 1.8MB/24、锁定尾窗中位 111.6MB/120、锁/解循环 25/14/1/4）全绿 |
 | `5a1fe3c` | **本地新建条目第一次能进远端（#100，收掉 #94 缺口 1 剩下的那半"新建"）**。上一轮的漂移扫描只认"远端快照确认过的身份"，所以本地新建的条目无论同步多少次都到不了服务器——不是管道断，是**没人给它一个可以被扫描到的身份**。三处补齐：① App 侧新增库页批量菜单项"上传 N 项到 Bitwarden"（`MainWindowViewModel.BitwardenPublish.cs`，判据 `IsLocalOnly` ∧ `CanEncode`，勾上 `BitwardenVaultId`、`BitwardenCipherId` 留空，然后复用 `SyncBitwardenAccountCommand` 立刻推）；② 扫描侧删掉 `if (baseline.Count == 0) return (0,0)` 的早退、把"无 cipher id"识别成 **create**（幂等键 `local-create:{vault}:{本地身份}` 故意**不带内容哈希**：首推之前改三次也只欠一个 cipher，带哈希会 POST 三份重复，而 update 的键仍按哈希走）；③ 队列行需要一个 id 而 Bitwarden 的 id 是服务器拥有的 GUID ⇒ 新增 `BitwardenLocalCipherIdentity`（`local-password:{entryId}`，不是 GUID 所以与真 id 天然不撞），处理器把服务器回的 `dto.Id`/`revisionDate` 写回那一行，之后同一条目走 update。顺手补 `CanEncode`（就是 `FindUnsupportedChange is null` 的公开问法），让"告诉用户会推几条"和"实际能推几条"是同一个判据。**接线上量到一条会真丢 id 的坑**：`SavePasswordAsync` 的 UPDATE 原本把四列 Bitwarden 身份整列覆盖，而同步是拿**它自己那份行**写库、屏幕上是同步之前加载的那份 ⇒ 在陈旧副本上保存一次编辑就把服务器刚发的 cipher id 抹成 null，下一次扫描把同一条目当新条目再推一遍（重复 cipher，用户只会看到多出来的那一条看不明白为什么）。改成 `COALESCE(@x, x)`（passwords 与 secure_items 两条 UPDATE 各四处），身份只保留不擦除。**负控真打**：`ProcessorCompletesAndDefers...` 里那条 create 的旧 fixture 是"条目已经绑在 cipher 上却排队 create"，正是新加的 `HasPublishableEntry` 闸门要跳过的形状——闸门一上，旧断言立刻红在 `Assert.Equal("remote-created-id", ...)`，把 fixture 改成真的未绑定条目（`BitwardenCipherId = null` + 本地身份）后才绿，说明写回路径是被证到的而不是被绕过的。覆盖：`BitwardenLocalChangeQueueTests` +3（空基线下的一条发布条目走完 排队→POST→写回→基线按服务器 id 记下→下次扫描安静，且指纹与存储行一致；首推前改两次仍只有一行且带最新内容的哈希；进回收站的发布条目不推）、`BitwardenMutationProcessorTests` +1（已绑定的条目排队 create ⇒ `RequestCount=0` 且身份不动，即"第二次上传不复制"）、UI +1（真 DI + 真视图：勾上本地独有条目后菜单里那一项可见、标题带计数、`Command` 就是 VM 那个命令）。**为什么删除仍然不传播**、以及**为什么"只勾了推不出去的条目"时菜单项不出现**（与 Stack/Archive 同一套"不做无用之事的项就不摆出来"的既有惯例）都是故意的，别再当漏项。门禁：格式 0 改动、commercial-release 绿（单测 862 常规 + 10 `perf-budget`、UI 231 常规 + 17 `perf-budget`、Release 0 warning）、重新 publish 后 jit 产物真跑绿（`CANONICAL VAULT passed`、loadMs=140/4000、KeePass 20000 条增长 3.3MB/24、锁定尾窗中位 105.2MB/120 区间 104.3–107.0、锁/解 25/14/1/4）。**本轮新量出来、已记成 #101 的缺陷**：一次拉取带回来的远端改动在解锁期间看不见——`VaultSnapshotLoader.LoadAsync` 全仓只有一个调用点（`LoadCoreAsync`），而 `OnBitwardenSyncStateChanged` 对 Completed 只回 `LoadBitwardenAccountsAsync()`，所以要重新锁定+解锁才看得见（COALESCE 挡住了数据被抹，挡不住界面陈旧）。**仍未做**：笔记/银行卡/证件没有写回编码器；本地删除不传播；`COALESCE` 之后"从 Bitwarden 库解绑"不能靠保存传 null 实现（将来要解绑得走显式 SQL，目前全仓只有克隆/导入那两处在 `Id=0` 的 INSERT 行上置 null，不受影响）；**全程从未对真 Bitwarden 服务器验过**（#94 缺口 4，要用户点头才动）
 | `dda2766` | 三片里的**片3：自动输入序列可配置**。原来那条流程写死"用户名 Tab 密码"，回车和不太规矩的登录框都得用户手动补。新增 `src/Monica.App/Services/AutoTypeSequenceParser.cs`（文件名带 Parser 是**没办法**：设置属性和 VM 都叫 `AutoTypeSequence`，同名 class 会被遮蔽），token 拼写用 KeePass 的 `{USERNAME}{TAB}{PASSWORD}{ENTER}{DELAY:ms}`。**为什么是这个拼写而不是 Android 的**——量过 Android 现状：那边根本没有序列解析器，`{USERNAME}{TAB}{PASSWORD}` 只是 `res/values/strings.xml:4605` 的一条 UI 提示，KDBX 的 `AutoTypeData` 读了存了但没有任何人消费，IME 填充写死、从不发回车、没有 `{DELAY}`、也没有按条目一列。所以贴齐的是**数据形状**（同一条语法，将来加按条目覆盖不用换语言），而"全局一条设置、不加 DB 列"是当前的诚实边界，按条目覆盖仍是待办。规则：整条模板要么全解析要么整体拒绝，未知 token／未闭合／非法延时都原样回显用户打的那个 token，**绝不部分生效**；缺字段的行会把它相邻的那一串 Tab 一起丢掉（两遍 `dropped[]` + `IsNextToDroppedField`），免得把光标敲飞；延时上限 5000ms 抽成 `AutoTypeLimits`，解析器和注入服务共用同一个数，不再是两处各写一份。**按下时再解析一次**：`settings.json` 可能在关闭期间被手改，设置页那个绿色勾不构成按下的许可证，新增 `SequenceInvalid`／`NothingToType` 两个结局都保证零按键。文案坑：`L[key]`/`Get` 返回原文所以花括号安全，但**带 `{...}` 的字符串绝不能当 `Format` 模板**，错误提示走 `AutoTypeSequenceInvalidFormat`（"……：{0}"）把 token 当**参数**传。设置持久化按上一轮的教训在 `Clone()` 里登记了，且 normalize 只补**空**值——解析不了的序列原样保留并报错，不静默改写用户输入。覆盖：单测 20 条（默认不发回车／缺字段与相邻 Tab 规则／字面量／大小写／10 行拒绝表含 `{DELAY:5001}` 与 `-1`／不成形 keystroke 序列／超长）+ UI 3 条（序列原样到达注入器、坏序列零按键且报出 token、设置页字段与错误行的绑定联动）；UI 门从 222→225。**两条负控里有一条打了脸**：去掉 `Mode=TwoWay` 测试**不红**——Avalonia 的 `TextBox.Text` 默认就是 TwoWay，这条得记下来；第二条（把错误行写死 `IsVisible="True"`）红在开头那句 `Assert.False`，所以测试有牙。**又踩了一次已知坑**：新 UI 测试读回 `null`，就是因为没先 `SelectedSettingsPage = "Desktop"`（§2 上一行已经写过）。产物真跑（发布 exe，每次一份全新 `MONICA_APPDATA_DIR`，只报布尔值和长度）5 次：默认→Typed 且 submitClicks=0/431ms、`{...}{DELAY:2000}{ENTER}`→submitClicks=1/2211ms、纯字面量→两个框 21/24 字符逐字相符、`{capslock}` 与 `{DELAY:9000}`→SequenceInvalid 且零按键。探针侧新事实：`--init`/`--seed` **不会**写 `settings.json`，要改序列得自己建那个文件（`appExit=1` 是 `--smoke-ui-exit-after-checks` 的既有退出码约定，不是失败）。门禁：格式 0 改动、Release 0 warning、单测 9+835、UI 17+225 全绿；产物门（本轮 publish，其后只加了一条 UI 测试、产品代码未再改动）`CANONICAL VAULT passed`、loadMs=197/4000、KeePass 增长 5.1MB/24、锁定尾窗中位 107.1MB/120（区间 106.5–108.4）。**仍留一条老实话**：切语言时序列错误文案会重译，但 `AutoTypeStatusDescriptionText` 不会——那是本轮之前就有的，没有一起改 |
+| `94858aa` | **一次拉取带回来的东西当场就能看见（#101，#100 那行记下的缺口）**。新增 `MainWindowViewModel.BitwardenPullRefresh.cs`：合并结果里 `Added+Updated+Deleted+ConflictsBackedUp > 0` 才重读库（全零的一轮绝不打扰屏幕），重读走 `ReloadVaultKeepingSelectionAsync`——先记下当前行的身份，重载后 `ReopenVaultRowAfterReload`（`VaultLibrary.cs`）把同一行重新打开，不弹编辑器也不把选中行换成邻居。同步页/认证命令/冲突还原三处共用这一条，新增 `BitwardenPullAppliedFormat` 中英各一份把"带回来几条"说清。**自己把自己打红过一次**：冲突还原现在会顺带重读库，而 `A conflict row resolves the command declared outside its template` 只跑一轮 `RunJobs()`，于是红在 `Assert.Empty() Failure: Collection was not empty`——红因是测试的泵不够，不是产品；改用 `RunJobsUntil(条件, 原因)`（20 秒上限、条件不成立即点名），而不是把断言放宽。门禁：格式 0 改动、单测 862 常规 + 10 `perf-budget`、UI 235 常规 + 17 `perf-budget` 全绿，重新 publish 后 jit 产物真跑绿（`CANONICAL VAULT passed`、loadMs=134/4000、KeePass 20000 条增长 5.7MB/24、锁定尾窗中位 107.6MB/120 区间 106.1–109.6、锁/解 25/14/1/4） |
+| `5868a1a` | **本地回收站第一次推得出去，并且"服务器也把它收进了回收站"终于是一个能收敛的状态（#102+#103，收掉 #94 缺口 1 的"删除"）**。删除**由路由决定、不带载荷**：新增 `BitwardenMutationOperationType.SoftDelete`（落库是字符串 `soft_delete`，不是序号），传输层走 `PUT /ciphers/{id}/delete`（官方客户端软删用它，把 `DELETE /ciphers/{id}` 留给永久删除），preflight 与"不读响应体"两处判断都按两种删除一并放行；队列对已绑定的漂移条目改判 `deletion`，载荷写 `"{}"`——**所以笔记/银行卡/证件这三类没有编码器也照样删得动**（实测 `A_trashed_secure_item_owes_a_delete_even_though_no_encoder_carries_its_content`）。两处竞态一并处理：① 用户在这台把条目放回架子上了、那条删除还没出门 ⇒ 处理器 `IsHeldAlive` 直接把行判完成、**一次请求都不发**（实测 `transport.Sends == 0`，红过一次的原因是我先写成"队列为空"，而 `GetAsync` 连完成的行一起回）；② `ReplaceForVaultAsync` 不再把回收站条目从同步基线里剔掉，否则"确认删除之后才做的恢复"在漂移扫描眼里零漂移（实测 `Expected: 1 / Actual: 0`），远端那份还会每轮回来再压一遍。随后量出**同族的第三个坑**：解码器对服务器回收站里的 cipher 给的是 `deleted:{revision}` 标记而不是指纹（`BitwardenCipherDecoder.cs:63-73`），拿它比本地指纹永远不等 ⇒ 每拉一次多一条冲突备份、漂移扫描每轮"欠一次删除"（实测安静库 `Enqueued 1`）、而只数**活着的**远端条目的安全闸门把"整库都被删进服务器回收站"直接判成 `EmptyRemoteVault` 抛异常（此后每次同步都失败）。修法是把标记收口成 `BitwardenPayloadFingerprint.ForRemoteDeletion/IsRemoteDeletionMarker`、合并引擎两边同删即短路、队列两边同删视为已同步、闸门改数 `Ciphers.Count`（真·无载荷仍然拦）。**负控**：只让 2 条新测试变红（`NoChange`→`CreateConflictBackupThenApplyRemote`、`Unchanged 1`→0），改回后 871 条单测全绿（上一行 `94858aa` 是 862，本轮净 +9：队列 6 + 传输 1 + 合并 2 + 拉取 1）；UI 235+perf 17、publish jit、真跑门（lockedPrivateMB=104.8/120、KeePass 20000 条 openMs=784 增长 2.9MB/24、锁定尾窗 104.0–107.1）、商业发布门**四道全 rc=0**。永久删除**故意不推**（`Delete` 无生产者）；`/delete` 路由与"对已删 cipher 发 update"仍只在替身下绿过，见缺口 4。 |
 
 §3 的 use-case 抽取改动已提交（`24d92b0`），OneDrive/WebDAV 冲突副本复用修复已提交（`957c5af`）。
 
@@ -730,10 +732,17 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
        下游 `BitwardenMutationProcessor` 永远在抽一个空队列。现在协调器在拉取之前先扫一遍漂移并入队。
        ~~**仍然缺的**：新建条目连 `BitwardenVaultId`/`BitwardenCipherId` 都不会被赋值~~ ⇒ 库页批量菜单多了一项
        "上传 N 项到 Bitwarden"，把勾选的本地独有条目打上 `BitwardenVaultId`（`BitwardenCipherId` 留空），漂移扫描
-       为它入队 **create**，服务器回的 cipher id 写回本地，之后同一行改内容走 update。**仍然缺的**：笔记/银行卡/证件这三类 secure item
-       同样没有编码器可走（只计数不推）；**本地删除也不会传播**——`BitwardenCipherPayloadBuilder.cs:88` 明确拒收
-       `IsDeleted` 的条目，所以把绑定条目移进回收站只会算作"欠一次但推不了"，从回收站恢复则指纹回到基线、
-       本来就不需要推。⇒ "在 Monica 里改密码其他客户端看不到"这半句已经不成立，~~"新建"~~已经修完，"删除"这一条仍然成立。
+       为它入队 **create**，服务器回的 cipher id 写回本地，之后同一行改内容走 update。~~**本地删除也不会传播**~~
+       **已修（§2 的删除传播那行）**：原状况确实如旧记录所说——`BitwardenCipherPayloadBuilder.cs:88` 拒收
+       `IsDeleted`，把绑定条目移进回收站只算"欠一次但推不了"；而 `IsDeleted` 在载荷指纹里，所以每轮同步都会
+       把这当成"本地改了没上传"，既把条目还回来又留下一条冲突备份。**仍然缺的**：笔记/银行卡/证件这三类 secure item
+       没有**内容**编码器（改内容只计数不推，但它们的删除推得出去——删除由路由决定、根本不带载荷）。
+       ⇒ "在 Monica 里改密码其他客户端看不到"这半句已经不成立，"新建"与"删除"也都修完，只剩这三类的**内容改动**。
+       删除那一轮又量出两个**同族的死循环**（都已修，见 §2 回收站标记那行）：解码器对服务器回收站里的 cipher
+       **不带载荷**、`PayloadHash` 位置写的是 `deleted:{revision}` 标记（`BitwardenCipherDecoder.cs:63-73`），
+       于是 ① 合并引擎把"两边都在回收站"当成内容不一致，每拉一次就多存一条冲突备份；② 漂移扫描拿本地指纹去比
+       那个标记，永远"欠一次删除"（实测 `Enqueued 1`，安静库里）；③ 顺带量出安全闸门只数**活着的**远端条目，
+       所以"用户把整库都删进服务器回收站"会被 `EmptyRemoteVault` 直接抛异常，此后每次同步都失败。
     2. ~~**冲突备份有表、有计数、没有界面**~~ **已修（`59c0fac` 撤掉错误生产者 + 下一轮列表/还原）**：
        原状况是 `IBitwardenConflictBackupStore` 在 Monica.App 里唯一消费者是账户卡那一行计数
        （`...BitwardenAccountProjection.cs:20-23`），没有任何页面能列出或还原备份。现在同步页多出一段
@@ -747,7 +756,20 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
        （schema 76→77），细节与取舍见 §2 下一行。
     4. **真服务器从未验过**：全仓 grep `vaultwarden` 0 命中，`eng/ci` 只有 4 个脚本，没有任何集成测试痕迹。
        登录 / prelogin / KDF / 2FA / captcha / 设备 OTP 只在替身 HTTP 下绿过。要接真账号或本地起 Vaultwarden，
-       得先拿用户点头。
+       得先拿用户点头。删除传播上线后又添了两条同类未验项：① `PUT /ciphers/{id}/delete` 这个路由（官方
+       客户端用它软删、把 `DELETE /ciphers/{id}` 留给永久删除）只在替身下绿过；② **对一台已进回收站的
+       cipher 再发 update** 是"用户在这台恢复了、远端还躺着"那条路会做的事，真服务器答什么没人知道
+       （本轮的选择是如实尝试让下一次同步把它带回活区，而不是悄悄留着）。③ 整条"服务器回收站"读法建立在
+       **sync 响应会把已删 cipher 一起带回来（带 `deletedDate`）** 这个假设上——真服务器若干脆省略它们，
+       本地那一份会走进 `PreserveLocalUnmatched`（保留、不删），同步不会坏，但"别处删了这里也跟着进回收站"
+       就不成立。永久删除（Monica 里从回收站
+       彻底清除）**不**传播，这是故意的：`BitwardenMutationOperationType.Delete` 没有任何生产者。
+    5. **一条疑似真缺陷，未动**（本轮读到，需要用户或真服务器才能判）：本仓给非 login cipher 编号用的是
+       `2=笔记 / 3=银行卡 / 4=证件`（`BitwardenPullMergeService.cs:274-276` 的 `MatchesSecureItemType`
+       与 `BitwardenPullMergeService.Apply.cs:228-230` 的 `ToCipherType` 两处一致），而 Bitwarden 官方
+       `CipherType` 是 `2=Card / 3=Identity / 4=SecureNote`。因为解码、回写、判型三处同源自洽，**现有测试
+       全绿也照不出来**；一旦接真服务器，每一条笔记/银行卡都会被按错的类型读写（写回去还会把远端那一类
+       变成另一类）。别顺手改一处——要么三处一起改并配一份"远端形状"的表，要么先拿真账号量。
 - **外观类改动欠一台"截图口味门"机器（#90 把这个缺口撞出来了，#92 修好了其中一条路）**。
   "这个滚动条有点丑了"这类判断按老规矩应该是"探一屏 + 截图过口味门"再铺开，当时两条路都不通、只能拿几何数字交差：
   1. **`--smoke-ui-screenshot-dir` 矩阵已经可用**（#92 修完）：7 次真跑里 1 次全帧相同，现在抓取前先验
