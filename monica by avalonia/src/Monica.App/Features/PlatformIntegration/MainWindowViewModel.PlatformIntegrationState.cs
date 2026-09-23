@@ -52,6 +52,11 @@ public sealed partial class MainWindowViewModel
         RaiseDesktopIntegrationPresentationState();
     }
 
+    partial void OnAutoTypeSequenceChanged(string value)
+    {
+        UpdateSettings(settings => settings.AutoTypeSequence = value);
+    }
+
     partial void OnBrowserIntegrationEnabledChanged(bool value)
     {
         if (value && !CanUseBrowserBridgeIntegration)
@@ -101,6 +106,8 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(TrayIntegrationStatusText));
         OnPropertyChanged(nameof(GlobalHotkeyIntegrationStatusText));
         OnPropertyChanged(nameof(AutoTypeIntegrationStatusText));
+        OnPropertyChanged(nameof(AutoTypeSequenceErrorText));
+        OnPropertyChanged(nameof(HasAutoTypeSequenceError));
         OnPropertyChanged(nameof(BrowserBridgeIntegrationStatusText));
         OnPropertyChanged(nameof(ExternalLinksIntegrationStatusText));
         OnPropertyChanged(nameof(FilePickerIntegrationStatusText));

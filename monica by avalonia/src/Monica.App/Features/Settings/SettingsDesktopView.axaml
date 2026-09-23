@@ -119,6 +119,24 @@
                                                  AutomationHelpText="{Binding AutoTypeStatusDescriptionText}" />
                         </fa:FASettingsExpanderItem.Footer>
                     </fa:FASettingsExpanderItem>
+                    <fa:FASettingsExpanderItem Content="{Binding L[AutoTypeSequence]}"
+                                               Description="{Binding L[AutoTypeSequenceDescription]}">
+                        <fa:FASettingsExpanderItem.Footer>
+                            <StackPanel Width="280"
+                                        Spacing="4">
+                                <TextBox x:Name="AutoTypeSequenceBox"
+                                         Text="{Binding AutoTypeSequence, Mode=TwoWay}"
+                                         IsEnabled="{Binding CanUseAutoTypeIntegration}"
+                                         AutomationProperties.Name="{Binding L[AutoTypeSequence]}" />
+                                <TextBlock x:Name="AutoTypeSequenceErrorText"
+                                           IsVisible="{Binding HasAutoTypeSequenceError}"
+                                           Text="{Binding AutoTypeSequenceErrorText}"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
+                            </StackPanel>
+                        </fa:FASettingsExpanderItem.Footer>
+                    </fa:FASettingsExpanderItem>
                 </StackPanel>
             </Border>
             <fa:FAInfoBar x:Name="QuickSearchStatusInfoBar"

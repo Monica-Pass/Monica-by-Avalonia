@@ -31,6 +31,7 @@ public sealed partial class MainWindowViewModel
             QuickSearchHotkey = settings.QuickSearchHotkey;
             AutoTypeEnabled = settings.AutoTypeEnabled && CanUseAutoTypeIntegration;
             AutoTypeHotkey = settings.AutoTypeHotkey;
+            AutoTypeSequence = settings.AutoTypeSequence;
             BrowserIntegrationEnabled = settings.BrowserIntegrationEnabled && CanUseBrowserBridgeIntegration;
             BrowserIntegrationPort = settings.BrowserIntegrationPort;
             CompactPasswordList = settings.CompactPasswordList;

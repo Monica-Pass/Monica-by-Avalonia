@@ -1,3 +1,5 @@
+using Monica.App.Services;
+
 namespace Monica.App.ViewModels;
 
 public enum BrowserBridgeDesktopState
@@ -183,6 +185,11 @@ public sealed partial class MainWindowViewModel
     public string BrowserBridgeEndpointText =>
         _localization.Format("BrowserBridgeEndpointFormat", BrowserIntegrationPort);
 
+    private string FormatSequenceError(AutoTypeSequenceError failure) =>
+        string.IsNullOrEmpty(failure.Argument)
+            ? _localization.Get(failure.MessageKey)
+            : _localization.Format(failure.MessageKey, failure.Argument);
+
     private void RaiseDesktopIntegrationPresentationState()
     {
         OnPropertyChanged(nameof(TrayIntegrationTaskStatusText));
@@ -192,6 +199,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(HasAutoTypeRegistrationError));
         OnPropertyChanged(nameof(AutoTypeStatusTitleText));
         OnPropertyChanged(nameof(AutoTypeStatusDescriptionText));
+        OnPropertyChanged(nameof(AutoTypeSequenceErrorText));
         OnPropertyChanged(nameof(BrowserBridgeDesktopStatus));
         OnPropertyChanged(nameof(IsBrowserBridgeUnavailableState));
         OnPropertyChanged(nameof(IsBrowserBridgeDisabledState));

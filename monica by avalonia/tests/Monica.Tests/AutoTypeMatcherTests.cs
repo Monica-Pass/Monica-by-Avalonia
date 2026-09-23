@@ -1,6 +1,5 @@
 using Monica.App.Services;
 using Monica.Core.Models;
-using Monica.Platform.Services;
 
 namespace Monica.Tests;
 
@@ -66,37 +65,6 @@ public sealed class AutoTypeMatcherTests
         {
             Assert.Equal(expected, hosts[0]);
         }
-    }
-
-    [Fact]
-    public void BuildTokens_sends_username_tab_password_and_never_enter()
-    {
-        var tokens = AutoTypeMatcher.BuildTokens(Entry("GitHub", "https://github.com", "octocat", "hunter2"));
-
-        Assert.Collection(
-            tokens,
-            token =>
-            {
-                Assert.Equal(AutoTypeTokenKind.Text, token.Kind);
-                Assert.Equal("octocat", token.Value);
-            },
-            token => Assert.Equal(AutoTypeTokenKind.Tab, token.Kind),
-            token =>
-            {
-                Assert.Equal(AutoTypeTokenKind.Text, token.Kind);
-                Assert.Equal("hunter2", token.Value);
-            });
-        Assert.DoesNotContain(tokens, token => token.Kind == AutoTypeTokenKind.Enter);
-    }
-
-    [Theory]
-    [InlineData("octocat", "", 1)]
-    [InlineData("", "hunter2", 1)]
-    [InlineData("octocat", "hunter2", 3)]
-    [InlineData("", "", 0)]
-    public void BuildTokens_emits_only_what_the_entry_carries(string username, string password, int expected)
-    {
-        Assert.Equal(expected, AutoTypeMatcher.BuildTokens(Entry("GitHub", "", username, password)).Count);
     }
 
     private static PasswordEntry Entry(string title, string website, string username, string password) =>

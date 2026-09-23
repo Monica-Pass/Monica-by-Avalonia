@@ -18,6 +18,8 @@ public sealed partial class MainWindowViewModel
         PickerForAllEntries,
         TargetUnavailable,
         InjectionFailed,
+        SequenceInvalid,
+        NothingToType,
         Typed,
     }
 
@@ -144,11 +146,24 @@ public sealed partial class MainWindowViewModel
     private void TypeIntoAutoTypeTarget(PasswordEntry entry)
     {
         var targetHandle = _autoTypeTargetHandle;
-        var tokens = AutoTypeMatcher.BuildTokens(entry);
+        // The sequence is the user's, so it is re-checked here rather than trusted from the settings
+        // page: the file could have been edited on disk while the app was closed.
+        if (!AutoTypeSequenceParser.TryBuild(
+                AutoTypeSequence,
+                entry.Username,
+                entry.Password,
+                out var tokens,
+                out _))
+        {
+            RetireAutoTypeTarget();
+            CompleteAutoType(AutoTypeOutcome.SequenceInvalid);
+            return;
+        }
+
         if (tokens.Count == 0)
         {
             RetireAutoTypeTarget();
-            CompleteAutoType(AutoTypeOutcome.InjectionFailed);
+            CompleteAutoType(AutoTypeOutcome.NothingToType);
             return;
         }
 
@@ -215,6 +230,12 @@ public sealed partial class MainWindowViewModel
                 break;
             case AutoTypeOutcome.InjectionFailed:
                 SetStatusFailure("AutoTypeInjectionFailedFormat", _autoTypeService.LastError);
+                break;
+            case AutoTypeOutcome.SequenceInvalid:
+                SetStatusFailure("AutoTypeSequenceInvalidFormat", AutoTypeSequenceErrorText);
+                break;
+            case AutoTypeOutcome.NothingToType:
+                SetStatusFailure("AutoTypeNothingToType");
                 break;
         }
     }

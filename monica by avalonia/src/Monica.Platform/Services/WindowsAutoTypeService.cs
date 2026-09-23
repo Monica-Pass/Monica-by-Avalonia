@@ -11,7 +11,7 @@ public sealed class WindowsAutoTypeService(IPlatformIntegrationService platformI
     private const ushort VirtualKeyTab = 0x09;
     private const ushort VirtualKeyReturn = 0x0D;
     private const int MaxChunkEvents = 64;
-    private const int MaxDelayMilliseconds = 5_000;
+    private const int MaxDelayMilliseconds = AutoTypeLimits.MaxDelayMilliseconds;
 
     public PlatformIntegrationCapability Capability { get; } =
         platformIntegrationService.GetCapability(PlatformFeatureKeys.AutoType);

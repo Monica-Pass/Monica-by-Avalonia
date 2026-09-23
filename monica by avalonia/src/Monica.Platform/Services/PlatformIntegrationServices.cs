@@ -105,6 +105,13 @@ public enum AutoTypeTokenKind
     Delay
 }
 
+public static class AutoTypeLimits
+{
+    // One number for both sides of the boundary: the sequence parser refuses a longer wait with a
+    // message, instead of letting the injector clamp it in silence.
+    public const int MaxDelayMilliseconds = 5_000;
+}
+
 public sealed record AutoTypeToken(AutoTypeTokenKind Kind, string Value = "", int DelayMilliseconds = 0)
 {
     public static AutoTypeToken Text(string value) => new(AutoTypeTokenKind.Text, value);

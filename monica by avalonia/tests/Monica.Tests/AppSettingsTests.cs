@@ -91,6 +91,27 @@ public sealed partial class AppSettingsTests
     }
 
     [Fact]
+    public async Task App_settings_keeps_a_sequence_it_cannot_parse_and_fills_an_empty_one()
+    {
+        // A sequence that does not parse is reported by the settings row and refused by auto-type rather
+        // than rewritten at load: replacing it silently would delete what the user typed and leave no
+        // trace of why the hotkey stopped working.
+        var path = GetTempPath();
+        await File.WriteAllTextAsync(path, "{\"AutoTypeSequence\":\"{capslock}\"}");
+
+        var settings = new AppSettingsService(path);
+        await settings.LoadAsync();
+
+        Assert.Equal("{capslock}", settings.Current.AutoTypeSequence);
+
+        await File.WriteAllTextAsync(path, "{\"AutoTypeSequence\":\"\"}");
+        var blank = new AppSettingsService(path);
+        await blank.LoadAsync();
+
+        Assert.Equal(AutoTypeSequenceParser.DefaultTemplate, blank.Current.AutoTypeSequence);
+    }
+
+    [Fact]
     public async Task App_settings_roundtrip_interactive_values()
     {
         var path = GetTempPath();

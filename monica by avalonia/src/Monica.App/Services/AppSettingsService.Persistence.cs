@@ -153,6 +153,7 @@ public sealed partial class AppSettingsService
         QuickSearchHotkey = source.QuickSearchHotkey,
         AutoTypeEnabled = source.AutoTypeEnabled,
         AutoTypeHotkey = source.AutoTypeHotkey,
+        AutoTypeSequence = source.AutoTypeSequence,
         BrowserIntegrationEnabled = source.BrowserIntegrationEnabled,
         BrowserIntegrationPort = source.BrowserIntegrationPort,
         CompactPasswordList = source.CompactPasswordList,

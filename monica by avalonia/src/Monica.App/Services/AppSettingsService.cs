@@ -29,6 +29,7 @@ public sealed class DesktopAppSettings
     public string QuickSearchHotkey { get; set; } = "Ctrl+Shift+Space";
     public bool AutoTypeEnabled { get; set; }
     public string AutoTypeHotkey { get; set; } = "Ctrl+Shift+Enter";
+    public string AutoTypeSequence { get; set; } = AutoTypeSequenceParser.DefaultTemplate;
     public bool BrowserIntegrationEnabled { get; set; }
     public int BrowserIntegrationPort { get; set; } = 49152;
     public bool CompactPasswordList { get; set; }
@@ -152,6 +153,14 @@ public sealed partial class AppSettingsService : IAppSettingsService
         if (string.IsNullOrWhiteSpace(settings.AutoTypeHotkey))
         {
             settings.AutoTypeHotkey = "Ctrl+Shift+Enter";
+        }
+
+        // Only an empty sequence falls back to the default. A sequence that does not parse is left
+        // exactly as it was saved: the settings page shows which token is at fault and auto-type refuses
+        // with that reason, whereas rewriting it here would delete what the user typed and say nothing.
+        if (string.IsNullOrEmpty(settings.AutoTypeSequence))
+        {
+            settings.AutoTypeSequence = AutoTypeSequenceParser.DefaultTemplate;
         }
 
         // Two slots cannot register the same gesture, but this layer does not resolve that by rewriting

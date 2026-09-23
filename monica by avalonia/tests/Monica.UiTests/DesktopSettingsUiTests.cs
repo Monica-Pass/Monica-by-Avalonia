@@ -58,6 +58,58 @@ public sealed class DesktopSettingsUiTests
     }
 
     [Fact]
+    public void Auto_type_sequence_row_shows_what_was_typed_and_says_which_token_is_wrong()
+    {
+        // The settings row is the only place a bad sequence can be fixed, so what it renders has to be
+        // the user's own text plus the reason - not a silently corrected value. This reads the live
+        // render tree, because a binding that never attached would leave the row looking fine empty.
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        var view = new SettingsDesktopView { DataContext = viewModel };
+        var host = new Window { Width = 1280, Height = 800, Content = view };
+        // The page's root is hidden unless it is the selected settings page, and a hidden subtree is
+        // never measured, so its bindings leave the controls at their defaults.
+        viewModel.SelectedSettingsPage = "Desktop";
+        host.Show();
+        try
+        {
+            Dispatcher.UIThread.RunJobs();
+
+            var box = view.FindControl<TextBox>("AutoTypeSequenceBox")!;
+            var error = view.FindControl<TextBlock>("AutoTypeSequenceErrorText")!;
+            // Stated rather than read from the shared settings file: every test in this assembly loads
+            // the same isolated app data, so the value on disk is whichever run got there last.
+            viewModel.AutoTypeSequence = AutoTypeSequenceParser.DefaultTemplate;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(box.Focusable);
+            Assert.Equal(AutoTypeSequenceParser.DefaultTemplate, box.Text);
+            Assert.False(error.IsVisible);
+
+            viewModel.AutoTypeSequence = "{USERNAME}{TAB}{PASSWORD{ENTER}";
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal("{USERNAME}{TAB}{PASSWORD{ENTER}", box.Text);
+            Assert.True(error.IsVisible);
+            Assert.Contains("{PASSWORD{ENTER}", error.Text, StringComparison.Ordinal);
+
+            box.Text = "{USERNAME}{TAB}{ENTER}";
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal("{USERNAME}{TAB}{ENTER}", viewModel.AutoTypeSequence);
+            Assert.False(error.IsVisible);
+            Assert.Equal(
+                "{USERNAME}{TAB}{ENTER}",
+                services.GetRequiredService<IAppSettingsService>().Current.AutoTypeSequence);
+        }
+        finally
+        {
+            host.Close();
+        }
+    }
+
+    [Fact]
     public async Task Browser_pairing_states_mask_the_token_and_copy_it_only_through_sensitive_clipboard()
     {
         var bridge = new RecordingSettingsBrowserBridgeService();

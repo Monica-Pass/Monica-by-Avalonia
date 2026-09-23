@@ -1,5 +1,4 @@
 using Monica.Core.Models;
-using Monica.Platform.Services;
 
 namespace Monica.App.Services;
 
@@ -47,32 +46,6 @@ internal static class AutoTypeMatcher
         !entry.IsDeleted &&
         !entry.IsArchived &&
         (!string.IsNullOrWhiteSpace(entry.Username) || !string.IsNullOrWhiteSpace(entry.Password));
-
-    public static IReadOnlyList<AutoTypeToken> BuildTokens(PasswordEntry entry)
-    {
-        var tokens = new List<AutoTypeToken>(3);
-        var hasUsername = !string.IsNullOrWhiteSpace(entry.Username);
-        var hasPassword = !string.IsNullOrWhiteSpace(entry.Password);
-        if (hasUsername)
-        {
-            tokens.Add(AutoTypeToken.Text(entry.Username));
-        }
-
-        if (hasUsername && hasPassword)
-        {
-            // Tab moves to the next focused control instead of typing a literal tab, which is how a
-            // username/password pair is reached in one pass. Enter is deliberately never sent: the
-            // user submits the form themselves.
-            tokens.Add(AutoTypeToken.Tab);
-        }
-
-        if (hasPassword)
-        {
-            tokens.Add(AutoTypeToken.Text(entry.Password));
-        }
-
-        return tokens;
-    }
 
     internal static IReadOnlyList<string> HostLabels(string websites) =>
         BrowserCredentialMatcher.GetWebHosts(websites)

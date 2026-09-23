@@ -239,6 +239,121 @@ public sealed class DesktopIntegrationUiTests
     }
 
     [Fact]
+    public void A_configured_sequence_reaches_the_injector_exactly_as_it_was_written()
+    {
+        // The setting exists so that the keystrokes leaving this process are the ones the user asked
+        // for: a delay is a real delay step and an Enter the user typed really is sent, where the old
+        // hard-coded flow stopped at the password.
+        var autoType = new RecordingAutoTypeService();
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window, collection =>
+            collection.AddSingleton<IAutoTypeService>(autoType));
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+
+        viewModel.IsUnlocked = true;
+        viewModel.Passwords.Add(new Monica.Core.Models.PasswordEntry
+        {
+            Id = 1,
+            Title = "GitHub",
+            Website = "https://github.com",
+            Username = "octocat",
+            Password = "hunter2"
+        });
+        viewModel.AutoTypeSequence = "{USERNAME}{TAB}{PASSWORD}{DELAY:120}{ENTER}";
+
+        Assert.Equal(
+            "{USERNAME}{TAB}{PASSWORD}{DELAY:120}{ENTER}",
+            services.GetRequiredService<IAppSettingsService>().Current.AutoTypeSequence);
+
+        viewModel.RunAutoTypeIntoForeground(autoType.ForegroundHandle, "Sign in to GitHub · GitHub", false);
+
+        Assert.Equal(MainWindowViewModel.AutoTypeOutcome.Typed, viewModel.LastAutoTypeOutcome);
+        Assert.False(viewModel.HasAutoTypeSequenceError);
+        Assert.Collection(
+            autoType.LastTokens,
+            token =>
+            {
+                Assert.Equal(AutoTypeTokenKind.Text, token.Kind);
+                Assert.Equal("octocat", token.Value);
+            },
+            token => Assert.Equal(AutoTypeTokenKind.Tab, token.Kind),
+            token =>
+            {
+                Assert.Equal(AutoTypeTokenKind.Text, token.Kind);
+                Assert.Equal("hunter2", token.Value);
+            },
+            token =>
+            {
+                Assert.Equal(AutoTypeTokenKind.Delay, token.Kind);
+                Assert.Equal(120, token.DelayMilliseconds);
+            },
+            token => Assert.Equal(AutoTypeTokenKind.Enter, token.Kind));
+    }
+
+    [Fact]
+    public void An_unusable_sequence_types_nothing_and_names_the_token_to_fix()
+    {
+        var autoType = new RecordingAutoTypeService();
+        var window = new Monica.App.MainWindow();
+        using var services = Monica.App.App.ConfigureServices(window, collection =>
+            collection.AddSingleton<IAutoTypeService>(autoType));
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+
+        viewModel.IsUnlocked = true;
+        var entry = new Monica.Core.Models.PasswordEntry
+        {
+            Id = 1,
+            Title = "GitHub",
+            Website = "https://github.com",
+            Username = "octocat",
+            Password = "hunter2"
+        };
+        viewModel.Passwords.Add(entry);
+
+        // Sending a partial sequence would be worse than sending none: half of a login lands in a
+        // window the user then has to clean up by hand. So the refusal names the token, and the
+        // settings row carries the same text before the hotkey is ever pressed.
+        viewModel.AutoTypeSequence = "{capslock}";
+
+        Assert.True(viewModel.HasAutoTypeSequenceError);
+        Assert.Contains("{capslock}", viewModel.AutoTypeSequenceErrorText, StringComparison.Ordinal);
+
+        viewModel.RunAutoTypeIntoForeground(autoType.ForegroundHandle, "Sign in to GitHub · GitHub", false);
+
+        Assert.Equal(MainWindowViewModel.AutoTypeOutcome.SequenceInvalid, viewModel.LastAutoTypeOutcome);
+        Assert.Equal(0, autoType.TypeCallCount);
+        Assert.False(viewModel.IsAutoTypePickerOpen);
+        Assert.Contains("{capslock}", viewModel.StatusMessage, StringComparison.Ordinal);
+
+        // The sequence is read at press time, so fixing it takes effect on the next hotkey rather than
+        // on the next start.
+        viewModel.AutoTypeSequence = "{USERNAME}{TAB}";
+
+        Assert.False(viewModel.HasAutoTypeSequenceError);
+        viewModel.RunAutoTypeIntoForeground(autoType.ForegroundHandle, "Sign in to GitHub · GitHub", false);
+
+        Assert.Equal(MainWindowViewModel.AutoTypeOutcome.Typed, viewModel.LastAutoTypeOutcome);
+        Assert.Equal(1, autoType.TypeCallCount);
+        Assert.Collection(
+            autoType.LastTokens,
+            token =>
+            {
+                Assert.Equal(AutoTypeTokenKind.Text, token.Kind);
+                Assert.Equal("octocat", token.Value);
+            },
+            token => Assert.Equal(AutoTypeTokenKind.Tab, token.Kind));
+
+        // The matched entry carrying none of what the sequence asks for is its own answer, and not a
+        // silent success: nothing went anywhere, and "no match" would send the user to the wrong field.
+        autoType.Reset();
+        entry.Username = "";
+        viewModel.RunAutoTypeIntoForeground(autoType.ForegroundHandle, "Sign in to GitHub · GitHub", false);
+
+        Assert.Equal(MainWindowViewModel.AutoTypeOutcome.NothingToType, viewModel.LastAutoTypeOutcome);
+        Assert.Equal(0, autoType.TypeCallCount);
+    }
+
+    [Fact]
     public void Auto_type_picker_selection_gives_the_keyboard_back_to_the_target_before_typing()
     {
         var autoType = new RecordingAutoTypeService();

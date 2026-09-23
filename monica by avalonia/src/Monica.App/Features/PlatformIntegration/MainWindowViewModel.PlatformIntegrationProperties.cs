@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Monica.App.Services;
 using Monica.Core.Models;
 using Monica.Platform.Services;
 
@@ -51,6 +52,19 @@ public sealed partial class MainWindowViewModel
 
     [ObservableProperty]
     private string _autoTypeHotkey = "Ctrl+Shift+Enter";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AutoTypeSequenceErrorText))]
+    [NotifyPropertyChangedFor(nameof(HasAutoTypeSequenceError))]
+    private string _autoTypeSequence = AutoTypeSequenceParser.DefaultTemplate;
+
+    // Empty while the sequence is usable. The page says what is wrong as the text is edited, so a
+    // broken sequence never reaches the hotkey unnoticed.
+    public string AutoTypeSequenceErrorText => AutoTypeSequenceParser.TryParse(AutoTypeSequence, out _, out var failure)
+        ? ""
+        : FormatSequenceError(failure!);
+
+    public bool HasAutoTypeSequenceError => AutoTypeSequenceErrorText.Length > 0;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(AutoTypeIntegrationStatusText))]
