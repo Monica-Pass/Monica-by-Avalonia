@@ -196,11 +196,13 @@ public sealed class BitwardenMutationProcessorTests
         }, secrets);
         var operationStore = new BitwardenPendingOperationStore(factory, migrator, crypto);
         var conflictStore = new BitwardenConflictBackupStore(factory, migrator, crypto);
+        var syncState = new BitwardenSyncStateStore(factory, migrator);
         return new Harness(
             repository,
             operationStore,
             conflictStore,
-            new BitwardenMutationProcessor(operationStore, conflictStore, repository),
+            syncState,
+            new BitwardenMutationProcessor(operationStore, conflictStore, syncState, repository),
             account.Id);
     }
 
@@ -208,6 +210,7 @@ public sealed class BitwardenMutationProcessorTests
         IMonicaRepository Repository,
         IBitwardenPendingOperationStore OperationStore,
         IBitwardenConflictBackupStore ConflictStore,
+        IBitwardenSyncStateStore SyncState,
         IBitwardenMutationProcessor Processor,
         long VaultId);
 

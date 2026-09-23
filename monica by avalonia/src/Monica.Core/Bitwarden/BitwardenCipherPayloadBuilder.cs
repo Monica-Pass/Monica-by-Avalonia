@@ -2,20 +2,23 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Monica.Core.Bitwarden;
 using Monica.Core.Models;
 
-namespace Monica.Platform.Bitwarden;
+namespace Monica.Core.Bitwarden;
 
 /// <summary>
 /// Turns a local entry into the body Bitwarden's create/update cipher endpoint expects. The shape is
-/// the deliberate inverse of <see cref="BitwardenCipherDecoder"/>: every field the decoder reads back
-/// is the only field written out, so push then pull reproduces the local entry instead of drifting.
-/// Anything that cannot round-trip loses the remote object on write, so it throws instead.
+/// the deliberate inverse of <c>BitwardenCipherDecoder</c> in Monica.Platform: every field the decoder
+/// reads back is the only field written out, so push then pull reproduces the local entry instead of
+/// drifting. It lives here because the write-back producer runs in Monica.Data, which cannot reach
+/// Platform, and everything this needs - the cipher-string crypto, the entity, the protocol exception -
+/// is already Core. Anything that cannot round-trip loses the remote object on write, so it throws.
 /// </summary>
 public static class BitwardenCipherPayloadBuilder
 {
     public const int MaximumPayloadUtf8Bytes = 2 * 1024 * 1024;
+
+    private static readonly JsonSerializerOptions PayloadOptions = new(JsonSerializerDefaults.Web);
 
     public static string BuildLoginCipher(
         PasswordEntry entry,
@@ -55,7 +58,7 @@ public static class BitwardenCipherPayloadBuilder
             PasswordHistory = BuildHistory(history, key)
         };
 
-        var json = JsonSerializer.Serialize(payload, BitwardenHttpContent.JsonOptions);
+        var json = JsonSerializer.Serialize(payload, PayloadOptions);
         if (Encoding.UTF8.GetByteCount(json) > MaximumPayloadUtf8Bytes)
         {
             throw new BitwardenProtocolException("Bitwarden cipher payload exceeds the supported size.");

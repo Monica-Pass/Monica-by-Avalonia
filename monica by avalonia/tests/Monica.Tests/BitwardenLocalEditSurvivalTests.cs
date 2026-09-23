@@ -27,7 +27,8 @@ public sealed class BitwardenLocalEditSurvivalTests
         var service = new BitwardenPullMergeService(
             harness.Repository,
             harness.FolderStore,
-            harness.ConflictStore);
+            harness.ConflictStore,
+            harness.SyncState);
 
         var result = await service.ApplyAsync(harness.VaultId, Snapshot(remote), [remote]);
 
@@ -46,7 +47,8 @@ public sealed class BitwardenLocalEditSurvivalTests
         var service = new BitwardenPullMergeService(
             harness.Repository,
             harness.FolderStore,
-            harness.ConflictStore);
+            harness.ConflictStore,
+            harness.SyncState);
 
         await RenameThroughEditorAsync(harness, saved.Id, "Renamed on this device");
 
@@ -75,7 +77,8 @@ public sealed class BitwardenLocalEditSurvivalTests
         var service = new BitwardenPullMergeService(
             harness.Repository,
             harness.FolderStore,
-            harness.ConflictStore);
+            harness.ConflictStore,
+            harness.SyncState);
 
         await RenameThroughEditorAsync(harness, saved.Id, "Renamed on this device");
         await service.ApplyAsync(harness.VaultId, Snapshot(remote), [remote]);
@@ -181,13 +184,23 @@ public sealed class BitwardenLocalEditSurvivalTests
         }, secrets);
         var folderStore = new BitwardenRemoteFolderStore(factory, migrator, crypto);
         var conflictStore = new BitwardenConflictBackupStore(factory, migrator, crypto);
-        return new Harness(repository, folderStore, conflictStore, factory, migrator, crypto, account.Id);
+        var syncState = new BitwardenSyncStateStore(factory, migrator);
+        return new Harness(
+            repository,
+            folderStore,
+            conflictStore,
+            syncState,
+            factory,
+            migrator,
+            crypto,
+            account.Id);
     }
 
     private sealed record Harness(
         IMonicaRepository Repository,
         IBitwardenRemoteFolderStore FolderStore,
         IBitwardenConflictBackupStore ConflictStore,
+        IBitwardenSyncStateStore SyncState,
         SqliteConnectionFactory Factory,
         DatabaseMigrator Migrator,
         CryptoService Crypto,

@@ -55,7 +55,8 @@ public sealed class BitwardenPullMergeServiceTests
         var service = new BitwardenPullMergeService(
             harness.Repository,
             harness.FolderStore,
-            harness.ConflictStore);
+            harness.ConflictStore,
+            harness.SyncState);
 
         var result = await service.ApplyAsync(
             harness.VaultId,
@@ -188,12 +189,14 @@ public sealed class BitwardenPullMergeServiceTests
         }, secrets);
         var folderStore = new BitwardenRemoteFolderStore(factory, migrator, crypto);
         var conflictStore = new BitwardenConflictBackupStore(factory, migrator, crypto);
-        return new Harness(repository, folderStore, conflictStore, account.Id);
+        var syncState = new BitwardenSyncStateStore(factory, migrator);
+        return new Harness(repository, folderStore, conflictStore, syncState, account.Id);
     }
 
     private sealed record Harness(
         IMonicaRepository Repository,
         IBitwardenRemoteFolderStore FolderStore,
         IBitwardenConflictBackupStore ConflictStore,
+        IBitwardenSyncStateStore SyncState,
         long VaultId);
 }

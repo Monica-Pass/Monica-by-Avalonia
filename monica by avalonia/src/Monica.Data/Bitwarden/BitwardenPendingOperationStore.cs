@@ -59,18 +59,19 @@ public sealed partial class BitwardenPendingOperationStore(
             """
             INSERT INTO bitwarden_pending_operations (
                 bitwarden_vault_id, cipher_id, operation_type, expected_remote_revision,
-                encrypted_payload_json, idempotency_key, status, failure_class,
+                local_payload_hash, encrypted_payload_json, idempotency_key, status, failure_class,
                 attempt_count, next_attempt_at, claimed_at, encrypted_last_error,
                 created_at, updated_at)
             VALUES (
                 @VaultId, @CipherId, @OperationType, @ExpectedRemoteRevision,
-                @EncryptedPayloadJson, @IdempotencyKey, 'pending', 'none',
+                @LocalPayloadHash, @EncryptedPayloadJson, @IdempotencyKey, 'pending', 'none',
                 0, @NextAttemptAt, NULL, NULL, @CreatedAt, @UpdatedAt)
             ON CONFLICT(idempotency_key) DO UPDATE SET
                 bitwarden_vault_id = excluded.bitwarden_vault_id,
                 cipher_id = excluded.cipher_id,
                 operation_type = excluded.operation_type,
                 expected_remote_revision = excluded.expected_remote_revision,
+                local_payload_hash = excluded.local_payload_hash,
                 encrypted_payload_json = excluded.encrypted_payload_json,
                 status = 'pending',
                 failure_class = 'none',
@@ -87,6 +88,7 @@ public sealed partial class BitwardenPendingOperationStore(
                 operation.CipherId,
                 OperationType = FormatOperationType(operation.OperationType),
                 operation.ExpectedRemoteRevision,
+                operation.LocalPayloadHash,
                 EncryptedPayloadJson = protectedPayload,
                 operation.IdempotencyKey,
                 NextAttemptAt = nextAttempt.ToUniversalTime().ToUnixTimeMilliseconds(),
@@ -275,6 +277,7 @@ public sealed partial class BitwardenPendingOperationStore(
     {
         BitwardenMutationGuard.ValidateForQueue(operation);
         if (operation.CipherId.Length > 256 || operation.IdempotencyKey.Length > 512 ||
+            operation.LocalPayloadHash is { Length: > 128 } ||
             Encoding.UTF8.GetByteCount(operation.PayloadJson) > MaximumPayloadUtf8Bytes)
         {
             throw new BitwardenProtocolException("Bitwarden pending operation exceeds the supported size.");

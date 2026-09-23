@@ -42,7 +42,8 @@ public sealed record BitwardenPendingOperation(
     DateTimeOffset? ClaimedAt,
     string? LastError,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string? LocalPayloadHash = null);
 
 public sealed record BitwardenMutationRequest(
     long OperationId,

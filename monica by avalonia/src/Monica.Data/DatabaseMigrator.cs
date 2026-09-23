@@ -9,7 +9,7 @@ public interface IDatabaseMigrator
 
 public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory) : IDatabaseMigrator
 {
-    public const int CurrentSchemaVersion = 76;
+    public const int CurrentSchemaVersion = 77;
 
     public async Task MigrateAsync(CancellationToken cancellationToken = default)
     {
@@ -52,6 +52,7 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
         await EnsureColumnAsync(connection, "bitwarden_vaults", "custom_ca_certificate_path", "TEXT DEFAULT NULL", cancellationToken);
         await EnsureColumnAsync(connection, "bitwarden_vaults", "client_certificate_path", "TEXT DEFAULT NULL", cancellationToken);
         await EnsureColumnAsync(connection, "bitwarden_vaults", "encrypted_client_certificate_password", "TEXT DEFAULT NULL", cancellationToken);
+        await EnsureColumnAsync(connection, "bitwarden_pending_operations", "local_payload_hash", "TEXT DEFAULT NULL", cancellationToken);
         await CreateIndexesAsync(connection, cancellationToken);
         await ExecuteAsync(connection, $"PRAGMA user_version={CurrentSchemaVersion};", cancellationToken);
     }
@@ -521,6 +522,7 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
             cipher_id TEXT NOT NULL,
             operation_type TEXT NOT NULL,
             expected_remote_revision TEXT DEFAULT NULL,
+            local_payload_hash TEXT DEFAULT NULL,
             encrypted_payload_json TEXT DEFAULT NULL,
             idempotency_key TEXT NOT NULL,
             status TEXT NOT NULL DEFAULT 'pending',
@@ -536,6 +538,16 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
         """,
         "CREATE UNIQUE INDEX IF NOT EXISTS index_bitwarden_pending_operations_idempotency ON bitwarden_pending_operations(idempotency_key);",
         "CREATE INDEX IF NOT EXISTS index_bitwarden_pending_operations_ready ON bitwarden_pending_operations(bitwarden_vault_id, status, next_attempt_at, id);",
+        """
+        CREATE TABLE IF NOT EXISTS bitwarden_sync_state (
+            bitwarden_vault_id INTEGER NOT NULL,
+            cipher_id TEXT NOT NULL,
+            payload_hash TEXT NOT NULL,
+            synced_at INTEGER NOT NULL,
+            PRIMARY KEY(bitwarden_vault_id, cipher_id),
+            FOREIGN KEY(bitwarden_vault_id) REFERENCES bitwarden_vaults(id) ON DELETE CASCADE
+        );
+        """,
         """
         CREATE TABLE IF NOT EXISTS attachments (
             id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,

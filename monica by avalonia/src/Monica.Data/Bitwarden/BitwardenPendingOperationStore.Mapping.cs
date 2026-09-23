@@ -11,6 +11,7 @@ public sealed partial class BitwardenPendingOperationStore
                cipher_id AS CipherId,
                operation_type AS OperationType,
                expected_remote_revision AS ExpectedRemoteRevision,
+               local_payload_hash AS LocalPayloadHash,
                encrypted_payload_json AS EncryptedPayloadJson,
                idempotency_key AS IdempotencyKey,
                status AS Status,
@@ -39,7 +40,8 @@ public sealed partial class BitwardenPendingOperationStore
         row.ClaimedAt is null ? null : DateTimeOffset.FromUnixTimeMilliseconds(row.ClaimedAt.Value),
         row.EncryptedLastError is null ? null : _protector.UnprotectString(row.EncryptedLastError),
         DateTimeOffset.FromUnixTimeMilliseconds(row.CreatedAt),
-        DateTimeOffset.FromUnixTimeMilliseconds(row.UpdatedAt));
+        DateTimeOffset.FromUnixTimeMilliseconds(row.UpdatedAt),
+        row.LocalPayloadHash);
 
     private static string FormatOperationType(BitwardenMutationOperationType value) => value switch
     {
@@ -108,6 +110,7 @@ public sealed partial class BitwardenPendingOperationStore
         public string CipherId { get; init; } = "";
         public string OperationType { get; init; } = "";
         public string? ExpectedRemoteRevision { get; init; }
+        public string? LocalPayloadHash { get; init; }
         public string? EncryptedPayloadJson { get; init; }
         public string IdempotencyKey { get; init; } = "";
         public string Status { get; init; } = "";

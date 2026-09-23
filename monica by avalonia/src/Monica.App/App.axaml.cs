@@ -184,6 +184,8 @@ public partial class App : Application
         services.AddSingleton<IBitwardenConflictBackupStore, BitwardenConflictBackupStore>();
         services.AddSingleton<IBitwardenPullMergeService, BitwardenPullMergeService>();
         services.AddSingleton<IBitwardenPendingOperationStore, BitwardenPendingOperationStore>();
+        services.AddSingleton<IBitwardenSyncStateStore, BitwardenSyncStateStore>();
+        services.AddSingleton<IBitwardenLocalChangeQueue, BitwardenLocalChangeQueue>();
         services.AddSingleton<IBitwardenMutationProcessor, BitwardenMutationProcessor>();
         services.AddSingleton<IBitwardenSessionManager, BitwardenSessionManager>();
         services.AddSingleton<IBitwardenHttpClientFactory, BitwardenHttpClientFactory>();

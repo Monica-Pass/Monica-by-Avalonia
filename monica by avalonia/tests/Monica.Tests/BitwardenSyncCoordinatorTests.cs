@@ -40,6 +40,11 @@ public sealed class BitwardenSyncCoordinatorTests
     {
         var harness = CreateHarness(expiring: true);
         var events = new List<string>();
+        harness.LocalChangeQueue.OnEnqueue = () =>
+        {
+            events.Add("enqueue");
+            return Task.FromResult(new BitwardenLocalChangeQueueResult(1, 0));
+        };
         harness.MutationProcessor.OnProcess = _ =>
         {
             events.Add("upload");
@@ -56,7 +61,7 @@ public sealed class BitwardenSyncCoordinatorTests
         var result = await harness.Coordinator.SyncAsync(7, BitwardenSyncTrigger.Manual);
 
         Assert.True(harness.Authentication.RefreshCalled);
-        Assert.Equal(["upload", "download", "apply"], events);
+        Assert.Equal(["enqueue", "upload", "download", "apply"], events);
         Assert.Equal(1, result.Merge.Added);
     }
 
@@ -67,6 +72,7 @@ public sealed class BitwardenSyncCoordinatorTests
         var accountStore = new FakeAccountStore(CreateAccount(expiring), CreateSecrets());
         var sessionManager = new BitwardenSessionManager(vaultSession);
         var authentication = new FakeAuthenticationService();
+        var localChangeQueue = new FakeLocalChangeQueue();
         var mutationProcessor = new FakeMutationProcessor();
         var syncTransport = new FakeSyncTransport();
         var pullMerge = new FakePullMergeService();
@@ -74,6 +80,7 @@ public sealed class BitwardenSyncCoordinatorTests
             accountStore,
             sessionManager,
             authentication,
+            localChangeQueue,
             mutationProcessor,
             new FakeMutationTransportFactory(),
             syncTransport,
@@ -83,6 +90,7 @@ public sealed class BitwardenSyncCoordinatorTests
             coordinator,
             vaultSession,
             authentication,
+            localChangeQueue,
             mutationProcessor,
             syncTransport,
             pullMerge);
@@ -119,9 +127,30 @@ public sealed class BitwardenSyncCoordinatorTests
         BitwardenSyncCoordinator Coordinator,
         VaultSessionService VaultSession,
         FakeAuthenticationService Authentication,
+        FakeLocalChangeQueue LocalChangeQueue,
         FakeMutationProcessor MutationProcessor,
         FakeSyncTransport SyncTransport,
         FakePullMergeService PullMerge);
+
+    private sealed class FakeLocalChangeQueue : IBitwardenLocalChangeQueue
+    {
+        public Func<Task<BitwardenLocalChangeQueueResult>>? OnEnqueue { get; set; }
+
+        public async Task<BitwardenLocalChangeQueueResult> EnqueueDriftedAsync(
+            long vaultId,
+            BitwardenSymmetricKey vaultKey,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(vaultKey);
+            if (OnEnqueue is { } handler)
+            {
+                return await handler();
+            }
+
+            return new BitwardenLocalChangeQueueResult(0, 0);
+        }
+    }
 
     private sealed class FakeAccountStore(BitwardenAccount account, BitwardenAccountSecrets secrets) : IBitwardenAccountStore
     {

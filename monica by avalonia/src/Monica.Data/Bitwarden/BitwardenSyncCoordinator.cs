@@ -7,6 +7,7 @@ public sealed class BitwardenSyncCoordinator(
     IBitwardenAccountStore accountStore,
     IBitwardenSessionManager sessionManager,
     IBitwardenAuthenticationService authenticationService,
+    IBitwardenLocalChangeQueue localChangeQueue,
     IBitwardenMutationProcessor mutationProcessor,
     IBitwardenMutationTransportFactory mutationTransportFactory,
     IBitwardenSyncTransport syncTransport,
@@ -137,6 +138,12 @@ public sealed class BitwardenSyncCoordinator(
                 }
 
                 Publish(accountId, trigger, BitwardenSyncPhase.Uploading);
+                using var vaultKey = activeLease.Secrets.CreateVaultKey();
+                await localChangeQueue.EnqueueDriftedAsync(
+                    accountId,
+                    vaultKey,
+                    _timeProvider.GetUtcNow(),
+                    lockToken);
                 using var mutationTransport = mutationTransportFactory.Create(activeAccount, activeLease.Secrets);
                 var mutations = await ProcessMutationsAsync(
                     accountId,

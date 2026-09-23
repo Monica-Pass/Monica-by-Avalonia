@@ -18,6 +18,7 @@ public interface IBitwardenMutationProcessor
 public sealed class BitwardenMutationProcessor(
     IBitwardenPendingOperationStore operationStore,
     IBitwardenConflictBackupStore conflictStore,
+    IBitwardenSyncStateStore syncStateStore,
     IMonicaRepository repository) : IBitwardenMutationProcessor
 {
     private static readonly ConcurrentDictionary<long, SemaphoreSlim> VaultLocks = new();
@@ -159,6 +160,19 @@ public sealed class BitwardenMutationProcessor(
         CancellationToken cancellationToken)
     {
         var remoteCipherId = response.RemoteCipherId ?? operation.CipherId;
+        // The server now holds exactly the content this upload carried, so it becomes the new
+        // baseline. Without this the idempotency key of a completed change would be re-queued and
+        // resurrected on the next sync.
+        if (operation.LocalPayloadHash is { } pushedHash)
+        {
+            await syncStateStore.AdvanceAsync(
+                operation.VaultId,
+                remoteCipherId,
+                pushedHash,
+                DateTimeOffset.UtcNow,
+                cancellationToken);
+        }
+
         if (local.Passwords.TryGetValue(operation.CipherId, out var password))
         {
             password.BitwardenCipherId = remoteCipherId;

@@ -16,7 +16,8 @@ public interface IBitwardenPullMergeService
 public sealed partial class BitwardenPullMergeService(
     IMonicaRepository repository,
     IBitwardenRemoteFolderStore folderStore,
-    IBitwardenConflictBackupStore conflictStore) : IBitwardenPullMergeService
+    IBitwardenConflictBackupStore conflictStore,
+    IBitwardenSyncStateStore syncStateStore) : IBitwardenPullMergeService
 {
     public async Task<BitwardenPullMergeResult> ApplyAsync(
         long vaultId,
@@ -119,6 +120,18 @@ public sealed partial class BitwardenPullMergeService(
                         $"Unsupported Bitwarden merge action: {decision.Action}.");
             }
         }
+
+        // Local state now mirrors the remote payload, so these fingerprints become the baseline that
+        // the next upload pass compares against. ValidateDecodedPayload already guarantees that the
+        // fingerprint of a decoded cipher equals its metadata hash.
+        await syncStateStore.ReplaceForVaultAsync(
+            vaultId,
+            snapshot.Ciphers
+                .Where(cipher => !cipher.IsDeleted)
+                .Select(cipher => new BitwardenSyncedCipher(cipher.CipherId, cipher.PayloadHash))
+                .ToList(),
+            snapshot.ReceivedAt,
+            cancellationToken);
 
         return new BitwardenPullMergeResult(
             added,
