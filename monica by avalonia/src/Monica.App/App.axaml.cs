@@ -13,6 +13,7 @@ using Monica.Core.Services;
 using Monica.Data;
 using Monica.Data.Bitwarden;
 using Monica.Data.Mdbx;
+using Monica.Data.Passkeys;
 using Monica.Data.Repositories;
 using Monica.Data.Services;
 using Monica.Platform.Services;
@@ -161,6 +162,9 @@ public partial class App : Application
         services.AddSingleton<IDatabaseMigrator, DatabaseMigrator>();
         services.AddSingleton<ILegacyBusinessDataInspector, LegacyBusinessDataInspector>();
         services.AddSingleton<IVaultCredentialStore, VaultCredentialStore>();
+        services.AddSingleton<IPasskeyPrivateKeyStore, PasskeyPrivateKeyStore>();
+        services.AddSingleton<IPasskeyStore, PasskeyStore>();
+        services.AddSingleton<IPasskeyService, PasskeyService>();
         services.AddSingleton<MonicaRepository>(provider => new MonicaRepository(
             provider.GetRequiredService<ISqliteConnectionFactory>(),
             provider.GetRequiredService<IDatabaseMigrator>(),

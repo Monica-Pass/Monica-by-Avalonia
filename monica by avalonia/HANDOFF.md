@@ -737,6 +737,34 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
      下一轮要做的是：在真的 workspace 视图里读 `ScrollBar.Bounds` / `Thumb.Bounds`，而不是再加一条合成用例。
   5. **仍未拿到的**：滚动条"好不好看"还是要用户在运行的应用里自己看一眼；本轮只多了一张 800x844 的
      `DatabaseManagement` 真帧可看（`artifacts/` 已 gitignore，图不入库）。
+- **Passkey 三片：片1 已落地，片2/片3 排队（用户 2026-09-23 点名"应该再支持一下 passkey 这些还有 Windows Hello 解锁客户端"，并选了"片1 Passkey 存储+自证引擎"先做）**。
+  1. **片1 已完（本轮）**：`Monica.Core/Passkeys/*` 是 Monica 自己的软件认证器 +  relying-party 校验器
+     （ES256/RS256 生成、authData 布局、CBOR 子集、clientDataJSON、none 证明、`passkey_private_key_v1_` 引用方案
+     全部照抄 Android 的 `passkey/` 包）；`Monica.Data/Passkeys/*` 是落地面：新表 `passkey_private_keys`
+     （schema 75→76）用保险库会话密钥加密 PKCS#8，凭据行只留引用，清库语句同步加了 `DELETE FROM passkey_private_keys`。
+     取证是 42 条单测（`PasskeyEngineTests` + `PasskeyStoreTests`）+ 两套门 + jit 产物真跑门全绿。
+  2. **片1 写的过程中修掉一个真缺陷**：`PasskeyStore.Validate` 原先把 `PasskeyRpId.Normalize(...)!` 直接赋回
+     `entry.RpId`，遇到 `".."`/纯点这类 rpId 会归一化成 null 再写库，报的是 SQLite `NOT NULL constraint failed`
+     而不是参数错误。现在先判空再写回。**教训：`!` 会把"归一化可能失败"这件事吃掉，只有真跑一条脏输入才暴露。**
+  3. **片1 的已知边界（不是 bug，是范围）**：
+     - 引擎目前是**纯库**，没有任何界面或协议入口消费它（`App.axaml.cs` 注册了 3 个 singleton，没人解析）。
+       所以 UI/产物门不会替 passkey 背书，只有那 42 条单测会。
+     - rpId 哈希按 Android 的做法对**原样传入**的字符串取 SHA-256（归一化只用于等价判断），所以一个凭据只在
+       它注册时的那个拼写下自证通过。
+     - 签名计数器恒为 0（照抄 Android `PasskeyAuthActivity` 的理由：整库备份恢复会让单调计数器跨设备回退，
+       表现成"用了若干次后 passkey 突然失效"），`PasskeyVerifier` 读但**不比**计数器。
+     - `passkeys` 行的元数据（`user_name`/`notes`/`rp_id`）仍是明文入库，只有私钥走了会话密钥。这一点与 Android
+       的表形状一致，动它等于破坏 schema 对齐，因此**没有**擅自改；如果以后要收，得连带设计导出口径。
+     - 全部 SQL 都保持编译期常量（包括 `SelectColumns + " WHERE ..."` 这种拼接），因为 Dapper.AOT 只拦截
+       常量命令文本；这与 #43（AOT 产物解锁失败）是同一个失效家族，别再退回插值字符串。
+  4. **片2 = Windows Hello 解锁客户端 + 平台 passkey（未开始，被外部条件卡住）**：
+     - 本机实测 `WebAuthNIsUserVerifyingPlatformAuthenticatorAvailable` 返回 `value=0`，也就是**这台机器还没登记
+       Windows Hello**，所以片2 端到端验不了；开工前要么用户先登记 PIN/指纹/人脸，要么只写边界与探针不做承诺。
+     - 真实 P/Invoke 名字是 `WebAuthNAuthenticatorMakeCredential` / `WebAuthNGetAssertion`（不是 `WebAuthNMakeCredential`
+       / `WebAuthNGetAssertion` 这种直觉拼法），外加 `hmac-secret` 扩展才能走"passkey 解保险库"这条路。
+     - 需要升级现有的 `NativePasskey` 能力上报，并对齐 Android 的 `biometric_enabled` / `auto_lock_timeout` 语义。
+  5. **片3 = 自动输入（Auto-Type）序列可配置（未开始）**：现在是写死的 `<tab>` 流程，要按 Android 那样支持
+     `<username><tab><password><enter><delay:N>` 并且让非密码条目也能参与。
 
 ## 8. 用户协作偏好（务必遵守）
 

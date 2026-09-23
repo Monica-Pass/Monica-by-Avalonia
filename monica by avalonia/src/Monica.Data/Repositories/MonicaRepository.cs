@@ -1461,6 +1461,7 @@ public sealed partial class MonicaRepository(
             "DELETE FROM password_entries;",
             "DELETE FROM secure_items;",
             "DELETE FROM passkeys;",
+            "DELETE FROM passkey_private_keys;",
             "DELETE FROM operation_logs;",
             "DELETE FROM categories;",
             "DELETE FROM local_mdbx_databases;",

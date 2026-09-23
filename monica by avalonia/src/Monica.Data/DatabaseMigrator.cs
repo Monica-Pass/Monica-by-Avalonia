@@ -9,7 +9,7 @@ public interface IDatabaseMigrator
 
 public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory) : IDatabaseMigrator
 {
-    public const int CurrentSchemaVersion = 75;
+    public const int CurrentSchemaVersion = 76;
 
     public async Task MigrateAsync(CancellationToken cancellationToken = default)
     {
@@ -383,6 +383,13 @@ public sealed class DatabaseMigrator(ISqliteConnectionFactory connectionFactory)
         "CREATE INDEX IF NOT EXISTS index_passkeys_user_name ON passkeys(user_name);",
         "CREATE INDEX IF NOT EXISTS index_passkeys_mdbx_database_id ON passkeys(mdbx_database_id);",
         "CREATE INDEX IF NOT EXISTS index_passkeys_mdbx_database_folder ON passkeys(mdbx_database_id, mdbx_folder_id);",
+        """
+        CREATE TABLE IF NOT EXISTS passkey_private_keys (
+            storage_key TEXT PRIMARY KEY NOT NULL,
+            encrypted_pkcs8 TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+        );
+        """,
         """
         CREATE TABLE IF NOT EXISTS local_mdbx_databases (
             id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
