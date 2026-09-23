@@ -1,7 +1,8 @@
-<Styles xmlns="https://github.com/avaloniaui"
+﻿<Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:fa="using:FluentAvalonia.UI.Controls"
-        xmlns:fap="using:FluentAvalonia.UI.Controls.Primitives">
+        xmlns:fap="using:FluentAvalonia.UI.Controls.Primitives"
+        xmlns:controls="using:Monica.App.Controls">
 
     <!-- Surfaces carry no fill and no stroke: the window paints exactly one
          background and panes are separated by hairlines only. -->
@@ -252,7 +253,7 @@
                         <Track.IncreaseButton>
                             <RepeatButton Name="PART_PageDownButton" Classes="slimScrollBarPage" Focusable="False" />
                         </Track.IncreaseButton>
-                        <Thumb Name="slimThumb" Margin="4,0" MinHeight="28" />
+                        <controls:SlimScrollBarThumb Name="slimThumb" Margin="4,0" MinHeight="28" />
                     </Track>
                 </Border>
             </ControlTemplate>
@@ -276,7 +277,7 @@
                         <Track.IncreaseButton>
                             <RepeatButton Name="PART_PageDownButton" Classes="slimScrollBarPage" Focusable="False" />
                         </Track.IncreaseButton>
-                        <Thumb Name="slimThumb" Margin="0,4" MinWidth="28" />
+                        <controls:SlimScrollBarThumb Name="slimThumb" Margin="0,4" MinWidth="28" />
                     </Track>
                 </Border>
             </ControlTemplate>
@@ -291,18 +292,21 @@
             </ControlTemplate>
         </Setter>
     </Style>
-    <Style Selector="ScrollBar /template/ Thumb#slimThumb">
+    <Style Selector="ScrollBar /template/ controls|SlimScrollBarThumb#slimThumb">
         <Setter Property="Background" Value="{DynamicResource SlimScrollBarThumbBrush}" />
+        <!-- FluentAvalonia fakes the WinUI slim bar by squeezing its Thumb with
+             scaleX(0.35) translateX(-2px), which lands on this template part too and would shrink
+             the painted strip to a third of whatever width our margins declare. -->
         <Setter Property="Template">
             <ControlTemplate>
                 <Border Background="{TemplateBinding Background}" CornerRadius="2" />
             </ControlTemplate>
         </Setter>
     </Style>
-    <Style Selector="ScrollBar:vertical /template/ Thumb#slimThumb:pointerover">
+    <Style Selector="ScrollBar:vertical /template/ controls|SlimScrollBarThumb#slimThumb:pointerover">
         <Setter Property="Margin" Value="2,0" />
     </Style>
-    <Style Selector="ScrollBar:horizontal /template/ Thumb#slimThumb:pointerover">
+    <Style Selector="ScrollBar:horizontal /template/ controls|SlimScrollBarThumb#slimThumb:pointerover">
         <Setter Property="Margin" Value="0,2" />
     </Style>
 </Styles>

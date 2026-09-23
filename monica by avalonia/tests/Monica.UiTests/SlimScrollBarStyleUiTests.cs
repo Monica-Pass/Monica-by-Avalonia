@@ -4,6 +4,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Monica.App.Controls;
 
 namespace Monica.UiTests;
 
@@ -78,6 +79,29 @@ public sealed class SlimScrollBarStyleUiTests
             Dispatcher.UIThread.RunJobs();
 
             Assert.Equal(120, scrollViewer.Offset.Y);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [Fact]
+    public void Slim_thumb_is_not_squeezed_by_the_widget_theme()
+    {
+        var window = OpenScrollableList(out var bar);
+
+        try
+        {
+            var thumb = bar.GetVisualDescendants().OfType<Thumb>().Single();
+
+            // FluentAvalonia's ScrollBar theme scales whatever Thumb it finds in the template by
+            // 0.35 to fake its own slim bar, at a value priority that neither a style setter nor a
+            // template attribute beats - so the 4 DIP bar the shell declared painted 1.3 DIP.
+            // The shell's thumb derives from Thumb because Avalonia type selectors match the exact
+            // type; if that ever stops holding the transform comes back and the bar shrinks again.
+            Assert.IsType<SlimScrollBarThumb>(thumb);
+            Assert.Null(thumb.RenderTransform);
         }
         finally
         {
