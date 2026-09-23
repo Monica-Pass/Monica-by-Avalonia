@@ -80,6 +80,8 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(BitwardenLoginActionText));
         OnPropertyChanged(nameof(BitwardenChallengeTitle));
         OnPropertyChanged(nameof(BitwardenChallengeDescription));
+        OnPropertyChanged(nameof(HasBitwardenConflicts));
+        OnPropertyChanged(nameof(CanResolveBitwardenConflicts));
         RefreshSyncHealthItems();
     }
 
@@ -103,6 +105,7 @@ public sealed partial class MainWindowViewModel
         }
 
         RaiseBitwardenState();
+        _ = LoadBitwardenConflictsAsync();
     }
 
     private void OnBitwardenSyncStateChanged(object? sender, BitwardenSyncState state) =>

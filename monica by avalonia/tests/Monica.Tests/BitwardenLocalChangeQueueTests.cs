@@ -345,6 +345,100 @@ public sealed class BitwardenLocalChangeQueueTests
         Assert.Equal("Renamed on this device", root.GetProperty("password").GetProperty("Title").GetString());
     }
 
+    [Fact]
+    public async Task A_restored_conflict_comes_back_whole_and_the_next_sync_uploads_it()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = BaselineCipher();
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([remote]), [remote]);
+        var edited = await RenameAsync(harness, "Renamed on this device");
+        await harness.Repository.ReplaceCustomFieldsAsync(
+            edited.Id,
+            [new CustomField { EntryId = edited.Id, Title = "Backup code", Value = "recovery-6-words" }],
+            CancellationToken.None);
+        await harness.Repository.SavePasswordHistoryAsync(
+            new PasswordHistoryEntry { EntryId = edited.Id, Password = "previous-password" },
+            CancellationToken.None);
+        await harness.Queue.EnqueueDriftedAsync(harness.VaultId, harness.VaultKey, DateTimeOffset.UtcNow);
+        await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            new AcceptedTransport(NextRevision, reject: true));
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([remote]), [remote]);
+
+        // The second pull won: this device now shows the remote content.
+        Assert.Equal("Remote baseline", (await ReadAsync(harness)).Title);
+        var summary = Assert.Single(await harness.Restore.GetSummariesAsync(harness.VaultId));
+        Assert.Equal("Renamed on this device", summary.Title);
+        Assert.True(summary.IsPassword);
+
+        await harness.Restore.RestoreAsync(harness.VaultId, summary.BackupId);
+
+        var restored = await ReadAsync(harness);
+        Assert.Equal("Renamed on this device", restored.Title);
+        Assert.True(restored.BitwardenLocalModified);
+        Assert.Equal(BaselineRevision, restored.BitwardenRevisionDate);
+        Assert.Equal(
+            ["Backup code"],
+            (await harness.Repository.GetCustomFieldsByEntryIdsAsync([restored.Id]))
+                .Values.SelectMany(fields => fields).Select(field => field.Title));
+        Assert.Equal(
+            ["previous-password"],
+            (await harness.Repository.GetPasswordHistoryByEntryIdsAsync([restored.Id]))
+                .Values.SelectMany(history => history).Select(history => history.Password));
+        Assert.Empty(await harness.ConflictStore.GetUnresolvedAsync(harness.VaultId));
+
+        // Recovering the content is only worth anything if it stops the server from overwriting it again.
+        Assert.Equal(1, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+        var batch = await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            new AcceptedTransport(NextRevision));
+        Assert.Equal(1, batch.Completed);
+        Assert.Equal(0, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+    }
+
+    [Fact]
+    public async Task Discarding_a_conflict_leaves_the_remote_version_alone_and_owes_nothing()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = BaselineCipher();
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([remote]), [remote]);
+        await RenameAsync(harness, "Renamed on this device");
+        await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow);
+        await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            new AcceptedTransport(NextRevision, reject: true));
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([remote]), [remote]);
+        var summary = Assert.Single(await harness.Restore.GetSummariesAsync(harness.VaultId));
+
+        await harness.Restore.DiscardAsync(harness.VaultId, summary.BackupId);
+
+        Assert.Empty(await harness.Restore.GetSummariesAsync(harness.VaultId));
+        Assert.Equal("Remote baseline", (await ReadAsync(harness)).Title);
+        Assert.Equal(0, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+    }
+
+    private static async Task<PasswordEntry> ReadAsync(Harness harness)
+    {
+        var stored = (await harness.Repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true))
+            .Single(entry => entry.BitwardenCipherId == "cipher-edit");
+        return stored;
+    }
+
     private static async Task<PasswordEntry> RenameAsync(Harness harness, string title)
     {
         var stored = (await harness.Repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true))
@@ -424,6 +518,7 @@ public sealed class BitwardenLocalChangeQueueTests
             new BitwardenPullMergeService(repository, folderStore, conflictStore, syncState),
             new BitwardenLocalChangeQueue(repository, syncState, pending),
             new BitwardenMutationProcessor(pending, syncState, repository),
+            new BitwardenConflictRestoreService(repository, conflictStore),
             new BitwardenSymmetricKey(
                 Enumerable.Repeat((byte)1, 32).ToArray(),
                 Enumerable.Repeat((byte)2, 32).ToArray()),
@@ -440,6 +535,7 @@ public sealed class BitwardenLocalChangeQueueTests
         BitwardenPullMergeService Pull,
         IBitwardenLocalChangeQueue Queue,
         IBitwardenMutationProcessor Processor,
+        IBitwardenConflictRestoreService Restore,
         BitwardenSymmetricKey VaultKey,
         SqliteConnectionFactory Factory,
         DatabaseMigrator Migrator,

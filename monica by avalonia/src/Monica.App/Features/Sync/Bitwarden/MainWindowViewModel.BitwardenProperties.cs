@@ -14,6 +14,7 @@ public sealed partial class MainWindowViewModel
     private readonly IBitwardenSessionManager? _bitwardenSessionManager;
     private readonly IBitwardenPendingOperationStore? _bitwardenPendingOperationStore;
     private readonly IBitwardenConflictBackupStore? _bitwardenConflictBackupStore;
+    private readonly IBitwardenConflictRestoreService? _bitwardenConflictRestoreService;
     private readonly IBitwardenDeviceIdentityProvider? _bitwardenDeviceIdentityProvider;
     private int _bitwardenSyncOperationActive;
     private int _bitwardenAccountsLoadActive;

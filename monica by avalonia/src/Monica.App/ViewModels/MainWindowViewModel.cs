@@ -80,6 +80,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IBitwardenSessionManager? bitwardenSessionManager = null,
         IBitwardenPendingOperationStore? bitwardenPendingOperationStore = null,
         IBitwardenConflictBackupStore? bitwardenConflictBackupStore = null,
+        IBitwardenConflictRestoreService? bitwardenConflictRestoreService = null,
         IBitwardenDeviceIdentityProvider? bitwardenDeviceIdentityProvider = null,
         IAutoTypeService? autoTypeService = null)
     {
@@ -104,6 +105,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _bitwardenSessionManager = bitwardenSessionManager;
         _bitwardenPendingOperationStore = bitwardenPendingOperationStore;
         _bitwardenConflictBackupStore = bitwardenConflictBackupStore;
+        _bitwardenConflictRestoreService = bitwardenConflictRestoreService;
         _bitwardenDeviceIdentityProvider = bitwardenDeviceIdentityProvider;
         if (_bitwardenSyncCoordinator is not null)
         {

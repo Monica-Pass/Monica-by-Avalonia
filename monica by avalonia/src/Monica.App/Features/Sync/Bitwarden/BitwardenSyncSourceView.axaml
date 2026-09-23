@@ -148,6 +148,47 @@
                     </fa:FASettingsExpanderItem.Footer>
                 </fa:FASettingsExpanderItem>
 
+                <fa:FASettingsExpanderItem Content="{Binding L[BitwardenConflictSectionTitle]}"
+                                           Description="{Binding L[BitwardenConflictSectionDescription]}"
+                                           IsVisible="{Binding HasBitwardenConflicts}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <StackPanel x:Name="BitwardenConflictSection" Spacing="8" MinWidth="300" MaxWidth="680" HorizontalAlignment="Stretch">
+                            <ItemsControl ItemsSource="{Binding BitwardenConflicts}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:BitwardenConflictDisplayItem">
+                                        <Border Padding="12,10" CornerRadius="6" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}">
+                                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <TextBlock Text="{Binding KindText}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                        <TextBlock Text="{Binding SavedText}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                                <Button Grid.Column="1" x:Name="BitwardenConflictRestoreButton" Classes="workspaceCommand"
+                                                        Command="{Binding #BitwardenSyncSourceRoot.DataContext.RestoreBitwardenConflictCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        IsEnabled="{Binding #BitwardenSyncSourceRoot.DataContext.CanResolveBitwardenConflicts}"
+                                                        AutomationProperties.Name="{Binding #BitwardenSyncSourceRoot.DataContext.L[RestoreItem]}"
+                                                        Margin="0,0,0,0">
+                                                    <TextBlock Text="{Binding #BitwardenSyncSourceRoot.DataContext.L[RestoreItem]}" />
+                                                </Button>
+                                                <Button Grid.Column="2" x:Name="BitwardenConflictDiscardButton" Classes="workspaceCommand"
+                                                        Command="{Binding #BitwardenSyncSourceRoot.DataContext.DiscardBitwardenConflictCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        IsEnabled="{Binding #BitwardenSyncSourceRoot.DataContext.CanResolveBitwardenConflicts}"
+                                                        AutomationProperties.Name="{Binding #BitwardenSyncSourceRoot.DataContext.L[Discard]}">
+                                                    <TextBlock Text="{Binding #BitwardenSyncSourceRoot.DataContext.L[Discard]}" />
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+
                 <fa:FASettingsExpanderItem Content="{Binding L[BitwardenConnectAccount]}"
                                            Description="{Binding L[BitwardenConnectAccountDescription]}"
                                            IsVisible="{Binding !IsBitwardenConnectionEditorVisible}">

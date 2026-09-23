@@ -182,6 +182,7 @@ public partial class App : Application
         services.AddSingleton<IBitwardenAccountStore, BitwardenAccountStore>();
         services.AddSingleton<IBitwardenRemoteFolderStore, BitwardenRemoteFolderStore>();
         services.AddSingleton<IBitwardenConflictBackupStore, BitwardenConflictBackupStore>();
+        services.AddSingleton<IBitwardenConflictRestoreService, BitwardenConflictRestoreService>();
         services.AddSingleton<IBitwardenPullMergeService, BitwardenPullMergeService>();
         services.AddSingleton<IBitwardenPendingOperationStore, BitwardenPendingOperationStore>();
         services.AddSingleton<IBitwardenSyncStateStore, BitwardenSyncStateStore>();

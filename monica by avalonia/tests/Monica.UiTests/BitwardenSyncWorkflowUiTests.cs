@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.App.Features.Sync.Bitwarden;
 using Monica.App.Services;
@@ -28,6 +29,7 @@ public sealed class BitwardenSyncWorkflowUiTests
         Assert.NotNull(view.FindControl<Button>("BitwardenReconnectButton"));
         Assert.NotNull(view.FindControl<Button>("BitwardenDisconnectButton"));
         Assert.NotNull(view.FindControl<StackPanel>("BitwardenConnectionForm"));
+        Assert.NotNull(view.FindControl<StackPanel>("BitwardenConflictSection"));
         Assert.NotNull(view.FindControl<Button>("BitwardenAuthenticateButton"));
         Assert.NotNull(view.FindControl<Button>("BitwardenCancelConnectionButton"));
         Assert.Equal('*', view.FindControl<TextBox>("BitwardenMasterPasswordBox")!.PasswordChar);
@@ -138,9 +140,170 @@ public sealed class BitwardenSyncWorkflowUiTests
         Assert.Contains("Sync now", viewModel.BitwardenOperationError, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task Bitwarden_conflict_surface_lists_the_overwritten_edit_and_uploads_a_restore()
+    {
+        var account = CreateAccount(id: 7, connected: true);
+        var authentication = new FakeAuthenticationService(_ => new BitwardenAuthenticationResult(
+            true,
+            account,
+            CreateSecrets(),
+            BitwardenLoginChallengeKind.None));
+        var conflicts = new FakeConflictRestoreService();
+        using var fixture = CreateFixture(authentication, conflictRestore: conflicts);
+        var viewModel = fixture.ViewModel;
+        viewModel.IsUnlocked = true;
+        viewModel.BitwardenEmail = account.Email;
+        viewModel.BitwardenMasterPassword = "master password";
+
+        await viewModel.AuthenticateBitwardenCommand.ExecuteAsync(null);
+        Dispatcher.UIThread.RunJobs();
+
+        // Selecting the account is what opens the list; nothing else asks for it.
+        var row = Assert.Single(viewModel.BitwardenConflicts);
+        Assert.Equal("Renamed on this device", row.Title);
+        Assert.True(viewModel.HasBitwardenConflicts);
+        Assert.True(viewModel.CanResolveBitwardenConflicts);
+
+        await viewModel.RestoreBitwardenConflictCommand.ExecuteAsync(row);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal([(7L, row.BackupId)], conflicts.Restored);
+        Assert.Empty(viewModel.BitwardenConflicts);
+    }
+
+    // A row lives in an ItemsControl's DataTemplate, where the commands are reached through the
+    // UserControl's name rather than its own binding source. Only a materialized template proves that
+    // hop resolves; a broken name would ship as a list of dead buttons.
+    [Fact]
+    public async Task A_conflict_row_resolves_the_command_declared_outside_its_template()
+    {
+        var account = CreateAccount(id: 7, connected: true);
+        var authentication = new FakeAuthenticationService(_ => new BitwardenAuthenticationResult(
+            true,
+            account,
+            CreateSecrets(),
+            BitwardenLoginChallengeKind.None));
+        var conflicts = new FakeConflictRestoreService();
+        using var fixture = CreateFixture(authentication, conflictRestore: conflicts);
+        var viewModel = fixture.ViewModel;
+        viewModel.IsUnlocked = true;
+        viewModel.BitwardenEmail = account.Email;
+        viewModel.BitwardenMasterPassword = "master password";
+        await viewModel.AuthenticateBitwardenCommand.ExecuteAsync(null);
+        viewModel.SelectedSyncPage = "Sources";
+
+        var view = new BitwardenSyncSourceView { DataContext = viewModel };
+        var window = new Window { Width = 900, Height = 700, Content = view };
+        window.Show();
+        try
+        {
+            Dispatcher.UIThread.RunJobs();
+
+            // Read the row here, not earlier: reloading the account list republishes the conflict rows,
+            // so only the instance standing after the last dispatcher pass can be the one the
+            // materialized template is holding.
+            var row = Assert.Single(viewModel.BitwardenConflicts);
+            var buttons = view.GetSelfAndVisualDescendants()
+                .OfType<Button>()
+                .Where(button => button.Name is "BitwardenConflictRestoreButton" or "BitwardenConflictDiscardButton")
+                .ToArray();
+
+            Assert.Equal(2, buttons.Length);
+            var restore = buttons.Single(button => button.Name == "BitwardenConflictRestoreButton");
+            var discard = buttons.Single(button => button.Name == "BitwardenConflictDiscardButton");
+
+            // Raising Button.ClickEvent was measured not to run a Command-bound button - only the
+            // pointer pipeline calls OnClick - so what is asserted here is the hop the template has to
+            // get right on its own: the command object, the row it carries, and that the call is live.
+            Assert.Same(viewModel.RestoreBitwardenConflictCommand, restore.Command);
+            Assert.Same(viewModel.DiscardBitwardenConflictCommand, discard.Command);
+            Assert.Same(row, restore.CommandParameter);
+            Assert.True(restore.IsEnabled);
+            Assert.True(restore.Command!.CanExecute(restore.CommandParameter));
+
+            restore.Command.Execute(restore.CommandParameter);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal([(7L, row.BackupId)], conflicts.Restored);
+            Assert.Empty(viewModel.BitwardenConflicts);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    // The list is read without being awaited, so switching accounts while a read is still on disk lets
+    // the previous vault's rows land afterwards: they would be listed under the account now selected,
+    // and restoring one would ask that account for a backup it does not own.
+    [Fact]
+    public async Task A_conflict_read_that_lands_after_the_account_changed_is_dropped()
+    {
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var conflicts = new FakeConflictRestoreService { Gate = gate.Task };
+        var account = CreateAccount(id: 7, connected: true);
+        var authentication = new FakeAuthenticationService(_ => new BitwardenAuthenticationResult(
+            true,
+            account,
+            CreateSecrets(),
+            BitwardenLoginChallengeKind.None));
+        using var fixture = CreateFixture(authentication, conflictRestore: conflicts);
+        var viewModel = fixture.ViewModel;
+        viewModel.IsUnlocked = true;
+        viewModel.BitwardenEmail = account.Email;
+        viewModel.BitwardenMasterPassword = "master password";
+        await viewModel.AuthenticateBitwardenCommand.ExecuteAsync(null);
+        Assert.Equal(1, conflicts.Reads);
+
+        fixture.AccountStore.Accounts.Add(CreateAccount(id: 8, connected: true));
+        await viewModel.LoadBitwardenAccountsCommand.ExecuteAsync(null);
+        viewModel.SelectedBitwardenAccount = viewModel.BitwardenAccounts.Single(item => item.Id == 8);
+        Assert.True(conflicts.Reads >= 2, $"expected the new account to be read too, saw {conflicts.Reads} reads");
+
+        gate.SetResult();
+        await Task.WhenAll(conflicts.Landed);
+        Dispatcher.UIThread.RunJobs();
+
+        var row = Assert.Single(viewModel.BitwardenConflicts);
+        Assert.Equal("Renamed on the other device", row.Title);
+    }
+
+    // Giving up is the branch that throws local content away, so the row it names matters: the discard
+    // must address the vault now selected and leave the remote version the merge wrote.
+    [Fact]
+    public async Task Discarding_a_row_removes_it_and_leaves_the_rest_alone()
+    {
+        var account = CreateAccount(id: 7, connected: true);
+        var authentication = new FakeAuthenticationService(_ => new BitwardenAuthenticationResult(
+            true,
+            account,
+            CreateSecrets(),
+            BitwardenLoginChallengeKind.None));
+        var conflicts = new FakeConflictRestoreService();
+        using var fixture = CreateFixture(authentication, conflictRestore: conflicts);
+        var viewModel = fixture.ViewModel;
+        viewModel.IsUnlocked = true;
+        viewModel.BitwardenEmail = account.Email;
+        viewModel.BitwardenMasterPassword = "master password";
+        await viewModel.AuthenticateBitwardenCommand.ExecuteAsync(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var row = Assert.Single(viewModel.BitwardenConflicts);
+        await viewModel.DiscardBitwardenConflictCommand.ExecuteAsync(row);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal([(7L, row.BackupId)], conflicts.Discarded);
+        Assert.Empty(conflicts.Restored);
+        Assert.Empty(viewModel.BitwardenConflicts);
+        Assert.False(viewModel.HasBitwardenConflicts);
+        Assert.Empty(viewModel.BitwardenOperationError);
+    }
+
     private static Fixture CreateFixture(
         IBitwardenAuthenticationService authentication,
-        bool failSynchronization = false)
+        bool failSynchronization = false,
+        IBitwardenConflictRestoreService? conflictRestore = null)
     {
         var accountStore = new FakeAccountStore();
         var sessionManager = new FakeSessionManager();
@@ -153,6 +316,10 @@ public sealed class BitwardenSyncWorkflowUiTests
             collection.AddSingleton<IBitwardenSyncCoordinator>(coordinator);
             collection.AddSingleton<IBitwardenSessionManager>(sessionManager);
             collection.AddSingleton<IBitwardenDeviceIdentityProvider>(new FakeDeviceIdentityProvider());
+            if (conflictRestore is not null)
+            {
+                collection.AddSingleton(conflictRestore);
+            }
         });
         return new Fixture(
             window,
@@ -325,5 +492,81 @@ public sealed class BitwardenSyncWorkflowUiTests
     {
         public string DeviceIdentifier => "0123456789abcdef0123456789abcdef";
         public string DeviceName => "Monica test desktop";
+    }
+
+    private sealed class FakeConflictRestoreService : IBitwardenConflictRestoreService
+    {
+        private static readonly BitwardenConflictSummary VaultSevenRow = new(
+            BackupId: 900,
+            CipherId: "cipher-overwritten-by-pull",
+            IsPassword: true,
+            Title: "Renamed on this device",
+            Reason: "Local and remote changed at the same revision.",
+            CreatedAt: new DateTimeOffset(2026, 9, 20, 8, 30, 0, TimeSpan.Zero));
+
+        private static readonly BitwardenConflictSummary VaultEightRow = new(
+            BackupId: 901,
+            CipherId: "cipher-overwritten-in-the-other-vault",
+            IsPassword: true,
+            Title: "Renamed on the other device",
+            Reason: "Local and remote changed at the same revision.",
+            CreatedAt: new DateTimeOffset(2026, 9, 21, 8, 30, 0, TimeSpan.Zero));
+
+        private readonly Dictionary<long, List<BitwardenConflictSummary>> unresolved = new()
+        {
+            [7] = [VaultSevenRow],
+            [8] = [VaultEightRow]
+        };
+
+        public List<(long VaultId, long BackupId)> Restored { get; } = [];
+
+        public List<(long VaultId, long BackupId)> Discarded { get; } = [];
+
+        public int Reads { get; private set; }
+
+        public Task? Gate { get; set; }
+
+        public List<Task> Landed { get; } = [];
+
+        public async Task<IReadOnlyList<BitwardenConflictSummary>> GetSummariesAsync(
+            long vaultId,
+            CancellationToken cancellationToken = default)
+        {
+            Reads++;
+            var landed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            Landed.Add(landed.Task);
+            if (Gate is { } gate)
+            {
+                await gate;
+            }
+
+            var result = unresolved.TryGetValue(vaultId, out var rows)
+                ? rows.ToArray()
+                : [];
+            landed.SetResult();
+            return result;
+        }
+
+        public Task RestoreAsync(long vaultId, long backupId, CancellationToken cancellationToken = default)
+        {
+            Restored.Add((vaultId, backupId));
+            Remove(backupId);
+            return Task.CompletedTask;
+        }
+
+        public Task DiscardAsync(long vaultId, long backupId, CancellationToken cancellationToken = default)
+        {
+            Discarded.Add((vaultId, backupId));
+            Remove(backupId);
+            return Task.CompletedTask;
+        }
+
+        private void Remove(long backupId)
+        {
+            foreach (var rows in unresolved.Values)
+            {
+                rows.RemoveAll(summary => summary.BackupId == backupId);
+            }
+        }
     }
 }
