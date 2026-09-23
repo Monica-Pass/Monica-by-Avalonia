@@ -416,7 +416,15 @@ public partial class MainWindow
         try
         {
             Directory.CreateDirectory(screenshotDirectory);
-            foreach (var section in sections)
+            var captureLive = await WaitForLiveSmokeCaptureAsync(viewModel);
+            if (!captureLive)
+            {
+                failures.Add("capture-stale");
+            }
+
+            // One frozen capture means the harness is broken, not that 13 screens are: writing the
+            // sections the compositor never repainted would only bury the reason under duplicates.
+            foreach (var section in captureLive ? sections : Array.Empty<string>())
             {
                 viewModel.SelectSectionCommand.Execute(section);
                 var settled = await WaitForSmokeWindowConditionAsync(
@@ -485,22 +493,66 @@ public partial class MainWindow
 
     private async Task<bool> SaveSmokeScreenshotAsync(string path)
     {
+        var frame = await CaptureSmokeFrameAsync();
+        if (frame is null || frame.Length == 0)
+        {
+            return false;
+        }
+
+        File.WriteAllBytes(path, frame);
+        return new FileInfo(path).Length > 0;
+    }
+
+    /// <summary>
+    /// Proves the capture is repainting before 13 files depend on it. Measured once in seven real runs
+    /// every section saved the same byte-identical pre-unlock frame while the log said the vault was
+    /// unlocked, and nothing downstream could tell a frozen harness from 13 screens that genuinely
+    /// look alike. The mechanism never got pinned down; this gate only refuses to lie about it.
+    /// </summary>
+    private async Task<bool> WaitForLiveSmokeCaptureAsync(MainWindowViewModel viewModel)
+    {
+        for (var attempt = 1; attempt <= 4; attempt++)
+        {
+            ShowFromDesktopIntegration();
+            var before = await CaptureSmokeFrameAsync();
+            viewModel.SelectSectionCommand.Execute("Settings");
+            await Task.Delay(250);
+            var after = await CaptureSmokeFrameAsync();
+            if (before is not null && after is not null && !before.SequenceEqual(after))
+            {
+                AppDiagnostics.Info($"Smoke UI capture liveness proved. attempt={attempt}");
+                return true;
+            }
+
+            AppDiagnostics.Info(
+                $"Smoke UI capture did not repaint. attempt={attempt}, " +
+                $"beforeBytes={before?.Length ?? 0}, afterBytes={after?.Length ?? 0}");
+            await Task.Delay(400);
+        }
+
+        return false;
+    }
+
+    private async Task<byte[]?> CaptureSmokeFrameAsync()
+    {
         var width = Math.Max(1, (int)Math.Round(Bounds.Width));
         var height = Math.Max(1, (int)Math.Round(Bounds.Height));
         if (width < 1 || height < 1)
         {
-            return false;
+            return null;
         }
 
         await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
         // Each frame holds a native backing surface, and the run captures one per section, so the
         // bitmap has to go back — otherwise the screenshots inflate the memory this gate measures.
         using var bitmap = new RenderTargetBitmap(new PixelSize(width, height), new Vector(96, 96));
-        // Rendering the Window itself captures its top-level drawing group, which the composited
-        // renderer leaves stale: every section then saved the same frozen frame.
+        // Rendering the Window itself captures its top-level drawing group; rendering Content skips
+        // that group. Which one the stale frame came out of is not established (the freeze reproduces
+        // about once in seven runs), so WaitForLiveSmokeCaptureAsync is what actually guards this.
         bitmap.Render((Visual)Content!);
-        bitmap.Save(path, new PngBitmapEncoderOptions());
-        return File.Exists(path) && new FileInfo(path).Length > 0;
+        using var stream = new MemoryStream();
+        bitmap.Save(stream, new PngBitmapEncoderOptions());
+        return stream.ToArray();
     }
 
     private bool HasControlClass(string className) =>
