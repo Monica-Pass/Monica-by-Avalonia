@@ -376,11 +376,11 @@ public sealed class BitwardenLocalChangeQueueTests
         Assert.Empty(await harness.ConflictStore.GetUnresolvedAsync(harness.VaultId));
     }
 
-    // The write-back encoder only carries login ciphers, but a deletion is decided by the route alone and
-    // travels no payload at all. Without this a trashed note is handed back by the next pull and leaves
-    // another conflict backup behind, on every synchronization, for as long as the vault exists.
+    // A deletion is decided by the route alone and travels no payload at all. Without this a trashed note
+    // is handed back by the next pull and leaves another conflict backup behind, on every synchronization,
+    // for as long as the vault exists.
     [Fact]
-    public async Task A_trashed_secure_item_owes_a_delete_even_though_no_encoder_carries_its_content()
+    public async Task A_trashed_secure_item_owes_only_the_delete_route_and_no_cipher_payload()
     {
         var harness = await CreateHarnessAsync();
         var note = BoundNoteCipher();
@@ -406,6 +406,44 @@ public sealed class BitwardenLocalChangeQueueTests
 
         Assert.Equal(1, batch.Completed);
         Assert.True((await ReadNoteAsync(harness)).IsDeleted);
+        Assert.Equal(0, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+    }
+
+    // The encoder refuses anything it cannot reproduce, so an update that reaches the store here is one the
+    // next pull reads back as the same row: a type-2 cipher carrying cipher strings, and a drift the push
+    // settles instead of one that comes round again.
+    [Fact]
+    public async Task An_edited_note_is_queued_as_a_note_cipher_and_pushes()
+    {
+        var harness = await CreateHarnessAsync();
+        var note = BoundNoteCipher();
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([note]), [note]);
+        var stored = await ReadNoteAsync(harness);
+        var saved = NoteContentCodec.BuildSavePayload("Renamed on this device", stored.Notes, "", false);
+        stored.Title = saved.Title;
+        stored.Notes = saved.NotesCache;
+        stored.ItemData = saved.ItemData;
+        stored.ImagePaths = saved.ImagePaths;
+        await harness.Repository.SaveSecureItemAsync(stored);
+
+        Assert.Equal(1, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+        var queued = Assert.Single(await harness.Pending.GetAsync(harness.VaultId));
+        Assert.Equal(BitwardenMutationOperationType.Update, queued.OperationType);
+        Assert.Contains("\"type\":2", queued.PayloadJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("Renamed on this device", queued.PayloadJson, StringComparison.Ordinal);
+
+        var batch = await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            new AcceptedTransport(NextRevision));
+
+        Assert.Equal(1, batch.Completed);
         Assert.Equal(0, (await harness.Queue.EnqueueDriftedAsync(
             harness.VaultId,
             harness.VaultKey,
@@ -858,11 +896,20 @@ public sealed class BitwardenLocalChangeQueueTests
     // and a fingerprint computed the same way the stored row will be read back.
     private static BitwardenDecodedCipher BoundNoteCipher()
     {
+        // A note is not stored as the text that was typed but as the save payload the codec derives from
+        // it, which is the only shape the write-back encoder can promise to hand back.
+        var saved = NoteContentCodec.BuildSavePayload(
+            "Remote note",
+            "written on another device",
+            "",
+            isMarkdown: false);
         var item = new SecureItem
         {
             ItemType = VaultItemType.Note,
-            Title = "Remote note",
-            Notes = "written on another device",
+            Title = saved.Title,
+            Notes = saved.NotesCache,
+            ItemData = saved.ItemData,
+            ImagePaths = saved.ImagePaths,
             BitwardenCipherId = "cipher-note",
             BitwardenRevisionDate = BaselineRevision
         };

@@ -68,16 +68,9 @@ public sealed class BitwardenLocalChangeQueue(
             }
 
             // The route decides a deletion, so no cipher payload travels; the store still requires
-            // something parseable in that column. That is also why a trashed note or card can reach the
-            // server even though no encoder carries its content yet.
+            // something parseable in that column. That is also why trashing a note or card needs no
+            // encoder for its content, while editing one does.
             var deletion = !isNew && candidate.Deleted;
-            if (candidate.Entry is null && !deletion)
-            {
-                // A secure item whose content changed has no encoder to carry it yet.
-                refused++;
-                continue;
-            }
-
             var payload = deletion ? "{}" : BuildPayload(candidate, vaultKey);
             if (payload is null)
             {
@@ -130,11 +123,13 @@ public sealed class BitwardenLocalChangeQueue(
     {
         try
         {
-            return BitwardenCipherPayloadBuilder.BuildLoginCipher(
-                candidate.Entry!,
-                vaultKey,
-                candidate.CustomFields,
-                candidate.History);
+            return candidate.Entry is not null
+                ? BitwardenCipherPayloadBuilder.BuildLoginCipher(
+                    candidate.Entry,
+                    vaultKey,
+                    candidate.CustomFields,
+                    candidate.History)
+                : BitwardenCipherPayloadBuilder.BuildSecureItemCipher(candidate.SecureItem!, vaultKey);
         }
         catch (BitwardenProtocolException)
         {
@@ -179,6 +174,7 @@ public sealed class BitwardenLocalChangeQueue(
                 entry.BitwardenRevisionDate,
                 BitwardenPayloadFingerprint.ForPassword(entry, fields, history),
                 entry,
+                null,
                 entry.IsDeleted,
                 fields,
                 history));
@@ -186,13 +182,12 @@ public sealed class BitwardenLocalChangeQueue(
 
         foreach (var item in secureItems)
         {
-            // Secure items are listed so the count of owed-but-unable uploads stays honest; the
-            // write-back encoder only carries login ciphers today, though a deletion needs no encoder.
             candidates.Add(new(
                 item.BitwardenCipherId,
                 item.BitwardenRevisionDate,
                 BitwardenPayloadFingerprint.ForSecureItem(item),
                 null,
+                item,
                 item.IsDeleted,
                 [],
                 []));
@@ -206,6 +201,7 @@ public sealed class BitwardenLocalChangeQueue(
         string? ExpectedRemoteRevision,
         string PayloadHash,
         PasswordEntry? Entry,
+        SecureItem? SecureItem,
         bool Deleted,
         IReadOnlyList<CustomField> CustomFields,
         IReadOnlyList<PasswordHistoryEntry> History);

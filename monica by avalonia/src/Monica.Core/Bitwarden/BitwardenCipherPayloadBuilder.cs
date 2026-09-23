@@ -14,7 +14,7 @@ namespace Monica.Core.Bitwarden;
 /// Platform, and everything this needs - the cipher-string crypto, the entity, the protocol exception -
 /// is already Core. Anything that cannot round-trip loses the remote object on write, so it throws.
 /// </summary>
-public static class BitwardenCipherPayloadBuilder
+public static partial class BitwardenCipherPayloadBuilder
 {
     public const int MaximumPayloadUtf8Bytes = 2 * 1024 * 1024;
 
@@ -279,6 +279,15 @@ internal sealed record CipherRequestDto
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public LoginRequestDto? Login { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SecureNoteRequestDto? SecureNote { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CardRequestDto? Card { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IdentityRequestDto? Identity { get; init; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<FieldRequestDto>? Fields { get; init; }
