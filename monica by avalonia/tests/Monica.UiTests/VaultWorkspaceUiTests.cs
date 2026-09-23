@@ -19,6 +19,59 @@ public sealed class VaultWorkspaceUiTests
         AvaloniaUiThreadTestContext.VerifyAccess();
     }
 
+    // The promise to hand a local entry to a Bitwarden vault is worth nothing if the menu row it lives
+    // on cannot be reached, so this checks the hop the batch flyout has to make on its own: the item is
+    // offered for a local-only selection, says how many it covers, and carries the command.
+    [Fact]
+    public void Local_only_selection_offers_upload_through_the_library_batch_menu()
+    {
+        using var library = LibraryUiHarness.Open();
+        library.ViewModel.Passwords.Add(new Monica.Core.Models.PasswordEntry
+        {
+            Id = 88,
+            Title = "Only on this device",
+            Username = "whoever",
+            Password = "a local secret",
+            BitwardenCipherType = 1
+        });
+        library.ViewModel.BitwardenAccounts.Add(new BitwardenAccountDisplayItem(
+            new Monica.Core.Bitwarden.BitwardenAccount
+            {
+                Id = 7,
+                Email = "person@example.com",
+                DisplayName = "Personal Bitwarden",
+                AccountKey = "bw:v1:test-account",
+                Endpoints = Monica.Core.Bitwarden.BitwardenEndpointSet.UnitedStates,
+                Kdf = Monica.Core.Bitwarden.BitwardenKdfParameters.Pbkdf2(),
+                IsConnected = true
+            },
+            "Personal Bitwarden",
+            "https://vault.bitwarden.com",
+            "Connected",
+            "Last sync just now",
+            "",
+            "",
+            "",
+            0,
+            0));
+        library.Settle();
+        library.ViewModel.SelectAllVaultRowsCommand.Execute(null);
+        library.Settle();
+
+        Assert.True(library.ViewModel.VaultBatchSupportsBitwardenPublish);
+        var batch = library.Workspace.FindControl<Button>("VaultBatchButton")!;
+        var flyout = Assert.IsType<MenuFlyout>(batch.Flyout);
+        flyout.ShowAt(batch);
+        library.Settle();
+
+        var item = LibraryUiHarness.MenuItems(flyout)
+            .Single(entry => Equals(entry.Command, library.ViewModel.PublishSelectionToBitwardenCommand));
+        Assert.True(item.IsVisible);
+        Assert.StartsWith("Upload 1", item.Header?.ToString(), StringComparison.Ordinal);
+
+        flyout.Hide();
+    }
+
     [Fact]
     public void Library_header_creates_the_kind_the_active_filter_names()
     {

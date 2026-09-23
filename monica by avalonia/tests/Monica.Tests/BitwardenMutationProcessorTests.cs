@@ -72,21 +72,22 @@ public sealed class BitwardenMutationProcessorTests
     public async Task ProcessorHandlesCreateAndDeleteRevisionSemantics()
     {
         var harness = await CreateHarnessAsync();
-        var created = await SavePasswordAsync(harness, "local-create-id", "Create item");
-        created.BitwardenRevisionDate = null;
-        await harness.Repository.SavePasswordAsync(created);
+        // Published locally and never seen by the server: the queue row carries a local identity, and
+        // only the response can name the cipher, so this is the shape a create actually arrives in.
+        var created = await SaveUnboundPasswordAsync(harness, "Create item");
         var deleted = await SavePasswordAsync(harness, "cipher-delete", "Delete item");
         deleted.IsDeleted = true;
         await harness.Repository.SavePasswordAsync(deleted);
         var now = new DateTimeOffset(2026, 7, 22, 6, 30, 0, TimeSpan.Zero);
+        var createdIdentity = BitwardenLocalCipherIdentity.ForPassword(created.Id);
         await harness.OperationStore.EnqueueAsync(new BitwardenPendingOperation(
             0,
             harness.VaultId,
-            "local-create-id",
+            createdIdentity,
             BitwardenMutationOperationType.Create,
             null,
             "{\"title\":\"Create item\"}",
-            $"{harness.VaultId}:create:local-create-id",
+            $"{harness.VaultId}:create:{createdIdentity}",
             BitwardenMutationStatus.Pending,
             BitwardenFailureClass.None,
             0,
@@ -133,6 +134,48 @@ public sealed class BitwardenMutationProcessorTests
         Assert.False(savedDelete.BitwardenLocalModified);
     }
 
+    [Fact]
+    public async Task ProcessorCompletesACreateNothingLocalOwesAnymore()
+    {
+        var harness = await CreateHarnessAsync();
+        var created = await SaveUnboundPasswordAsync(harness, "Create item");
+        var identity = BitwardenLocalCipherIdentity.ForPassword(created.Id);
+        var now = new DateTimeOffset(2026, 7, 22, 7, 0, 0, TimeSpan.Zero);
+        await harness.OperationStore.EnqueueAsync(new BitwardenPendingOperation(
+            0,
+            harness.VaultId,
+            identity,
+            BitwardenMutationOperationType.Create,
+            null,
+            "{\"title\":\"Create item\"}",
+            $"{harness.VaultId}:create:{identity}",
+            BitwardenMutationStatus.Pending,
+            BitwardenFailureClass.None,
+            0,
+            now,
+            null,
+            null,
+            now,
+            now));
+        // The entry has since been given its cipher - by the first of two queue rows, or by a pull that
+        // matched it - so this create is a copy of something the server already holds.
+        created.BitwardenCipherId = "already-created-cipher";
+        created.BitwardenRevisionDate = "2026-07-22T06:59:00Z";
+        await harness.Repository.SavePasswordAsync(created);
+        var transport = new ScriptedTransport(_ => new BitwardenMutationResponse(
+            true,
+            "second-copy-cipher",
+            "2026-07-22T07:00:01Z"));
+
+        var result = await harness.Processor.ProcessReadyAsync(harness.VaultId, now, transport);
+
+        Assert.Equal(1, result.Completed);
+        Assert.Equal(0, transport.RequestCount);
+        var saved = (await harness.Repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true))
+            .Single(item => item.Id == created.Id);
+        Assert.Equal("already-created-cipher", saved.BitwardenCipherId);
+    }
+
     private static async Task<PasswordEntry> SavePasswordAsync(
         Harness harness,
         string cipherId,
@@ -145,6 +188,22 @@ public sealed class BitwardenMutationProcessorTests
             BitwardenVaultId = harness.VaultId,
             BitwardenCipherId = cipherId,
             BitwardenRevisionDate = "2026-07-21T00:00:00Z",
+            BitwardenCipherType = 1,
+            BitwardenLocalModified = true
+        };
+        await harness.Repository.SavePasswordAsync(password);
+        return password;
+    }
+
+    private static async Task<PasswordEntry> SaveUnboundPasswordAsync(Harness harness, string title)
+    {
+        var password = new PasswordEntry
+        {
+            Title = title,
+            Password = "local-password",
+            BitwardenVaultId = harness.VaultId,
+            BitwardenCipherId = null,
+            BitwardenRevisionDate = null,
             BitwardenCipherType = 1,
             BitwardenLocalModified = true
         };

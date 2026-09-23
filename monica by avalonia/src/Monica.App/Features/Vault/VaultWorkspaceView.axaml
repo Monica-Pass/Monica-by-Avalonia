@@ -129,6 +129,13 @@
                                           Command="{Binding ArchiveVaultBatchCommand}">
                                     <MenuItem.Icon><ic:FluentIcon Icon="Archive" FontSize="14" /></MenuItem.Icon>
                                 </MenuItem>
+                                <!-- Only offered while the checked set holds entries no server has ever seen:
+                                     an item that already belongs to a vault is uploaded by sync, not here. -->
+                                <MenuItem Header="{Binding BitwardenPublishMenuText}"
+                                          IsVisible="{Binding VaultBatchSupportsBitwardenPublish}"
+                                          Command="{Binding PublishSelectionToBitwardenCommand}">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="ArrowSync" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
                                 <MenuItem Header="{Binding L.BatchDelete}"
                                           Command="{Binding DeleteVaultBatchCommand}">
                                     <MenuItem.Icon><ic:FluentIcon Icon="Delete" FontSize="14" /></MenuItem.Icon>

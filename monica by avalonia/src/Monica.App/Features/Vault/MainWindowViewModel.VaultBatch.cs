@@ -39,6 +39,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(VaultBatchSupportsFavorite));
         OnPropertyChanged(nameof(VaultBatchSupportsArchive));
         OnPropertyChanged(nameof(VaultBatchSupportsStack));
+        RaiseBitwardenPublishState();
     }
 
     [RelayCommand]

@@ -111,6 +111,89 @@ public sealed class BitwardenLocalChangeQueueTests
     }
 
     [Fact]
+    public async Task A_published_entry_reaches_the_server_once_and_comes_back_with_its_cipher()
+    {
+        var harness = await CreateHarnessAsync();
+        // No baseline at all: a pull has never spoken about this vault, which is exactly the state a
+        // freshly published entry is in. The old scan gave up here and the entry never left the device.
+        var entry = await SavePublishedAsync(harness, "Published on this device");
+
+        var queued = await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow);
+
+        var operation = Assert.Single(await harness.Pending.GetAsync(harness.VaultId));
+        Assert.Equal(1, queued.Enqueued);
+        Assert.Equal(BitwardenMutationOperationType.Create, operation.OperationType);
+        // The queue row cannot carry a cipher id the server has not handed out yet.
+        Assert.Equal(BitwardenLocalCipherIdentity.ForPassword(entry.Id), operation.CipherId);
+        Assert.Null(operation.ExpectedRemoteRevision);
+        Assert.StartsWith("local-create:", operation.IdempotencyKey, StringComparison.Ordinal);
+
+        var pushed = await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            new AcceptedTransport(NextRevision, assignedCipherId: "cipher-from-server"));
+        Assert.Equal(1, pushed.Completed);
+
+        var saved = await ReadByIdAsync(harness, entry.Id);
+        Assert.Equal("cipher-from-server", saved.BitwardenCipherId);
+        Assert.Equal(NextRevision, saved.BitwardenRevisionDate);
+
+        // The pull that follows must not read this entry as local work again, and a second create would
+        // put a duplicate of it on the server.
+        Assert.Equal(0, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+        Assert.Equal(
+            BitwardenPayloadFingerprint.ForPassword(saved, [], []),
+            Assert.Contains("cipher-from-server", await harness.SyncState.GetPayloadHashesAsync(harness.VaultId)));
+    }
+
+    [Fact]
+    public async Task Edits_before_the_first_upload_stay_one_promised_cipher()
+    {
+        var harness = await CreateHarnessAsync();
+        var entry = await SavePublishedAsync(harness, "First draft");
+        await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow);
+
+        entry.Title = "Second draft";
+        await harness.Repository.SavePasswordAsync(entry);
+        var again = await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow);
+
+        // A content-scoped key would queue the same cipher twice and post both, because a create has no
+        // remote revision to compare against. One row, carrying the newest content, is the honest shape.
+        Assert.Equal(1, again.Enqueued);
+        var operation = Assert.Single(await harness.Pending.GetAsync(harness.VaultId));
+        Assert.Equal(
+            BitwardenPayloadFingerprint.ForPassword(entry, [], []),
+            operation.LocalPayloadHash);
+    }
+
+    [Fact]
+    public async Task A_published_entry_trashed_before_its_first_upload_owes_nothing()
+    {
+        var harness = await CreateHarnessAsync();
+        var entry = await SavePublishedAsync(harness, "Deleted before it left");
+        entry.IsDeleted = true;
+        await harness.Repository.SavePasswordAsync(entry);
+
+        Assert.Equal(0, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+        Assert.Empty(await harness.Pending.GetAsync(harness.VaultId));
+    }
+
+    [Fact]
     public async Task A_shape_bitwarden_cannot_carry_is_counted_rather_than_failing_the_scan()
     {
         var harness = await CreateHarnessAsync();
@@ -432,6 +515,26 @@ public sealed class BitwardenLocalChangeQueueTests
             DateTimeOffset.UtcNow)).Enqueued);
     }
 
+    private static async Task<PasswordEntry> SavePublishedAsync(Harness harness, string title)
+    {
+        // What the publish command leaves behind: the entry belongs to this vault by account, and the
+        // server has not confirmed an identity for it.
+        var entry = new PasswordEntry
+        {
+            Title = title,
+            Username = "whoever",
+            Password = "a local secret",
+            BitwardenVaultId = harness.VaultId,
+            BitwardenCipherType = 1
+        };
+        await harness.Repository.SavePasswordAsync(entry);
+        return entry;
+    }
+
+    private static async Task<PasswordEntry> ReadByIdAsync(Harness harness, long id) =>
+        (await harness.Repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true))
+            .Single(entry => entry.Id == id);
+
     private static async Task<PasswordEntry> ReadAsync(Harness harness)
     {
         var stored = (await harness.Repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true))
@@ -541,13 +644,16 @@ public sealed class BitwardenLocalChangeQueueTests
         DatabaseMigrator Migrator,
         long VaultId);
 
-    private sealed class AcceptedTransport(string revision, bool reject = false) : IBitwardenMutationTransport
+    private sealed class AcceptedTransport(
+        string revision,
+        bool reject = false,
+        string? assignedCipherId = null) : IBitwardenMutationTransport
     {
         public Task<BitwardenMutationResponse> SendAsync(
             BitwardenMutationRequest request,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(reject
                 ? new BitwardenMutationResponse(false, request.CipherId, null, 409, "revision conflict")
-                : new BitwardenMutationResponse(true, request.CipherId, revision));
+                : new BitwardenMutationResponse(true, assignedCipherId ?? request.CipherId, revision));
     }
 }

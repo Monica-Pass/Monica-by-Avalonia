@@ -82,6 +82,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(BitwardenChallengeDescription));
         OnPropertyChanged(nameof(HasBitwardenConflicts));
         OnPropertyChanged(nameof(CanResolveBitwardenConflicts));
+        RaiseBitwardenPublishState();
         RefreshSyncHealthItems();
     }
 

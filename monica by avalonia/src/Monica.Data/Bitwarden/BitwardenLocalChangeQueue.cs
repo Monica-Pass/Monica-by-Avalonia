@@ -21,7 +21,9 @@ public interface IBitwardenLocalChangeQueue
 /// <summary>
 /// Turns local edits into upload work before the next pull runs. Drift is measured against the
 /// baseline written by the last completed synchronization, because ordinary editor saves do not set
-/// the dirty flag and a content hash is the only signal that survives a restart.
+/// the dirty flag and a content hash is the only signal that survives a restart. An entry bound to this
+/// vault by identity alone - published here, never confirmed by the server - is the other kind of work,
+/// and it is queued as a create so the next pull cannot mistake it for a resurrected cipher.
 /// </summary>
 public sealed class BitwardenLocalChangeQueue(
     IMonicaRepository repository,
@@ -36,25 +38,23 @@ public sealed class BitwardenLocalChangeQueue(
     {
         ArgumentNullException.ThrowIfNull(vaultKey);
         var baseline = await syncStateStore.GetPayloadHashesAsync(vaultId, cancellationToken);
-        if (baseline.Count == 0)
-        {
-            return new BitwardenLocalChangeQueueResult(0, 0);
-        }
-
         var enqueued = 0;
         var refused = 0;
         foreach (var candidate in await LoadCandidatesAsync(vaultId, cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var isNew = candidate.CipherId is null;
             // An entry with no baseline is one the remote snapshot did not confirm, so uploading it
             // would resurrect a cipher the server no longer has; only tracked identities may drift.
-            if (!baseline.TryGetValue(candidate.CipherId, out var syncedHash) ||
-                string.Equals(syncedHash, candidate.PayloadHash, StringComparison.Ordinal))
+            // An entry with no identity at all is the other case: it was published here and the
+            // server has never seen it, so the remote snapshot cannot speak for it either way.
+            if (!isNew && (!baseline.TryGetValue(candidate.CipherId!, out var syncedHash) ||
+                           string.Equals(syncedHash, candidate.PayloadHash, StringComparison.Ordinal)))
             {
                 continue;
             }
 
-            if (candidate.Entry is null || string.IsNullOrWhiteSpace(candidate.ExpectedRemoteRevision))
+            if (candidate.Entry is null || (!isNew && string.IsNullOrWhiteSpace(candidate.ExpectedRemoteRevision)))
             {
                 refused++;
                 continue;
@@ -76,14 +76,23 @@ public sealed class BitwardenLocalChangeQueue(
                 continue;
             }
 
+            var identity = candidate.CipherId ?? BitwardenLocalCipherIdentity.ForPassword(candidate.Entry.Id);
             await operationStore.EnqueueAsync(new BitwardenPendingOperation(
                 Id: 0,
                 VaultId: vaultId,
-                CipherId: candidate.CipherId,
-                OperationType: BitwardenMutationOperationType.Update,
-                ExpectedRemoteRevision: candidate.ExpectedRemoteRevision,
+                CipherId: identity,
+                OperationType: isNew
+                    ? BitwardenMutationOperationType.Create
+                    : BitwardenMutationOperationType.Update,
+                // A create has no remote state to guard against, and a revision there would make the
+                // queue guard reject it as an update.
+                ExpectedRemoteRevision: isNew ? null : candidate.ExpectedRemoteRevision,
                 PayloadJson: payload,
-                IdempotencyKey: $"local-update:{vaultId}:{candidate.CipherId}:{candidate.PayloadHash}",
+                // Deliberately content-free: an entry edited three times before its first upload is one
+                // cipher owed, not three, and each of those creates would have been posted separately.
+                IdempotencyKey: isNew
+                    ? $"local-create:{vaultId}:{identity}"
+                    : $"local-update:{vaultId}:{identity}:{candidate.PayloadHash}",
                 Status: BitwardenMutationStatus.Pending,
                 LastFailureClass: BitwardenFailureClass.None,
                 AttemptCount: 0,
@@ -107,7 +116,11 @@ public sealed class BitwardenLocalChangeQueue(
                 includeDeleted: true,
                 includeArchived: true,
                 cancellationToken))
-            .Where(entry => entry.BitwardenVaultId == vaultId && entry.BitwardenCipherId is not null)
+            .Where(entry => entry.BitwardenVaultId == vaultId &&
+                            // A published entry that has not been uploaded yet owes a create, unless it
+                            // is already in the trash: the server never had it, so there is nothing to
+                            // delete there and pushing it would create the very thing the user removed.
+                            (entry.BitwardenCipherId is not null || !entry.IsDeleted))
             .ToList();
         var secureItems = (await repository.GetSecureItemsAsync(
                 itemType: null,
@@ -128,7 +141,7 @@ public sealed class BitwardenLocalChangeQueue(
             var fields = customFields.GetValueOrDefault(entry.Id) ?? [];
             var history = histories.GetValueOrDefault(entry.Id) ?? [];
             candidates.Add(new(
-                entry.BitwardenCipherId!,
+                entry.BitwardenCipherId,
                 entry.BitwardenRevisionDate,
                 BitwardenPayloadFingerprint.ForPassword(entry, fields, history),
                 entry,
@@ -141,7 +154,7 @@ public sealed class BitwardenLocalChangeQueue(
             // Secure items are listed so the count of owed-but-unable uploads stays honest; the
             // write-back encoder only carries login ciphers today.
             candidates.Add(new(
-                item.BitwardenCipherId!,
+                item.BitwardenCipherId,
                 item.BitwardenRevisionDate,
                 BitwardenPayloadFingerprint.ForSecureItem(item),
                 null,
@@ -153,7 +166,7 @@ public sealed class BitwardenLocalChangeQueue(
     }
 
     private sealed record Candidate(
-        string CipherId,
+        string? CipherId,
         string? ExpectedRemoteRevision,
         string PayloadHash,
         PasswordEntry? Entry,

@@ -57,6 +57,17 @@ public sealed class BitwardenMutationProcessor(
                 cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
+                    if (operation.OperationType == BitwardenMutationOperationType.Create &&
+                        !local.HasPublishableEntry(operation.CipherId))
+                    {
+                        // Nothing local is owed any more: the entry was published twice and the first
+                        // upload already gave it a cipher, or it was deleted before the push. Posting the
+                        // create again would add a second copy of an entry the server already holds.
+                        await operationStore.CompleteAsync(operation.Id, cancellationToken);
+                        completed++;
+                        continue;
+                    }
+
                     var response = await transport.SendAsync(ToRequest(operation), cancellationToken);
                     BitwardenMutationGuard.ValidateResponse(operation, response);
                     if (response.Succeeded)
@@ -116,6 +127,8 @@ public sealed class BitwardenMutationProcessor(
         BitwardenMutationResponse response,
         CancellationToken cancellationToken)
     {
+        // For a create the queue row carries a local key, so only the response can say what the
+        // cipher is called; guessing here would bind the local entry to an identity nothing owns.
         var remoteCipherId = response.RemoteCipherId ?? operation.CipherId;
         // The server now holds exactly the content this upload carried, so it becomes the new
         // baseline. Without this the idempotency key of a completed change would be re-queued and
@@ -130,7 +143,8 @@ public sealed class BitwardenMutationProcessor(
                 cancellationToken);
         }
 
-        if (local.Passwords.TryGetValue(operation.CipherId, out var password))
+        if (local.Passwords.TryGetValue(operation.CipherId, out var password) ||
+            local.UnboundPasswords.TryGetValue(operation.CipherId, out password))
         {
             password.BitwardenCipherId = remoteCipherId;
             password.BitwardenRevisionDate = response.RemoteRevision ?? password.BitwardenRevisionDate;
@@ -150,13 +164,21 @@ public sealed class BitwardenMutationProcessor(
 
     private async Task<LocalItems> LoadLocalItemsAsync(long vaultId, CancellationToken cancellationToken)
     {
-        var passwords = (await repository.GetPasswordsAsync(true, true, cancellationToken))
-            .Where(item => item.BitwardenVaultId == vaultId && item.BitwardenCipherId is not null)
-            .ToDictionary(item => item.BitwardenCipherId!, StringComparer.Ordinal);
-        var secureItems = (await repository.GetSecureItemsAsync(null, true, cancellationToken))
-            .Where(item => item.BitwardenVaultId == vaultId && item.BitwardenCipherId is not null)
-            .ToDictionary(item => item.BitwardenCipherId!, StringComparer.Ordinal);
-        return new LocalItems(passwords, secureItems);
+        var passwords = await repository.GetPasswordsAsync(true, true, cancellationToken);
+        return new LocalItems(
+            passwords
+                .Where(item => item.BitwardenVaultId == vaultId && item.BitwardenCipherId is not null)
+                .ToDictionary(item => item.BitwardenCipherId!, StringComparer.Ordinal),
+            // A published entry that reached the trash before its first upload owes nothing: posting it
+            // would put back on the server the very entry the user removed locally.
+            passwords
+                .Where(item => item.BitwardenVaultId == vaultId &&
+                               item.BitwardenCipherId is null &&
+                               !item.IsDeleted)
+                .ToDictionary(item => BitwardenLocalCipherIdentity.ForPassword(item.Id), StringComparer.Ordinal),
+            (await repository.GetSecureItemsAsync(null, true, cancellationToken))
+                .Where(item => item.BitwardenVaultId == vaultId && item.BitwardenCipherId is not null)
+                .ToDictionary(item => item.BitwardenCipherId!, StringComparer.Ordinal));
     }
 
     private static BitwardenMutationRequest ToRequest(BitwardenPendingOperation operation) => new(
@@ -190,5 +212,10 @@ public sealed class BitwardenMutationProcessor(
 
     private sealed record LocalItems(
         IReadOnlyDictionary<string, PasswordEntry> Passwords,
-        IReadOnlyDictionary<string, SecureItem> SecureItems);
+        IReadOnlyDictionary<string, PasswordEntry> UnboundPasswords,
+        IReadOnlyDictionary<string, SecureItem> SecureItems)
+    {
+        public bool HasPublishableEntry(string localIdentity) =>
+            UnboundPasswords.ContainsKey(localIdentity);
+    }
 }

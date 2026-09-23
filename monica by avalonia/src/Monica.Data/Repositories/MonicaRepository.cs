@@ -135,6 +135,10 @@ public sealed partial class MonicaRepository(
         else
         {
             var parameters = ToRow(_vaultDataProtector.Protect(entry));
+            // The Bitwarden identity is kept rather than overwritten: the synchronization writes it to
+            // the database from its own copy of the row, while the screen still holds the object it
+            // loaded before that sync ran. Saving an edit off the stale copy would otherwise erase a
+            // cipher id the server had just handed out, and the next scan would publish it a second time.
             var updated = await connection.ExecuteAsync(
                 """
                 UPDATE password_entries SET
@@ -150,8 +154,11 @@ public sealed partial class MonicaRepository(
                     sso_ref_entry_id=@SsoRefEntryId, wifi_metadata=@WifiMetadata, custom_icon_type=@CustomIconType,
                     custom_icon_value=@CustomIconValue, custom_icon_updated_at=@CustomIconUpdatedAt, is_deleted=@IsDeleted,
                     deleted_at=@DeletedAt, is_archived=@IsArchived, archived_at=@ArchivedAt, replica_group_id=@ReplicaGroupId,
-                    bitwarden_vault_id=@BitwardenVaultId, bitwarden_cipher_id=@BitwardenCipherId, bitwarden_folder_id=@BitwardenFolderId,
-                    bitwarden_revision_date=@BitwardenRevisionDate, bitwarden_cipher_type=@BitwardenCipherType,
+                    bitwarden_vault_id=COALESCE(@BitwardenVaultId, bitwarden_vault_id),
+                    bitwarden_cipher_id=COALESCE(@BitwardenCipherId, bitwarden_cipher_id),
+                    bitwarden_folder_id=COALESCE(@BitwardenFolderId, bitwarden_folder_id),
+                    bitwarden_revision_date=COALESCE(@BitwardenRevisionDate, bitwarden_revision_date),
+                    bitwarden_cipher_type=@BitwardenCipherType,
                     bitwarden_local_modified=@BitwardenLocalModified
                 WHERE id=@Id;
                 """,
@@ -703,6 +710,8 @@ public sealed partial class MonicaRepository(
         else
         {
             var parameters = ToRow(_vaultDataProtector.Protect(item));
+            // Same identity rule as SavePasswordAsync: a stale in-memory copy must not erase the
+            // Bitwarden identity a synchronization wrote behind its back.
             var updated = await connection.ExecuteAsync(
                 """
                 UPDATE secure_items SET item_type=@ItemType, title=@Title, notes=@Notes, is_favorite=@IsFavorite,
@@ -711,8 +720,11 @@ public sealed partial class MonicaRepository(
                     category_id=@CategoryId, keepass_database_id=@KeepassDatabaseId, keepass_group_path=@KeepassGroupPath,
                     keepass_entry_uuid=@KeepassEntryUuid, keepass_group_uuid=@KeepassGroupUuid, mdbx_database_id=@MdbxDatabaseId,
                     mdbx_folder_id=@MdbxFolderId, is_deleted=@IsDeleted, deleted_at=@DeletedAt, replica_group_id=@ReplicaGroupId,
-                    bitwarden_vault_id=@BitwardenVaultId, bitwarden_cipher_id=@BitwardenCipherId, bitwarden_folder_id=@BitwardenFolderId,
-                    bitwarden_revision_date=@BitwardenRevisionDate, bitwarden_local_modified=@BitwardenLocalModified,
+                    bitwarden_vault_id=COALESCE(@BitwardenVaultId, bitwarden_vault_id),
+                    bitwarden_cipher_id=COALESCE(@BitwardenCipherId, bitwarden_cipher_id),
+                    bitwarden_folder_id=COALESCE(@BitwardenFolderId, bitwarden_folder_id),
+                    bitwarden_revision_date=COALESCE(@BitwardenRevisionDate, bitwarden_revision_date),
+                    bitwarden_local_modified=@BitwardenLocalModified,
                     sync_status=@SyncStatus
                 WHERE id=@Id;
                 """,

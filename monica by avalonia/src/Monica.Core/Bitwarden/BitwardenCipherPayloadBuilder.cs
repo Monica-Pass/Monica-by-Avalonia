@@ -20,6 +20,13 @@ public static class BitwardenCipherPayloadBuilder
 
     private static readonly JsonSerializerOptions PayloadOptions = new(JsonSerializerDefaults.Web);
 
+    /// <summary>
+    /// Whether this entry has a shape Bitwarden can carry, asked before a local entry is promised to a
+    /// vault so the count of uploads the user was told about is the count that can actually happen.
+    /// </summary>
+    public static bool CanEncode(PasswordEntry entry) =>
+        entry is not null && FindUnsupportedChange(entry) is null;
+
     public static string BuildLoginCipher(
         PasswordEntry entry,
         BitwardenSymmetricKey key,
