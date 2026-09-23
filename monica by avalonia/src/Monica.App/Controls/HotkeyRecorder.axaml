@@ -1,0 +1,15 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Monica.App.Controls.HotkeyRecorder"
+             x:Name="Root">
+    <Button x:Name="RecordButton"
+            MinWidth="180"
+            MaxWidth="320"
+            MinHeight="{DynamicResource ControlHeight}"
+            HorizontalContentAlignment="Center"
+            Content="{Binding #Root.DisplayText}"
+            Click="OnRecordButtonClicked"
+            ToolTip.Tip="{Binding #Root.AutomationHelpText}"
+            AutomationProperties.Name="{Binding #Root.AutomationName}"
+            AutomationProperties.HelpText="{Binding #Root.AutomationHelpText}" />
+</UserControl>

@@ -50,6 +50,39 @@ public sealed class WindowsAutoTypeService(IPlatformIntegrationService platformI
         return windowProcessId == unchecked((uint)Environment.ProcessId);
     }
 
+    // Whether the keystrokes that follow will actually land in the window the user chose. The desktop
+    // gives the foreground to whoever it likes, so the answer is read back from the OS after the request
+    // rather than taken from the call's own return value.
+    public bool TryRestoreForeground(IntPtr windowHandle)
+    {
+        LastError = "";
+
+        if (!OperatingSystem.IsWindows())
+        {
+            LastError = "Restoring a foreground window is only implemented on Windows.";
+            return false;
+        }
+
+        if (windowHandle == IntPtr.Zero || !IsWindow(windowHandle))
+        {
+            LastError = "The window to type into has already closed.";
+            return false;
+        }
+
+        if (GetForegroundWindowNative() == windowHandle)
+        {
+            return true;
+        }
+
+        if (!SetForegroundWindow(windowHandle) || GetForegroundWindowNative() != windowHandle)
+        {
+            LastError = "The target window did not take the focus back.";
+            return false;
+        }
+
+        return true;
+    }
+
     public bool TryType(IReadOnlyList<AutoTypeToken> tokens)
     {
         LastError = "";
@@ -212,6 +245,14 @@ public sealed class WindowsAutoTypeService(IPlatformIntegrationService platformI
 
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindow(IntPtr hWnd);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int GetWindowTextLength(IntPtr hWnd);

@@ -90,6 +90,11 @@ internal sealed class DesktopIntegrationCoordinator(
         else if (e.PropertyName == nameof(MainWindowViewModel.IsUnlocked))
         {
             ApplyBrowserBridgeSetting();
+            if (_viewModel is { IsUnlocked: false })
+            {
+                // A list of account names is not something to leave on screen behind a locked vault.
+                window.CloseAutoTypePicker("VaultLocked");
+            }
         }
     }
 
@@ -223,13 +228,22 @@ internal sealed class DesktopIntegrationCoordinator(
         window.FocusDesktopQuickSearch();
     }
 
-    // Runs on the UI thread, and deliberately does not touch Monica's own windows: raising or
-    // focusing anything here would take the focus the target application still needs.
+    // Runs on the UI thread. It raises no Monica window of its own accord: anything shown here takes
+    // the focus the target application still needs, which is why the one window it does surface - the
+    // picker - has to hand that focus back before it types a single character.
     private void RunAutoType()
     {
         var viewModel = _viewModel;
         if (viewModel is null)
         {
+            return;
+        }
+
+        // A second press while the list is up means "not this one, forget it". By then Monica does own
+        // the foreground, so the refusal below would be technically true and useless as an answer.
+        if (viewModel.IsAutoTypePickerOpen)
+        {
+            window.CloseAutoTypePicker("SecondHotkeyPress");
             return;
         }
 
@@ -245,6 +259,10 @@ internal sealed class DesktopIntegrationCoordinator(
             foreground,
             autoTypeService.GetWindowTitle(foreground),
             foregroundIsMonicaWindow);
+        if (viewModel.IsAutoTypePickerOpen)
+        {
+            window.ShowAutoTypePicker();
+        }
     }
 
     private void LockVault()

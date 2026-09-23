@@ -28,6 +28,7 @@ public partial class MainWindow : Window
         InitializeStatusNoticeLifecycle();
         InitializeBackgroundMemoryLifecycle();
         InitializeTrayHintLifecycle();
+        Closed += (_, _) => CloseAutoTypePicker("MainWindowClosed");
     }
 
     private async void OnOpened(object? sender, EventArgs e)

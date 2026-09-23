@@ -4,6 +4,7 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FluentAvalonia.UI.Controls;
 using Microsoft.Extensions.DependencyInjection;
+using Monica.App.Controls;
 using Monica.App.Features.Settings;
 using Monica.App.Services;
 using Monica.App.ViewModels;
@@ -35,17 +36,19 @@ public sealed class DesktopSettingsUiTests
 
         var trayToggle = view.FindControl<ToggleSwitch>("MinimizeToTrayToggle")!;
         var quickSearchToggle = view.FindControl<ToggleSwitch>("QuickSearchToggle")!;
-        var hotkeyBox = view.FindControl<TextBox>("QuickSearchHotkeyBox")!;
+        var hotkeyBox = view.FindControl<HotkeyRecorder>("QuickSearchHotkeyBox")!;
         var autoTypeToggle = view.FindControl<ToggleSwitch>("AutoTypeToggle")!;
-        var autoTypeHotkeyBox = view.FindControl<TextBox>("AutoTypeHotkeyBox")!;
+        var autoTypeHotkeyBox = view.FindControl<HotkeyRecorder>("AutoTypeHotkeyBox")!;
         var browserToggle = pairing.FindControl<ToggleSwitch>("BrowserIntegrationToggle")!;
         var copyButton = pairing.FindControl<Button>("CopyBrowserPairingTokenButton")!;
 
         Assert.True(trayToggle.Focusable);
         Assert.True(quickSearchToggle.Focusable);
-        Assert.True(hotkeyBox.Focusable);
+        // A recorder is reached through the button inside it: the control itself stays out of the tab
+        // order so one row is one stop, not two.
+        Assert.True(hotkeyBox.InnerRecordButton!.Focusable);
         Assert.True(autoTypeToggle.Focusable);
-        Assert.True(autoTypeHotkeyBox.Focusable);
+        Assert.True(autoTypeHotkeyBox.InnerRecordButton!.Focusable);
         Assert.True(browserToggle.Focusable);
         Assert.True(copyButton.Focusable);
         Assert.False(autoTypeToggle.IsChecked!.Value);

@@ -6,9 +6,10 @@ namespace Monica.App.Services;
 /// <summary>
 /// Picks the vault entry an auto-type hotkey should send into the window that currently has focus.
 /// The only signal available is the foreground window's title text, so an entry matches when one of
-/// the host labels stored on it appears as a whole word in that text. Anything other than exactly
-/// one match refuses to type rather than guessing, because a wrong credential landing in a live
-/// form (a payment field, a support chat) is worse than the user copying it manually.
+/// the host labels stored on it appears as a whole word in that text. Exactly one match types
+/// straight away; anything else hands the choice back to the user as a list instead of guessing,
+/// because a wrong credential landing in a live form (a payment field, a support chat) is worse than
+/// one extra click.
 /// </summary>
 internal static class AutoTypeMatcher
 {
@@ -23,11 +24,29 @@ internal static class AutoTypeMatcher
         var titleHosts = CollectHostTokens(windowText);
 
         return entries
-            .Where(entry => !entry.IsDeleted && !entry.IsArchived)
-            .Where(entry => !string.IsNullOrWhiteSpace(entry.Username) || !string.IsNullOrWhiteSpace(entry.Password))
+            .Where(IsTypeable)
             .Where(entry => EntryMatches(entry.Website, words, titleHosts))
             .ToArray();
     }
+
+    /// <summary>
+    /// Entries the hotkey could send into a form, which is the list the picker falls back to when the
+    /// window title matched nothing. Title order keeps the list stable while the filter box is typed in.
+    /// </summary>
+    public static IReadOnlyList<AutoTypeCandidate> Candidates(IEnumerable<PasswordEntry> entries) =>
+        entries
+            .Where(IsTypeable)
+            .OrderBy(entry => entry.Title, StringComparer.CurrentCultureIgnoreCase)
+            .Select(CandidateOf)
+            .ToArray();
+
+    public static AutoTypeCandidate CandidateOf(PasswordEntry entry) =>
+        new(entry.Id, entry.Title, entry.Username);
+
+    private static bool IsTypeable(PasswordEntry entry) =>
+        !entry.IsDeleted &&
+        !entry.IsArchived &&
+        (!string.IsNullOrWhiteSpace(entry.Username) || !string.IsNullOrWhiteSpace(entry.Password));
 
     public static IReadOnlyList<AutoTypeToken> BuildTokens(PasswordEntry entry)
     {

@@ -148,12 +148,11 @@ public sealed partial class AppSettingsService : IAppSettingsService
             settings.AutoTypeHotkey = "Ctrl+Shift+Enter";
         }
 
-        // Two slots cannot register the same gesture: the second registration is rejected by the
-        // desktop, which would leave auto-type silently dead behind a confusing error line.
-        if (string.Equals(settings.AutoTypeHotkey, settings.QuickSearchHotkey, StringComparison.OrdinalIgnoreCase))
-        {
-            settings.AutoTypeHotkey = "Ctrl+Shift+Enter";
-        }
+        // Two slots cannot register the same gesture, but this layer does not resolve that by rewriting
+        // what the user recorded: a saved value is the user's choice, and quietly replacing it at load
+        // would lose it for good while the collision stays invisible. The desktop integration reports the
+        // conflict on every start until one of the two rows is changed, and the recorded gesture then
+        // becomes live the moment the collision goes away.
 
         NormalizeFeatureToggles(settings);
     }

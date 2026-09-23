@@ -128,6 +128,12 @@ public interface IAutoTypeService
     // true at a moment when the process owned no top-level window at all.
     bool IsWindowOwnedByThisProcess(IntPtr windowHandle);
 
+    // Hands the foreground back to a window the user was looking at before one of our own windows took
+    // the keyboard - the auto-type picker has to be dismissed and its target re-focused before a
+    // credential is safe to send. Returning false means the keystrokes would land somewhere the user
+    // never pointed at, so callers must refuse to type rather than type anyway.
+    bool TryRestoreForeground(IntPtr windowHandle);
+
     bool TryType(IReadOnlyList<AutoTypeToken> tokens);
 }
 
@@ -343,6 +349,12 @@ public sealed class CapabilityOnlyAutoTypeService(IPlatformIntegrationService pl
     public IntPtr GetForegroundWindow() => IntPtr.Zero;
     public string GetWindowTitle(IntPtr windowHandle) => "";
     public bool IsWindowOwnedByThisProcess(IntPtr windowHandle) => false;
+
+    public bool TryRestoreForeground(IntPtr windowHandle)
+    {
+        LastError = Capability.UnsupportedReason ?? "Restoring a foreground window is not available on this platform.";
+        return false;
+    }
 
     public bool TryType(IReadOnlyList<AutoTypeToken> tokens)
     {

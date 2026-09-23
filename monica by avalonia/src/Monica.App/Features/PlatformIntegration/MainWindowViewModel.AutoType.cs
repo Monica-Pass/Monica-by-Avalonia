@@ -14,8 +14,9 @@ public sealed partial class MainWindowViewModel
         Locked,
         NoTargetWindow,
         MonicaIsForeground,
-        NoMatch,
-        Ambiguous,
+        PickerForMatches,
+        PickerForAllEntries,
+        TargetUnavailable,
         InjectionFailed,
         Typed,
     }
@@ -24,58 +25,167 @@ public sealed partial class MainWindowViewModel
 
     internal IReadOnlyList<PasswordEntry> LastAutoTypeMatches { get; private set; } = [];
 
-    // Types the matched credential into whatever window had focus when the hotkey was pressed. The
-    // caller (the desktop integration coordinator) resolves the foreground window first and says
-    // whether it belongs to Monica, because typing into our own window is always a mistake and the
-    // ViewModel has no handle on the shell.
+    internal bool IsAutoTypePickerOpen { get; private set; }
+
+    internal IReadOnlyList<AutoTypeCandidate> AutoTypePickerCandidates { get; private set; } = [];
+
+    // Says whether the list holds a handful of title matches or the whole vault. A short list is
+    // meant to be picked from, so the list keeps the keyboard; a full vault has to be filtered first,
+    // so the filter box takes it.
+    internal bool AutoTypePickerListsAllEntries { get; private set; }
+
+    internal string AutoTypePickerHeadingText =>
+        _localization.Format("AutoTypePickerHeadingFormat", ShortenAutoTypeTarget(_autoTypeTargetTitle));
+
+    internal string AutoTypePickerFilterPlaceholderText => _localization.Get("AutoTypePickerFilterPlaceholder");
+
+    internal string AutoTypePickerHintText => _localization.Get("AutoTypePickerHint");
+
+    // The window the credential is headed for, kept between the hotkey press and the moment the user
+    // picks a row. Nothing is sent until that handle has the keyboard back.
+    private IntPtr _autoTypeTargetHandle;
+    private string _autoTypeTargetTitle = "";
+    private IReadOnlyList<PasswordEntry> _autoTypeTargetEntries = [];
+
+    /// <summary>
+    /// Types the matched credential into whatever window had focus when the hotkey was pressed. The
+    /// caller (the desktop integration coordinator) resolves the foreground window first and says
+    /// whether it belongs to Monica, because typing into our own window is always a mistake and the
+    /// ViewModel has no handle on the shell.
+    /// </summary>
     internal void RunAutoTypeIntoForeground(IntPtr foregroundHandle, string windowText, bool foregroundIsMonicaWindow)
     {
         if (!IsUnlocked)
         {
-            LastAutoTypeMatches = [];
+            RetireAutoTypeTarget();
             CompleteAutoType(AutoTypeOutcome.Locked);
             return;
         }
 
         if (foregroundIsMonicaWindow)
         {
-            LastAutoTypeMatches = [];
+            RetireAutoTypeTarget();
             CompleteAutoType(AutoTypeOutcome.MonicaIsForeground);
             return;
         }
 
         if (foregroundHandle == IntPtr.Zero || string.IsNullOrWhiteSpace(windowText))
         {
-            LastAutoTypeMatches = [];
+            RetireAutoTypeTarget();
             CompleteAutoType(AutoTypeOutcome.NoTargetWindow);
             return;
         }
 
         var matches = AutoTypeMatcher.Match(Passwords, windowText);
         LastAutoTypeMatches = matches;
-        if (matches.Count == 0)
+        _autoTypeTargetHandle = foregroundHandle;
+        _autoTypeTargetTitle = windowText;
+
+        if (matches.Count == 1)
         {
-            CompleteAutoType(AutoTypeOutcome.NoMatch);
+            // The common case stays one keystroke: a unique match types straight through, exactly as
+            // it did before the picker existed.
+            _autoTypeTargetEntries = matches;
+            TypeIntoAutoTypeTarget(matches[0]);
             return;
         }
 
-        if (matches.Count > 1)
+        IsAutoTypePickerOpen = true;
+        AutoTypePickerListsAllEntries = matches.Count == 0;
+        _autoTypeTargetEntries = AutoTypePickerListsAllEntries ? Passwords.ToArray() : matches;
+        AutoTypePickerCandidates = AutoTypeMatcher.Candidates(_autoTypeTargetEntries);
+        CompleteAutoType(AutoTypePickerListsAllEntries
+            ? AutoTypeOutcome.PickerForAllEntries
+            : AutoTypeOutcome.PickerForMatches);
+    }
+
+    /// <summary>
+    /// Runs the row the user picked. The picker took the keyboard, so the first thing this does after
+    /// closing the list is hand the focus back to the target window and refuse to type unless it worked.
+    /// </summary>
+    internal void CompleteAutoTypeFromPicker(AutoTypeCandidate candidate)
+    {
+        if (!IsAutoTypePickerOpen)
         {
-            CompleteAutoType(AutoTypeOutcome.Ambiguous);
             return;
         }
 
-        var entry = matches[0];
+        var entry = _autoTypeTargetEntries.FirstOrDefault(item => item.Id == candidate.EntryId);
+        CloseAutoTypePicker();
+        if (!IsUnlocked)
+        {
+            RetireAutoTypeTarget();
+            CompleteAutoType(AutoTypeOutcome.Locked);
+            return;
+        }
+
+        if (entry is null)
+        {
+            RetireAutoTypeTarget();
+            CompleteAutoType(AutoTypeOutcome.TargetUnavailable);
+            return;
+        }
+
+        TypeIntoAutoTypeTarget(entry);
+    }
+
+    internal void CancelAutoTypePicker()
+    {
+        if (!IsAutoTypePickerOpen)
+        {
+            return;
+        }
+
+        CloseAutoTypePicker();
+        RetireAutoTypeTarget();
+        SetStatusNotice("AutoTypePickerCancelled");
+    }
+
+    private void TypeIntoAutoTypeTarget(PasswordEntry entry)
+    {
+        var targetHandle = _autoTypeTargetHandle;
         var tokens = AutoTypeMatcher.BuildTokens(entry);
-        if (tokens.Count == 0 || !_autoTypeService.TryType(tokens))
+        if (tokens.Count == 0)
         {
-            LastAutoTypeMatches = [];
+            RetireAutoTypeTarget();
             CompleteAutoType(AutoTypeOutcome.InjectionFailed);
             return;
         }
 
+        if (!_autoTypeService.TryRestoreForeground(targetHandle))
+        {
+            RetireAutoTypeTarget();
+            CompleteAutoType(AutoTypeOutcome.TargetUnavailable);
+            return;
+        }
+
+        if (!_autoTypeService.TryType(tokens))
+        {
+            RetireAutoTypeTarget();
+            CompleteAutoType(AutoTypeOutcome.InjectionFailed);
+            return;
+        }
+
+        _autoTypeTargetEntries = [];
+        RetireAutoTypeTarget();
         CompleteAutoType(AutoTypeOutcome.Typed, entry.Title);
     }
+
+    private void CloseAutoTypePicker()
+    {
+        IsAutoTypePickerOpen = false;
+        AutoTypePickerCandidates = [];
+        _autoTypeTargetEntries = [];
+    }
+
+    private void RetireAutoTypeTarget()
+    {
+        _autoTypeTargetHandle = IntPtr.Zero;
+        _autoTypeTargetTitle = "";
+    }
+
+    private static string ShortenAutoTypeTarget(string value) =>
+        value.Length <= 48 ? value : value[..45] + "...";
 
     private void CompleteAutoType(AutoTypeOutcome outcome, string? targetLabel = null)
     {
@@ -94,11 +204,14 @@ public sealed partial class MainWindowViewModel
             case AutoTypeOutcome.NoTargetWindow:
                 SetStatusFailure("AutoTypeNoTargetWindow");
                 break;
-            case AutoTypeOutcome.NoMatch:
-                SetStatusFailure("AutoTypeNoMatch");
+            case AutoTypeOutcome.PickerForMatches:
+                SetStatusNotice("AutoTypePickerMatchesFormat", LastAutoTypeMatches.Count);
                 break;
-            case AutoTypeOutcome.Ambiguous:
-                SetStatusFailure("AutoTypeAmbiguousFormat", LastAutoTypeMatches.Count);
+            case AutoTypeOutcome.PickerForAllEntries:
+                SetStatusNotice("AutoTypePickerNoMatch");
+                break;
+            case AutoTypeOutcome.TargetUnavailable:
+                SetStatusFailure("AutoTypeTargetUnavailable");
                 break;
             case AutoTypeOutcome.InjectionFailed:
                 SetStatusFailure("AutoTypeInjectionFailedFormat", _autoTypeService.LastError);

@@ -4,6 +4,7 @@
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:vm="using:Monica.App.ViewModels"
              xmlns:settings="using:Monica.App.Features.Settings"
+             xmlns:ctrl="using:Monica.App.Controls"
              x:Class="Monica.App.Features.Settings.SettingsDesktopView"
              x:DataType="vm:MainWindowViewModel">
     <StackPanel x:Name="DesktopSettingsTaskPage"
@@ -82,14 +83,14 @@
                     <fa:FASettingsExpanderItem Content="{Binding L.QuickSearchHotkey}"
                                                Description="{Binding L.QuickSearchHotkeyDescription}">
                         <fa:FASettingsExpanderItem.Footer>
-                            <TextBox x:Name="QuickSearchHotkeyBox"
-                                     MinWidth="180"
-                                     MaxWidth="320"
-                                     Text="{Binding QuickSearchHotkey}"
-                                     IsEnabled="{Binding CanUseGlobalHotkeyIntegration}"
-                                     ToolTip.Tip="{Binding GlobalQuickSearchStatusDescriptionText}"
-                                     AutomationProperties.Name="{Binding L.QuickSearchHotkey}"
-                                     AutomationProperties.HelpText="{Binding GlobalQuickSearchStatusDescriptionText}" />
+                            <ctrl:HotkeyRecorder x:Name="QuickSearchHotkeyBox"
+                                                 Gesture="{Binding QuickSearchHotkey, Mode=TwoWay}"
+                                                 PromptText="{Binding L[HotkeyRecorderPrompt]}"
+                                                 InvalidText="{Binding L[HotkeyRecorderInvalid]}"
+                                                 IsEnabled="{Binding CanUseGlobalHotkeyIntegration}"
+                                                 ToolTip.Tip="{Binding GlobalQuickSearchStatusDescriptionText}"
+                                                 AutomationName="{Binding L.QuickSearchHotkey}"
+                                                 AutomationHelpText="{Binding GlobalQuickSearchStatusDescriptionText}" />
                         </fa:FASettingsExpanderItem.Footer>
                     </fa:FASettingsExpanderItem>
                     <fa:FASettingsExpanderItem Content="{Binding L[AutoType]}"
@@ -108,14 +109,14 @@
                     <fa:FASettingsExpanderItem Content="{Binding L[AutoTypeHotkey]}"
                                                Description="{Binding L[AutoTypeHotkeyDescription]}">
                         <fa:FASettingsExpanderItem.Footer>
-                            <TextBox x:Name="AutoTypeHotkeyBox"
-                                     MinWidth="180"
-                                     MaxWidth="320"
-                                     Text="{Binding AutoTypeHotkey}"
-                                     IsEnabled="{Binding CanUseAutoTypeIntegration}"
-                                     ToolTip.Tip="{Binding AutoTypeStatusDescriptionText}"
-                                     AutomationProperties.Name="{Binding L[AutoTypeHotkey]}"
-                                     AutomationProperties.HelpText="{Binding AutoTypeStatusDescriptionText}" />
+                            <ctrl:HotkeyRecorder x:Name="AutoTypeHotkeyBox"
+                                                 Gesture="{Binding AutoTypeHotkey, Mode=TwoWay}"
+                                                 PromptText="{Binding L[HotkeyRecorderPrompt]}"
+                                                 InvalidText="{Binding L[HotkeyRecorderInvalid]}"
+                                                 IsEnabled="{Binding CanUseAutoTypeIntegration}"
+                                                 ToolTip.Tip="{Binding AutoTypeStatusDescriptionText}"
+                                                 AutomationName="{Binding L[AutoTypeHotkey]}"
+                                                 AutomationHelpText="{Binding AutoTypeStatusDescriptionText}" />
                         </fa:FASettingsExpanderItem.Footer>
                     </fa:FASettingsExpanderItem>
                 </StackPanel>

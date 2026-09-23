@@ -62,6 +62,34 @@ public sealed partial class AppSettingsTests
     }
 
     [Fact]
+    public async Task App_settings_keeps_a_recorded_gesture_even_when_it_collides()
+    {
+        // Both slots cannot hold one gesture, and the old fix rewrote the stored auto-type value to the
+        // default at load. That discarded a choice the user had pressed into the settings row, and did it
+        // on every start after the one that made the collision, without a word. The gesture now stays as
+        // recorded while the desktop integration reports the conflict, so the recorded value becomes live
+        // the moment the other row moves, without the user entering it a second time.
+        var path = GetTempPath();
+        await File.WriteAllTextAsync(
+            path,
+            "{\"AutoTypeEnabled\":true,\"QuickSearchHotkey\":\"Ctrl+Shift+Space\",\"AutoTypeHotkey\":\"Ctrl+Shift+Space\"}");
+
+        var settings = new AppSettingsService(path);
+        await settings.LoadAsync();
+
+        Assert.Equal("Ctrl+Shift+Space", settings.Current.AutoTypeHotkey);
+
+        settings.Current.QuickSearchHotkey = "Ctrl+Shift+U";
+        await settings.SaveAsync();
+
+        var reloaded = new AppSettingsService(path);
+        await reloaded.LoadAsync();
+
+        Assert.Equal("Ctrl+Shift+Space", reloaded.Current.AutoTypeHotkey);
+        Assert.Equal("Ctrl+Shift+U", reloaded.Current.QuickSearchHotkey);
+    }
+
+    [Fact]
     public async Task App_settings_roundtrip_interactive_values()
     {
         var path = GetTempPath();

@@ -471,13 +471,29 @@ public partial class App
         var pressed = await WaitForSmokeConditionAsync(
             () => viewModel.LastAutoTypeOutcome != MainWindowViewModel.AutoTypeOutcome.None,
             TimeSpan.FromSeconds(timeoutSeconds));
+        // Surfacing the list is a step, not an answer, so the probe keeps watching while the popup is
+        // up; an external harness filters and confirms, and only the terminal outcome decides.
+        var pickerSurfaced = pressed && IsAutoTypePickerOutcome(viewModel.LastAutoTypeOutcome);
+        if (pickerSurfaced)
+        {
+            var pickerState = viewModel.LastAutoTypeOutcome;
+            await WaitForSmokeConditionAsync(
+                () => viewModel.LastAutoTypeOutcome != pickerState || !viewModel.IsAutoTypePickerOpen,
+                TimeSpan.FromSeconds(timeoutSeconds));
+        }
+
         var success = armed && pressed &&
             viewModel.LastAutoTypeOutcome == MainWindowViewModel.AutoTypeOutcome.Typed;
         AppDiagnostics.Info(
             $"Smoke UI auto type result. success={success}, armed={armed}, pressed={pressed}, " +
+            $"pickerSurfaced={pickerSurfaced}, pickerOpen={viewModel.IsAutoTypePickerOpen}, " +
             $"outcome={viewModel.LastAutoTypeOutcome}, matches={viewModel.LastAutoTypeMatches.Count}");
         return success;
     }
+
+    private static bool IsAutoTypePickerOutcome(MainWindowViewModel.AutoTypeOutcome outcome) =>
+        outcome is MainWindowViewModel.AutoTypeOutcome.PickerForMatches
+            or MainWindowViewModel.AutoTypeOutcome.PickerForAllEntries;
 
     private static void CompactSmokeUiMemory()
     {

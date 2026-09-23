@@ -145,13 +145,20 @@ public sealed class TrayHintUiTests
             Assert.True(window.IsTrayHintVisible);
 
             window.ShowFromDesktopIntegration();
+            // Hand the reload the mismatch the debounced save produces in the wild: this run has been
+            // told, the file has not. Putting the flag back in memory would only re-open the race with
+            // the save still in flight, so the reload starts from the file's answer and the guard under
+            // test has to be the one that remembers.
+            settings.Current.TrayHintShown = false;
+            await settings.SaveAsync(TestContext.Current.CancellationToken);
+            var settingsBeforeReload = settings.Current;
             await settings.LoadAsync(TestContext.Current.CancellationToken);
             Drain();
 
-            // The reload really does wipe the flag - it replaces the in-memory object with the file
-            // copy, and the debounced write has not landed yet. Without this the fact below would pass
-            // for the wrong reason.
+            // The reload really did replace the in-memory object, so the two facts below cannot pass
+            // because nothing happened.
             Assert.False(settings.Current.TrayHintShown);
+            Assert.NotSame(settingsBeforeReload, settings.Current);
             Assert.False(viewModel.ShouldSurfaceTrayHint());
 
             window.WindowState = WindowState.Minimized;
@@ -199,8 +206,12 @@ public sealed class TrayHintUiTests
         window.DataContext = viewModel;
         viewModel.MinimizeToTray = true;
         // Which installs have already been told lives in settings.json and the suite shares one file, so
-        // every fact starts from "not yet" - the state a fresh install is in.
+        // every fact starts from "not yet" - the state a fresh install is in. Memory alone is not enough:
+        // a re-show reloads the file copy, so a previous run's leftover would decide what these facts see.
         settings.Current.TrayHintShown = false;
+        // Off the UI thread on purpose: SaveAsync awaits without ConfigureAwait(false), so blocking on it
+        // here would deadlock the test on its own dispatcher.
+        Task.Run(() => settings.SaveAsync()).GetAwaiter().GetResult();
         Drain();
         return (window, viewModel, settings, services);
     }
