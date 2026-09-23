@@ -764,12 +764,14 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
        本地那一份会走进 `PreserveLocalUnmatched`（保留、不删），同步不会坏，但"别处删了这里也跟着进回收站"
        就不成立。永久删除（Monica 里从回收站
        彻底清除）**不**传播，这是故意的：`BitwardenMutationOperationType.Delete` 没有任何生产者。
-    5. **一条疑似真缺陷，未动**（本轮读到，需要用户或真服务器才能判）：本仓给非 login cipher 编号用的是
-       `2=笔记 / 3=银行卡 / 4=证件`（`BitwardenPullMergeService.cs:274-276` 的 `MatchesSecureItemType`
-       与 `BitwardenPullMergeService.Apply.cs:228-230` 的 `ToCipherType` 两处一致），而 Bitwarden 官方
-       `CipherType` 是 `2=Card / 3=Identity / 4=SecureNote`。因为解码、回写、判型三处同源自洽，**现有测试
-       全绿也照不出来**；一旦接真服务器，每一条笔记/银行卡都会被按错的类型读写（写回去还会把远端那一类
-       变成另一类）。别顺手改一处——要么三处一起改并配一份"远端形状"的表，要么先拿真账号量。
+    5. ~~**一条疑似真缺陷：非 login cipher 编号**~~ **核对后判定：本仓是对的，别改**。上一轮记成"官方是
+       `2=Card / 3=Identity / 4=SecureNote`"，那句话本身就是错的——Bitwarden 的 `CipherType` 是
+       `Login=1 / SecureNote=2 / Card=3 / Identity=4 / SshKey=5`。证据取只读事实来源 Android 仓两处：
+       `PasswordEntry.kt:146` 的列注释 `1=Login, 2=SecureNote, 3=Card, 4=Identity`，和
+       `bitwarden/mapper/SecureNoteMapper.kt:14` 的 `Monica SecureItem (NOTE) <-> Bitwarden SecureNote (Type 2)`。
+       与本仓 `MatchesSecureItemType` / `ToCipherType` 完全一致，**不需要动任何代码**（这条留着是因为差点
+       顺手"修"它就会把三处自洽的映射改坏）。顺带记一份现成参考：Android 那批 `bitwarden/mapper/*.kt` 是
+       这三类 cipher 的**出站载荷**写法（含 `toCreateRequest`），桌面端还缺的正是这个编码器。
 - **外观类改动欠一台"截图口味门"机器（#90 把这个缺口撞出来了，#92 修好了其中一条路）**。
   "这个滚动条有点丑了"这类判断按老规矩应该是"探一屏 + 截图过口味门"再铺开，当时两条路都不通、只能拿几何数字交差：
   1. **`--smoke-ui-screenshot-dir` 矩阵已经可用**（#92 修完）：7 次真跑里 1 次全帧相同，现在抓取前先验
