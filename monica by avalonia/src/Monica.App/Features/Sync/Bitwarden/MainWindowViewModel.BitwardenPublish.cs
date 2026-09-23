@@ -12,9 +12,10 @@ namespace Monica.App.ViewModels;
 /// drift scan, so a publish that cannot reach the network still stands, and the next sync finishes it.
 public sealed partial class MainWindowViewModel
 {
-    // Notes are deliberately absent: the library's batch layer does not count, select-all, clear, move or
-    // delete them at all, so a note a user ticks by hand is invisible to every other action there. Offering
-    // them here would be the one place that quietly disagrees with that.
+    // Notes are absent for a reason that reads like an oversight: nothing in the app can put a note into a
+    // batch selection at all. The library tree has no per-row checkbox, and its one source of selection -
+    // "select all" - skips row kinds with no bulk command behind them. Counting notes here would tally
+    // nothing; the path a note needs is its own single-entry offer, which is an open product call.
     private int VaultBatchBitwardenPublishableCount =>
         Passwords.Count(IsPublishable) + WalletItems.Count(IsPublishable);
 
