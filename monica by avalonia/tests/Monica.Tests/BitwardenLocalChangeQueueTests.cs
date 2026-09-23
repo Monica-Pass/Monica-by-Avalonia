@@ -193,6 +193,67 @@ public sealed class BitwardenLocalChangeQueueTests
         Assert.Empty(await harness.Pending.GetAsync(harness.VaultId));
     }
 
+    // A wallet row is a different table with a different id, so publishing one has to travel the same create
+    // route without borrowing the password entry's identity - otherwise the response would name a cipher for
+    // a row nothing can find back.
+    [Fact]
+    public async Task A_published_card_reaches_the_server_once_and_comes_back_with_its_cipher()
+    {
+        var harness = await CreateHarnessAsync();
+        var card = PublishedCard(harness.VaultId);
+        await harness.Repository.SaveSecureItemAsync(card);
+
+        var queued = await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow);
+
+        var operation = Assert.Single(await harness.Pending.GetAsync(harness.VaultId));
+        Assert.Equal(1, queued.Enqueued);
+        Assert.Equal(BitwardenMutationOperationType.Create, operation.OperationType);
+        Assert.Equal(BitwardenLocalCipherIdentity.ForSecureItem(card.Id), operation.CipherId);
+        Assert.Null(operation.ExpectedRemoteRevision);
+        Assert.Contains("\"type\":3", operation.PayloadJson, StringComparison.Ordinal);
+        Assert.DoesNotContain(CardNumber, operation.PayloadJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("Example Credit Union", operation.PayloadJson, StringComparison.Ordinal);
+
+        var pushed = await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            new AcceptedTransport(NextRevision, assignedCipherId: "cipher-card-from-server"));
+
+        Assert.Equal(1, pushed.Completed);
+        var saved = (await harness.Repository.GetSecureItemsAsync(itemType: null, includeDeleted: true))
+            .Single(item => item.Id == card.Id);
+        Assert.Equal("cipher-card-from-server", saved.BitwardenCipherId);
+        Assert.Equal(NextRevision, saved.BitwardenRevisionDate);
+        Assert.Equal(0, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+    }
+
+    [Fact]
+    public async Task A_published_card_the_encoder_refuses_is_counted_but_never_posted()
+    {
+        var harness = await CreateHarnessAsync();
+        var card = PublishedCard(harness.VaultId);
+        // The shape a locally created card defaults to: Bitwarden has no field for a debit designation.
+        var data = WalletItemDataCodec.DecodeBankCard(card);
+        data.CardTypeString = "DEBIT";
+        card.ItemData = WalletItemDataCodec.EncodeBankCard(data);
+        await harness.Repository.SaveSecureItemAsync(card);
+
+        var queued = await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow);
+
+        Assert.Equal(0, queued.Enqueued);
+        Assert.Equal(1, queued.Refused);
+        Assert.Empty(await harness.Pending.GetAsync(harness.VaultId));
+    }
+
     [Fact]
     public async Task A_trashed_entry_is_queued_as_a_delete_and_stays_trashed_through_a_whole_sync()
     {
@@ -807,6 +868,35 @@ public sealed class BitwardenLocalChangeQueueTests
             harness.VaultId,
             harness.VaultKey,
             DateTimeOffset.UtcNow)).Enqueued);
+    }
+
+    private const string CardNumber = "4111111111111111";
+
+    // What the library's publish command leaves behind for a wallet row: it belongs to this vault by
+    // account, the server has never named it, and every field is one the encoder can hand back unchanged -
+    // the bank name echoes the brand and the type reads CREDIT, which is what a pull would have stored.
+    private static SecureItem PublishedCard(long vaultId)
+    {
+        var data = new BankCardWalletData
+        {
+            CardholderName = "A Holder",
+            Brand = "Example Credit Union",
+            CardNumber = CardNumber,
+            ExpiryMonth = "04",
+            ExpiryYear = "2030",
+            Cvv = "123",
+            BankName = "Example Credit Union",
+            CardTypeString = "CREDIT"
+        };
+        return new SecureItem
+        {
+            ItemType = VaultItemType.BankCard,
+            Title = "Published card",
+            Notes = "",
+            ItemData = WalletItemDataCodec.EncodeBankCard(data),
+            ImagePaths = "[]",
+            BitwardenVaultId = vaultId
+        };
     }
 
     private static async Task<PasswordEntry> SavePublishedAsync(Harness harness, string title)

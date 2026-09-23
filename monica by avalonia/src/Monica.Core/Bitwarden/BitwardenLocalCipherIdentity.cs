@@ -9,14 +9,23 @@ namespace Monica.Core.Bitwarden;
 public static class BitwardenLocalCipherIdentity
 {
     private const string PasswordPrefix = "local-password:";
+    private const string SecureItemPrefix = "local-secure:";
 
     public static string ForPassword(long entryId) => PasswordPrefix + entryId.ToString();
 
-    public static bool TryReadPasswordId(string cipherId, out long entryId)
+    public static string ForSecureItem(long itemId) => SecureItemPrefix + itemId.ToString();
+
+    public static bool TryReadPasswordId(string cipherId, out long entryId) =>
+        TryRead(cipherId, PasswordPrefix, out entryId);
+
+    public static bool TryReadSecureItemId(string cipherId, out long itemId) =>
+        TryRead(cipherId, SecureItemPrefix, out itemId);
+
+    private static bool TryRead(string? cipherId, string prefix, out long id)
     {
-        entryId = 0;
+        id = 0;
         return cipherId is not null &&
-               cipherId.StartsWith(PasswordPrefix, StringComparison.Ordinal) &&
-               long.TryParse(cipherId.AsSpan(PasswordPrefix.Length), out entryId);
+               cipherId.StartsWith(prefix, StringComparison.Ordinal) &&
+               long.TryParse(cipherId.AsSpan(prefix.Length), out id);
     }
 }

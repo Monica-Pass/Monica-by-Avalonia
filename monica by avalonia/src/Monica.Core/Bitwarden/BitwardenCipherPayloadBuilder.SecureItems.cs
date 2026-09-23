@@ -33,20 +33,34 @@ public static partial class BitwardenCipherPayloadBuilder
         "Username"
     ];
 
+    /// <summary>
+    /// Asks whether this row can travel without encrypting anything. The vault key is only used to turn
+    /// plaintext into cipher strings, never to decide, so the projection gate below answers the question on
+    /// its own - which is what lets the library count publishable rows before an upload is even chosen.
+    /// </summary>
+    public static bool CanEncode(SecureItem item)
+    {
+        if (item is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            PlanSecureItem(item);
+            return true;
+        }
+        catch (BitwardenProtocolException)
+        {
+            return false;
+        }
+    }
+
     public static string BuildSecureItemCipher(SecureItem item, BitwardenSymmetricKey key)
     {
         ArgumentNullException.ThrowIfNull(item);
         ArgumentNullException.ThrowIfNull(key);
-        var request = item.ItemType switch
-        {
-            VaultItemType.Note => PlanNote(item, key),
-            VaultItemType.BankCard => PlanCard(item, key),
-            VaultItemType.Document => PlanIdentity(item, key),
-            _ => throw new BitwardenProtocolException(
-                "Monica can only write back Bitwarden login, note, card and identity ciphers.")
-        };
-
-        var json = JsonSerializer.Serialize(request, PayloadOptions);
+        var json = JsonSerializer.Serialize(Emit(PlanSecureItem(item), key), PayloadOptions);
         if (Encoding.UTF8.GetByteCount(json) > MaximumPayloadUtf8Bytes)
         {
             throw new BitwardenProtocolException("Bitwarden cipher payload exceeds the supported size.");
@@ -55,7 +69,16 @@ public static partial class BitwardenCipherPayloadBuilder
         return json;
     }
 
-    private static CipherRequestDto PlanNote(SecureItem item, BitwardenSymmetricKey key)
+    private static SecureItemPlan PlanSecureItem(SecureItem item) => item.ItemType switch
+    {
+        VaultItemType.Note => PlanNote(item),
+        VaultItemType.BankCard => PlanCard(item),
+        VaultItemType.Document => PlanIdentity(item),
+        _ => throw new BitwardenProtocolException(
+            "Monica can only write back Bitwarden login, note, card and identity ciphers.")
+    };
+
+    private static SecureItemPlan PlanNote(SecureItem item)
     {
         var title = RequireSecureTitle(item);
         var content = NoteContentCodec.DecodeFromItem(item).Content;
@@ -63,12 +86,10 @@ public static partial class BitwardenCipherPayloadBuilder
         // title and the text again, so that is the only state a written note can return to.
         var saved = NoteContentCodec.BuildSavePayload(title, content, "", isMarkdown: false);
         EnsureRoundTrips(item, VaultItemType.Note, saved.Title, saved.NotesCache, saved.ItemData, saved.ImagePaths);
-        return SecureItemRequest(item, 2, title, saved.NotesCache, key)
-            with
-        { SecureNote = new SecureNoteRequestDto { Type = 0 } };
+        return new SecureItemPlan(2, saved.Title, FolderOf(item), item.IsFavorite, saved.NotesCache, null, null);
     }
 
-    private static CipherRequestDto PlanCard(SecureItem item, BitwardenSymmetricKey key)
+    private static SecureItemPlan PlanCard(SecureItem item)
     {
         var title = RequireSecureTitle(item);
         var source = WalletItemDataCodec.DecodeBankCard(item);
@@ -92,21 +113,23 @@ public static partial class BitwardenCipherPayloadBuilder
             item.Notes,
             WalletItemDataCodec.EncodeBankCard(decoded),
             "[]");
-        return SecureItemRequest(item, 3, title, item.Notes, key) with
-        {
-            Card = new CardRequestDto
-            {
-                CardholderName = EncryptOptional(source.CardholderName, key),
-                Brand = EncryptOptional(source.Brand, key),
-                Number = EncryptOptional(source.CardNumber, key),
-                ExpMonth = EncryptOptional(source.ExpiryMonth, key),
-                ExpYear = EncryptOptional(source.ExpiryYear, key),
-                Code = EncryptOptional(source.Cvv, key)
-            }
-        };
+        return new SecureItemPlan(
+            3,
+            title,
+            FolderOf(item),
+            item.IsFavorite,
+            item.Notes,
+            new CardPlan(
+                source.CardholderName,
+                source.Brand,
+                source.CardNumber,
+                source.ExpiryMonth,
+                source.ExpiryYear,
+                source.Cvv),
+            null);
     }
 
-    private static CipherRequestDto PlanIdentity(SecureItem item, BitwardenSymmetricKey key)
+    private static SecureItemPlan PlanIdentity(SecureItem item)
     {
         var title = RequireSecureTitle(item);
         var source = WalletItemDataCodec.DecodeDocument(item);
@@ -150,29 +173,84 @@ public static partial class BitwardenCipherPayloadBuilder
             item.Notes,
             WalletItemDataCodec.EncodeDocument(decoded),
             "[]");
-        return SecureItemRequest(item, 4, title, item.Notes, key) with
+        return new SecureItemPlan(
+            4,
+            title,
+            FolderOf(item),
+            item.IsFavorite,
+            item.Notes,
+            null,
+            new IdentityPlan(
+                Detail(details, "Title"),
+                source.FullName,
+                Detail(details, "Address"),
+                Detail(details, "Address2"),
+                Detail(details, "Address3"),
+                Detail(details, "City"),
+                Detail(details, "State"),
+                Detail(details, "Postal code"),
+                country,
+                Detail(details, "Company"),
+                Detail(details, "Email"),
+                Detail(details, "Phone"),
+                Detail(details, "Username"),
+                number,
+                license,
+                ssn));
+    }
+
+    private static CipherRequestDto Emit(SecureItemPlan plan, BitwardenSymmetricKey key)
+    {
+        var request = new CipherRequestDto
         {
-            Identity = new IdentityRequestDto
+            FolderId = plan.FolderId,
+            Type = plan.CipherType,
+            Name = BitwardenCipherStringCrypto.EncryptString(plan.Title, key),
+            Notes = EncryptOptional(plan.Notes, key),
+            Favorite = plan.IsFavorite
+        };
+        return plan.CipherType switch
+        {
+            2 => request with { SecureNote = new SecureNoteRequestDto { Type = 0 } },
+            3 => request with
             {
-                Title = EncryptOptional(Detail(details, "Title"), key),
-                FirstName = EncryptOptional(source.FullName, key),
-                Address1 = EncryptOptional(Detail(details, "Address"), key),
-                Address2 = EncryptOptional(Detail(details, "Address2"), key),
-                Address3 = EncryptOptional(Detail(details, "Address3"), key),
-                City = EncryptOptional(Detail(details, "City"), key),
-                State = EncryptOptional(Detail(details, "State"), key),
-                PostalCode = EncryptOptional(Detail(details, "Postal code"), key),
-                Country = EncryptOptional(country, key),
-                Company = EncryptOptional(Detail(details, "Company"), key),
-                Email = EncryptOptional(Detail(details, "Email"), key),
-                Phone = EncryptOptional(Detail(details, "Phone"), key),
-                Username = EncryptOptional(Detail(details, "Username"), key),
-                PassportNumber = EncryptOptional(number, key),
-                LicenseNumber = EncryptOptional(license, key),
-                Ssn = EncryptOptional(ssn, key)
+                Card = new CardRequestDto
+                {
+                    CardholderName = EncryptOptional(plan.Card!.CardholderName, key),
+                    Brand = EncryptOptional(plan.Card.Brand, key),
+                    Number = EncryptOptional(plan.Card.Number, key),
+                    ExpMonth = EncryptOptional(plan.Card.ExpMonth, key),
+                    ExpYear = EncryptOptional(plan.Card.ExpYear, key),
+                    Code = EncryptOptional(plan.Card.Code, key)
+                }
+            },
+            _ => request with
+            {
+                Identity = new IdentityRequestDto
+                {
+                    Title = EncryptOptional(plan.Identity!.Title, key),
+                    FirstName = EncryptOptional(plan.Identity.FirstName, key),
+                    Address1 = EncryptOptional(plan.Identity.Address1, key),
+                    Address2 = EncryptOptional(plan.Identity.Address2, key),
+                    Address3 = EncryptOptional(plan.Identity.Address3, key),
+                    City = EncryptOptional(plan.Identity.City, key),
+                    State = EncryptOptional(plan.Identity.State, key),
+                    PostalCode = EncryptOptional(plan.Identity.PostalCode, key),
+                    Country = EncryptOptional(plan.Identity.Country, key),
+                    Company = EncryptOptional(plan.Identity.Company, key),
+                    Email = EncryptOptional(plan.Identity.Email, key),
+                    Phone = EncryptOptional(plan.Identity.Phone, key),
+                    Username = EncryptOptional(plan.Identity.Username, key),
+                    PassportNumber = EncryptOptional(plan.Identity.PassportNumber, key),
+                    LicenseNumber = EncryptOptional(plan.Identity.LicenseNumber, key),
+                    Ssn = EncryptOptional(plan.Identity.Ssn, key)
+                }
             }
         };
     }
+
+    private static string? FolderOf(SecureItem item) =>
+        string.IsNullOrWhiteSpace(item.BitwardenFolderId) ? null : item.BitwardenFolderId;
 
     private static string RequireSecureTitle(SecureItem item)
     {
@@ -190,20 +268,6 @@ public static partial class BitwardenCipherPayloadBuilder
 
         return title;
     }
-
-    private static CipherRequestDto SecureItemRequest(
-        SecureItem item,
-        int cipherType,
-        string title,
-        string notes,
-        BitwardenSymmetricKey key) => new()
-        {
-            FolderId = string.IsNullOrWhiteSpace(item.BitwardenFolderId) ? null : item.BitwardenFolderId,
-            Type = cipherType,
-            Name = BitwardenCipherStringCrypto.EncryptString(title, key),
-            Notes = EncryptOptional(notes, key),
-            Favorite = item.IsFavorite
-        };
 
     private static void EnsureRoundTrips(
         SecureItem item,
@@ -288,6 +352,45 @@ public static partial class BitwardenCipherPayloadBuilder
     private static string JoinNonEmpty(params string[] values) =>
         string.Join(" ", values.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Trim()));
 }
+
+/// <summary>
+/// What a safe write looks like, stated in plaintext. The projection gate decides inside the plan, so
+/// everything after it - including whether a row is worth offering for upload at all - reads from here.
+/// </summary>
+internal sealed record SecureItemPlan(
+    int CipherType,
+    string Title,
+    string? FolderId,
+    bool IsFavorite,
+    string Notes,
+    CardPlan? Card,
+    IdentityPlan? Identity);
+
+internal sealed record CardPlan(
+    string CardholderName,
+    string Brand,
+    string Number,
+    string ExpMonth,
+    string ExpYear,
+    string Code);
+
+internal sealed record IdentityPlan(
+    string Title,
+    string FirstName,
+    string Address1,
+    string Address2,
+    string Address3,
+    string City,
+    string State,
+    string PostalCode,
+    string Country,
+    string Company,
+    string Email,
+    string Phone,
+    string Username,
+    string PassportNumber,
+    string LicenseNumber,
+    string Ssn);
 
 internal sealed record SecureNoteRequestDto
 {

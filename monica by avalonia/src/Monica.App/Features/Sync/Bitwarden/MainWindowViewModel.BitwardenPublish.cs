@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.Input;
 using Monica.App.Features.Vault;
 using Monica.Core.Bitwarden;
+using Monica.Core.Models;
 
 namespace Monica.App.ViewModels;
 
@@ -11,10 +12,11 @@ namespace Monica.App.ViewModels;
 /// drift scan, so a publish that cannot reach the network still stands, and the next sync finishes it.
 public sealed partial class MainWindowViewModel
 {
-    private int VaultBatchBitwardenPublishableCount => Passwords.Count(
-        item => item.IsSelected &&
-                VaultQuickFilters.IsLocalOnly(item) &&
-                BitwardenCipherPayloadBuilder.CanEncode(item));
+    // Notes are deliberately absent: the library's batch layer does not count, select-all, clear, move or
+    // delete them at all, so a note a user ticks by hand is invisible to every other action there. Offering
+    // them here would be the one place that quietly disagrees with that.
+    private int VaultBatchBitwardenPublishableCount =>
+        Passwords.Count(IsPublishable) + WalletItems.Count(IsPublishable);
 
     public bool VaultBatchSupportsBitwardenPublish =>
         VaultBatchBitwardenPublishableCount > 0 && BitwardenAccounts.Any(item => item.IsConnected);
@@ -28,6 +30,12 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(BitwardenPublishMenuText));
     }
 
+    private static bool IsPublishable(PasswordEntry entry) =>
+        entry.IsSelected && VaultQuickFilters.IsLocalOnly(entry) && BitwardenCipherPayloadBuilder.CanEncode(entry);
+
+    private static bool IsPublishable(SecureItem item) =>
+        item.IsSelected && VaultQuickFilters.IsLocalOnly(item) && BitwardenCipherPayloadBuilder.CanEncode(item);
+
     [RelayCommand]
     private async Task PublishSelectionToBitwardenAsync()
     {
@@ -38,31 +46,43 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var selected = Passwords.Where(item => item.IsSelected && VaultQuickFilters.IsLocalOnly(item))
+        var selectedPasswords = Passwords
+            .Where(item => item.IsSelected && VaultQuickFilters.IsLocalOnly(item))
             .ToArray();
-        var publishable = selected.Where(BitwardenCipherPayloadBuilder.CanEncode).ToArray();
-        if (publishable.Length == 0)
+        var selectedWalletItems = WalletItems
+            .Where(item => item.IsSelected && VaultQuickFilters.IsLocalOnly(item))
+            .ToArray();
+        var publishablePasswords = selectedPasswords.Where(BitwardenCipherPayloadBuilder.CanEncode).ToArray();
+        var publishableWalletItems = selectedWalletItems.Where(BitwardenCipherPayloadBuilder.CanEncode).ToArray();
+        var skipped = (selectedPasswords.Length - publishablePasswords.Length) +
+                      (selectedWalletItems.Length - publishableWalletItems.Length);
+        if (publishablePasswords.Length == 0 && publishableWalletItems.Length == 0)
         {
             return;
         }
 
         SelectedBitwardenAccount = account;
-        foreach (var entry in publishable)
+        foreach (var entry in publishablePasswords)
         {
             entry.BitwardenVaultId = account.Id;
             entry.IsSelected = false;
             await _repository.SavePasswordAsync(entry);
         }
 
+        foreach (var item in publishableWalletItems)
+        {
+            item.BitwardenVaultId = account.Id;
+            item.IsSelected = false;
+            await _repository.SaveSecureItemAsync(item);
+        }
+
         RebuildVaultTree();
         RaiseVaultBatchState();
-        if (publishable.Length < selected.Length)
+        if (skipped > 0)
         {
             // Say so before the synchronization takes the status line over: an upload that silently
             // covers fewer entries than were checked reads as though it lost some.
-            SetStatusFailure(
-                "BitwardenPublishSkippedFormat",
-                selected.Length - publishable.Length);
+            SetStatusFailure("BitwardenPublishSkippedFormat", skipped);
         }
 
         await SyncBitwardenAccountCommand.ExecuteAsync(account);

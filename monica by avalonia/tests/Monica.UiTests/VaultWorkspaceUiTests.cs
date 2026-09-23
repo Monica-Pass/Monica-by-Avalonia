@@ -72,6 +72,103 @@ public sealed class VaultWorkspaceUiTests
         flyout.Hide();
     }
 
+    // A wallet row now travels the same create route as a password, and the menu must ask the encoder the
+    // same question rather than assume every card can go: a debit designation is a field Bitwarden has no
+    // home for, so a selection holding only that card offers nothing at all.
+    [Fact]
+    public void Local_only_wallet_rows_are_offered_only_as_far_as_the_encoder_carries_them()
+    {
+        using var library = LibraryUiHarness.Open();
+        library.ViewModel.BitwardenAccounts.Add(new BitwardenAccountDisplayItem(
+            new Monica.Core.Bitwarden.BitwardenAccount
+            {
+                Id = 7,
+                Email = "person@example.com",
+                DisplayName = "Personal Bitwarden",
+                AccountKey = "bw:v1:test-account",
+                Endpoints = Monica.Core.Bitwarden.BitwardenEndpointSet.UnitedStates,
+                Kdf = Monica.Core.Bitwarden.BitwardenKdfParameters.Pbkdf2(),
+                IsConnected = true
+            },
+            "Personal Bitwarden",
+            "https://vault.bitwarden.com",
+            "Connected",
+            "Last sync just now",
+            "",
+            "",
+            "",
+            0,
+            0));
+        library.Settle();
+
+        Assert.False(library.ViewModel.VaultBatchSupportsBitwardenPublish);
+        Assert.False(IsOfferedInBatchMenu(library));
+
+        var debit = WalletCard(" debit", "DEBIT");
+        library.ViewModel.WalletItems.Add(debit);
+        library.Settle();
+        library.ViewModel.SelectAllVaultRowsCommand.Execute(null);
+        library.Settle();
+
+        // Checked, local-only, and still nothing to offer: the refusal is the encoder's, not a filter list.
+        Assert.False(library.ViewModel.VaultBatchSupportsBitwardenPublish);
+        Assert.False(IsOfferedInBatchMenu(library));
+
+        library.ViewModel.WalletItems.Add(WalletCard(" credit", "CREDIT"));
+        library.Settle();
+        library.ViewModel.SelectAllVaultRowsCommand.Execute(null);
+        library.Settle();
+
+        Assert.True(library.ViewModel.VaultBatchSupportsBitwardenPublish);
+        Assert.True(IsOfferedInBatchMenu(library, "Upload 1"));
+    }
+
+    private static Monica.Core.Models.SecureItem WalletCard(string title, string cardType) => new()
+    {
+        ItemType = Monica.Core.Models.VaultItemType.BankCard,
+        Title = $"Only on this device{title}",
+        Notes = "",
+        ImagePaths = "[]",
+        ItemData = Monica.Core.Models.WalletItemDataCodec.EncodeBankCard(
+            new Monica.Core.Models.BankCardWalletData
+            {
+                CardholderName = "A Holder",
+                Brand = "Example Credit Union",
+                CardNumber = "4111111111111111",
+                ExpiryMonth = "04",
+                ExpiryYear = "2030",
+                Cvv = "123",
+                BankName = "Example Credit Union",
+                CardTypeString = cardType
+            })
+    };
+
+    private static bool IsOfferedInBatchMenu(LibraryUiHarness library, string? headerPrefix = null)
+    {
+        var batch = library.Workspace.FindControl<Button>("VaultBatchButton")!;
+        var flyout = Assert.IsType<MenuFlyout>(batch.Flyout);
+        flyout.ShowAt(batch);
+        library.Settle();
+        try
+        {
+            var item = LibraryUiHarness.MenuItems(flyout)
+                .SingleOrDefault(entry => Equals(entry.Command, library.ViewModel.PublishSelectionToBitwardenCommand));
+            // An action the current selection cannot perform is not offered at all, so a present-but-hidden
+            // row reads the same as no row here.
+            if (item is null || !item.IsVisible)
+            {
+                return false;
+            }
+
+            return headerPrefix is null ||
+                   item.Header?.ToString()?.StartsWith(headerPrefix, StringComparison.Ordinal) == true;
+        }
+        finally
+        {
+            flyout.Hide();
+        }
+    }
+
     [Fact]
     public void Library_header_creates_the_kind_the_active_filter_names()
     {

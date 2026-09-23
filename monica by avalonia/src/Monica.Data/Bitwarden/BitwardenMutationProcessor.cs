@@ -166,7 +166,10 @@ public sealed class BitwardenMutationProcessor(
             return;
         }
 
-        if (local.SecureItems.TryGetValue(operation.CipherId, out var secureItem))
+        // A note or card published from the library carries a local key until this point, and the response
+        // is the only thing that can name the cipher the server just made for it.
+        if (local.SecureItems.TryGetValue(operation.CipherId, out var secureItem) ||
+            local.UnboundSecureItems.TryGetValue(operation.CipherId, out secureItem))
         {
             secureItem.BitwardenCipherId = remoteCipherId;
             secureItem.BitwardenRevisionDate = response.RemoteRevision ?? secureItem.BitwardenRevisionDate;
@@ -178,6 +181,8 @@ public sealed class BitwardenMutationProcessor(
     private async Task<LocalItems> LoadLocalItemsAsync(long vaultId, CancellationToken cancellationToken)
     {
         var passwords = await repository.GetPasswordsAsync(true, true, cancellationToken);
+        var secureItems = await repository.GetSecureItemsAsync(null, true, cancellationToken);
+        var bound = secureItems.Where(item => item.BitwardenVaultId == vaultId).ToArray();
         return new LocalItems(
             passwords
                 .Where(item => item.BitwardenVaultId == vaultId && item.BitwardenCipherId is not null)
@@ -189,9 +194,14 @@ public sealed class BitwardenMutationProcessor(
                                item.BitwardenCipherId is null &&
                                !item.IsDeleted)
                 .ToDictionary(item => BitwardenLocalCipherIdentity.ForPassword(item.Id), StringComparer.Ordinal),
-            (await repository.GetSecureItemsAsync(null, true, cancellationToken))
-                .Where(item => item.BitwardenVaultId == vaultId && item.BitwardenCipherId is not null)
-                .ToDictionary(item => item.BitwardenCipherId!, StringComparer.Ordinal));
+            bound
+                .Where(item => item.BitwardenCipherId is not null)
+                .ToDictionary(item => item.BitwardenCipherId!, StringComparer.Ordinal),
+            // Same shape as the unbound passwords above: published from the library, never uploaded, so
+            // the create's local key is the only handle back to the row the server must be told about.
+            bound
+                .Where(item => item.BitwardenCipherId is null && !item.IsDeleted)
+                .ToDictionary(item => BitwardenLocalCipherIdentity.ForSecureItem(item.Id), StringComparer.Ordinal));
     }
 
     private static BitwardenMutationRequest ToRequest(BitwardenPendingOperation operation) => new(
@@ -226,10 +236,11 @@ public sealed class BitwardenMutationProcessor(
     private sealed record LocalItems(
         IReadOnlyDictionary<string, PasswordEntry> Passwords,
         IReadOnlyDictionary<string, PasswordEntry> UnboundPasswords,
-        IReadOnlyDictionary<string, SecureItem> SecureItems)
+        IReadOnlyDictionary<string, SecureItem> SecureItems,
+        IReadOnlyDictionary<string, SecureItem> UnboundSecureItems)
     {
         public bool HasPublishableEntry(string localIdentity) =>
-            UnboundPasswords.ContainsKey(localIdentity);
+            UnboundPasswords.ContainsKey(localIdentity) || UnboundSecureItems.ContainsKey(localIdentity);
 
         /// <summary>
         /// A bound row the user has since put back on the shelf. The dictionaries are loaded with

@@ -79,10 +79,11 @@ public sealed class BitwardenLocalChangeQueue(
                 continue;
             }
 
-            // The loader only builds a candidate without a local row from a secure item the server
-            // already named, so an identity is guaranteed exactly where the entry is not.
-            var identity = candidate.CipherId
-                ?? BitwardenLocalCipherIdentity.ForPassword(candidate.Entry!.Id);
+            // The loader only keeps a row with no identity when it stands for something the server has
+            // never seen, so one is derived from whichever local table it came from.
+            var identity = candidate.CipherId ?? (candidate.Entry is not null
+                ? BitwardenLocalCipherIdentity.ForPassword(candidate.Entry.Id)
+                : BitwardenLocalCipherIdentity.ForSecureItem(candidate.SecureItem!.Id));
             await operationStore.EnqueueAsync(new BitwardenPendingOperation(
                 Id: 0,
                 VaultId: vaultId,
@@ -155,7 +156,10 @@ public sealed class BitwardenLocalChangeQueue(
                 itemType: null,
                 includeDeleted: true,
                 cancellationToken))
-            .Where(item => item.BitwardenVaultId == vaultId && item.BitwardenCipherId is not null)
+            .Where(item => item.BitwardenVaultId == vaultId &&
+                          // Same rule as passwords: a note or card published here but never uploaded owes
+                          // a create, and one trashed before it ever left owes nothing at all.
+                          (item.BitwardenCipherId is not null || !item.IsDeleted))
             .ToList();
         var customFields = await repository.GetCustomFieldsByEntryIdsAsync(
             passwords.Select(entry => entry.Id).ToArray(),

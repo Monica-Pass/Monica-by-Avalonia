@@ -106,6 +106,19 @@ public sealed class BitwardenSecureItemPayloadBuilderTests
         AssertOnlyCipherStrings(json);
     }
 
+    // The library asks this question without a vault key to decide what to offer for upload, so it must
+    // never disagree with the encoder that actually writes. The three refusal theories above prove the
+    // other direction, one row per shape Bitwarden has no field for.
+    [Fact]
+    public void The_publish_question_agrees_with_the_encoder_for_every_pulled_shape()
+    {
+        using var key = TestKey();
+
+        Assert.True(BitwardenCipherPayloadBuilder.CanEncode(Pull(key, NoteCipher(key)).SecureItem!));
+        Assert.True(BitwardenCipherPayloadBuilder.CanEncode(Pull(key, CardCipher(key)).SecureItem!));
+        Assert.True(BitwardenCipherPayloadBuilder.CanEncode(Pull(key, IdentityCipher(key)).SecureItem!));
+    }
+
     [Theory]
     [InlineData("tags")]
     [InlineData("markdown")]
@@ -131,6 +144,7 @@ public sealed class BitwardenSecureItemPayloadBuilderTests
                 break;
         }
 
+        Assert.False(BitwardenCipherPayloadBuilder.CanEncode(note));
         Assert.Throws<BitwardenProtocolException>(
             () => BitwardenCipherPayloadBuilder.BuildSecureItemCipher(note, key));
     }
@@ -166,6 +180,7 @@ public sealed class BitwardenSecureItemPayloadBuilderTests
         }
 
         card.ItemData = WalletItemDataCodec.EncodeBankCard(data);
+        Assert.False(BitwardenCipherPayloadBuilder.CanEncode(card));
         Assert.Throws<BitwardenProtocolException>(
             () => BitwardenCipherPayloadBuilder.BuildSecureItemCipher(card, key));
     }
@@ -206,6 +221,7 @@ public sealed class BitwardenSecureItemPayloadBuilderTests
         }
 
         identity.ItemData = WalletItemDataCodec.EncodeDocument(data);
+        Assert.False(BitwardenCipherPayloadBuilder.CanEncode(identity));
         Assert.Throws<BitwardenProtocolException>(
             () => BitwardenCipherPayloadBuilder.BuildSecureItemCipher(identity, key));
     }

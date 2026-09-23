@@ -59,4 +59,9 @@ public sealed record VaultQuickFilters(
         entry.BitwardenVaultId is null &&
         entry.KeepassDatabaseId is null &&
         entry.MdbxDatabaseId is null;
+
+    public static bool IsLocalOnly(SecureItem item) =>
+        item.BitwardenVaultId is null &&
+        item.KeepassDatabaseId is null &&
+        item.MdbxDatabaseId is null;
 }
