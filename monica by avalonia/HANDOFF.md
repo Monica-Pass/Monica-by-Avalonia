@@ -950,3 +950,19 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
 按类型钳掉到三分之一，派生 `SlimScrollBarThumb` 逃出后离屏与真屏都是 4 DIP→6 设备像素，hover 加宽
 也确认生效，守卫与负控都在。**只剩外观口味本身要用户在运行的应用里看一眼**——不需要再开调查任务。
 其余可挑的活在各条末尾那份"仍未做/仍未验证"清单里，不必再花时间复验已绿的部分。
+
+---
+
+## 附：本地起 Vaultwarden 验真服务器的执行清单（缺口 4 的下一步，**尚未执行**）
+
+前提说清：这一步要动本机的 Docker Desktop（已安装，引擎是停的）。已经就此问过用户、**答复还没拿到**，所以没人替它启动。1.37.3 的 GitHub Release 页只有 attestation、没有裸二进制，所以只能走镜像。
+
+1. 起引擎：启动 `C:\Program Files\Docker\Docker Desktop.exe`，轮询 `docker version` 直到拿到 Server 版本（冷启实测过的量级是 30–90s，别把第一次连接失败当成装坏了）。
+2. 起一次性服务（数据不出机器）：`docker run -d --name vw-probe -p 127.0.0.1:8080:80 -e SIGNUPS_ALLOWED=true -e DOMAIN=http://localhost:8080 -v vw-probe-data:/data vaultwarden/server:latest`。绑 `127.0.0.1` 而不是 `8080:80`，是为了即使防火墙没拦住也只暴露给本机；App 侧现在连得上明文环回（`9d9db9d`），所以不再需要自签证书。
+3. 建测试账号：走 `POST /identity/accounts/register`，载荷用文件经 `--data-binary @…` 传，**主密码绝不进 argv、不进日志、不进聊天、不进 git**；KDF 参数以服务器 `prelogin` 回来的为准（这正是本轮要验的事情之一）。
+4. 用**发布产物** `artifacts/publish/win-x64/jit/Monica.App.exe` 配一份全新 `MONICA_APPDATA_DIR`，逐条走并记下"真服务器答了什么"：
+   登录（无 2FA / 有 2FA / captcha 出现时三态）、`prelogin` 的 KDF 与本地默认不一致时的行为、拉取后库页当场可见、本地新建密码推上去并写回服务器回的 cipher id、改一条后另一端能看见、删除走 `PUT /ciphers/{id}/delete`、**对已进回收站的 cipher 再发 update**（恢复路径，服务器答什么没人知道）、发一条笔记与一张 CREDIT 卡、两端都改时冲突备份出现且能还原。
+5. 判据只用布尔值与计数（`success=`、`Total=`、条数）。**不截任何含明文的图**；界面停在锁定或空库态。
+6. 收尾：`docker rm -f vw-probe`、`docker volume rm vw-probe-data`，然后按实际结果改本节与 §7 缺口 4——验过就划掉，没验过的部分改成"已验到 X、Y 仍未验"，不整条勾掉。
+
+同一条没定位的旧账顺手记在这里：产物真跑门出现过 `release gate completed. success=False` 而打印出来的各子结果全是 True，同一份产物复跑绿。**下次遇到同一产物两跑不一致，先把红的那一项揪出来**，别把复跑当结论。
