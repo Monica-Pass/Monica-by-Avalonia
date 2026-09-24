@@ -145,6 +145,60 @@ public sealed class BitwardenSyncWorkflowUiTests
         Assert.Contains("Sync now", viewModel.BitwardenOperationError, StringComparison.OrdinalIgnoreCase);
     }
 
+    // The editor's single-entry offer is a note's only door into a vault, and the command behind it makes
+    // three ordered commitments: save the draft first, refuse a shape the encoder cannot carry, and
+    // otherwise stamp the vault id and hand the upload to the ordinary drift scan. Run against a recording
+    // repository and the sync double, so the stamp is observed without a database or a server.
+    [Fact]
+    public async Task Note_publish_stamps_only_a_note_the_encoder_can_carry()
+    {
+        var repository = DispatchProxy.Create<IMonicaRepository, NotePublishRepositoryProxy>();
+        var vault = (NotePublishRepositoryProxy)(object)repository;
+        var authentication = new FakeAuthenticationService(_ => new BitwardenAuthenticationResult(
+            false,
+            null,
+            null,
+            BitwardenLoginChallengeKind.None,
+            Factors: []));
+        using var fixture = CreateFixture(authentication, repository: repository);
+        var viewModel = fixture.ViewModel;
+        viewModel.IsUnlocked = true;
+        viewModel.BitwardenAccounts.Add(new BitwardenAccountDisplayItem(
+            CreateAccount(id: 7, connected: true),
+            "Personal Bitwarden",
+            "https://vault.bitwarden.com",
+            "Connected",
+            "Last sync just now",
+            "",
+            "",
+            "",
+            0,
+            0));
+        Assert.True(viewModel.BitwardenNotePublishOffered);
+
+        viewModel.AddNoteCommand.Execute(null);
+        Assert.NotNull(viewModel.SelectedNoteTab);
+
+        // Markdown has no field on the server side, so publishing it would mean the next pull silently
+        // rewriting the note. The draft still gets saved - it is the stamp that is refused.
+        viewModel.NoteIsMarkdown = true;
+        await viewModel.PublishCurrentNoteToBitwardenCommand.ExecuteAsync(null);
+
+        Assert.NotEmpty(vault.WrittenSecureItems);
+        Assert.All(vault.StampedVaultIds, vaultId => Assert.Null(vaultId));
+        // The refusal is a failure-tone status line; its wording is localized, so the tone is the claim.
+        Assert.True(viewModel.IsStatusMessageFailure);
+
+        viewModel.NoteIsMarkdown = false;
+        await viewModel.PublishCurrentNoteToBitwardenCommand.ExecuteAsync(null);
+
+        Assert.Equal(7, vault.StampedVaultIds.Last());
+        Assert.Equal(7, viewModel.SelectedNoteTab!.Source!.BitwardenVaultId);
+        var coordinator = Assert.IsType<FakeSyncCoordinator>(
+            fixture.Services.GetRequiredService<IBitwardenSyncCoordinator>());
+        Assert.Equal(BitwardenSyncPhase.Completed, coordinator.GetState(7).Phase);
+    }
+
     [Fact]
     public async Task Bitwarden_conflict_surface_lists_the_overwritten_edit_and_uploads_a_restore()
     {
@@ -746,6 +800,64 @@ public sealed class BitwardenSyncWorkflowUiTests
         {
             Interlocked.Increment(ref _passwordReads);
             return _passwordItems;
+        }
+    }
+
+    /// Reads answer from an in-memory note list and writes are kept, including the vault id the row carried
+    /// at that exact moment - the instance is mutated in place afterwards, so a snapshot is the only way to
+    /// see whether a write was stamped or only saved.
+    private class NotePublishRepositoryProxy : DispatchProxy
+    {
+        private readonly List<SecureItem> _items = [];
+
+        public List<long?> StampedVaultIds { get; } = [];
+
+        public IReadOnlyList<SecureItem> WrittenSecureItems => _items;
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            ArgumentNullException.ThrowIfNull(targetMethod);
+            return targetMethod.Name switch
+            {
+                nameof(IMonicaRepository.GetSecureItemsAsync) => Task.FromResult(
+                    (IReadOnlyList<SecureItem>)_items
+                        .Where(item => args is { Length: > 0 } && Equals(args[0], VaultItemType.Note) ||
+                                        item.ItemType == VaultItemType.Note)
+                        .ToList()),
+                nameof(IMonicaRepository.SaveSecureItemAsync) => Save(args),
+                nameof(IMonicaRepository.GetPasswordsAsync) => Task.FromResult<IReadOnlyList<PasswordEntry>>([]),
+                nameof(IMonicaRepository.GetCustomFieldsByEntryIdsAsync) =>
+                    Task.FromResult<IReadOnlyDictionary<long, IReadOnlyList<CustomField>>>(
+                        new Dictionary<long, IReadOnlyList<CustomField>>()),
+                nameof(IMonicaRepository.GetAttachmentsByOwnerIdsAsync) =>
+                    Task.FromResult<IReadOnlyDictionary<long, IReadOnlyList<Attachment>>>(
+                        new Dictionary<long, IReadOnlyList<Attachment>>()),
+                nameof(IMonicaRepository.GetAttachmentOwnerIdsAsync) =>
+                    Task.FromResult<IReadOnlyList<long>>([]),
+                nameof(IMonicaRepository.GetCategoriesAsync) => Task.FromResult<IReadOnlyList<Category>>([]),
+                nameof(IMonicaRepository.GetPasswordQuickAccessRecordsAsync) =>
+                    Task.FromResult<IReadOnlyList<PasswordQuickAccessRecord>>([]),
+                nameof(IMonicaRepository.GetMdbxDatabasesAsync) =>
+                    Task.FromResult<IReadOnlyList<LocalMdbxDatabase>>([]),
+                nameof(IMonicaRepository.GetOperationLogsAsync) =>
+                    Task.FromResult<IReadOnlyList<OperationLog>>([]),
+                nameof(IMonicaRepository.LogAsync) => Task.CompletedTask,
+                _ => throw new NotSupportedException($"Unexpected repository call: {targetMethod.Name}")
+            };
+        }
+
+        private Task<long> Save(object?[]? args)
+        {
+            var item = (SecureItem)(args?[0] ?? throw new ArgumentException("Save without a payload."));
+            if (item.Id == 0)
+            {
+                item.Id = 4_000 + _items.Count;
+            }
+
+            StampedVaultIds.Add(item.BitwardenVaultId);
+            _items.RemoveAll(existing => existing.Id == item.Id);
+            _items.Add(item);
+            return Task.FromResult(item.Id);
         }
     }
 

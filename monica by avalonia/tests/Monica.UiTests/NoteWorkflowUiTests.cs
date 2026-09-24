@@ -83,6 +83,52 @@ public sealed class NoteWorkflowUiTests
         Assert.Equal(new Thickness(16, 20, 16, 16), viewModel.NoteEditorContentMargin);
     }
 
+    // A note's only way into a Bitwarden vault is this toolbar item - the library offers no row checkbox and
+    // its select-all skips notes - so the promise checked here is that the door exists exactly when an
+    // account exists to carry the note. What the door then does is a different promise, and it is checked in
+    // BitwardenSyncWorkflowUiTests against a recording repository rather than a real MDBX vault.
+    [Fact]
+    public void Note_toolbar_offers_publish_only_where_an_account_can_carry_it()
+    {
+        using var library = LibraryUiHarness.Open();
+
+        library.ViewModel.AddNoteCommand.Execute(null);
+        library.Settle();
+
+        Assert.False(library.ViewModel.BitwardenNotePublishOffered);
+
+        library.ViewModel.BitwardenAccounts.Add(new Monica.App.ViewModels.BitwardenAccountDisplayItem(
+            new Monica.Core.Bitwarden.BitwardenAccount
+            {
+                Id = 7,
+                Email = "person@example.com",
+                DisplayName = "Personal Bitwarden",
+                AccountKey = "bw:v1:test-account",
+                Endpoints = Monica.Core.Bitwarden.BitwardenEndpointSet.UnitedStates,
+                Kdf = Monica.Core.Bitwarden.BitwardenKdfParameters.Pbkdf2(),
+                IsConnected = true
+            },
+            "Personal Bitwarden",
+            "https://vault.bitwarden.com",
+            "Connected",
+            "Last sync just now",
+            "",
+            "",
+            "",
+            0,
+            0));
+        library.Settle();
+
+        Assert.True(library.ViewModel.BitwardenNotePublishOffered);
+        // The item lives in the command bar's overflow, whose entries bind only once that menu opens, so
+        // this checks the declaration the menu hands out rather than pretending to drive a live row.
+        var toolbarXaml = File.ReadAllText(FindSourceFile("NoteEditorToolbarView.axaml"));
+        Assert.Contains("Command=\"{Binding PublishCurrentNoteToBitwardenCommand}\"", toolbarXaml,
+            StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding BitwardenNotePublishOffered}\"", toolbarXaml,
+            StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Note_toolbar_uses_a_native_command_bar_and_the_inspector_a_single_scroll_surface()
     {

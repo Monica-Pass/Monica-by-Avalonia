@@ -12,10 +12,9 @@ namespace Monica.App.ViewModels;
 /// drift scan, so a publish that cannot reach the network still stands, and the next sync finishes it.
 public sealed partial class MainWindowViewModel
 {
-    // Notes are absent for a reason that reads like an oversight: nothing in the app can put a note into a
-    // batch selection at all. The library tree has no per-row checkbox, and its one source of selection -
-    // "select all" - skips row kinds with no bulk command behind them. Counting notes here would tally
-    // nothing; the path a note needs is its own single-entry offer, which is an open product call.
+    // Notes are absent here on purpose: nothing can put a note into a batch selection, because the library
+    // tree has no row checkbox and its one source of selection - select all - skips row kinds with no bulk
+    // command behind them. A note gets its own single-entry offer in the editor that holds it instead.
     private int VaultBatchBitwardenPublishableCount =>
         Passwords.Count(IsPublishable) + WalletItems.Count(IsPublishable);
 
@@ -29,6 +28,7 @@ public sealed partial class MainWindowViewModel
     {
         OnPropertyChanged(nameof(VaultBatchSupportsBitwardenPublish));
         OnPropertyChanged(nameof(BitwardenPublishMenuText));
+        OnPropertyChanged(nameof(BitwardenNotePublishOffered));
     }
 
     private static bool IsPublishable(PasswordEntry entry) =>

@@ -2012,6 +2012,9 @@ public sealed class LocalizationService : ILocalizationService
         ["BitwardenPublishMenuFormat"] = "Upload {0} to Bitwarden",
         ["BitwardenPublishNoAccount"] = "Connect a Bitwarden account before uploading items to it.",
         ["BitwardenPublishSkippedFormat"] = "{0} selected items cannot be carried by Bitwarden and stayed local.",
+        ["BitwardenPublishNoteMenu"] = "Upload this note to Bitwarden",
+        ["BitwardenPublishNoteNotCarriable"] =
+            "This note holds what Bitwarden has no field for - tags, Markdown or attachments - so it stayed on this device.",
         ["BitwardenPullAppliedFormat"] = "Bitwarden brought in {0} new, {1} changed, {2} removed.",
         ["BitwardenConnectedSyncFailed"] = "The account is connected, but its first synchronization did not complete. Use Sync now to retry.",
         ["BitwardenLoadAccountsFailed"] = "Bitwarden accounts could not be loaded.",
@@ -3512,6 +3515,8 @@ public sealed class LocalizationService : ILocalizationService
         ["BitwardenPublishMenuFormat"] = "上传 {0} 项到 Bitwarden",
         ["BitwardenPublishNoAccount"] = "请先连接 Bitwarden 账户，再上传项目。",
         ["BitwardenPublishSkippedFormat"] = "有 {0} 个所选项目无法由 Bitwarden 承载，已留在本地。",
+        ["BitwardenPublishNoteMenu"] = "上传这条笔记到 Bitwarden",
+        ["BitwardenPublishNoteNotCarriable"] = "这条笔记里有 Bitwarden 装不下的内容（标签、Markdown 或附件），已留在本机。",
         ["BitwardenPullAppliedFormat"] = "已从 Bitwarden 同步：新增 {0}、更新 {1}、移除 {2}。",
         ["BitwardenConnectedSyncFailed"] = "账户已连接，但首次同步未完成。请使用“立即同步”重试。",
         ["BitwardenLoadAccountsFailed"] = "无法加载 Bitwarden 账户。",
