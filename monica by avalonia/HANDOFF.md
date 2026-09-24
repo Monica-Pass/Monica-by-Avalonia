@@ -966,3 +966,15 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
 6. 收尾：`docker rm -f vw-probe`、`docker volume rm vw-probe-data`，然后按实际结果改本节与 §7 缺口 4——验过就划掉，没验过的部分改成"已验到 X、Y 仍未验"，不整条勾掉。
 
 同一条没定位的旧账顺手记在这里：产物真跑门出现过 `release gate completed. success=False` 而打印出来的各子结果全是 True，同一份产物复跑绿。**下次遇到同一产物两跑不一致，先把红的那一项揪出来**，别把复跑当结论。
+
+## 附：真服务器第一轮实测（2026-09-24，**只跑到注册，未验成同步链路**）
+
+按上一节的清单动了，实际状态与量到的事实：
+
+- Docker 引擎与 Vaultwarden 都真起来了：`docker_server=27.1.1`，容器 `vw-probe`（`vaultwarden/server:latest`，`-p 127.0.0.1:8080:80`，`SIGNUPS_ALLOWED=true`，卷 `vw-probe-data`），`GET /alive => 200`。**它此刻仍在运行**，Docker Desktop 也是本次会话起的；收法：`docker rm -f vw-probe && docker volume rm vw-probe-data`，再退出 Docker Desktop。
+- **一条替身给不出的真协议事实**：`POST /identity/connect/token` 若不带 `Bitwarden-Client-Version` 头，服务器直接 `auth][ERROR] Unauthorized Error: No Bitwarden-Client-Version header provided` 并回 400，同时报 `client_id cannot be blank`。本仓的客户端在 `BitwardenIdentityClient.cs:105-106` 是**发**这两个头的（`Bitwarden-Client-Name: desktop`、`Bitwarden-Client-Version: 2025.9.1`、`Auth-Email`、`device-type: 8`），所以这条真服务器的硬性要求在代码里已经满足——但**"满足"目前只有代码阅读与替身断言作保，握手本身还没成功过一次**。
+- 生产代码真的打了一次真服务器并读回了真答案：`BitwardenAuthenticationService.PreloginAsync` 对未知邮箱走 `POST /identity/accounts/prelogin => 200`，拿到 `Algorithm=Pbkdf2Sha256 Iterations=600000`（`MemoryMb`/`Parallelism` 为空）。这是缺口 4 的第一次真实握手。
+- 探针在 `D:\Monica\probe-appdata\bwprobe`（一次性、不进仓）：控制台工程只 `ProjectReference` 到 `src/Monica.Platform`，注册用**生产**的 `DeriveMasterKey` / `DeriveMasterPasswordHash` / `StretchMasterKey` / `BitwardenCipherStringCrypto.Encrypt` 拼载荷，之后 登录→`GET /sync`→队列 create→update→软删→"对已进回收站的 cipher 再发 update" 都写好了，跑的就是 §Option A 那条真管道（真 SQLite + 真 `MonicaRepository` + 真 coordinator）。输出侧按属性名把 `*Password*`/`*Key*`/`*Token*`/`*Hash*` 一律 `[redacted]`，随机主密码只写进 `account.json`，从不打印。
+- **卡住的位置**：`POST /identity/accounts/register => 422`，服务器 `Data guard Json < RegisterData > failed: ... untagged enum RegisterDataCompat`。逐轮缩小后量到两个真事实：① `keys` 里那个字段的真名是 **`encryptedPrivateKey`**（服务器原话 `Error("missing field \`encryptedPrivateKey\`")`，不是本仓任何文档里的 `encrypted`）；② 换上真名并试过现代 `accountDecryption{masterKey{encryptedKey,macKey},kdf,kdfIterations}` 形状之后，仍是 untagged enum 整体不匹配。
+- **下一格实验（最高置信度，先做这个再考虑别的）**：V1 变体大概还要求顶层 `kdf` 与 `kdfIterations`（V2 把它们放在 `accountDecryption` 里）。也就是说：`key` + `keys{publicKey,encryptedPrivateKey}` + `email` + `masterPasswordHash` + `name` + **`kdf:0` + `kdfIterations:600000`** + `collectionGroups:[]` + `passwordHints:[]`，**不要**带 `accountDecryption`。注册一旦 200/204，探针会自己往下跑完登录与同步，那一轮的输出才是缺口 4 的判据。
+- 因此本节**没有**、也**不能**被读成"和真服务器验过了"：登录（除 prelogin 外）、2FA、captcha、设备 OTP、`POST /ciphers`、`PUT /ciphers/{id}`、`PUT /ciphers/{id}/delete`、"对已删 cipher 发 update"、sync 带回 `deletedDate` 的假设，**全部仍未验**。`9d9db9d` 那行的"门不让进→进得去、还没进"依然成立。
