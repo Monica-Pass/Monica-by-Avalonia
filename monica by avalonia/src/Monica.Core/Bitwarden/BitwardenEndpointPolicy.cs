@@ -1,3 +1,5 @@
+using System.Net;
+
 namespace Monica.Core.Bitwarden;
 
 public sealed record BitwardenEndpointSet(Uri WebVault, Uri Identity, Uri Api, Uri? Notifications = null)
@@ -77,12 +79,35 @@ public static class BitwardenEndpointPolicy
         return ValidateBaseAddress(uri, parameterName);
     }
 
+    /// <summary>
+    /// Whether traffic to this address is acceptable as a credential transport. HTTPS always is; plain HTTP
+    /// only on the loopback interface, because that is how a self-hosted vault on this machine is served by
+    /// default and those bytes never leave the device. Any other host has to prove itself with TLS.
+    /// </summary>
+    public static bool IsTransportSecured(Uri uri)
+    {
+        ArgumentNullException.ThrowIfNull(uri);
+        if (uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) &&
+               IsLoopbackHost(uri.Host);
+    }
+
+    private static bool IsLoopbackHost(string host) =>
+        host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+        host.Equals("ip6-loopback", StringComparison.OrdinalIgnoreCase) ||
+        (IPAddress.TryParse(host, out var address) && IPAddress.IsLoopback(address));
+
     public static Uri ValidateBaseAddress(Uri uri, string parameterName)
     {
         ArgumentNullException.ThrowIfNull(uri);
-        if (!uri.IsAbsoluteUri || !uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        if (!uri.IsAbsoluteUri || !IsTransportSecured(uri))
         {
-            throw new BitwardenProtocolException($"Bitwarden {parameterName} must use HTTPS.");
+            throw new BitwardenProtocolException(
+                $"Bitwarden {parameterName} must use HTTPS, or plain HTTP on this machine.");
         }
 
         if (string.IsNullOrWhiteSpace(uri.Host) || uri.HostNameType == UriHostNameType.Unknown)

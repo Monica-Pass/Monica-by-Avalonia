@@ -128,4 +128,22 @@ public sealed class BitwardenProtocolTests
         Assert.Throws<BitwardenProtocolException>(() =>
             BitwardenEndpointPolicy.ValidateBaseAddress("https://vault.example.test/%2e%2e/admin", "server"));
     }
+
+    // A self-hosted vault on this machine is served over plain HTTP by default, and those bytes never leave
+    // the device, so that one host shape is what the transport rule makes room for. It has to be the same
+    // validator the connect button runs, or the address is refused one stage later instead of at the gate.
+    [Fact]
+    public void Loopback_http_is_accepted_for_a_self_hosted_vault_while_other_plain_hosts_are_refused()
+    {
+        var endpoints = BitwardenEndpointPolicy.CreateSelfHosted("http://localhost:8080/");
+        Assert.Equal("http://localhost:8080/identity/", endpoints.Identity.AbsoluteUri);
+        Assert.Equal("http://localhost:8080/api/", endpoints.Api.AbsoluteUri);
+        Assert.True(BitwardenEndpointPolicy.IsTransportSecured(new Uri("http://127.0.0.1:8080/")));
+        Assert.True(BitwardenEndpointPolicy.IsTransportSecured(new Uri("http://[::1]:8080/")));
+        Assert.True(BitwardenEndpointPolicy.IsTransportSecured(new Uri("https://vault.example.test/")));
+        Assert.False(BitwardenEndpointPolicy.IsTransportSecured(new Uri("http://192.168.1.20:8080/")));
+        Assert.False(BitwardenEndpointPolicy.IsTransportSecured(new Uri("http://vault.example.test/")));
+        Assert.Throws<BitwardenProtocolException>(() =>
+            BitwardenEndpointPolicy.ValidateBaseAddress("http://vault.example.test", "server"));
+    }
 }

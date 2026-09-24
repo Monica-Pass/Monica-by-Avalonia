@@ -122,6 +122,33 @@ public sealed class BitwardenSyncWorkflowUiTests
         Assert.False(viewModel.IsBitwardenSyncActive);
     }
 
+    // The connect button is where the transport rule meets the user, so the allowance is checked there and
+    // not only in the validator: a vault served on this machine may be plain HTTP, anything else on the
+    // network still has to bring TLS.
+    [Fact]
+    public void Bitwarden_connect_accepts_a_loopback_http_vault_and_refuses_a_plain_http_host_elsewhere()
+    {
+        using var fixture = CreateFixture(new FakeAuthenticationService(_ => new BitwardenAuthenticationResult(
+            false,
+            null,
+            null,
+            BitwardenLoginChallengeKind.None,
+            Factors: [])));
+        var viewModel = fixture.ViewModel;
+        viewModel.IsUnlocked = true;
+        viewModel.BitwardenEmail = "person@example.com";
+        viewModel.BitwardenMasterPassword = "correct horse battery staple";
+
+        viewModel.BitwardenServerUrl = "http://localhost:8080/";
+        Assert.True(viewModel.CanAuthenticateBitwarden);
+
+        viewModel.BitwardenServerUrl = "http://192.168.1.20:8080/";
+        Assert.False(viewModel.CanAuthenticateBitwarden);
+
+        viewModel.BitwardenServerUrl = "https://vault.bitwarden.eu/";
+        Assert.True(viewModel.CanAuthenticateBitwarden);
+    }
+
     [Fact]
     public async Task Bitwarden_initial_sync_failure_keeps_the_account_connected_and_exposes_retry_feedback()
     {

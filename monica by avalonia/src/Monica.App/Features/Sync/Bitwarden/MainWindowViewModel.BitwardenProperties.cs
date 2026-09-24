@@ -54,7 +54,7 @@ public sealed partial class MainWindowViewModel
                 string.IsNullOrWhiteSpace(BitwardenEmail) ||
                 string.IsNullOrEmpty(BitwardenMasterPassword) ||
                 !Uri.TryCreate(BitwardenServerUrl?.Trim(), UriKind.Absolute, out var server) ||
-                !server.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+                !BitwardenEndpointPolicy.IsTransportSecured(server))
             {
                 return false;
             }
