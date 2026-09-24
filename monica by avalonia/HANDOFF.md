@@ -766,6 +766,9 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
        ⇒ **已定并已实现（`979e6d0`）**：用户选了"笔记单条入口"——发布笔记的门开在**拿着这条笔记的那个编辑器**的工具栏溢出里
        （`MainWindowViewModel.BitwardenNotePublish.cs` + `NoteEditorToolbarView.axaml`），批量菜单照旧不收笔记。
        于是缺口清单现在只剩两条：永久删除（`Delete` 无生产者，#107）、缺口 4（从未对真服务器验过）。
+       ⇒ **2026-09-24 更新（见文末"真服务器第二轮实测"）**：缺口 4 的主链路已经对真 Vaultwarden 1.37.3 验完
+       （登录／建／改／软删／收敛／远端改→本地／冲突备份→还原→再推），量出来一条**新的**产品缺陷 #108
+       （"从回收站还原"推不出去：update 不能把 cipher 拿出服务器回收站），永久删除的路由也当场量通了（#107 的预飞已完成）。
        删除那一轮又量出两个**同族的死循环**（都已修，见 §2 回收站标记那行）：解码器对服务器回收站里的 cipher
        **不带载荷**、`PayloadHash` 位置写的是 `deleted:{revision}` 标记（`BitwardenCipherDecoder.cs:63-73`），
        于是 ① 合并引擎把"两边都在回收站"当成内容不一致，每拉一次就多存一条冲突备份；② 漂移扫描拿本地指纹去比
@@ -827,7 +830,12 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
        ⑤ **自证模板**：`BitwardenLocalChangeQueueTests.cs:258-303`（真 SQLite + 真基线库 + `AcceptedTransport`
        走完"入队→发送→下一轮扫描安静→确认拉取 0 冲突"）与 `:444-474`（secure item 只欠路由不带载荷）；
        负控至少两条——去掉入队生产者 ⇒ 队列测试红；让硬删复用软删的幂等键 ⇒ "下一轮扫描安静"那条红。
-       **仍然未验**：`DELETE /ciphers/{id}` 至今只在替身 HTTP 下绿过，缺口 4 原样。
+       **仍然未验**：~~`DELETE /ciphers/{id}` 至今只在替身 HTTP 下绿过，缺口 4 原样。~~
+       ⇒ **已验（真 Vaultwarden 1.37.3）**：`DELETE /ciphers/{id}` 真服务器 2xx，回收站内外的 cipher 都删得掉；
+       但**必须带当前 revision**，否则被我们自己 `BitwardenMutationHttpTransport.cs:62-80` 的 preflight 挡成
+       409，服务器根本不会被问到（实测 `stage=update_without_expected_revision status=409 note=client_side_gate`）。
+       删干净之后本地行留在原地、`BitwardenCipherId` 保留（悬空）、后续两轮 pull 稳定在 `PreservedLocalOnly=1`
+       且不再动作 ⇒ 收敛，不会循环；代价是那一行从此推不动（下次编辑它推出去会撞上什么，**没验**）。
     5. ~~**一条疑似真缺陷：非 login cipher 编号**~~ **核对后判定：本仓是对的，别改**。上一轮记成"官方是
        `2=Card / 3=Identity / 4=SecureNote`"，那句话本身就是错的——Bitwarden 的 `CipherType` 是
        `Login=1 / SecureNote=2 / Card=3 / Identity=4 / SshKey=5`。证据取只读事实来源 Android 仓两处：
@@ -942,7 +950,8 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
 四类条目（登录/笔记/银行卡/证件）都有出站载荷与 create 路径，笔记另有编辑器里的单条"上传"入口（#106）。
 剩下的只列在 §7 那条缺口清单里，两条：**永久删除传播**（#107，规格已量到行号，照 §7 那段冷开工即可，
 关键结论是"传输层已就绪、缺的是**清除那一刻的入队生产者**，因为 tombstone 丢了 Bitwarden 身份"）、
-以及**从未对真服务器验过**（缺口 4）——接真账号或本地起 Vaultwarden 要用户点头才动（已选：本地起 Vaultwarden）。
+以及~~**从未对真服务器验过**（缺口 4）~~**已验**（2026-09-24 本地 Vaultwarden 1.37.3，见文末两轮实测：主链路全绿，
+新量出 #108"回收站还原推不出去"；2FA／captcha／设备 OTP／离线队列恢复仍未验）。
 用户排队点名的两条现在只剩一半：忘记密码只出厂了非破坏的那一半（应急包 `6613df6`），
 **破坏的那一半（锁定态重置为空库）不要自己开工**——它卡在 §7 那条"只是本地"与"mdbx 不要动"的语义矛盾上，
 下一轮第一件事是拿这个问题问用户，第二步才是那条不需要任何破坏动作的锁定态"忘记密码？"入口。
@@ -953,7 +962,7 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
 
 ---
 
-## 附：本地起 Vaultwarden 验真服务器的执行清单（缺口 4 的下一步，**尚未执行**）
+## 附：本地起 Vaultwarden 验真服务器的执行清单（缺口 4 的下一步，**已执行，结果见下面两节**）
 
 前提说清：这一步要动本机的 Docker Desktop（已安装，引擎是停的）。已经就此问过用户、**答复还没拿到**，所以没人替它启动。1.37.3 的 GitHub Release 页只有 attestation、没有裸二进制，所以只能走镜像。
 
@@ -978,3 +987,23 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
 - **卡住的位置**：`POST /identity/accounts/register => 422`，服务器 `Data guard Json < RegisterData > failed: ... untagged enum RegisterDataCompat`。逐轮缩小后量到两个真事实：① `keys` 里那个字段的真名是 **`encryptedPrivateKey`**（服务器原话 `Error("missing field \`encryptedPrivateKey\`")`，不是本仓任何文档里的 `encrypted`）；② 换上真名并试过现代 `accountDecryption{masterKey{encryptedKey,macKey},kdf,kdfIterations}` 形状之后，仍是 untagged enum 整体不匹配。
 - **下一格实验（最高置信度，先做这个再考虑别的）**：V1 变体大概还要求顶层 `kdf` 与 `kdfIterations`（V2 把它们放在 `accountDecryption` 里）。也就是说：`key` + `keys{publicKey,encryptedPrivateKey}` + `email` + `masterPasswordHash` + `name` + **`kdf:0` + `kdfIterations:600000`** + `collectionGroups:[]` + `passwordHints:[]`，**不要**带 `accountDecryption`。注册一旦 200/204，探针会自己往下跑完登录与同步，那一轮的输出才是缺口 4 的判据。
 - 因此本节**没有**、也**不能**被读成"和真服务器验过了"：登录（除 prelogin 外）、2FA、captcha、设备 OTP、`POST /ciphers`、`PUT /ciphers/{id}`、`PUT /ciphers/{id}/delete`、"对已删 cipher 发 update"、sync 带回 `deletedDate` 的假设，**全部仍未验**。`9d9db9d` 那行的"门不让进→进得去、还没进"依然成立。
+  ⇒ **本节到这一行为止是历史。** 上一格实验（顶层 `kdf` + `kdfIterations` 的老形状）已被下一节证实，注册通了，上面那句"全部仍未验"里除了 2FA/captcha/设备 OTP 之外都已验完。
+
+## 附：真服务器第二轮实测（2026-09-24，**同步链路验通了，并量出一条新缺陷 #108**）
+
+跑法：`D:\Monica\probe-appdata\bwprobe` 那份一次性控制台探针（不进仓），`ProjectReference` 只指向 `src/Monica.Platform`，注册之后每一步用的都是**生产类型**（`BitwardenAuthenticationService` / `SqliteConnectionFactory` + 真 `MonicaRepository` / `BitwardenAccountStore` / `BitwardenSyncCoordinator` / `BitwardenLocalChangeQueue` / `BitwardenMutationProcessor` / `BitwardenPullMergeService` / `BitwardenMutationHttpTransport`），服务器是本机的 Vaultwarden **1.37.3**（容器 `vw-probe`，`http://127.0.0.1:8080`）。输出只有布尔值、计数和"探针里写死的替身值的字母代号"（A/B/C/D/E 各代一个假值），**没有任何凭据落进日志**：`Dump()` 按属性名把 `*Password*`/`*Key*`/`*Token*`/`*Hash*` 一律 `[redacted]`，随机主密码只进 `account.json`。日志本身在 `D:\Monica\probe-appdata\probe_run*.log`（一次性目录，不进仓）。
+
+- **注册为什么一直 422**：是形状问题，不是签名问题。`RegisterDataCompat` 的两种形状直接从 1.37.3 的 `src/api/core/accounts.rs` 读到，并用容器里那份 46MB 二进制的 rodata 佐证——`accountDecryption`、`collectionGroups`、`passwordHints` 出现次数**都是 0**，也就是这一版服务器根本不认上一轮试的那个现代形状。真相是 `RegisterData` 顶层**没有** `masterPasswordHash`，它和 `key`/KDF 一起在 `#[serde(flatten)] compat` 里：老形状 = `email + kdf + kdfIterations + key + masterPasswordHash`（可带 `keys{publicKey,encryptedPrivateKey}`）；新形状 = `masterPasswordAuthentication{kdf,salt,hash}` + `masterPasswordUnlock{kdf,salt,key}`，且服务器要求两处 `salt` 等于 trim+lowercase 的邮箱、两处 kdf 相等。**实测**：新形状仍然 422（没继续追，注册不是产品范围），**老形状 200**（`{"captchaBypassToken":"","object":"register"}`）。
+- **第一次真登录**：`AuthenticateAsync` 对真服务器 `succeeded=True challenge=None factors=<空>` ⇒ 第一轮那句"握手本身还没成功过一次"可以划掉了。**2FA / captcha / 设备 OTP 仍未验**（这台服务器没开任何 2FA）。
+- **create**：本地新建一条密码 ⇒ `mutations[Claimed=1/Completed=1]`，紧接着一次全新的 `DownloadAsync` 用**生产解码器**读回：`ciphers=1 title=Monica live probe entry user=probe-user pw=A id=<服务器发的 GUID>` ⇒ `POST /ciphers` 与"服务器回的 cipher id 写回那一行"（#100）为真。
+- **update**：`Completed=1`，revision 由 `…44.063493Z` 前进到 `…44.175484Z`，重新拉取解出 `pw=B` ⇒ `PUT /ciphers/{id}` 通，且那道"preflight GET + 比 revision"的闸门没有误伤。
+- **软删**：`Completed=1` ⇒ `PUT /ciphers/{id}/delete` 真服务器接受；随后 `merge[Deleted=1]` 把回收站状态落回本地，而**再连做两轮 Manual pull 全零**（`Claimed=0 / Unchanged=1`）⇒ #103 那三条死循环（每轮多一条冲突备份、每轮欠一次删除、整库被误判成 `EmptyRemoteVault`）在真服务器上确认不再出现。
+- **远端改 → 本地**：绕过本地仓库、直接用传输层 PUT 一份"别的客户端"的改动，再 `SyncAsync(Manual)` ⇒ `merge[Updated=1]`，本地行的值成为 C 且 `dirty=False`。
+- **冲突闭环（#99 + #100 的真服务器版）**：本地脏成 D（未同步）+ 远端被改到 E ⇒ `mutations[Claimed=1/Completed=0/Conflicts=1]`、`merge[Updated=1/ConflictsBackedUp=1]`；冲突列表**恰好 1 行、标题正确**；`RestoreAsync` 之后本地是 D 且 `dirty=True`；下一次 `LocalMutation` 同步 `Completed=1`，**远端读回 D**，且那一条冲突行被清掉（`still_listed=0`；后面某轮里 `still_listed=1` 是 #108 另造出来的第二条，不是这条没清）。这是本仓第一次在真服务器上把"冲突→备份→拿回来→再推上去"整圈走完。
+- **一直悬着的那条：对已进回收站的 cipher 再发 update，服务器怎么答**：**2xx 接受，但载荷里的 `deleted:false` 被忽略**——`listed=True isDeleted=True`，只有 revision 前进。替身永远给不出这个答案。
+- **⇒ 新缺陷 #108（用户可见，已实测）**：正因为上一条，**"从回收站还原"推不出去**。走产品路径（置 `IsDeleted=false` + `BitwardenLocalModified=true` → `SyncAsync(LocalMutation)`）量到：`local_restore_push mutations[Claimed=1/Completed=1]`（服务器收了这一发）、`remote_after_local_restore listed=True isDeleted=True`（远端还在回收站）、于是同一轮 pull `merge[Deleted=1/ConflictsBackedUp=1]` **把本地再删回去**，并把用户刚恢复的那条备份成冲突。净效果：**用户点"还原"，条目立刻弹回回收站，并在同步页留下一条他没发起的冲突记录**；两轮之后状态稳定（`local_after_second_restore_pull isDeleted=True`、后续 pull 全零），所以它不是死循环，是**功能性错误 + 一条误导性残留**。根因不在接线：`BitwardenMutationOperationType`（`src/Monica.Core/Bitwarden/BitwardenMutationContracts.cs:3-20`）只有 Create/Update/Delete/SoftDelete，**没有 restore 这一档**，漂移扫描只能把它判成 update。
+- **修法已经被量到可行性**：`PUT /api/ciphers/{id}/restore` 真服务器 **200**，之后 `remote_after_raw_restore listed=True isDeleted=False`；再走一次常规 pull ⇒ `merge[Updated=1]`，本地行 `isDeleted=False` **复活** ⇒ 拉取侧不需要任何改动（这一条实测就是证据），缺的是"新增 `Restore` 操作类型 + 队列侧'本地活、基线判删 ⇒ restore'那一格分派 + 界面少留那条假冲突"。#108 要的是完整一轮（单测／负控／四道门），别把这行文档读成已修。
+- **#107 的预飞（永久删除）**：`Delete` 那条路由真服务器 2xx，回收站内外都删得掉；删干净之后本仓拉取侧**收敛**（连续两轮 `PreservedLocalOnly=1`、零请求、本地行留在原地但 `BitwardenCipherId` 悬空）。剩下的确实只有"清除那一刻的入队生产者 + tombstone 保留 Bitwarden 身份"，规格照旧在 §7。
+- **两条新踩的取证坑（值得单列）**：① `dotnet build` 失败之后 `dotnet run --no-build` 会**静静跑上一份二进制**——有一轮日志看起来"跑完了"，其实新加的那几个 stage 根本不在里面。判据：跑之前必须看见 `Build succeeded`，跑之后**在日志里搜新 stage 的名字**。（这是 §2 `40e9ae8` 那条 `--no-build` 坑的第三次。）② `status=409` 不一定是服务器答的：`ExpectedRemoteRevision` 传 null 必然被自己的 preflight 挡下（实测 `note=client_side_gate`）。凡是对端状态码，先问"请求出门了吗"，再记成"服务器行为"。
+- **仍未验（缺口 4 剩下的部分，别读成全绿）**：2FA／captcha／设备 OTP／令牌过期后 `RefreshingToken` 那条自动刷新路径／离线把变更堆进队列再回来推的恢复路径／官方 Bitwarden 云（只验过自托管 1.37.3）／笔记与银行卡、证件这三类在真服务器上的 create+update 往返（本轮只跑登录型条目）。
+- **机器状态**：容器 `vw-probe` 与 Docker Desktop 仍是本会话起的、此刻还在跑；收法照旧 `docker rm -f vw-probe && docker volume rm vw-probe-data` 后退出 Docker Desktop（卷里只有探针账号，删掉即净）。**本轮没有改任何产品代码**，只有这份文档。
