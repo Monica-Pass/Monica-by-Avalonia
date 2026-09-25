@@ -16,7 +16,7 @@
 
 ## 2. 当前状态（工作树干净）
 
-分支 `main`，`git status` 只剩给本节标提交号的文档改动。功能 HEAD = `d1fdf59`（其后只有给本节自身标提交号的文档提交），近几轮：
+分支 `main`，`git status` 只剩给本节标提交号的文档改动。功能 HEAD = `6e99e22`（其后只有给本节自身标提交号的文档提交），近几轮：
 
 下面这张表**不是按时间排的**：同一条线的行挨在一起（例如 Bitwarden 写回的两行 `94adacd` → `5cf27c9`），
 读某一件事的来龙去脉时按主题往下连，不要按行号当时间线。
@@ -62,6 +62,7 @@
 | `9d9db9d` | **本机自托管的服务器第一次连得上（#94 缺口 4 的前置，不是它本身）**。用户选的是"本地起 Vaultwarden 来验真服务器"，而这条路在此之前根本进不去：`MainWindowViewModel.BitwardenProperties.cs` 的 `CanAuthenticateBitwarden` 与 `BitwardenEndpointPolicy.ValidateBaseAddress` 两道都写死 HTTPS，Vaultwarden 默认端上就是明文 HTTP。规则收成**一处判据** `BitwardenEndpointPolicy.IsTransportSecured`：HTTPS 一律放行，明文 HTTP 只认环回（`localhost`、`127.0.0.1`、`[::1]`、`ip6-loopback`，走 `IPAddress.IsLoopback` 而不是比字符串前缀），其他任何主机仍必须有 TLS。连接按钮与端点校验共用同一个函数，所以"按钮点亮了、下一步才被地址校验拒掉"这种不一致从形状上就不成立。三条面向用户的文案（`BitwardenConnectionDetailsDescription`、`BitwardenSecurityNoticeMessage`、`BitwardenSecureConnectionRequired`）中英各改一份，因为原句写的是"只允许 HTTPS 端点"，改完再照字面读就是假话。**自证 2 条**：单测钉判据本身（环回三种写法与任意 https 为真，`192.168.1.20` 与公网主机为假；`CreateSelfHosted("http://localhost:8080/")` 真的产出 `/identity/` 与 `/api/`，`http://vault.example.test` 仍然抛）；UI 那条钉在用户经过的地方（同一个 VM 连改三次地址：本机 http 可点、局域网 http 不可点、官方 https 可点）。**负控两道方向对称、各打中一次**：摘掉环回那一半 ⇒ 两条新测试红在正向断言（单测红在 `BitwardenProtocolException: Bitwarden serverUrl must use HTTPS, or plain HTTP on this machine.`，UI 红在 `Assert.True() Failure`）；把规则放宽成"任何 http 都放行" ⇒ 红在反向断言（单测 `Assert.False() Failure` 与 `Assert.Throws() Failure: No exception was thrown`，UI `Assert.False() Failure`），并顺带把既有的 `EndpointsRequireHttpsAndRejectAmbientAuthorityData` 一起打红——那条老测试确实是这道门的第二双眼睛。改回后文件 sha 与动手前一致。**这一行没把"和真服务器验过"划掉**：Vaultwarden 仍未起来（Docker Desktop 装着但引擎是停的；1.37.3 的 GitHub Release 页只有 attestation、没有裸二进制，所以只能走镜像），缺口 4 原样保留，只是从"门不让进"变成"进得去、还没进"。门禁（就这份字节）：格式 0 改动、常规单测 896/896 加顺序通道 10/10、Release 0 Warning、`cr_rc=0 / pub_rc=0`（`Commercial release verification passed.`）、UI 独立跑 `Total: 256, Errors: 0, Failed: 0`。**产物真跑门第一次红、同一份产物复跑绿**：首跑 `rt_rc=1`（复合行 `release gate completed. success=False, loadMs=265`，打印出来的各子结果都是 True，**红在哪一项子结果没查清**），复跑 `rt2_rc=0`（`CANONICAL VAULT passed`、loadMs=268/4000、KeePass 20000 条 openMs=2200 增长 5.4MB/24、锁定尾窗 108.8MB/120、锁/解 25/14/1/4）。按既有结论（单次读数不可信、先复跑取分布）这不算把红蒙过去，但下次同一产物两跑不一致时要优先把那一项定位出来。 |
 | `916e578` | **无远端修订号的本机改动不再一声不响地被盖掉（#113，被下一行那轮的实测抓出来）**。形状：一条绑着 cipher 却拿不出远端 revision 的行，写回队列按规矩拒绝（送出去就是无守卫的覆盖），而**同一轮的 pull 把它判成普通更新**并用服务器那份盖回来——真服务器量出 `s18b_sync_no_revision merge[Updated=1/ConflictsBackedUp=0]`、冲突备份 `named=0`、按 cipher id 查 `any_conflict_for_cipher=0`，改动到此连一条痕迹都不留。为什么合并引擎只能靠内容判："这台设备改了"在普通编辑路径上从不置 `BitwardenLocalModified`（#94 量过），于是唯一的证据就是内容与远端不同，而"不同"分不清是服务器动了还是本机动了。判据只补一条：`local.RevisionDate` 为空且内容不同 ⇒ 先留一份可恢复的备份再应用远端；内容相同是例外——没有东西要留，留了反而每轮凭空造出一条什么也没报的冲突。覆盖 4 条：`BitwardenMergeTests` 2（判据本体，含"不该备份"那半）+ `BitwardenPullMergeServiceTests` 2（真 SQLite + 真仓库 + 真 pull：备份里取回本机那句标题、应用后的行带远端 revision；同一行改成与远端一致 ⇒ `ConflictsBackedUp=0` 且备份表空）。**负控真打**：摘掉那条分支 ⇒ 恰有 2 条红，正是那两条"必须备份"（Core 那条红在动作判回 `ApplyRemoteUpdate`，Data 那条红在 `ConflictsBackedUp` 的计数），两条"不该备份"照旧绿；还原后文件 sha 与动手前一致。同一 stage 在两版二进制上跑出**相反判决**（`s19b-run.log` 前／`s19c-run.log` 后），见文末第七轮实测。**边界**：这条只服务"被拒而推不出去"那一档，有 revision 可守卫的编辑仍走队列推送、不撞这里；`MissingRemoteRevision` 从哪来（身份取自服务器、revision 却没有）本轮没有回验来源，v1 继续拒绝推送而不是补读一次远端。 |
 | `d1fdf59` | **Bitwarden 收不下的本机改动第一次带着原因走到界面（#112，闭上 §7 那条可诊断性缺口）**。旧形状：`EnqueueDriftedAsync` 算出 `Refused` 就把它丢掉、队列不记账、同一轮 pull 再用服务器那份盖回那一行，屏幕上写的是"已同步"——一条永远推不出去的改动唯一的线索是探针自己打印的 `localRev=(none)`。新增 `src/Monica.Core/Bitwarden/BitwardenPayloadRefusal.cs`：六个原因码（`MissingRemoteRevision`／`UnsupportedShape`／`HasAttachments`／`MissingTitle`／`UnsupportedContent`／`PayloadTooLarge`，每一个都是用户接受得了或改得动的状态）、`BitwardenPayloadRefusalException : BitwardenProtocolException`（**子类化而不是替换**，因此既有 catch 一处不改：队列照旧停车、测试照旧断言被拒、协调器照旧消毒消息）、`BitwardenPayloadRefusalInfo`（码与给日志的那句绑在一起，判据和解释不能分头漂）、`BitwardenUnsyncableLocalChange(Title, IsPassword, Reason)`（**只带标题和码，永远不带密钥字段**——这份列表会走到同步页与诊断日志）。编码器 11 处拒绝点各自点名（`UnsupportedShape` 5、`MissingTitle` 2、`PayloadTooLarge` 2、`HasAttachments` 1、`UnsupportedContent` 1），队列那一处 `MissingRemoteRevision` 由判据自己带上；只报了字段名而没分类的老闸门归入 `UnsupportedContent` 并保留原句，所以"有闸门但没分类"也漏不掉。`BitwardenLocalChangeQueueResult(Enqueued, Refused, Unsyncable)` 里 `Refused == Unsyncable.Count` 由构造钉住（只读计数的调用方无法少报它即将展示的清单）；协调器把它带进 `BitwardenSyncResult.Unsyncable`；App 侧新 partial `MainWindowViewModel.BitwardenUnsyncableChanges.cs` + `BitwardenSyncSourceView.axaml` 的 `BitwardenUnsyncableItem` 段落（12 个 key 中英各一份）。可见性按**账户 id** 判而不是"选中变空就清空"——账户列表几乎每个 Bitwarden 动作都会重载，后者会在警告出现的那一刻把它撤掉；列表**不从存储读**：拒绝是一轮的属性，那行后来被修好或被用户删掉（删掉根本不需要编码器）就必须自己从屏幕上消失，不需要谁去清。诊断日志只写 `code:count`，不写标题。覆盖：单测 +4（队列 3：名单点名条目与编码器给的那个原因／一条只因没有 revision 被拒／不再被拒就不再出现在名单上；协调器 1：`SyncAsync` 把被拒条目交给调用方）+ UI +2（真视图里段落带原因出现；只在债站着时可见）。**一条被实测推翻的前提**：动手时的说法是"这一条从此每一轮都被拒"，真服务器量出来是**拒它的那一轮**列得出来（`s18_sync_shape rows=1`）、下一轮同一形状静默（`s18_sync_shape_again rows=0`，因为本地已经没有待推的改动），唯一出路是从冲突列表取回备份、在下一次同步之前把形态改成 Bitwarden 能存的——实测 `enqueued=1 refused=0` ⇒ `Claimed=1/Completed=1` ⇒ `edit_travelled=True conflicts_left=0`；取回而不改形态照旧被拒（`s18_scan_after_restore refused=1`）。中英两句分区说明因此按实测重写，指向"形态"而不是"再同步一次"。 |
+| `6e99e22` | **本机文件夹移动第一次推得出去（#114，接 #94 缺口 4 的"位置"）**。库页改的是 `CategoryId`，而漂移指纹与载荷读的是 `bitwarden_folder_id` 列 ⇒ 两边各自都"对"，移动在服务器上看不到（先量红：新测试 `Expected: 1 / Actual: 0`）。修法是一份共享投影 `src/Monica.Data/Bitwarden/BitwardenLocalFolderProjection.cs`：`BitwardenLocalChangeQueue`（构造函数多一个 `IBitwardenRemoteFolderStore`）与 `BitwardenPullMergeService.LoadLocalContextAsync` **都**先投影再算指纹，判断与载荷因此不可能各说一套。**第一版留的"本机的夹没有 counterpart 就沿用那一列"回退，被同一轮真服务器实测推翻**（每一步都 `local_folder=(none)`：那一列只有 pull 会写、而成功的 push 之后 pull 读到 NoChange 什么都不写；加上 `SavePasswordAsync` 的 `COALESCE` 让它永不清零），已改成**只从本地树推导**：绑到远端夹答那个夹，其余一律答根。覆盖 `BitwardenLocalChangeQueueTests` +4（42 条）、负控四批 + 批次4 真打（把旧回退装回去 → 恰那一条红 `Expected: 1 / Actual: 0`）。真服务器第九轮 8 项读数同形：`into_first/into_second` 各 `enqueued=1` → 服务器落点等于目标夹、`at_root=True keeps_local_folder=True`、每步 `owed_again=0 conflicts=0`（见文末第八、九轮）。**未做**：界面对"放进 Bitwarden 收不下的本机夹 = 服务器上到根"没有任何提示，镜像夹下面用户自建的子夹同属这一类。
 
 §3 的 use-case 抽取改动已提交（`24d92b0`），OneDrive/WebDAV 冲突副本复用修复已提交（`957c5af`）。
 
@@ -1353,4 +1354,95 @@ teardown——用户要求本地的 keepass／mdbx／bitwarden 这些数据一�
   指纹（#94 缺口 4 其余各项原样）。
 
 **机器状态**：容器 `vw-probe` 仍在跑（本轮探针又注册了一个新账号，卷里只有探针数据），`D:\Monica\probe-appdata\`
-按用户要求一字不动；收法照旧 `docker rm -f vw-probe && docker volume rm vw-probe-data`，且要等用户点头。
+按用户要求一字不动；收法照旧 `docker rm -f vw-probe && docker volume rm vw-probe-data`，且要等用户点头。
+
+## 附：真服务器第八轮实测（2026-09-25，**#114 文件夹移动第一次推得出去——然后它自己的第一版规则在同一轮被推翻**）
+
+跑法照旧：`D:\Monica\probe-appdata\bwrestore` 那份一次性控制台探针（不进仓，注册之后的每一步用的都是
+**生产类型**：真 SQLite + 真 `MonicaRepository` + 真 `BitwardenLocalChangeQueue` + 真协调器 + 真合并引擎），
+服务器仍是本机 Vaultwarden **1.37.3**（容器 `vw-probe`，`127.0.0.1:8080->80/tcp`，healthy；本轮结束**没有**
+teardown——用户要求本地的 keepass／mdbx／bitwarden 这些数据一律不动）。本轮新增 stage 20（`s20*`）：先用
+`POST /folders` **在真服务器上建两个夹**（名字必须是加密串——解码器 `DecryptRequired(folder.Name, ...)` 会拒
+明文），拉一次让绑定建立，再拿一条新建条目走"夹 A → 夹 B → 只有本机的夹 → 根"四步，每步量：队列欠不欠、
+推完服务器上这条落在哪个夹、本机那一行的 category／folder 列／revision、冲突备份数、以及**推完再扫一次还欠
+不欠**。主日志 `probe-appdata/bwrestore/s20-run.log`（**exit 0**，201 行），判据只有 id／revision／状态／布尔／
+计数：全量 `grep -ciE` 三条已知 fixture 字面量 = **0**、44 字符以上的 base64 形态串 = **0**（条目标题只以
+`found=`／`named=` 参与判断，从不打印）。
+
+### 一、#114 要修的那件事，和它确实修好的部分
+
+- 旧形状：库页移动条目只改本地 `CategoryId`，而漂移指纹读的是 `bitwarden_folder_id` 列 ⇒ 判断与载荷读同一个
+  来源，**移动从来没有成为一次上传**。红是先量出来的：新测试 `Expected: 1 / Actual: 0`。
+- 修法：一份共享投影 `src/Monica.Data/Bitwarden/BitwardenLocalFolderProjection.cs`，让**判漂移的和建载荷的走
+  同一个函数**（队列 `LoadCandidatesAsync` 与合并引擎 `LoadLocalContextAsync` 各自先投影再指纹）。
+- 实测：`s20_into_first_scan enqueued=1` → `remote_folder=f459701e`、`s20_into_second_scan enqueued=1` →
+  `remote_folder=17bb1b39`，两步 `conflicts=0 owed_again=0` ⇒ 真服务器认了这两次移动，而且移动**不会被下一轮
+  同步又判成一次待办**（这才是"没有同步问题"的口径）；`s20_out_to_root enqueued=0 remote_folder=(none)`。
+
+### 二、被同一轮推翻的第一版规则（本轮最贵的一条）
+
+第一版给"本机的夹在服务器上没有 counterpart"留了一条回退：拿不准就用 `bitwarden_folder_id` 列里那份，注释写
+的是"让服务器继续持有它已经持有的那个夹"。实测 `s20_into_local_only`：`enqueued=1` 之后 `remote_folder=(none)`、
+`s20_local_only_still_holds_folder=False` —— 条目在服务器上被抹平到了根。往下挖到的原因比这条规则本身重要：
+**每一步的读数都是 `local_folder=(none)`**。那一列只有 pull 会写，而一次成功的 push 之后 pull 读到的是
+NoChange，于是它什么都不改写 ⇒ 列里要么是空的、要么滞留在更早某个夹，"读它"等于读一个没人保证盖过的戳。它
+在单元测试里之所以成立，只因为那份 fixture 恰好先做过一次会改写该列的 pull——**fixture 替规则撒了谎**。
+
+⇒ 规则改成**只从本地树推导**：绑到远端夹的 category 答那个夹，其余一律答根（根、以及服务器没有 counterpart 的
+本机夹）。这不是"简单点"，而是把判断从"某一列的历史状态"换成"用户屏幕上那棵树"：同一棵树永远欠同一次上传，
+不需要别处有人在恰好的时机替它盖戳。代价是同一条被量化的事实换了方向——把条目放进一个 Bitwarden 收不下的本机
+夹，服务器上它就是到了根；所以第九轮把断言换成这件事真正要问的两条。
+
+### 三、四条负控真打（每条都重新构建、只看它该红的那一条）
+
+- 批次1（队列不再投影）⇒ 夹→夹那条红在 `Expected: 1 / Actual: 0`：移动又变回"没人欠"。
+- 批次2（合并引擎的本地引用不再投影）⇒ 同一条测试红在**后半**的 `ConflictsBackedUp`（`Actual: 1`）：判漂移的
+  一边投影、另一边不投影，服务器就会把这台设备自己的移动当成一份要盖回去的远端改动。
+- 批次3A（secure item 不投影）⇒ 笔记那条红；批次3B（`categoryId is null` 读列而不是答根）⇒ 挪出到根那条红。
+- "挪进没有 counterpart 的夹"那条守卫在以上每一批里都保持绿——它当时守的还是**错的**规则，这一点由第二节的
+  实测补上，不是由负控补上。
+
+## 附：真服务器第九轮实测（2026-09-25，**#114 按改正后的规则重跑：八项读数全部同形**）
+
+同一份探针、同一个容器（`vw-probe`，Vaultwarden **1.37.3**，本轮结束仍不 teardown），只改两件事：投影换成
+"只从本地树推导"，以及 stage 20 那一步的断言从"服务器上还在原夹"换成它实际该问的两条 —— `at_root`（服务器上
+这条已挪到根）与 `keeps_local_folder`（本机那一行仍在用户放进去的夹里）。日志
+`probe-appdata/bwrestore/s20b-run.log`（**exit 0**，202 行，与上一轮同一组泄漏扫描：fixture 字面量 **0**、
+44+ 字符 base64 形态串 **0**）。
+
+- 建夹与绑定：`s20_folders made=2 distinct=2 ids=[228a0f90,37ce2f8f]`、`s20_bindings first=True second=True
+  categories=2` ⇒ "建 → 拉 → 绑定成本机的 category"这条前置路走通。
+- 移动：`s20_into_first_scan enqueued=1 refused=0` → `remote_folder=228a0f90`、`s20_into_second_scan enqueued=1`
+  → `remote_folder=37ce2f8f`，两步 `conflicts=0 owed_again=0`、`merge[...ConflictsBackedUp=0/Unchanged=7...]`
+  ⇒ 推得出去、服务器认、合并引擎不把它当成一份要盖回的远端改动。
+- 挪进没有 counterpart 的本机夹：`s20_into_local_only_scan enqueued=1` → `remote_folder=(none)`
+  `local_category=3`、`s20_local_only_at_root=True keeps_local_folder=True`、`owed_again=0` `conflicts=0`
+  ⇒ 服务器上落到根，而**本机那一行留在原地**（pull 没把它踢回它曾经的夹、也没把 category 清成根），下一轮
+  不再欠任何东西。
+- 再挪到根：`s20_out_to_root_scan enqueued=0` → `remote_folder=(none)`、`local_category=`（空）⇒ 上一条已经在
+  根了，这一步不该有幻影工作，队列确实什么都没欠。
+- 每一步仍是 `local_folder=(none)` ⇒ 第八轮那条结论（push 不盖这列的戳）在这份字节上继续成立，也正是它判了
+  回退规则死刑。
+
+单元侧同轮换钉 4 条（`BitwardenLocalChangeQueueTests` 现 **42 条全绿**）：夹→夹（登录项与笔记各一条，笔记走
+另一个编码器）、挪出到根（载荷里 `folderId` 属性**不存在**，而不是为空）、以及上面那条改判后的"挪进没有
+counterpart 的夹"。**负控批次4 真打**：把第八轮那条被推翻的回退原样装回去、重建、只跑这一条 ⇒ 红在
+`Expected: 1 / Actual: 0`（正是真服务器量到的"什么都不欠、服务器却在原夹"），换回新规则 42/42 绿。
+
+### 四、门禁与剩下的口子（别读成账清了）
+
+- 门禁全部跑在**出货的那份字节**上（代码提交 `6e99e22`，publish 与工作区源文件之间没有再动过任何一行）：`dotnet format Monica.slnx --verify-no-changes` 退出 **0**（0 改动）；`verify-commercial-release.ps1 -Configuration Release` ⇒ `cr_rc=0`，末行 `Commercial release verification passed.`（日志 `probe-appdata/gate114.log`），四份 trx 逐一读总数：单测 **10 `perf-budget` + 926 常规**（上一轮 922 ⇒ 本轮 +4 条夹移动覆盖）、UI **17 `perf-budget` + 244 常规**；同一串里的 `dotnet build -c Release --warnaserror` 因此是 **0 warning / 0 error**。产物级：`publish-desktop.ps1` ⇒ `pub_rc=0`（六个版本参数都是 Mandatory，漏一个就 exit 1 而门照跑旧字节——本轮踩过一次），`verify-artifact-runtime.ps1` ⇒ `art_rc=0`：`UI SMOKE passed` + `RUNTIME SMOKE passed`，loadMs=**293**/4000（库加载 actualMs=598/4000）、KeePass 20000 条 3.23MB：openMs=2059 / streamMs=479 / collectedMB=117.2 → growthMB=**7.2**/24、锁定态 10 拍轨迹 120.8/122.4/116.1/114.5/115.2/112.7/112.7/111.9/112.6/113.9，尾 5 拍 **中位 112.7MB／区间 111.9–113.9**（预算 120）、锁/解往返 passwords=25/25、notes=14/14、totp=1/1、wallet=4/4，瞬态回执 `retired=True`。**一条时序要写清**：第一次重跑产物门是**红**的（`smoke-ui` exit 1，KeePass 那一段没出读数、loadMs 从 119 跳到 1327），而它当时测的还是上一轮 16:18 那份旧字节（publish 因缺参数没跑成）；同一份旧字节在前一次跑是绿的 ⇒ 那是并发把机器压满时的计时抖动，不是新缺陷。重新 publish（18:12）后在安静机器上一次通过，上面所有数字出自那一次。
+- **踩到的一条工具坑（记下来，它会再犯）**：`BitwardenLocalChangeQueue.cs` 被 python 以 LF 重写过，
+  `dotnet format --verify-no-changes` 当场报 **21 处 WHITESPACE**，而**同一份纯 LF 的另两个文件一条都不报**——
+  这条规则只在注释挤进对象初始化器／实参列表的位置才生效，所以"整文件是 LF"并不预示它一定红。改法：把该文件
+  按仓库多数派换回 CRLF（`attr: text=auto` ⇒ 索引里仍是 LF，`git diff` 不会因此变脏）。
+- **仍然没验 / 新规则的后果**：① 界面对"把条目放进一个 Bitwarden 收不下的本机夹"没有任何提示——按新规则它就
+  是在服务器上到根，行为只有单元与探针读数证明，用户在屏幕上看不到这件事将会解释不了；② 镜像夹下面用户自己
+  建的**子夹**同属"没有 counterpart"，其中的条目也按根发布（Bitwarden 的夹本来就是平面的，服务器下发的层级
+  会各自绑定、不受影响）；③ #94 缺口 4 的其余各项原样：官方 Bitwarden 云、2FA／captcha／设备 OTP、
+  `RefreshingToken` 自动刷新、离线堆队再回来推、卡片与证件的真服务器 create+update 往返、`IsArchived` 不进漂移
+  指纹；④ App 层"真清除命令写出一条队列行"的行为证明照旧缺（`6bbf449` 只钉注册与类型）。
+
+**机器状态**：容器 `vw-probe` 仍在跑（第八、九两轮各注册一个新账号，卷里只有探针数据），
+`D:\Monica\probe-appdata\` 按用户要求一字不动；收法照旧 `docker rm -f vw-probe && docker volume rm vw-probe-data`，
+且要等用户点头。
