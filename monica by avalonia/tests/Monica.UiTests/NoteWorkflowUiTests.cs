@@ -295,6 +295,12 @@ public sealed class NoteWorkflowUiTests
             viewModel.SelectedVaultRow = noteRow;
             Dispatcher.UIThread.RunJobs();
             Assert.Equal(VaultSurface.Note, viewModel.SelectedVaultSurface);
+
+            // The command being wired is not enough: the library files an entry by opening a category
+            // picker from the row's menu, so that item has to be on the menu for a selected entry.
+            Assert.True(tree.IsEntrySelection);
+            Assert.True(tree.ShowsEntryCommands);
+            Assert.True(tree.ShowsEntryFolderPicker);
         }
         finally
         {

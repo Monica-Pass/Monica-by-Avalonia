@@ -459,6 +459,7 @@ public interface ILocalizationService : INotifyPropertyChanged
     string KeePassApplyEdit { get; }
     string KeePassShowSecrets { get; }
     string KeePassSaveToFile { get; }
+    string KeePassNewEntry { get; }
     string KeePassUnsavedChanges { get; }
     string BitwardenImportTitle { get; }
     string BitwardenImportDescription { get; }
@@ -976,6 +977,7 @@ public sealed class LocalizationService : ILocalizationService
     public string KeePassApplyEdit => Text();
     public string KeePassShowSecrets => Text();
     public string KeePassSaveToFile => Text();
+    public string KeePassNewEntry => Text();
     public string KeePassUnsavedChanges => Text();
     public string BitwardenImportTitle => Text();
     public string BitwardenImportDescription => Text();
@@ -2121,6 +2123,18 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassDiscardTitle"] = "Close the KeePass database?",
         ["KeePassDiscardMessage"] = "This database has changes that are not saved to the file yet. Closing it now discards them.",
         ["KeePassDiscardAction"] = "Close without saving",
+        ["KeePassNewEntry"] = "New entry",
+        ["KeePassEntryCreatedFormat"] = "{0} has been added to the opened database. Save writes it to the file.",
+        ["KeePassEntryDeletedFormat"] = "{0} has been removed from the opened database. Save writes it to the file.",
+        ["KeePassEntryMovedFormat"] = "{0} is now in folder {1}. Save writes it to the file.",
+        ["KeePassFolderCreatedFormat"] = "Folder {0} has been created. Save writes it to the file.",
+        ["KeePassFolderRenamedFormat"] = "The folder is now named {0}. Save writes it to the file.",
+        ["KeePassFolderDeletedFormat"] = "Folder {0} has been deleted. Save writes it to the file.",
+        ["KeePassFolderMovedFormat"] = "Folder {0} is now inside {1}. Save writes it to the file.",
+        ["KeePassFolderNotEmptyConfirmFormat"] = "{0} still holds {1} entries and {2} folders. Deleting it removes all of them from the opened database, and saving writes that to the file.",
+        ["KeePassFolderGone"] = "This folder is no longer in the opened KeePass database.",
+        ["KeePassRootFolderProtected"] = "The database's own root folder cannot be renamed or deleted.",
+        ["KeePassManageFailed"] = "The KeePass database could not be changed.",
         ["SelectBitwardenJsonFile"] = "Select a Bitwarden JSON export",
         ["BitwardenFileSelectedFormat"] = "Selected Bitwarden export: {0}",
         ["BitwardenFileSelectionFailed"] = "The Bitwarden export could not be selected.",
@@ -3137,6 +3151,18 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassDiscardTitle"] = "关闭 KeePass 数据库？",
         ["KeePassDiscardMessage"] = "该数据库还有尚未写入文件的改动，现在关闭会丢弃这些改动。",
         ["KeePassDiscardAction"] = "不保存并关闭",
+        ["KeePassNewEntry"] = "新建条目",
+        ["KeePassEntryCreatedFormat"] = "已向打开的数据库新增条目「{0}」，点击保存才会写入文件。",
+        ["KeePassEntryDeletedFormat"] = "已从打开的数据库移除条目「{0}」，点击保存才会写入文件。",
+        ["KeePassEntryMovedFormat"] = "已将条目「{0}」移入文件夹「{1}」，点击保存才会写入文件。",
+        ["KeePassFolderCreatedFormat"] = "已新建文件夹「{0}」，点击保存才会写入文件。",
+        ["KeePassFolderRenamedFormat"] = "文件夹已改名为「{0}」，点击保存才会写入文件。",
+        ["KeePassFolderDeletedFormat"] = "已删除文件夹「{0}」，点击保存才会写入文件。",
+        ["KeePassFolderMovedFormat"] = "已将文件夹「{0}」移到「{1}」下，点击保存才会写入文件。",
+        ["KeePassFolderNotEmptyConfirmFormat"] = "「{0}」中仍有 {1} 个条目和 {2} 个文件夹。删除会把它们一并从打开的数据库中移除，保存后写入文件。",
+        ["KeePassFolderGone"] = "该文件夹已不在当前打开的 KeePass 数据库中。",
+        ["KeePassRootFolderProtected"] = "数据库自身的根文件夹不能改名或删除。",
+        ["KeePassManageFailed"] = "无法修改 KeePass 数据库。",
         ["SelectBitwardenJsonFile"] = "选择 Bitwarden JSON 导出文件",
         ["BitwardenFileSelectedFormat"] = "已选择 Bitwarden 导出文件：{0}",
         ["BitwardenFileSelectionFailed"] = "无法选择 Bitwarden 导出文件。",

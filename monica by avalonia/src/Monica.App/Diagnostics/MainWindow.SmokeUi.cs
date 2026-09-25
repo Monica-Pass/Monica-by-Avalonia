@@ -513,26 +513,12 @@ public partial class MainWindow
 
         try
         {
-            viewModel.SelectSectionCommand.Execute("Sync");
-            viewModel.SelectedSyncPage = "Import";
-            ShowFromDesktopIntegration();
-            await Task.Delay(250);
-
-            var tabs = this.GetVisualDescendants()
-                .OfType<TabControl>()
-                .FirstOrDefault(control => control.Name == "ImportSourceTabs");
-            var keepassTab = tabs?.Items
-                .OfType<TabItem>()
-                .FirstOrDefault(item => item.Name == "KeePassImportTab");
-            if (tabs is null || keepassTab is null)
+            var keepassTab = await RealizeSmokeKeePassImportTabAsync("edit shot");
+            if (keepassTab is null)
             {
-                AppDiagnostics.Info(
-                    $"Smoke UI KeePass edit shot failed. reason=tabs-not-realized, " +
-                    $"tabsFound={tabs is not null}, keepassTabFound={keepassTab is not null}");
                 return false;
             }
 
-            tabs.SelectedItem = keepassTab;
             var state = await viewModel.SmokeShowKeePassEditorAsync(vaultPath, password);
             await Task.Delay(250);
 
@@ -569,6 +555,114 @@ public partial class MainWindow
             AppDiagnostics.Error("Smoke UI KeePass edit shot failed", ex);
             return false;
         }
+    }
+
+    /// <summary>
+    /// One frame of the row-management surface: a folder added to the tree and an entry filed into it,
+    /// with the unsaved-changes notice lit and the file on disk still the one that was opened. Both
+    /// halves of that are the point of the shot - the tree growing proves the commands run against the
+    /// browsed database, and the file being untouched proves nothing was saved to get there.
+    /// </summary>
+    public async Task<bool> RunSmokeUiKeePassManageShotAsync(
+        string vaultPath,
+        string password,
+        string? screenshotDirectory)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            return await Dispatcher.UIThread.InvokeAsync(
+                () => RunSmokeUiKeePassManageShotAsync(vaultPath, password, screenshotDirectory));
+        }
+
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            AppDiagnostics.Info("Smoke UI KeePass manage shot failed. reason=no-view-model");
+            return false;
+        }
+
+        try
+        {
+            var keepassTab = await RealizeSmokeKeePassImportTabAsync("manage shot");
+            if (keepassTab is null)
+            {
+                return false;
+            }
+
+            var state = await viewModel.SmokeShowKeePassEditorManagementAsync(vaultPath, password);
+            await Task.Delay(250);
+
+            var frame = await CaptureSmokeFrameAsync();
+            var frameBytes = frame?.Length ?? 0;
+            var wantedFile = !string.IsNullOrWhiteSpace(screenshotDirectory);
+            var written = false;
+            var fileName = "";
+            if (wantedFile && frameBytes > 0)
+            {
+                Directory.CreateDirectory(screenshotDirectory!);
+                fileName = $"KeePassManage_{Math.Max(1, (int)Math.Round(Bounds.Width))}x" +
+                    $"{Math.Max(1, (int)Math.Round(Bounds.Height))}.png";
+                var path = Path.Combine(screenshotDirectory!, fileName);
+                File.WriteAllBytes(path, frame!);
+                written = new FileInfo(path).Length > 0;
+            }
+
+            var success = state.DatabaseOpened &&
+                state.FolderShown &&
+                state.DraftShown &&
+                state.EntryShown &&
+                state.UnsavedNoticeShown &&
+                keepassTab.IsSelected &&
+                frameBytes > 0 &&
+                (!wantedFile || written);
+            AppDiagnostics.Info(
+                $"Smoke UI KeePass manage shot result. success={success}, opened={state.DatabaseOpened}, " +
+                $"folderAdded={state.FolderShown}, draftOpened={state.DraftShown}, " +
+                $"entryAdded={state.EntryShown}, unsavedNotice={state.UnsavedNoticeShown}, " +
+                $"treeRows={state.TreeRows}, folderRows={state.FolderRows}, entryRows={state.EntryRows}, " +
+                $"vaultBytes={state.FileBytes}, tabSelected={keepassTab.IsSelected}, " +
+                $"frameBytes={frameBytes}, written={written}, file={fileName}");
+            return success;
+        }
+        catch (Exception ex)
+        {
+            AppDiagnostics.Error("Smoke UI KeePass manage shot failed", ex);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Walks the window to the opened-database tab both KeePass shots capture from. Returns the tab so
+    /// a caller can prove it stayed selected in the frame it captured, or null after logging why it
+    /// could not get there.
+    /// </summary>
+    private async Task<TabItem?> RealizeSmokeKeePassImportTabAsync(string reasonPrefix)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return null;
+        }
+
+        viewModel.SelectSectionCommand.Execute("Sync");
+        viewModel.SelectedSyncPage = "Import";
+        ShowFromDesktopIntegration();
+        await Task.Delay(250);
+
+        var tabs = this.GetVisualDescendants()
+            .OfType<TabControl>()
+            .FirstOrDefault(control => control.Name == "ImportSourceTabs");
+        var keepassTab = tabs?.Items
+            .OfType<TabItem>()
+            .FirstOrDefault(item => item.Name == "KeePassImportTab");
+        if (tabs is null || keepassTab is null)
+        {
+            AppDiagnostics.Info(
+                $"Smoke UI KeePass {reasonPrefix} failed. reason=tabs-not-realized, " +
+                $"tabsFound={tabs is not null}, keepassTabFound={keepassTab is not null}");
+            return null;
+        }
+
+        tabs.SelectedItem = keepassTab;
+        return keepassTab;
     }
 
     private static string FormatSmokeLogValue(string? value) =>

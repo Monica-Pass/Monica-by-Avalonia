@@ -283,6 +283,19 @@ public partial class App
                 smokeSuccess &= editShotSuccess;
             }
 
+            var keepassManagePath = GetSmokeUiArgument(
+                Environment.GetCommandLineArgs(), "--smoke-ui-keepass-manage");
+            if (!string.IsNullOrWhiteSpace(keepassManagePath))
+            {
+                var keepassPassword = GetSmokeUiArgument(
+                    Environment.GetCommandLineArgs(), "--smoke-ui-keepass-password");
+                var manageShotSuccess = await mainWindow.RunSmokeUiKeePassManageShotAsync(
+                    keepassManagePath,
+                    keepassPassword ?? "",
+                    smokeScreenshotDirectory);
+                smokeSuccess &= manageShotSuccess;
+            }
+
             if (HasSmokeUiFlag(Environment.GetCommandLineArgs(), "--smoke-ui-autotype"))
             {
                 smokeSuccess &= await RunSmokeUiAutoTypeProbeAsync(viewModel, desktopIntegration);

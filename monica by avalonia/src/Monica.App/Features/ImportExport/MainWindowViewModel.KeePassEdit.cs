@@ -72,18 +72,33 @@ public sealed partial class MainWindowViewModel
 
         try
         {
-            var updated = await session.UpdateEntryAsync(editor.ToEdit());
+            var edit = editor.ToEdit();
+            var updated = editor.IsDraft
+                ? await session.CreateEntryAsync(editor.GroupUuid, edit)
+                : await session.UpdateEntryAsync(edit);
             if (updated is null)
             {
-                SetStatusFailure("KeePassEntryGone");
+                SetStatusFailure(editor.IsDraft ? "KeePassFolderGone" : "KeePassEntryGone");
                 return;
+            }
+
+            if (editor.IsDraft)
+            {
+                _keePassOpenFolders.Add(editor.GroupUuid);
             }
 
             ShowKeePassEntryDetail(session, updated);
             await RebuildKeePassTreeAsync(session, CancellationToken.None);
             KeePassEditorPublic = null;
             RaiseKeePassWriteState();
-            SetStatusMessage("KeePassChangeStaged");
+            if (editor.IsDraft)
+            {
+                SetStatusNotice("KeePassEntryCreatedFormat", updated.Row.Title);
+            }
+            else
+            {
+                SetStatusMessage("KeePassChangeStaged");
+            }
         }
         catch (Exception error)
         {
@@ -188,8 +203,20 @@ public sealed partial class MainWindowViewModel
     {
         OnPropertyChanged(nameof(KeePassVaultIsDirty));
         OnPropertyChanged(nameof(KeePassUnsavedChangesText));
-        OnPropertyChanged(nameof(CanEditKeePassEntry));
         OnPropertyChanged(nameof(KeePassPreviewSummaryText));
+        RaiseKeePassManageState();
+    }
+
+    /// <summary>
+    /// The row that is selected decides which of the structural commands are live, so every place
+    /// that moves the selection has to raise them together - a stale pair leaves a delete button
+    /// pointing at a row the tree no longer shows.
+    /// </summary>
+    private void RaiseKeePassManageState()
+    {
+        OnPropertyChanged(nameof(CanEditKeePassEntry));
+        OnPropertyChanged(nameof(CanManageSelectedKeePassFolder));
+        OnPropertyChanged(nameof(CanManageKeePassRows));
     }
 
     private static string KeePassWriteFailureKey(KeePassVaultError error) => error switch

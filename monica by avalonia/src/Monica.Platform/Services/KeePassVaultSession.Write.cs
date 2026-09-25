@@ -43,7 +43,7 @@ public sealed partial class KeePassVaultSession
                 return null;
             }
 
-            ApplyEdit(entry, edit);
+            ApplyEdit(entry, edit, keepHistory: true);
             IsDirty = true;
             return CreateDetail(entry, KeePassVaultText.GroupPathOf(entry.ParentGroup ?? root, root));
         }
@@ -127,9 +127,16 @@ public sealed partial class KeePassVaultSession
         }
     }
 
-    private void ApplyEdit(PwEntry entry, KeePassEntryEdit edit)
+    /// <param name="keepHistory">
+    /// A created entry has no earlier shape to remember, so its first fill must not snapshot itself.
+    /// </param>
+    private void ApplyEdit(PwEntry entry, KeePassEntryEdit edit, bool keepHistory)
     {
-        AddHistorySnapshot(entry);
+        if (keepHistory)
+        {
+            AddHistorySnapshot(entry);
+        }
+
         entry.Strings.Set(PwDefs.TitleField, new ProtectedString(false, edit.Title.Trim()));
         entry.Strings.Set(PwDefs.UserNameField, new ProtectedString(false, edit.UserName.Trim()));
         entry.Strings.Set(PwDefs.PasswordField, new ProtectedString(true, edit.Password));

@@ -98,6 +98,9 @@
                                 <TextBlock x:Name="KeePassUnsavedChangesText" Text="{Binding KeePassUnsavedChangesText}" IsVisible="{Binding KeePassVaultIsDirty}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorCautionBrush}" />
                             </StackPanel>
                             <WrapPanel Grid.Row="1" IsEnabled="{Binding IsKeePassImportIdle}">
+                                <Button x:Name="NewKeePassEntryButton" Classes="workspaceCommand" Command="{Binding NewKeePassEntryCommand}" Margin="0,0,8,8">
+                                    <TextBlock Text="{Binding L.KeePassNewEntry}" />
+                                </Button>
                                 <Button x:Name="EditKeePassEntryButton" Classes="workspaceCommand" Command="{Binding EditKeePassEntryCommand}" IsVisible="{Binding CanEditKeePassEntry}" Margin="0,0,8,8">
                                     <TextBlock Text="{Binding L.KeePassEditEntry}" />
                                 </Button>
@@ -118,7 +121,16 @@
                                                               ItemsSource="{Binding KeePassTreeRowsPublic}"
                                                               SelectedItem="{Binding SelectedKeePassTreeRowPublic, Mode=TwoWay}"
                                                               ToggleExpansionCommand="{Binding ToggleKeePassFolderCommand}"
-                                                              CanManageRows="False"
+                                                              CreateFolderCommand="{Binding CreateKeePassFolderCommand}"
+                                                              RenameFolderCommand="{Binding RenameKeePassFolderCommand}"
+                                                              DeleteFolderCommand="{Binding DeleteKeePassFolderCommand}"
+                                                              MoveFolderCommand="{Binding MoveKeePassFolderCommand}"
+                                                              MoveEntryToFolderCommand="{Binding MoveKeePassEntryCommand}"
+                                                              EditEntryCommand="{Binding EditKeePassEntryCommand}"
+                                                              DeleteEntryCommand="{Binding DeleteKeePassEntryCommand}"
+                                                              CanManageSelected="{Binding CanManageSelectedKeePassFolder}"
+                                                              CanManageRows="{Binding CanManageKeePassRows}"
+                                                              FolderName="{Binding KeePassFolderName, Mode=TwoWay}"
                                                               CopyRowUsernameCommand="{Binding CopyKeePassRowUsernameCommand}"
                                                               CopyRowSecretCommand="{Binding CopyKeePassRowSecretCommand}" />
                                 </Border>
@@ -173,7 +185,7 @@
                                                                                 <DataTemplate x:DataType="vm:PasswordDetailField">
                                                                                     <Grid ColumnDefinitions="120,*" ColumnSpacing="8" Margin="0,2,0,0">
                                                                                         <TextBlock Text="{Binding Label}" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                                                        <TextBlock Text="{Binding DisplayValue}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                                                        <TextBlock Grid.Column="1" Text="{Binding DisplayValue}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                                                                                     </Grid>
                                                                                 </DataTemplate>
                                                                             </ItemsControl.ItemTemplate>

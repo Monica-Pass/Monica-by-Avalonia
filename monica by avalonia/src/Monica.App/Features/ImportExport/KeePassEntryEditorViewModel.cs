@@ -17,6 +17,7 @@ public sealed partial class KeePassEntryEditorViewModel : ObservableObject
     {
         _detail = detail;
         EntryUuid = detail.Row.EntryUuid;
+        GroupUuid = detail.Row.GroupUuid;
         GroupPath = detail.Row.GroupPath;
         _title = detail.Row.Title;
         _userName = detail.Row.UserName;
@@ -26,7 +27,33 @@ public sealed partial class KeePassEntryEditorViewModel : ObservableObject
         _authenticatorKey = detail.AuthenticatorKey;
     }
 
+    /// <summary>
+    /// Opens the form on an entry that does not exist yet. Creating on apply rather than on click
+    /// means a new entry the user abandons leaves nothing behind in the database.
+    /// </summary>
+    public static KeePassEntryEditorViewModel CreateDraft(string groupUuid, string groupPath) =>
+        new(new KeePassEntryDetail(
+            new KeePassEntryRow(
+                "",
+                groupUuid,
+                groupPath,
+                "",
+                "",
+                "",
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow,
+                []),
+            "",
+            "",
+            "",
+            [],
+            []));
+
     public string EntryUuid { get; }
+
+    public string GroupUuid { get; }
+
+    public bool IsDraft => string.IsNullOrEmpty(EntryUuid);
 
     public string GroupPath { get; }
 

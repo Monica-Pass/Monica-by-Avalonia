@@ -125,14 +125,14 @@ public sealed partial class MainWindowViewModel
             _selectedKeePassTreeRow = null;
             SelectedKeePassTreeRowPublic = null;
             KeePassEditorPublic = null;
-            OnPropertyChanged(nameof(CanEditKeePassEntry));
+            RaiseKeePassManageState();
             return;
         }
 
         _selectedKeePassTreeRow = row;
         SelectedKeePassTreeRowPublic = row;
         KeePassEditorPublic = null;
-        OnPropertyChanged(nameof(CanEditKeePassEntry));
+        RaiseKeePassManageState();
 
         if (!row.IsEntryRow || row.Entry is null)
         {

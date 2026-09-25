@@ -133,8 +133,8 @@
                                           Command="{Binding #Root.DeleteFolderCommand}">
                                     <MenuItem.Icon><ic:FluentIcon Icon="Delete" FontSize="14" /></MenuItem.Icon>
                                 </MenuItem>
-                                <!-- An entry moves by folder picker, never by drag, so these three
-                                     replace the folder group instead of adding to it. -->
+                                <!-- These replace the folder group instead of adding to it: the row under
+                                     the pointer decides which set of commands applies. -->
                                 <MenuItem Header="{Binding #Root.Text.Edit}"
                                           IsVisible="{Binding #Root.ShowsEntryCommands}"
                                           Command="{Binding #Root.EditEntryCommand}">
@@ -160,8 +160,11 @@
                                           CommandParameter="{Binding}">
                                     <MenuItem.Icon><ic:FluentIcon Icon="NumberSymbol" FontSize="14" /></MenuItem.Icon>
                                 </MenuItem>
+                                <!-- Where the host files an entry by asking for a target (the library's
+                                     category picker) the item shows; a tree whose entries move by drag
+                                     leaves it off instead of showing a command with nothing to run. -->
                                 <MenuItem Header="{Binding #Root.Text.MoveToFolder}"
-                                          IsVisible="{Binding #Root.ShowsEntryCommands}"
+                                          IsVisible="{Binding #Root.ShowsEntryFolderPicker}"
                                           Command="{Binding #Root.MoveEntryCommand}">
                                     <MenuItem.Icon><ic:FluentIcon Icon="Folder" FontSize="14" /></MenuItem.Icon>
                                 </MenuItem>

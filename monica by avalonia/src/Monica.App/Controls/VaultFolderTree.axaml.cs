@@ -65,6 +65,12 @@ public partial class VaultFolderTree : UserControl
     public static readonly StyledProperty<ICommand?> MoveEntryCommandProperty =
         AvaloniaProperty.Register<VaultFolderTree, ICommand?>(nameof(MoveEntryCommand));
 
+    // Two hosts move an entry in two different ways: the library page asks which category to file it
+    // under, an opened .kdbx has folders to drop onto. Only the second one takes a drop, so the drag
+    // gate and the menu item read separate properties instead of guessing from one.
+    public static readonly StyledProperty<ICommand?> MoveEntryToFolderCommandProperty =
+        AvaloniaProperty.Register<VaultFolderTree, ICommand?>(nameof(MoveEntryToFolderCommand));
+
     public static readonly StyledProperty<ICommand?> DeleteEntryCommandProperty =
         AvaloniaProperty.Register<VaultFolderTree, ICommand?>(nameof(DeleteEntryCommand));
 
@@ -92,6 +98,11 @@ public partial class VaultFolderTree : UserControl
 
     public static readonly StyledProperty<bool> ShowsEntryCommandsProperty =
         AvaloniaProperty.Register<VaultFolderTree, bool>(nameof(ShowsEntryCommands));
+
+    // The "move to folder" menu item appears only where a picker-style command is wired to it; an
+    // entry that moves by drag has no use for a menu item that does nothing.
+    public static readonly StyledProperty<bool> ShowsEntryFolderPickerProperty =
+        AvaloniaProperty.Register<VaultFolderTree, bool>(nameof(ShowsEntryFolderPicker));
 
     // The context menu is built per row, but its items live in one menu, so the menu group is chosen
     // from the row the pointer last pressed rather than from the item's own data context.
@@ -201,6 +212,12 @@ public partial class VaultFolderTree : UserControl
         set => SetValue(MoveEntryCommandProperty, value);
     }
 
+    public ICommand? MoveEntryToFolderCommand
+    {
+        get => GetValue(MoveEntryToFolderCommandProperty);
+        set => SetValue(MoveEntryToFolderCommandProperty, value);
+    }
+
     public ICommand? DeleteEntryCommand
     {
         get => GetValue(DeleteEntryCommandProperty);
@@ -255,6 +272,12 @@ public partial class VaultFolderTree : UserControl
         set => SetValue(ShowsEntryCommandsProperty, value);
     }
 
+    public bool ShowsEntryFolderPicker
+    {
+        get => GetValue(ShowsEntryFolderPickerProperty);
+        set => SetValue(ShowsEntryFolderPickerProperty, value);
+    }
+
     public string? FolderName
     {
         get => GetValue(FolderNameProperty);
@@ -282,7 +305,9 @@ public partial class VaultFolderTree : UserControl
             var selected = change.GetNewValue<object?>();
             IsEntrySelection = selected is IFolderTreeRow row && row.IsEntryLeaf();
         }
-        else if (change.Property == IsEntrySelectionProperty || change.Property == CanManageRowsProperty)
+        else if (change.Property == IsEntrySelectionProperty ||
+                 change.Property == CanManageRowsProperty ||
+                 change.Property == MoveEntryCommandProperty)
         {
             RefreshRowCommandVisibility();
         }
@@ -292,6 +317,7 @@ public partial class VaultFolderTree : UserControl
     {
         ShowsFolderCommands = CanManageRows && !IsEntrySelection;
         ShowsEntryCommands = CanManageRows && IsEntrySelection;
+        ShowsEntryFolderPicker = ShowsEntryCommands && MoveEntryCommand is not null;
     }
 
     public bool IsTreeFocused => FolderTreeList.IsFocused;
@@ -322,8 +348,8 @@ public partial class VaultFolderTree : UserControl
             e.Source is not Visual pressed ||
             FindRowItem(pressed) is not ListBoxItem item ||
             item.DataContext is not IFolderTreeRow row ||
-            // Dragging reparents folders; an entry moves through the context menu instead.
-            row.IsEntryLeaf())
+            // An entry can be dragged only where the host can take a drop.
+            (row.IsEntryLeaf() && MoveEntryToFolderCommand is null))
         {
             return;
         }
@@ -368,21 +394,31 @@ public partial class VaultFolderTree : UserControl
 
         var source = _dragSourceRow;
         var target = _dragTargetItem?.DataContext;
+        // Cleared before the read, an entry drag would look itself up as no longer a drag and fall
+        // through to the folder command.
+        var command = ActiveMoveCommand;
         ClearDragState();
 
         if (source is null || target is not IFolderTreeRow targetRow ||
             targetRow.IsEntryLeaf() ||
-            MoveFolderCommand is not { } command)
+            command is not { } move)
         {
             return;
         }
 
         var request = new FolderMoveRequest(source, targetRow);
-        if (command.CanExecute(request))
+        if (move.CanExecute(request))
         {
-            command.Execute(request);
+            move.Execute(request);
         }
     }
+
+    /// <summary>
+    /// A dragged folder is reparented and a dragged entry is moved into the folder it lands on; both
+    /// drops onto a folder row, so one drop path serves both and the host decides which it accepts.
+    /// </summary>
+    private ICommand? ActiveMoveCommand =>
+        _dragSourceRow is { } source && source.IsEntryLeaf() ? MoveEntryToFolderCommand : MoveFolderCommand;
 
     private void OnTreePointerCaptureLost(object? sender, PointerCaptureLostEventArgs e) => ClearDragState();
 
@@ -396,7 +432,7 @@ public partial class VaultFolderTree : UserControl
             !target.IsEntryLeaf() &&
             !ReferenceEquals(target, source))
         {
-            accepts = MoveFolderCommand?.CanExecute(new FolderMoveRequest(source, target)) == true;
+            accepts = ActiveMoveCommand?.CanExecute(new FolderMoveRequest(source, target)) == true;
         }
 
         var item = accepts ? candidate : null;

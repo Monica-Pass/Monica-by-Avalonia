@@ -1356,7 +1356,7 @@ teardown——用户要求本地的 keepass／mdbx／bitwarden 这些数据一�
   指纹（#94 缺口 4 其余各项原样）。
 
 **机器状态**：容器 `vw-probe` 仍在跑（本轮探针又注册了一个新账号，卷里只有探针数据），`D:\Monica\probe-appdata\`
-按用户要求一字不动；收法照旧 `docker rm -f vw-probe && docker volume rm vw-probe-data`，且要等用户点头。
+按用户要求一字不动；收法照旧 `docker rm -f vw-probe && docker volume rm vw-probe-data`，且要等用户点头。
 
 ## 附：真服务器第八轮实测（2026-09-25，**#114 文件夹移动第一次推得出去——然后它自己的第一版规则在同一轮被推翻**）
 
@@ -1550,6 +1550,7 @@ commercial-release `cr_rc=0`（单测 10 `perf-budget` + 969 常规、UI 17 `per
 
 - **#116 片 B/C**：条目新增/删除、文件夹新增/改名/删除/移动都还没有界面入口——`KeePassBrowseTree` 的 `CanManageRows`
   仍是 `False`，而且会话只在打开时索引一次 `_groups / _groupsByUuid / EntryCount`，改树之后必须重索引。
+  **（下一条已把这条做掉，见「附：桌面端 .kdbx 的增删改接上树」一节；此处按原文留着，因为它记的是当时的真实状态。）**
 - **#116 片 D**：读模型仍丢历史、自定义图标、AutoType 序列、过期策略、标签、前景/背景色。表单里看得到自定义字段与附件，
   但不能编辑（原样带回，不改写）。
 - **#116 片 F**：桌面端**新建**空库与 Android kotpass 的磁盘形状还没对拍（头部默认值、`MonicaLocalId`、受保护/明文分配）；
@@ -1557,3 +1558,86 @@ commercial-release `cr_rc=0`（单测 10 `perf-budget` + 969 常规、UI 17 `per
 - `KeePassVaultError.NoSourceFile` 在 `KeePassWriteFailureKey` 里映射到通用 key，当前分支走不到它。
 - 锁定丢弃脏库这条路径（`ClearSensitiveImportBuffers` 的默认参数）没有专门测试；本轮测的是导航与换文件。
 - 截图门只回答"面板在屏幕上、帧非空"，不回答好不好看——上面那四条是人眼看出来的。
+
+## 附：桌面端 .kdbx 的增删改接上树（2026-09-26，**#118 出厂：打开的库第一次能建条目、建夹、搬家，并且人眼又抓到一条文字叠字**）
+
+### 一、这一轮把什么变成了事实
+
+- `CanManageRows` 从写死的 `False` 换成 `CanManageKeePassRows`（有打开的库且空闲），于是那棵树真的开始接受结构编辑：
+  文件夹行——新建 / 改名 / 删除 / 拖动改父级；条目行——编辑 / 删除 / 复制用户名与机密，改父级走拖到目标夹上。
+  摘要下面多了一个「新建条目」按钮，与"编辑条目 / 保存到文件 / 导入已检查条目 / 关闭文件"同一行。
+- 会话侧新增七个结构操作（`KeePassVaultSession.Manage.cs`，274 行）：`CreateGroup / RenameGroup / DeleteGroup /
+  MoveGroup / CreateEntry / DeleteEntry / MoveEntry`。每一个都改内存模型、置脏、**重索引**，所以树与计数说的是
+  "现在的库"而不是"打开那一刻的库"；文件只在点保存时才变。`KeePassVaultManageTests` 最后一条把这条闭环钉住：
+  结构改动保存后重新打开，形状一致。
+- 删非空的夹先问一次，而且带着它装了多少：`KeePassGroupDeleteResult(Status, EntryCount, GroupCount)` →
+  确认框「「{0}」中仍有 {1} 个条目和 {2} 个文件夹…」。根夹 outright 保护（不能改名、不能删、不能被拖走）。
+  把夹拖到自己、自己的当前父级、或自己的子孙上，三种都拒（那会把它从它落进的树里剪掉）。
+- 新增条目是**草稿**：`KeePassEntryEditorViewModel.CreateDraft` + `IsDraft`，"记入改动"才真的建出来——
+  点了「新建条目」又取消的人不会在库里留下一条空记录。落点=选中的夹 / 选中条目所在的夹 / 根。
+  新建的条目不带自己的历史快照，编辑过的才带（`A_created_entry_carries_no_history_snapshot_of_itself_but_an_edited_one_does`）。
+- 拖动与选择器分家（`VaultFolderTree`）：`MoveEntryToFolderCommand`（能吃拖放的宿主，= KeePass 树）与
+  `MoveEntryCommand`（弹类别选择器的宿主，= 库页）是两条命令，"移到文件夹"菜单项改由
+  `ShowsEntryFolderPicker` 决定——只有真有人应答才出现，否则它就是一个点了什么也不做的死项。
+  库页那三条 `Assert.True(tree.ShowsEntryFolderPicker)` 补在 `NoteWorkflowUiTests` 里，钉住分家之后它没被弄丢。
+- 界面级证据：`KeePassEditWorkflowUiTests` 从 1 条长成 3 条（树与七个命令的接线、条目建出来、文件字节仍是打开那一份）；
+  `VaultFolderTreeUiTests` 14 → 16 条（条目拖放、死菜单项）；单测 +17 条（10 条会话结构 + 7 条 VM 命令）。
+
+### 二、人眼抓到一条，三条负控各钉住一条
+
+1. **详情行文字叠字**（截图抓到，读代码看不出）：`SyncImportView.axaml` 详情字段模板把标签和值都塞在
+   `ColumnDefinitions="120,*"` 的第 0 列——值少了 `Grid.Column="1"`，于是"标题/用户名/网站"的值直接画在标签上面，
+   绑定和 `DisplayValue` 全都对。修完新增一条无头断言：每个两列行取那两个 TextBlock，量 `value.Bounds.X >= label.Bounds.Right`。
+   负控：把 `Grid.Column="1"` 去掉 ⇒ 该测试红在
+   `a detail value starts at x=0 while its label runs to x=120, so the two are painted on top of each other`；
+   同一条命令还原后绿。另外三处同形状的 `DisplayValue` 站点（`GeneratorResultView` / `PasswordDetailDialog` /
+   `WalletWorkbenchView`）查过，本来就带 `Grid.Column="1"`——只有这一处漏了。
+2. **拖动落点选错命令**（写的时候就知道会错，用负控钉住）：`OnTreePointerReleased` 里 `ActiveMoveCommand`
+   必须在 `ClearDragState()` **之前**读——晚读时 `_dragSourceRow` 已经是 null，条目拖放会退化成移动文件夹的命令。
+   负控：把两行顺序换过来 ⇒ `VaultFolderTreeUiTests` 16 条里恰好 1 条红（`Dragging_an_entry_row_onto_a_folder_requests_the_move`），
+   文件夹拖放那条不受影响，归属干净。
+3. **死菜单项**：负控把 `ShowsEntryFolderPicker` 改成只看 `ShowsEntryCommands` ⇒ 同样 16 条里恰好 1 条红，
+   红在 `Assert.False`。
+4. 修完重新 publish，1280x800 与 1600x1000 两张 `KeePassManage_*.png` 复核：详情栏"标题 → Smoke Managed Entry"
+   这类行值在标签右边、树里能看到新建的夹和它下面新建的条目、状态栏是中文的
+   「已向打开的数据库新增条目「…」，点击保存才会写入文件。」。1600x1000 一屏看全（含"KeePass KDBX"标题与
+   "选择 KeePass 数据库"按钮）；1280x800 那一张标题和标签页被外层滚动顶出视口了——登记为 #120，本轮没动它。
+
+### 三、截图门现在真的会拦
+
+`--smoke-ui-keepass-manage` 是 `KeePassEditWorkflowUiTests` 之外唯一能证明"发出去的那只二进制画得出这套界面"的东西
+（右键菜单和拖放在无头之外没有别的入口）。它现在被 `verify-artifact-runtime.ps1` 要求，且要求 `success=True`。
+这条强制按最后一次真跑的 `runtime.log` 回放验过三个分支：原日志 ⇒ 通过；manage 行改成 `success=False` ⇒
+`KeePass manage shot reported failure`；manage 行整行删掉 ⇒ `smoke-ui produced no KeePass manage shot result line.`。
+manage seam 的载荷性另外真打过一次：主密码给错 ⇒ `success=False, opened=False, folderAdded=False, draftOpened=False,
+entryAdded=False, unsavedNotice=False`，进程退出码 1。
+（诚实边界：那两条 throw 是把脚本的解析块对着真日志回放出来的，不是把整只门带一个坏掉的截图门跑一遍——
+端到端那一路只有正向证据。）
+
+### 四、门禁
+
+跑在本轮最后那份字节上（改动全部还原后重新测）：格式 0 改动、Release `--warnaserror` 0 warning / 0 error、
+commercial-release `GATE_RC=0`（300 行结构门通过、NuGet 漏洞审计通过、单测 10 `perf-budget` + 1001 常规、
+UI 整串 266 条 0 红＝`perf-budget` 17 + 常规 249）、重新 publish 后产物门通过——`CANONICAL VAULT passed` native=`mdbx_ffi.dll`、
+库载入 477ms 对 4000、KeePass 20000 条 openMs=803 / streamMs=215 / 增长 2.1MB 对 24MB、
+edit 帧 `success=True frameBytes=103437`、manage 帧 `success=True, folderAdded=True, draftOpened=True, entryAdded=True,
+unsavedNotice=True, treeRows=10, folderRows=5, entryRows=5, vaultBytes=3294, frameBytes=104893`、
+锁定尾窗中位 110.6MB 对 120MB、锁环 25/14/1/4 全部还原、`release gate completed success=True`、
+`UI SMOKE passed` / `RUNTIME SMOKE passed`。
+
+### 五、仍然没做到（这些是欠账，不是决定）
+
+- **右键菜单与拖放从没在真机屏幕上被手指/鼠标走过**。证据只有两张 in-process 帧 + 无头测试；帧里看得见"树多了两行"，
+  看不见菜单打开的样子，也看不见一次拖放的中间态。
+- **删条目没有二次确认**，唯一的保护是"没保存就没了"。删夹有确认、删条目没有——不一致。
+- **桌面端没有回收站概念**：`DeleteEntryAsync` 直接把条目从内存模型里摘掉。Android 侧的
+  `KeePassChangeSet / KeePassMaintenance / KeePassDatabaseSettings` 里建模了 `recycleBin`，
+  `KeePassNativeManagerScreen` 删条目和删夹都弹 `AlertDialog` 确认（只核到"有建模、有确认"这一层，
+  没核到它每次删除是否真的走回收站）。要对齐得单开一片。
+- KeePass 树的条目搬家只有拖放，没有键盘或菜单退路；库页反过来只有选择器、不能拖。两条路各缺另一条的退路。
+- #120：1280x800 的库面板外层滚动会把标题与标签页顶出视口，1600x1000 不复现。
+- 片 D：读模型仍丢历史、自定义图标、AutoType 序列、过期策略、标签、前景/背景色；自定义字段与附件看得到但不能编辑（原样带回）。
+- 片 F：桌面端**新建**空库与 Android kotpass 的磁盘形状还没对拍（头部默认值、`MonicaLocalId`、受保护/明文分配）；
+  KPCLib 不建模 `<Generator>`，桌面端重存一次 kotpass 会报 `generator=Kotpass`——**这条仍只推理过，没实测**。
+  也就是说 #118 只能编辑已有的库，还不能当"新建 KeePass 库"用。
+- `KeePassVaultError.NoSourceFile` 在 `KeePassWriteFailureKey` 里映射到通用 key，当前分支走不到它（沿用 #117 的登记）。

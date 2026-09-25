@@ -76,3 +76,19 @@ public sealed record KeePassSaveResult(
     int FileBytes,
     string PayloadSha256,
     int EntryCount);
+
+/// <summary>
+/// What deleting a folder did. A folder that still holds anything reports its contents back instead
+/// of emptying itself, so the caller can show what would go and ask once.
+/// </summary>
+public sealed record KeePassGroupDeleteResult(
+    KeePassGroupDeleteStatus Status,
+    int EntryCount,
+    int GroupCount);
+
+public enum KeePassGroupDeleteStatus
+{
+    Deleted,
+    NotEmpty,
+    NotFound
+}

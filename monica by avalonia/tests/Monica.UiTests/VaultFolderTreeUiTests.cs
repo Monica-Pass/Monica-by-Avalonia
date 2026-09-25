@@ -345,6 +345,90 @@ public sealed class VaultFolderTreeUiTests
     }
 
     [Fact]
+    public void Dragging_an_entry_row_onto_a_folder_requests_the_move()
+    {
+        var folder = new FakeFolderRow("alpha", "Alpha");
+        var entry = new FakeEntryRow("p:1", "Checking");
+        var moves = new List<FolderMoveRequest>();
+        var tree = new VaultFolderTree
+        {
+            ItemsSource = new IFolderTreeRow[] { folder, entry },
+            MoveEntryToFolderCommand = new RecordingMoveCommand(moves),
+        };
+        var window = new Window { Content = tree };
+        window.Show();
+        try
+        {
+            Dispatcher.UIThread.RunJobs();
+
+            var list = tree.FindControl<ListBox>("FolderTreeList")!;
+            var folderItem = RowContainer(list, folder);
+            var entryItem = RowContainer(list, entry);
+
+            // The host declared a command that takes a destination folder, so the row lifts.
+            window.MouseDown(CenterOf(window, entryItem), MouseButton.Left);
+            window.MouseMove(CenterOf(window, folderItem));
+            Assert.Contains("draggingSource", entryItem.Classes);
+            Assert.Contains("dropTarget", folderItem.Classes);
+
+            window.MouseUp(CenterOf(window, folderItem), MouseButton.Left);
+
+            var move = Assert.Single(moves);
+            Assert.Same(entry, move.Source);
+            Assert.Same(folder, move.Target);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [Fact]
+    public void The_entry_move_item_shows_only_where_a_picker_answers_it()
+    {
+        var folder = new FakeFolderRow("alpha", "Alpha");
+        var entry = new FakeEntryRow("p:1", "Checking");
+        var picker = new RecordingMoveCommand(new List<FolderMoveRequest>());
+        var tree = new VaultFolderTree
+        {
+            ItemsSource = new IFolderTreeRow[] { folder, entry },
+            MoveEntryCommand = picker,
+        };
+        var window = new Window { Content = tree };
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            var list = tree.FindControl<ListBox>("FolderTreeList")!;
+            var entryItem = RowContainer(list, entry);
+            window.MouseDown(CenterOf(window, entryItem), MouseButton.Right);
+            window.MouseUp(CenterOf(window, entryItem), MouseButton.Right);
+            Dispatcher.UIThread.RunJobs();
+
+            var items = MenuItems(RowContextMenuHost(entryItem)!);
+            var item = ItemFor(items, picker);
+            Assert.True(tree.IsEntrySelection);
+            Assert.True(item.IsVisible);
+
+            // The same row where entries move by drag instead: the item would run no command, so it
+            // leaves the menu rather than sitting on it as a dead button.
+            tree.MoveEntryCommand = null;
+            tree.MoveEntryToFolderCommand = new RecordingMoveCommand(new List<FolderMoveRequest>());
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(tree.ShowsEntryCommands);
+            Assert.False(tree.ShowsEntryFolderPicker);
+            Assert.Null(item.Command);
+            Assert.False(item.IsVisible);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [Fact]
     public void A_press_that_barely_moves_stays_a_click()
     {
         var source = new FakeFolderRow("alpha", "Alpha");

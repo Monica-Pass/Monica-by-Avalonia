@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.App.Controls;
 using Monica.App.Features.ImportExport;
@@ -161,6 +162,215 @@ public sealed class KeePassEditWorkflowUiTests
                     (await File.ReadAllBytesAsync(
                          fixturePath,
                          TestContext.Current.CancellationToken)).AsSpan().SequenceEqual(content));
+            }
+            finally
+            {
+                host.Close();
+                Dispatcher.UIThread.RunJobs();
+            }
+        }
+        finally
+        {
+            TryDelete(fixturePath);
+        }
+    }
+
+    [Fact]
+    public async Task KeePass_tree_renders_with_folder_and_entry_management_wired()
+    {
+        var fixturePath = Path.Combine(
+            Path.GetTempPath(),
+            "monica-uitests",
+            $"keepass-manage-{Guid.NewGuid():N}.kdbx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+        try
+        {
+            var info = await Task.Run(() =>
+                KeePassSmokeVaultWriter.Write(fixturePath, FixturePassword, entries: 3, groups: 2));
+            var content = await File.ReadAllBytesAsync(
+                fixturePath,
+                TestContext.Current.CancellationToken);
+            var picker = new SingleKeePassFileService(new PickedBinaryFile(info.FileName, content, fixturePath));
+
+            var window = new Monica.App.MainWindow();
+            using var services = Monica.App.App.ConfigureServices(window, collection =>
+            {
+                collection.AddSingleton<IFileSystemPickerService>(picker);
+            });
+            var viewModel = services.GetRequiredService<MainWindowViewModel>();
+
+            await viewModel.SelectKeePassFileCommand.ExecuteAsync(null);
+            viewModel.KeePassImportPassword = FixturePassword;
+            await viewModel.PreviewKeePassImportCommand.ExecuteAsync(null);
+
+            var view = new SyncImportView { DataContext = viewModel };
+            var host = new Window { Width = 1280, Height = 800, Content = view };
+            viewModel.SelectedSyncPage = "Import";
+            host.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            var tabs = view.FindControl<TabControl>("ImportSourceTabs")!;
+            tabs.SelectedItem = view.FindControl<TabItem>("KeePassImportTab")!;
+            Dispatcher.UIThread.RunJobs();
+            try
+            {
+                var tree = view.FindControl<VaultFolderTree>("KeePassBrowseTree")!;
+                Assert.True(tree.Bounds.Width > 0 && tree.Bounds.Height > 0);
+                Assert.True(tree.CanManageRows);
+                // Each of these is the exact command the panel declares, so a binding that lands on a
+                // neighbouring command - valid at compile time, wrong for the user - shows up here.
+                Assert.Same(viewModel.CreateKeePassFolderCommand, tree.CreateFolderCommand);
+                Assert.Same(viewModel.RenameKeePassFolderCommand, tree.RenameFolderCommand);
+                Assert.Same(viewModel.DeleteKeePassFolderCommand, tree.DeleteFolderCommand);
+                Assert.Same(viewModel.MoveKeePassFolderCommand, tree.MoveFolderCommand);
+                Assert.Same(viewModel.MoveKeePassEntryCommand, tree.MoveEntryToFolderCommand);
+                Assert.Same(viewModel.EditKeePassEntryCommand, tree.EditEntryCommand);
+                Assert.Same(viewModel.DeleteKeePassEntryCommand, tree.DeleteEntryCommand);
+                // The root is selected at open and the root is not something a user may delete.
+                Assert.False(tree.CanManageSelected);
+
+                var editorPane = view.FindControl<StackPanel>("KeePassEntryEditorPane")!;
+                Assert.False(editorPane.IsVisible);
+                // Raising Button.ClickEvent was measured not to run a Command-bound button - only the
+                // pointer pipeline calls OnClick - so the hop proved here is the one the template owns:
+                // the binding resolved to the live command, and clicking it is what opens the form.
+                var newEntryButton = view.FindControl<Button>("NewKeePassEntryButton")!;
+                Assert.Same(viewModel.NewKeePassEntryCommand, newEntryButton.Command);
+                Assert.True(newEntryButton.IsEnabled);
+                Assert.True(newEntryButton.Command!.CanExecute(null));
+                newEntryButton.Command.Execute(null);
+                Dispatcher.UIThread.RunJobs();
+
+                Assert.True(viewModel.HasKeePassEditor);
+                Assert.True(editorPane.IsVisible);
+                var titleBox = view.FindControl<TextBox>("KeePassEditTitleBox")!;
+                Assert.Equal("", titleBox.Text);
+                titleBox.Text = "Filed from the UI test";
+                await viewModel.ApplyKeePassEntryEditCommand.ExecuteAsync(null);
+                Dispatcher.UIThread.RunJobs();
+
+                Assert.False(viewModel.HasKeePassEditor);
+                Assert.Contains(
+                    "Filed from the UI test",
+                    viewModel.KeePassTreeRowsPublic.Select(row => row.Label));
+
+                // An entry of an opened .kdbx moves by drag onto a folder, so the folder-picker item
+                // the library page shows has to stay off this menu rather than sit on it inert.
+                var filedRow = Assert.Single(
+                    viewModel.KeePassTreeRowsPublic,
+                    row => row.IsEntryRow && row.Label == "Filed from the UI test");
+                await viewModel.SelectKeePassRowCommand.ExecuteAsync(filedRow);
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(tree.IsEntrySelection);
+                Assert.True(tree.ShowsEntryCommands);
+                Assert.False(tree.ShowsEntryFolderPicker);
+
+                // The inline naming box is the tree's own property; the view model has to receive what
+                // the user types into it and put the next name back for the box to show it.
+                tree.SetValue(VaultFolderTree.FolderNameProperty, "Renamed in the UI test");
+                Assert.Equal("Renamed in the UI test", viewModel.KeePassFolderName);
+                viewModel.KeePassFolderName = "Created in the UI test";
+                Assert.Equal("Created in the UI test", tree.GetValue(VaultFolderTree.FolderNameProperty));
+
+                tree.CreateFolderCommand!.Execute(null);
+                Dispatcher.UIThread.RunJobs();
+
+                Assert.Contains(
+                    "Created in the UI test",
+                    viewModel.KeePassTreeRowsPublic.Select(row => row.Label));
+                Assert.True(viewModel.KeePassVaultIsDirty);
+
+                Assert.True(
+                    (await File.ReadAllBytesAsync(
+                         fixturePath,
+                         TestContext.Current.CancellationToken)).AsSpan().SequenceEqual(content));
+            }
+            finally
+            {
+                host.Close();
+                Dispatcher.UIThread.RunJobs();
+            }
+        }
+        finally
+        {
+            TryDelete(fixturePath);
+        }
+    }
+
+    /// <summary>
+    /// The detail pane is what a user reads after adding or filing an entry, and it is a two-column
+    /// table: a field name on the left and its value on the right. Both landing in the left column
+    /// paints the value over the name, which reads as garbage on a screen and as nothing at all in a
+    /// binding assertion - so this measures where the two texts actually ended up.
+    /// </summary>
+    [Fact]
+    public async Task KeePass_detail_rows_put_the_value_beside_their_label()
+    {
+        var fixturePath = Path.Combine(
+            Path.GetTempPath(),
+            "monica-uitests",
+            $"keepass-detail-{Guid.NewGuid():N}.kdbx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+        try
+        {
+            var info = await Task.Run(() =>
+                KeePassSmokeVaultWriter.Write(fixturePath, FixturePassword, entries: 3, groups: 2));
+            var content = await File.ReadAllBytesAsync(
+                fixturePath,
+                TestContext.Current.CancellationToken);
+            var picker = new SingleKeePassFileService(new PickedBinaryFile(info.FileName, content, fixturePath));
+
+            var window = new Monica.App.MainWindow();
+            using var services = Monica.App.App.ConfigureServices(window, collection =>
+            {
+                collection.AddSingleton<IFileSystemPickerService>(picker);
+            });
+            var viewModel = services.GetRequiredService<MainWindowViewModel>();
+
+            await viewModel.SelectKeePassFileCommand.ExecuteAsync(null);
+            viewModel.KeePassImportPassword = FixturePassword;
+            await viewModel.PreviewKeePassImportCommand.ExecuteAsync(null);
+
+            var view = new SyncImportView { DataContext = viewModel };
+            var host = new Window { Width = 1280, Height = 800, Content = view };
+            viewModel.SelectedSyncPage = "Import";
+            host.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            var tabs = view.FindControl<TabControl>("ImportSourceTabs")!;
+            tabs.SelectedItem = view.FindControl<TabItem>("KeePassImportTab")!;
+            Dispatcher.UIThread.RunJobs();
+            try
+            {
+                // Entries live inside folders, and the tree opens with them collapsed.
+                var closedFolder = viewModel.KeePassTreeRowsPublic.First(row =>
+                    row is { IsEntryRow: false, IsExpanded: false, Group.HasEntries: true });
+                await viewModel.ToggleKeePassFolderCommand.ExecuteAsync(closedFolder);
+                var entryRow = viewModel.KeePassTreeRowsPublic.First(row => row.IsEntryRow);
+                await viewModel.SelectKeePassRowCommand.ExecuteAsync(entryRow);
+                Dispatcher.UIThread.RunJobs();
+
+                var detailPanes = view.GetVisualDescendants()
+                    .OfType<ContentControl>()
+                    .Where(control => control.Content is PasswordDetailViewModel)
+                    .ToList();
+                var detailPane = Assert.Single(detailPanes);
+                var fieldRows = detailPane.GetVisualDescendants()
+                    .OfType<Grid>()
+                    .Where(row => row.ColumnDefinitions.Count == 2)
+                    .ToList();
+                Assert.NotEmpty(fieldRows);
+                foreach (var row in fieldRows)
+                {
+                    var texts = row.GetVisualChildren().OfType<TextBlock>().ToList();
+                    Assert.Equal(2, texts.Count);
+                    var label = texts[0];
+                    var value = texts[1];
+                    Assert.True(
+                        value.Bounds.X >= label.Bounds.Right,
+                        $"a detail value starts at x={value.Bounds.X} while its label runs to " +
+                        $"x={label.Bounds.Right}, so the two are painted on top of each other");
+                }
             }
             finally
             {

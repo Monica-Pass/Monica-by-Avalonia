@@ -208,6 +208,17 @@ try {
             throw 'ui-seed-smoke-keepass-vault did not report success.'
         }
 
+        # The probe database is deliberately huge because it measures retention; a frame does not need
+        # 20,000 rows to be painted, and rebuilding that tree for every screenshot would only make the
+        # shot slow enough that someone turns it off. This one is sized like a screen.
+        $keepassShotPath = Join-Path $keepassDirectory 'shots.kdbx'
+        $keepassShotSeed = Invoke-ArtifactCommand -Label 'ui-seed-smoke-keepass-vault-shot' -Arguments @(
+            '--seed-smoke-keepass-vault', $keepassShotPath, 'keepass-smoke-fixture-not-a-secret',
+            '12', '3')
+        if ($keepassShotSeed -notmatch 'Smoke KeePass vault seeded') {
+            throw 'ui-seed-smoke-keepass-vault-shot did not report success.'
+        }
+
         $null = Invoke-ArtifactCommand -Label 'smoke-ui' -TimeoutSeconds $UiTimeoutSeconds -AppLogPath $uiLog -Arguments @(
             '--smoke-ui-unlock', $MasterPassword,
             '--smoke-ui-width', '1280',
@@ -223,6 +234,8 @@ try {
             '--smoke-ui-keepass-password', 'keepass-smoke-fixture-not-a-secret',
             '--smoke-ui-keepass-stream-details',
             '--smoke-ui-keepass-max-growth-mb', "$MaxKeePassGrowthMb",
+            '--smoke-ui-keepass-edit', $keepassShotPath,
+            '--smoke-ui-keepass-manage', $keepassShotPath,
             '--smoke-ui-lock-after-checks',
             '--smoke-ui-exit-after-checks'
         )
@@ -233,7 +246,8 @@ try {
 
         $gateLines = @(Get-Content -LiteralPath $uiLog | Select-String -SimpleMatch `
             'release gate completed', 'budget result', 'check failed', 'lock cycle result',
-            'KeePass probe', 'status notice retirement', 'locked settle result')
+            'KeePass probe', 'status notice retirement', 'locked settle result',
+            'KeePass edit shot', 'KeePass manage shot')
         foreach ($line in $gateLines) { Write-Host ($line.Line -replace '^\[[^\]]+\]\s*', '') }
         $gateLine = $gateLines | Where-Object { $_.Line -match 'release gate completed' } | Select-Object -Last 1
         if ($null -eq $gateLine) {
@@ -253,6 +267,20 @@ try {
 
         if ($keepassLine.Line -notmatch 'success=True') {
             throw "KeePass memory probe reported failure: $($keepassLine.Line)"
+        }
+
+        # The edit form and the row commands are reachable only behind a native file dialog, so these
+        # two in-process frames are the whole proof that the shipped binary draws them. A run where
+        # either stopped painting would otherwise leave the gate green.
+        foreach ($shot in @('KeePass edit shot', 'KeePass manage shot')) {
+            $shotLine = @($gateLines | Where-Object { $_.Line -match "$shot result" }) | Select-Object -Last 1
+            if ($null -eq $shotLine) {
+                throw "smoke-ui produced no $shot result line."
+            }
+
+            if ($shotLine.Line -notmatch 'success=True') {
+                throw "$shot reported failure: $($shotLine.Line)"
+            }
         }
 
         # Same reason: the dispatcher timer that retires status acknowledgements only exists in a
