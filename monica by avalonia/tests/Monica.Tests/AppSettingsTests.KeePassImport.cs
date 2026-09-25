@@ -140,10 +140,11 @@ public sealed partial class AppSettingsTests
             ReadOnlyMemory<byte> content,
             string fileName,
             string? password,
+            string? localPath = null,
             CancellationToken cancellationToken = default)
         {
             ReceivedPassword = password;
-            var session = await _inner.OpenAsync(content, fileName, password, cancellationToken);
+            var session = await _inner.OpenAsync(content, fileName, password, localPath, cancellationToken);
             OpenedSession = session;
             return session;
         }

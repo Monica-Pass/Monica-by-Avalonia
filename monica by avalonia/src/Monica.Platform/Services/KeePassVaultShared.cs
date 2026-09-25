@@ -50,11 +50,26 @@ internal static class KeePassVaultFaults
     public static KeePassVaultException ResourceLimitExceeded() => new(
         KeePassVaultError.ResourceLimitExceeded,
         "The KeePass database exceeds the safe opening limits.");
+
+    public static KeePassVaultException WriteFailed() => new(
+        KeePassVaultError.WriteFailed,
+        "The KeePass database could not be written in a state that verifies.");
+
+    public static KeePassVaultException ConcurrentChange() => new(
+        KeePassVaultError.ConcurrentChange,
+        "The KeePass file changed on disk after it was opened. Reload it before saving.");
+
+    public static KeePassVaultException NoSourceFile() => new(
+        KeePassVaultError.NoSourceFile,
+        "This KeePass session was not opened from a file, so it cannot save in place.");
 }
 
 internal static class KeePassVaultText
 {
-    private static readonly string[] TotpFieldNames = ["otp", "TOTP Seed"];
+    /// <summary>
+    /// Field names Android writes a TOTP seed under. The first is the one Monica writes back.
+    /// </summary>
+    public static IReadOnlyList<string> TotpFieldNames { get; } = ["otp", "TOTP Seed"];
 
     public static string ReadTotp(PwEntry entry)
     {
@@ -75,6 +90,17 @@ internal static class KeePassVaultText
 
     public static string NormalizeDisplayText(string? value, string fallback) =>
         string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+
+    /// <summary>
+    /// A custom field name as it can safely reach the XML layer. Control characters have no
+    /// representation in the document format other clients parse, so an unusable name is dropped
+    /// rather than written.
+    /// </summary>
+    public static string NormalizeFieldName(string? value)
+    {
+        var name = value?.Trim() ?? "";
+        return name.Length is 0 or > 128 || name.Any(char.IsControl) ? "" : name;
+    }
 
     public static string NormalizeFileName(string? fileName)
     {

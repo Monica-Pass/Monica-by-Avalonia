@@ -179,7 +179,7 @@ public sealed partial class PlatformServiceTests
         cancellation.Cancel();
 
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
-            service.OpenAsync(fixture.Content, "cancelled.kdbx", fixture.Password, cancellation.Token));
+            service.OpenAsync(fixture.Content, "cancelled.kdbx", fixture.Password, null, cancellation.Token));
     }
 
     [Fact]

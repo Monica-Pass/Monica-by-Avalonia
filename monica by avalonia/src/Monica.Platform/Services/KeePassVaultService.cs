@@ -10,20 +10,23 @@ public sealed class KeePassVaultService : IKeePassVaultService
         ReadOnlyMemory<byte> content,
         string fileName,
         string? password,
+        string? localPath = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         KeePassVaultLimits.EnsureFileSize(content.Length);
         var safeFileName = KeePassVaultText.NormalizeFileName(fileName);
         var ciphertext = content.ToArray();
+        var sourcePath = localPath?.Trim();
         return Task.Run(
-            () => OpenCore(ciphertext, safeFileName, password, cancellationToken),
+            () => OpenCore(ciphertext, safeFileName, sourcePath, password, cancellationToken),
             cancellationToken);
     }
 
     private static KeePassVaultSession OpenCore(
         byte[] ciphertext,
         string fileName,
+        string? sourcePath,
         string? password,
         CancellationToken cancellationToken)
     {
@@ -41,7 +44,7 @@ public sealed class KeePassVaultService : IKeePassVaultService
             using var stream = new MemoryStream(ciphertext, writable: false);
             new KdbxFile(database).Load(stream, KdbxFormat.Default, null);
             cancellationToken.ThrowIfCancellationRequested();
-            var session = new KeePassVaultSession(database, fileName, cancellationToken);
+            var session = new KeePassVaultSession(database, fileName, sourcePath, ciphertext, cancellationToken);
             ownershipTransferred = true;
             return session;
         }

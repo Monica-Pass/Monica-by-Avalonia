@@ -4,7 +4,10 @@ public enum KeePassVaultError
 {
     InvalidCredentialsOrFile,
     UnsupportedFormat,
-    ResourceLimitExceeded
+    ResourceLimitExceeded,
+    WriteFailed,
+    ConcurrentChange,
+    NoSourceFile
 }
 
 public sealed class KeePassVaultException(KeePassVaultError error, string message, Exception? innerException = null)
@@ -52,3 +55,24 @@ public sealed record KeePassCustomField(
 public sealed record KeePassAttachmentContent(
     KeePassAttachmentRow Row,
     ReadOnlyMemory<byte> Content);
+
+/// <summary>
+/// The complete editable content of one entry. Applying an edit replaces the entry's standard
+/// fields, its TOTP field and its whole custom field set, so a caller has to build it from a detail
+/// it just read; whatever the edit leaves out is dropped when the file is saved.
+/// </summary>
+public sealed record KeePassEntryEdit(
+    string EntryUuid,
+    string Title,
+    string UserName,
+    string Password,
+    string Url,
+    string Notes,
+    string AuthenticatorKey,
+    IReadOnlyList<KeePassCustomField> CustomFields);
+
+public sealed record KeePassSaveResult(
+    string Path,
+    int FileBytes,
+    string PayloadSha256,
+    int EntryCount);

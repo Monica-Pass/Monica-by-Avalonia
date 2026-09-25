@@ -73,7 +73,7 @@ public sealed class AvaloniaFileSystemPickerService(
 
         await using var stream = await file.OpenReadAsync();
         var content = await ReadBinaryContentAsync(stream, declaredLength, cancellationToken);
-        return new PickedBinaryFile(file.Name, content);
+        return new PickedBinaryFile(file.Name, content, file.TryGetLocalPath());
     }
 
     internal static Task<byte[]> ReadBinaryContentAsync(

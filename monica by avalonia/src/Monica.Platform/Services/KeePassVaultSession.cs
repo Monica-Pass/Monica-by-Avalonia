@@ -8,7 +8,7 @@ namespace Monica.Platform.Services;
 /// re-read the file, while entry secrets and attachment bytes are resolved one entry at a time
 /// instead of being projected for the whole database up front.
 /// </summary>
-public sealed class KeePassVaultSession : IDisposable
+public sealed partial class KeePassVaultSession : IDisposable
 {
     private PwDatabase? _database;
     private PwGroup? _root;
@@ -17,11 +17,19 @@ public sealed class KeePassVaultSession : IDisposable
     private readonly SemaphoreSlim _gate = new(1, 1);
     private bool _disposed;
 
-    internal KeePassVaultSession(PwDatabase database, string fileName, CancellationToken cancellationToken)
+    internal KeePassVaultSession(
+        PwDatabase database,
+        string fileName,
+        string? sourcePath,
+        ReadOnlySpan<byte> payload,
+        CancellationToken cancellationToken)
     {
         _database = database;
         _root = database.RootGroup ?? throw KeePassVaultFaults.InvalidFile();
         SourceFileName = fileName;
+        SourcePath = string.IsNullOrWhiteSpace(sourcePath) ? null : Path.GetFullPath(sourcePath.Trim());
+        FormatVersion = KeePassVaultWrite.ReadFormatVersion(payload);
+        PayloadSha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(payload));
         RootGroupUuid = _root.Uuid.ToHexString();
         DatabaseId = KeePassVaultText.CreateDatabaseId(_root.Uuid.UuidBytes);
         DatabaseName = string.IsNullOrWhiteSpace(database.Name)

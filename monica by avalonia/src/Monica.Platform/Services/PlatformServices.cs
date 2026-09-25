@@ -176,10 +176,15 @@ public sealed record OneDriveSignInChallenge(
 
 public interface IKeePassVaultService
 {
+    /// <param name="localPath">
+    /// The path the content was read from. Passing it is what lets the session save back in place,
+    /// so a session opened without one is read-only.
+    /// </param>
     Task<KeePassVaultSession> OpenAsync(
         ReadOnlyMemory<byte> content,
         string fileName,
         string? password,
+        string? localPath = null,
         CancellationToken cancellationToken = default);
 }
 

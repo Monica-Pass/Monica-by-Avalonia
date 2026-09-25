@@ -64,6 +64,7 @@ public sealed partial class MainWindowViewModel
                 _keePassPendingFile.Content,
                 _keePassPendingFile.FileName,
                 password,
+                _keePassPendingFile.FullPath,
                 cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             _keePassVaultSession = session;

@@ -36,7 +36,11 @@ public interface IPlatformIntegrationService
 public sealed record PlatformFilePickerFileType(string Name, IReadOnlyList<string> Patterns);
 
 public sealed record PickedTextFile(string FileName, string Content);
-public sealed record PickedBinaryFile(string FileName, byte[] Content);
+/// <param name="FullPath">
+/// The local path the content came from when the platform exposes one. Callers that can write the
+/// file back need it; a picker that hands over bytes alone leaves the session read-only.
+/// </param>
+public sealed record PickedBinaryFile(string FileName, byte[] Content, string? FullPath = null);
 
 public interface ISecretProtector
 {
