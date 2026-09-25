@@ -64,6 +64,8 @@
 | `d1fdf59` | **Bitwarden 收不下的本机改动第一次带着原因走到界面（#112，闭上 §7 那条可诊断性缺口）**。旧形状：`EnqueueDriftedAsync` 算出 `Refused` 就把它丢掉、队列不记账、同一轮 pull 再用服务器那份盖回那一行，屏幕上写的是"已同步"——一条永远推不出去的改动唯一的线索是探针自己打印的 `localRev=(none)`。新增 `src/Monica.Core/Bitwarden/BitwardenPayloadRefusal.cs`：六个原因码（`MissingRemoteRevision`／`UnsupportedShape`／`HasAttachments`／`MissingTitle`／`UnsupportedContent`／`PayloadTooLarge`，每一个都是用户接受得了或改得动的状态）、`BitwardenPayloadRefusalException : BitwardenProtocolException`（**子类化而不是替换**，因此既有 catch 一处不改：队列照旧停车、测试照旧断言被拒、协调器照旧消毒消息）、`BitwardenPayloadRefusalInfo`（码与给日志的那句绑在一起，判据和解释不能分头漂）、`BitwardenUnsyncableLocalChange(Title, IsPassword, Reason)`（**只带标题和码，永远不带密钥字段**——这份列表会走到同步页与诊断日志）。编码器 11 处拒绝点各自点名（`UnsupportedShape` 5、`MissingTitle` 2、`PayloadTooLarge` 2、`HasAttachments` 1、`UnsupportedContent` 1），队列那一处 `MissingRemoteRevision` 由判据自己带上；只报了字段名而没分类的老闸门归入 `UnsupportedContent` 并保留原句，所以"有闸门但没分类"也漏不掉。`BitwardenLocalChangeQueueResult(Enqueued, Refused, Unsyncable)` 里 `Refused == Unsyncable.Count` 由构造钉住（只读计数的调用方无法少报它即将展示的清单）；协调器把它带进 `BitwardenSyncResult.Unsyncable`；App 侧新 partial `MainWindowViewModel.BitwardenUnsyncableChanges.cs` + `BitwardenSyncSourceView.axaml` 的 `BitwardenUnsyncableItem` 段落（12 个 key 中英各一份）。可见性按**账户 id** 判而不是"选中变空就清空"——账户列表几乎每个 Bitwarden 动作都会重载，后者会在警告出现的那一刻把它撤掉；列表**不从存储读**：拒绝是一轮的属性，那行后来被修好或被用户删掉（删掉根本不需要编码器）就必须自己从屏幕上消失，不需要谁去清。诊断日志只写 `code:count`，不写标题。覆盖：单测 +4（队列 3：名单点名条目与编码器给的那个原因／一条只因没有 revision 被拒／不再被拒就不再出现在名单上；协调器 1：`SyncAsync` 把被拒条目交给调用方）+ UI +2（真视图里段落带原因出现；只在债站着时可见）。**一条被实测推翻的前提**：动手时的说法是"这一条从此每一轮都被拒"，真服务器量出来是**拒它的那一轮**列得出来（`s18_sync_shape rows=1`）、下一轮同一形状静默（`s18_sync_shape_again rows=0`，因为本地已经没有待推的改动），唯一出路是从冲突列表取回备份、在下一次同步之前把形态改成 Bitwarden 能存的——实测 `enqueued=1 refused=0` ⇒ `Claimed=1/Completed=1` ⇒ `edit_travelled=True conflicts_left=0`；取回而不改形态照旧被拒（`s18_scan_after_restore refused=1`）。中英两句分区说明因此按实测重写，指向"形态"而不是"再同步一次"。 |
 | `6e99e22` | **本机文件夹移动第一次推得出去（#114，接 #94 缺口 4 的"位置"）**。库页改的是 `CategoryId`，而漂移指纹与载荷读的是 `bitwarden_folder_id` 列 ⇒ 两边各自都"对"，移动在服务器上看不到（先量红：新测试 `Expected: 1 / Actual: 0`）。修法是一份共享投影 `src/Monica.Data/Bitwarden/BitwardenLocalFolderProjection.cs`：`BitwardenLocalChangeQueue`（构造函数多一个 `IBitwardenRemoteFolderStore`）与 `BitwardenPullMergeService.LoadLocalContextAsync` **都**先投影再算指纹，判断与载荷因此不可能各说一套。**第一版留的"本机的夹没有 counterpart 就沿用那一列"回退，被同一轮真服务器实测推翻**（每一步都 `local_folder=(none)`：那一列只有 pull 会写、而成功的 push 之后 pull 读到 NoChange 什么都不写；加上 `SavePasswordAsync` 的 `COALESCE` 让它永不清零），已改成**只从本地树推导**：绑到远端夹答那个夹，其余一律答根。覆盖 `BitwardenLocalChangeQueueTests` +4（42 条）、负控四批 + 批次4 真打（把旧回退装回去 → 恰那一条红 `Expected: 1 / Actual: 0`）。真服务器第九轮 8 项读数同形：`into_first/into_second` 各 `enqueued=1` → 服务器落点等于目标夹、`at_root=True keeps_local_folder=True`、每步 `owed_again=0 conflicts=0`（见文末第八、九轮）。**未做**：界面对"放进 Bitwarden 收不下的本机夹 = 服务器上到根"没有任何提示，镜像夹下面用户自建的子夹同属这一类。
 
+| `517eec9` | **桌面端建出的库第一次按 Android 的形状落盘（#115，用户要求"两边创建的文件必须一模一样、完全相同"）**。先量清 Android 到底认什么：隐藏根项目 `.monica-root`（`Mdbx2VaultSessionExecutor.kt:665/673`，id = `UUID.nameUUIDFromBytes("monica-root:{vaultId}")`）、夹的父子关系**只**落在 `MdbxCollectionSummary.groupId`、条目写入一律 `execute_write_operation` + 客户端自带 id。桌面端此前既不建根、又无条件写 `mdbx_folder_id`，于是 **Android 往桌面端建的库存一条"没有分类"的条目会直接失败**（实测：向不存在的项目写条目，引擎抛 Storage 错误）。补的东西：① `MdbxAndroidRoot`（`src/Monica.Data/Mdbx/`）复刻 Java 的 v3 UUID，读写路径经 `EnsureRootProjectAsync` 惰性补齐，无分类条目落根且载荷里**不含** `mdbx_folder_id`（实测键不存在，不是写 null）；② 夹走 `CreateProjectWithIdentityAsync(clientUuid, title, parent=root)` + kind `monica-create-folder`。**最关键的一条证据不是我们自己算的**：本机有且只有两份 Android 真跑出来的 `.mdbx`（`Monica-all/.codex-tasks/20260731-mdbx2-local-create-failure/raw/`，schema 17），用只读 SQLite 读出来——`vault_meta` **15 列同名同序**、取值 `MDBX-2/17/MDBX-1/MDBX-2/multi/2/compliant/mdbx-vault-header-hmac-sha256-v1`，而两份都是 `commits=1 / commit_operations=0 / projects=0 / entries=0` 且**都没有根项目**；建库日期（07-31）晚于 Android 根功能落地（`3a3086b6` 07-28、`81ef058b` 07-29，`git log -S` 查过），`createMigrationFolders` 是 MDBX-1→2 的夹迁移不是补根 ⇒ **"建完还没写过东西"的库天生没有根**，桌面端的惰性补齐是必要的，而 Android 自己的打开路径（`:338-392` 三条只做 openVault）对这种半成品库照样会踩 §2.2 那条写失败。**六条负控真打**：① `ToFfiMode` 的 `Multi` 临时接到 `Power` ⇒ 外壳测试立刻红，而且红在 `tiga_compliance_status`（`Expected: compliant / Actual: remediation-required`，比 `default_tiga_mode` 更早炸）——建库模式会决定合规位，要对齐的不止那一格；② 新建后先插一个 project ⇒ 空库那条红在 `Expected: projects=0 / Actual: projects=1`（连带 `commits 1→2`、`commit_operations 0→1`）；③ 版本 nibble 写成 v4 ⇒ **只有** Java 向量那组红，存储层测试全绿（两边都用自家函数算 id，对称地错——这就是为什么必须钉跨语言向量：`nameUUIDFromBytes("test")=098f6bcd-4621-3373-8ade-4e832627b4f6`、`rootProjectId("test")=a422cc5f-e505-3b65-b298-fbf94de90dd8`）；④ 拔掉父链接 ⇒ 只红 `groupId` 那一条；⑤ 不建根 ⇒ 3 条红；⑥ 无条件写 `mdbx_folder_id` ⇒ 3 条红。覆盖：`MdbxVaultShapeParityTests` 2 + `MdbxAndroidRootTests`（Theory + 形状）+ `MdbxUniffiBindingTests` 真 dll 布局 1 + `MdbxRepositoryTests` 树形 1，另删掉零读写的 `PasswordEntry.MdbxLogicalEntryId`。**诚实边界（别读成"整库互通已验"）**：那两份 Android 库的**密码不在手**，桌面端从未解锁过任何一座 Android 建的库，能对的只有外壳与写出形状；`.kdbx` 两边**不等价**（Android kotpass 0.10.0 读+写，桌面端 KPCLib 2.0.4 只导入、丢历史/自定义图标/AutoType）；桌面端 passkey 私钥在本机 SQLite 而非 mdbx 载荷，Android 看不见；Android 的 `steam-mafile` 桌面端不认识；随包 dll 来源链与那 5 个 overlay 补丁未核。跨仓规格写在 `Monica-all/mdbx-android-desktop-interop-handoff.md`（工作区根，不改 Android 代码）。门禁（就 `517eec9` 这份字节）：格式 0 改动、Release **0 Warning(s)**、commercial-release `cr_rc=0`（单测 10 `perf-budget` + **969 常规**、UI 17 + 244，末行 `Commercial release verification passed.`）、`pub_rc=0 / art_rc=0`（`CANONICAL VAULT passed`、loadMs=224/4000、KeePass 20000 条 openMs=1324 增长 **2.5MB**/24、锁定态 **112.5MB**/120、锁/解 25/14/1/4、canonical passwords=27 notes=14 categories=6 attachmentOwners=6）。**另记一条不利的取证事实**：整串单测在**同一进程并行**跑时会出两条墙钟红（`Vault_snapshot_loader_fans_out_reads_after_password_snapshot` 842ms 对上限 4×188=752ms、`Searching_a_library_of_payloads_rebuilds_the_tree_within_its_budget` 444ms 对 400ms），隔离复跑 3/3 绿、按 CI 的通道拆开跑 979/979 全绿 ⇒ 是负载计时抖动，不是新缺陷；上一轮那条"没抓到测试名的单次红"很可能就是同一族，但没有名字证据，不许写成已确认。 |
+
 §3 的 use-case 抽取改动已提交（`24d92b0`），OneDrive/WebDAV 冲突副本复用修复已提交（`957c5af`）。
 
 ## 3. Task #27（ViewModel 抽 use-case）状态 — 已可判定完成
@@ -1446,3 +1448,62 @@ counterpart 的夹"。**负控批次4 真打**：把第八轮那条被推翻的�
 **机器状态**：容器 `vw-probe` 仍在跑（第八、九两轮各注册一个新账号，卷里只有探针数据），
 `D:\Monica\probe-appdata\` 按用户要求一字不动；收法照旧 `docker rm -f vw-probe && docker volume rm vw-probe-data`，
 且要等用户点头。
+
+## 附：Android↔桌面端本地库互通对拍（2026-09-25，本轮唯一目标是"两边创建的文件必须一模一样"）
+
+### 一、手上真正有什么证据（先把最弱的一条摆前面）
+
+桌面上有**两份 Android 真跑出来的 `.mdbx`**：`Monica-all/.codex-tasks/20260731-mdbx2-local-create-failure/raw/`
+里的 `ascii-create.mdbx` 与 `中文创建.mdbx`（2026-07-31 建，schema 17）。用只读 SQLite 直接读出来的原话是：
+
+- 两份的 `vault_meta` **同为 15 列、同序**，取值一致：`format_version=MDBX-2`、`schema_version=17`、
+  `min_reader_version=MDBX-1`、`min_writer_version=MDBX-2`、`default_tiga_mode=multi`、`tiga_policy_version=2`、
+  `tiga_compliance_status=compliant`、`header_integrity_profile=mdbx-vault-header-hmac-sha256-v1`；
+- 两份都是 `commits=1 / commit_operations=0 / projects=0 / entries=0`，**都没有 `.monica-root`**。
+  建库时间晚于 Android 根功能落地（`3a3086b6` 07-28、`81ef058b` 07-29），`git log -S` 查过；
+  `createMigrationFolders`（`Mdbx2Repository.kt:524`）是 MDBX-1→2 的夹迁移，不是补根。
+  ⇒ **结论：Android 自己"新建后尚未写入"的库就是没有根项目的**，桌面端 `EnsureRootProjectAsync` 的惰性补齐是必要的，不是防御性的多余。
+- 它们的密码不在手，所以"桌面端解锁一座 Android 建的库"**这一轮仍然没验过**，不许读成已确认。
+
+### 二、把"一模一样"钉成了什么
+
+1. `MdbxVaultShapeParityTests`（新）：桌面端新建库的 `vault_meta` 与上面那 15 列**同名同序同值**，
+   且新建出来的文件与那两份"建了没写"的 Android 库**同样空**。
+   **负控两条真打**：① 把 `ToFfiMode` 的 `Multi` 临时接到 `Power` ⇒ 外壳那条立刻红，而且红在
+   `tiga_compliance_status`：`Expected: compliant / Actual: remediation-required`（比 `default_tiga_mode` 更早炸）——
+   建库用的 TIGA 模式会决定合规位，两边要对齐的不止那一格；② 新建之后先插一个 project ⇒ 空库那条红在
+   `Expected: projects=0 / Actual: projects=1`（同时 `commits 1→2`、`commit_operations 0→1`）。还原后 2/2 绿。
+2. `MdbxAndroidRootTests`（新）：`UUID.nameUUIDFromBytes` 的复刻用 **Java 真跑出来的三条向量**钉死
+   （`test`→`a422cc5f-e505-3b65-b298-fbf94de90dd8` 等），外加 v3/variant 两个 nibble 的形状断言。
+   **为什么非要外部向量**：负控③把版本 nibble 写错成 v4 时，只有这 4 条红，存储层测试**全绿**——
+   因为两边都用自己的函数算 id，对称地错。这类缺陷只能靠跨语言向量抓。
+3. `MdbxUniffiBindingTests.Native_store_lays_out_the_root_project_and_folder_links_android_expects`（新）：
+   在**真 dll** 上量布局——根项目标题/id、文件夹的 `groupId` 指向根、无分类条目落在根且载荷里**没有** `mdbx_folder_id`、
+   有分类条目落 own 夹且载荷里有。负控④拔掉父链接 ⇒ 只红 `groupId` 那一条；负控⑤不建根 ⇒ 3 条红；
+   负控⑥无条件写 `mdbx_folder_id` ⇒ 3 条红。
+4. `MdbxRepositoryTests.Repository_files_the_project_tree_the_way_android_reads_it`（新）：同一件事的存储层口径，
+   fake 桥补了 `GetParentProjectId / GetProjectIdByTitle / GetProjectIdForEntry` 才问得出来。
+5. 顺手清掉一处死码：`PasswordEntry.MdbxLogicalEntryId` 全仓零读写，删。
+
+### 三、门禁
+
+跑在提交 `517eec9` 那份字节上：格式 0 改动、Release `--warnaserror` 0 warning、
+commercial-release `cr_rc=0`（单测 10 `perf-budget` + 969 常规、UI 17 `perf-budget` + 244 常规）、
+产物级 `pub_rc=0 / art_rc=0`（`CANONICAL VAULT passed`、loadMs=224/4000、KeePass 20000 条增长 2.5MB/24、
+锁定态 112.5MB/120、锁/解往返 25/14/1/4、canonical passwords=27 notes=14 categories=6 attachmentOwners=6）。
+
+**两条只在"整串单测同进程并行"下出现的红，如实记下**：`Vault_snapshot_loader_fans_out_reads_after_password_snapshot`
+（842ms 对上限 4×188=752ms）与 `Searching_a_library_of_payloads_rebuilds_the_tree_within_its_budget`（444ms 对 400ms）。
+隔离复跑三次 5/5 全绿，按 CI 的通道拆开跑（10 + 969）全绿 ⇒ 判定为负载计时抖动。
+上一轮那次"1 条红但没抓到测试名"的运行很可能是同一族，但**没有名字证据，不写成已确认的 flake**。
+
+### 四、仍然不等价的部分（**这些是产品决定，不是实现欠账**）
+
+- **`.kdbx` 不是一条线**：Android 用 kotpass 0.10.0（读+写），桌面端用 KPCLib 2.0.4（只导入、不写回），
+  并且桌面端丢历史、自定义图标、AutoType。两边写出的 `.kdbx` 字节**不等价**，也不打算在这一轮等价——
+  要用户拍：桌面端要不要写回 kdbx，还是明确定位成"只能导入"。
+- **passkey 私钥**只在本机 SQLite（`passkey_private_keys`），不在 mdbx 载荷里 ⇒ Android 看不见桌面端建的 passkey，反之亦然。
+- Android 的 `steam-mafile` 载荷类型桌面端不认识；两边"谁认识哪些类型"仍然只写在各自己的常量里（交接文档 §2.3）。
+- 随包 `mdbx_ffi.dll` 的来源链、Android 那 5 个 overlay 补丁是否影响保险库字节：都未核。
+
+跨仓规格写在 `Monica-all/mdbx-android-desktop-interop-handoff.md`（工作区根，**不在任何仓里，不改 Android 代码**）。
