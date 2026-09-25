@@ -83,7 +83,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IBitwardenConflictRestoreService? bitwardenConflictRestoreService = null,
         IBitwardenDeviceIdentityProvider? bitwardenDeviceIdentityProvider = null,
         IAutoTypeService? autoTypeService = null,
-        IBitwardenPurgeQueue? bitwardenPurgeQueue = null)
+        IBitwardenPurgeQueue? bitwardenPurgeQueue = null,
+        IBitwardenStuckEraseService? bitwardenStuckEraseService = null)
     {
         _viewModelDispatcher = Dispatcher.CurrentDispatcher;
         _repository = repository;
@@ -107,6 +108,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _bitwardenPendingOperationStore = bitwardenPendingOperationStore;
         _bitwardenConflictBackupStore = bitwardenConflictBackupStore;
         _bitwardenConflictRestoreService = bitwardenConflictRestoreService;
+        _bitwardenStuckEraseService = bitwardenStuckEraseService;
         _bitwardenDeviceIdentityProvider = bitwardenDeviceIdentityProvider;
         _bitwardenPurgeQueue = bitwardenPurgeQueue;
         if (_bitwardenSyncCoordinator is not null)

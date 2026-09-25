@@ -82,6 +82,8 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(BitwardenChallengeDescription));
         OnPropertyChanged(nameof(HasBitwardenConflicts));
         OnPropertyChanged(nameof(CanResolveBitwardenConflicts));
+        OnPropertyChanged(nameof(HasBitwardenStuckErasures));
+        OnPropertyChanged(nameof(CanResolveBitwardenStuckErasures));
         RaiseBitwardenPublishState();
         RefreshSyncHealthItems();
     }
@@ -107,6 +109,7 @@ public sealed partial class MainWindowViewModel
 
         RaiseBitwardenState();
         _ = LoadBitwardenConflictsAsync();
+        _ = LoadBitwardenStuckErasuresAsync();
     }
 
     private void OnBitwardenSyncStateChanged(object? sender, BitwardenSyncState state) =>
@@ -120,6 +123,10 @@ public sealed partial class MainWindowViewModel
             if (state.Phase is BitwardenSyncPhase.Completed or BitwardenSyncPhase.Failed)
             {
                 _ = LoadBitwardenAccountsAsync();
+                // A push attempt is what turns a delete into a stuck erase, so a finished synchronization is
+                // the moment this list gains or loses a row. Without the read the user would have to select
+                // another account and come back to see the decision the sync just made for them.
+                _ = LoadBitwardenStuckErasuresAsync();
             }
         });
 

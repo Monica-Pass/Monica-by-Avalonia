@@ -189,6 +189,39 @@
                     </fa:FASettingsExpanderItem.Footer>
                 </fa:FASettingsExpanderItem>
 
+                <fa:FASettingsExpanderItem Content="{Binding L[BitwardenStuckEraseSectionTitle]}"
+                                           Description="{Binding L[BitwardenStuckEraseSectionDescription]}"
+                                           IsVisible="{Binding HasBitwardenStuckErasures}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <StackPanel x:Name="BitwardenStuckEraseSection" Spacing="8" MinWidth="300" MaxWidth="680" HorizontalAlignment="Stretch">
+                            <ItemsControl ItemsSource="{Binding BitwardenStuckErasures}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:BitwardenStuckEraseDisplayItem">
+                                        <Border Padding="12,10" CornerRadius="6" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding CipherText}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                    <StackPanel Spacing="2">
+                                                        <TextBlock Text="{Binding ReasonText}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                                        <TextBlock Text="{Binding LastAttemptText}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                                <Button Grid.Column="1" x:Name="BitwardenStuckEraseAbandonButton" Classes="workspaceCommand"
+                                                        Command="{Binding #BitwardenSyncSourceRoot.DataContext.AbandonBitwardenStuckEraseCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        IsEnabled="{Binding #BitwardenSyncSourceRoot.DataContext.CanResolveBitwardenStuckErasures}"
+                                                        AutomationProperties.Name="{Binding #BitwardenSyncSourceRoot.DataContext.L[BitwardenStuckEraseAction]}">
+                                                    <TextBlock Text="{Binding #BitwardenSyncSourceRoot.DataContext.L[BitwardenStuckEraseAction]}" />
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+
                 <fa:FASettingsExpanderItem Content="{Binding L[BitwardenConnectAccount]}"
                                            Description="{Binding L[BitwardenConnectAccountDescription]}"
                                            IsVisible="{Binding !IsBitwardenConnectionEditorVisible}">

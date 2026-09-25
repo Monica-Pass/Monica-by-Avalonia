@@ -35,6 +35,7 @@ public sealed class BitwardenSyncWorkflowUiTests
         Assert.NotNull(view.FindControl<Button>("BitwardenDisconnectButton"));
         Assert.NotNull(view.FindControl<StackPanel>("BitwardenConnectionForm"));
         Assert.NotNull(view.FindControl<StackPanel>("BitwardenConflictSection"));
+        Assert.NotNull(view.FindControl<StackPanel>("BitwardenStuckEraseSection"));
         Assert.NotNull(view.FindControl<Button>("BitwardenAuthenticateButton"));
         Assert.NotNull(view.FindControl<Button>("BitwardenCancelConnectionButton"));
         Assert.Equal('*', view.FindControl<TextBox>("BitwardenMasterPasswordBox")!.PasswordChar);
@@ -391,6 +392,121 @@ public sealed class BitwardenSyncWorkflowUiTests
         Assert.Empty(viewModel.BitwardenOperationError);
     }
 
+    // A delete the server would not take is the one sync outcome nobody can undo on their own: the queue has
+    // stopped retrying, the entry is gone here and still alive there, and the pull keeps honouring the debt.
+    // The list has to name each stuck erase separately and act on exactly the row it was given - the conflicts
+    // next to it are a different decision about different content and must stay put.
+    [Fact]
+    public async Task Abandoning_a_stuck_erase_drops_only_that_row()
+    {
+        var account = CreateAccount(id: 7, connected: true);
+        var authentication = new FakeAuthenticationService(_ => new BitwardenAuthenticationResult(
+            true,
+            account,
+            CreateSecrets(),
+            BitwardenLoginChallengeKind.None));
+        var conflicts = new FakeConflictRestoreService();
+        var erasures = new FakeStuckEraseService();
+        using var fixture = CreateFixture(
+            authentication,
+            conflictRestore: conflicts,
+            stuckErasures: erasures);
+        var viewModel = fixture.ViewModel;
+        viewModel.IsUnlocked = true;
+        viewModel.BitwardenEmail = account.Email;
+        viewModel.BitwardenMasterPassword = "master password";
+
+        RunOnUiThread(() => viewModel.AuthenticateBitwardenCommand.ExecuteAsync(null));
+        RunJobsUntil(
+            () => viewModel.BitwardenStuckErasures.Count == 2 && viewModel.BitwardenConflicts.Count == 1,
+            "the stuck-erase list never filled once the account was selected");
+
+        Assert.True(viewModel.HasBitwardenStuckErasures);
+        Assert.True(viewModel.CanResolveBitwardenStuckErasures);
+        var refused = Assert.Single(
+            viewModel.BitwardenStuckErasures,
+            row => row.ReasonText == viewModel.L.Get("BitwardenStuckEraseReasonFailed"));
+        var raced = Assert.Single(
+            viewModel.BitwardenStuckErasures,
+            row => row.ReasonText == viewModel.L.Get("BitwardenStuckEraseReasonConflict"));
+        Assert.Contains("cipher-erase-refused", refused.CipherText, StringComparison.Ordinal);
+        Assert.Contains("20", refused.LastAttemptText, StringComparison.Ordinal);
+        var conflictRow = Assert.Single(viewModel.BitwardenConflicts);
+
+        RunOnUiThread(() => viewModel.AbandonBitwardenStuckEraseCommand.ExecuteAsync(refused));
+        RunJobsUntil(
+            () => viewModel.BitwardenStuckErasures.Count == 1,
+            "the abandoned erase never left the list");
+
+        Assert.Equal([(7L, refused.OperationId)], erasures.Abandoned);
+        Assert.Equal([raced], viewModel.BitwardenStuckErasures);
+        Assert.Empty(conflicts.Restored);
+        Assert.Empty(conflicts.Discarded);
+        Assert.Equal([conflictRow], viewModel.BitwardenConflicts);
+        Assert.Empty(viewModel.BitwardenOperationError);
+    }
+
+    // Two rows are materialized on purpose. A template that bound the command parameter to the wrong
+    // instance would render a list where abandoning one erase quietly retires another, and only the rendered
+    // hop - not the view model call above - can show which row a button is actually carrying.
+    [Fact]
+    public async Task A_stuck_erase_row_resolves_the_command_declared_outside_its_template()
+    {
+        var account = CreateAccount(id: 7, connected: true);
+        var authentication = new FakeAuthenticationService(_ => new BitwardenAuthenticationResult(
+            true,
+            account,
+            CreateSecrets(),
+            BitwardenLoginChallengeKind.None));
+        var erasures = new FakeStuckEraseService();
+        using var fixture = CreateFixture(authentication, stuckErasures: erasures);
+        var viewModel = fixture.ViewModel;
+        viewModel.IsUnlocked = true;
+        viewModel.BitwardenEmail = account.Email;
+        viewModel.BitwardenMasterPassword = "master password";
+        await viewModel.AuthenticateBitwardenCommand.ExecuteAsync(null);
+        viewModel.SelectedSyncPage = "Sources";
+
+        var view = new BitwardenSyncSourceView { DataContext = viewModel };
+        var window = new Window { Width = 900, Height = 700, Content = view };
+        window.Show();
+        try
+        {
+            Button[] Buttons() => view.GetSelfAndVisualDescendants()
+                .OfType<Button>()
+                .Where(button => button.Name == "BitwardenStuckEraseAbandonButton")
+                .ToArray();
+            RunJobsUntil(
+                () => Buttons().Length == 2 && viewModel.BitwardenStuckErasures.Count == 2,
+                "the stuck-erase rows never materialized in the template");
+            var buttons = Buttons();
+            var rows = viewModel.BitwardenStuckErasures.ToArray();
+
+            Assert.All(
+                buttons,
+                button => Assert.Same(viewModel.AbandonBitwardenStuckEraseCommand, button.Command));
+            Assert.Equal(
+                rows.Select(row => row.OperationId).ToArray(),
+                buttons.Select(button =>
+                    ((BitwardenStuckEraseDisplayItem)button.CommandParameter!).OperationId).ToArray());
+            Assert.All(buttons, button => Assert.True(button.IsEnabled));
+
+            var first = buttons[0];
+            Assert.True(first.Command!.CanExecute(first.CommandParameter));
+            first.Command.Execute(first.CommandParameter);
+            RunJobsUntil(
+                () => viewModel.BitwardenStuckErasures.Count == 1,
+                "the abandoned erase never left the list");
+
+            Assert.Equal([(7L, rows[0].OperationId)], erasures.Abandoned);
+            Assert.Equal([rows[1]], viewModel.BitwardenStuckErasures);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
     // A pull writes straight into the database while every on-screen collection keeps its old copies,
     // so a change from another device used to stay invisible until the vault was locked and unlocked
     // again. This runs the user's own path: the library is open, one entry is up in the editor, "Sync
@@ -566,6 +682,11 @@ public sealed class BitwardenSyncWorkflowUiTests
             fixture.Services.GetRequiredService<IBitwardenPullMergeService>());
         Assert.IsType<BitwardenPendingOperationStore>(
             fixture.Services.GetRequiredService<IBitwardenPendingOperationStore>());
+        // The decision that reads the same queue row is registered next to the two that wrote it, and a
+        // missing line here costs nothing but the section: the view model takes its erasure service as an
+        // optional parameter, so the list would simply never fill and the stuck delete would stay invisible.
+        Assert.IsType<BitwardenStuckEraseService>(
+            fixture.Services.GetRequiredService<IBitwardenStuckEraseService>());
     }
 
     private static void RunOnUiThread(Func<Task> work)
@@ -612,7 +733,8 @@ public sealed class BitwardenSyncWorkflowUiTests
         bool failSynchronization = false,
         IBitwardenConflictRestoreService? conflictRestore = null,
         IMonicaRepository? repository = null,
-        FakePull? pull = null)
+        FakePull? pull = null,
+        IBitwardenStuckEraseService? stuckErasures = null)
     {
         var accountStore = new FakeAccountStore();
         var sessionManager = new FakeSessionManager();
@@ -633,6 +755,11 @@ public sealed class BitwardenSyncWorkflowUiTests
             if (conflictRestore is not null)
             {
                 collection.AddSingleton(conflictRestore);
+            }
+
+            if (stuckErasures is not null)
+            {
+                collection.AddSingleton(stuckErasures);
             }
         });
         return new Fixture(
@@ -915,6 +1042,37 @@ public sealed class BitwardenSyncWorkflowUiTests
     {
         public string DeviceIdentifier => "0123456789abcdef0123456789abcdef";
         public string DeviceName => "Monica test desktop";
+    }
+
+    private sealed class FakeStuckEraseService : IBitwardenStuckEraseService
+    {
+        private static readonly BitwardenStuckErase EditedElsewhere = new(
+            OperationId: 700,
+            CipherId: "cipher-erase-edited-elsewhere",
+            Status: BitwardenMutationStatus.Conflict,
+            LastAttemptAt: new DateTimeOffset(2026, 9, 20, 9, 0, 0, TimeSpan.Zero));
+
+        private static readonly BitwardenStuckErase Refused = new(
+            OperationId: 701,
+            CipherId: "cipher-erase-refused",
+            Status: BitwardenMutationStatus.Failed,
+            LastAttemptAt: new DateTimeOffset(2026, 9, 21, 9, 0, 0, TimeSpan.Zero));
+
+        private readonly List<BitwardenStuckErase> stuck = [EditedElsewhere, Refused];
+
+        public List<(long VaultId, long OperationId)> Abandoned { get; } = [];
+
+        public Task<IReadOnlyList<BitwardenStuckErase>> GetStuckAsync(
+            long vaultId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<BitwardenStuckErase>>(vaultId == 7 ? stuck.ToArray() : []);
+
+        public Task AbandonAsync(long vaultId, long operationId, CancellationToken cancellationToken = default)
+        {
+            Abandoned.Add((vaultId, operationId));
+            stuck.RemoveAll(row => row.OperationId == operationId);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeConflictRestoreService : IBitwardenConflictRestoreService
