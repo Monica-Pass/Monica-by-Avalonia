@@ -93,7 +93,10 @@
                     </StackPanel>
                     <Border x:Name="KeePassPreviewCard" Padding="14,12" BorderBrush="{DynamicResource AccentFillColorSecondaryBrush}" BorderThickness="0,1,0,0" IsVisible="{Binding HasKeePassImportPreview}">
                         <Grid RowDefinitions="Auto,*,Auto" RowSpacing="10">
-                            <TextBlock Text="{Binding KeePassPreviewSummaryText}" TextWrapping="Wrap" />
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="{Binding KeePassPreviewSummaryText}" TextWrapping="Wrap" />
+                                <TextBlock x:Name="KeePassUnsavedChangesText" Text="{Binding KeePassUnsavedChangesText}" IsVisible="{Binding KeePassVaultIsDirty}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorCautionBrush}" />
+                            </StackPanel>
                             <Grid Grid.Row="1" ColumnDefinitions="320,*" ColumnSpacing="12" MinHeight="280">
                                 <Border Grid.Column="0" Classes="workspaceTreeRail">
                                     <controls:VaultFolderTree x:Name="KeePassBrowseTree"
@@ -107,7 +110,37 @@
                                 </Border>
                                 <Border Grid.Column="1" Classes="workspaceDetail" IsVisible="{Binding KeePassEntryDetailsPublic, Converter={x:Static ObjectConverters.IsNotNull}}">
                                     <ScrollViewer>
-                                        <ContentControl Content="{Binding KeePassEntryDetailsPublic}" Margin="0,0,0,24">
+                                        <StackPanel Spacing="12">
+                                            <StackPanel x:Name="KeePassEntryEditorPane" Spacing="8" IsVisible="{Binding HasKeePassEditor}">
+                                                <TextBlock Text="{Binding KeePassEditorPublic.GroupPath}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                <Grid ColumnDefinitions="110,*" ColumnSpacing="8" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
+                                                    <TextBlock Grid.Row="0" Text="{Binding L.KeePassEntryTitleLabel}" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                    <TextBox Grid.Row="0" Grid.Column="1" x:Name="KeePassEditTitleBox" Text="{Binding KeePassEditorPublic.Title}" AutomationProperties.Name="{Binding L.KeePassEntryTitleLabel}" />
+                                                    <TextBlock Grid.Row="1" Text="{Binding L.Username}" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="KeePassEditUserBox" Text="{Binding KeePassEditorPublic.UserName}" AutomationProperties.Name="{Binding L.Username}" />
+                                                    <TextBlock Grid.Row="2" Text="{Binding L.Password}" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                    <StackPanel Grid.Row="2" Grid.Column="1" Spacing="4">
+                                                        <TextBox x:Name="KeePassEditPasswordBox" PasswordChar="*" Text="{Binding KeePassEditorPublic.Password}" IsVisible="{Binding !KeePassEditorPublic.IsPasswordVisible}" AutomationProperties.Name="{Binding L.Password}" />
+                                                        <TextBox x:Name="KeePassEditPasswordRevealedBox" Text="{Binding KeePassEditorPublic.Password}" IsVisible="{Binding KeePassEditorPublic.IsPasswordVisible}" AutomationProperties.Name="{Binding L.Password}" />
+                                                        <ToggleButton x:Name="KeePassPasswordVisibilityToggle" Content="{Binding L.ShowPassword}" IsChecked="{Binding KeePassEditorPublic.IsPasswordVisible}" HorizontalAlignment="Left" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Row="3" Text="{Binding L.Website}" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                    <TextBox Grid.Row="3" Grid.Column="1" x:Name="KeePassEditUrlBox" Text="{Binding KeePassEditorPublic.Url}" AutomationProperties.Name="{Binding L.Website}" />
+                                                    <TextBlock Grid.Row="4" Text="{Binding L.AuthenticatorKey}" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                    <TextBox Grid.Row="4" Grid.Column="1" x:Name="KeePassEditTotpBox" Text="{Binding KeePassEditorPublic.AuthenticatorKey}" AutomationProperties.Name="{Binding L.AuthenticatorKey}" />
+                                                    <TextBlock Grid.Row="5" Text="{Binding L.Notes}" VerticalAlignment="Top" Margin="0,6,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                    <TextBox Grid.Row="5" Grid.Column="1" x:Name="KeePassEditNotesBox" Text="{Binding KeePassEditorPublic.Notes}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" AutomationProperties.Name="{Binding L.Notes}" />
+                                                </Grid>
+                                                <WrapPanel>
+                                                    <Button x:Name="ApplyKeePassEditButton" Classes="workspacePrimaryCommand" Command="{Binding ApplyKeePassEntryEditCommand}" Margin="0,0,8,0">
+                                                        <TextBlock Text="{Binding L.KeePassApplyEdit}" />
+                                                    </Button>
+                                                    <Button x:Name="CancelKeePassEditButton" Classes="workspaceCommand" Command="{Binding CancelKeePassEntryEditCommand}">
+                                                        <TextBlock Text="{Binding L.Cancel}" />
+                                                    </Button>
+                                                </WrapPanel>
+                                            </StackPanel>
+                                            <ContentControl Content="{Binding KeePassEntryDetailsPublic}" Margin="0,0,0,24" IsVisible="{Binding HasKeePassEditor, Converter={x:Static BoolConverters.Not}}">
                                             <ContentControl.ContentTemplate>
                                                 <DataTemplate x:DataType="vm:PasswordDetailViewModel">
                                                     <StackPanel Spacing="8">
@@ -136,10 +169,17 @@
                                                 </DataTemplate>
                                             </ContentControl.ContentTemplate>
                                         </ContentControl>
+                                        </StackPanel>
                                     </ScrollViewer>
                                 </Border>
                             </Grid>
                             <WrapPanel Grid.Row="2" IsEnabled="{Binding IsKeePassImportIdle}">
+                                <Button x:Name="EditKeePassEntryButton" Classes="workspaceCommand" Command="{Binding EditKeePassEntryCommand}" IsVisible="{Binding CanEditKeePassEntry}" Margin="0,0,8,8">
+                                    <TextBlock Text="{Binding L.KeePassEditEntry}" />
+                                </Button>
+                                <Button x:Name="SaveKeePassVaultButton" Classes="workspaceCommand" Command="{Binding SaveKeePassVaultCommand}" Margin="0,0,8,8">
+                                    <TextBlock Text="{Binding L.KeePassSaveToFile}" />
+                                </Button>
                                 <Button x:Name="ImportKeePassVaultButton" Classes="workspacePrimaryCommand" Command="{Binding ImportKeePassVaultCommand}" Margin="0,0,8,8">
                                     <TextBlock Text="{Binding L.KeePassImportNow}" />
                                 </Button>

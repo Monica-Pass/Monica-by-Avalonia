@@ -124,11 +124,15 @@ public sealed partial class MainWindowViewModel
         {
             _selectedKeePassTreeRow = null;
             SelectedKeePassTreeRowPublic = null;
+            KeePassEditorPublic = null;
+            OnPropertyChanged(nameof(CanEditKeePassEntry));
             return;
         }
 
         _selectedKeePassTreeRow = row;
         SelectedKeePassTreeRowPublic = row;
+        KeePassEditorPublic = null;
+        OnPropertyChanged(nameof(CanEditKeePassEntry));
 
         if (!row.IsEntryRow || row.Entry is null)
         {
@@ -149,21 +153,7 @@ public sealed partial class MainWindowViewModel
                 return;
             }
 
-            _keePassEntryDetails?.Dispose();
-            var entry = CreatePasswordFromKeePass(session.DatabaseId, detail);
-            _keePassEntryDetails = new PasswordDetailViewModel(
-                _localization,
-                _clipboardService,
-                _cryptoService,
-                _totpService,
-                entry,
-                [],
-                null,
-                null,
-                [],
-                [],
-                secretsAlreadyPlaintext: true);
-            KeePassEntryDetailsPublic = _keePassEntryDetails;
+            ShowKeePassEntryDetail(session, detail);
         }
         catch (Exception error)
         {

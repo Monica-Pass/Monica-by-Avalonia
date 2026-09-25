@@ -122,6 +122,7 @@ public sealed partial class MainWindowViewModel
         _keePassEntryDetails?.Dispose();
         _keePassEntryDetails = null;
         KeePassEntryDetailsPublic = null;
+        KeePassEditorPublic = null;
         _keePassOpenFolders.Clear();
         _keePassTreeRows = [];
         KeePassTreeRowsPublic = [];
@@ -130,6 +131,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(HasKeePassImportPreview));
         OnPropertyChanged(nameof(KeePassPreviewSummaryText));
         OnPropertyChanged(nameof(HasKeePassImportPreview));
+        RaiseKeePassWriteState();
     }
 
     private static string CreateKeePassSourceKey(long databaseId, string entryUuid) =>

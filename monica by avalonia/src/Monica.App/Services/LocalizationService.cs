@@ -454,6 +454,11 @@ public interface ILocalizationService : INotifyPropertyChanged
     string KeePassChooseDifferentFile { get; }
     string KeePassCloseFile { get; }
     string SelectKeePassFile { get; }
+    string KeePassEntryTitleLabel { get; }
+    string KeePassEditEntry { get; }
+    string KeePassApplyEdit { get; }
+    string KeePassSaveToFile { get; }
+    string KeePassUnsavedChanges { get; }
     string BitwardenImportTitle { get; }
     string BitwardenImportDescription { get; }
     string SelectBitwardenJsonFile { get; }
@@ -965,6 +970,11 @@ public sealed class LocalizationService : ILocalizationService
     public string KeePassChooseDifferentFile => Text();
     public string KeePassCloseFile => Text();
     public string SelectKeePassFile => Text();
+    public string KeePassEntryTitleLabel => Text();
+    public string KeePassEditEntry => Text();
+    public string KeePassApplyEdit => Text();
+    public string KeePassSaveToFile => Text();
+    public string KeePassUnsavedChanges => Text();
     public string BitwardenImportTitle => Text();
     public string BitwardenImportDescription => Text();
     public string SelectBitwardenJsonFile => Text();
@@ -2088,6 +2098,22 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassImportNow"] = "Import reviewed entries",
         ["KeePassChooseDifferentFile"] = "Choose a different file",
         ["KeePassCloseFile"] = "Close file",
+        ["KeePassEntryTitleLabel"] = "Title",
+        ["KeePassEditEntry"] = "Edit entry",
+        ["KeePassApplyEdit"] = "Apply changes",
+        ["KeePassSaveToFile"] = "Save to file",
+        ["KeePassUnsavedChanges"] = "Unsaved changes",
+        ["KeePassEntryRequired"] = "Select a KeePass entry to edit.",
+        ["KeePassEntryGone"] = "This entry is no longer in the opened KeePass database.",
+        ["KeePassEntryEditFailed"] = "The KeePass entry could not be prepared for editing.",
+        ["KeePassEditApplyFailed"] = "The KeePass entry could not be updated.",
+        ["KeePassChangeStaged"] = "The change is recorded in the opened database. Save writes it to the file.",
+        ["KeePassSavedFormat"] = "KeePass database saved ({0} bytes).",
+        ["KeePassSavedCopyFormat"] = "Saved a copy of the KeePass database to {0}.",
+        ["KeePassSaveFailed"] = "The KeePass database could not be saved.",
+        ["KeePassWriteFailed"] = "The KeePass database could not be written in a state that verifies. The file was left unchanged.",
+        ["KeePassConcurrentChange"] = "The KeePass file changed outside Monica. Close it elsewhere, or save to a different file.",
+        ["KeePassNoSourceFile"] = "The opened KeePass database has no file to write back to.",
         ["SelectBitwardenJsonFile"] = "Select a Bitwarden JSON export",
         ["BitwardenFileSelectedFormat"] = "Selected Bitwarden export: {0}",
         ["BitwardenFileSelectionFailed"] = "The Bitwarden export could not be selected.",
@@ -3083,6 +3109,22 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassImportNow"] = "导入已检查条目",
         ["KeePassChooseDifferentFile"] = "选择其他文件",
         ["KeePassCloseFile"] = "关闭文件",
+        ["KeePassEntryTitleLabel"] = "标题",
+        ["KeePassEditEntry"] = "编辑条目",
+        ["KeePassApplyEdit"] = "记入改动",
+        ["KeePassSaveToFile"] = "保存到文件",
+        ["KeePassUnsavedChanges"] = "有未保存的改动",
+        ["KeePassEntryRequired"] = "请先选择要编辑的 KeePass 条目。",
+        ["KeePassEntryGone"] = "该条目已不在当前打开的 KeePass 数据库中。",
+        ["KeePassEntryEditFailed"] = "无法准备编辑该 KeePass 条目。",
+        ["KeePassEditApplyFailed"] = "无法更新该 KeePass 条目。",
+        ["KeePassChangeStaged"] = "改动已记入打开的数据库，点击保存才会写入文件。",
+        ["KeePassSavedFormat"] = "KeePass 数据库已保存（{0} 字节）。",
+        ["KeePassSavedCopyFormat"] = "已将 KeePass 数据库的副本保存到 {0}。",
+        ["KeePassSaveFailed"] = "无法保存 KeePass 数据库。",
+        ["KeePassWriteFailed"] = "无法写出可通过自检验证的 KeePass 数据库，原文件保持不变。",
+        ["KeePassConcurrentChange"] = "该 KeePass 文件已被其他程序改动，请先在别处关闭它，或另存到其他文件。",
+        ["KeePassNoSourceFile"] = "当前打开的 KeePass 数据库没有可写回的文件。",
         ["SelectBitwardenJsonFile"] = "选择 Bitwarden JSON 导出文件",
         ["BitwardenFileSelectedFormat"] = "已选择 Bitwarden 导出文件：{0}",
         ["BitwardenFileSelectionFailed"] = "无法选择 Bitwarden 导出文件。",
