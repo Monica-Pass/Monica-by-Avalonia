@@ -16,7 +16,7 @@
 
 ## 2. 当前状态（工作树干净）
 
-分支 `main`，`git status` 只剩给本节标提交号的文档改动。功能 HEAD = `39bb145`（其后只有给本节自身标提交号的文档提交），近几轮：
+分支 `main`，`git status` 只剩给本节标提交号的文档改动。功能 HEAD = `d1fdf59`（其后只有给本节自身标提交号的文档提交），近几轮：
 
 下面这张表**不是按时间排的**：同一条线的行挨在一起（例如 Bitwarden 写回的两行 `94adacd` → `5cf27c9`），
 读某一件事的来龙去脉时按主题往下连，不要按行号当时间线。
@@ -60,6 +60,8 @@
 | `40e9ae8` | **笔记/银行卡/证件第一次有 create 路径（#105，收掉上一行末尾那句"secure item 至今没有 create"）**。上一轮的编码器只服务"远端已经认识这一行"的更新；库里新建的卡/证件没有 cipher id，`LoadCandidatesAsync` 里 `item.BitwardenCipherId is not null` 那道过滤直接把它筛掉，于是"上传 N 项到 Bitwarden"对这三类**永远数不到**。这轮补齐三处：① `BitwardenLocalCipherIdentity` 多一种本地身份 `local-secure:{id}`（和 `local-password:{id}` 一样不是 GUID，不可能与服务器发的 id 相撞）；② 扫描侧换成与密码同一条规则 `cipherId is not null || !IsDeleted`（先排除"发布后还没上传就被丢进回收站"，否则会把用户刚删的东西推回服务器）；③ 处理器的 `LocalItems` 多一张 `UnboundSecureItems`，`HasPublishableEntry` 认它（重复发布或已删的 create 就地完成，不再多发一份副本），`ApplySuccessAsync` 把服务器回的 cipher id 写回这一行，之后再改内容走 update。**关键设计**：批量菜单问"这一行推得出去吗"必须和编码器**同一个判据**，所以没有再写一份条件清单，而是把三个 plan 拆成"投影（不需要密钥）+ 发射（只有加密需要密钥）"两半，`CanEncode(SecureItem)` 只走前半——于是它能在手里没有保险库密钥的界面上问，答案却和真正写出去时一致；投影判错的后果仍然只有"多拒一条"。**边界（别读成"三类都能新建上传"）**：菜单现在把 `WalletItems` 数进来，**笔记不数**——原因不是"两处判据不一致"，而是**笔记根本进不了批量选择**：库页唯一的选中来源是"全选"，它按 `VaultTreeEntryRow.IsBatchable` 跳过笔记行（`VaultBatch.cs:50-52`、`VaultTreeRows.cs:196-200` 都写明这是故意的："a note would be checked invisibly and then swept up by an action the user never saw offered"），而**库树没有行级复选框**（量过：全仓 `IsBatchable` 只有那一个消费者，`.axaml` 里零引用；行级动作走右键菜单，笔记在那里照样能编辑／移动／删除，不受影响）。于是把笔记计入发布判据在今天**永远数不到东西**。要给笔记一条发布路径，先得回答"批量动作对笔记算什么"——收藏／归档对笔记不适用，移动／删除只有单行版，这是**范围决定，不是缺陷**（记在 #106）；而且 create 推不推得出去取决于那行长成什么形状：**本地新建的卡默认 `CardTypeString = DEBIT`、有签发或到期日的证件、带标签的笔记照旧推不出去**，这不是 create 路径漏了，是投影闸门本来就在这么判。自证 +4：投影一致 1（解码器留下的三种形状 `CanEncode` 均为真）＋队列 2（一张 CREDIT 卡从"已发布、无 cipher id"一路走到服务器回 id 并写回、再扫一次安静；一张 DEBIT 卡 `Enqueued 0 / Refused 1` 且队列为空）＋真视图 UI 1（两张卡全选时菜单写 "Upload 1"，只有 DEBIT 那张时菜单**根本不出现**）。另外给 15 条"该拒"的用例各加一句 `Assert.False(CanEncode(...))`，让"菜单不出现"与"编码器拒绝"从此是同一件事的两面。**负控**：把扫描侧过滤退回 `is not null` ⇒ 恰好 2 条红，正是那两条新队列测试。单测 892→**895** 全绿（单独跑 UI 时 `BackgroundMemoryUiTests` 那条已知的 GC 回收计时 flake 红过一次：预算 2500ms、实测 2592ms，与本轮无关，门禁串跑下同一条 236/236 绿）。**踩过的坑记一笔**：`dotnet format` 之后用 `--no-build` 跑测试，那两条新测试红了，重新构建后 895/895——格式收敛改了源文件时间戳，`--no-build` 测的已经不是刚才那份代码。门禁：publish jit 与产物运行时门 `pub_rc=0 / rt_rc=0`（`CANONICAL VAULT passed`、loadMs=183/4000、KeePass 20000 条 openMs=918 增长 4.1MB/24、锁定尾窗中位 111.5MB/120）、商业发布门 `cr_rc=0`（同一份产物：NuGet 漏洞审计过、Release **0 warning / 0 error**、常规 895/895 + 顺序通道 10/10、UI 236 + UI 性能 17，末行 `Commercial release verification passed.`）。 |
 | `979e6d0` | **笔记第一次有自己的发布入口（#106，收掉上一行末尾那句"需产品决定"）**。用户选定"笔记单条入口"：门开在**已经拿着这条笔记的那个编辑器**的工具栏溢出里，批量菜单照旧不收笔记（那是故意的，不是漏）。新增 `MainWindowViewModel.BitwardenNotePublish.cs`：`BitwardenNotePublishOffered` 只在有已连接账户时为真；命令先 `CaptureNoteEditorState` + `SaveNoteTabAsync`（**存草稿不是走过场——编码器判的是库里那一行，草稿还不是那一行**），再问 `BitwardenCipherPayloadBuilder.CanEncode`：不通过就写失败态（`BitwardenPublishNoteNotCarriable` 中英各一份）并**就地返回**——什么都没出门，笔记照样能用；通过才盖 `BitwardenVaultId`、保存、`RebuildVaultTree`，然后交给常规漂移扫描上传（所以"发布时没网"这件事仍然成立，下一轮同步补完）。`RaiseBitwardenPublishState` 顺带把 `BitwardenNotePublishOffered` 一起通知掉，`BitwardenPublish.cs` 那段"为什么这里不数笔记"的注释改成现在真正的原因。**自证方式换了个赛道，值得记一笔**：`LibraryUiHarness` 只把 `IsUnlocked` 设真，任何真写库都抛 `A usable default MDBX vault is required...`（实测过），所以三个分支跑在 `BitwardenSyncWorkflowUiTests` 里——`CreateFixture(..., repository:)` 收一个 `DispatchProxy.Create<IMonicaRepository, ...>()` 替身（替身类不能 `sealed`；`SaveSecureItemAsync` 返回 `Task<long>`，返回类型不对会被生成的代理直接 `InvalidCastException`），配上文件里本来就有的 `FakeSyncCoordinator`，于是**不碰数据库也不碰网络**就把写路径真跑了一遍：markdown 笔记"存了但绝不盖戳"（写次非空 + 所有 `StampedVaultIds` 为 null + `IsStatusMessageFailure`，按语义判而不按已翻译文案判，见 §走查那几行），改成可承载的笔记后最后一次写带 account 7、`Source.BitwardenVaultId == 7`、`coordinator.GetState(7).Phase == Completed`。**负控两条各打中一次**：去掉盖戳 ⇒ 该测试红；绕过编码器判断 ⇒ 该测试红；改回后 sha 一致、重跑绿。另在 `NoteWorkflowUiTests` 补一条"门只在有账户时出现"（工具栏那条只能声明级：溢出菜单的项要点开才绑定，所以断的是 XAML 里声明的 `Command`/`IsVisible`，注释写明没有假装驱动活行）。**踩过的取证坑**：整串 UI 跑用 `-reporter quiet` 时**什么都不打印**（只留一行横幅），"没输出"不等于"跑过"；换 `verbose`/`silent` 才拿到 `Total: 255, Failed: 0`，`-reporter long` 非法取值会 rc=3 静默不跑——三条都写进了 §常用命令。**尚未验证（别读成"和真服务器验过"）**：这条入口推出去的动作至今只在替身传输下绿过，缺口 4 原样还在。门禁（就在 `979e6d0` 这份字节上重跑）：格式 0 改动、Release **0 Warning(s)**、常规单测 895/895 + 顺序通道 10/10、UI 常规 238 + UI 性能 17（独立跑一次 `Total: 255, Failed: 0`，新测试在清单里）、`cr_rc=0 / pub_rc=0 / rt_rc=0`（`CANONICAL VAULT passed`、loadMs=271/4000、KeePass 20000 条 openMs=2096 增长 3.6MB/24、锁定尾窗中位 108.4MB/120、锁/解 25/14/1/4、末行 `Commercial release verification passed.`）。
 | `9d9db9d` | **本机自托管的服务器第一次连得上（#94 缺口 4 的前置，不是它本身）**。用户选的是"本地起 Vaultwarden 来验真服务器"，而这条路在此之前根本进不去：`MainWindowViewModel.BitwardenProperties.cs` 的 `CanAuthenticateBitwarden` 与 `BitwardenEndpointPolicy.ValidateBaseAddress` 两道都写死 HTTPS，Vaultwarden 默认端上就是明文 HTTP。规则收成**一处判据** `BitwardenEndpointPolicy.IsTransportSecured`：HTTPS 一律放行，明文 HTTP 只认环回（`localhost`、`127.0.0.1`、`[::1]`、`ip6-loopback`，走 `IPAddress.IsLoopback` 而不是比字符串前缀），其他任何主机仍必须有 TLS。连接按钮与端点校验共用同一个函数，所以"按钮点亮了、下一步才被地址校验拒掉"这种不一致从形状上就不成立。三条面向用户的文案（`BitwardenConnectionDetailsDescription`、`BitwardenSecurityNoticeMessage`、`BitwardenSecureConnectionRequired`）中英各改一份，因为原句写的是"只允许 HTTPS 端点"，改完再照字面读就是假话。**自证 2 条**：单测钉判据本身（环回三种写法与任意 https 为真，`192.168.1.20` 与公网主机为假；`CreateSelfHosted("http://localhost:8080/")` 真的产出 `/identity/` 与 `/api/`，`http://vault.example.test` 仍然抛）；UI 那条钉在用户经过的地方（同一个 VM 连改三次地址：本机 http 可点、局域网 http 不可点、官方 https 可点）。**负控两道方向对称、各打中一次**：摘掉环回那一半 ⇒ 两条新测试红在正向断言（单测红在 `BitwardenProtocolException: Bitwarden serverUrl must use HTTPS, or plain HTTP on this machine.`，UI 红在 `Assert.True() Failure`）；把规则放宽成"任何 http 都放行" ⇒ 红在反向断言（单测 `Assert.False() Failure` 与 `Assert.Throws() Failure: No exception was thrown`，UI `Assert.False() Failure`），并顺带把既有的 `EndpointsRequireHttpsAndRejectAmbientAuthorityData` 一起打红——那条老测试确实是这道门的第二双眼睛。改回后文件 sha 与动手前一致。**这一行没把"和真服务器验过"划掉**：Vaultwarden 仍未起来（Docker Desktop 装着但引擎是停的；1.37.3 的 GitHub Release 页只有 attestation、没有裸二进制，所以只能走镜像），缺口 4 原样保留，只是从"门不让进"变成"进得去、还没进"。门禁（就这份字节）：格式 0 改动、常规单测 896/896 加顺序通道 10/10、Release 0 Warning、`cr_rc=0 / pub_rc=0`（`Commercial release verification passed.`）、UI 独立跑 `Total: 256, Errors: 0, Failed: 0`。**产物真跑门第一次红、同一份产物复跑绿**：首跑 `rt_rc=1`（复合行 `release gate completed. success=False, loadMs=265`，打印出来的各子结果都是 True，**红在哪一项子结果没查清**），复跑 `rt2_rc=0`（`CANONICAL VAULT passed`、loadMs=268/4000、KeePass 20000 条 openMs=2200 增长 5.4MB/24、锁定尾窗 108.8MB/120、锁/解 25/14/1/4）。按既有结论（单次读数不可信、先复跑取分布）这不算把红蒙过去，但下次同一产物两跑不一致时要优先把那一项定位出来。 |
+| `916e578` | **无远端修订号的本机改动不再一声不响地被盖掉（#113，被下一行那轮的实测抓出来）**。形状：一条绑着 cipher 却拿不出远端 revision 的行，写回队列按规矩拒绝（送出去就是无守卫的覆盖），而**同一轮的 pull 把它判成普通更新**并用服务器那份盖回来——真服务器量出 `s18b_sync_no_revision merge[Updated=1/ConflictsBackedUp=0]`、冲突备份 `named=0`、按 cipher id 查 `any_conflict_for_cipher=0`，改动到此连一条痕迹都不留。为什么合并引擎只能靠内容判："这台设备改了"在普通编辑路径上从不置 `BitwardenLocalModified`（#94 量过），于是唯一的证据就是内容与远端不同，而"不同"分不清是服务器动了还是本机动了。判据只补一条：`local.RevisionDate` 为空且内容不同 ⇒ 先留一份可恢复的备份再应用远端；内容相同是例外——没有东西要留，留了反而每轮凭空造出一条什么也没报的冲突。覆盖 4 条：`BitwardenMergeTests` 2（判据本体，含"不该备份"那半）+ `BitwardenPullMergeServiceTests` 2（真 SQLite + 真仓库 + 真 pull：备份里取回本机那句标题、应用后的行带远端 revision；同一行改成与远端一致 ⇒ `ConflictsBackedUp=0` 且备份表空）。**负控真打**：摘掉那条分支 ⇒ 恰有 2 条红，正是那两条"必须备份"（Core 那条红在动作判回 `ApplyRemoteUpdate`，Data 那条红在 `ConflictsBackedUp` 的计数），两条"不该备份"照旧绿；还原后文件 sha 与动手前一致。同一 stage 在两版二进制上跑出**相反判决**（`s19b-run.log` 前／`s19c-run.log` 后），见文末第七轮实测。**边界**：这条只服务"被拒而推不出去"那一档，有 revision 可守卫的编辑仍走队列推送、不撞这里；`MissingRemoteRevision` 从哪来（身份取自服务器、revision 却没有）本轮没有回验来源，v1 继续拒绝推送而不是补读一次远端。 |
+| `d1fdf59` | **Bitwarden 收不下的本机改动第一次带着原因走到界面（#112，闭上 §7 那条可诊断性缺口）**。旧形状：`EnqueueDriftedAsync` 算出 `Refused` 就把它丢掉、队列不记账、同一轮 pull 再用服务器那份盖回那一行，屏幕上写的是"已同步"——一条永远推不出去的改动唯一的线索是探针自己打印的 `localRev=(none)`。新增 `src/Monica.Core/Bitwarden/BitwardenPayloadRefusal.cs`：六个原因码（`MissingRemoteRevision`／`UnsupportedShape`／`HasAttachments`／`MissingTitle`／`UnsupportedContent`／`PayloadTooLarge`，每一个都是用户接受得了或改得动的状态）、`BitwardenPayloadRefusalException : BitwardenProtocolException`（**子类化而不是替换**，因此既有 catch 一处不改：队列照旧停车、测试照旧断言被拒、协调器照旧消毒消息）、`BitwardenPayloadRefusalInfo`（码与给日志的那句绑在一起，判据和解释不能分头漂）、`BitwardenUnsyncableLocalChange(Title, IsPassword, Reason)`（**只带标题和码，永远不带密钥字段**——这份列表会走到同步页与诊断日志）。编码器 11 处拒绝点各自点名（`UnsupportedShape` 5、`MissingTitle` 2、`PayloadTooLarge` 2、`HasAttachments` 1、`UnsupportedContent` 1），队列那一处 `MissingRemoteRevision` 由判据自己带上；只报了字段名而没分类的老闸门归入 `UnsupportedContent` 并保留原句，所以"有闸门但没分类"也漏不掉。`BitwardenLocalChangeQueueResult(Enqueued, Refused, Unsyncable)` 里 `Refused == Unsyncable.Count` 由构造钉住（只读计数的调用方无法少报它即将展示的清单）；协调器把它带进 `BitwardenSyncResult.Unsyncable`；App 侧新 partial `MainWindowViewModel.BitwardenUnsyncableChanges.cs` + `BitwardenSyncSourceView.axaml` 的 `BitwardenUnsyncableItem` 段落（12 个 key 中英各一份）。可见性按**账户 id** 判而不是"选中变空就清空"——账户列表几乎每个 Bitwarden 动作都会重载，后者会在警告出现的那一刻把它撤掉；列表**不从存储读**：拒绝是一轮的属性，那行后来被修好或被用户删掉（删掉根本不需要编码器）就必须自己从屏幕上消失，不需要谁去清。诊断日志只写 `code:count`，不写标题。覆盖：单测 +4（队列 3：名单点名条目与编码器给的那个原因／一条只因没有 revision 被拒／不再被拒就不再出现在名单上；协调器 1：`SyncAsync` 把被拒条目交给调用方）+ UI +2（真视图里段落带原因出现；只在债站着时可见）。**一条被实测推翻的前提**：动手时的说法是"这一条从此每一轮都被拒"，真服务器量出来是**拒它的那一轮**列得出来（`s18_sync_shape rows=1`）、下一轮同一形状静默（`s18_sync_shape_again rows=0`，因为本地已经没有待推的改动），唯一出路是从冲突列表取回备份、在下一次同步之前把形态改成 Bitwarden 能存的——实测 `enqueued=1 refused=0` ⇒ `Claimed=1/Completed=1` ⇒ `edit_travelled=True conflicts_left=0`；取回而不改形态照旧被拒（`s18_scan_after_restore refused=1`）。中英两句分区说明因此按实测重写，指向"形态"而不是"再同步一次"。 |
 
 §3 的 use-case 抽取改动已提交（`24d92b0`），OneDrive/WebDAV 冲突副本复用修复已提交（`957c5af`）。
 
@@ -1091,7 +1093,7 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
 
 - `dotnet format --verify-no-changes` 会因为**编辑工具往 CRLF 文件里写了裸 LF 行**而报一片 WHITESPACE 红，**连内容与 HEAD 逐字节相同的那些行也一起报**（本轮 27 条里有这种）。判据：`grep -c $'\r$'` 对 `grep -c -v $'\r$'`，本轮修完的两个文件是 254／0。
 - UI 套件那份 dll **不带 `-filter` 直接跑**：exit 0、日志里只剩一行 runner 头、**0 条被计数** —— 那是"没跑"，不能读成"跑绿"。正解是照 `eng/ci/verify-commercial-release.ps1:253-274` 那样带 `-filter '/[Category!=perf-budget]'` + `-trx` 再用 `Assert-TestReportRanTests` 验总数。
-- `BitwardenLocalChangeQueue.EnqueueDriftedAsync` 的 **`Refused` 计数在 `BitwardenSyncResult` 里根本不出现**，界面与日志都看不见。本轮有一条笔记因为载荷建错（`Notes` 留空、只填 `ItemData`）从头到尾没入过队、也没上过服务器，唯一看得见的线索是探针打印的 `localRev=(none)`；**为什么被拒这一格至今未定位**（是编码器拒绝还是别的判断，无从分辨）。这是 #94 的可诊断性缺口，不是那条笔记的根因结论。
+- `BitwardenLocalChangeQueue.EnqueueDriftedAsync` 的 **`Refused` 计数在 `BitwardenSyncResult` 里根本不出现**，界面与日志都看不见。本轮有一条笔记因为载荷建错（`Notes` 留空、只填 `ItemData`）从头到尾没入过队、也没上过服务器，唯一看得见的线索是探针打印的 `localRev=(none)`；~~**为什么被拒这一格至今未定位**（是编码器拒绝还是别的判断，无从分辨）~~ **已修（`d1fdf59`，#112）**：拒绝现在由编码器点名（`BitwardenPayloadRefusal`）、由队列带出、经 `BitwardenSyncResult.Unsyncable` 同时到达同步页与诊断日志，真服务器读数见文末第七轮实测；**那条笔记具体是哪一格本轮没有回验**，不替它改判。这是 #94 的可诊断性缺口（已闭），不是那条笔记的根因结论。
 - 还有一条本轮自己造的假绿：后台跑门禁时写成 `powershell … | tail -60`，**管道会把真 exit code 吞成 `tail` 的 0**，而日志文件是 0 字节、`TestResults/**` 的时间戳一动没动 —— 看着"完成了"，其实一步没跑。判据改成：重定向到文件，跑完**看 trx 的时间戳与总数**，别信 `$?`（这是 §2 那条 `--no-build` 假绿的同族）。
 
 **机器状态**：Docker Desktop 与容器 `vw-probe` 都是本会话起的，**此刻仍在跑**（`GET http://127.0.0.1:8080/alive => 200`）；收法照旧 `docker rm -f vw-probe && docker volume rm vw-probe-data` 后退出 Docker Desktop（卷里只有探针账号）。探针与日志都在 `D:\Monica\probe-appdata\`（一次性目录，不进仓）。**本轮改了产品代码**：`Restore` 那一档（#108）与 pull 落库按 cipher id 解析（#109）。
@@ -1214,7 +1216,7 @@ cipher 回的是字面量 `"(gone)"`，被 `[17..24]` 切片绊倒；**产品读
   三条墙写在 §7 缺口 4 ①）；② 一条 `Conflict`／`Failed` 的 erase **谁也不会替用户重下决定**——队列不重试、
   本地压住、服务器留残迹，缺的是界面上那条可见的冲突决定（#99 那一族），不是把 revision 自动改判 ⇒ **#111 已把这条决定交给用户（`39bb145`，读数见文末第六轮实测）**；
   ③ 官方 Bitwarden 云、2FA／captcha／设备 OTP、`RefreshingToken` 自动刷新、离线堆队再回来推、卡片与证件的
-  真服务器 create+update 往返、`IsArchived` 不进漂移指纹、`Refused` 不出现在界面与诊断里（#94 缺口 4 原样）。
+  真服务器 create+update 往返、`IsArchived` 不进漂移指纹、~~`Refused` 不出现在界面与诊断里~~ **已修（`d1fdf59`，#112：`Refused` 现在带着原因码同时出现在同步页与诊断日志，读数见文末第七轮实测）**（#94 缺口 4 其余各项原样）。
 
 ## 附：真服务器第六轮实测（2026-09-25，**#111 出厂：那条推不出去的删除第一次有人能改主意**）
 
@@ -1270,4 +1272,85 @@ cipher 回的是字面量 `"(gone)"`，被 `[17..24]` 切片绊倒；**产品读
   时出现）；③ 行上只有 cipher id：v1 不打算补标题，因为那要在清除时另存一份名字，而 §2 那行记的理由是
   "队列行是那个决定之最后记录"，多存一份名字等于再开一条数据寿命；④ 官方 Bitwarden 云、2FA／captcha／
   设备 OTP、`RefreshingToken` 自动刷新、离线堆队再回来推、卡片与证件的真服务器 create+update 往返、
-  `IsArchived` 不进漂移指纹、`Refused` 不出现在界面与诊断里（#94 缺口 4 原样）。
+  `IsArchived` 不进漂移指纹、~~`Refused` 不出现在界面与诊断里~~ **已修（`d1fdf59`，#112：`Refused` 现在带着原因码同时出现在同步页与诊断日志，读数见文末第七轮实测）**（#94 缺口 4 其余各项原样）。
+
+
+## 附：真服务器第七轮实测（2026-09-25，**#112 出厂：拒绝第一次带着原因走到界面，并且它当场推翻了自己的一条前提**）
+
+跑法照旧：`D:\Monica\probe-appdata\bwrestore` 那份一次性控制台探针（不进仓，注册之后每一步用的都是
+**生产类型**：真 SQLite + 真 `MonicaRepository` + 真 `BitwardenLocalChangeQueue` + 真协调器 + 真合并引擎），
+服务器仍是本机 Vaultwarden **1.37.3**（容器 `vw-probe`，`127.0.0.1:8080->80/tcp`，healthy；本轮结束**没有**
+teardown——用户要求本地的 keepass／mdbx／bitwarden 这些数据一律不动）。本轮新增 stage 18 与 18b（`s18*`）：
+前者拿一条 **Bitwarden 存不下的形状**（`UnsupportedShape`）走完整条路，后者拿另一条独立条目专门走
+`MissingRemoteRevision` 那一档——两条各问一件事，不是一条测两遍。主日志 `probe-appdata/bwrestore/s19d-run.log`
+（**exit 0**，stage 1…18b 整串一次跑完，184 行），另有两份对照：`s19b-run.log` 跑在 #113 **之前**的那份二进制、
+`s19c-run.log` 跑在之后。判据只有 id／revision／状态／布尔／计数与代码样的原因串，`grep -c probe-value` =
+**0**（没有任何载荷落进日志；条目标题只以 `named=` 布尔参与判断，从不打印）。
+
+### 一、#112 的读数：清单在同步之前就在，但只在"盖回它的那一轮"挂着
+
+- `s18_pre_sync_scan enqueued=0 refused=1 listed=1 count_matches_list=True` +
+  `rows=1 named=True is_password=True codes=[UnsupportedShape]`，连跑两次（`s18_pre_sync_scan_again`）读数不变
+  ⇒ **不调用协调器**、直接问队列，就已经知道"哪一条推不出去、为什么"；`Refused == Unsyncable.Count` 不是
+  推断而是每轮量出来的（`count_matches_list=True`），所以界面不可能少列队列拒了的东西。
+- `s18_pre_sync_owed=0 row_has_edit=True` ⇒ 这条改动**没有欠任何一次推送**：队列拒了它、没记账，而本机那一行
+  确实带着用户刚打的改动。这正是旧形状里"屏幕上写已同步"的那一格。
+- `s18_sync_shape merge[Updated=1/ConflictsBackedUp=1]` + `s18_row_after_refusing_pull has_edit=False
+  modified=False` + `s18_conflict_after_pull count=2 named=1` ⇒ 同一轮的 pull 用服务器那份盖回这一行，改动
+  **只以一条冲突备份存在**（列表里那条就是它），而不是留在条目上。
+- `s18_sync_shape_again merge[...ConflictsBackedUp=0...]` + `rows=0 named=False codes=[]` ⇒ **下一轮同一形状
+  静默**：本地已经没有"这台设备改了"这件事，警告自然退场。
+- `s18_scan_after_restore refused=1`（从冲突列表取回备份之后）+ `s18_sync_after_restore
+  merge[Updated=1/ConflictsBackedUp=1]` ⇒ 取回而不改形态，取回来的正是刚被拒收的那个形状，再拒一次。
+- `s18_scan_after_fix enqueued=1 refused=0 listed=0` ⇒ `s18_sync_shape_fixed
+  mutations[Claimed=1/Completed=1]` ⇒ `s18_edit_travelled=True conflicts_left=0` ⇒ 唯一出路是**改形态**；
+  改完不仅推得出去，前几轮攒下的冲突备份也归零。
+
+### 二、被推翻的那条前提（记下来因为它是本轮最贵的一条）
+
+动手时写下的说法是"一条被拒的改动从此**每一轮**都被拒，界面因此永远挂着这条警告"。实测不成立：警告只挂在
+**盖回它的那一轮**，下一轮 `rows=0`。真相比原说法更糟而不是更好——改动不是"一直推不出去"，而是**一次都没留下
+痕迹就被覆盖**，除非队列或合并引擎替它留一份备份。所以本轮做了两件事：① 中英两句分区说明按实测重写
+（`BitwardenUnsyncableSectionDescription`），指向"改成 Bitwarden 能存的形态"而不是"再同步一次"，并明说从冲突
+列表取回它等于取回刚被拒的那个形状；② 顺着"下一轮凭什么静默"往下问，才撞出下面 #113 那一档。
+
+### 三、⇒ #113：同一 stage 在两版二进制上跑出相反判决
+
+- **修复前**（`s19b-run.log`）：`s18b_sync_no_revision merge[Added=0/Updated=1/Deleted=0/ConflictsBackedUp=0/
+  ...]`、`s18b_conflict_after_pull count=2 named=0`、`s18b_any_conflict_for_cipher=0` ⇒ 一条 `MissingRemoteRevision`
+  被拒的改动被 pull 判成普通更新盖掉，**按 cipher id 查不出任何冲突备份**——一声不响地没了。
+- **修复后**（`s19c-run.log`、`s19d-run.log` 两份独立注册各跑一遍，读数同形）：`ConflictsBackedUp=1`、
+  `named=1`、`any_conflict_for_cipher=1`，且备份里那条的原因点名是新判据那句
+  `The local row has no remote revision to compare against; keep its content recoverable, then apply remote.`，
+  与既有那句 `Local state differs at the remote revision; ...` 并存于同一份列表 ⇒ 两条不同的判据各有各的记录，
+  没有互相顶替。
+- **单元级负控真打**（本轮在出货字节之外重跑过一次）：摘掉 `BitwardenMergeEngine` 那条分支、重建、跑那 5 条
+  ⇒ 恰有 2 条红，红因分别是 `Expected: CreateConflictBackupThenApplyRemote / Actual: ApplyRemoteUpdate`（Core
+  的判据本体）与 `Expected: 1 / Actual: 0`（Data 侧真 SQLite + 真 pull 的 `ConflictsBackedUp` 计数）；两条
+  "不该备份"的照旧绿。还原后 `sha1sum -c` 读回 `OK`（`7e7547aea2af04ea5cfd2cbc426847438da4eb67`），重建后
+  5/5 绿。
+
+### 四、门禁与剩下的口子（别读成账清了）
+
+- 门禁全部在**出货的那份字节**（`d1fdf59`）上跑：`dotnet format --verify-no-changes` 退出 **0**（0 改动）；
+  `verify-commercial-release.ps1 -Configuration Release` ⇒ `cr_rc=0`，末行 `Commercial release verification
+  passed.`，四份 trx 逐一读总数（日志 `probe-appdata/gate112.log`）：单测 **10 `perf-budget` + 922 常规**、
+  UI **17 `perf-budget` + 244 常规**；同一串里的 `dotnet build -c Release --warnaserror` 因此也是 **0 warning**。
+  产物级：`publish-desktop.ps1` ⇒ `pub_rc=0`，`verify-artifact-runtime.ps1` ⇒ `art_rc=0`：
+  `UI SMOKE passed` + `RUNTIME SMOKE passed`，loadMs=**148**/4000（库加载 actualMs=634/4000）、KeePass 20000 条
+  3.23MB：openMs=1191 / streamMs=305 / collectedMB=109.5 → growthMB=**-3.5**/24（开库释放后比基线还低，
+  这是既有那条形同"-增长"的读数，不是新事实）、锁定态 10 拍轨迹 115.1/117.3/109.7/110.5/111.8/106.1/106.2/
+  110.0/106.0/107.9，尾 5 拍 **中位 106.2MB／区间 106.0–110.0**（预算 120）、锁/解往返 passwords=25/25、
+  notes=14/14、totp=1/1、wallet=4/4，瞬态回执 `retired=True`。**时序要写清**：产物门跑在 16:18 那次 publish 上，
+  而上面那次负控只是把同一份源文件取走又放回（sha1 逐字节一致，见 §三），放回的时间在 `cr_rc` 落盘之后
+  （gate 日志末尾时间戳 16:28:28，摘分支在 16:29），所以三份读数测的都是出货那份字节。
+- **仍然没验**：① **这一段界面在真机上没人看过**——和 #111 一样，证据是无头 UI 树里段落控件在位、命令解析、
+  以及"只在债站着时可见"，没有截图口味门（它只在真有一条被拒改动时出现）；② `MissingRemoteRevision` 的**来源**
+  没回验（身份取自服务器而 revision 缺失是从哪一步开始的），v1 继续拒绝推送而不是补读一次远端；③ 上一轮那条
+  "载荷建错的笔记到底是被哪一格拒的"没有回验，本轮只是把"拒了会说出来"这件事做到位；④ App 层"真清除命令写出
+  一条队列行"的**行为**证明照旧缺（`6bbf449` 只钉注册与类型）；⑤ 官方 Bitwarden 云、2FA／captcha／设备 OTP、
+  `RefreshingToken` 自动刷新、离线堆队再回来推、卡片与证件的真服务器 create+update 往返、`IsArchived` 不进漂移
+  指纹（#94 缺口 4 其余各项原样）。
+
+**机器状态**：容器 `vw-probe` 仍在跑（本轮探针又注册了一个新账号，卷里只有探针数据），`D:\Monica\probe-appdata\`
+按用户要求一字不动；收法照旧 `docker rm -f vw-probe && docker volume rm vw-probe-data`，且要等用户点头。
