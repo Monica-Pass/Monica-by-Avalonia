@@ -93,6 +93,85 @@ public sealed class BitwardenPullMergeServiceTests
         Assert.Equal(nestedCategory.Id, autoFolderNote.CategoryId);
     }
 
+    // The other half of the same measured failure: the queue refuses an edit whose row has no remote
+    // revision to update against, and the pull of that same round then overwrote the row. Nothing said so
+    // afterwards, because the overwrite came with no backup - the edit existed in neither place.
+    [Fact]
+    public async Task An_edit_on_a_row_with_no_remote_revision_is_kept_when_the_pull_applies_remote()
+    {
+        var harness = await CreateHarnessAsync();
+        var orphan = new PasswordEntry
+        {
+            Title = "Local edit with no guard",
+            Password = "local-password",
+            BitwardenVaultId = harness.VaultId,
+            BitwardenCipherId = "cipher-unguarded",
+            BitwardenRevisionDate = "",
+            BitwardenCipherType = 1
+        };
+        await harness.Repository.SavePasswordAsync(orphan);
+        var remote = DecodedPassword(
+            "cipher-unguarded",
+            "Remote winner",
+            "2026-07-22T03:00:00Z",
+            null);
+        var service = new BitwardenPullMergeService(
+            harness.Repository,
+            harness.FolderStore,
+            harness.ConflictStore,
+            harness.SyncState,
+            harness.Pending);
+
+        var result = await service.ApplyAsync(
+            harness.VaultId,
+            Snapshot([remote.Metadata], "2026-07-22T03:01:00Z"),
+            [remote]);
+
+        Assert.Equal(1, result.Updated);
+        Assert.Equal(1, result.ConflictsBackedUp);
+        var applied = (await harness.Repository.GetPasswordsAsync(true, true))
+            .Single(entry => entry.Id == orphan.Id);
+        Assert.Equal("Remote winner", applied.Title);
+        Assert.Equal("2026-07-22T03:00:00Z", applied.BitwardenRevisionDate);
+        var backup = Assert.Single(await harness.ConflictStore.GetUnresolvedAsync(harness.VaultId));
+        Assert.Contains("Local edit with no guard", backup.PayloadJson, StringComparison.Ordinal);
+    }
+
+    // The exception that keeps the rule from becoming noise: identical content and no guard is the
+    // server's own state, and a conflict record would report a change nobody made.
+    [Fact]
+    public async Task An_unchanged_row_with_no_remote_revision_applies_without_a_backup()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = DecodedPassword("cipher-same", "Remote winner", "2026-07-22T03:00:00Z", null);
+        var local = new PasswordEntry
+        {
+            Title = "Remote winner",
+            Username = "remote-user",
+            Password = "remote-password",
+            BitwardenVaultId = harness.VaultId,
+            BitwardenCipherId = "cipher-same",
+            BitwardenRevisionDate = "",
+            BitwardenCipherType = 1
+        };
+        await harness.Repository.SavePasswordAsync(local);
+        var service = new BitwardenPullMergeService(
+            harness.Repository,
+            harness.FolderStore,
+            harness.ConflictStore,
+            harness.SyncState,
+            harness.Pending);
+
+        var result = await service.ApplyAsync(
+            harness.VaultId,
+            Snapshot([remote.Metadata], "2026-07-22T03:01:00Z"),
+            [remote]);
+
+        Assert.Equal(1, result.Updated);
+        Assert.Equal(0, result.ConflictsBackedUp);
+        Assert.Empty(await harness.ConflictStore.GetUnresolvedAsync(harness.VaultId));
+    }
+
     // Measured against a real Vaultwarden: the two local tables number their rows on independent
     // sequences, so the first login and the first note are both row #1. A remote deletion arriving for
     // the note was resolved by that id alone, found the login, threw it into Monica's recycle bin and

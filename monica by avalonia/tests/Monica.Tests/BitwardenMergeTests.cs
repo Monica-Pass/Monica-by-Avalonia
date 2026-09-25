@@ -120,6 +120,35 @@ public sealed class BitwardenMergeTests
         Assert.Equal(BitwardenMergeAction.PreserveLocalUnmatched, decisions[5].Action);
     }
 
+    // A bound row with no remote revision cannot prove the server has not moved, so the merge has nothing
+    // to compare its content against. Measured against Vaultwarden 1.37.3, an edit made while in that state
+    // came back as merge[Updated=1/ConflictsBackedUp=0] with zero conflict records for the cipher: the pull
+    // destroyed the local content on the same round the queue refused to upload it, silently.
+    [Fact]
+    public void AnUnguardedLocalRowIsBackedUpBeforeTheRemoteOverwritesIt()
+    {
+        var decisions = BitwardenMergeEngine.Plan(
+            Snapshot([Remote("a-unguarded", revision: "2026-07-22T00:00:01Z")], true),
+            [Local(20, "a-unguarded", revision: "")]);
+
+        Assert.Equal(
+            BitwardenMergeAction.CreateConflictBackupThenApplyRemote,
+            decisions.Single().Action);
+    }
+
+    // The guard is only worth a backup when there is something to keep. Content identical to the server's
+    // needs no record of a change nobody made, and filing one every round would fill the conflict list with
+    // noise the user has to dismiss.
+    [Fact]
+    public void AnUnguardedLocalRowWithNothingToKeepTakesTheRemoteWithoutABackup()
+    {
+        var decisions = BitwardenMergeEngine.Plan(
+            Snapshot([Remote("a-same", revision: "2026-07-22T00:00:01Z", payloadHash: "same")], true),
+            [Local(21, "a-same", revision: "", payloadHash: "same")]);
+
+        Assert.Equal(BitwardenMergeAction.ApplyRemoteUpdate, decisions.Single().Action);
+    }
+
     private static BitwardenPullSnapshot Snapshot(
         IReadOnlyList<BitwardenRemoteCipherMetadata> ciphers,
         bool isComplete) =>

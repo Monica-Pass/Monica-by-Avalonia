@@ -116,6 +116,23 @@ public static class BitwardenMergeEngine
                 "Local changes differ from the remote revision; preserve a conflict backup before applying remote state.");
         }
 
+        // A row with no remote revision cannot say the server has moved past it, so nothing here proves the
+        // differing content is the server's rather than this device's. The change may also be one the upload
+        // queue just refused and therefore cannot send, which is how a refusing round used to overwrite an
+        // edit with no record left behind. Content identical to the remote is the exception: there is no
+        // change to keep, and backing it up would file a conflict that reports nothing.
+        if (string.IsNullOrWhiteSpace(local.RevisionDate) && !sameState)
+        {
+            return new(
+                BitwardenMergeAction.CreateConflictBackupThenApplyRemote,
+                remote.CipherId,
+                local.LocalId,
+                remote.CipherType,
+                local.RevisionDate,
+                remote.RevisionDate,
+                "The local row has no remote revision to compare against; keep its content recoverable, then apply remote.");
+        }
+
         return new(
             remote.IsDeleted
                 ? BitwardenMergeAction.ApplyRemoteDeletion
