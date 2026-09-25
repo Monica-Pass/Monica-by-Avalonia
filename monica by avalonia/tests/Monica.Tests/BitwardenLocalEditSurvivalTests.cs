@@ -28,7 +28,8 @@ public sealed class BitwardenLocalEditSurvivalTests
             harness.Repository,
             harness.FolderStore,
             harness.ConflictStore,
-            harness.SyncState);
+            harness.SyncState,
+            harness.Pending);
 
         var result = await service.ApplyAsync(harness.VaultId, Snapshot(remote), [remote]);
 
@@ -48,7 +49,8 @@ public sealed class BitwardenLocalEditSurvivalTests
             harness.Repository,
             harness.FolderStore,
             harness.ConflictStore,
-            harness.SyncState);
+            harness.SyncState,
+            harness.Pending);
 
         await RenameThroughEditorAsync(harness, saved.Id, "Renamed on this device");
 
@@ -73,12 +75,12 @@ public sealed class BitwardenLocalEditSurvivalTests
         var harness = await CreateHarnessAsync();
         var remote = BaselineCipher();
         var saved = await SaveLocalFromRemoteAsync(harness, remote.Password!);
-        var pending = new BitwardenPendingOperationStore(harness.Factory, harness.Migrator, harness.Crypto);
         var service = new BitwardenPullMergeService(
             harness.Repository,
             harness.FolderStore,
             harness.ConflictStore,
-            harness.SyncState);
+            harness.SyncState,
+            harness.Pending);
 
         await RenameThroughEditorAsync(harness, saved.Id, "Renamed on this device");
         await service.ApplyAsync(harness.VaultId, Snapshot(remote), [remote]);
@@ -86,7 +88,7 @@ public sealed class BitwardenLocalEditSurvivalTests
         var stored = (await harness.Repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true))
             .Single(entry => entry.Id == saved.Id);
 
-        var local = (await pending.GetAsync(harness.VaultId)).Count;
+        var local = (await harness.Pending.GetAsync(harness.VaultId)).Count;
         var unresolved = (await harness.ConflictStore.GetUnresolvedAsync(harness.VaultId)).Count;
         var reportsFullyInSync = !stored.BitwardenLocalModified && local == 0 && unresolved == 0;
         var editKept = stored.Title == "Renamed on this device";
@@ -190,6 +192,7 @@ public sealed class BitwardenLocalEditSurvivalTests
             folderStore,
             conflictStore,
             syncState,
+            new BitwardenPendingOperationStore(factory, migrator, crypto),
             factory,
             migrator,
             crypto,
@@ -201,6 +204,7 @@ public sealed class BitwardenLocalEditSurvivalTests
         IBitwardenRemoteFolderStore FolderStore,
         IBitwardenConflictBackupStore ConflictStore,
         IBitwardenSyncStateStore SyncState,
+        IBitwardenPendingOperationStore Pending,
         SqliteConnectionFactory Factory,
         DatabaseMigrator Migrator,
         CryptoService Crypto,

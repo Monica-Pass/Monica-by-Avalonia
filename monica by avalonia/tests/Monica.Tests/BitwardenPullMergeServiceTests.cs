@@ -57,7 +57,8 @@ public sealed class BitwardenPullMergeServiceTests
             harness.Repository,
             harness.FolderStore,
             harness.ConflictStore,
-            harness.SyncState);
+            harness.SyncState,
+            harness.Pending);
 
         var result = await service.ApplyAsync(
             harness.VaultId,
@@ -106,7 +107,8 @@ public sealed class BitwardenPullMergeServiceTests
             harness.Repository,
             harness.FolderStore,
             harness.ConflictStore,
-            harness.SyncState);
+            harness.SyncState,
+            harness.Pending);
         await service.ApplyAsync(
             harness.VaultId,
             Snapshot([login.Metadata, note.Metadata], "2026-07-22T03:03:00Z"),
@@ -136,6 +138,94 @@ public sealed class BitwardenPullMergeServiceTests
         var savedNote = Assert.Single(await harness.Repository.GetSecureItemsAsync(includeDeleted: true));
         Assert.True(savedNote.IsDeleted);
         Assert.Equal("2026-07-22T04:00:00Z", savedNote.BitwardenRevisionDate);
+    }
+
+    // A permanent purge leaves the vault through two doors at once: the local row goes and the server is
+    // told by a queue row that carries the only surviving copy of the cipher identity. If that row has not
+    // been granted yet, the pull still finds the cipher alive and nothing local to match it against, and
+    // without the debt in front of it the entry grows back in front of the person who erased it.
+    [Fact]
+    public async Task A_pull_leaves_an_entry_gone_while_its_erase_is_still_owed()
+    {
+        var harness = await CreateHarnessAsync();
+        var service = new BitwardenPullMergeService(
+            harness.Repository,
+            harness.FolderStore,
+            harness.ConflictStore,
+            harness.SyncState,
+            harness.Pending);
+        var erase = await PurgeAndBookTheEraseAsync(harness, "cipher-erase", "Erased on this device");
+        Assert.Equal(BitwardenMutationStatus.Pending, erase.Status);
+
+        var erased = DecodedPassword("cipher-erase", "Erased on this device", "2026-07-21T00:00:00Z", null);
+        var stranger = DecodedPassword("cipher-stranger", "Made elsewhere", "2026-07-22T05:00:00Z", null);
+        var snapshot = Snapshot([erased.Metadata, stranger.Metadata], "2026-07-22T05:01:00Z");
+
+        var result = await service.ApplyAsync(harness.VaultId, snapshot, [erased, stranger]);
+
+        Assert.Equal(1, result.Added);
+        Assert.Equal(1, result.SuppressedResurrections);
+        var passwords = await harness.Repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true);
+        Assert.DoesNotContain(passwords, entry => entry.BitwardenCipherId == "cipher-erase");
+        Assert.Single(passwords, entry => entry.BitwardenCipherId == "cipher-stranger");
+
+        // The debt is what holds the door, not the identity: once the erase has been granted, a server that
+        // names that cipher again is another client putting it back, and this pull has to follow it.
+        await harness.Pending.CompleteAsync(erase.Id);
+
+        var second = await service.ApplyAsync(harness.VaultId, snapshot, [erased, stranger]);
+
+        Assert.Equal(1, second.Added);
+        Assert.Equal(0, second.SuppressedResurrections);
+        Assert.Single(
+            await harness.Repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true),
+            entry => entry.BitwardenCipherId == "cipher-erase");
+    }
+
+    // Retrying is the queue's business, not the user's: a row the retry budget gave up on is still an erase
+    // the server has never heard, and reading "no further attempts" as "nothing owed" would bring the entry
+    // back on the next synchronization of a vault whose server is unreachable for a reason we cannot answer.
+    [Fact]
+    public async Task An_erase_that_gave_up_keeping_trying_still_holds_the_entry_down()
+    {
+        var harness = await CreateHarnessAsync();
+        var service = new BitwardenPullMergeService(
+            harness.Repository,
+            harness.FolderStore,
+            harness.ConflictStore,
+            harness.SyncState,
+            harness.Pending);
+        var erase = await PurgeAndBookTheEraseAsync(harness, "cipher-erase", "Erased on this device");
+        await harness.Pending.RecordFailureAsync(
+            erase.Id,
+            BitwardenFailureClass.Validation,
+            "the server refused the erase",
+            DateTimeOffset.UtcNow);
+        Assert.Equal(
+            BitwardenMutationStatus.Failed,
+            Assert.Single(await harness.Pending.GetAsync(harness.VaultId)).Status);
+
+        var erased = DecodedPassword("cipher-erase", "Erased on this device", "2026-07-21T00:00:00Z", null);
+        var result = await service.ApplyAsync(
+            harness.VaultId,
+            Snapshot([erased.Metadata], "2026-07-22T05:01:00Z"),
+            [erased]);
+
+        Assert.Equal(0, result.Added);
+        Assert.Equal(1, result.SuppressedResurrections);
+        Assert.Empty(await harness.Repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
+    }
+
+    private static async Task<BitwardenPendingOperation> PurgeAndBookTheEraseAsync(
+        Harness harness,
+        string cipherId,
+        string title)
+    {
+        var carried = await SaveLocalPasswordAsync(harness, cipherId, title, false);
+        Assert.True(await new BitwardenPurgeQueue(harness.Pending).EnqueuePasswordAsync(carried));
+        await harness.Repository.DeletePasswordPermanentlyAsync(carried.Id);
+        return (await harness.Pending.GetAsync(harness.VaultId))
+            .Single(operation => operation.CipherId == cipherId);
     }
 
     private static BitwardenPullSnapshot Snapshot(
@@ -242,7 +332,8 @@ public sealed class BitwardenPullMergeServiceTests
         var folderStore = new BitwardenRemoteFolderStore(factory, migrator, crypto);
         var conflictStore = new BitwardenConflictBackupStore(factory, migrator, crypto);
         var syncState = new BitwardenSyncStateStore(factory, migrator);
-        return new Harness(repository, folderStore, conflictStore, syncState, account.Id);
+        var pending = new BitwardenPendingOperationStore(factory, migrator, crypto);
+        return new Harness(repository, folderStore, conflictStore, syncState, pending, account.Id);
     }
 
     private sealed record Harness(
@@ -250,5 +341,6 @@ public sealed class BitwardenPullMergeServiceTests
         IBitwardenRemoteFolderStore FolderStore,
         IBitwardenConflictBackupStore ConflictStore,
         IBitwardenSyncStateStore SyncState,
+        IBitwardenPendingOperationStore Pending,
         long VaultId);
 }

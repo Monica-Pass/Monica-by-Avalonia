@@ -17,7 +17,8 @@ public sealed partial class BitwardenPullMergeService(
     IMonicaRepository repository,
     IBitwardenRemoteFolderStore folderStore,
     IBitwardenConflictBackupStore conflictStore,
-    IBitwardenSyncStateStore syncStateStore) : IBitwardenPullMergeService
+    IBitwardenSyncStateStore syncStateStore,
+    IBitwardenPendingOperationStore operationStore) : IBitwardenPullMergeService
 {
     public async Task<BitwardenPullMergeResult> ApplyAsync(
         long vaultId,
@@ -35,6 +36,7 @@ public sealed partial class BitwardenPullMergeService(
         var decodedById = ValidateDecoded(snapshot, decodedCiphers);
         var local = await LoadLocalContextAsync(vaultId, cancellationToken);
         var decisions = BitwardenMergeEngine.Plan(snapshot, local.References);
+        var owedErasures = await LoadOwedErasuresAsync(vaultId, cancellationToken);
 
         await folderStore.ReplaceCompleteSnapshotAsync(
             vaultId,
@@ -57,6 +59,7 @@ public sealed partial class BitwardenPullMergeService(
         var markedClean = 0;
         var preserved = 0;
         var unchanged = 0;
+        var suppressed = 0;
 
         foreach (var decision in decisions)
         {
@@ -72,6 +75,9 @@ public sealed partial class BitwardenPullMergeService(
                 case BitwardenMergeAction.MarkLocalClean:
                     await MarkLocalCleanAsync(local, decision, cancellationToken);
                     markedClean++;
+                    break;
+                case BitwardenMergeAction.AddRemote when owedErasures.Contains(decision.CipherId):
+                    suppressed++;
                     break;
                 case BitwardenMergeAction.AddRemote:
                     await ApplyActiveRemoteAsync(
@@ -142,7 +148,26 @@ public sealed partial class BitwardenPullMergeService(
             conflicts,
             markedClean,
             preserved,
-            unchanged);
+            unchanged,
+            suppressed);
+    }
+
+    /// <summary>
+    /// The remote identities this device still owes the server a permanent erase for. A purge deletes the
+    /// local row and the tombstone keeps no cipher identity, so an erase that has not left yet is the only
+    /// surviving record of the user's decision - without it a pull taken while the push was still waiting
+    /// would read that cipher as a brand new item another client made and grow it back on screen.
+    /// </summary>
+    private async Task<HashSet<string>> LoadOwedErasuresAsync(
+        long vaultId,
+        CancellationToken cancellationToken)
+    {
+        var operations = await operationStore.GetAsync(vaultId, cancellationToken);
+        return operations
+            .Where(operation => operation.OperationType == BitwardenMutationOperationType.Delete &&
+                                operation.Status != BitwardenMutationStatus.Completed)
+            .Select(operation => operation.CipherId)
+            .ToHashSet(StringComparer.Ordinal);
     }
 
     private async Task EnsureLocalCategoriesAsync(

@@ -106,6 +106,11 @@ public sealed record BitwardenDecodedCipher(
     IReadOnlyList<CustomField> CustomFields,
     IReadOnlyList<PasswordHistoryEntry> PasswordHistory);
 
+/// <param name="SuppressedResurrections">
+/// Remote ciphers this pull left on the shelf instead of writing them into the vault, because this device
+/// still owes the server an erase for that exact identity. The default keeps every caller that does not
+/// consult the outgoing queue honest about knowing nothing.
+/// </param>
 public sealed record BitwardenPullMergeResult(
     int Added,
     int Updated,
@@ -113,4 +118,5 @@ public sealed record BitwardenPullMergeResult(
     int ConflictsBackedUp,
     int MarkedClean,
     int PreservedLocalOnly,
-    int Unchanged);
+    int Unchanged,
+    int SuppressedResurrections = 0);

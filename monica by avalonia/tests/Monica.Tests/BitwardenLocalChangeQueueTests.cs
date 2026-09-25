@@ -1483,7 +1483,7 @@ public sealed class BitwardenLocalChangeQueueTests
             syncState,
             pending,
             conflictStore,
-            new BitwardenPullMergeService(repository, folderStore, conflictStore, syncState),
+            new BitwardenPullMergeService(repository, folderStore, conflictStore, syncState, pending),
             new BitwardenLocalChangeQueue(repository, syncState, pending),
             new BitwardenMutationProcessor(pending, syncState, repository),
             new BitwardenConflictRestoreService(repository, conflictStore),
