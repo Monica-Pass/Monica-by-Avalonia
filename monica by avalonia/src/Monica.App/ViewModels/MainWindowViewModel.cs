@@ -82,7 +82,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IBitwardenConflictBackupStore? bitwardenConflictBackupStore = null,
         IBitwardenConflictRestoreService? bitwardenConflictRestoreService = null,
         IBitwardenDeviceIdentityProvider? bitwardenDeviceIdentityProvider = null,
-        IAutoTypeService? autoTypeService = null)
+        IAutoTypeService? autoTypeService = null,
+        IBitwardenPurgeQueue? bitwardenPurgeQueue = null)
     {
         _viewModelDispatcher = Dispatcher.CurrentDispatcher;
         _repository = repository;
@@ -107,6 +108,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _bitwardenConflictBackupStore = bitwardenConflictBackupStore;
         _bitwardenConflictRestoreService = bitwardenConflictRestoreService;
         _bitwardenDeviceIdentityProvider = bitwardenDeviceIdentityProvider;
+        _bitwardenPurgeQueue = bitwardenPurgeQueue;
         if (_bitwardenSyncCoordinator is not null)
         {
             _bitwardenSyncCoordinator.StateChanged += OnBitwardenSyncStateChanged;

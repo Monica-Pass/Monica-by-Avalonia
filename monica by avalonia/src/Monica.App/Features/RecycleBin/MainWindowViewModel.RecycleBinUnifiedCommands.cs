@@ -78,6 +78,7 @@ public sealed partial class MainWindowViewModel
             foreach (var sibling in siblings)
             {
                 await _repository.DeletePasswordPermanentlyAsync(sibling.Id);
+                await QueueBitwardenPurgeForRemovalAsync(sibling);
                 await LogOperationAsync(new OperationLog
                 {
                     ItemType = "PASSWORD",
@@ -93,6 +94,7 @@ public sealed partial class MainWindowViewModel
         {
             var secure = item.SecureItem;
             await _repository.DeleteSecureItemPermanentlyAsync(secure.Id);
+            await QueueBitwardenPurgeForRemovalAsync(secure);
             await LogOperationAsync(new OperationLog
             {
                 ItemType = secure.ItemType.ToString().ToUpperInvariant(),

@@ -68,14 +68,19 @@ public sealed class BitwardenMutationProcessor(
                         continue;
                     }
 
-                    if (operation.OperationType is BitwardenMutationOperationType.Delete
-                            or BitwardenMutationOperationType.SoftDelete &&
+                    if (operation.OperationType == BitwardenMutationOperationType.SoftDelete &&
                         local.IsHeldAlive(operation.CipherId))
                     {
                         // The entry came back out of the trash before this delete left the device.
                         // Trashing the remote copy anyway would take an item away from every other client
                         // that the user kept here; completing the row lets the next scan re-decide from
                         // the content that actually stands.
+                        //
+                        // A permanent erase deliberately keeps no such escape: nothing restores a purged
+                        // row, so the only way a purged cipher stands on the shelf again is a pull that
+                        // re-added it while the erase was still waiting to leave - a machine artifact, not
+                        // the last word from the user. Letting that cancel the erase would quietly undo a
+                        // decision nobody could take back on screen.
                         await operationStore.CompleteAsync(operation.Id, cancellationToken);
                         completed++;
                         continue;
@@ -106,6 +111,20 @@ public sealed class BitwardenMutationProcessor(
                     var failureClass = response.HttpStatusCode is { } status
                         ? BitwardenRetryPolicy.ClassifyHttpStatus((HttpStatusCode)status)
                         : BitwardenFailureClass.Permanent;
+                    if (failureClass == BitwardenFailureClass.Validation &&
+                        response.HttpStatusCode == (int)HttpStatusCode.NotFound &&
+                        operation.OperationType is BitwardenMutationOperationType.Delete
+                            or BitwardenMutationOperationType.SoftDelete)
+                    {
+                        // The server is not holding this cipher any more - another client erased it, or the
+                        // trash this delete aimed at was emptied. A deletion whose target is gone has been
+                        // answered in full, and recording it as a failure would leave a row no retry can
+                        // ever satisfy sitting in the queue for the rest of the vault's life.
+                        await operationStore.CompleteAsync(operation.Id, cancellationToken);
+                        completed++;
+                        continue;
+                    }
+
                     var statusResult = await operationStore.RecordFailureAsync(
                         operation.Id,
                         failureClass,

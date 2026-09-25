@@ -1064,6 +1064,186 @@ public sealed class BitwardenLocalChangeQueueTests
             DateTimeOffset.UtcNow)).Enqueued);
     }
 
+    // A permanent purge is the one local change the drift scan cannot discover: the row it reads to work
+    // out what the server owes is the row the purge destroys, and the tombstone the writer leaves behind
+    // keeps nothing but its ids. So the erase has to be booked off the entry still in memory, and the
+    // first assertion below is the negative control - with the producer removed the vault would quietly
+    // keep a copy the user threw away forever.
+    [Fact]
+    public async Task A_purged_entry_is_queued_as_an_erase_no_later_scan_can_invent()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = BaselineCipher();
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([remote]), [remote]);
+        var doomed = await ReadAsync(harness);
+        await harness.Repository.DeletePasswordPermanentlyAsync(doomed.Id);
+
+        Assert.Equal(0, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+        Assert.Empty(await harness.Pending.GetAsync(harness.VaultId));
+
+        Assert.True(await harness.Purge.EnqueuePasswordAsync(doomed));
+        var queued = Assert.Single(await harness.Pending.GetAsync(harness.VaultId));
+        Assert.Equal(BitwardenMutationOperationType.Delete, queued.OperationType);
+        Assert.Equal("cipher-edit", queued.CipherId);
+        // The erase guards the version the user was looking at: without it a copy edited elsewhere would
+        // be erased by a delete aimed at a state nobody saw.
+        Assert.Equal(BaselineRevision, queued.ExpectedRemoteRevision);
+        Assert.Equal("{}", queued.PayloadJson);
+        Assert.StartsWith("local-purge:", queued.IdempotencyKey, StringComparison.Ordinal);
+        // No content travelled, so the processor must be left with nothing to record as what the server
+        // now holds.
+        Assert.Null(queued.LocalPayloadHash);
+
+        var batch = await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            new AcceptedTransport(NextRevision));
+
+        Assert.Equal(1, batch.Completed);
+        Assert.Empty(await harness.Repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
+        Assert.Equal(BitwardenMutationStatus.Completed, Assert.Single(await harness.Pending.GetAsync(harness.VaultId)).Status);
+        Assert.Equal(0, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+
+        // The pull that follows retires the erased cipher's baseline with the rest of the snapshot, so
+        // nothing is left behind claiming the server still holds it.
+        var kept = BoundCipher("cipher-kept", "Still on the server", "kept-user");
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([kept]), [kept]);
+        var baseline = await harness.SyncState.GetPayloadHashesAsync(harness.VaultId);
+        Assert.False(baseline.ContainsKey("cipher-edit"));
+        Assert.True(baseline.ContainsKey("cipher-kept"));
+    }
+
+    // A purge is the second decision about a cipher the user already threw away, and the store raises a
+    // completed row back to pending when an enqueue lands on its key. Reusing the trash's key would reopen
+    // a deletion the server granted - and leave the erase queued under a row that is already gone.
+    [Fact]
+    public async Task A_permanent_erase_keys_apart_from_the_trash_that_came_before_it()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = BaselineCipher();
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([remote]), [remote]);
+        var trashed = await ReadAsync(harness);
+        trashed.IsDeleted = true;
+        trashed.DeletedAt = new DateTimeOffset(2026, 7, 22, 3, 30, 0, TimeSpan.Zero);
+        await harness.Repository.SavePasswordAsync(trashed);
+        await harness.Queue.EnqueueDriftedAsync(harness.VaultId, harness.VaultKey, DateTimeOffset.UtcNow);
+        await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            new AcceptedTransport(NextRevision));
+        var doomed = await ReadAsync(harness);
+        await harness.Repository.DeletePasswordPermanentlyAsync(doomed.Id);
+
+        Assert.True(await harness.Purge.EnqueuePasswordAsync(doomed));
+        var rows = await harness.Pending.GetAsync(harness.VaultId);
+        Assert.Equal(2, rows.Count);
+        var trash = Assert.Single(rows, row => row.OperationType == BitwardenMutationOperationType.SoftDelete);
+        var erase = Assert.Single(rows, row => row.OperationType == BitwardenMutationOperationType.Delete);
+        Assert.Equal(BitwardenMutationStatus.Completed, trash.Status);
+        Assert.Equal(BitwardenMutationStatus.Pending, erase.Status);
+        Assert.NotEqual(trash.IdempotencyKey, erase.IdempotencyKey);
+
+        var batch = await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            new AcceptedTransport("2026-07-22T05:00:00Z"));
+
+        Assert.Equal(1, batch.Completed);
+        Assert.Equal(0, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+    }
+
+    // Two rows an erase cannot be aimed at: one the server has never been told about, and one that never
+    // learned which version of itself the server holds. Sending either would be a guess, and a wrong guess
+    // about a deletion cannot be taken back.
+    [Fact]
+    public async Task An_erase_with_nothing_to_erase_or_nothing_to_guard_is_refused()
+    {
+        var harness = await CreateHarnessAsync();
+        var published = await SavePublishedAsync(harness, "Published, never uploaded");
+        var untracked = new PasswordEntry
+        {
+            Title = "Bound without a revision",
+            Username = "whoever",
+            Password = "a local secret",
+            BitwardenVaultId = harness.VaultId,
+            BitwardenCipherId = "cipher-no-revision",
+            BitwardenCipherType = 1
+        };
+        await harness.Repository.SavePasswordAsync(untracked);
+
+        Assert.False(await harness.Purge.EnqueuePasswordAsync(published));
+        Assert.False(await harness.Purge.EnqueuePasswordAsync(untracked));
+        Assert.Empty(await harness.Pending.GetAsync(harness.VaultId));
+    }
+
+    // The server answers 404 for a cipher another client already erased. Today that lands as a validation
+    // failure the retry policy never re-tries, so the queue would carry a permanently failed row for a
+    // change that is, from the server's point of view, fully granted.
+    [Fact]
+    public async Task An_erase_the_server_no_longer_has_is_settled_instead_of_parked()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = BaselineCipher();
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([remote]), [remote]);
+        var doomed = await ReadAsync(harness);
+        await harness.Repository.DeletePasswordPermanentlyAsync(doomed.Id);
+        Assert.True(await harness.Purge.EnqueuePasswordAsync(doomed));
+
+        var transport = new AcceptedTransport(NextRevision, failureStatus: 404);
+        var batch = await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            transport);
+
+        Assert.Equal(1, transport.Sends);
+        Assert.Equal(1, batch.Completed);
+        Assert.Equal(0, batch.Failed);
+        var row = Assert.Single(await harness.Pending.GetAsync(harness.VaultId));
+        Assert.Equal(BitwardenMutationStatus.Completed, row.Status);
+        // Settling is not the same as succeeding: the cipher may be held by nobody now, so the erase must
+        // not leave the baseline claiming the server has it.
+        Assert.Equal(
+            BitwardenPayloadFingerprint.ForPassword(remote.Password!, [], []),
+            Assert.Contains("cipher-edit", await harness.SyncState.GetPayloadHashesAsync(harness.VaultId)));
+    }
+
+    // Undoing a trash before it leaves the device cancels the delete, because a live row is the user's
+    // later word. A purge has no such later word available - nothing restores an erased entry here - so a
+    // row standing under an owed erase can only be a copy the pull brought back while the erase waited.
+    // Cancelling on that would quietly undo a decision the user cannot take back on screen.
+    [Fact]
+    public async Task A_permanent_erase_is_not_cancelled_by_a_row_the_pull_put_back()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = BaselineCipher();
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([remote]), [remote]);
+        var doomed = await ReadAsync(harness);
+        await harness.Repository.DeletePasswordPermanentlyAsync(doomed.Id);
+        Assert.True(await harness.Purge.EnqueuePasswordAsync(doomed));
+        await harness.Repository.SavePasswordAsync(doomed);
+
+        var transport = new AcceptedTransport(NextRevision);
+        var batch = await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            transport);
+
+        Assert.Equal(1, transport.Sends);
+        Assert.Equal(1, batch.Completed);
+        Assert.Equal(
+            BitwardenMutationStatus.Completed,
+            Assert.Single(await harness.Pending.GetAsync(harness.VaultId)).Status);
+    }
+
     private const string CardNumber = "4111111111111111";
 
     // What the library's publish command leaves behind for a wallet row: it belongs to this vault by
@@ -1268,6 +1448,7 @@ public sealed class BitwardenLocalChangeQueueTests
             new BitwardenLocalChangeQueue(repository, syncState, pending),
             new BitwardenMutationProcessor(pending, syncState, repository),
             new BitwardenConflictRestoreService(repository, conflictStore),
+            new BitwardenPurgeQueue(pending),
             new BitwardenSymmetricKey(
                 Enumerable.Repeat((byte)1, 32).ToArray(),
                 Enumerable.Repeat((byte)2, 32).ToArray()),
@@ -1285,6 +1466,7 @@ public sealed class BitwardenLocalChangeQueueTests
         IBitwardenLocalChangeQueue Queue,
         IBitwardenMutationProcessor Processor,
         IBitwardenConflictRestoreService Restore,
+        IBitwardenPurgeQueue Purge,
         BitwardenSymmetricKey VaultKey,
         SqliteConnectionFactory Factory,
         DatabaseMigrator Migrator,
@@ -1293,7 +1475,8 @@ public sealed class BitwardenLocalChangeQueueTests
     private sealed class AcceptedTransport(
         string revision,
         bool reject = false,
-        string? assignedCipherId = null) : IBitwardenMutationTransport
+        string? assignedCipherId = null,
+        int? failureStatus = null) : IBitwardenMutationTransport
     {
         public int Sends { get; private set; }
 
@@ -1302,9 +1485,19 @@ public sealed class BitwardenLocalChangeQueueTests
             CancellationToken cancellationToken = default)
         {
             Sends++;
-            return Task.FromResult(reject
-                ? new BitwardenMutationResponse(false, request.CipherId, null, 409, "revision conflict")
-                : new BitwardenMutationResponse(true, assignedCipherId ?? request.CipherId, revision));
+            int? failure = failureStatus ?? (reject ? (int?)409 : null);
+            if (failure is { } status)
+            {
+                return Task.FromResult(new BitwardenMutationResponse(
+                    false,
+                    request.CipherId,
+                    null,
+                    status,
+                    $"Bitwarden mutation answered HTTP {status}."));
+            }
+
+            return Task.FromResult(
+                new BitwardenMutationResponse(true, assignedCipherId ?? request.CipherId, revision));
         }
     }
 }

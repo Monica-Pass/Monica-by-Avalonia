@@ -80,6 +80,7 @@ public sealed partial class MainWindowViewModel
         {
             item.IsSelected = false;
             await _repository.DeletePasswordPermanentlyAsync(item.Id);
+            await QueueBitwardenPurgeForRemovalAsync(item);
             await LogOperationAsync(new OperationLog
             {
                 ItemType = "PASSWORD",
