@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Monica.Core.Bitwarden;
 using Monica.Core.Models;
@@ -90,6 +91,57 @@ public sealed class BitwardenPullMergeServiceTests
             item => item.BitwardenCipherId == "cipher-auto-note");
         Assert.Equal(nestedCategory.Id, autoFolderNote.CategoryId);
     }
+
+    // Measured against a real Vaultwarden: the two local tables number their rows on independent
+    // sequences, so the first login and the first note are both row #1. A remote deletion arriving for
+    // the note was resolved by that id alone, found the login, threw it into Monica's recycle bin and
+    // left the note's own copy on a stale revision - which is why its restore could never converge.
+    [Fact]
+    public async Task A_remote_note_deletion_cannot_touch_the_login_sharing_its_row_id()
+    {
+        var harness = await CreateHarnessAsync();
+        var login = DecodedPassword("cipher-login", "Live login", "2026-07-22T03:00:00Z", null);
+        var note = DecodedNote("cipher-note", "Remote note", "2026-07-22T03:02:00Z", null);
+        var service = new BitwardenPullMergeService(
+            harness.Repository,
+            harness.FolderStore,
+            harness.ConflictStore,
+            harness.SyncState);
+        await service.ApplyAsync(
+            harness.VaultId,
+            Snapshot([login.Metadata, note.Metadata], "2026-07-22T03:03:00Z"),
+            [login, note]);
+
+        var localLogin = (await harness.Repository.GetPasswordsAsync()).Single();
+        var localNote = (await harness.Repository.GetSecureItemsAsync()).Single();
+        Assert.Equal(localLogin.Id, localNote.Id);
+
+        var trashedNote = new BitwardenRemoteCipherMetadata(
+            "cipher-note",
+            null,
+            "2026-07-22T04:00:00Z",
+            2,
+            true,
+            BitwardenPayloadFingerprint.ForRemoteDeletion("2026-07-22T04:00:00Z"));
+        var result = await service.ApplyAsync(
+            harness.VaultId,
+            Snapshot([login.Metadata, trashedNote], "2026-07-22T04:01:00Z"),
+            [login]);
+
+        Assert.Equal(1, result.Deleted);
+        Assert.Equal(1, result.Unchanged);
+        var password = Assert.Single(
+            await harness.Repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true));
+        Assert.False(password.IsDeleted);
+        var savedNote = Assert.Single(await harness.Repository.GetSecureItemsAsync(includeDeleted: true));
+        Assert.True(savedNote.IsDeleted);
+        Assert.Equal("2026-07-22T04:00:00Z", savedNote.BitwardenRevisionDate);
+    }
+
+    private static BitwardenPullSnapshot Snapshot(
+        IReadOnlyList<BitwardenRemoteCipherMetadata> ciphers,
+        string revision) =>
+        new([], ciphers, revision, true, DateTimeOffset.Parse(revision, CultureInfo.InvariantCulture));
 
     private static async Task<PasswordEntry> SaveLocalPasswordAsync(
         Harness harness,

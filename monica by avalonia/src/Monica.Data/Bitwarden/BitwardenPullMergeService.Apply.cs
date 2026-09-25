@@ -108,7 +108,7 @@ public sealed partial class BitwardenPullMergeService
             throw new BitwardenProtocolException("A remote deletion has no local identity.");
         }
 
-        var password = local.Passwords.SingleOrDefault(entry => entry.Id == decision.LocalId);
+        var password = FindPassword(local, decision.CipherId);
         if (password is not null)
         {
             password.IsDeleted = true;
@@ -119,7 +119,7 @@ public sealed partial class BitwardenPullMergeService
             return;
         }
 
-        var secureItem = local.SecureItems.Single(item => item.Id == decision.LocalId);
+        var secureItem = FindSecureItem(local, decision.CipherId);
         secureItem.IsDeleted = true;
         secureItem.DeletedAt = DateTimeOffset.UtcNow;
         secureItem.BitwardenRevisionDate = decision.RemoteRevisionDate;
@@ -132,7 +132,7 @@ public sealed partial class BitwardenPullMergeService
         BitwardenMergeDecision decision,
         CancellationToken cancellationToken)
     {
-        var password = local.Passwords.SingleOrDefault(entry => entry.Id == decision.LocalId);
+        var password = FindPassword(local, decision.CipherId);
         if (password is not null)
         {
             password.BitwardenLocalModified = false;
@@ -140,10 +140,23 @@ public sealed partial class BitwardenPullMergeService
             return;
         }
 
-        var item = local.SecureItems.Single(secureItem => secureItem.Id == decision.LocalId);
+        var item = FindSecureItem(local, decision.CipherId);
         item.BitwardenLocalModified = false;
         await repository.SaveSecureItemAsync(item, cancellationToken);
     }
+
+    // The two local tables number their rows independently, so resolving a row by its id alone can land
+    // on the other table's row. Measured against a real server: trashing a note's cipher threw a live
+    // login into the recycle bin and left the note's own row stuck on a stale revision. Cipher ids are
+    // unique across both tables, so they are the only identity safe to locate a row with.
+    private static PasswordEntry? FindPassword(LocalContext local, string cipherId) =>
+        local.Passwords.SingleOrDefault(entry =>
+            string.Equals(entry.BitwardenCipherId, cipherId, StringComparison.Ordinal));
+
+    private static SecureItem FindSecureItem(LocalContext local, string cipherId) =>
+        local.SecureItems.SingleOrDefault(item =>
+            string.Equals(item.BitwardenCipherId, cipherId, StringComparison.Ordinal))
+        ?? throw new BitwardenProtocolException($"No local secure item is bound to cipher {cipherId}.");
 
     private async Task SaveConflictBackupAsync(
         long vaultId,
@@ -151,9 +164,10 @@ public sealed partial class BitwardenPullMergeService
         BitwardenMergeDecision decision,
         CancellationToken cancellationToken)
     {
-        var password = local.Passwords.SingleOrDefault(entry => entry.Id == decision.LocalId);
         string payload;
         string itemKind;
+        long localItemId;
+        var password = FindPassword(local, decision.CipherId);
         if (password is not null)
         {
             payload = JsonSerializer.Serialize(new
@@ -163,14 +177,14 @@ public sealed partial class BitwardenPullMergeService
                 passwordHistory = local.Histories.GetValueOrDefault(password.Id) ?? []
             });
             itemKind = "password";
+            localItemId = password.Id;
         }
         else
         {
-            payload = JsonSerializer.Serialize(new
-            {
-                secureItem = local.SecureItems.Single(item => item.Id == decision.LocalId)
-            });
+            var secureItem = FindSecureItem(local, decision.CipherId);
+            payload = JsonSerializer.Serialize(new { secureItem });
             itemKind = "secure-item";
+            localItemId = secureItem.Id;
         }
 
         await conflictStore.SaveAsync(new BitwardenConflictBackup(
@@ -178,7 +192,7 @@ public sealed partial class BitwardenPullMergeService
             vaultId,
             decision.CipherId,
             itemKind,
-            decision.LocalId!.Value,
+            localItemId,
             decision.LocalRevisionDate,
             decision.RemoteRevisionDate,
             payload,
