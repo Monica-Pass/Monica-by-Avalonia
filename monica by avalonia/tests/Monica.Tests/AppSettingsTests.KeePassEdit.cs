@@ -178,6 +178,108 @@ public sealed partial class AppSettingsTests
         Assert.True((await File.ReadAllBytesAsync(path)).AsSpan().SequenceEqual(fixture.Content));
     }
 
+    [Fact]
+    public async Task KeePass_unsaved_edit_survives_leaving_and_returning_to_the_page()
+    {
+        var fixture = KeePassTestVault.Create("keep-across-navigation");
+        var path = TestTempPaths.CreateFilePath(".kdbx");
+        await File.WriteAllBytesAsync(path, fixture.Content);
+        var picker = new KeePassEditFilePicker(new PickedBinaryFile("ledger.kdbx", fixture.Content, path));
+        var viewModel = CreateViewModel(GetTempPath(), fileSystemPickerService: picker);
+        await OpenKeePassVaultAsync(viewModel, fixture.Password);
+        await ExpandKeePassFolderAsync(viewModel, "Personal");
+        await SelectKeePassEntryAsync(viewModel, KeePassTestVault.ExistingTitle);
+        await viewModel.EditKeePassEntryCommand.ExecuteAsync(null);
+        viewModel.KeePassEditorPublic!.Title = "Held across the tab switch";
+        await viewModel.ApplyKeePassEntryEditCommand.ExecuteAsync(null);
+
+        viewModel.SelectedSyncPage = "Export";
+
+        Assert.True(viewModel.HasKeePassImportPreview);
+        Assert.True(viewModel.KeePassVaultIsDirty);
+        Assert.Equal("Unsaved changes", viewModel.KeePassUnsavedChangesText);
+        Assert.Equal("ledger.kdbx", viewModel.KeePassSelectedFileName);
+        Assert.Contains(
+            "Held across the tab switch",
+            viewModel.KeePassTreeRowsPublic.Select(row => row.Label));
+        Assert.True((await File.ReadAllBytesAsync(path)).AsSpan().SequenceEqual(fixture.Content));
+    }
+
+    [Fact]
+    public async Task KeePass_opening_another_file_is_refused_while_edits_are_unsaved()
+    {
+        var fixture = KeePassTestVault.Create("refuse-to-replace");
+        var path = TestTempPaths.CreateFilePath(".kdbx");
+        await File.WriteAllBytesAsync(path, fixture.Content);
+        var picker = new KeePassEditFilePicker(new PickedBinaryFile("ledger.kdbx", fixture.Content, path));
+        var viewModel = CreateViewModel(GetTempPath(), fileSystemPickerService: picker);
+        await OpenKeePassVaultAsync(viewModel, fixture.Password);
+        await ExpandKeePassFolderAsync(viewModel, "Personal");
+        await SelectKeePassEntryAsync(viewModel, KeePassTestVault.ExistingTitle);
+        await viewModel.EditKeePassEntryCommand.ExecuteAsync(null);
+        viewModel.KeePassEditorPublic!.Title = "Still owed a save";
+        await viewModel.ApplyKeePassEntryEditCommand.ExecuteAsync(null);
+        picker.OpenCalls = 0;
+
+        await viewModel.SelectKeePassFileCommand.ExecuteAsync(null);
+        await viewModel.PreviewKeePassImportCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, picker.OpenCalls);
+        Assert.True(viewModel.IsStatusMessageFailure);
+        Assert.Contains("Save or close the opened KeePass database", viewModel.StatusMessage, StringComparison.Ordinal);
+        Assert.True(viewModel.KeePassVaultIsDirty);
+        Assert.True(viewModel.HasKeePassImportPreview);
+        Assert.Contains(
+            "Still owed a save",
+            viewModel.KeePassTreeRowsPublic.Select(row => row.Label));
+    }
+
+    [Fact]
+    public async Task KeePass_closing_a_dirty_database_asks_and_only_forgets_when_confirmed()
+    {
+        var fixture = KeePassTestVault.Create("ask-before-discard");
+        var path = TestTempPaths.CreateFilePath(".kdbx");
+        await File.WriteAllBytesAsync(path, fixture.Content);
+        var picker = new KeePassEditFilePicker(new PickedBinaryFile("ledger.kdbx", fixture.Content, path));
+        var declines = new RecordingConfirmationDialogService(result: false);
+        var viewModel = CreateViewModel(
+            GetTempPath(),
+            fileSystemPickerService: picker,
+            confirmationDialogService: declines);
+        await OpenKeePassVaultAsync(viewModel, fixture.Password);
+        await ExpandKeePassFolderAsync(viewModel, "Personal");
+        await SelectKeePassEntryAsync(viewModel, KeePassTestVault.ExistingTitle);
+        await viewModel.EditKeePassEntryCommand.ExecuteAsync(null);
+        viewModel.KeePassEditorPublic!.Title = "Wanted gone";
+        await viewModel.ApplyKeePassEntryEditCommand.ExecuteAsync(null);
+
+        await viewModel.ResetKeePassImportCommand.ExecuteAsync(null);
+
+        Assert.True(declines.WasCalled);
+        Assert.True(viewModel.HasKeePassImportPreview);
+        Assert.True(viewModel.KeePassVaultIsDirty);
+
+        var approves = new RecordingConfirmationDialogService(result: true);
+        var approvingViewModel = CreateViewModel(
+            GetTempPath(),
+            fileSystemPickerService: picker,
+            confirmationDialogService: approves);
+        await OpenKeePassVaultAsync(approvingViewModel, fixture.Password);
+        await ExpandKeePassFolderAsync(approvingViewModel, "Personal");
+        await SelectKeePassEntryAsync(approvingViewModel, KeePassTestVault.ExistingTitle);
+        await approvingViewModel.EditKeePassEntryCommand.ExecuteAsync(null);
+        approvingViewModel.KeePassEditorPublic!.Title = "Wanted gone";
+        await approvingViewModel.ApplyKeePassEntryEditCommand.ExecuteAsync(null);
+
+        await approvingViewModel.ResetKeePassImportCommand.ExecuteAsync(null);
+
+        Assert.True(approves.WasCalled);
+        Assert.False(approvingViewModel.HasKeePassImportPreview);
+        Assert.False(approvingViewModel.KeePassVaultIsDirty);
+        // Discarding is not saving: the edits were given up, never written to the file.
+        Assert.True((await File.ReadAllBytesAsync(path)).AsSpan().SequenceEqual(fixture.Content));
+    }
+
     private static async Task OpenKeePassVaultAsync(MainWindowViewModel viewModel, string password)
     {
         await viewModel.SelectKeePassFileCommand.ExecuteAsync(null);
@@ -216,14 +318,19 @@ public sealed partial class AppSettingsTests
 
     private sealed class KeePassEditFilePicker(PickedBinaryFile? file, string? saveTarget = null) : IFileSystemPickerService
     {
+        public int OpenCalls { get; set; }
+
         public PlatformIntegrationCapability Capability { get; } =
             PlatformIntegrationService.Available(PlatformFeatureKeys.FilePicker, "Test file picker");
 
         public Task<PickedTextFile?> OpenTextFileAsync(string title, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
             Task.FromResult<PickedTextFile?>(null);
 
-        public Task<PickedBinaryFile?> OpenBinaryFileAsync(string title, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
-            Task.FromResult(file);
+        public Task<PickedBinaryFile?> OpenBinaryFileAsync(string title, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default)
+        {
+            OpenCalls++;
+            return Task.FromResult(file);
+        }
 
         public Task<string?> SaveTextFileAsync(string title, string suggestedFileName, string content, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
             Task.FromResult<string?>(null);

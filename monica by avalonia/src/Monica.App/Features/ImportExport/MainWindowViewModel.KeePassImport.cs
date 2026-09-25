@@ -15,6 +15,12 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        if (KeePassVaultIsDirty)
+        {
+            SetStatusFailure("KeePassDiscardBeforeOpening");
+            return;
+        }
+
         try
         {
             var file = await _fileSystemPickerService.OpenBinaryFileAsync(
@@ -46,6 +52,12 @@ public sealed partial class MainWindowViewModel
         if (_keePassPendingFile is null)
         {
             SetStatusFailure("KeePassFileRequired");
+            return;
+        }
+
+        if (KeePassVaultIsDirty)
+        {
+            SetStatusFailure("KeePassDiscardBeforeOpening");
             return;
         }
 
@@ -206,7 +218,9 @@ public sealed partial class MainWindowViewModel
                 }),
                 DeviceName = Environment.MachineName
             });
-            ClearKeePassImportState(cancelActiveOperation: false);
+            // A database the user still has unsaved edits in stays open after the import; the ones
+            // they came here with nothing pending on close the way they always did.
+            ClearKeePassImportState(cancelActiveOperation: false, keepUnsavedDatabase: true);
             await LoadAsync();
             SetStatusNotice("KeePassImportedFormat", imported, skipped);
         }
@@ -233,6 +247,27 @@ public sealed partial class MainWindowViewModel
         SetStatusNotice("KeePassImportCanceled");
     }
 
+    /// <summary>
+    /// The one affordance that throws away an opened database on purpose, so if it still holds
+    /// edits that never reached the file the user is asked before they are gone. Navigation keeps
+    /// such a database open instead of deciding for them.
+    /// </summary>
     [RelayCommand]
-    private void ResetKeePassImport() => ClearKeePassImportState(cancelActiveOperation: true);
+    private async Task ResetKeePassImportAsync()
+    {
+        if (KeePassVaultIsDirty)
+        {
+            var discard = await _confirmationDialogService.ConfirmAsync(
+                _localization.Get("KeePassDiscardTitle"),
+                _localization.Get("KeePassDiscardMessage"),
+                _localization.Get("KeePassDiscardAction"),
+                _localization.Cancel);
+            if (!discard)
+            {
+                return;
+            }
+        }
+
+        ClearKeePassImportState(cancelActiveOperation: true);
+    }
 }

@@ -98,14 +98,26 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(KeePassImportProgressText));
     }
 
-    private void ClearKeePassImportState(bool cancelActiveOperation)
+    /// <param name="keepUnsavedDatabase">
+    /// Navigation asks to keep a database whose edits have not reached the file yet, because leaving
+    /// the tab and coming back must not quietly throw away work the user still has to save — and an
+    /// in-flight save must not be cancelled by a click somewhere else. Locking is not navigation: it
+    /// passes false, and the decrypted database goes with the session. Opening a different file
+    /// refuses outright instead of discarding on the user's behalf.
+    /// </param>
+    private void ClearKeePassImportState(bool cancelActiveOperation, bool keepUnsavedDatabase = false)
     {
+        KeePassImportPassword = "";
+        if (keepUnsavedDatabase && KeePassVaultIsDirty)
+        {
+            return;
+        }
+
         if (cancelActiveOperation)
         {
             _keePassOperationCancellation?.Cancel();
         }
 
-        KeePassImportPassword = "";
         _keePassPendingFile = null;
         KeePassSelectedFileName = "";
         ClearKeePassImportPreview();

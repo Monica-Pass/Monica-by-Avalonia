@@ -217,7 +217,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         if (!string.Equals(value, "Sync", StringComparison.OrdinalIgnoreCase))
         {
-            ClearSensitiveImportBuffers();
+            ClearSensitiveImportBuffers(keepUnsavedKeePassDatabase: true);
             ClearSensitiveExportPreviews();
         }
 

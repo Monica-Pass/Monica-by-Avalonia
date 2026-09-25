@@ -6,7 +6,7 @@ public sealed partial class MainWindowViewModel
     {
         if (!IsWorkspacePageSelected(value, "Import"))
         {
-            ClearSensitiveImportBuffers();
+            ClearSensitiveImportBuffers(keepUnsavedKeePassDatabase: true);
         }
 
         if (!IsWorkspacePageSelected(value, "Export"))

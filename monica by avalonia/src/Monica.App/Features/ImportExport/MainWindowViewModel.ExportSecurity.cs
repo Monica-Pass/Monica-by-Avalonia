@@ -50,7 +50,7 @@ public sealed partial class MainWindowViewModel
         _exportPreviewAuthorizationExpiresAt = null;
     }
 
-    private void ClearSensitiveImportBuffers()
+    private void ClearSensitiveImportBuffers(bool keepUnsavedKeePassDatabase = false)
     {
         ImportJsonText = "";
         ImportCsvText = "";
@@ -59,7 +59,7 @@ public sealed partial class MainWindowViewModel
         AegisImportPassword = "";
         IsAegisImportPasswordRequired = false;
         ImportTotpCsvText = "";
-        ClearKeePassImportState(cancelActiveOperation: true);
+        ClearKeePassImportState(cancelActiveOperation: true, keepUnsavedKeePassDatabase);
         ClearBitwardenImportState(cancelActiveOperation: true);
     }
 }
