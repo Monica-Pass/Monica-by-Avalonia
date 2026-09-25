@@ -1126,6 +1126,14 @@ Vaultwarden **1.37.3**（容器 `vw-probe`，`127.0.0.1:8080->80/tcp`）。日�
 - 门禁：格式 0 改动、`dotnet build --warnaserror` 0 warning、commercial-release 全绿
   （单测 **10 `perf-budget` + 909 常规**、UI **17 `perf-budget` + 239 常规**）。本轮代码分两个提交：
   `48d6b21`（生产者 + 接线 + 两处处理器判断 + 5 条测试）、`201501e`（400 结算 + 1 条测试）。
+- **产物级真跑门在"新接线的那份二进制"上重跑过一遍**（`App.axaml.cs` 多了一条 DI 注册、`MainWindowViewModel`
+  多了一个可选构造参数，不重 publish 就等于没验）：`publish=0` ⇒ `artifacts/publish/win-x64/jit`，
+  `runtime=0` ⇒ `CANONICAL VAULT passed`（native=mdbx_ffi.dll，canonicalVaultFiles=1）、
+  库读取 passwords=27/notes=14/categories=6/attachmentOwners=6、UI 门 loadMs=521/4000（发布判据那次 139）、
+  KeePass 20000 条 3.23MB：openMs=817 / streamMs=229 / 明细 20000 全读、峰值 189.9MB、
+  强制回收后 collectedMB=109.9（相对基线 115.3 为 growthMB=-5.4，预算 24）、
+  锁定 10 轮尾窗中位数 **107.9MB / 预算 120**、锁/解往返 25/14/1/4 全等，`UI SMOKE passed` →
+  `RUNTIME SMOKE passed`（日志 `D:\Monica\probe-appdata\pub107.log`、`run107.log`，只取退出码与这些读数）。
 - **仍然没验**（别读成全绿）：① App 层那三处调用点**无自动化证明**（UI harness 只 fake `IsUnlocked`，队列行要真实
   `bitwarden_vaults` 行才过外键），本轮的"接线正确"只有 Data 层证据 + 真服务器上手工走的那条 `Purge.EnqueuePasswordAsync`；
   ② **硬删推送失败而 pull 成功**时 `AddRemote` 会把条目在本地重新长回来（未做、未测，设计草图在 §7 第 4 条末尾）；
