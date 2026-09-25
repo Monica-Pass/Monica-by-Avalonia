@@ -34,7 +34,9 @@ public interface IBitwardenLocalChangeQueue
 /// <summary>
 /// Turns local edits into upload work before the next pull runs. Drift is measured against the
 /// baseline written by the last completed synchronization, because ordinary editor saves do not set
-/// the dirty flag and a content hash is the only signal that survives a restart. An entry bound to this
+/// the dirty flag and a content hash is the only signal that survives a restart. Moving an entry between
+/// folders is measured the same way, through the remote folder its local category resolves to rather than
+/// the column a move leaves untouched (<see cref="BitwardenLocalFolderProjection"/>). An entry bound to this
 /// vault by identity alone - published here, never confirmed by the server - is the other kind of work,
 /// and it is queued as a create so the next pull cannot mistake it for a resurrected cipher. The third
 /// kind is a trashed entry the server still holds live: the pull treats that difference as a local edit
@@ -46,7 +48,8 @@ public interface IBitwardenLocalChangeQueue
 public sealed class BitwardenLocalChangeQueue(
     IMonicaRepository repository,
     IBitwardenSyncStateStore syncStateStore,
-    IBitwardenPendingOperationStore operationStore) : IBitwardenLocalChangeQueue
+    IBitwardenPendingOperationStore operationStore,
+    IBitwardenRemoteFolderStore folderStore) : IBitwardenLocalChangeQueue
 {
     public async Task<BitwardenLocalChangeQueueResult> EnqueueDriftedAsync(
         long vaultId,
@@ -237,10 +240,16 @@ public sealed class BitwardenLocalChangeQueue(
         var histories = await repository.GetPasswordHistoryByEntryIdsAsync(
             passwords.Select(entry => entry.Id).ToArray(),
             cancellationToken);
+        // Both the comparison below and the payload the encoder builds read the location through here, so a
+        // move the user made between folders cannot be a difference this scan is blind to while the encoder
+        // is already ready to send it.
+        var boundCategories = BitwardenLocalFolderProjection.BoundCategories(
+            await folderStore.GetAsync(vaultId, cancellationToken));
         var candidates = new List<Candidate>(passwords.Count + secureItems.Count);
 
-        foreach (var entry in passwords)
+        foreach (var stored in passwords)
         {
+            var entry = BitwardenLocalFolderProjection.Project(stored, boundCategories);
             var fields = customFields.GetValueOrDefault(entry.Id) ?? [];
             var history = histories.GetValueOrDefault(entry.Id) ?? [];
             candidates.Add(new(
@@ -254,8 +263,9 @@ public sealed class BitwardenLocalChangeQueue(
                 history));
         }
 
-        foreach (var item in secureItems)
+        foreach (var stored in secureItems)
         {
+            var item = BitwardenLocalFolderProjection.Project(stored, boundCategories);
             candidates.Add(new(
                 item.BitwardenCipherId,
                 item.BitwardenRevisionDate,

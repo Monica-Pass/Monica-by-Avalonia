@@ -81,6 +81,247 @@ public sealed class BitwardenLocalChangeQueueTests
         Assert.Equal(expectedHash, queued.IdempotencyKey.Split(':').Last());
     }
 
+    // Folders are how a Bitwarden vault is organized, and the library page reorganizes by rewriting the
+    // local category. The remote folder a row sits in is a projection of that category, so a move has to be
+    // read back through the binding table before it is compared with the baseline; measured against the
+    // column the move never touched, the reorganization a user did with their hands is the one change the
+    // drift scan cannot see.
+    [Fact]
+    public async Task Moving_an_entry_into_another_remote_folder_is_owed_an_update()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = FolderCipher("cipher-foldered", "Kept in order", "folder-a");
+        await harness.Pull.ApplyAsync(
+            harness.VaultId,
+            Snapshot([RemoteFolder("folder-a", "First folder"), RemoteFolder("folder-b", "Second folder")], [remote]),
+            [remote]);
+        var stored = await ReadFolderedAsync(harness);
+        var categories = await harness.Repository.GetCategoriesAsync();
+        Assert.Equal(
+            categories.Single(category => category.BitwardenFolderId == "folder-a").Id,
+            stored.CategoryId);
+
+        stored.CategoryId = categories.Single(category => category.BitwardenFolderId == "folder-b").Id;
+        await harness.Repository.SavePasswordAsync(stored);
+
+        var result = await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow);
+
+        Assert.Equal(1, result.Enqueued);
+        var queued = Assert.Single(await harness.Pending.GetAsync(harness.VaultId));
+        Assert.Equal("cipher-foldered", queued.CipherId);
+        Assert.Equal(BitwardenMutationOperationType.Update, queued.OperationType);
+        Assert.Contains("\"folderId\":\"folder-b\"", queued.PayloadJson, StringComparison.Ordinal);
+
+        // Once the server has taken it, the same move cannot be owed twice: the baseline has to be able to
+        // say the server holds what the local category resolves to.
+        const string movedRevision = "2026-07-22T05:00:00Z";
+        var batch = await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            new AcceptedTransport(movedRevision));
+        Assert.Equal(1, batch.Completed);
+        Assert.Equal(0, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+
+        // The next pull carries the folder the server agreed to. It must leave the row where the user put it
+        // and file no conflict for a change the server has already accepted.
+        var asServerHolds = stored.CreateDetachedCopy();
+        asServerHolds.BitwardenFolderId = "folder-b";
+        var asRemote = new BitwardenDecodedCipher(
+            remote.Metadata with
+            {
+                FolderId = "folder-b",
+                RevisionDate = movedRevision,
+                PayloadHash = BitwardenPayloadFingerprint.ForPassword(asServerHolds, [], [])
+            },
+            remote.Password,
+            null,
+            [],
+            []);
+        var pull = await harness.Pull.ApplyAsync(
+            harness.VaultId,
+            Snapshot([RemoteFolder("folder-a", "First folder"), RemoteFolder("folder-b", "Second folder")], [asRemote]),
+            [asRemote]);
+
+        Assert.Equal(0, pull.ConflictsBackedUp);
+        Assert.Equal(
+            categories.Single(category => category.BitwardenFolderId == "folder-b").Id,
+            (await ReadFolderedAsync(harness)).CategoryId);
+    }
+
+    // Moving an entry out of a folder is the other half of the same reorganization, and this one does have a
+    // remote answer: Monica's root and Bitwarden's root are the same place. Measured with the payload carrying
+    // no folder at all, because a folder id left in the payload would put it back where the user took it from.
+    [Fact]
+    public async Task Taking_an_entry_out_of_a_folder_owes_the_server_a_move_to_root()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = FolderCipher("cipher-foldered", "Kept in order", "folder-a");
+        await harness.Pull.ApplyAsync(
+            harness.VaultId,
+            Snapshot([RemoteFolder("folder-a", "First folder")], [remote]),
+            [remote]);
+
+        var stored = await ReadFolderedAsync(harness);
+        stored.CategoryId = null;
+        await harness.Repository.SavePasswordAsync(stored);
+
+        Assert.Equal(1, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+        var queued = Assert.Single(await harness.Pending.GetAsync(harness.VaultId));
+        using (var document = JsonDocument.Parse(queued.PayloadJson))
+        {
+            Assert.False(document.RootElement.TryGetProperty("folderId", out _));
+        }
+
+        const string rootRevision = "2026-07-22T05:00:00Z";
+        Assert.Equal(1, (await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            new AcceptedTransport(rootRevision))).Completed);
+
+        // The stored row keeps the folder column the server confirmed until a pull rewrites it, so the scan
+        // has to keep reading the location through the category. Reading the column here would owe this move
+        // again on every synchronization, forever.
+        Assert.Equal(0, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+
+        var atRoot = stored.CreateDetachedCopy();
+        atRoot.BitwardenFolderId = null;
+        var asRemote = new BitwardenDecodedCipher(
+            remote.Metadata with
+            {
+                FolderId = null,
+                RevisionDate = rootRevision,
+                PayloadHash = BitwardenPayloadFingerprint.ForPassword(atRoot, [], [])
+            },
+            remote.Password,
+            null,
+            [],
+            []);
+        var pull = await harness.Pull.ApplyAsync(
+            harness.VaultId,
+            Snapshot([RemoteFolder("folder-a", "First folder")], [asRemote]),
+            [asRemote]);
+
+        Assert.Equal(0, pull.ConflictsBackedUp);
+        Assert.Null((await ReadFolderedAsync(harness)).CategoryId);
+    }
+
+    // Notes, cards and identities are filed in folders the same way logins are, and their payload is built by
+    // a different encoder, so the location they travel with has to be resolved before that encoder reads it.
+    [Fact]
+    public async Task Moving_a_note_into_another_remote_folder_is_owed_an_update()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = FolderNoteCipher("cipher-note-foldered", "Remote note", "folder-a");
+        await harness.Pull.ApplyAsync(
+            harness.VaultId,
+            Snapshot([RemoteFolder("folder-a", "First folder"), RemoteFolder("folder-b", "Second folder")], [remote]),
+            [remote]);
+
+        var categories = await harness.Repository.GetCategoriesAsync();
+        var stored = await ReadFolderedNoteAsync(harness);
+        Assert.Equal(
+            categories.Single(category => category.BitwardenFolderId == "folder-a").Id,
+            stored.CategoryId);
+        stored.CategoryId = categories.Single(category => category.BitwardenFolderId == "folder-b").Id;
+        await harness.Repository.SaveSecureItemAsync(stored);
+
+        Assert.Equal(1, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+        var queued = Assert.Single(await harness.Pending.GetAsync(harness.VaultId));
+        Assert.Equal(BitwardenMutationOperationType.Update, queued.OperationType);
+        Assert.Contains("\"folderId\":\"folder-b\"", queued.PayloadJson, StringComparison.Ordinal);
+
+        const string movedRevision = "2026-07-22T05:00:00Z";
+        Assert.Equal(1, (await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            new AcceptedTransport(movedRevision))).Completed);
+        Assert.Equal(0, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+    }
+
+    // A folder the user made on this device has no remote counterpart and Monica does not speak the
+    // folder-create API, so the location it names has exactly one honest remote answer: none. The entry is
+    // reported at root and keeps living in that folder locally. The alternative - holding on to whatever the
+    // folder column says - was measured against a real Vaultwarden and dropped the entry out of its server
+    // folder anyway, because a move that was pushed rather than pulled never stamps that column. What this
+    // row asserts is the other half of the bargain: the pull has to respect the local choice rather than
+    // fight it back out of the folder the user put it in.
+    [Fact]
+    public async Task A_move_into_a_folder_with_no_remote_counterpart_is_reported_at_root()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = FolderCipher("cipher-foldered", "Kept in order", "folder-a");
+        await harness.Pull.ApplyAsync(
+            harness.VaultId,
+            Snapshot([RemoteFolder("folder-a", "First folder")], [remote]),
+            [remote]);
+        var localOnly = new Category { Name = "Only on this device" };
+        await harness.Repository.SaveCategoryAsync(localOnly);
+
+        var stored = await ReadFolderedAsync(harness);
+        stored.CategoryId = localOnly.Id;
+        await harness.Repository.SavePasswordAsync(stored);
+
+        Assert.Equal(1, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+        var queued = Assert.Single(await harness.Pending.GetAsync(harness.VaultId));
+        Assert.Equal(BitwardenMutationOperationType.Update, queued.OperationType);
+        using (var document = JsonDocument.Parse(queued.PayloadJson))
+        {
+            Assert.False(document.RootElement.TryGetProperty("folderId", out _));
+        }
+
+        const string rootRevision = "2026-07-22T05:00:00Z";
+        Assert.Equal(1, (await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            new AcceptedTransport(rootRevision))).Completed);
+        Assert.Equal(0, (await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Enqueued);
+
+        var atRoot = stored.CreateDetachedCopy();
+        atRoot.BitwardenFolderId = null;
+        var asRemote = new BitwardenDecodedCipher(
+            remote.Metadata with
+            {
+                FolderId = null,
+                RevisionDate = rootRevision,
+                PayloadHash = BitwardenPayloadFingerprint.ForPassword(atRoot, [], [])
+            },
+            remote.Password,
+            null,
+            [],
+            []);
+        var pull = await harness.Pull.ApplyAsync(
+            harness.VaultId,
+            Snapshot([RemoteFolder("folder-a", "First folder")], [asRemote]),
+            [asRemote]);
+
+        Assert.Equal(0, pull.ConflictsBackedUp);
+        Assert.Equal(localOnly.Id, (await ReadFolderedAsync(harness)).CategoryId);
+    }
+
     [Fact]
     public async Task An_identity_the_remote_snapshot_never_confirmed_is_not_uploaded()
     {
@@ -1476,6 +1717,66 @@ public sealed class BitwardenLocalChangeQueueTests
             [],
             []);
 
+    private static BitwardenRemoteFolder RemoteFolder(string id, string name) => new(id, name, null);
+
+    // What the server reports for a cipher it keeps inside one of its folders: the folder id travels in the
+    // metadata in clear, and the fingerprint the decoder promises covers it.
+    private static BitwardenDecodedCipher FolderCipher(string cipherId, string title, string folderId)
+    {
+        var password = new PasswordEntry
+        {
+            Title = title,
+            Username = "whoever",
+            Password = $"baseline-password-{cipherId}",
+            BitwardenCipherId = cipherId,
+            BitwardenFolderId = folderId,
+            BitwardenRevisionDate = BaselineRevision,
+            BitwardenCipherType = 1
+        };
+        var metadata = new BitwardenRemoteCipherMetadata(
+            cipherId,
+            folderId,
+            BaselineRevision,
+            1,
+            false,
+            BitwardenPayloadFingerprint.ForPassword(password, [], []));
+        return new BitwardenDecodedCipher(metadata, password, null, [], []);
+    }
+
+    private static async Task<PasswordEntry> ReadFolderedAsync(Harness harness) =>
+        (await harness.Repository.GetPasswordsAsync(includeDeleted: true, includeArchived: true))
+            .Single(entry => entry.BitwardenCipherId == "cipher-foldered");
+
+    // The same fact about a note: the folder id sits in the metadata in clear and is part of the fingerprint,
+    // and the note's own content is carried by the save payload the codec derives from it.
+    private static BitwardenDecodedCipher FolderNoteCipher(string cipherId, string title, string folderId)
+    {
+        var saved = NoteContentCodec.BuildSavePayload(title, "written on another device", "", isMarkdown: false);
+        var item = new SecureItem
+        {
+            ItemType = VaultItemType.Note,
+            Title = saved.Title,
+            Notes = saved.NotesCache,
+            ItemData = saved.ItemData,
+            ImagePaths = saved.ImagePaths,
+            BitwardenCipherId = cipherId,
+            BitwardenFolderId = folderId,
+            BitwardenRevisionDate = BaselineRevision
+        };
+        var metadata = new BitwardenRemoteCipherMetadata(
+            cipherId,
+            folderId,
+            BaselineRevision,
+            2,
+            false,
+            BitwardenPayloadFingerprint.ForSecureItem(item));
+        return new BitwardenDecodedCipher(metadata, null, item, [], []);
+    }
+
+    private static async Task<SecureItem> ReadFolderedNoteAsync(Harness harness) =>
+        (await harness.Repository.GetSecureItemsAsync(itemType: null, includeDeleted: true))
+            .Single(item => item.BitwardenCipherId == "cipher-note-foldered");
+
     private static BitwardenDecodedCipher BoundCipher(string cipherId, string title, string username)
     {
         var password = new PasswordEntry
@@ -1533,8 +1834,13 @@ public sealed class BitwardenLocalChangeQueueTests
     }
 
     private static BitwardenPullSnapshot Snapshot(IReadOnlyList<BitwardenDecodedCipher> ciphers) =>
+        Snapshot([], ciphers);
+
+    private static BitwardenPullSnapshot Snapshot(
+        IReadOnlyList<BitwardenRemoteFolder> folders,
+        IReadOnlyList<BitwardenDecodedCipher> ciphers) =>
         new(
-            [],
+            folders,
             ciphers.Select(cipher => cipher.Metadata).ToList(),
             BaselineRevision,
             true,
@@ -1574,7 +1880,7 @@ public sealed class BitwardenLocalChangeQueueTests
             pending,
             conflictStore,
             new BitwardenPullMergeService(repository, folderStore, conflictStore, syncState, pending),
-            new BitwardenLocalChangeQueue(repository, syncState, pending),
+            new BitwardenLocalChangeQueue(repository, syncState, pending, folderStore),
             new BitwardenMutationProcessor(pending, syncState, repository),
             new BitwardenConflictRestoreService(repository, conflictStore),
             new BitwardenPurgeQueue(pending),

@@ -25,10 +25,17 @@ public sealed partial class BitwardenPullMergeService
         var passwordIds = passwords.Select(entry => entry.Id).ToArray();
         var customFields = await repository.GetCustomFieldsByEntryIdsAsync(passwordIds, cancellationToken);
         var histories = await repository.GetPasswordHistoryByEntryIdsAsync(passwordIds, cancellationToken);
+        // The same projection the upload queue judges drift with: a row filed under one of this vault's
+        // folders is described to the merge by the folder its local category resolves to, so a move that is
+        // still waiting to be uploaded reads as the local difference it is rather than as a remote change to
+        // overwrite.
+        var boundCategories = BitwardenLocalFolderProjection.BoundCategories(
+            await folderStore.GetAsync(vaultId, cancellationToken));
         var references = new List<BitwardenLocalCipherReference>(passwords.Count + secureItems.Count);
 
-        foreach (var entry in passwords)
+        foreach (var stored in passwords)
         {
+            var entry = BitwardenLocalFolderProjection.Project(stored, boundCategories);
             var fields = customFields.GetValueOrDefault(entry.Id) ?? [];
             var history = histories.GetValueOrDefault(entry.Id) ?? [];
             references.Add(new(
@@ -44,8 +51,9 @@ public sealed partial class BitwardenPullMergeService
                 entry.UpdatedAt));
         }
 
-        foreach (var item in secureItems)
+        foreach (var stored in secureItems)
         {
+            var item = BitwardenLocalFolderProjection.Project(stored, boundCategories);
             references.Add(new(
                 item.Id,
                 item.BitwardenCipherId!,
