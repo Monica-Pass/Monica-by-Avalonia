@@ -16,7 +16,7 @@
 
 ## 2. 当前状态（工作树干净）
 
-分支 `main`，`git status` 只剩给本节标提交号的文档改动。功能 HEAD = `12ed5a9`（其后只有 `6bbf449` 一条测试提交，以及给本节自身标提交号的文档提交），近几轮：
+分支 `main`，`git status` 只剩给本节标提交号的文档改动。功能 HEAD = `39bb145`（其后只有给本节自身标提交号的文档提交），近几轮：
 
 下面这张表**不是按时间排的**：同一条线的行挨在一起（例如 Bitwarden 写回的两行 `94adacd` → `5cf27c9`），
 读某一件事的来龙去脉时按主题往下连，不要按行号当时间线。
@@ -27,6 +27,7 @@
 | `201501e` | 上一条那条结算判据**被真服务器当场纠正**：Vaultwarden 对"手里没有的 cipher"答 **400 而不是 404**（活 cipher 控制组 200、从未存在的 id 也 400），所以按 404 写的分支是死代码、erase 落成永久 `Failed`。放宽为"两种删除读到 400 或 404 即完成"，**只限删除**（请求没有体，400 不可能是载荷写错；`Update` 吃 400 仍算失败，新测试在同一批次里两头钉住）。真服务器复跑 `Completed=1/Failed=0` + 下一轮 `Claimed=0`。
 | `12ed5a9` | **pull 不再把"还欠一次 erase"的条目养回来（#110，收掉 `48d6b21` 那行末尾的"未做、未测"）**。判据只一条：合并计划里的 `AddRemote` 若撞上"本账户有一条 `Delete` **且状态不是 `Completed`** 的待处理操作" ⇒ 不写库、只计数。为什么只能读队列而不是读行：tombstone 连 cipher 身份一起丢（正是 #107 要当场记账的那条理由在这里反过来），清除之后从行上问不出"它曾经是谁的"。`IBitwardenPendingOperationStore` 是 `BitwardenPullMergeService` 的**必需**构造参数而非可选：可选参数会让「没人给闸门喂数据」看起来一切正常（下一行那个反证就是这个形状），必需参数则在编译期与容器解析期各自点名——实测探针那份 `Program.cs:154` 立刻报 `CS7036: There is no argument given that corresponds to the required parameter 'operationStore'`。结果记录加**尾部可选**字段 `SuppressedResurrections = 0`，5 个既有构造点因此一行不改就能编译。覆盖 2 条单测：① 同一份快照里"欠 erase 的那条"和"别处新建的那条"一起回来 ⇒ `Added=1`（是那个陌生人，不是被清除的那条）+ `SuppressedResurrections=1`，读库 `DoesNotContain cipher-erase`、`Single cipher-stranger`（所以抑制是**逐条**的，不是一轮 pull 整体压住）；再把那条 erase 判完成、拉同一份 ⇒ `Added=1/Suppressed=0` 且 `cipher-erase` 回来了 ⇒ **压住的是欠账，不是身份**。② `RecordFailureAsync(Validation)` 把那条 erase 打成 `Failed` ⇒ 照旧 `Added=0/Suppressed=1`、库空（重试与否是队列的事，用户没重新决定之前不把东西叫回来）。**负控**：摘掉抑制分支 ⇒ 恰好这 2 条红，红因读的是消息不是计数（`Expected: 1 / Actual: 2` 与 `Expected: 0 / Actual: 1`）。真服务器同一 stage 在两版二进制上跑出**相反判决**（含"erase 后来落地、多长出来的那行仍然留在本地"这个最坏形状），见文末第五轮实测。**新边界（别读成账清了）**：`ClaimReadyAsync` 只领 `status='pending'` 且未超尝试预算的行 ⇒ 一条 `Conflict`／`Failed` 的 erase **永不再试**，条目在本地被压住、服务器那份残迹一直留着，直到有人按同一幂等键 `local-purge:{vault}:{cipher}` 重新记账（`ON CONFLICT DO UPDATE` 把它抬回 pending）。正确的产品答案是给这条冲突一条**用户可见的决定**（#99 那一族界面），不是我们自动改判 revision。 |
 | `6bbf449` | 上一行补一条**容器级**证据（`48d6b21` 那条"App 层接线没有自动化证明"缺口的**前半**）：UI harness 本来就经 `App.ConfigureServices` 建**生产**容器，所以在 `BitwardenSyncWorkflowUiTests` 里解析 `IBitwardenPurgeQueue`／`IBitwardenPullMergeService`／`IBitwardenPendingOperationStore` 的实现类型，就把"永久删除的两半都在位"钉住了。**反证正是它要防的形状**：删掉 `App.axaml.cs:190` 那行注册重新构建，`MainWindowViewModel` **照样建得出来**（它的队列参数是 `IBitwardenPurgeQueue? bitwardenPurgeQueue = null`，本仓惯例是尾参数一律可选）——应用能启动、能本地清除，只是不再记账、下一轮 pull 把条目养回来；而这条断言即刻红在 `No service for type 'Monica.Data.Bitwarden.IBitwardenPurgeQueue' has been registered.`。还原后 `sha256sum -c` OK、该 UI 类 15/15 绿、格式 0 改动、Release 0 warning。**行为那一半仍缺**（真清除命令走出一条队列行），理由写在 §7 缺口 4 第 ① 条。 |
+| `39bb145` | **推不出去的永久删除第一次有一条可见的决定（#111，收掉 `12ed5a9` 那行末尾的"新边界"）**。`12ed5a9` 留下的形状是三方各自正确、没有人能改主意：`ClaimReadyAsync` 只领 `status='pending'` 且未超尝试预算的行 ⇒ 一条 `Conflict`／`Failed` 的 erase **永不再试**，合并引擎照旧按"还欠一次 erase"压住条目，服务器那份残迹长留。修法不是我们自动改判 revision，而是把决定还给用户：新增 `src/Monica.Data/Bitwarden/BitwardenStuckEraseService.cs`（`IBitwardenStuckEraseService`：列出卡住的 erase／放弃其中一条），口径**只认硬删**——软删推不出去时本地行仍在回收站、仍绑着库，pull 看得见这个决定，条目不会复活。界面接在同步页冲突段落之后（新 partial `MainWindowViewModel.BitwardenStuckErasures.cs` + `BitwardenSyncSourceView.axaml` 的 `BitwardenStuckEraseSection`），唯一动作"把服务器那一份放回本机"就是 `CompleteAsync`——正是这一条让 #110 那条抑制判据（"状态不是 `Completed`"）即刻让路。放弃前**重读队列而不是信屏幕上那行**：列表是在同步进行中标出来的，而同一幂等键的重新记账（再清一次就是）会把行抬回 pending，照旧标记完成等于悄悄丢掉用户刚刚要的删除。**刻意不顺带跑一轮同步**：这是个本地决定，跑整轮会连带把队列里别的东西推出去，文案因此说"下次同步会把服务器那一份拉回本机"。v1 **不做**"强行再删一次"：那要的是服务器当前 revision，而 `bitwarden_sync_state` 只存 `cipher_id/payload_hash/synced_at`，`BitwardenMutationGuard` 因此拒绝没有基线的删除。行同样只能显示 cipher id——清除之后没有任何表还留着它的标题（这正是"队列行是那个决定之最后记录"的同一件事）。覆盖 3 条单测（列表**只出那一条**：pending／在途（已被 `ClaimReadyAsync` 领走）／软删／已完成／换账户这五种 id 逐个放弃全抛 `KeyNotFoundException`，且抛完队列状态一字未动；放弃之后同一份快照由 `Added=0/Suppressed=1` 翻成 `Added=1/Suppressed=0`；重记账那行不再是债，放弃必须抛）+ UI 类 15→**17**（分区控件在位、生产容器解析出实现类型、一行放弃只摘那一行且不碰冲突列表、模板外那条命令 `Assert.Same` + 参数对号）。**负控四批真打**：放宽选择口径（把软删或非终态也算卡住）⇒ 列表口径那条红；拔掉 `AbandonAsync` 的重读 ⇒"重记账不是屏幕上那行"那条红；删掉 `App.axaml.cs` 那行注册 ⇒ 容器断言红；拆掉模板按钮的 `Command=` ⇒ 两条命令解析红。还原后 `sha256sum -c`（`probe-appdata/nc111.sha`）三个 OK。真服务器 stage 17 见文末第六轮实测。门禁：格式 0 改动、Release 0 warning、commercial-release `=0`（单测 10 `perf-budget` + 914 常规、UI 17 + 242 常规）、产物级 `pub_rc=0`/`rt_rc=0`。 |
 | `4ee20e6` | 库头部插槽内容真正落地（`WorkspaceHeader.Has*Content` 改为注册的 DirectProperty），一次翻正 10 条 UI 红；并停止离屏页面继续跑仓库元数据搜索 |
 | `c962fb8` | 上一步引入的 `dotnet format` 空白违规 |
 | `22f018c` | 内存门改为"先压缩再采样"，消除锁定态私有字节采样的竞态假红（阈值仍 120MB，产品运行时未动） |
@@ -881,7 +882,7 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
          需要把 `IBitwardenPendingOperationStore` 注进 `BitwardenPullMergeService` 并决定要不要给用户一条提示——
          **未做、未测**~~ **已修并双重自证（`12ed5a9`，实机读数见文末第五轮实测）**：抑制判据是"本账户有一条
          `Delete` 且状态不是 `Completed`"，`IBitwardenPendingOperationStore` 走**必需**参数注入合并服务，计数走
-         `BitwardenPullMergeResult.SuppressedResurrections`。③ ~~404 结算分支的状态码口径来自替身~~ **已实测并当场改判（`201501e`）**：真
+         `BitwardenPullMergeResult.SuppressedResurrections`。⇒ **#111 接上了这条缺口的另一半（`39bb145`，实机读数见文末第六轮实测）**：那条判成 `Conflict`／`Failed` 的 erase 现在在同步页有一条可见的决定"把服务器那一份放回本机"，走 `BitwardenStuckEraseService.AbandonAsync`⇒`CompleteAsync`，正好让上面的抑制判据让路；v1 只给这一个动作，"强行再删一次"要的是服务器当前 revision，而 `bitwarden_sync_state` 不存它，`BitwardenMutationGuard` 因此拒绝无基线的删除。③ ~~404 结算分支的状态码口径来自替身~~ **已实测并当场改判（`201501e`）**：真
          Vaultwarden 对"手里没有的 cipher"答 **400，不是 404**（GET／DELETE／PUT \/delete 三条全 400，
          一个从未存在的 id 也答 400，而同一探针在活 cipher 上的控制组是 200 —— 所以 400 不是探针自己把 URL
          打错了）。按 404 写的分支在这台服务器上是**死代码**，erase 落成 `Delete/Failed/validation` 永久停放
@@ -1211,6 +1212,62 @@ cipher 回的是字面量 `"(gone)"`，被 `[17..24]` 切片绊倒；**产品读
   （日志 `D:\Monica\probe-appdata\pub110.log`、`run110.log`，只取退出码与这些读数）。
 - **仍然没验**（别读成全绿）：① App 层"真清除命令写出一条队列行"的**行为**证明（`6bbf449` 只钉住注册与类型，
   三条墙写在 §7 缺口 4 ①）；② 一条 `Conflict`／`Failed` 的 erase **谁也不会替用户重下决定**——队列不重试、
-  本地压住、服务器留残迹，缺的是界面上那条可见的冲突决定（#99 那一族），不是把 revision 自动改判；
+  本地压住、服务器留残迹，缺的是界面上那条可见的冲突决定（#99 那一族），不是把 revision 自动改判 ⇒ **#111 已把这条决定交给用户（`39bb145`，读数见文末第六轮实测）**；
   ③ 官方 Bitwarden 云、2FA／captcha／设备 OTP、`RefreshingToken` 自动刷新、离线堆队再回来推、卡片与证件的
   真服务器 create+update 往返、`IsArchived` 不进漂移指纹、`Refused` 不出现在界面与诊断里（#94 缺口 4 原样）。
+
+## 附：真服务器第六轮实测（2026-09-25，**#111 出厂：那条推不出去的删除第一次有人能改主意**）
+
+跑法照旧：`D:\Monica\probe-appdata\bwrestore` 那份一次性控制台探针（不进仓，注册之后每一步用的都是
+**生产类型**），服务器仍是本机 Vaultwarden **1.37.3**（容器 `vw-probe`，`127.0.0.1:8080->80/tcp`，healthy；
+本轮结束**没有** teardown——用户要求本地的 keepass／mdbx／bitwarden 这些数据一律不动）。新增的是 stage 17
+（`s17*`），它问的正是第五轮那份读数的下一步：同一条 `Delete/Conflict` 的 erase，这次由**产品自己那个
+`BitwardenStuckEraseService`**（不是替身、也不是探针手写 SQL）列出来、放弃掉，再看下一轮 pull 把服务器
+那一份交回成什么样子。日志 `probe-appdata/bwrestore/s17-run.log`（**exit 0**，stage 1…17 整串一次跑完）。
+判据只有 id／revision／状态／内容类别／计数，`grep -c probe-value` = **0**（没有载荷落进日志）。
+
+### 一、四条读数：债列得出来、放得掉、放掉之后拿回来的是"干净且服务器确认过"的那一份
+
+- `s17_listed rows=1 detail=[57fc029f/Conflict] bound_local_rows=0 remote_rev=46.2013`
+  ⇒ 与第五轮 `s16_owed_state` 同一形状（真服务器确实把它判成 `Conflict` 并且永不再试），区别只有一个：
+  这一条是**界面用的那个方法**列出来的，探针没有另写查询。
+- `s17_after_abandon rows=[Delete/Completed] still_listed=0`
+  ⇒ 放弃 = 队列行落成 `Completed`，同一份列表即刻不再包含它——#110 那条抑制判据读的正是"状态不是
+  `Completed`"，所以这里不需要任何新的让路逻辑。
+- `s17_sync_after_abandon mutations[Claimed=0/Completed=0/Deferred=0/Conflicts=0/Failed=0]
+  merge[Added=1/Updated=0/Deleted=0/ConflictsBackedUp=0/MarkedClean=0/PreservedLocalOnly=1/Unchanged=4/SuppressedResurrections=0]`
+  + `s17_restored rows=1 title=Monica live probe s17 edited elsewhere pw=C modified=False rev=46.2013
+  remote_rev=46.2013`
+  ⇒ 条目走的是**普通 add 路径**回来（没为它开后门），带回来的是**另一个客户端那份内容**（`pw=C` 而不是
+  本机那份 `A`）、`modified=False`（本地没有待推的改动）、本地 revision **等于**服务器 revision。
+- `s17_rebooked booked=True rev=46.2013` ⇒ `s17_sync_second_erase mutations[Claimed=1/Completed=1/Deferred=0/Conflicts=0/Failed=0]`
+  + `s17_second_erase rows=[Delete/Completed/failure=None] stuck=0 bound_local_rows=0 remote_rev=(gone)`
+  ⇒ 同一个用户决定重下一次**这一次落地了**。这一条才是本轮真正的收获：放弃不是"把东西叫回来就算了"，
+  而是把那条债**从死账变回有基线、可谈判的账**——放回的那份带着服务器确认过的 revision，所以再删一次是
+  一次普通 erase，而不是又一条谁也不会再问的账。
+
+### 二、对照：同一份日志里 stage 16 仍是"没有出口"的样子
+
+`s16_owed_state rows=[Delete/Conflict/failure=Conflict] bound_local_rows=0 remote_rev=45.3909`，而探针不按
+当前 revision 重新记账时 `s16_sync_third_round mutations[Claimed=0/Completed=0/...]` ——债永远不动。
+**这不是负控**：真服务器这一轮没有拆件重跑，#111 的四批负控全在单元与 UI 级（逐条红因写在 §2 那行）。
+
+### 三、门禁与剩下的口子
+
+- 门禁全部在**出货的那份字节**（`39bb145`）上跑：格式 `--verify-no-changes` 退出 0、Release **0 warning**；
+  `verify-commercial-release.ps1` ⇒ `cr_rc=0`，四份 trx 逐一读 `recorded N executed tests`：单测
+  **10 `perf-budget` + 914 常规**、UI **17 `perf-budget` + 242 常规**（日志 `probe-appdata/gate111.log`）。
+  产物级：`publish-desktop.ps1` ⇒ `pub_rc=0` → `artifacts/publish/win-x64/jit`，
+  `verify-artifact-runtime.ps1` ⇒ `rt_rc=0`：`CANONICAL VAULT passed`（native=`mdbx_ffi.dll`、
+  canonicalVaultFiles=1、回读 passwords=27/notes=14/categories=6/attachmentOwners=6）、UI 门
+  loadMs=131、KeePass 20000 条 3.22MB：openMs=781 / streamMs=205 / collectedMB=109.1 → growthMB=**3.2**/24、
+  锁定态 106.7MB/120、锁/解往返 25/14/1/4 全等 → `RUNTIME SMOKE passed`
+  （日志 `probe-appdata/pub111.log`、`run111.log`，只取退出码与这些读数）。
+- **仍然没验**（别读成全绿）：① 上一轮那条"App 层真清除命令写出一条队列行"的**行为**证明照旧缺
+  （`6bbf449` 只钉住注册与类型，三道墙写在 §7 缺口 4 ①）——本轮的 stage 17 用的是 Data 层服务，
+  不是从按钮走下去的；② **这一段界面在真机上没人看过**：#111 的界面证据是无头 UI 树的命令解析与
+  行数变化，没有截图口味门（该节要 `HasBitwardenStuckErasures` 为真才可见，而它只在有一条卡住的 erase
+  时出现）；③ 行上只有 cipher id：v1 不打算补标题，因为那要在清除时另存一份名字，而 §2 那行记的理由是
+  "队列行是那个决定之最后记录"，多存一份名字等于再开一条数据寿命；④ 官方 Bitwarden 云、2FA／captcha／
+  设备 OTP、`RefreshingToken` 自动刷新、离线堆队再回来推、卡片与证件的真服务器 create+update 往返、
+  `IsArchived` 不进漂移指纹、`Refused` 不出现在界面与诊断里（#94 缺口 4 原样）。
