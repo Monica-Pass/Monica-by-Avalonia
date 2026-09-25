@@ -545,6 +545,29 @@ public sealed class BitwardenSyncWorkflowUiTests
         Assert.Empty(viewModel.BitwardenConflicts);
     }
 
+    // Both halves of a permanent delete are wired by registration alone, and the view model takes its
+    // queue as an optional parameter. Delete either line in the composition root and the app still
+    // builds, still starts, and still clears the row locally - it just stops booking the erase and
+    // stops honouring the booking on the next pull, so the entry the user threw away grows back. This
+    // resolves from the same container that built the view model above, which is the only place the
+    // production graph is reachable from a test.
+    [Fact]
+    public void The_production_graph_holds_both_halves_of_a_permanent_delete()
+    {
+        var authentication = new FakeAuthenticationService(_ => new BitwardenAuthenticationResult(
+            false,
+            null,
+            null,
+            BitwardenLoginChallengeKind.None));
+        using var fixture = CreateFixture(authentication);
+
+        Assert.IsType<BitwardenPurgeQueue>(fixture.Services.GetRequiredService<IBitwardenPurgeQueue>());
+        Assert.IsType<BitwardenPullMergeService>(
+            fixture.Services.GetRequiredService<IBitwardenPullMergeService>());
+        Assert.IsType<BitwardenPendingOperationStore>(
+            fixture.Services.GetRequiredService<IBitwardenPendingOperationStore>());
+    }
+
     private static void RunOnUiThread(Func<Task> work)
     {
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
