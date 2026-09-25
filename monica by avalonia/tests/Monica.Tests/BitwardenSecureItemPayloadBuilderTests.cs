@@ -232,18 +232,22 @@ public sealed class BitwardenSecureItemPayloadBuilderTests
         using var key = TestKey();
         var trashed = Pull(key, NoteCipher(key)).SecureItem!;
         trashed.IsDeleted = true;
-        Assert.Throws<BitwardenProtocolException>(
+        Assert.Throws<BitwardenPayloadRefusalException>(
             () => BitwardenCipherPayloadBuilder.BuildSecureItemCipher(trashed, key));
 
         var nameless = Pull(key, NoteCipher(key)).SecureItem!;
         nameless.Title = "   ";
-        Assert.Throws<BitwardenProtocolException>(
-            () => BitwardenCipherPayloadBuilder.BuildSecureItemCipher(nameless, key));
+        Assert.Equal(
+            BitwardenPayloadRefusal.MissingTitle,
+            Assert.Throws<BitwardenPayloadRefusalException>(
+                () => BitwardenCipherPayloadBuilder.BuildSecureItemCipher(nameless, key)).Reason);
 
         var address = Pull(key, NoteCipher(key)).SecureItem!;
         address.ItemType = VaultItemType.BillingAddress;
-        Assert.Throws<BitwardenProtocolException>(
-            () => BitwardenCipherPayloadBuilder.BuildSecureItemCipher(address, key));
+        Assert.Equal(
+            BitwardenPayloadRefusal.UnsupportedShape,
+            Assert.Throws<BitwardenPayloadRefusalException>(
+                () => BitwardenCipherPayloadBuilder.BuildSecureItemCipher(address, key)).Reason);
     }
 
     /// <summary>

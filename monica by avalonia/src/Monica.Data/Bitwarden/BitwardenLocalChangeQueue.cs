@@ -4,8 +4,21 @@ using Monica.Data.Repositories;
 
 namespace Monica.Data.Bitwarden;
 
-public sealed record BitwardenLocalChangeQueueResult(int Enqueued, int Refused)
+/// <summary>
+/// What one scan of the vault owed Bitwarden: work it booked, and the rows it could not book with the
+/// reason the encoder gave. <see cref="Refused"/> always equals <see cref="Unsyncable"/>.Count, so a caller
+/// that only reads the count cannot understate the list it is about to show.
+/// </summary>
+public sealed record BitwardenLocalChangeQueueResult(
+    int Enqueued,
+    int Refused,
+    IReadOnlyList<BitwardenUnsyncableLocalChange> Unsyncable)
 {
+    public BitwardenLocalChangeQueueResult(int Enqueued, int Refused)
+        : this(Enqueued, Refused, [])
+    {
+    }
+
     public int Drifted => Enqueued + Refused;
 }
 
@@ -45,6 +58,7 @@ public sealed class BitwardenLocalChangeQueue(
         var baseline = await syncStateStore.GetPayloadHashesAsync(vaultId, cancellationToken);
         var enqueued = 0;
         var refused = 0;
+        var unsyncable = new List<BitwardenUnsyncableLocalChange>();
         foreach (var candidate in await LoadCandidatesAsync(vaultId, cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -74,7 +88,14 @@ public sealed class BitwardenLocalChangeQueue(
 
             if (!isNew && string.IsNullOrWhiteSpace(candidate.ExpectedRemoteRevision))
             {
+                // The identity came from the server but its revision did not, so an update here would have
+                // to be sent unguarded and could quietly overwrite a change made elsewhere.
                 refused++;
+                unsyncable.Add(UnsyncableOf(
+                    candidate,
+                    new BitwardenPayloadRefusalInfo(
+                        BitwardenPayloadRefusal.MissingRemoteRevision,
+                        "The cipher has no remote revision to update against.")));
                 continue;
             }
 
@@ -82,13 +103,18 @@ public sealed class BitwardenLocalChangeQueue(
             // requires something parseable in that column. That is also why trashing or reviving a note or
             // card needs no encoder for its content, while editing one does.
             var deletion = !isNew && candidate.Deleted;
-            var payload = deletion || restoring ? "{}" : BuildPayload(candidate, vaultKey);
-            if (payload is null)
+            var encoded = deletion || restoring
+                ? new EncoderOutcome("{}", null)
+                : Encode(candidate, vaultKey);
+            if (encoded.PayloadJson is null)
             {
                 // Local shapes Bitwarden cannot carry stay local rather than failing the whole sync.
                 refused++;
+                unsyncable.Add(UnsyncableOf(candidate, encoded.Refusal!));
                 continue;
             }
+
+            var payload = encoded.PayloadJson;
 
             // The loader only keeps a row with no identity when it stands for something the server has
             // never seen, so one is derived from whichever local table it came from.
@@ -138,26 +164,49 @@ public sealed class BitwardenLocalChangeQueue(
             enqueued++;
         }
 
-        return new BitwardenLocalChangeQueueResult(enqueued, refused);
+        return new BitwardenLocalChangeQueueResult(enqueued, refused, unsyncable);
     }
 
-    private static string? BuildPayload(Candidate candidate, BitwardenSymmetricKey vaultKey)
+    /// <summary>
+    /// Either the payload to upload or the single reason this row cannot travel. The reason is read out of
+    /// the encoder itself rather than guessed at by the caller, so the sync page can list an entry only when
+    /// the queue would truly have refused it.
+    /// </summary>
+    private static EncoderOutcome Encode(Candidate candidate, BitwardenSymmetricKey vaultKey)
     {
         try
         {
-            return candidate.Entry is not null
+            return new EncoderOutcome(candidate.Entry is not null
                 ? BitwardenCipherPayloadBuilder.BuildLoginCipher(
                     candidate.Entry,
                     vaultKey,
                     candidate.CustomFields,
                     candidate.History)
-                : BitwardenCipherPayloadBuilder.BuildSecureItemCipher(candidate.SecureItem!, vaultKey);
+                : BitwardenCipherPayloadBuilder.BuildSecureItemCipher(candidate.SecureItem!, vaultKey), null);
         }
-        catch (BitwardenProtocolException)
+        catch (BitwardenPayloadRefusalException refusal)
         {
-            return null;
+            return new EncoderOutcome(null, new BitwardenPayloadRefusalInfo(refusal.Reason, refusal.Message));
+        }
+        catch (BitwardenProtocolException exception)
+        {
+            // A projection gate that named its field without classifying it: still a refusal, still worth
+            // showing, and the encoder is the only place that knew.
+            return new EncoderOutcome(null, new BitwardenPayloadRefusalInfo(
+                BitwardenPayloadRefusal.UnsupportedContent,
+                exception.Message));
         }
     }
+
+    private static BitwardenUnsyncableLocalChange UnsyncableOf(
+        Candidate candidate,
+        BitwardenPayloadRefusalInfo refusal) =>
+        new(
+            (candidate.Entry?.Title ?? candidate.SecureItem?.Title ?? string.Empty).Trim(),
+            candidate.Entry is not null,
+            refusal.Reason);
+
+    private sealed record EncoderOutcome(string? PayloadJson, BitwardenPayloadRefusalInfo? Refusal);
 
     private async Task<IReadOnlyList<Candidate>> LoadCandidatesAsync(
         long vaultId,

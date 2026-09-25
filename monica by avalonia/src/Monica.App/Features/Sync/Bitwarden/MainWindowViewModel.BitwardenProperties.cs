@@ -207,5 +207,6 @@ public sealed partial class MainWindowViewModel
     [NotifyPropertyChangedFor(nameof(HasSelectedBitwardenAccount))]
     [NotifyPropertyChangedFor(nameof(CanSyncSelectedBitwardenAccount))]
     [NotifyPropertyChangedFor(nameof(CanDisconnectSelectedBitwardenAccount))]
+    [NotifyPropertyChangedFor(nameof(HasBitwardenUnsyncableChanges))]
     private BitwardenAccountDisplayItem? _selectedBitwardenAccount;
 }

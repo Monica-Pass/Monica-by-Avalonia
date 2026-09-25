@@ -50,10 +50,25 @@ public sealed record BitwardenSyncState(
     DateTimeOffset UpdatedAt,
     string? Message = null);
 
+/// <summary>
+/// The outcome of one synchronization. <paramref name="Unsyncable"/> carries the local rows Bitwarden could
+/// not take, because a sync that booked nothing and merged nothing still told the truth only if the reason is
+/// said: without it the vault looks synchronized while the same edit is refused on every round from here.
+/// </summary>
 public sealed record BitwardenSyncResult(
     BitwardenAccount Account,
     BitwardenMutationBatchResult Mutations,
-    BitwardenPullMergeResult Merge);
+    BitwardenPullMergeResult Merge,
+    IReadOnlyList<BitwardenUnsyncableLocalChange> Unsyncable)
+{
+    public BitwardenSyncResult(
+        BitwardenAccount Account,
+        BitwardenMutationBatchResult Mutations,
+        BitwardenPullMergeResult Merge)
+        : this(Account, Mutations, Merge, [])
+    {
+    }
+}
 
 public interface IBitwardenSyncCoordinator
 {

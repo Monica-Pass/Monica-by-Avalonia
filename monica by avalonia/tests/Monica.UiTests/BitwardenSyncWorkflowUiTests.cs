@@ -3,6 +3,7 @@ using System.Reflection;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using FluentAvalonia.UI.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.App.Features.Sync.Bitwarden;
 using Monica.App.Features.Vault;
@@ -593,6 +594,143 @@ public sealed class BitwardenSyncWorkflowUiTests
             viewModel.StatusMessage);
     }
 
+    // A local edit Bitwarden cannot encode is refused on every round, and the pull rewrites the baseline
+    // each time, so the same row is declined forever. Until the refusal list existed the count was
+    // computed, returned and dropped: the vault kept the edit, the queue booked nothing, and the screen
+    // said 已同步. The rows must carry the entry the queue actually declined and the code its encoder
+    // gave, and the status line must contradict "已同步" rather than sit under it.
+    [Fact]
+    public async Task A_local_change_bitwarden_cannot_take_is_listed_with_the_reason_it_gave()
+    {
+        var account = CreateAccount(id: 7, connected: true);
+        var authentication = new FakeAuthenticationService(_ => new BitwardenAuthenticationResult(
+            true,
+            account,
+            CreateSecrets(),
+            BitwardenLoginChallengeKind.None));
+        var pull = new FakePull(
+            new BitwardenPullMergeResult(0, 0, 0, 0, 0, 0, 0),
+            () => { },
+            [
+                new BitwardenUnsyncableLocalChange(
+                    "Bank",
+                    true,
+                    BitwardenPayloadRefusal.UnsupportedShape),
+                new BitwardenUnsyncableLocalChange(
+                    "",
+                    false,
+                    BitwardenPayloadRefusal.MissingRemoteRevision)
+            ]);
+        using var fixture = CreateFixture(authentication, pull: pull);
+        var viewModel = fixture.ViewModel;
+        viewModel.IsUnlocked = true;
+        fixture.AccountStore.Accounts.Add(account);
+        await viewModel.LoadBitwardenAccountsCommand.ExecuteAsync(null);
+
+        RunOnUiThread(() => viewModel.SyncBitwardenAccountCommand.ExecuteAsync(null));
+
+        Assert.True(viewModel.HasBitwardenUnsyncableChanges);
+        Assert.Equal(
+            [
+                ("Bank", viewModel.L.Get("BitwardenUnsyncableKindLogin"),
+                    viewModel.L.Get("BitwardenUnsyncableReasonShape")),
+                (viewModel.L.Get("BitwardenUnsyncableUntitledEntry"),
+                    viewModel.L.Get("BitwardenUnsyncableKindSecureItem"),
+                    viewModel.L.Get("BitwardenUnsyncableReasonNoRevision"))
+            ],
+            viewModel.BitwardenUnsyncableChanges
+                .Select(row => (row.Title, row.KindText, row.ReasonText))
+                .ToArray());
+        Assert.Equal(
+            viewModel.L.Format("BitwardenUnsyncableChangesFormat", 2),
+            viewModel.StatusMessage);
+
+        // The list describes the vault that is on screen; locking it away has to take the accusation
+        // with it, because the next unlock opens a vault nobody has offered anything to.
+        viewModel.IsUnlocked = false;
+        Assert.False(viewModel.HasBitwardenUnsyncableChanges);
+        Assert.Empty(viewModel.BitwardenUnsyncableChanges);
+    }
+
+    // The gate runs both ways, and only the rendered item can be asked: an expander row that stayed up
+    // with nothing in it would tell every connected user their vault is broken, and a row that vanished
+    // because something unrelated touched the account list would put the silent failure back again.
+    [Fact]
+    public async Task The_refusal_section_shows_only_while_a_change_is_standing_behind()
+    {
+        var account = CreateAccount(id: 7, connected: true);
+        var authentication = new FakeAuthenticationService(_ => new BitwardenAuthenticationResult(
+            true,
+            account,
+            CreateSecrets(),
+            BitwardenLoginChallengeKind.None));
+        var pull = new FakePull(
+            new BitwardenPullMergeResult(0, 0, 0, 0, 0, 0, 0),
+            () => { },
+            [new BitwardenUnsyncableLocalChange("Bank", true, BitwardenPayloadRefusal.HasAttachments)]);
+        using var fixture = CreateFixture(authentication, pull: pull);
+        var viewModel = fixture.ViewModel;
+        viewModel.IsUnlocked = true;
+        fixture.AccountStore.Accounts.Add(account);
+        await viewModel.LoadBitwardenAccountsCommand.ExecuteAsync(null);
+        viewModel.SelectedSyncPage = "Sources";
+
+        var view = new BitwardenSyncSourceView { DataContext = viewModel };
+        var window = new Window { Width = 900, Height = 700, Content = view };
+        window.Show();
+        try
+        {
+            var item = view.FindControl<FASettingsExpanderItem>("BitwardenUnsyncableItem");
+            Assert.NotNull(item);
+            string[] Texts() => view.GetSelfAndVisualDescendants()
+                .OfType<TextBlock>()
+                .Select(text => text.Text ?? "")
+                .ToArray();
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(item.IsVisible);
+            Assert.DoesNotContain("Bank", Texts());
+
+            RunOnUiThread(() => viewModel.SyncBitwardenAccountCommand.ExecuteAsync(null));
+            RunJobsUntil(
+                () => item.IsVisible,
+                "the refusal section never appeared once a change was refused");
+            RunJobsUntil(
+                () => Texts().Contains("Bank"),
+                "the refused entry was never rendered as a row");
+            Assert.Contains(viewModel.L.Get("BitwardenUnsyncableReasonAttachments"), Texts());
+
+            // A synchronization refreshes the account list underneath itself, and the refresh used to run
+            // the selection through null - which retired the warning a beat after it appeared.
+            await viewModel.LoadBitwardenAccountsCommand.ExecuteAsync(null);
+            Assert.True(viewModel.HasBitwardenUnsyncableChanges);
+            Assert.True(item.IsVisible);
+
+            // The refusal is one vault's business: another account on screen must not inherit it, and
+            // coming back must not need another synchronization to say it again.
+            fixture.AccountStore.Accounts.Add(CreateAccount(id: 8, connected: true));
+            await viewModel.LoadBitwardenAccountsCommand.ExecuteAsync(null);
+            viewModel.SelectedBitwardenAccount = viewModel.BitwardenAccounts.Single(row => row.Id == 8);
+            RunJobsUntil(
+                () => !item.IsVisible,
+                "another account's vault inherited a refusal it was never offered");
+            Assert.Single(viewModel.BitwardenUnsyncableChanges);
+            viewModel.SelectedBitwardenAccount = viewModel.BitwardenAccounts.Single(row => row.Id == 7);
+            RunJobsUntil(
+                () => item.IsVisible,
+                "the refusal did not come back with the account it belongs to");
+
+            viewModel.IsUnlocked = false;
+            RunJobsUntil(
+                () => !item.IsVisible,
+                "the refusal section survived the vault being locked");
+            Assert.DoesNotContain("Bank", Texts());
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
     // Connecting for the first time is the biggest pull there is, and the vault the account owns has
     // to be the one on screen right after - not one the user only sees after locking and unlocking.
     [Fact]
@@ -927,14 +1065,18 @@ public sealed class BitwardenSyncWorkflowUiTests
             return Task.FromResult(new BitwardenSyncResult(
                 account,
                 new BitwardenMutationBatchResult(0, 0, 0, 0, 0),
-                pull?.Merge ?? new BitwardenPullMergeResult(0, 0, 0, 0, 0, 0, 0)));
+                pull?.Merge ?? new BitwardenPullMergeResult(0, 0, 0, 0, 0, 0, 0),
+                pull?.Unsyncable ?? []));
         }
     }
 
     /// Stands in for a merge that reached the database: the write itself is covered by the pull
     /// service's own tests, so what the fake owes here is the counts and a repository that answers
     /// differently once the sync has run.
-    private sealed record FakePull(BitwardenPullMergeResult Merge, Action Apply);
+    private sealed record FakePull(
+        BitwardenPullMergeResult Merge,
+        Action Apply,
+        IReadOnlyList<BitwardenUnsyncableLocalChange>? Unsyncable = null);
 
     private class PulledVaultRepositoryProxy : DispatchProxy
     {

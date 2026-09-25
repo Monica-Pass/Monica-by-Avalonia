@@ -38,21 +38,32 @@ public static partial class BitwardenCipherPayloadBuilder
     /// plaintext into cipher strings, never to decide, so the projection gate below answers the question on
     /// its own - which is what lets the library count publishable rows before an upload is even chosen.
     /// </summary>
-    public static bool CanEncode(SecureItem item)
-    {
-        if (item is null)
-        {
-            return false;
-        }
+    public static bool CanEncode(SecureItem item) => item is not null && ExplainSecureItem(item) is null;
 
+    /// <summary>
+    /// Why this row cannot travel, as the same projection gate <see cref="CanEncode"/> runs judges it. The
+    /// verdict and its reason come out of one decision so the screen can never list an entry the queue would
+    /// in fact have uploaded.
+    /// </summary>
+    public static BitwardenPayloadRefusalInfo? ExplainSecureItem(SecureItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
         try
         {
             PlanSecureItem(item);
-            return true;
+            return null;
         }
-        catch (BitwardenProtocolException)
+        catch (BitwardenPayloadRefusalException refusal)
         {
-            return false;
+            return new BitwardenPayloadRefusalInfo(refusal.Reason, refusal.Message);
+        }
+        catch (BitwardenProtocolException exception)
+        {
+            // A projection gate that names its field without classifying it. One sentence covers them all,
+            // because the user's move is the same: take out what Bitwarden's shape has no place for.
+            return new BitwardenPayloadRefusalInfo(
+                BitwardenPayloadRefusal.UnsupportedContent,
+                exception.Message);
         }
     }
 
@@ -63,7 +74,9 @@ public static partial class BitwardenCipherPayloadBuilder
         var json = JsonSerializer.Serialize(Emit(PlanSecureItem(item), key), PayloadOptions);
         if (Encoding.UTF8.GetByteCount(json) > MaximumPayloadUtf8Bytes)
         {
-            throw new BitwardenProtocolException("Bitwarden cipher payload exceeds the supported size.");
+            throw new BitwardenPayloadRefusalException(
+                BitwardenPayloadRefusal.PayloadTooLarge,
+                "Bitwarden cipher payload exceeds the supported size.");
         }
 
         return json;
@@ -74,7 +87,8 @@ public static partial class BitwardenCipherPayloadBuilder
         VaultItemType.Note => PlanNote(item),
         VaultItemType.BankCard => PlanCard(item),
         VaultItemType.Document => PlanIdentity(item),
-        _ => throw new BitwardenProtocolException(
+        _ => throw new BitwardenPayloadRefusalException(
+            BitwardenPayloadRefusal.UnsupportedShape,
             "Monica can only write back Bitwarden login, note, card and identity ciphers.")
     };
 
@@ -256,14 +270,17 @@ public static partial class BitwardenCipherPayloadBuilder
     {
         if (item.IsDeleted)
         {
-            throw new BitwardenProtocolException(
+            throw new BitwardenPayloadRefusalException(
+                BitwardenPayloadRefusal.UnsupportedShape,
                 "Monica deletes Bitwarden ciphers through the trash endpoint, not the update payload.");
         }
 
         var title = item.Title.Trim();
         if (title.Length == 0)
         {
-            throw new BitwardenProtocolException("A Bitwarden cipher requires a title.");
+            throw new BitwardenPayloadRefusalException(
+                BitwardenPayloadRefusal.MissingTitle,
+                "A Bitwarden cipher requires a title.");
         }
 
         return title;

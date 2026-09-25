@@ -743,6 +743,96 @@ public sealed class BitwardenLocalChangeQueueTests
     }
 
     [Fact]
+    public async Task A_refusal_names_the_entry_and_the_reason_the_encoder_gave()
+    {
+        var harness = await CreateHarnessAsync();
+        // A card carrying a debit designation: Bitwarden's card shape has no field for it, so the encoder's
+        // projection gate refuses it - and that gate names its field without classifying it, which is the
+        // case the catch-all reason exists for.
+        var card = PublishedCard(harness.VaultId);
+        var data = WalletItemDataCodec.DecodeBankCard(card);
+        data.CardTypeString = "DEBIT";
+        card.ItemData = WalletItemDataCodec.EncodeBankCard(data);
+        await harness.Repository.SaveSecureItemAsync(card);
+
+        var result = await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow);
+
+        // The screen shows exactly this row, so it is asserted as the row: what stayed behind is named by
+        // the title the user reads in the library, and the reason is the code the encoder decided on, not a
+        // guess made afterwards from the fact that nothing was booked.
+        var refusal = Assert.Single(result.Unsyncable);
+        Assert.Equal("Published card", refusal.Title);
+        Assert.False(refusal.IsPassword);
+        Assert.Equal(BitwardenPayloadRefusal.UnsupportedContent, refusal.Reason);
+        Assert.Equal(result.Refused, result.Unsyncable.Count);
+        Assert.Empty(await harness.Pending.GetAsync(harness.VaultId));
+    }
+
+    [Fact]
+    public async Task A_row_with_no_remote_revision_is_refused_for_that_reason_alone()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = BaselineCipher();
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([remote]), [remote]);
+        // Drift plus a missing revision: the shape is one Bitwarden would take, so the only thing standing
+        // in the way is that an update would have to go out unguarded. Written as an empty string because a
+        // save cannot clear the column to null - which is the state this guard exists for, since a create
+        // response that names a cipher without reporting its revision leaves the row exactly like this.
+        var stored = await RenameAsync(harness, "Renamed while unguarded");
+        stored.BitwardenRevisionDate = "";
+        await harness.Repository.SavePasswordAsync(stored);
+
+        var result = await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow);
+
+        var refusal = Assert.Single(result.Unsyncable);
+        Assert.Equal(BitwardenPayloadRefusal.MissingRemoteRevision, refusal.Reason);
+        Assert.Equal(0, result.Enqueued);
+        Assert.Equal(1, result.Refused);
+        Assert.Equal(result.Refused, result.Unsyncable.Count);
+        Assert.Empty(await harness.Pending.GetAsync(harness.VaultId));
+    }
+
+    [Fact]
+    public async Task A_row_that_stops_being_refused_stops_being_listed()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = BaselineCipher();
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([remote]), [remote]);
+        var stored = await ReadAsync(harness);
+        stored.LoginType = PasswordLoginType.SshKey;
+        await harness.Repository.SavePasswordAsync(stored);
+
+        Assert.Single((await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow)).Unsyncable);
+
+        // Trashing it needs no encoder at all, so the very next scan books the delete and owes nothing:
+        // the list is a fresh read of one scan, not a log something has to remember to clear.
+        var trashed = await ReadAsync(harness);
+        trashed.IsDeleted = true;
+        trashed.DeletedAt = new DateTimeOffset(2026, 9, 25, 3, 30, 0, TimeSpan.Zero);
+        await harness.Repository.SavePasswordAsync(trashed);
+
+        var result = await harness.Queue.EnqueueDriftedAsync(
+            harness.VaultId,
+            harness.VaultKey,
+            DateTimeOffset.UtcNow);
+
+        Assert.Equal(1, result.Enqueued);
+        Assert.Empty(result.Unsyncable);
+        Assert.Equal(
+            BitwardenMutationOperationType.SoftDelete,
+            Assert.Single(await harness.Pending.GetAsync(harness.VaultId)).OperationType);
+    }
+
+    [Fact]
     public async Task A_shape_bitwarden_cannot_carry_is_counted_rather_than_failing_the_scan()
     {
         var harness = await CreateHarnessAsync();

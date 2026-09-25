@@ -45,6 +45,7 @@ public sealed partial class MainWindowViewModel
         IsBitwardenConnectionEditorVisible = true;
         IsBitwardenSyncActive = false;
         BitwardenSyncStageText = "";
+        ClearBitwardenUnsyncableChanges();
         RaiseBitwardenState();
     }
 

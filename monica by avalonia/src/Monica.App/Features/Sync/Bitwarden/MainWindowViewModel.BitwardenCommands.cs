@@ -101,6 +101,15 @@ public sealed partial class MainWindowViewModel
             {
                 SetStatusNotice("BitwardenSyncedFormat", account.DisplayName);
             }
+
+            if (result.Unsyncable.Count > 0)
+            {
+                // Last word on the status line, because it is the part the user still has to act on. The
+                // pull in this same round has already written the server's copy back over the refused row
+                // (measured: merge[Updated=1]), so "已同步" would be wrong twice over - the edit did not
+                // leave the device, and the row on screen is no longer the one the user typed.
+                SetStatusFailure("BitwardenUnsyncableChangesFormat", result.Unsyncable.Count);
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

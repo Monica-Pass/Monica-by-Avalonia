@@ -65,6 +65,28 @@ public sealed class BitwardenSyncCoordinatorTests
         Assert.Equal(1, result.Merge.Added);
     }
 
+    [Fact]
+    public async Task SyncAsync_CarriesTheRefusedLocalChangesToTheCaller()
+    {
+        var harness = CreateHarness();
+        harness.LocalChangeQueue.OnEnqueue = () => Task.FromResult(new BitwardenLocalChangeQueueResult(
+            0,
+            1,
+            [new BitwardenUnsyncableLocalChange(
+                "A note with tags",
+                false,
+                BitwardenPayloadRefusal.UnsupportedContent)]));
+        harness.SyncTransport.Release.TrySetResult(true);
+
+        var result = await harness.Coordinator.SyncAsync(7, BitwardenSyncTrigger.Manual);
+
+        // This list used to be computed, returned and dropped inside the run: the phase event that follows
+        // says only "completed", so the caller had no way to tell a clean sync from one that refused work.
+        var refusal = Assert.Single(result.Unsyncable);
+        Assert.Equal("A note with tags", refusal.Title);
+        Assert.Equal(BitwardenPayloadRefusal.UnsupportedContent, refusal.Reason);
+    }
+
     private static Harness CreateHarness(bool expiring = false)
     {
         var vaultSession = new VaultSessionService();

@@ -144,8 +144,11 @@ public sealed class BitwardenCipherPayloadBuilderTests
         var entry = LoginEntry();
         entry.BitwardenCipherType = cipherType;
 
-        Assert.Throws<BitwardenProtocolException>(
+        // Asserted as a coded refusal, not just some protocol exception: the screen lists this row only
+        // because the encoder said so, and the reason it shows has to be the reason the encoder gave.
+        var refusal = Assert.Throws<BitwardenPayloadRefusalException>(
             () => BitwardenCipherPayloadBuilder.BuildLoginCipher(entry, key));
+        Assert.Equal(BitwardenPayloadRefusal.UnsupportedShape, refusal.Reason);
     }
 
     [Fact]
@@ -155,24 +158,32 @@ public sealed class BitwardenCipherPayloadBuilderTests
 
         var ssh = LoginEntry();
         ssh.LoginType = PasswordLoginType.SshKey;
-        Assert.Throws<BitwardenProtocolException>(
-            () => BitwardenCipherPayloadBuilder.BuildLoginCipher(ssh, key));
+        Assert.Equal(
+            BitwardenPayloadRefusal.UnsupportedShape,
+            Assert.Throws<BitwardenPayloadRefusalException>(
+                () => BitwardenCipherPayloadBuilder.BuildLoginCipher(ssh, key)).Reason);
 
         var attached = LoginEntry();
         attached.HasAttachments = true;
-        Assert.Throws<BitwardenProtocolException>(
-            () => BitwardenCipherPayloadBuilder.BuildLoginCipher(attached, key));
+        Assert.Equal(
+            BitwardenPayloadRefusal.HasAttachments,
+            Assert.Throws<BitwardenPayloadRefusalException>(
+                () => BitwardenCipherPayloadBuilder.BuildLoginCipher(attached, key)).Reason);
 
         var trashed = LoginEntry();
         trashed.IsDeleted = true;
-        Assert.Throws<BitwardenProtocolException>(
+        Assert.Throws<BitwardenPayloadRefusalException>(
             () => BitwardenCipherPayloadBuilder.BuildLoginCipher(trashed, key));
 
         var nameless = LoginEntry();
         nameless.Title = "   ";
-        Assert.Throws<BitwardenProtocolException>(
-            () => BitwardenCipherPayloadBuilder.BuildLoginCipher(nameless, key));
+        Assert.Equal(
+            BitwardenPayloadRefusal.MissingTitle,
+            Assert.Throws<BitwardenPayloadRefusalException>(
+                () => BitwardenCipherPayloadBuilder.BuildLoginCipher(nameless, key)).Reason);
 
+        // A protocol failure that is not a shape verdict keeps its plain type: the queue refuses the row all
+        // the same, and the screen has no reason to claim it knows more than "this cannot be encoded".
         var blankField = LoginEntry();
         Assert.Throws<BitwardenProtocolException>(
             () => BitwardenCipherPayloadBuilder.BuildLoginCipher(

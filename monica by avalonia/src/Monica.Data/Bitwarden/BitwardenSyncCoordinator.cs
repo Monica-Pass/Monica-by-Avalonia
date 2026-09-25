@@ -139,7 +139,7 @@ public sealed class BitwardenSyncCoordinator(
 
                 Publish(accountId, trigger, BitwardenSyncPhase.Uploading);
                 using var vaultKey = activeLease.Secrets.CreateVaultKey();
-                await localChangeQueue.EnqueueDriftedAsync(
+                var drifted = await localChangeQueue.EnqueueDriftedAsync(
                     accountId,
                     vaultKey,
                     _timeProvider.GetUtcNow(),
@@ -172,7 +172,7 @@ public sealed class BitwardenSyncCoordinator(
                 }, activeLease.Secrets, lockToken);
                 failureAccount = activeAccount;
                 Publish(accountId, trigger, BitwardenSyncPhase.Completed);
-                return new BitwardenSyncResult(activeAccount, mutations, merge);
+                return new BitwardenSyncResult(activeAccount, mutations, merge, drifted.Unsyncable);
             }
             finally
             {

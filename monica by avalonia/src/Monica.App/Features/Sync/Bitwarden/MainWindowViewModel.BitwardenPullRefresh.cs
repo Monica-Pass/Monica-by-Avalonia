@@ -12,6 +12,12 @@ public sealed partial class MainWindowViewModel
 {
     private async Task<bool> ApplyBitwardenPullToVaultAsync(BitwardenSyncResult result)
     {
+        // Both Bitwarden paths hand their whole result to this one method, so it is the only place a list
+        // taken from that result can be written without a second call site forgetting it. It runs ahead of
+        // the early return below on purpose: that return asks whether the library needs re-reading, which
+        // is a different question from whether anything was declined, and a round that changed no rows at
+        // all still has to say so.
+        ApplyBitwardenUnsyncableChanges(result.Account.Id, result.Unsyncable);
         var merge = result.Merge;
         if (merge.Added + merge.Updated + merge.Deleted + merge.ConflictsBackedUp == 0)
         {

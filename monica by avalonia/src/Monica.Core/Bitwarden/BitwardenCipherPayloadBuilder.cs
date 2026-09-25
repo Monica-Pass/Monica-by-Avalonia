@@ -24,8 +24,53 @@ public static partial class BitwardenCipherPayloadBuilder
     /// Whether this entry has a shape Bitwarden can carry, asked before a local entry is promised to a
     /// vault so the count of uploads the user was told about is the count that can actually happen.
     /// </summary>
-    public static bool CanEncode(PasswordEntry entry) =>
-        entry is not null && FindUnsupportedChange(entry) is null;
+    public static bool CanEncode(PasswordEntry entry) => entry is not null && ExplainLogin(entry) is null;
+
+    /// <summary>
+    /// Why this entry cannot be written back, or null when it can. The reason travels as a code because the
+    /// queue reports it to the screen, which has to say it in the language the user chose; the message stays
+    /// beside it so the log keeps the specificity a coarse code cannot carry.
+    /// </summary>
+    public static BitwardenPayloadRefusalInfo? ExplainLogin(PasswordEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        if (entry.BitwardenCipherType != 1)
+        {
+            return Unsupported(BitwardenPayloadRefusal.UnsupportedShape,
+                "Monica can only write back Bitwarden login ciphers.");
+        }
+
+        if (entry.LoginType != PasswordLoginType.Password)
+        {
+            return Unsupported(BitwardenPayloadRefusal.UnsupportedShape,
+                "Monica cannot write back this login type to Bitwarden.");
+        }
+
+        if (entry.HasAttachments)
+        {
+            return Unsupported(BitwardenPayloadRefusal.HasAttachments,
+                "Monica cannot write back a Bitwarden cipher that has attachments.");
+        }
+
+        if (entry.IsDeleted)
+        {
+            // Unreachable through the queue, which routes a deletion by endpoint instead of by payload; it
+            // stays here because a caller that forgot that would write the row back as a live cipher.
+            return Unsupported(BitwardenPayloadRefusal.UnsupportedShape,
+                "Monica deletes Bitwarden ciphers through the trash endpoint, not the update payload.");
+        }
+
+        if (string.IsNullOrWhiteSpace(entry.Title))
+        {
+            return Unsupported(BitwardenPayloadRefusal.MissingTitle,
+                "A Bitwarden cipher requires a title.");
+        }
+
+        return null;
+    }
+
+    private static BitwardenPayloadRefusalInfo Unsupported(BitwardenPayloadRefusal reason, string message) =>
+        new(reason, message);
 
     public static string BuildLoginCipher(
         PasswordEntry entry,
@@ -34,10 +79,10 @@ public static partial class BitwardenCipherPayloadBuilder
         IReadOnlyList<PasswordHistoryEntry>? history = null)
     {
         ArgumentNullException.ThrowIfNull(key);
-        var refusal = FindUnsupportedChange(entry);
+        var refusal = ExplainLogin(entry);
         if (refusal is not null)
         {
-            throw new BitwardenProtocolException(refusal);
+            throw new BitwardenPayloadRefusalException(refusal.Reason, refusal.Message);
         }
 
         customFields ??= [];
@@ -68,41 +113,12 @@ public static partial class BitwardenCipherPayloadBuilder
         var json = JsonSerializer.Serialize(payload, PayloadOptions);
         if (Encoding.UTF8.GetByteCount(json) > MaximumPayloadUtf8Bytes)
         {
-            throw new BitwardenProtocolException("Bitwarden cipher payload exceeds the supported size.");
+            throw new BitwardenPayloadRefusalException(
+                BitwardenPayloadRefusal.PayloadTooLarge,
+                "Bitwarden cipher payload exceeds the supported size.");
         }
 
         return json;
-    }
-
-    private static string? FindUnsupportedChange(PasswordEntry entry)
-    {
-        ArgumentNullException.ThrowIfNull(entry);
-        if (entry.BitwardenCipherType != 1)
-        {
-            return "Monica can only write back Bitwarden login ciphers.";
-        }
-
-        if (entry.LoginType != PasswordLoginType.Password)
-        {
-            return "Monica cannot write back this login type to Bitwarden.";
-        }
-
-        if (entry.HasAttachments)
-        {
-            return "Monica cannot write back a Bitwarden cipher that has attachments.";
-        }
-
-        if (entry.IsDeleted)
-        {
-            return "Monica deletes Bitwarden ciphers through the trash endpoint, not the update payload.";
-        }
-
-        if (string.IsNullOrWhiteSpace(entry.Title))
-        {
-            return "A Bitwarden cipher requires a title.";
-        }
-
-        return null;
     }
 
     private static string? EncryptOptional(string value, BitwardenSymmetricKey key) =>
