@@ -112,7 +112,7 @@ public sealed class BitwardenMutationProcessor(
                         ? BitwardenRetryPolicy.ClassifyHttpStatus((HttpStatusCode)status)
                         : BitwardenFailureClass.Permanent;
                     if (failureClass == BitwardenFailureClass.Validation &&
-                        response.HttpStatusCode == (int)HttpStatusCode.NotFound &&
+                        response.HttpStatusCode is (int)HttpStatusCode.NotFound or (int)HttpStatusCode.BadRequest &&
                         operation.OperationType is BitwardenMutationOperationType.Delete
                             or BitwardenMutationOperationType.SoftDelete)
                     {
@@ -120,6 +120,14 @@ public sealed class BitwardenMutationProcessor(
                         // trash this delete aimed at was emptied. A deletion whose target is gone has been
                         // answered in full, and recording it as a failure would leave a row no retry can
                         // ever satisfy sitting in the queue for the rest of the vault's life.
+                        //
+                        // BadRequest belongs in this test because of a measurement, not a guess: a live
+                        // Vaultwarden answers HTTP 400 - never 404 - for a cipher id it does not hold, on
+                        // GET, DELETE and PUT /delete alike (2026-09-25, stage s15: control GET on a live
+                        // cipher 200, the same three routes after erasing it 400/400/400, and an id that
+                        // never existed 400). Restricted to the deletions, whose request is a route plus an
+                        // id with no body to get wrong, so 400 can only mean the target is absent; an
+                        // update answered 400 is a payload this client got wrong and stays a failure.
                         await operationStore.CompleteAsync(operation.Id, cancellationToken);
                         completed++;
                         continue;

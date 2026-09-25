@@ -1216,6 +1216,45 @@ public sealed class BitwardenLocalChangeQueueTests
             Assert.Contains("cipher-edit", await harness.SyncState.GetPayloadHashesAsync(harness.VaultId)));
     }
 
+    // Measured on a live Vaultwarden rather than assumed: a cipher the server does not hold answers HTTP 400
+    // - never 404 - on GET, DELETE and PUT /delete alike, and an id that never existed answers the same. So
+    // the settle above has to recognize 400 too, or every erase of a cipher another client removed stays a
+    // failed row for the rest of the vault's life. The 400 an update earns is a payload this client got
+    // wrong and must keep failing: the deletions are the only operations whose request carries no body.
+    [Fact]
+    public async Task An_erase_answered_400_settles_while_an_update_answered_400_still_fails()
+    {
+        var harness = await CreateHarnessAsync();
+        var remote = BaselineCipher();
+        var kept = BoundCipher("cipher-keep", "Kept remote", "kept-user");
+        await harness.Pull.ApplyAsync(harness.VaultId, Snapshot([remote, kept]), [remote, kept]);
+        var doomed = await ReadAsync(harness);
+        await harness.Repository.DeletePasswordPermanentlyAsync(doomed.Id);
+        Assert.True(await harness.Purge.EnqueuePasswordAsync(doomed));
+        var standing = (await harness.Repository.GetPasswordsAsync(true, true))
+            .Single(entry => entry.BitwardenCipherId == "cipher-keep");
+        standing.Title = "Edited here, never uploaded";
+        await harness.Repository.SavePasswordAsync(standing);
+        await harness.Queue.EnqueueDriftedAsync(harness.VaultId, harness.VaultKey, DateTimeOffset.UtcNow);
+
+        var transport = new AcceptedTransport(NextRevision, failureStatus: 400);
+        var batch = await harness.Processor.ProcessReadyAsync(
+            harness.VaultId,
+            DateTimeOffset.UtcNow,
+            transport);
+
+        Assert.Equal(2, transport.Sends);
+        Assert.Equal(1, batch.Completed);
+        Assert.Equal(1, batch.Failed);
+        var rows = await harness.Pending.GetAsync(harness.VaultId);
+        Assert.Equal(
+            BitwardenMutationStatus.Completed,
+            rows.Single(row => row.OperationType == BitwardenMutationOperationType.Delete).Status);
+        var update = rows.Single(row => row.OperationType == BitwardenMutationOperationType.Update);
+        Assert.Equal(BitwardenMutationStatus.Failed, update.Status);
+        Assert.Equal(BitwardenFailureClass.Validation, update.LastFailureClass);
+    }
+
     // Undoing a trash before it leaves the device cancels the delete, because a live row is the user's
     // later word. A purge has no such later word available - nothing restores an erased entry here - so a
     // row standing under an owed erase can only be a copy the pull brought back while the erase waited.
