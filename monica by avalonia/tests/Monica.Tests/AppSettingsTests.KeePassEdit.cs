@@ -280,6 +280,27 @@ public sealed partial class AppSettingsTests
         Assert.True((await File.ReadAllBytesAsync(path)).AsSpan().SequenceEqual(fixture.Content));
     }
 
+    [Fact]
+    public async Task KeePass_master_password_field_retires_once_the_database_is_unlocked()
+    {
+        var fixture = KeePassTestVault.Create("retire-open-form");
+        var path = TestTempPaths.CreateFilePath(".kdbx");
+        await File.WriteAllBytesAsync(path, fixture.Content);
+        var picker = new KeePassEditFilePicker(new PickedBinaryFile("ledger.kdbx", fixture.Content, path));
+        var viewModel = CreateViewModel(GetTempPath(), fileSystemPickerService: picker);
+
+        await viewModel.SelectKeePassFileCommand.ExecuteAsync(null);
+        Assert.Equal("ledger.kdbx", viewModel.KeePassSelectedFileName);
+        Assert.True(viewModel.ShowKeePassOpenForm);
+
+        viewModel.KeePassImportPassword = fixture.Password;
+        await viewModel.PreviewKeePassImportCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.HasKeePassImportPreview);
+        Assert.False(viewModel.ShowKeePassOpenForm);
+        Assert.Equal("", viewModel.KeePassImportPassword);
+    }
+
     private static async Task OpenKeePassVaultAsync(MainWindowViewModel viewModel, string password)
     {
         await viewModel.SelectKeePassFileCommand.ExecuteAsync(null);

@@ -488,9 +488,91 @@ public partial class MainWindow
         return success;
     }
 
+    /// <summary>
+    /// One frame of the KeePass edit form out of the shipped binary. The rest of the matrix covers the
+    /// pages a section name reaches; this surface sits behind a native file dialog, so without a seam
+    /// like it nobody has looked at how the form actually lays out. Counts and byte sizes are logged,
+    /// never a title or a secret.
+    /// </summary>
+    public async Task<bool> RunSmokeUiKeePassEditShotAsync(
+        string vaultPath,
+        string password,
+        string? screenshotDirectory)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            return await Dispatcher.UIThread.InvokeAsync(
+                () => RunSmokeUiKeePassEditShotAsync(vaultPath, password, screenshotDirectory));
+        }
+
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            AppDiagnostics.Info("Smoke UI KeePass edit shot failed. reason=no-view-model");
+            return false;
+        }
+
+        try
+        {
+            viewModel.SelectSectionCommand.Execute("Sync");
+            viewModel.SelectedSyncPage = "Import";
+            ShowFromDesktopIntegration();
+            await Task.Delay(250);
+
+            var tabs = this.GetVisualDescendants()
+                .OfType<TabControl>()
+                .FirstOrDefault(control => control.Name == "ImportSourceTabs");
+            var keepassTab = tabs?.Items
+                .OfType<TabItem>()
+                .FirstOrDefault(item => item.Name == "KeePassImportTab");
+            if (tabs is null || keepassTab is null)
+            {
+                AppDiagnostics.Info(
+                    $"Smoke UI KeePass edit shot failed. reason=tabs-not-realized, " +
+                    $"tabsFound={tabs is not null}, keepassTabFound={keepassTab is not null}");
+                return false;
+            }
+
+            tabs.SelectedItem = keepassTab;
+            var state = await viewModel.SmokeShowKeePassEditorAsync(vaultPath, password);
+            await Task.Delay(250);
+
+            var frame = await CaptureSmokeFrameAsync();
+            var frameBytes = frame?.Length ?? 0;
+            var wantedFile = !string.IsNullOrWhiteSpace(screenshotDirectory);
+            var written = false;
+            var fileName = "";
+            if (wantedFile && frameBytes > 0)
+            {
+                Directory.CreateDirectory(screenshotDirectory!);
+                fileName = $"KeePassEdit_{Math.Max(1, (int)Math.Round(Bounds.Width))}x" +
+                    $"{Math.Max(1, (int)Math.Round(Bounds.Height))}.png";
+                var path = Path.Combine(screenshotDirectory!, fileName);
+                File.WriteAllBytes(path, frame!);
+                written = new FileInfo(path).Length > 0;
+            }
+
+            var success = state.DatabaseOpened &&
+                state.EditorShown &&
+                state.EntryRows > 0 &&
+                keepassTab.IsSelected &&
+                frameBytes > 0 &&
+                (!wantedFile || written);
+            AppDiagnostics.Info(
+                $"Smoke UI KeePass edit shot result. success={success}, opened={state.DatabaseOpened}, " +
+                $"editor={state.EditorShown}, treeRows={state.TreeRows}, entryRows={state.EntryRows}, " +
+                $"vaultBytes={state.FileBytes}, tabSelected={keepassTab.IsSelected}, " +
+                $"frameBytes={frameBytes}, written={written}, file={fileName}");
+            return success;
+        }
+        catch (Exception ex)
+        {
+            AppDiagnostics.Error("Smoke UI KeePass edit shot failed", ex);
+            return false;
+        }
+    }
+
     private static string FormatSmokeLogValue(string? value) =>
         (value ?? "").Replace("\r", "\\r", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal);
-
     private async Task<bool> SaveSmokeScreenshotAsync(string path)
     {
         var frame = await CaptureSmokeFrameAsync();

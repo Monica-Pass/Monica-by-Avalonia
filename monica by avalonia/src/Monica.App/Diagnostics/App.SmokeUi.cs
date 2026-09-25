@@ -270,6 +270,19 @@ public partial class App
                 smokeSuccess &= probeSuccess;
             }
 
+            var keepassEditPath = GetSmokeUiArgument(
+                Environment.GetCommandLineArgs(), "--smoke-ui-keepass-edit");
+            if (!string.IsNullOrWhiteSpace(keepassEditPath))
+            {
+                var keepassPassword = GetSmokeUiArgument(
+                    Environment.GetCommandLineArgs(), "--smoke-ui-keepass-password");
+                var editShotSuccess = await mainWindow.RunSmokeUiKeePassEditShotAsync(
+                    keepassEditPath,
+                    keepassPassword ?? "",
+                    smokeScreenshotDirectory);
+                smokeSuccess &= editShotSuccess;
+            }
+
             if (HasSmokeUiFlag(Environment.GetCommandLineArgs(), "--smoke-ui-autotype"))
             {
                 smokeSuccess &= await RunSmokeUiAutoTypeProbeAsync(viewModel, desktopIntegration);

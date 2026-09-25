@@ -56,7 +56,7 @@
                     </Border>
                 </StackPanel>
             </TabItem>
-            <TabItem>
+            <TabItem x:Name="KeePassImportTab">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal" Spacing="9">
                         <ic:FluentIcon Icon="Database" FontSize="16" />
@@ -75,9 +75,9 @@
                         </StackPanel>
                     </Button>
                     <TextBlock x:Name="KeePassSelectedFileText" Text="{Binding KeePassSelectedFileName}" IsVisible="{Binding HasKeePassSelectedFile}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                    <StackPanel Spacing="8" IsVisible="{Binding HasKeePassSelectedFile}" IsEnabled="{Binding IsKeePassImportIdle}">
+                    <StackPanel Spacing="8" IsVisible="{Binding ShowKeePassOpenForm}" IsEnabled="{Binding IsKeePassImportIdle}">
                         <TextBlock Text="{Binding L.KeePassMasterPassword}" FontSize="12" FontWeight="SemiBold" />
-                        <TextBox x:Name="KeePassImportPasswordBox" MaxWidth="420" HorizontalAlignment="Left" PasswordChar="*" Text="{Binding KeePassImportPassword}" AutomationProperties.Name="{Binding L.KeePassMasterPassword}" />
+                        <TextBox x:Name="KeePassImportPasswordBox" MaxWidth="420" PasswordChar="*" Text="{Binding KeePassImportPassword}" AutomationProperties.Name="{Binding L.KeePassMasterPassword}" />
                         <Button x:Name="PreviewKeePassImportButton" Classes="workspacePrimaryCommand" Command="{Binding PreviewKeePassImportCommand}" HorizontalAlignment="Left" AutomationProperties.Name="{Binding L.KeePassInspect}">
                             <TextBlock Text="{Binding L.KeePassInspect}" />
                         </Button>
@@ -92,12 +92,26 @@
                         </Grid>
                     </StackPanel>
                     <Border x:Name="KeePassPreviewCard" Padding="14,12" BorderBrush="{DynamicResource AccentFillColorSecondaryBrush}" BorderThickness="0,1,0,0" IsVisible="{Binding HasKeePassImportPreview}">
-                        <Grid RowDefinitions="Auto,*,Auto" RowSpacing="10">
+                        <Grid RowDefinitions="Auto,Auto,*" RowSpacing="10">
                             <StackPanel Spacing="2">
                                 <TextBlock Text="{Binding KeePassPreviewSummaryText}" TextWrapping="Wrap" />
                                 <TextBlock x:Name="KeePassUnsavedChangesText" Text="{Binding KeePassUnsavedChangesText}" IsVisible="{Binding KeePassVaultIsDirty}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorCautionBrush}" />
                             </StackPanel>
-                            <Grid Grid.Row="1" ColumnDefinitions="320,*" ColumnSpacing="12" MinHeight="280">
+                            <WrapPanel Grid.Row="1" IsEnabled="{Binding IsKeePassImportIdle}">
+                                <Button x:Name="EditKeePassEntryButton" Classes="workspaceCommand" Command="{Binding EditKeePassEntryCommand}" IsVisible="{Binding CanEditKeePassEntry}" Margin="0,0,8,8">
+                                    <TextBlock Text="{Binding L.KeePassEditEntry}" />
+                                </Button>
+                                <Button x:Name="SaveKeePassVaultButton" Classes="workspaceCommand" Command="{Binding SaveKeePassVaultCommand}" Margin="0,0,8,8">
+                                    <TextBlock Text="{Binding L.KeePassSaveToFile}" />
+                                </Button>
+                                <Button x:Name="ImportKeePassVaultButton" Classes="workspacePrimaryCommand" Command="{Binding ImportKeePassVaultCommand}" Margin="0,0,8,8">
+                                    <TextBlock Text="{Binding L.KeePassImportNow}" />
+                                </Button>
+                                <Button Classes="workspaceCommand" Command="{Binding ResetKeePassImportCommand}" Margin="0,0,0,8">
+                                    <TextBlock Text="{Binding L.KeePassCloseFile}" />
+                                </Button>
+                            </WrapPanel>
+                            <Grid Grid.Row="2" ColumnDefinitions="320,*" ColumnSpacing="12" MinHeight="280">
                                 <Border Grid.Column="0" Classes="workspaceTreeRail">
                                     <controls:VaultFolderTree x:Name="KeePassBrowseTree"
                                                               Text="{Binding L}"
@@ -122,12 +136,15 @@
                                                     <StackPanel Grid.Row="2" Grid.Column="1" Spacing="4">
                                                         <TextBox x:Name="KeePassEditPasswordBox" PasswordChar="*" Text="{Binding KeePassEditorPublic.Password}" IsVisible="{Binding !KeePassEditorPublic.IsPasswordVisible}" AutomationProperties.Name="{Binding L.Password}" />
                                                         <TextBox x:Name="KeePassEditPasswordRevealedBox" Text="{Binding KeePassEditorPublic.Password}" IsVisible="{Binding KeePassEditorPublic.IsPasswordVisible}" AutomationProperties.Name="{Binding L.Password}" />
-                                                        <ToggleButton x:Name="KeePassPasswordVisibilityToggle" Content="{Binding L.ShowPassword}" IsChecked="{Binding KeePassEditorPublic.IsPasswordVisible}" HorizontalAlignment="Left" />
+                                                        <ToggleButton x:Name="KeePassPasswordVisibilityToggle" Content="{Binding L.KeePassShowSecrets}" IsChecked="{Binding KeePassEditorPublic.IsPasswordVisible}" HorizontalAlignment="Left" />
                                                     </StackPanel>
                                                     <TextBlock Grid.Row="3" Text="{Binding L.Website}" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                                     <TextBox Grid.Row="3" Grid.Column="1" x:Name="KeePassEditUrlBox" Text="{Binding KeePassEditorPublic.Url}" AutomationProperties.Name="{Binding L.Website}" />
                                                     <TextBlock Grid.Row="4" Text="{Binding L.AuthenticatorKey}" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                    <TextBox Grid.Row="4" Grid.Column="1" x:Name="KeePassEditTotpBox" Text="{Binding KeePassEditorPublic.AuthenticatorKey}" AutomationProperties.Name="{Binding L.AuthenticatorKey}" />
+                                                    <StackPanel Grid.Row="4" Grid.Column="1" Spacing="4">
+                                                        <TextBox x:Name="KeePassEditTotpBox" PasswordChar="*" Text="{Binding KeePassEditorPublic.AuthenticatorKey}" IsVisible="{Binding !KeePassEditorPublic.IsPasswordVisible}" AutomationProperties.Name="{Binding L.AuthenticatorKey}" />
+                                                        <TextBox x:Name="KeePassEditTotpRevealedBox" Text="{Binding KeePassEditorPublic.AuthenticatorKey}" IsVisible="{Binding KeePassEditorPublic.IsPasswordVisible}" AutomationProperties.Name="{Binding L.AuthenticatorKey}" />
+                                                    </StackPanel>
                                                     <TextBlock Grid.Row="5" Text="{Binding L.Notes}" VerticalAlignment="Top" Margin="0,6,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                                     <TextBox Grid.Row="5" Grid.Column="1" x:Name="KeePassEditNotesBox" Text="{Binding KeePassEditorPublic.Notes}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" AutomationProperties.Name="{Binding L.Notes}" />
                                                 </Grid>
@@ -173,20 +190,6 @@
                                     </ScrollViewer>
                                 </Border>
                             </Grid>
-                            <WrapPanel Grid.Row="2" IsEnabled="{Binding IsKeePassImportIdle}">
-                                <Button x:Name="EditKeePassEntryButton" Classes="workspaceCommand" Command="{Binding EditKeePassEntryCommand}" IsVisible="{Binding CanEditKeePassEntry}" Margin="0,0,8,8">
-                                    <TextBlock Text="{Binding L.KeePassEditEntry}" />
-                                </Button>
-                                <Button x:Name="SaveKeePassVaultButton" Classes="workspaceCommand" Command="{Binding SaveKeePassVaultCommand}" Margin="0,0,8,8">
-                                    <TextBlock Text="{Binding L.KeePassSaveToFile}" />
-                                </Button>
-                                <Button x:Name="ImportKeePassVaultButton" Classes="workspacePrimaryCommand" Command="{Binding ImportKeePassVaultCommand}" Margin="0,0,8,8">
-                                    <TextBlock Text="{Binding L.KeePassImportNow}" />
-                                </Button>
-                                <Button Classes="workspaceCommand" Command="{Binding ResetKeePassImportCommand}" Margin="0,0,0,8">
-                                    <TextBlock Text="{Binding L.KeePassCloseFile}" />
-                                </Button>
-                            </WrapPanel>
                         </Grid>
                     </Border>
                 </StackPanel>

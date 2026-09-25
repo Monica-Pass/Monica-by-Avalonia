@@ -457,6 +457,7 @@ public interface ILocalizationService : INotifyPropertyChanged
     string KeePassEntryTitleLabel { get; }
     string KeePassEditEntry { get; }
     string KeePassApplyEdit { get; }
+    string KeePassShowSecrets { get; }
     string KeePassSaveToFile { get; }
     string KeePassUnsavedChanges { get; }
     string BitwardenImportTitle { get; }
@@ -973,6 +974,7 @@ public sealed class LocalizationService : ILocalizationService
     public string KeePassEntryTitleLabel => Text();
     public string KeePassEditEntry => Text();
     public string KeePassApplyEdit => Text();
+    public string KeePassShowSecrets => Text();
     public string KeePassSaveToFile => Text();
     public string KeePassUnsavedChanges => Text();
     public string BitwardenImportTitle => Text();
@@ -2101,6 +2103,7 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassEntryTitleLabel"] = "Title",
         ["KeePassEditEntry"] = "Edit entry",
         ["KeePassApplyEdit"] = "Apply changes",
+        ["KeePassShowSecrets"] = "Show password and key",
         ["KeePassSaveToFile"] = "Save to file",
         ["KeePassUnsavedChanges"] = "Unsaved changes",
         ["KeePassEntryRequired"] = "Select a KeePass entry to edit.",
@@ -3116,6 +3119,7 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassEntryTitleLabel"] = "标题",
         ["KeePassEditEntry"] = "编辑条目",
         ["KeePassApplyEdit"] = "记入改动",
+        ["KeePassShowSecrets"] = "显示密码与密钥",
         ["KeePassSaveToFile"] = "保存到文件",
         ["KeePassUnsavedChanges"] = "有未保存的改动",
         ["KeePassEntryRequired"] = "请先选择要编辑的 KeePass 条目。",

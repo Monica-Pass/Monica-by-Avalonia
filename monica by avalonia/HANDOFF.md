@@ -1502,8 +1502,58 @@ commercial-release `cr_rc=0`（单测 10 `perf-budget` + 969 常规、UI 17 `per
 - **`.kdbx` 不是一条线**：Android 用 kotpass 0.10.0（读+写），桌面端用 KPCLib 2.0.4（只导入、不写回），
   并且桌面端丢历史、自定义图标、AutoType。两边写出的 `.kdbx` 字节**不等价**，也不打算在这一轮等价——
   要用户拍：桌面端要不要写回 kdbx，还是明确定位成"只能导入"。
+  **（这条已经过时：用户拍了「要写回」，见文末 2026-09-26 的 #116/#117 条目；丢历史/图标/AutoType 那条仍然成立。）**
 - **passkey 私钥**只在本机 SQLite（`passkey_private_keys`），不在 mdbx 载荷里 ⇒ Android 看不见桌面端建的 passkey，反之亦然。
 - Android 的 `steam-mafile` 载荷类型桌面端不认识；两边"谁认识哪些类型"仍然只写在各自己的常量里（交接文档 §2.3）。
 - 随包 `mdbx_ffi.dll` 的来源链、Android 那 5 个 overlay 补丁是否影响保险库字节：都未核。
 
 跨仓规格写在 `Monica-all/mdbx-android-desktop-interop-handoff.md`（工作区根，**不在任何仓里，不改 Android 代码**）。
+
+## 附：桌面端 .kdbx 写回接上界面（2026-09-26，**#117 出厂：编辑面板第一次在真机屏幕上被看见，并且当场抓到一条明文泄漏**）
+
+### 一、这一轮把什么变成了事实
+
+- 写路径在界面上有完整出口：选文件 → 主密码 → 检查 → 树里选中条目 → 编辑 → 记入改动（只进内存）→ 保存到文件
+  （原子写 + 回读校验）。"记入改动"和"保存到文件"是两件事，现在屏幕上看得见：`KeePassUnsavedChanges` 挂在摘要下面。
+- 脏库守卫：离开标签页保住未保存的库；库脏时换文件直接被拒（要么保存，要么明确「不保存并关闭」）；
+  锁定不算导航——锁屏照常丢弃解密库。
+- 新增 `KeePassEditWorkflowUiTests`：无头宿主把 `SyncImportView` 装进 1280x800 真窗口，走"选文件 → 密码 → 检查 →
+  展开夹 → 选中条目 → 编辑 → 记入改动"，断言编辑面板出现在详情位置、掩码框 `PasswordChar='*'`、脏提示可见，
+  最后证明磁盘字节仍是打开时那一份。三条关键断言（面板可见 / 掩码可见 / 脏提示可见）各自做过负控，逐条打红后还原。
+- 新增产物级截图门 `--smoke-ui-keepass-edit`（`MainWindow.SmokeUi.cs::RunSmokeUiKeePassEditShotAsync` +
+  一次性 VM seam `SmokeShowKeePassEditorAsync`）：判定只看 opened / editor / entryRows / tabSelected / frameBytes
+  这些计数与布尔，日志里不出现条目标题，也不出现任何机密。
+
+### 二、真机截图抓到、并且当场修掉的四条（读代码看不出，看屏幕才看得出）
+
+1. **验证器密钥明文上屏**：编辑表单把 `otpauth://…` 连种子一起直接显示出来，而同一张表单的密码框是掩码的。
+   改成与密码同款的"掩码 / 显形"一对，开关文案换成 `KeePassShowSecrets`（显示密码与密钥）——一个开关同时决定两样机密，
+   标签就得说清它管两件，否则用户点"显示密码"时被多泄露一条。负控：摘掉 TOTP 的 `PasswordChar` ⇒ UI 测试红在 `Assert.Equal`。
+2. **主密码框塌成 ~60px 方块**：`MaxWidth=420` 配 `HorizontalAlignment=Left` 的空 TextBox 按内容取宽。去掉左对齐让它吃满。
+3. **文件操作行整排掉出视口**：库打开后"编辑条目 / 保存到文件 / 导入 / 关闭"挂在预览卡最后一行，1280x800 和 1600x1000
+   两张截图里都被顶到看不见——主操作在屏幕外。把它提到摘要正下方（外层 `RowDefinitions` 由 `Auto,*,Auto` 改成 `Auto,Auto,*`）。
+4. **库打开之后那个"主密码"框永远是空的**（检查完立即清除），它唯一的作用是把树挤到折叠线以下。新增
+   `ShowKeePassOpenForm`（选了文件且尚未打开才显示，连同"检查"按钮一起退场），要换文件走"关闭文件"。
+   负控：把它改成只看文件名 ⇒ 新单测红在 `Assert.False`。
+
+修完重新 publish，1280x800 与 1600x1000 两张 `KeePassEdit_*.png` 复核：验证器密钥一栏是点、主密码框不再出现、
+四个文件操作按钮就在摘要下面第一行、1600x1000 整张表单（含"记入改动 / 取消"）一屏看全。
+
+### 三、门禁
+
+跑在本轮那份字节上：格式 0 改动、Release `--warnaserror` 0 warning、commercial-release `gate_rc=0`
+（单测 10 `perf-budget` + 984 常规、UI 17 `perf-budget` + 245 常规）、重新 publish 后产物门 `art_rc=0`
+（`CANONICAL VAULT passed` native=`mdbx_ffi.dll`、KeePass 20000 条 openMs=774 / streamMs=222 / 增长 3.5MB 对 24MB 预算、
+锁定尾窗中位 108.5MB 对 120MB、loadMs=134 对 4000、`UI SMOKE passed` / `RUNTIME SMOKE passed`）。
+
+### 四、仍然没做到（这些是欠账，不是决定）
+
+- **#116 片 B/C**：条目新增/删除、文件夹新增/改名/删除/移动都还没有界面入口——`KeePassBrowseTree` 的 `CanManageRows`
+  仍是 `False`，而且会话只在打开时索引一次 `_groups / _groupsByUuid / EntryCount`，改树之后必须重索引。
+- **#116 片 D**：读模型仍丢历史、自定义图标、AutoType 序列、过期策略、标签、前景/背景色。表单里看得到自定义字段与附件，
+  但不能编辑（原样带回，不改写）。
+- **#116 片 F**：桌面端**新建**空库与 Android kotpass 的磁盘形状还没对拍（头部默认值、`MonicaLocalId`、受保护/明文分配）；
+  KPCLib 不建模 `<Generator>`，桌面端重存一次，kotpass 会报 `generator=Kotpass` 而不是原值——**这条只推理过，没实测**。
+- `KeePassVaultError.NoSourceFile` 在 `KeePassWriteFailureKey` 里映射到通用 key，当前分支走不到它。
+- 锁定丢弃脏库这条路径（`ClearSensitiveImportBuffers` 的默认参数）没有专门测试；本轮测的是导航与换文件。
+- 截图门只回答"面板在屏幕上、帧非空"，不回答好不好看——上面那四条是人眼看出来的。

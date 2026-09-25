@@ -83,6 +83,7 @@ public sealed partial class MainWindowViewModel
             _keePassOpenFolders.Add(session.RootGroupUuid);
             await RebuildKeePassTreeAsync(session, cancellationToken);
             OnPropertyChanged(nameof(HasKeePassImportPreview));
+            OnPropertyChanged(nameof(ShowKeePassOpenForm));
             OnPropertyChanged(nameof(KeePassPreviewSummaryText));
             SetStatusNotice("KeePassPreviewReadyFormat", session.DatabaseName, session.EntryCount, session.GroupCount);
         }

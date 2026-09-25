@@ -24,6 +24,7 @@ public sealed partial class MainWindowViewModel
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasKeePassSelectedFile))]
+    [NotifyPropertyChangedFor(nameof(ShowKeePassOpenForm))]
     private string _keePassSelectedFileName = "";
 
     [ObservableProperty]
@@ -54,6 +55,13 @@ public sealed partial class MainWindowViewModel
 
     public bool HasKeePassSelectedFile => !string.IsNullOrWhiteSpace(KeePassSelectedFileName);
     public bool HasKeePassImportPreview => _keePassVaultSession is not null;
+
+    /// <summary>
+    /// The master password is cleared the moment a database unlocks, so the field that took it can
+    /// only ever render empty afterwards. Retiring it keeps the browse tree above the fold; closing
+    /// the file brings the open form back.
+    /// </summary>
+    public bool ShowKeePassOpenForm => HasKeePassSelectedFile && !HasKeePassImportPreview;
     public bool IsKeePassImportIdle => !IsKeePassImportBusy;
     public string KeePassPreviewSummaryText => _keePassVaultSession is null
         ? _localization.Get("KeePassPreviewEmpty")
@@ -141,8 +149,8 @@ public sealed partial class MainWindowViewModel
         _selectedKeePassTreeRow = null;
         SelectedKeePassTreeRowPublic = null;
         OnPropertyChanged(nameof(HasKeePassImportPreview));
+        OnPropertyChanged(nameof(ShowKeePassOpenForm));
         OnPropertyChanged(nameof(KeePassPreviewSummaryText));
-        OnPropertyChanged(nameof(HasKeePassImportPreview));
         RaiseKeePassWriteState();
     }
 
