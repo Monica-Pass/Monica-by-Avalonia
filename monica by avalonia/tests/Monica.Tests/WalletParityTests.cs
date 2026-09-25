@@ -17,7 +17,7 @@ public sealed class WalletParityTests
             LoginType = PasswordLoginType.Barcode,
             Password = "line-one\nline-two"
         };
-        var barcodeJson = AndroidMdbxPayloadCodec.EncodePassword(barcode, []);
+        var barcodeJson = AndroidMdbxPayloadCodec.EncodePassword(barcode, [], folderId: null);
         var decodedBarcode = AndroidMdbxPayloadCodec.DecodePassword(barcodeJson, "Recovery barcode");
         Assert.NotNull(decodedBarcode);
         Assert.Equal(PasswordLoginType.Barcode, decodedBarcode!.Entry.LoginType);
@@ -43,11 +43,11 @@ public sealed class WalletParityTests
         };
 
         var decodedAddress = AndroidMdbxPayloadCodec.DecodeSecureItem(
-            AndroidMdbxPayloadCodec.EncodeSecureItem(address),
+            AndroidMdbxPayloadCodec.EncodeSecureItem(address, folderId: null),
             "Home",
             "billing-address");
         var decodedPayment = AndroidMdbxPayloadCodec.DecodeSecureItem(
-            AndroidMdbxPayloadCodec.EncodeSecureItem(payment),
+            AndroidMdbxPayloadCodec.EncodeSecureItem(payment, folderId: null),
             "Monica Pay",
             "payment-account");
 

@@ -601,6 +601,13 @@ public sealed partial class PlatformServiceTests
         public Task<MdbxNativeProjectRecord> CreateProjectAsync(string title, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<MdbxNativeProjectRecord> CreateProjectWithIdentityAsync(
+            string projectId,
+            string title,
+            string? parentProjectId,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<IReadOnlyList<MdbxNativeProjectRecord>> ListProjectsAsync(CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 

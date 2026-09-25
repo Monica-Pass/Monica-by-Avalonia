@@ -330,14 +330,16 @@ public sealed class MdbxRepositoryTests
         var entry = passwordPayload.RootElement;
         AssertMissingOrNull(entry, "mdbxDatabaseId");
         AssertMissingOrNull(entry, "mdbxFolderId");
-        Assert.Equal(password.MdbxFolderId, entry.GetProperty("mdbx_folder_id").GetString());
+        // A desktop entry with no category lives in the root project, where Android leaves the key out
+        // altogether; the entry's own record id must never appear in its place.
+        Assert.False(entry.TryGetProperty("mdbx_folder_id", out _));
         Assert.False(entry.TryGetProperty("data", out _));
 
         using var secureItemPayload = JsonDocument.Parse(bridge.GetEntryPayloadJson(database.WorkingCopyPath!, note.MdbxFolderId!)!);
         var item = secureItemPayload.RootElement;
         AssertMissingOrNull(item, "mdbxDatabaseId");
         AssertMissingOrNull(item, "mdbxFolderId");
-        Assert.Equal(note.MdbxFolderId, item.GetProperty("mdbx_folder_id").GetString());
+        Assert.False(item.TryGetProperty("mdbx_folder_id", out _));
         Assert.False(item.TryGetProperty("data", out _));
 
         Assert.NotNull(Assert.Single(await repository.GetPasswordsAsync()).MdbxDatabaseId);
@@ -349,6 +351,215 @@ public sealed class MdbxRepositoryTests
                 !element.TryGetProperty(propertyName, out var property) || property.ValueKind == JsonValueKind.Null,
                 $"Expected '{propertyName}' to be absent or null.");
         }
+    }
+
+    [Fact]
+    public async Task Repository_round_trips_ssh_key_data_and_sort_order_through_mdbx()
+    {
+        var repository = CreateRepository(out _);
+        await SaveDefaultMdbxDatabaseAsync(repository);
+        await repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "SSH round trip",
+            Username = "ssh-user",
+            Password = "ssh-secret",
+            SshKeyData = "fixture-ssh-private-key-material",
+            SortOrder = 5
+        });
+
+        var reloaded = Assert.Single(await repository.GetPasswordsAsync());
+
+        Assert.Equal("fixture-ssh-private-key-material", reloaded.SshKeyData);
+        Assert.Equal(5, reloaded.SortOrder);
+    }
+
+    [Fact]
+    public async Task Repository_writes_the_folder_object_id_into_payloads_the_way_android_reads_it()
+    {
+        var repository = CreateRepository(out var bridge);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        var category = new Category { Name = "Interop Folder" };
+        await repository.SaveCategoryAsync(category);
+        var password = new PasswordEntry
+        {
+            Title = "Interop login",
+            Password = "secret",
+            CategoryId = category.Id
+        };
+        await repository.SavePasswordAsync(password);
+
+        using var document = JsonDocument.Parse(bridge.GetEntryPayloadJson(database.WorkingCopyPath!, password.MdbxFolderId!)!);
+        var folderId = document.RootElement.GetProperty("mdbx_folder_id").GetString();
+
+        Assert.Equal(category.MdbxFolderId, folderId);
+        Assert.NotEqual(password.MdbxFolderId, folderId);
+    }
+
+    [Fact]
+    public async Task Repository_writes_no_payload_key_as_json_null_that_android_would_read_as_the_text_null()
+    {
+        var repository = CreateRepository(out var bridge);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry { Title = "Root login", Password = "secret" };
+        await repository.SavePasswordAsync(password);
+
+        using var document = JsonDocument.Parse(bridge.GetEntryPayloadJson(database.WorkingCopyPath!, password.MdbxFolderId!)!);
+        var root = document.RootElement;
+
+        // Android reads these with org.json optString/optLong, which turn a JSON null into the
+        // literal text "null" (see Mdbx2Repository.kt folderIdFromPayload and the "null" guard in
+        // ImportDestinationWriter.kt). Android's writer drops the key instead of writing null.
+        foreach (var property in root.EnumerateObject())
+        {
+            Assert.False(property.Value.ValueKind == JsonValueKind.Null,
+                $"Expected '{property.Name}' to be omitted rather than written as null.");
+        }
+
+        foreach (var key in new[] { "category_id", "deleted_at", "bound_note_room_id", "bound_note_entry_id", "mdbx_folder_id" })
+        {
+            Assert.False(root.TryGetProperty(key, out _), $"Expected '{key}' to be absent.");
+        }
+
+        // Android omits mdbx_folder_id for entries that sit in the root project, which is exactly what
+        // an uncategorized desktop entry is; writing the id there instead would make Android look for a
+        // folder that its own folder list does not contain.
+    }
+
+    [Fact]
+    public async Task Repository_preserves_androids_monica_entry_id_across_a_desktop_edit()
+    {
+        var repository = CreateRepository(out var bridge);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        const string androidPayload =
+            """
+            {"kind":"password","monica_entry_id":"login:42","room_id":42,"website":"","username":"",
+             "password_plain":"secret","notes":"","sort_order":0,"category_id":null,
+             "mdbx_folder_id":"login:42","login_type":"PASSWORD","ssh_key_data":"",
+             "authenticator_key":"","passkey_bindings":"","custom_fields":[],
+             "bitwarden_mode":false,"keepass_mode":false}
+            """;
+        bridge.SeedEntry(database.WorkingCopyPath!, "Monica", "login", "Android login", androidPayload);
+
+        var reloaded = Assert.Single(await repository.GetPasswordsAsync());
+        await repository.SavePasswordAsync(reloaded);
+
+        Assert.Equal("login:42", reloaded.ReplicaGroupId);
+        using var document = JsonDocument.Parse(bridge.GetEntryPayloadJson(database.WorkingCopyPath!, reloaded.MdbxFolderId!)!);
+
+        Assert.Equal("login:42", document.RootElement.GetProperty("monica_entry_id").GetString());
+    }
+
+    /// <summary>
+    /// Android imports a secure item only when the native entry type is one of
+    /// note/totp/card/document-ref/billing-address/payment-account (MdbxViewModel.kt). Storing the
+    /// wallet kinds as "identity" made every desktop billing address and payment account invisible on
+    /// Android, and re-typed an Android-authored entry out of Android's own list on the first edit.
+    /// </summary>
+    [Theory]
+    [InlineData("billing_address", "billing-address")]
+    [InlineData("payment_account", "payment-account")]
+    [InlineData("bank_card", "card")]
+    [InlineData("document", "document-ref")]
+    public async Task Repository_round_trips_androids_secure_item_entry_types(string kind, string entryType)
+    {
+        var repository = CreateRepository(out var bridge);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        var androidPayload =
+            $$"""
+            {"kind":"{{kind}}","monica_entry_id":"{{entryType}}:7","room_id":7,"notes":"from android",
+             "sort_order":3,"item_data":"{}","image_paths":[],
+             "bitwarden_mode":false,"keepass_mode":false}
+            """;
+        bridge.SeedEntry(database.WorkingCopyPath!, "Monica", entryType, "Android item", androidPayload);
+
+        var item = Assert.Single(await repository.GetSecureItemsAsync());
+        Assert.Equal("from android", item.Notes);
+        Assert.Equal(3, item.SortOrder);
+        await repository.SaveSecureItemAsync(item);
+
+        Assert.Equal(entryType, bridge.GetEntryType(database.WorkingCopyPath!, item.MdbxFolderId!));
+        Assert.Equal(1, bridge.CountActiveEntries(database.WorkingCopyPath!));
+    }
+
+    [Fact]
+    public async Task Repository_writes_new_secure_items_under_the_entry_types_android_reads()
+    {
+        var repository = CreateRepository(out var bridge);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        var address = new SecureItem
+        {
+            ItemType = VaultItemType.BillingAddress,
+            Title = "Desktop address",
+            ItemData = """{"fullName":"Ada"}"""
+        };
+        var account = new SecureItem
+        {
+            ItemType = VaultItemType.PaymentAccount,
+            Title = "Desktop account",
+            ItemData = """{"accountName":"Ada"}"""
+        };
+
+        await repository.SaveSecureItemAsync(address);
+        await repository.SaveSecureItemAsync(account);
+
+        Assert.Equal("billing-address", bridge.GetEntryType(database.WorkingCopyPath!, address.MdbxFolderId!));
+        Assert.Equal("payment-account", bridge.GetEntryType(database.WorkingCopyPath!, account.MdbxFolderId!));
+    }
+
+    /// <summary>
+    /// Android writes every password as entry type "login" and keeps the SSH-key distinction in the
+    /// payload's login_type. A desktop edit that re-typed the record to "ssh-key" removed it from
+    /// Android's password list, because Android imports only entryType == "login".
+    /// </summary>
+    [Fact]
+    public async Task Repository_keeps_androids_ssh_key_logins_as_login_entries()
+    {
+        var repository = CreateRepository(out var bridge);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        const string androidPayload =
+            """
+            {"kind":"password","monica_entry_id":"login:12","room_id":12,"website":"","username":"ada",
+             "password_plain":"","notes":"","sort_order":0,"mdbx_folder_id":"login:12",
+             "login_type":"SSH_KEY","ssh_key_data":"{\"private_key\":\"PEM:abc\"}",
+             "authenticator_key":"","passkey_bindings":"","custom_fields":[],
+             "bitwarden_mode":false,"keepass_mode":false}
+            """;
+        bridge.SeedEntry(database.WorkingCopyPath!, "Monica", "login", "Android ssh login", androidPayload);
+
+        var password = Assert.Single(await repository.GetPasswordsAsync());
+        Assert.Equal(PasswordLoginType.SshKey, password.LoginType);
+        await repository.SavePasswordAsync(password);
+
+        Assert.Equal("login", bridge.GetEntryType(database.WorkingCopyPath!, password.MdbxFolderId!));
+        Assert.Equal(1, bridge.CountActiveEntries(database.WorkingCopyPath!));
+        using var document = JsonDocument.Parse(bridge.GetEntryPayloadJson(database.WorkingCopyPath!, password.MdbxFolderId!)!);
+
+        Assert.Equal("SSH_KEY", document.RootElement.GetProperty("login_type").GetString());
+        Assert.Contains("PEM:abc", document.RootElement.GetProperty("ssh_key_data").ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Repository_still_reads_desktop_authored_ssh_key_entries()
+    {
+        var repository = CreateRepository(out var bridge);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        var password = new PasswordEntry
+        {
+            Title = "Desktop ssh login",
+            LoginType = PasswordLoginType.SshKey,
+            SshKeyData = """{"private_key":"PEM:xyz"}"""
+        };
+        await repository.SavePasswordAsync(password);
+        var entryId = password.MdbxFolderId!;
+
+        // Vault files written by earlier desktop builds carry the legacy native type; reading them
+        // back must not depend on how the record happens to be typed.
+        bridge.RenameEntryType(database.WorkingCopyPath!, entryId, "ssh-key");
+        password.MdbxFolderId = null;
+
+        var reloaded = Assert.Single(await repository.GetPasswordsAsync());
+        Assert.Equal(PasswordLoginType.SshKey, reloaded.LoginType);
+        Assert.Equal(entryId, reloaded.MdbxFolderId);
     }
 
     [Fact]
@@ -1731,6 +1942,61 @@ public sealed class MdbxRepositoryTests
         Assert.Equal("Work", bridge.GetProjectTitleForEntry(database.WorkingCopyPath!, reloadedNote.MdbxFolderId!));
     }
 
+    /// <summary>
+    /// The shape Android builds its tree from: one hidden root project whose id both clients recompute
+    /// from the vault id, folders filed beneath it by id, and no folder key at all on an entry that sits
+    /// in the root. Keeping a desktop-only default project instead left Android writing its folder-less
+    /// entries into a project the engine reports as missing.
+    /// </summary>
+    [Fact]
+    public async Task Repository_files_the_project_tree_the_way_android_reads_it()
+    {
+        var repository = CreateRepository(out var bridge);
+        var database = await SaveDefaultMdbxDatabaseAsync(repository);
+        var rootProjectId = MdbxAndroidRoot.ProjectIdFor("fake-vault");
+        var category = new Category
+        {
+            Name = "Work",
+            SortOrder = 3
+        };
+        await repository.SaveCategoryAsync(category);
+        await repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "Work login",
+            Username = "dev",
+            Password = "secret",
+            CategoryId = category.Id
+        });
+        await repository.SavePasswordAsync(new PasswordEntry
+        {
+            Title = "Uncategorized login",
+            Username = "solo",
+            Password = "secret"
+        });
+
+        var reloadedCategory = Assert.Single(await repository.GetCategoriesAsync());
+        Assert.Equal("Work", reloadedCategory.Name);
+        Assert.Equal(rootProjectId, bridge.GetProjectIdByTitle(database.WorkingCopyPath!, MdbxAndroidRoot.Title));
+        Assert.Equal(rootProjectId, bridge.GetParentProjectId(database.WorkingCopyPath!, reloadedCategory.MdbxFolderId!));
+
+        var passwords = await repository.GetPasswordsAsync();
+        var categorized = passwords.Single(entry => entry.Title == "Work login");
+        var rootFiled = passwords.Single(entry => entry.Title == "Uncategorized login");
+
+        // mdbx_folder_id is the native *project* id; the entry's own record id is what the desktop cache
+        // happens to store in PasswordEntry.MdbxFolderId, so the two must not be confused here.
+        Assert.Equal(reloadedCategory.MdbxFolderId, bridge.GetProjectIdForEntry(database.WorkingCopyPath!, categorized.MdbxFolderId!));
+        Assert.Equal(rootProjectId, bridge.GetProjectIdForEntry(database.WorkingCopyPath!, rootFiled.MdbxFolderId!));
+
+        using var categorizedPayload = JsonDocument.Parse(bridge.GetEntryPayloadJson(database.WorkingCopyPath!, categorized.MdbxFolderId!)!);
+        Assert.Equal(
+            reloadedCategory.MdbxFolderId,
+            categorizedPayload.RootElement.GetProperty("mdbx_folder_id").GetString());
+
+        using var rootFiledPayload = JsonDocument.Parse(bridge.GetEntryPayloadJson(database.WorkingCopyPath!, rootFiled.MdbxFolderId!)!);
+        Assert.False(rootFiledPayload.RootElement.TryGetProperty("mdbx_folder_id", out _));
+    }
+
     [Fact]
     public async Task Repository_recovers_mdbx_project_categories_when_sqlite_category_cache_is_missing()
     {
@@ -1851,8 +2117,10 @@ public sealed class MdbxRepositoryTests
         var history = Assert.Single(await repository.GetPasswordHistoryAsync(password.Id));
         Assert.Null(reloadedPassword.CategoryId);
         Assert.Null(reloadedNote.CategoryId);
-        Assert.Equal("Monica", bridge.GetProjectTitleForEntry(database.WorkingCopyPath!, reloadedPassword.MdbxFolderId!));
-        Assert.Equal("Monica", bridge.GetProjectTitleForEntry(database.WorkingCopyPath!, reloadedNote.MdbxFolderId!));
+        // Unassigning a category moves the entry into Android's root project, which is the folder-less
+        // home both clients share; the desktop's old private "Monica" project is not it.
+        Assert.Equal(MdbxAndroidRoot.Title, bridge.GetProjectTitleForEntry(database.WorkingCopyPath!, reloadedPassword.MdbxFolderId!));
+        Assert.Equal(MdbxAndroidRoot.Title, bridge.GetProjectTitleForEntry(database.WorkingCopyPath!, reloadedNote.MdbxFolderId!));
         Assert.Equal("env", customField.Title);
         Assert.Equal("prod", customField.Value);
         Assert.Equal("old-secret", history.Password);
@@ -2856,6 +3124,15 @@ public sealed class MdbxRepositoryTests
         public string? GetProjectTitleForEntry(string path, string entryId) =>
             _vaults.TryGetValue(path, out var vault) ? vault.GetProjectTitleForEntry(entryId) : null;
 
+        public string? GetProjectIdByTitle(string path, string title) =>
+            _vaults.TryGetValue(path, out var vault) ? vault.GetProjectIdByTitle(title) : null;
+
+        public string? GetProjectIdForEntry(string path, string entryId) =>
+            _vaults.TryGetValue(path, out var vault) ? vault.GetProjectIdForEntry(entryId) : null;
+
+        public string? GetParentProjectId(string path, string projectId) =>
+            _vaults.TryGetValue(path, out var vault) ? vault.GetParentProjectId(projectId) : null;
+
         public int CountEntries(string path) =>
             _vaults.TryGetValue(path, out var vault) ? vault.CountEntries() : 0;
 
@@ -2873,6 +3150,12 @@ public sealed class MdbxRepositoryTests
 
         public string? GetEntryPayloadJson(string path, string entryId) =>
             _vaults.TryGetValue(path, out var vault) ? vault.GetEntryPayloadJson(entryId) : null;
+
+        public string? GetEntryType(string path, string entryId) =>
+            _vaults.TryGetValue(path, out var vault) ? vault.GetEntryType(entryId) : null;
+
+        public void RenameEntryType(string path, string entryId, string entryType) =>
+            _vaults[path].RenameEntryType(entryId, entryType);
 
         public void SeedEntry(string path, string projectTitle, string entryType, string title, string payloadJson)
         {
@@ -2912,6 +3195,7 @@ public sealed class MdbxRepositoryTests
         private readonly List<MdbxNativeEntryRecord> _entries = [];
         private readonly List<MdbxNativeAttachmentRecord> _attachments = [];
         private readonly Dictionary<string, byte[]> _attachmentContent = [];
+        private readonly Dictionary<string, string> _projectParents = new(StringComparer.OrdinalIgnoreCase);
         private int _nextProjectId = 1;
         private int _nextEntryId = 1;
         private int _nextAttachmentId = 1;
@@ -2928,27 +3212,109 @@ public sealed class MdbxRepositoryTests
             return Task.FromResult(project);
         }
 
+        public Task<MdbxNativeProjectRecord> CreateProjectWithIdentityAsync(
+            string projectId,
+            string title,
+            string? parentProjectId,
+            CancellationToken cancellationToken = default)
+        {
+            if (_projects.Any(project => string.Equals(project.ProjectId, projectId, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new InvalidOperationException($"native mdbx_ffi rejects a colliding project id: {projectId}");
+            }
+
+            var project = new MdbxNativeProjectRecord(projectId, title);
+            _projects.Add(project);
+            if (parentProjectId is not null)
+            {
+                _projectParents[projectId] = parentProjectId;
+            }
+
+            return Task.FromResult(project);
+        }
+
+        public string? GetParentProjectId(string projectId) =>
+            _projectParents.GetValueOrDefault(projectId);
+
+        public string? GetProjectIdByTitle(string title) =>
+            _projects.FirstOrDefault(project => string.Equals(project.Title, title, StringComparison.OrdinalIgnoreCase))?.ProjectId;
+
+        /// <summary>
+        /// Measured against the real engine: an entry write whose target project does not exist fails
+        /// with a Storage error. That is why Android's root project — the target it falls back to for
+        /// every folder-less entry — has to be materialized, not merely assumed to exist.
+        /// </summary>
+        private void RequireProject(string projectId)
+        {
+            if (!_projects.Any(project => string.Equals(project.ProjectId, projectId, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new InvalidOperationException($"native mdbx_ffi rejects entries in an unknown project: {projectId}");
+            }
+        }
+
         public Task<IReadOnlyList<MdbxNativeProjectRecord>> ListProjectsAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<MdbxNativeProjectRecord>>(_projects.ToList());
 
-        private static readonly string[] NativeEntryTypes =
+        /// <summary>
+        /// Mirrors mdbx-core's ObjectTypeId::from_str: the nine legacy names plus any custom id that
+        /// passes validate_extension_id. Kept in sync with the native engine rather than with a
+        /// comment, because the previous version of this list asserted "nine types only" and quietly
+        /// legitimised storing Android's wallet entries under a name Android never reads.
+        /// </summary>
+        private static readonly string[] LegacyEntryTypes =
         [
             "login", "note", "totp", "card", "document-ref", "identity", "passkey", "ssh-key", "api-token"
         ];
 
         private static void ValidateEntryType(string entryType)
         {
-            if (!NativeEntryTypes.Contains(entryType, StringComparer.Ordinal))
+            if (LegacyEntryTypes.Contains(entryType, StringComparer.Ordinal) || IsValidCustomEntryType(entryType))
             {
-                throw new InvalidOperationException(
-                    $"native mdbx_ffi rejects this entry type: @entryType={entryType}");
+                return;
             }
+
+            throw new InvalidOperationException(
+                $"native mdbx_ffi rejects this entry type: @entryType={entryType}");
         }
+
+        /// <summary>
+        /// Mirrors the measured engine: create accepts a custom object type id, but the listing
+        /// filter parses a legacy-only enum, so scanning by "billing-address" throws instead of
+        /// returning Android's wallet entries. A client that lists one type at a time can never read
+        /// those entries; it has to list unfiltered and narrow in memory.
+        /// </summary>
+        private static void ValidateListedEntryType(string entryType)
+        {
+            if (LegacyEntryTypes.Contains(entryType, StringComparer.Ordinal))
+            {
+                return;
+            }
+
+            throw new InvalidOperationException(
+                $"native mdbx_ffi rejects this entry type on the list path: @entryType={entryType}");
+        }
+
+        private static bool IsValidCustomEntryType(string value)
+        {
+            if (value.Length is 0 or > 128 || LegacyEntryTypes.Contains(value, StringComparer.Ordinal))
+            {
+                return false;
+            }
+
+            return IsAsciiAlphanumeric(value[0])
+                && IsAsciiAlphanumeric(value[^1])
+                && value.All(character => character is >= 'a' and <= 'z' or >= '0' and <= '9' or '.' or '-' or '_')
+                && !value.Contains("..", StringComparison.Ordinal);
+        }
+
+        private static bool IsAsciiAlphanumeric(char character) =>
+            character is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9';
 
         public Task<MdbxNativeEntryRecord> CreateEntryAsync(string projectId, string entryType, string title, string payloadJson, CancellationToken cancellationToken = default)
         {
             ValidateEntryType(entryType);
-            var entry = new MdbxNativeEntryRecord($"entry-{_nextEntryId++}", projectId, entryType, title, payloadJson, Deleted: false);
+            RequireProject(projectId);
+            var entry = new MdbxNativeEntryRecord(Guid.NewGuid().ToString(), projectId, entryType, title, payloadJson, Deleted: false);
             _entries.Add(entry);
             return Task.FromResult(entry);
         }
@@ -2957,7 +3323,7 @@ public sealed class MdbxRepositoryTests
         {
             if (entryType is not null)
             {
-                ValidateEntryType(entryType);
+                ValidateListedEntryType(entryType);
             }
 
             return Task.FromResult<IReadOnlyList<MdbxNativeEntryRecord>>(
@@ -2968,7 +3334,7 @@ public sealed class MdbxRepositoryTests
         {
             if (entryType is not null)
             {
-                ValidateEntryType(entryType);
+                ValidateListedEntryType(entryType);
             }
 
             return Task.FromResult<IReadOnlyList<MdbxNativeEntryRecord>>(
@@ -2978,6 +3344,7 @@ public sealed class MdbxRepositoryTests
         public Task<MdbxNativeEntryRecord> UpdateEntryAsync(string projectId, string entryId, string entryType, string title, string payloadJson, CancellationToken cancellationToken = default)
         {
             ValidateEntryType(entryType);
+            RequireProject(projectId);
             var index = _entries.FindIndex(entry => entry.EntryId == entryId && entry.ProjectId == projectId);
             if (index < 0)
             {
@@ -3072,14 +3439,17 @@ public sealed class MdbxRepositoryTests
 
         public string? GetProjectTitleForEntry(string entryId)
         {
-            var entry = _entries.FirstOrDefault(entry => string.Equals(entry.EntryId, entryId, StringComparison.OrdinalIgnoreCase));
-            if (entry is null)
+            var projectId = GetProjectIdForEntry(entryId);
+            if (projectId is null)
             {
                 return null;
             }
 
-            return _projects.FirstOrDefault(project => string.Equals(project.ProjectId, entry.ProjectId, StringComparison.OrdinalIgnoreCase))?.Title;
+            return _projects.FirstOrDefault(project => string.Equals(project.ProjectId, projectId, StringComparison.OrdinalIgnoreCase))?.Title;
         }
+
+        public string? GetProjectIdForEntry(string entryId) =>
+            _entries.FirstOrDefault(entry => string.Equals(entry.EntryId, entryId, StringComparison.OrdinalIgnoreCase))?.ProjectId;
 
         public int CountEntries() => _entries.Count;
 
@@ -3094,6 +3464,21 @@ public sealed class MdbxRepositoryTests
 
         public string? GetEntryPayloadJson(string entryId) =>
             _entries.FirstOrDefault(entry => string.Equals(entry.EntryId, entryId, StringComparison.OrdinalIgnoreCase))?.PayloadJson;
+
+        public string? GetEntryType(string entryId) =>
+            _entries.FirstOrDefault(entry => string.Equals(entry.EntryId, entryId, StringComparison.OrdinalIgnoreCase))?.EntryType;
+
+        public void RenameEntryType(string entryId, string entryType)
+        {
+            ValidateEntryType(entryType);
+            var index = _entries.FindIndex(entry => string.Equals(entry.EntryId, entryId, StringComparison.OrdinalIgnoreCase));
+            if (index < 0)
+            {
+                throw new InvalidOperationException($"Entry '{entryId}' was not found.");
+            }
+
+            _entries[index] = _entries[index] with { EntryType = entryType };
+        }
 
         public void SeedEntry(string projectTitle, string entryType, string title, string payloadJson)
         {

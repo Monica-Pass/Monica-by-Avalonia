@@ -199,6 +199,13 @@ public sealed partial class MdbxVaultStore
         public Task<MdbxNativeProjectRecord> CreateProjectAsync(string title, CancellationToken cancellationToken = default) =>
             _vault.CreateProjectAsync(title, cancellationToken);
 
+        public Task<MdbxNativeProjectRecord> CreateProjectWithIdentityAsync(
+            string projectId,
+            string title,
+            string? parentProjectId,
+            CancellationToken cancellationToken = default) =>
+            _vault.CreateProjectWithIdentityAsync(projectId, title, parentProjectId, cancellationToken);
+
         public Task<IReadOnlyList<MdbxNativeProjectRecord>> ListProjectsAsync(CancellationToken cancellationToken = default) =>
             _vault.ListProjectsAsync(cancellationToken);
 

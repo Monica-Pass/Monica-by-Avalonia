@@ -18,9 +18,14 @@ public static class AndroidMdbxPayloadCodec
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
+    /// <param name="folderId">
+    /// Native folder (project) object id the entry lives in. Android reads <c>mdbx_folder_id</c> as
+    /// the entry's parent folder, so the entry's own record id must never be written there.
+    /// </param>
     public static string EncodePassword(
         PasswordEntry entry,
         IReadOnlyList<CustomField> customFields,
+        string? folderId,
         string? boundNoteEntryId = null,
         IReadOnlyList<PasswordHistoryEntry>? passwordHistory = null,
         IReadOnlyList<Attachment>? attachments = null)
@@ -28,8 +33,10 @@ public static class AndroidMdbxPayloadCodec
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream))
         {
+            // Key order mirrors Monica Android's passwordMutation so both clients emit the same document.
             writer.WriteStartObject();
             writer.WriteString("kind", "password");
+            WriteOptionalString(writer, "monica_entry_id", entry.ReplicaGroupId);
             writer.WriteNumber("room_id", entry.Id);
             writer.WriteString("website", entry.Website ?? "");
             writer.WriteString("username", entry.Username ?? "");
@@ -37,12 +44,16 @@ public static class AndroidMdbxPayloadCodec
             writer.WriteString("app_name", entry.AppName ?? "");
             writer.WriteString("password_plain", entry.Password ?? "");
             writer.WriteString("notes", entry.Notes ?? "");
-            WriteNullableNumber(writer, "category_id", entry.CategoryId);
-            WriteMdbxFolderId(writer, entry.MdbxFolderId);
-            WriteNullableUnixMilliseconds(writer, "deleted_at", entry.DeletedAt);
-            WriteNullableNumber(writer, "bound_note_room_id", entry.BoundNoteId);
-            WriteNullableString(writer, "bound_note_entry_id", boundNoteEntryId);
+            writer.WriteNumber("sort_order", entry.SortOrder);
+            WriteOptionalNumber(writer, "category_id", entry.CategoryId);
+            WriteOptionalString(writer, "mdbx_folder_id", NormalizeMdbxFolderId(folderId));
+            WriteOptionalNumber(writer, "bound_note_room_id", entry.BoundNoteId);
+            WriteOptionalString(writer, "bound_note_entry_id", boundNoteEntryId);
             writer.WriteString("login_type", ToAndroidLoginType(entry.LoginType));
+            // An empty desktop value must not be emitted as an explicit "": Android treats a
+            // present-but-empty ssh_key_data as a clear, and legacy Android payloads carry the
+            // key only in Room, so omission is the only non-destructive choice.
+            WriteOptionalString(writer, "ssh_key_data", string.IsNullOrEmpty(entry.SshKeyData) ? null : entry.SshKeyData);
             writer.WriteString("authenticator_key", entry.AuthenticatorKey ?? "");
             writer.WriteString("passkey_bindings", entry.PasskeyBindings ?? "");
             writer.WritePropertyName("custom_fields");
@@ -67,6 +78,7 @@ public static class AndroidMdbxPayloadCodec
             // Avalonia-only compatibility extensions stay flat and are ignored by Android.
             // They preserve current desktop history/attachment behavior until those features
             // move to canonical MDBX-native records in the next storage milestone.
+            WriteOptionalUnixMilliseconds(writer, "deleted_at", entry.DeletedAt);
             if (passwordHistory is not null)
             {
                 writer.WritePropertyName("password_history");
@@ -84,7 +96,7 @@ public static class AndroidMdbxPayloadCodec
             if (entry.IsArchived || entry.ArchivedAt is not null)
             {
                 writer.WriteBoolean("is_archived", entry.IsArchived);
-                WriteNullableUnixMilliseconds(writer, "archived_at", entry.ArchivedAt);
+                WriteOptionalUnixMilliseconds(writer, "archived_at", entry.ArchivedAt);
             }
 
             writer.WriteEndObject();
@@ -117,13 +129,16 @@ public static class AndroidMdbxPayloadCodec
                 AppName = GetString(root, "app_name", "appName"),
                 Password = GetPreferredString(root, "password_plain", "password"),
                 Notes = GetString(root, "notes"),
+                SortOrder = checked((int)(GetInt64(root, "sort_order", "sortOrder") ?? 0)),
                 CategoryId = GetInt64(root, "category_id", "categoryId"),
                 MdbxFolderId = NormalizeMdbxFolderId(GetNullableString(root, "mdbx_folder_id", "mdbxFolderId")),
+                ReplicaGroupId = NormalizeOptionalText(GetNullableString(root, "monica_entry_id", "monicaEntryId")),
                 DeletedAt = GetDateTimeOffset(root, "deleted_at", "deletedAt"),
                 IsArchived = GetBoolean(root, "is_archived", "isArchived"),
                 ArchivedAt = GetDateTimeOffset(root, "archived_at", "archivedAt"),
                 BoundNoteId = GetInt64(root, "bound_note_room_id", "boundNoteRoomId"),
                 LoginType = ParseLoginType(GetString(root, "login_type", "loginType")),
+                SshKeyData = GetMdbxSshKeyData(root),
                 AuthenticatorKey = GetString(root, "authenticator_key", "authenticatorKey"),
                 PasskeyBindings = GetString(root, "passkey_bindings", "passkeyBindings")
             };
@@ -144,26 +159,33 @@ public static class AndroidMdbxPayloadCodec
         }
     }
 
+    /// <param name="folderId">
+    /// Native folder (project) object id the item lives in; see the note on <see cref="EncodePassword"/>.
+    /// </param>
     public static string EncodeSecureItem(
         SecureItem item,
+        string? folderId,
         string? boundPasswordEntryId = null,
         IReadOnlyList<Attachment>? attachments = null)
     {
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream))
         {
+            // Key order mirrors Monica Android's secureItemMutation.
             writer.WriteStartObject();
             writer.WriteString("kind", ToAndroidSecureItemKind(item.ItemType));
+            WriteOptionalString(writer, "monica_entry_id", item.ReplicaGroupId);
             writer.WriteNumber("room_id", item.Id);
             writer.WriteString("notes", item.Notes ?? "");
+            writer.WriteNumber("sort_order", item.SortOrder);
             writer.WriteString("item_data", item.ItemData ?? "");
             writer.WriteString("image_paths", item.ImagePaths ?? "[]");
-            WriteNullableNumber(writer, "category_id", item.CategoryId);
-            WriteMdbxFolderId(writer, item.MdbxFolderId);
-            WriteNullableUnixMilliseconds(writer, "deleted_at", item.DeletedAt);
-            WriteNullableString(writer, "bound_password_entry_id", boundPasswordEntryId);
+            WriteOptionalNumber(writer, "category_id", item.CategoryId);
+            WriteOptionalString(writer, "mdbx_folder_id", NormalizeMdbxFolderId(folderId));
+            WriteOptionalString(writer, "bound_password_entry_id", boundPasswordEntryId);
             writer.WriteBoolean("bitwarden_mode", item.BitwardenVaultId is not null);
             writer.WriteBoolean("keepass_mode", item.KeepassDatabaseId is not null);
+            WriteOptionalUnixMilliseconds(writer, "deleted_at", item.DeletedAt);
             if (attachments is not null)
             {
                 writer.WritePropertyName("attachments");
@@ -202,10 +224,12 @@ public static class AndroidMdbxPayloadCodec
                 ItemType = itemType.Value,
                 Title = recordTitle ?? "",
                 Notes = GetString(root, "notes"),
+                SortOrder = checked((int)(GetInt64(root, "sort_order", "sortOrder") ?? 0)),
                 ItemData = GetString(root, "item_data", "itemData"),
                 ImagePaths = GetPreferredString(root, "image_paths", "imagePaths", "[]"),
                 CategoryId = GetInt64(root, "category_id", "categoryId"),
                 MdbxFolderId = NormalizeMdbxFolderId(GetNullableString(root, "mdbx_folder_id", "mdbxFolderId")),
+                ReplicaGroupId = NormalizeOptionalText(GetNullableString(root, "monica_entry_id", "monicaEntryId")),
                 DeletedAt = GetDateTimeOffset(root, "deleted_at", "deletedAt")
             };
 
@@ -323,40 +347,47 @@ public static class AndroidMdbxPayloadCodec
             ? null
             : value.Trim();
 
-    private static void WriteMdbxFolderId(Utf8JsonWriter writer, string? value) =>
-        WriteNullableString(writer, "mdbx_folder_id", NormalizeMdbxFolderId(value));
+    private static string? NormalizeOptionalText(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private static void WriteNullableString(Utf8JsonWriter writer, string propertyName, string? value)
+    /// <summary>
+    /// Mirrors Android's readMdbxSshKeyData: an absent key means "leave the local value alone",
+    /// an explicit empty string clears it, and object-valued producers are kept as raw JSON text.
+    /// </summary>
+    private static string GetMdbxSshKeyData(JsonElement root, string existing = "")
     {
-        if (value is null)
+        if (!TryGetProperty(root, out var value, "ssh_key_data", "sshKeyData") || value.ValueKind == JsonValueKind.Null)
         {
-            writer.WriteNull(propertyName);
+            return existing;
         }
-        else
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString() ?? "",
+            JsonValueKind.Object or JsonValueKind.Array => value.GetRawText(),
+            _ => existing
+        };
+    }
+
+    private static void WriteOptionalString(Utf8JsonWriter writer, string propertyName, string? value)
+    {
+        if (value is not null)
         {
             writer.WriteString(propertyName, value);
         }
     }
 
-    private static void WriteNullableNumber(Utf8JsonWriter writer, string propertyName, long? value)
+    private static void WriteOptionalNumber(Utf8JsonWriter writer, string propertyName, long? value)
     {
-        if (value is null)
-        {
-            writer.WriteNull(propertyName);
-        }
-        else
+        if (value is not null)
         {
             writer.WriteNumber(propertyName, value.Value);
         }
     }
 
-    private static void WriteNullableUnixMilliseconds(Utf8JsonWriter writer, string propertyName, DateTimeOffset? value)
+    private static void WriteOptionalUnixMilliseconds(Utf8JsonWriter writer, string propertyName, DateTimeOffset? value)
     {
-        if (value is null)
-        {
-            writer.WriteNull(propertyName);
-        }
-        else
+        if (value is not null)
         {
             writer.WriteNumber(propertyName, value.Value.ToUnixTimeMilliseconds());
         }

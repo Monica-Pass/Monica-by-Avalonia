@@ -126,6 +126,13 @@ public sealed class MdbxUniffiNativeBridge : IMdbxNativeBridge
 
     private sealed class MdbxUniffiNativeVault(MdbxVault vault) : IMdbxNativeVault, IDisposable
     {
+        // Android labels every entry write with this operation kind and it lands in the commit rows.
+        private const string EntryWriteOperationKind = "monica-upsert-entries";
+
+        // Android's own labels for the two project writes; the engine stores them verbatim.
+        private const string RootProjectOperationKind = "monica-initialize";
+        private const string FolderOperationKind = "monica-create-folder";
+
         public Task<MdbxNativeVaultInfo> GetInfoAsync(CancellationToken cancellationToken = default) =>
             RunBlockingNativeAsync(() =>
             {
@@ -135,6 +142,27 @@ public sealed class MdbxUniffiNativeBridge : IMdbxNativeBridge
 
         public Task<MdbxNativeProjectRecord> CreateProjectAsync(string title, CancellationToken cancellationToken = default) =>
             RunBlockingNativeAsync(() => ToProject(vault.CreateProject(title)), cancellationToken);
+
+        public Task<MdbxNativeProjectRecord> CreateProjectWithIdentityAsync(
+            string projectId,
+            string title,
+            string? parentProjectId,
+            CancellationToken cancellationToken = default) =>
+            RunBlockingNativeAsync(
+                () =>
+                {
+                    // Root projects are unparented and folders hang off the root, each under the label
+                    // Android uses for that command.
+                    var command = parentProjectId is null
+                        ? (MdbxWriteCommand)new MdbxWriteCommand.CreateProject(projectId, title)
+                        : new MdbxWriteCommand.CreateProjectWithParent(projectId, title, parentProjectId);
+                    vault.ExecuteWriteOperation(
+                        Guid.NewGuid().ToString(),
+                        parentProjectId is null ? RootProjectOperationKind : FolderOperationKind,
+                        [command]);
+                    return new MdbxNativeProjectRecord(projectId, title);
+                },
+                cancellationToken);
 
         public Task<IReadOnlyList<MdbxNativeProjectRecord>> ListProjectsAsync(CancellationToken cancellationToken = default) =>
             RunBlockingNativeAsync<IReadOnlyList<MdbxNativeProjectRecord>>(
@@ -161,7 +189,14 @@ public sealed class MdbxUniffiNativeBridge : IMdbxNativeBridge
             string payloadJson,
             CancellationToken cancellationToken = default) =>
             RunBlockingNativeAsync(
-                () => ToEntry(vault.CreateEntry(projectId, entryType, title, payloadJson)),
+                () =>
+                {
+                    // The command surface assigns nothing on its own, so the client picks the id the
+                    // way Android does instead of letting create_entry invent one.
+                    var entryId = Guid.NewGuid().ToString();
+                    Execute(new MdbxWriteCommand.CreateEntry(entryId, projectId, entryType, title, payloadJson));
+                    return new MdbxNativeEntryRecord(entryId, projectId, entryType, title, payloadJson, Deleted: false);
+                },
                 cancellationToken);
 
         public Task<IReadOnlyList<MdbxNativeEntryRecord>> ListEntriesAsync(
@@ -188,8 +223,22 @@ public sealed class MdbxUniffiNativeBridge : IMdbxNativeBridge
             string payloadJson,
             CancellationToken cancellationToken = default) =>
             RunBlockingNativeAsync(
-                () => ToEntry(vault.UpdateEntry(projectId, entryId, entryType, title, payloadJson)),
+                () =>
+                {
+                    Execute(new MdbxWriteCommand.UpdateEntry(entryId, projectId, entryType, title, payloadJson));
+                    return new MdbxNativeEntryRecord(entryId, projectId, entryType, title, payloadJson, Deleted: false);
+                },
                 cancellationToken);
+
+        /// <summary>
+        /// Entry writes go through execute_write_operation, not create_entry/update_entry. Those two
+        /// parse the type as a legacy-only enum and reject everything else, which is how Android's
+        /// billing-address and payment-account entries — and the desktop entries that must keep those
+        /// names to stay visible on Android — become unwritable. Android writes through this same
+        /// surface, so the commit's operation kind has to match its string too.
+        /// </summary>
+        private void Execute(MdbxWriteCommand command) =>
+            vault.ExecuteWriteOperation(Guid.NewGuid().ToString(), EntryWriteOperationKind, [command]);
 
         public Task<MdbxNativeEntryRecord> MoveEntryAsync(
             string projectId,

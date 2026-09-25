@@ -58,10 +58,27 @@ public sealed partial class MdbxVaultStore(
     ICryptoService? cryptoService = null,
     IVaultSessionService? vaultSessionService = null) : IMdbxVaultStore, IDisposable
 {
+    /// <summary>
+    /// Read-side exclusion only: desktop builds predating the root project kept uncategorized entries
+    /// in a project of this name. New writes go to <see cref="MdbxAndroidRoot"/>.
+    /// </summary>
     private const string DefaultProjectTitle = "Monica";
     private const string DeviceId = "monica-avalonia";
-    private static readonly string[] PasswordEntryTypes = ["login", "ssh-key"];
-    private static readonly string[] SecureEntryTypes = ["note", "totp", "card", "document-ref", "identity"];
+    /// <summary>
+    /// Types to look for when reading a password record. "login" is what Android writes for every
+    /// password — including SSH keys, which live in the payload's login_type — while "ssh-key" is
+    /// only kept so vaults written by earlier desktop builds stay readable.
+    /// </summary>
+    private static readonly string[] PasswordEntryTypes = [PasswordEntryType, "ssh-key"];
+
+    /// <summary>
+    /// Types to look for when reading a secure item. The names Android writes come first;
+    /// "identity" is retained purely to read vaults an earlier desktop build authored.
+    /// </summary>
+    private static readonly string[] SecureEntryTypes =
+    [
+        "note", "totp", "card", "document-ref", "billing-address", "payment-account", "identity"
+    ];
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -81,9 +98,10 @@ public sealed partial class MdbxVaultStore(
         var vault = await OpenAsync(database, cancellationToken);
         using var _ = vault;
         var projects = await EnsureProjectsForReadAsync(vault, cancellationToken);
+        var rootProjectId = await RootProjectIdAsync(vault, cancellationToken);
         var categories = new List<Category>();
         foreach (var project in projects
-                     .Where(project => !string.Equals(project.Title, DefaultProjectTitle, StringComparison.OrdinalIgnoreCase))
+                     .Where(project => !IsHiddenProject(project, rootProjectId))
                      .OrderBy(project => project.Title, StringComparer.OrdinalIgnoreCase))
         {
             categories.Add(new Category
@@ -145,7 +163,7 @@ public sealed partial class MdbxVaultStore(
         var vault = await OpenAsync(database, cancellationToken);
         using var _ = vault;
         var project = await ResolveProjectAsync(vault, entry.CategoryId, categories, cancellationToken);
-        var entryType = ToMdbxEntryType(entry);
+        var entryType = PasswordEntryType;
         var portableEntry = ClonePasswordEntryForPayload(entry);
         portableEntry.Password = ToPortableSensitiveValue(portableEntry.Password);
         portableEntry.AuthenticatorKey = ToPortableSensitiveValue(portableEntry.AuthenticatorKey);
@@ -167,6 +185,7 @@ public sealed partial class MdbxVaultStore(
         var payload = AndroidMdbxPayloadCodec.EncodePassword(
             portableEntry,
             portableFields,
+            await PayloadFolderIdAsync(vault, project, cancellationToken),
             boundNoteEntryId,
             portableHistory,
             NormalizeAttachments(entry.Id, attachments).ToList());
@@ -543,6 +562,7 @@ public sealed partial class MdbxVaultStore(
         var boundPasswordEntryId = await ResolvePasswordEntryIdAsync(vault, item.BoundPasswordId, cancellationToken);
         var payload = AndroidMdbxPayloadCodec.EncodeSecureItem(
             portableItem,
+            await PayloadFolderIdAsync(vault, project, cancellationToken),
             boundPasswordEntryId,
             NormalizeSecureItemAttachments(item.Id, DecodeSecureItemImagePaths(item)).ToList());
         var record = await SaveEntryAsync(vault, project.ProjectId, item.MdbxFolderId, SecureEntryTypes, entryType, item.Title, payload, cancellationToken);
@@ -564,10 +584,10 @@ public sealed partial class MdbxVaultStore(
         var categoryByProjectId = BuildCategoryByProjectId(categories, projects);
         var records = itemType is null
             ? await ListSecureRecordsAsync(vault, projects, includeDeleted, cancellationToken)
-            : await ListSecureRecordsAsync(vault, projects, [ToMdbxEntryType(itemType.Value)], includeDeleted, cancellationToken);
+            : await ListSecureRecordsAsync(vault, projects, SecureReadEntryTypes(itemType.Value), includeDeleted, cancellationToken);
         var payloads = records
             .Select(record => (Record: record, Payload: DeserializeSecureItemPayloadSnapshot(record.PayloadJson, record.Title, record.EntryType)))
-            .Where(item => item.Payload is not null)
+            .Where(item => item.Payload is not null && (itemType is null || item.Payload!.Item.ItemType == itemType))
             .ToList();
         IReadOnlyDictionary<string, long> passwordIdByEntryId = payloads.Any(item => item.Payload!.BoundPasswordEntryId is { Length: > 0 })
             ? await BuildPasswordIdByEntryIdAsync(vault, projects, cancellationToken)
@@ -714,10 +734,11 @@ public sealed partial class MdbxVaultStore(
             payload.Entry.CategoryId = null;
             payload.Entry.MdbxDatabaseId = database.Id;
             payload.Entry.MdbxFolderId = record.EntryId;
-            var entryType = ToMdbxEntryType(payload.Entry);
+            var entryType = PasswordEntryType;
             var payloadJson = AndroidMdbxPayloadCodec.EncodePassword(
                 ClonePasswordEntryForPayload(payload.Entry),
                 payload.CustomFields ?? [],
+                folderId: null,
                 payload.BoundNoteEntryId,
                 payload.PasswordHistory,
                 payload.Attachments);
@@ -744,6 +765,7 @@ public sealed partial class MdbxVaultStore(
             var entryType = ToMdbxEntryType(item.ItemType);
             var payloadJson = AndroidMdbxPayloadCodec.EncodeSecureItem(
                 CloneSecureItemForPayload(item),
+                folderId: null,
                 securePayload.BoundPasswordEntryId,
                 NormalizeSecureItemAttachments(item.Id, DecodeSecureItemImagePaths(item)).ToList());
             if (!string.Equals(record.ProjectId, defaultProject.ProjectId, StringComparison.OrdinalIgnoreCase))
@@ -845,31 +867,65 @@ public sealed partial class MdbxVaultStore(
         var projects = await vault.ListProjectsAsync(cancellationToken);
         foreach (var project in projects)
         {
-            foreach (var entryType in entryTypes)
+            var records = (await vault.ListEntriesAsync(project.ProjectId, entryType: null, cancellationToken))
+                .Where(record => entryTypes.Contains(record.EntryType, StringComparer.OrdinalIgnoreCase))
+                .ToList();
+            foreach (var record in records)
             {
-                var records = await vault.ListEntriesAsync(project.ProjectId, entryType, cancellationToken);
-                foreach (var record in records)
+                if (deleteAttachments)
                 {
-                    if (deleteAttachments)
+                    var attachments = await vault.ListAttachmentsAsync(project.ProjectId, record.EntryId, cancellationToken);
+                    foreach (var attachment in attachments)
                     {
-                        var attachments = await vault.ListAttachmentsAsync(project.ProjectId, record.EntryId, cancellationToken);
-                        foreach (var attachment in attachments)
-                        {
-                            await vault.DeleteAttachmentAsync(attachment.AttachmentId, cancellationToken);
-                        }
+                        await vault.DeleteAttachmentAsync(attachment.AttachmentId, cancellationToken);
                     }
-
-                    await vault.DeleteEntryAsync(project.ProjectId, record.EntryId, cancellationToken);
                 }
+
+                await vault.DeleteEntryAsync(project.ProjectId, record.EntryId, cancellationToken);
             }
         }
     }
 
+    private static async Task<MdbxNativeProjectRecord> EnsureDefaultProjectAsync(IMdbxNativeVault vault, CancellationToken cancellationToken) =>
+        await EnsureRootProjectAsync(vault, cancellationToken);
 
-    private static async Task<MdbxNativeProjectRecord> EnsureDefaultProjectAsync(IMdbxNativeVault vault, CancellationToken cancellationToken)
+    /// <summary>
+    /// Android writes every folder-less entry into a project whose id it derives from the vault id, and
+    /// the engine rejects such a write outright when that project is absent (measured: Storage error).
+    /// So the desktop has to materialize the same project rather than keep its own private default.
+    /// </summary>
+    private static async Task<MdbxNativeProjectRecord> EnsureRootProjectAsync(IMdbxNativeVault vault, CancellationToken cancellationToken)
     {
-        return await EnsureProjectAsync(vault, null, DefaultProjectTitle, cancellationToken);
+        var rootProjectId = await RootProjectIdAsync(vault, cancellationToken);
+        var projects = await vault.ListProjectsAsync(cancellationToken);
+        return projects.FirstOrDefault(project => string.Equals(project.ProjectId, rootProjectId, StringComparison.OrdinalIgnoreCase))
+            ?? await vault.CreateProjectWithIdentityAsync(rootProjectId, MdbxAndroidRoot.Title, parentProjectId: null, cancellationToken);
     }
+
+    private static async Task<string> RootProjectIdAsync(IMdbxNativeVault vault, CancellationToken cancellationToken) =>
+        MdbxAndroidRoot.ProjectIdFor((await vault.GetInfoAsync(cancellationToken)).VaultId);
+
+    /// <summary>
+    /// Android's root project and the desktop's pre-root default are storage detail rather than user
+    /// folders, so neither is offered as a category. Entries filed inside them still load.
+    /// </summary>
+    private static bool IsHiddenProject(MdbxNativeProjectRecord project, string rootProjectId) =>
+        MdbxAndroidRoot.IsRootTitle(project.Title)
+        || string.Equals(project.ProjectId, rootProjectId, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(project.Title, DefaultProjectTitle, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The folder id Android stores inside the payload. It omits the key for entries that sit in the
+    /// root project, and the native project id is what Android's own folder resolution reads, so the
+    /// entry's record id must never be substituted here.
+    /// </summary>
+    private static async Task<string?> PayloadFolderIdAsync(
+        IMdbxNativeVault vault,
+        MdbxNativeProjectRecord project,
+        CancellationToken cancellationToken) =>
+        string.Equals(project.ProjectId, await RootProjectIdAsync(vault, cancellationToken), StringComparison.OrdinalIgnoreCase)
+            ? null
+            : project.ProjectId;
 
     private static async Task<MdbxNativeProjectRecord> EnsureProjectAsync(IMdbxNativeVault vault, string? projectId, string title, CancellationToken cancellationToken)
     {
@@ -883,35 +939,36 @@ public sealed partial class MdbxVaultStore(
             }
         }
 
-        var normalizedTitle = string.IsNullOrWhiteSpace(title) ? DefaultProjectTitle : title.Trim();
-        return projects.FirstOrDefault(project => string.Equals(project.Title, normalizedTitle, StringComparison.OrdinalIgnoreCase))
-            ?? await vault.CreateProjectAsync(normalizedTitle, cancellationToken);
+        var normalizedTitle = string.IsNullOrWhiteSpace(title) ? MdbxAndroidRoot.Title : title.Trim();
+        var existingByTitle = projects.FirstOrDefault(project => string.Equals(project.Title, normalizedTitle, StringComparison.OrdinalIgnoreCase));
+        if (existingByTitle is not null)
+        {
+            return existingByTitle;
+        }
+
+        // Android files every folder under the root project; a folder created beside the root rather
+        // than beneath it would show up in the other client's tree at the wrong depth.
+        var root = await EnsureRootProjectAsync(vault, cancellationToken);
+        return await vault.CreateProjectWithIdentityAsync(
+            Guid.NewGuid().ToString(),
+            normalizedTitle,
+            root.ProjectId,
+            cancellationToken);
     }
 
     private static async Task<IReadOnlyList<MdbxNativeProjectRecord>> EnsureProjectsForReadAsync(IMdbxNativeVault vault, CancellationToken cancellationToken)
     {
-        var projects = (await vault.ListProjectsAsync(cancellationToken)).ToList();
-        if (projects.Any(project => string.Equals(project.Title, DefaultProjectTitle, StringComparison.OrdinalIgnoreCase)))
-        {
-            return projects;
-        }
-
-        projects.Add(await vault.CreateProjectAsync(DefaultProjectTitle, cancellationToken));
-        return projects;
+        await EnsureRootProjectAsync(vault, cancellationToken);
+        return await vault.ListProjectsAsync(cancellationToken);
     }
 
     private static async Task<bool> HasBusinessEntriesAsync(IMdbxNativeVault vault, string projectId, CancellationToken cancellationToken)
     {
-        foreach (var entryType in PasswordEntryTypes.Concat(SecureEntryTypes))
-        {
-            if ((await vault.ListEntriesAsync(projectId, entryType, cancellationToken)).Count > 0 ||
-                (await vault.ListDeletedEntriesAsync(projectId, entryType, cancellationToken)).Count > 0)
-            {
-                return true;
-            }
-        }
-
-        return false;
+        var recognisedTypes = PasswordEntryTypes.Concat(SecureEntryTypes).ToList();
+        return (await vault.ListEntriesAsync(projectId, entryType: null, cancellationToken))
+                .Any(entry => recognisedTypes.Contains(entry.EntryType, StringComparer.OrdinalIgnoreCase)) ||
+            (await vault.ListDeletedEntriesAsync(projectId, entryType: null, cancellationToken))
+            .Any(entry => recognisedTypes.Contains(entry.EntryType, StringComparer.OrdinalIgnoreCase));
     }
 
     private static async Task<MdbxNativeProjectRecord> ResolveProjectAsync(
@@ -972,23 +1029,24 @@ public sealed partial class MdbxVaultStore(
         var projects = await EnsureProjectsForReadAsync(vault, cancellationToken);
         foreach (var project in projects)
         {
-            foreach (var entryType in entryTypes)
+            var active = await vault.ListEntriesAsync(project.ProjectId, entryType: null, cancellationToken);
+            var match = active.FirstOrDefault(entry =>
+                entryTypes.Contains(entry.EntryType, StringComparer.OrdinalIgnoreCase) &&
+                string.Equals(entry.EntryId, entryId, StringComparison.OrdinalIgnoreCase));
+            if (match is not null)
             {
-                var active = await vault.ListEntriesAsync(project.ProjectId, entryType, cancellationToken);
-                var match = active.FirstOrDefault(entry => string.Equals(entry.EntryId, entryId, StringComparison.OrdinalIgnoreCase));
+                return match;
+            }
+
+            if (includeDeleted)
+            {
+                var deleted = await vault.ListDeletedEntriesAsync(project.ProjectId, entryType: null, cancellationToken);
+                match = deleted.FirstOrDefault(entry =>
+                    entryTypes.Contains(entry.EntryType, StringComparer.OrdinalIgnoreCase) &&
+                    string.Equals(entry.EntryId, entryId, StringComparison.OrdinalIgnoreCase));
                 if (match is not null)
                 {
                     return match;
-                }
-
-                if (includeDeleted)
-                {
-                    var deleted = await vault.ListDeletedEntriesAsync(project.ProjectId, entryType, cancellationToken);
-                    match = deleted.FirstOrDefault(entry => string.Equals(entry.EntryId, entryId, StringComparison.OrdinalIgnoreCase));
-                    if (match is not null)
-                    {
-                        return match;
-                    }
                 }
             }
         }
@@ -1037,6 +1095,11 @@ public sealed partial class MdbxVaultStore(
         return await ListRecordsAsync(vault, projects, entryTypes, includeDeleted, cancellationToken);
     }
 
+    /// <summary>
+    /// Lists every entry of a project once and narrows by type in memory. The native list_entries
+    /// call rejects a type name outside the legacy set, so scanning "billing-address" directly would
+    /// fail the whole read — and Android's vaults are full of those entries.
+    /// </summary>
     private static async Task<IReadOnlyList<MdbxNativeEntryRecord>> ListRecordsAsync(
         IMdbxNativeVault vault,
         IReadOnlyList<MdbxNativeProjectRecord> projects,
@@ -1047,13 +1110,12 @@ public sealed partial class MdbxVaultStore(
         var records = new List<MdbxNativeEntryRecord>();
         foreach (var project in projects)
         {
-            foreach (var entryType in entryTypes)
+            records.AddRange((await vault.ListEntriesAsync(project.ProjectId, entryType: null, cancellationToken))
+                .Where(entry => entryTypes.Contains(entry.EntryType, StringComparer.OrdinalIgnoreCase)));
+            if (includeDeleted)
             {
-                records.AddRange(await vault.ListEntriesAsync(project.ProjectId, entryType, cancellationToken));
-                if (includeDeleted)
-                {
-                    records.AddRange(await vault.ListDeletedEntriesAsync(project.ProjectId, entryType, cancellationToken));
-                }
+                records.AddRange((await vault.ListDeletedEntriesAsync(project.ProjectId, entryType: null, cancellationToken))
+                    .Where(entry => entryTypes.Contains(entry.EntryType, StringComparer.OrdinalIgnoreCase)));
             }
         }
 
@@ -1176,6 +1238,9 @@ public sealed partial class MdbxVaultStore(
     {
         var clone = JsonSerializer.Deserialize<PasswordEntry>(JsonSerializer.Serialize(entry, JsonOptions), JsonOptions) ?? new PasswordEntry();
         clone.MdbxDatabaseId = null;
+        // MdbxFolderId carries this client's native record id; the payload's folder key is
+        // supplied separately so the two namespaces can never be confused again.
+        clone.MdbxFolderId = null;
         return clone;
     }
 
@@ -1183,6 +1248,7 @@ public sealed partial class MdbxVaultStore(
     {
         var clone = JsonSerializer.Deserialize<SecureItem>(JsonSerializer.Serialize(item, JsonOptions), JsonOptions) ?? new SecureItem();
         clone.MdbxDatabaseId = null;
+        clone.MdbxFolderId = null;
         return clone;
     }
 
@@ -1370,18 +1436,35 @@ public sealed partial class MdbxVaultStore(
             })
             .ToList();
 
-    private static string ToMdbxEntryType(PasswordEntry entry) =>
-        entry.LoginType == PasswordLoginType.SshKey ? "ssh-key" : "login";
+    /// <summary>
+    /// Android writes every password as a "login" entry and keeps the SSH-key distinction in the
+    /// payload's login_type, because its importer only reads entryType == "login".
+    /// </summary>
+    private const string PasswordEntryType = "login";
 
+    /// <summary>
+    /// Must match Android's secureItemPrefix: it imports only these native types, and the engine
+    /// stores billing-address/payment-account as legal custom object type ids.
+    /// </summary>
     private static string ToMdbxEntryType(VaultItemType itemType) => itemType switch
     {
         VaultItemType.Totp => "totp",
         VaultItemType.BankCard => "card",
         VaultItemType.Document => "document-ref",
-        // MDBX accepts nine entry types only and billing-address/payment-account are not among
-        // them; the payload "kind" still carries the exact Android kind string.
-        VaultItemType.BillingAddress or VaultItemType.PaymentAccount => "identity",
+        VaultItemType.BillingAddress => "billing-address",
+        VaultItemType.PaymentAccount => "payment-account",
         _ => "note"
+    };
+
+    /// <summary>
+    /// Native types to scan for one requested item type. Earlier desktop builds filed both wallet
+    /// kinds under "identity", so that legacy name stays in the scan set and the payload's own kind
+    /// decides which of the two a record really is.
+    /// </summary>
+    private static IReadOnlyList<string> SecureReadEntryTypes(VaultItemType itemType) => itemType switch
+    {
+        VaultItemType.BillingAddress or VaultItemType.PaymentAccount => [ToMdbxEntryType(itemType), "identity"],
+        _ => [ToMdbxEntryType(itemType)]
     };
 
     private static IReadOnlyList<string> DecodeSecureItemImagePaths(SecureItem item) => item.ItemType switch

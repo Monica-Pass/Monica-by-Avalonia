@@ -106,7 +106,7 @@ public sealed class AndroidMdbxPayloadCodecTests
             new() { EntryId = 42, Title = "Protected", Value = "value", IsProtected = true, SortOrder = 4 }
         ];
 
-        using var document = JsonDocument.Parse(AndroidMdbxPayloadCodec.EncodePassword(entry, fields, "note:84"));
+        using var document = JsonDocument.Parse(AndroidMdbxPayloadCodec.EncodePassword(entry, fields, "folder-77", "note:84"));
         var root = document.RootElement;
 
         Assert.Equal("password", root.GetProperty("kind").GetString());
@@ -129,7 +129,8 @@ public sealed class AndroidMdbxPayloadCodecTests
     {
         using var document = JsonDocument.Parse(AndroidMdbxPayloadCodec.EncodePassword(
             new PasswordEntry { Id = 42, Title = "Active" },
-            []));
+            [],
+            folderId: null));
 
         Assert.False(document.RootElement.TryGetProperty("is_archived", out _));
         Assert.False(document.RootElement.TryGetProperty("archived_at", out _));
@@ -141,7 +142,7 @@ public sealed class AndroidMdbxPayloadCodecTests
         var archivedAt = new DateTimeOffset(2026, 5, 4, 3, 2, 1, TimeSpan.Zero);
         var entry = new PasswordEntry { Id = 42, Title = "Archived", IsArchived = true, ArchivedAt = archivedAt };
 
-        var payload = AndroidMdbxPayloadCodec.EncodePassword(entry, []);
+        var payload = AndroidMdbxPayloadCodec.EncodePassword(entry, [], folderId: null);
         using var document = JsonDocument.Parse(payload);
         Assert.True(document.RootElement.GetProperty("is_archived").GetBoolean());
         Assert.Equal(archivedAt.ToUnixTimeMilliseconds(), document.RootElement.GetProperty("archived_at").GetInt64());
@@ -197,7 +198,7 @@ public sealed class AndroidMdbxPayloadCodecTests
             KeepassDatabaseId = 2
         };
 
-        using var document = JsonDocument.Parse(AndroidMdbxPayloadCodec.EncodeSecureItem(item, "login:42"));
+        using var document = JsonDocument.Parse(AndroidMdbxPayloadCodec.EncodeSecureItem(item, "folder-103", "login:42"));
         var root = document.RootElement;
 
         Assert.Equal("bank_card", root.GetProperty("kind").GetString());
@@ -209,6 +210,87 @@ public sealed class AndroidMdbxPayloadCodecTests
         Assert.False(root.TryGetProperty("data", out _));
         Assert.False(root.TryGetProperty("schemaVersion", out _));
         Assert.False(root.TryGetProperty("title", out _));
+    }
+
+    [Fact]
+    public void Encode_password_emits_every_key_android_writes()
+    {
+        // Verbatim key list from Monica Android's Mdbx2Repository.passwordMutation. A missing key
+        // is either dropped or kept stale when the entry travels back to Android.
+        string[] androidKeys =
+        [
+            "kind", "monica_entry_id", "room_id", "website", "username", "app_package_name",
+            "app_name", "password_plain", "notes", "sort_order", "category_id", "mdbx_folder_id",
+            "bound_note_room_id", "bound_note_entry_id", "login_type", "ssh_key_data",
+            "authenticator_key", "passkey_bindings", "custom_fields", "bitwarden_mode", "keepass_mode"
+        ];
+        var entry = new PasswordEntry
+        {
+            Id = 42,
+            Website = "https://example.test",
+            Username = "fixture-user",
+            Password = "portable-secret",
+            SortOrder = 5,
+            CategoryId = 7,
+            MdbxFolderId = "folder-77",
+            ReplicaGroupId = "login:42",
+            BoundNoteId = 84,
+            SshKeyData = "fixture-ssh-public-key-material",
+            AuthenticatorKey = "portable-authenticator",
+            PasskeyBindings = "[]"
+        };
+
+        using var document = JsonDocument.Parse(
+            AndroidMdbxPayloadCodec.EncodePassword(entry, [], "folder-77", "note:84"));
+        var produced = document.RootElement.EnumerateObject().Select(property => property.Name).ToArray();
+
+        // deleted_at and the archive fields are Avalonia-only extensions; Android ignores unknown keys.
+        Assert.Empty(produced.Except(androidKeys.Concat(["password_history", "attachments", "deleted_at"])));
+        foreach (var key in androidKeys)
+        {
+            Assert.Contains(key, produced);
+        }
+    }
+
+    [Fact]
+    public void Decode_password_keeps_android_identity_and_ordering_fields()
+    {
+        const string json =
+            """
+            {
+              "kind": "password",
+              "monica_entry_id": "login:42",
+              "room_id": 42,
+              "sort_order": 5,
+              "ssh_key_data": "fixture-ssh-private-key-material",
+              "password_plain": "portable-secret"
+            }
+            """;
+
+        var decoded = AndroidMdbxPayloadCodec.DecodePassword(json, "Android login");
+
+        Assert.NotNull(decoded);
+        Assert.Equal(5, decoded.Entry.SortOrder);
+        Assert.Equal("fixture-ssh-private-key-material", decoded.Entry.SshKeyData);
+        Assert.Equal("login:42", decoded.Entry.ReplicaGroupId);
+
+        using var roundTrip = JsonDocument.Parse(AndroidMdbxPayloadCodec.EncodePassword(decoded.Entry, decoded.CustomFields, folderId: null));
+        Assert.Equal("login:42", roundTrip.RootElement.GetProperty("monica_entry_id").GetString());
+        Assert.Equal(5, roundTrip.RootElement.GetProperty("sort_order").GetInt32());
+        Assert.Equal(
+            "fixture-ssh-private-key-material",
+            roundTrip.RootElement.GetProperty("ssh_key_data").GetString());
+    }
+
+    [Fact]
+    public void Encode_password_does_not_write_an_empty_ssh_key_android_would_read_as_a_clear()
+    {
+        using var document = JsonDocument.Parse(AndroidMdbxPayloadCodec.EncodePassword(
+            new PasswordEntry { Id = 42, SshKeyData = "" },
+            [],
+            folderId: null));
+
+        Assert.False(document.RootElement.TryGetProperty("ssh_key_data", out _));
     }
 
     private static string ReadFixture(string fileName) =>

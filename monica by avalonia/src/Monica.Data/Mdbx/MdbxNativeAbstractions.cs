@@ -21,6 +21,19 @@ public interface IMdbxNativeVault : IDisposable
 {
     Task<MdbxNativeVaultInfo> GetInfoAsync(CancellationToken cancellationToken = default);
     Task<MdbxNativeProjectRecord> CreateProjectAsync(string title, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a project whose id is chosen by the caller and, where a parent is given, files it under
+    /// that parent. Android creates its root and every folder this way; the plain CreateProjectAsync
+    /// leaves the id to the engine and never sets a parent, so the other client cannot address the
+    /// result by the id it expects.
+    /// </summary>
+    Task<MdbxNativeProjectRecord> CreateProjectWithIdentityAsync(
+        string projectId,
+        string title,
+        string? parentProjectId,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<MdbxNativeProjectRecord>> ListProjectsAsync(CancellationToken cancellationToken = default);
     Task<MdbxNativeEntryRecord> CreateEntryAsync(string projectId, string entryType, string title, string payloadJson, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<MdbxNativeEntryRecord>> ListEntriesAsync(string projectId, string? entryType = null, CancellationToken cancellationToken = default);
