@@ -117,6 +117,57 @@ public sealed class BitwardenMutationHttpTransportTests
         Assert.Null(handler.Requests[1].Body);
     }
 
+    // A recycle-bin restore is decided by its route, like a trash is. The difference is the answer: the
+    // server hands back the revived cipher, and the revision in it is what tells the following pull that
+    // the local row and the remote copy are the same state rather than a change to back up.
+    [Fact]
+    public async Task Restore_WritesNoBodyButReadsTheRevivedCipherRevision()
+    {
+        var handler = new CaptureHandler(request => request.Method == HttpMethod.Get
+            ? Json(HttpStatusCode.OK, new { Id = "cipher-id", RevisionDate = "rev-1" })
+            : Json(HttpStatusCode.OK, new
+            {
+                Id = "cipher-id",
+                RevisionDate = "rev-2",
+                DeletedDate = (string?)null
+            }));
+        using var transport = CreateTransport(handler);
+
+        var response = await transport.SendAsync(Request(
+            BitwardenMutationOperationType.Restore,
+            "cipher-id",
+            "rev-1"));
+
+        Assert.True(response.Succeeded);
+        Assert.Equal("rev-2", response.RemoteRevision);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Equal(HttpMethod.Put, handler.Requests[1].Method);
+        Assert.Equal("https://api.example.test/ciphers/cipher-id/restore", handler.Requests[1].Uri.AbsoluteUri);
+        Assert.Null(handler.Requests[1].Body);
+    }
+
+    [Fact]
+    public async Task Restore_StopsWhenRemoteRevisionChanged()
+    {
+        var handler = new CaptureHandler(_ => Json(HttpStatusCode.OK, new
+        {
+            Id = "cipher-id",
+            RevisionDate = "remote-rev"
+        }));
+        using var transport = CreateTransport(handler);
+
+        var response = await transport.SendAsync(Request(
+            BitwardenMutationOperationType.Restore,
+            "cipher-id",
+            "expected-rev"));
+
+        Assert.False(response.Succeeded);
+        Assert.Equal((int)HttpStatusCode.Conflict, response.HttpStatusCode);
+        // The guard is the whole point: a restore that would revive a cipher another client already
+        // changed has to stop before the route is written.
+        Assert.Single(handler.Requests);
+    }
+
     [Fact]
     public async Task RateLimitResponse_ExposesRetryAfterWithoutErrorBodySecrets()
     {

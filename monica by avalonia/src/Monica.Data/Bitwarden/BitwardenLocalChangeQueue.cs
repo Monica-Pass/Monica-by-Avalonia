@@ -26,7 +26,9 @@ public interface IBitwardenLocalChangeQueue
 /// and it is queued as a create so the next pull cannot mistake it for a resurrected cipher. The third
 /// kind is a trashed entry the server still holds live: the pull treats that difference as a local edit
 /// it is about to overwrite, so without a queued delete every synchronization hands the entry back and
-/// leaves another conflict backup behind.
+/// leaves another conflict backup behind. The fourth is that pair reversed - the entry restored here
+/// while the server keeps it in its trash - and it needs its own route, because an update is accepted for
+/// a trashed cipher without clearing the deletion, which leaves the pull to re-trash the row again.
 /// </summary>
 public sealed class BitwardenLocalChangeQueue(
     IMonicaRepository repository,
@@ -47,16 +49,25 @@ public sealed class BitwardenLocalChangeQueue(
         {
             cancellationToken.ThrowIfCancellationRequested();
             var isNew = candidate.CipherId is null;
+            var syncedHash = isNew ? null : baseline.GetValueOrDefault(candidate.CipherId!);
+            // The baseline carries the server's marker, not content, for a cipher it is only keeping in its
+            // trash, and a row we trashed too is therefore settled however the hashes differ; without this
+            // a quiet vault owed one delete per synchronization.
+            var heldInRemoteTrash = syncedHash is not null &&
+                                    BitwardenPayloadFingerprint.IsRemoteDeletionMarker(syncedHash);
+            // The entry came out of Monica's recycle bin while the last completed synchronization left the
+            // server holding it in its own. Only a restore reconciles the two: a plain update is accepted
+            // for a trashed cipher but does not clear the deletion, so every following pull would put the
+            // row back in the trash and back up a change nobody made.
+            var restoring = heldInRemoteTrash && !candidate.Deleted;
             // An entry with no baseline is one the remote snapshot did not confirm, so uploading it
             // would resurrect a cipher the server no longer has; only tracked identities may drift.
             // An entry with no identity at all is the other case: it was published here and the
             // server has never seen it, so the remote snapshot cannot speak for it either way.
-            if (!isNew && (!baseline.TryGetValue(candidate.CipherId!, out var syncedHash) ||
-                           string.Equals(syncedHash, candidate.PayloadHash, StringComparison.Ordinal) ||
-                           // The baseline carries the server's marker, not content, for a cipher it is only
-                           // keeping in its trash. A row we trashed too is therefore settled, however the
-                           // hashes differ; without this a quiet vault owed one delete per synchronization.
-                           (candidate.Deleted && BitwardenPayloadFingerprint.IsRemoteDeletionMarker(syncedHash))))
+            if (!isNew &&
+                (syncedHash is null ||
+                 string.Equals(syncedHash, candidate.PayloadHash, StringComparison.Ordinal) ||
+                 (candidate.Deleted && heldInRemoteTrash)))
             {
                 continue;
             }
@@ -67,11 +78,11 @@ public sealed class BitwardenLocalChangeQueue(
                 continue;
             }
 
-            // The route decides a deletion, so no cipher payload travels; the store still requires
-            // something parseable in that column. That is also why trashing a note or card needs no
-            // encoder for its content, while editing one does.
+            // The route decides a deletion or a restore, so no cipher payload travels; the store still
+            // requires something parseable in that column. That is also why trashing or reviving a note or
+            // card needs no encoder for its content, while editing one does.
             var deletion = !isNew && candidate.Deleted;
-            var payload = deletion ? "{}" : BuildPayload(candidate, vaultKey);
+            var payload = deletion || restoring ? "{}" : BuildPayload(candidate, vaultKey);
             if (payload is null)
             {
                 // Local shapes Bitwarden cannot carry stay local rather than failing the whole sync.
@@ -92,7 +103,9 @@ public sealed class BitwardenLocalChangeQueue(
                     ? BitwardenMutationOperationType.Create
                     : deletion
                         ? BitwardenMutationOperationType.SoftDelete
-                        : BitwardenMutationOperationType.Update,
+                        : restoring
+                            ? BitwardenMutationOperationType.Restore
+                            : BitwardenMutationOperationType.Update,
                 // A create has no remote state to guard against, and a revision there would make the
                 // queue guard reject it as an update.
                 ExpectedRemoteRevision: isNew ? null : candidate.ExpectedRemoteRevision,
@@ -100,11 +113,16 @@ public sealed class BitwardenLocalChangeQueue(
                 // Deliberately content-free: an entry edited three times before its first upload is one
                 // cipher owed, not three, and each of those creates would have been posted separately.
                 // A deletion keys the same way, because trashing an entry twice is one trash, not two.
+                // A restore keys apart from both, because an entry revived after it was trashed owes the
+                // server two different decisions and reusing the delete's key would resurrect the row the
+                // delete already completed.
                 IdempotencyKey: isNew
                     ? $"local-create:{vaultId}:{identity}"
                     : deletion
                         ? $"local-delete:{vaultId}:{identity}"
-                        : $"local-update:{vaultId}:{identity}:{candidate.PayloadHash}",
+                        : restoring
+                            ? $"local-restore:{vaultId}:{identity}"
+                            : $"local-update:{vaultId}:{identity}:{candidate.PayloadHash}",
                 Status: BitwardenMutationStatus.Pending,
                 LastFailureClass: BitwardenFailureClass.None,
                 AttemptCount: 0,
@@ -113,7 +131,10 @@ public sealed class BitwardenLocalChangeQueue(
                 LastError: null,
                 CreatedAt: now,
                 UpdatedAt: now,
-                LocalPayloadHash: candidate.PayloadHash), cancellationToken);
+                // A completed push normally rewrites the baseline with the content the server now holds.
+                // A restore carried no content, so recording this hash would claim the trash held the local
+                // copy and an edit made in the same session would never be owed again.
+                LocalPayloadHash: restoring ? null : candidate.PayloadHash), cancellationToken);
             enqueued++;
         }
 

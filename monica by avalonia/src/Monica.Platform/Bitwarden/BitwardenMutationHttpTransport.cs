@@ -61,7 +61,8 @@ internal sealed class BitwardenMutationHttpTransport : IBitwardenOwnedMutationTr
         ValidatePayload(request);
         if (request.OperationType is BitwardenMutationOperationType.Update
                 or BitwardenMutationOperationType.Delete
-                or BitwardenMutationOperationType.SoftDelete)
+                or BitwardenMutationOperationType.SoftDelete
+                or BitwardenMutationOperationType.Restore)
         {
             var preflight = await ReadRevisionAsync(request.CipherId, cancellationToken);
             if (!preflight.Succeeded)
@@ -92,6 +93,10 @@ internal sealed class BitwardenMutationHttpTransport : IBitwardenOwnedMutationTr
             // erasing it, which is the pair Monica's own recoverable trash and permanent purge map onto.
             BitwardenMutationOperationType.SoftDelete =>
                 (HttpMethod.Put, TrashUri(request.CipherId)),
+            // A restore is decided by the route as well, and unlike the deletions the server answers it
+            // with the whole revived cipher, so its revision has to be read back (see ReadsCipherResponse).
+            BitwardenMutationOperationType.Restore =>
+                (HttpMethod.Put, RestoreUri(request.CipherId)),
             _ => throw new BitwardenProtocolException("Unsupported Bitwarden mutation operation.")
         };
         using var message = CreateRequest(method, uri, request.IdempotencyKey);
@@ -152,7 +157,7 @@ internal sealed class BitwardenMutationHttpTransport : IBitwardenOwnedMutationTr
             return Failure(response);
         }
 
-        if (WritesNoBody(request.OperationType))
+        if (!ReadsCipherResponse(request.OperationType))
         {
             return new BitwardenMutationResponse(true, request.CipherId, request.ExpectedRemoteRevision);
         }
@@ -237,10 +242,27 @@ internal sealed class BitwardenMutationHttpTransport : IBitwardenOwnedMutationTr
     private Uri TrashUri(string cipherId) =>
         new($"{CipherUri(cipherId).AbsoluteUri}/delete", UriKind.Absolute);
 
+    private Uri RestoreUri(string cipherId) =>
+        new($"{CipherUri(cipherId).AbsoluteUri}/restore", UriKind.Absolute);
+
     /// <summary>
-    /// Both deletions are decided by the route alone, so the queued payload is not sent and the empty
-    /// response body must not be read as a cipher.
+    /// These routes decide the change on their own, so the queued payload is not sent. A restore belongs
+    /// here even though it revives the cipher: sending the local copy back over a trashed one would look
+    /// like an edit the server has no reason to accept.
     /// </summary>
     private static bool WritesNoBody(BitwardenMutationOperationType operation) =>
-        operation is BitwardenMutationOperationType.Delete or BitwardenMutationOperationType.SoftDelete;
+        operation is BitwardenMutationOperationType.Delete
+            or BitwardenMutationOperationType.SoftDelete
+            or BitwardenMutationOperationType.Restore;
+
+    /// <summary>
+    /// Whether the answer names the cipher and its revision. Both deletions leave the cipher where the
+    /// server put it and answer with nothing to read, while a restore answers with the revived cipher,
+    /// whose revision is what tells the next pull that the local copy and the remote one are the same
+    /// state - without it the pull reads a content difference at an older revision and backs the entry up.
+    /// </summary>
+    private static bool ReadsCipherResponse(BitwardenMutationOperationType operation) =>
+        operation is BitwardenMutationOperationType.Create
+            or BitwardenMutationOperationType.Update
+            or BitwardenMutationOperationType.Restore;
 }

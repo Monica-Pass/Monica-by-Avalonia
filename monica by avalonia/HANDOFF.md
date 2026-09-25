@@ -769,6 +769,13 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
        ⇒ **2026-09-24 更新（见文末"真服务器第二轮实测"）**：缺口 4 的主链路已经对真 Vaultwarden 1.37.3 验完
        （登录／建／改／软删／收敛／远端改→本地／冲突备份→还原→再推），量出来一条**新的**产品缺陷 #108
        （"从回收站还原"推不出去：update 不能把 cipher 拿出服务器回收站），永久删除的路由也当场量通了（#107 的预飞已完成）。
+       ⇒ **2026-09-25 更新（见文末"真服务器第三轮实测"）**：**#108 已修并在真服务器上按三种口径验通**（新增 `Restore`
+       操作档 + `local-restore:` 键 + `PUT /ciphers/{id}/restore` 无体 + 撤销竞态闸门）。真跑还量到 `restore` 对未知
+       cipher 答 **400 不是 404**（#107 那条"404 即终局停放"认不了这种），以及对活条目再 restore **还会推高一次 revision**。
+       顺带抓到一条**比 #108 更严重的缺陷并修掉（#109）**：pull 落库三处拿 `decision.LocalId` 按"先查密码表、否则查
+       安全条目表"解析，而两张表各自独立编号 ⇒ 属于笔记的远端删除落到同号的在用登录行上（实测那条登录几轮里
+       `live→del→live→del`），笔记自己的行 revision 永不前进——那才是"笔记还原推不出去"的真因。现在一律按 cipher id
+       定位，笔记 restore 在真服务器上收敛（`Restore/Completed` + 下一轮 `Claimed=0`）。
        删除那一轮又量出两个**同族的死循环**（都已修，见 §2 回收站标记那行）：解码器对服务器回收站里的 cipher
        **不带载荷**、`PayloadHash` 位置写的是 `deleted:{revision}` 标记（`BitwardenCipherDecoder.cs:63-73`），
        于是 ① 合并引擎把"两边都在回收站"当成内容不一致，每拉一次就多存一条冲突备份；② 漂移扫描拿本地指纹去比
@@ -1007,3 +1014,34 @@ dotnet run --project src/Monica.App/Monica.App.csproj --no-build
 - **两条新踩的取证坑（值得单列）**：① `dotnet build` 失败之后 `dotnet run --no-build` 会**静静跑上一份二进制**——有一轮日志看起来"跑完了"，其实新加的那几个 stage 根本不在里面。判据：跑之前必须看见 `Build succeeded`，跑之后**在日志里搜新 stage 的名字**。（这是 §2 `40e9ae8` 那条 `--no-build` 坑的第三次。）② `status=409` 不一定是服务器答的：`ExpectedRemoteRevision` 传 null 必然被自己的 preflight 挡下（实测 `note=client_side_gate`）。凡是对端状态码，先问"请求出门了吗"，再记成"服务器行为"。
 - **仍未验（缺口 4 剩下的部分，别读成全绿）**：2FA／captcha／设备 OTP／令牌过期后 `RefreshingToken` 那条自动刷新路径／离线把变更堆进队列再回来推的恢复路径／官方 Bitwarden 云（只验过自托管 1.37.3）／笔记与银行卡、证件这三类在真服务器上的 create+update 往返（本轮只跑登录型条目）。
 - **机器状态**：容器 `vw-probe` 与 Docker Desktop 仍是本会话起的、此刻还在跑；收法照旧 `docker rm -f vw-probe && docker volume rm vw-probe-data` 后退出 Docker Desktop（卷里只有探针账号，删掉即净）。**本轮没有改任何产品代码**，只有这份文档。
+
+
+## 附：真服务器第三轮实测（2026-09-25，**#108 已修并验通；顺带抓到一条更严重的串表污染 #109，也修了**）
+
+跑法照旧：`D:\Monica\probe-appdata\bwrestore` 那份一次性控制台探针（不进仓，`AssemblyName=bwprobe`，`ProjectReference` 只指向 `src/Monica.Platform`，注册之后每一步用的都是**生产类型**），服务器是本机 Vaultwarden **1.37.3**（容器 `vw-probe`，端口映射实测是 `127.0.0.1:8080->80/tcp`）。日志 `D:\Monica\probe-appdata\probe_run14.log`（105 行，判据只有 id／revision／布尔／计数／字节数；`grep -c probe-value` = **0**，没有任何载荷落进日志）。
+
+### #108 已经出厂，并在真服务器上按三种口径验通
+
+- 改了什么：`BitwardenMutationOperationType` 多出一档 `Restore`；漂移扫描在"基线是 `deleted:` 标记而本地行活着"那一格入队 `local-restore:{vault}:{id}`（**键必须和 update 分开**，因为 `BitwardenPendingOperationStore.EnqueueAsync` 是 `ON CONFLICT(idempotency_key) DO UPDATE SET status='pending'`，同键会把两件事并成一件）；传输走 `PUT /ciphers/{id}/restore`、**不带体**；processor 加了撤销竞态闸门（用户在这一发出门之前又把条目丢回回收站 ⇒ 不发，直接 `CompleteAsync` 落定）。
+- 原始路由电池（stage 12 的 `r*`）：`r2_restore_no_body status=200 bytes=971 revMoved=True`（服务器回**整份 cipher JSON**、`deletedDate=null`、revision 前进）；`r3_restore_on_alive status=200 revMoved=True`（对活条目照样 200，**并且还会再推高一次 revision** ⇒ "重放是幂等的"这个假设不成立，重试计数的语义要按这个读）；`r4_restore_with_body status=200`；`r5_restore_unknown_id status=400` ⇒ **未知 cipher 的 restore 答 400 而不是 404**，所以 #107 那条"404 即终局停放"的分派认不了这种形状，实测记在这儿。
+- 产品路径登录型（stage 9）：`local_restore_push mutations[Claimed=1/Completed=1]` → `remote_after_local_restore listed=True isDeleted=False` → `local_after_local_restore isDeleted=False`，**再拉一轮仍 `Claimed=0 / Unchanged=1 / isDeleted=False`** ⇒ 第二轮量到的"点还原立刻弹回回收站"已经没有了。
+- 干净的一进一出（stage 13 `x*` 与 stage 14 `s*`，登录型与笔记各一遍）：`x3_local_restore_push` 之后 `merge` 里 `ConflictsBackedUp=0`、`x3_after_restore_remote isDeleted=False revMatchesRemote=True`、`x4_second_sync Claimed=0`；笔记同形状 `x7_note_after_restore remoteIsDeleted=False localIsDeleted=False revMatchesRemote=True`、`x8_note_second_sync Claimed=0` ⇒ **收敛，并且这条路径一条冲突记录都不留**（第二轮那句"在同步页留下一条他没发起的冲突记录"跟着消失了）。
+- 还剩一枚观察，不算缺陷但要说清：**只有在"条目已经躺在服务器回收站里时被别处改过"那种形状**下，还原那一轮仍会多出一条冲突备份（stage 9 正是这种，前面用裸传输 PUT 过一条 `update_on_trashed_cipher`，实测 `merge[Updated=1/ConflictsBackedUp=1]`）。这是合并引擎既有规则（同 revision 内容不同 ⇒ 先备份本地再让远端赢）的正常产物，可用户看见"冲突"两个字仍然会费解 —— 要不要换一句更准的措辞属于界面范围，本轮没动。
+
+### ⇒ 本轮真正的新东西：#109，pull 落库按 id 解析会**串表**（不是笔记专属）
+
+- 根因：`BitwardenPullMergeService` 的三处落库（`ApplyRemoteDeletionAsync`／`MarkLocalCleanAsync`／`SaveConflictBackupAsync`）拿 `decision.LocalId` 去"先查密码表、查不到再查安全条目表"，而 `passwords.id` 与 `secure_items.id` 是**两条各自独立的自增序列** —— 库里第一条登录和第一条笔记都是 `#1`（本轮实测打印：`pw=[#3,#2,#1]`、`si=[#2,#1]`）。
+- run13 量到的后果：**属于笔记 cipher 的远端删除落到同号的那条在用登录上**（它因此在几轮同步里 `live→del→live→del` 反复），而笔记自己的行 revision 永远不前进（`localRev=…01.0430` vs `remoteRev/baselineRev=…01.2594`）。**这才是"笔记的还原推不出去、永远停在 Conflict"的真因** —— #108 只是它外面的一层皮，只修 #108 治不到笔记。
+- 修法：三处一律按 **cipher id** 定位行（cipher id 在两张表之间唯一，`BitwardenMergeEngine.BuildUniqueLocalMap` 早就把它当唯一身份在用）；冲突备份那行记的是**命中那一行的 Id**（还原侧按 `itemKind` + id 解析，本来就是对的）。
+- 负控与守卫：新测试 `BitwardenPullMergeServiceTests.A_remote_note_deletion_cannot_touch_the_login_sharing_its_row_id` —— 先造出同号的登录＋笔记（断言 `localLogin.Id == localNote.Id` 把前提钉住），再推一条"笔记被远端删除"的快照。**去掉修复即红**（`Assert.False(password.IsDeleted)` 在该文件 line 135 失败：登录被投进了回收站），**带修复绿**；整串 `Category!=perf-budget` **903 条全绿**（加这条之前是 902）。
+- 真服务器复验（stage 14，笔记全程走产品路径）：笔记行 `si=#2` 的 revision 逐轮 `29.0973 live → 29.2755 del → 29.4960 live`，**每一轮都与 `remoteRev` 相等**；同时三条登录 `pw=[#3,#2,#1]` 从头到尾都是 `live`、没被碰过；队列侧 `rows=[SoftDelete/Completed | Restore/Completed]`、基线从 `marker` 回到 `content`、`s14_scan_after_restore_push enqueued=0`、下一轮整场 `Claimed=0` ⇒ **#108+#109 合起来把笔记的回收站还原走通了**。
+- 没动的那一格（诚实记下）：`ApplyActiveRemoteAsync` 仍然按远端 `cipherType` 决定落哪张表、并复用 `decision.LocalId`。只有"同一个 cipher 在登录型与安全条目型之间翻转类型"这种服务器行为才会撞上它，**本轮没有实测过那种形状**，所以没顺手改 —— 改法是同样按 cipher id 在目标表里解析，但会引出"两行同时绑一个 cipher id ⇒ 下一轮 `BuildUniqueLocalMap` 抛错、整库同步被拒"的新问题，需要单独一轮把"类型翻转"当一等公民设计（入 #94 的未验清单）。
+
+### 这一轮新踩的取证坑（三条）
+
+- `dotnet format --verify-no-changes` 会因为**编辑工具往 CRLF 文件里写了裸 LF 行**而报一片 WHITESPACE 红，**连内容与 HEAD 逐字节相同的那些行也一起报**（本轮 27 条里有这种）。判据：`grep -c $'\r$'` 对 `grep -c -v $'\r$'`，本轮修完的两个文件是 254／0。
+- UI 套件那份 dll **不带 `-filter` 直接跑**：exit 0、日志里只剩一行 runner 头、**0 条被计数** —— 那是"没跑"，不能读成"跑绿"。正解是照 `eng/ci/verify-commercial-release.ps1:253-274` 那样带 `-filter '/[Category!=perf-budget]'` + `-trx` 再用 `Assert-TestReportRanTests` 验总数。
+- `BitwardenLocalChangeQueue.EnqueueDriftedAsync` 的 **`Refused` 计数在 `BitwardenSyncResult` 里根本不出现**，界面与日志都看不见。本轮有一条笔记因为载荷建错（`Notes` 留空、只填 `ItemData`）从头到尾没入过队、也没上过服务器，唯一看得见的线索是探针打印的 `localRev=(none)`；**为什么被拒这一格至今未定位**（是编码器拒绝还是别的判断，无从分辨）。这是 #94 的可诊断性缺口，不是那条笔记的根因结论。
+- 还有一条本轮自己造的假绿：后台跑门禁时写成 `powershell … | tail -60`，**管道会把真 exit code 吞成 `tail` 的 0**，而日志文件是 0 字节、`TestResults/**` 的时间戳一动没动 —— 看着"完成了"，其实一步没跑。判据改成：重定向到文件，跑完**看 trx 的时间戳与总数**，别信 `$?`（这是 §2 那条 `--no-build` 假绿的同族）。
+
+**机器状态**：Docker Desktop 与容器 `vw-probe` 都是本会话起的，**此刻仍在跑**（`GET http://127.0.0.1:8080/alive => 200`）；收法照旧 `docker rm -f vw-probe && docker volume rm vw-probe-data` 后退出 Docker Desktop（卷里只有探针账号）。探针与日志都在 `D:\Monica\probe-appdata\`（一次性目录，不进仓）。**本轮改了产品代码**：`Restore` 那一档（#108）与 pull 落库按 cipher id 解析（#109）。

@@ -81,6 +81,18 @@ public sealed class BitwardenMutationProcessor(
                         continue;
                     }
 
+                    if (operation.OperationType == BitwardenMutationOperationType.Restore &&
+                        !local.IsHeldAlive(operation.CipherId))
+                    {
+                        // The mirror of that race: this entry went back into the trash - or out of the
+                        // vault altogether - while the restore was still queued, so reviving the remote
+                        // copy would hand back what the user has since removed. Completing the row lets
+                        // the next scan re-decide from the state that actually stands.
+                        await operationStore.CompleteAsync(operation.Id, cancellationToken);
+                        completed++;
+                        continue;
+                    }
+
                     var response = await transport.SendAsync(ToRequest(operation), cancellationToken);
                     BitwardenMutationGuard.ValidateResponse(operation, response);
                     if (response.Succeeded)

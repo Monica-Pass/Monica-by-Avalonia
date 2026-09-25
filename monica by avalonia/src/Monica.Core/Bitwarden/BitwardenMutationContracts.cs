@@ -14,7 +14,14 @@ public enum BitwardenMutationOperationType
     /// Moves the remote cipher into the server's trash, which is what Monica's own trash means: the
     /// entry stays recoverable there, exactly as it stays recoverable here.
     /// </summary>
-    SoftDelete
+    SoftDelete,
+    /// <summary>
+    /// Moves a cipher the server is holding in its trash back into the live set. Monica needs this because
+    /// its own recycle bin restore is local-only until the queue carries it: an ordinary update is accepted
+    /// for a trashed cipher but does not clear the server's deletion, so the next pull would trash the
+    /// entry again and back up a change the user never made.
+    /// </summary>
+    Restore
 }
 
 public enum BitwardenMutationStatus
@@ -100,6 +107,7 @@ public static class BitwardenMutationGuard
         if (operation.OperationType is BitwardenMutationOperationType.Update
                 or BitwardenMutationOperationType.Delete
                 or BitwardenMutationOperationType.SoftDelete
+                or BitwardenMutationOperationType.Restore
             && string.IsNullOrWhiteSpace(operation.ExpectedRemoteRevision))
         {
             throw new BitwardenProtocolException(

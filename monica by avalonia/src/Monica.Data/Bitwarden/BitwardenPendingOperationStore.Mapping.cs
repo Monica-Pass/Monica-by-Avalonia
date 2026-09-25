@@ -49,6 +49,7 @@ public sealed partial class BitwardenPendingOperationStore
         BitwardenMutationOperationType.Update => "update",
         BitwardenMutationOperationType.Delete => "delete",
         BitwardenMutationOperationType.SoftDelete => "soft_delete",
+        BitwardenMutationOperationType.Restore => "restore",
         _ => throw new BitwardenProtocolException($"Unsupported Bitwarden operation type: {value}.")
     };
 
@@ -58,6 +59,7 @@ public sealed partial class BitwardenPendingOperationStore
         "update" => BitwardenMutationOperationType.Update,
         "delete" => BitwardenMutationOperationType.Delete,
         "soft_delete" => BitwardenMutationOperationType.SoftDelete,
+        "restore" => BitwardenMutationOperationType.Restore,
         _ => throw new BitwardenProtocolException($"Stored Bitwarden operation type is invalid: {value}.")
     };
 
