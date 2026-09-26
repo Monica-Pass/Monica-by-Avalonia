@@ -12,6 +12,7 @@ public sealed partial class KeePassVaultSession : IDisposable
 {
     private PwDatabase? _database;
     private PwGroup? _root;
+    private PwGroup? _recycleBin;
     private readonly List<KeePassGroupRow> _groups = [];
     private readonly Dictionary<string, PwGroup> _groupsByUuid = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -63,6 +64,80 @@ public sealed partial class KeePassVaultSession : IDisposable
     public int GroupCount => _groups.Count;
 
     public int EntryCount { get; private set; }
+
+    /// <summary>
+    /// The folder deleted entries land in, or null while the database has no usable one. The pointer a
+    /// file carries is only trusted when it reaches a group that is in the tree and is not the root, so
+    /// a stale pointer costs a new bin rather than the entries routed through it.
+    /// </summary>
+    public string? RecycleBinUuid => _recycleBin?.Uuid.ToHexString();
+
+    /// <summary>
+    /// Whether a folder is the recycle bin or sits inside it. Entries in there are kept out of the
+    /// recycle path and out of the move targets, which is what a folder of already-deleted things is.
+    /// </summary>
+    public bool IsInRecycleBin(string? groupUuid)
+    {
+        var bin = _recycleBin;
+        if (bin is null || string.IsNullOrWhiteSpace(groupUuid))
+        {
+            return false;
+        }
+
+        return _groupsByUuid.TryGetValue(groupUuid.Trim(), out var group) && IsInsideRecycleBin(group);
+    }
+
+    private bool IsInsideRecycleBin(PwGroup group)
+    {
+        var bin = _recycleBin;
+        return bin is not null && (ReferenceEquals(group, bin) || group.IsContainedIn(bin));
+    }
+
+    private PwGroup? ResolveRecycleBinGroup(PwDatabase database, PwGroup root)
+    {
+        if (!database.RecycleBinEnabled)
+        {
+            return null;
+        }
+
+        var uuid = database.RecycleBinUuid;
+        if (uuid is null || IsZeroUuid(uuid))
+        {
+            return null;
+        }
+
+        var wanted = uuid.ToHexString();
+        if (string.Equals(wanted, root.Uuid.ToHexString(), StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return FindGroupByUuid(root, wanted);
+    }
+
+    private static bool IsZeroUuid(PwUuid uuid)
+    {
+        var bytes = uuid.UuidBytes;
+        return bytes is not { Length: > 0 } || bytes.All(value => value == 0);
+    }
+
+    private static PwGroup? FindGroupByUuid(PwGroup group, string uuid)
+    {
+        foreach (var child in group.Groups)
+        {
+            if (string.Equals(child.Uuid.ToHexString(), uuid, StringComparison.OrdinalIgnoreCase))
+            {
+                return child;
+            }
+
+            if (FindGroupByUuid(child, uuid) is { } nested)
+            {
+                return nested;
+            }
+        }
+
+        return null;
+    }
 
     /// <summary>
     /// Streams every entry with its secrets, custom fields and attachment content resolved.
@@ -158,6 +233,7 @@ public sealed partial class KeePassVaultSession : IDisposable
         var database = _database;
         _database = null;
         _root = null;
+        _recycleBin = null;
         _groups.Clear();
         _groupsByUuid.Clear();
         EntryCount = 0;
@@ -197,6 +273,7 @@ public sealed partial class KeePassVaultSession : IDisposable
 
     private void Index(PwGroup root, CancellationToken cancellationToken)
     {
+        _recycleBin = _database is { } database ? ResolveRecycleBinGroup(database, root) : null;
         var state = new IndexState();
         IndexGroup(root, root, "", state, cancellationToken);
         EntryCount = state.EntryCount;
@@ -218,7 +295,8 @@ public sealed partial class KeePassVaultSession : IDisposable
                 path,
                 group.Uuid.ToHexString(),
                 group.ParentGroup?.Uuid.ToHexString(),
-                group.Entries.Any()));
+                group.Entries.Any(),
+                IsInsideRecycleBin(group)));
         }
 
         foreach (var entry in group.Entries)

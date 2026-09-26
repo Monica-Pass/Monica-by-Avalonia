@@ -169,9 +169,22 @@
                                     <MenuItem.Icon><ic:FluentIcon Icon="Folder" FontSize="14" /></MenuItem.Icon>
                                 </MenuItem>
                                 <MenuItem Header="{Binding #Root.Text.Delete}"
-                                          IsVisible="{Binding #Root.ShowsEntryCommands}"
+                                          IsVisible="{Binding #Root.ShowsEntryPlainDeleteItem}"
                                           Command="{Binding #Root.DeleteEntryCommand}">
                                     <MenuItem.Icon><ic:FluentIcon Icon="Delete" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
+                                <!-- A .kdbx carries its own recycle bin, so the tree splits the deletion
+                                     in two: the reversible step stays primary, and destroying a password
+                                     asks before it runs. -->
+                                <MenuItem Header="{Binding #Root.Text.MoveToRecycleBin}"
+                                          IsVisible="{Binding #Root.ShowsEntryRecycleItem}"
+                                          Command="{Binding #Root.MoveToRecycleBinCommand}">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="Delete" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{Binding #Root.Text.DeletePermanently}"
+                                          IsVisible="{Binding #Root.ShowsEntryPermanentItem}"
+                                          Command="{Binding #Root.DeleteEntryPermanentlyCommand}">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="DeleteLines" FontSize="14" /></MenuItem.Icon>
                                 </MenuItem>
                             </ContextMenu>
                         </Panel.ContextMenu>

@@ -21,7 +21,8 @@ public sealed record KeePassGroupRow(
     string Path,
     string Uuid,
     string? ParentUuid,
-    bool HasEntries = false);
+    bool HasEntries = false,
+    bool IsRecycleBin = false);
 
 public sealed record KeePassEntryRow(
     string EntryUuid,
@@ -90,5 +91,23 @@ public enum KeePassGroupDeleteStatus
 {
     Deleted,
     NotEmpty,
+    NotFound
+}
+
+/// <summary>
+/// How an entry leaves the tree. Recycling keeps the entry inside the database so a later KeePass
+/// client can still find it; permanent deletion detaches it and records it in the deletion list,
+/// which is the only trace a syncing client gets that the entry is gone rather than hidden.
+/// </summary>
+public enum KeePassDeleteMode
+{
+    RecycleBin,
+    Permanent
+}
+
+public enum KeePassEntryDeleteStatus
+{
+    Recycled,
+    PermanentlyDeleted,
     NotFound
 }

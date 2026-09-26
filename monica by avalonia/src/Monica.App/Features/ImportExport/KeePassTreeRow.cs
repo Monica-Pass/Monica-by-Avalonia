@@ -36,9 +36,11 @@ public sealed record KeePassTreeRow : IVaultTreeRow
 
     public bool IsEntryRow => Kind == KeePassTreeRowKind.Entry;
 
-    public Symbol EntrySymbol => Kind == KeePassTreeRowKind.Folder
-        ? Symbol.Folder
-        : Symbol.Key;
+    public Symbol EntrySymbol => Kind == KeePassTreeRowKind.Entry
+        ? Symbol.Key
+        : Group?.IsRecycleBin == true
+            ? Symbol.Delete
+            : Symbol.Folder;
 
     public string EntryDetail => Kind == KeePassTreeRowKind.Entry
         ? Entry?.UserName ?? ""

@@ -74,6 +74,17 @@ public partial class VaultFolderTree : UserControl
     public static readonly StyledProperty<ICommand?> DeleteEntryCommandProperty =
         AvaloniaProperty.Register<VaultFolderTree, ICommand?>(nameof(DeleteEntryCommand));
 
+    // A database file keeps its own recycle bin, so a host that can write one offers two deletions
+    // instead of one. Hosts without a bin leave both null and keep the single delete item.
+    public static readonly StyledProperty<ICommand?> MoveToRecycleBinCommandProperty =
+        AvaloniaProperty.Register<VaultFolderTree, ICommand?>(nameof(MoveToRecycleBinCommand));
+
+    public static readonly StyledProperty<ICommand?> DeleteEntryPermanentlyCommandProperty =
+        AvaloniaProperty.Register<VaultFolderTree, ICommand?>(nameof(DeleteEntryPermanentlyCommand));
+
+    public static readonly StyledProperty<bool> SelectedEntryInRecycleBinProperty =
+        AvaloniaProperty.Register<VaultFolderTree, bool>(nameof(SelectedEntryInRecycleBin));
+
     // Copy is asked for row by row because a tree mixes the kinds that hold different values, and
     // the parameter is the row itself so a copy never waits for the selection to catch up.
     public static readonly StyledProperty<ICommand?> CopyRowUsernameCommandProperty =
@@ -103,6 +114,15 @@ public partial class VaultFolderTree : UserControl
     // entry that moves by drag has no use for a menu item that does nothing.
     public static readonly StyledProperty<bool> ShowsEntryFolderPickerProperty =
         AvaloniaProperty.Register<VaultFolderTree, bool>(nameof(ShowsEntryFolderPicker));
+
+    public static readonly StyledProperty<bool> ShowsEntryRecycleItemProperty =
+        AvaloniaProperty.Register<VaultFolderTree, bool>(nameof(ShowsEntryRecycleItem));
+
+    public static readonly StyledProperty<bool> ShowsEntryPermanentItemProperty =
+        AvaloniaProperty.Register<VaultFolderTree, bool>(nameof(ShowsEntryPermanentItem));
+
+    public static readonly StyledProperty<bool> ShowsEntryPlainDeleteItemProperty =
+        AvaloniaProperty.Register<VaultFolderTree, bool>(nameof(ShowsEntryPlainDeleteItem));
 
     // The context menu is built per row, but its items live in one menu, so the menu group is chosen
     // from the row the pointer last pressed rather than from the item's own data context.
@@ -224,6 +244,24 @@ public partial class VaultFolderTree : UserControl
         set => SetValue(DeleteEntryCommandProperty, value);
     }
 
+    public ICommand? MoveToRecycleBinCommand
+    {
+        get => GetValue(MoveToRecycleBinCommandProperty);
+        set => SetValue(MoveToRecycleBinCommandProperty, value);
+    }
+
+    public ICommand? DeleteEntryPermanentlyCommand
+    {
+        get => GetValue(DeleteEntryPermanentlyCommandProperty);
+        set => SetValue(DeleteEntryPermanentlyCommandProperty, value);
+    }
+
+    public bool SelectedEntryInRecycleBin
+    {
+        get => GetValue(SelectedEntryInRecycleBinProperty);
+        set => SetValue(SelectedEntryInRecycleBinProperty, value);
+    }
+
     public ICommand? CopyRowUsernameCommand
     {
         get => GetValue(CopyRowUsernameCommandProperty);
@@ -278,6 +316,24 @@ public partial class VaultFolderTree : UserControl
         set => SetValue(ShowsEntryFolderPickerProperty, value);
     }
 
+    public bool ShowsEntryRecycleItem
+    {
+        get => GetValue(ShowsEntryRecycleItemProperty);
+        set => SetValue(ShowsEntryRecycleItemProperty, value);
+    }
+
+    public bool ShowsEntryPermanentItem
+    {
+        get => GetValue(ShowsEntryPermanentItemProperty);
+        set => SetValue(ShowsEntryPermanentItemProperty, value);
+    }
+
+    public bool ShowsEntryPlainDeleteItem
+    {
+        get => GetValue(ShowsEntryPlainDeleteItemProperty);
+        set => SetValue(ShowsEntryPlainDeleteItemProperty, value);
+    }
+
     public string? FolderName
     {
         get => GetValue(FolderNameProperty);
@@ -307,7 +363,9 @@ public partial class VaultFolderTree : UserControl
         }
         else if (change.Property == IsEntrySelectionProperty ||
                  change.Property == CanManageRowsProperty ||
-                 change.Property == MoveEntryCommandProperty)
+                 change.Property == MoveEntryCommandProperty ||
+                 change.Property == MoveToRecycleBinCommandProperty ||
+                 change.Property == SelectedEntryInRecycleBinProperty)
         {
             RefreshRowCommandVisibility();
         }
@@ -318,6 +376,14 @@ public partial class VaultFolderTree : UserControl
         ShowsFolderCommands = CanManageRows && !IsEntrySelection;
         ShowsEntryCommands = CanManageRows && IsEntrySelection;
         ShowsEntryFolderPicker = ShowsEntryCommands && MoveEntryCommand is not null;
+
+        // Where a bin exists the single delete item is wrong: one click must not destroy a password
+        // without asking, and an entry already in the bin can only go one way. The host signals a bin
+        // by wiring the recycle command, so a tree can never claim a split it has nothing to run.
+        var supportsBin = MoveToRecycleBinCommand is not null;
+        ShowsEntryRecycleItem = ShowsEntryCommands && supportsBin && !SelectedEntryInRecycleBin;
+        ShowsEntryPermanentItem = ShowsEntryCommands && supportsBin;
+        ShowsEntryPlainDeleteItem = ShowsEntryCommands && !supportsBin;
     }
 
     public bool IsTreeFocused => FolderTreeList.IsFocused;

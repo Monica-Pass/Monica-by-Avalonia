@@ -225,7 +225,11 @@ public sealed class KeePassEditWorkflowUiTests
                 Assert.Same(viewModel.MoveKeePassFolderCommand, tree.MoveFolderCommand);
                 Assert.Same(viewModel.MoveKeePassEntryCommand, tree.MoveEntryToFolderCommand);
                 Assert.Same(viewModel.EditKeePassEntryCommand, tree.EditEntryCommand);
-                Assert.Same(viewModel.DeleteKeePassEntryCommand, tree.DeleteEntryCommand);
+                // A .kdbx carries its own recycle bin, so this host wires the split pair rather than the
+                // single delete the library page uses.
+                Assert.Same(viewModel.DeleteKeePassEntryCommand, tree.MoveToRecycleBinCommand);
+                Assert.Same(viewModel.DeleteKeePassEntryPermanentlyCommand, tree.DeleteEntryPermanentlyCommand);
+                Assert.False(tree.SelectedEntryInRecycleBin);
                 // The root is selected at open and the root is not something a user may delete.
                 Assert.False(tree.CanManageSelected);
 
@@ -264,6 +268,18 @@ public sealed class KeePassEditWorkflowUiTests
                 Assert.True(tree.IsEntrySelection);
                 Assert.True(tree.ShowsEntryCommands);
                 Assert.False(tree.ShowsEntryFolderPicker);
+
+                // Both depths of delete are on the menu, and the plain one the library page uses is off
+                // it; an entry that already sits in the bin has only the permanent way out left.
+                Assert.True(tree.ShowsEntryRecycleItem);
+                Assert.True(tree.ShowsEntryPermanentItem);
+                Assert.False(tree.ShowsEntryPlainDeleteItem);
+                Assert.False(viewModel.KeePassSelectedEntryInRecycleBin);
+                tree.SelectedEntryInRecycleBin = true;
+                Assert.False(tree.ShowsEntryRecycleItem);
+                Assert.True(tree.ShowsEntryPermanentItem);
+                tree.SelectedEntryInRecycleBin = false;
+                Assert.True(tree.ShowsEntryRecycleItem);
 
                 // The inline naming box is the tree's own property; the view model has to receive what
                 // the user types into it and put the next name back for the box to show it.

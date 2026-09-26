@@ -558,10 +558,11 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// One frame of the row-management surface: a folder added to the tree and an entry filed into it,
-    /// with the unsaved-changes notice lit and the file on disk still the one that was opened. Both
-    /// halves of that are the point of the shot - the tree growing proves the commands run against the
-    /// browsed database, and the file being untouched proves nothing was saved to get there.
+    /// One frame of the row-management surface: a folder added to the tree, an entry filed into it and
+    /// that entry then recycled, with the unsaved-changes notice lit and the file on disk still the one
+    /// that was opened. Both halves of that are the point of the shot - the tree growing and shrinking
+    /// proves the commands run against the browsed database, and the file being untouched proves nothing
+    /// was saved to get there.
     /// </summary>
     public async Task<bool> RunSmokeUiKeePassManageShotAsync(
         string vaultPath,
@@ -611,6 +612,9 @@ public partial class MainWindow
                 state.DraftShown &&
                 state.EntryShown &&
                 state.UnsavedNoticeShown &&
+                state.BinShown &&
+                state.EntryInBin &&
+                state.BinDeleteSplit &&
                 keepassTab.IsSelected &&
                 frameBytes > 0 &&
                 (!wantedFile || written);
@@ -618,6 +622,8 @@ public partial class MainWindow
                 $"Smoke UI KeePass manage shot result. success={success}, opened={state.DatabaseOpened}, " +
                 $"folderAdded={state.FolderShown}, draftOpened={state.DraftShown}, " +
                 $"entryAdded={state.EntryShown}, unsavedNotice={state.UnsavedNoticeShown}, " +
+                $"binShown={state.BinShown}, entryInBin={state.EntryInBin}, " +
+                $"binDeleteSplit={state.BinDeleteSplit}, " +
                 $"treeRows={state.TreeRows}, folderRows={state.FolderRows}, entryRows={state.EntryRows}, " +
                 $"vaultBytes={state.FileBytes}, tabSelected={keepassTab.IsSelected}, " +
                 $"frameBytes={frameBytes}, written={written}, file={fileName}");

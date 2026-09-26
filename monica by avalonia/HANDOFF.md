@@ -1641,3 +1641,106 @@ unsavedNotice=True, treeRows=10, folderRows=5, entryRows=5, vaultBytes=3294, fra
   KPCLib 不建模 `<Generator>`，桌面端重存一次 kotpass 会报 `generator=Kotpass`——**这条仍只推理过，没实测**。
   也就是说 #118 只能编辑已有的库，还不能当"新建 KeePass 库"用。
 - `KeePassVaultError.NoSourceFile` 在 `KeePassWriteFailureKey` 里映射到通用 key，当前分支走不到它（沿用 #117 的登记）。
+
+## 附：桌面端 .kdbx 的删除语义与回收站对齐 Android（2026-09-26，**#121 出厂：一条密码第一次要两下才会没，并且当场翻出两条一直没被走过的缺陷**）
+
+### 一、这一轮把什么变成了事实
+
+- 删条目从"一下就没"变成两档，分派与 Android 同形（`KeePassNativeManagement.kt:26` 的
+  `KeePassNativeDeleteMode { RECYCLE_BIN, PERMANENT }`；`deleteEntries` 在 `:226` 起——RECYCLE_BIN 先
+  `KeePassRecycleBinPolicy().ensure(database)` 再把条目移进那个夹，PERMANENT 才 `removeEntry`）。
+  桌面端 `KeePassVaultSession.Manage.cs:207` 的 `DeleteEntryAsync(uuid, KeePassDeleteMode…)` 同一分派：
+  **回收那一档不写删除记录**（什么都没离开文件），永久那一档 detach + `RecordDeletions`，把 uuid 落进
+  `<DeletedObjects>`，好让另一个客户端知道"是没了，不是丢了"。
+- 删夹**不进**回收站，也是 Android 的形状：`KeePassChangeSetApplier.kt:892` 的 `deleteGroup` 是
+  `removeGroupByUuidWithValue` + `recordPermanentDeletion`，根夹在 `:897` 直接拒。桌面端 `DeleteGroupAsync`
+  同形——整棵子树的 uuid 一次写进删除记录（`CollectTreeUuids`），非空先问一次并带上它装了多少。
+- 两档都**先确认**，补掉 #118 登记的那条不一致（删夹有确认、删条目没有）：
+  `MainWindowViewModel.KeePassManage.cs:90` `ConfirmKeePassRecycleAsync` / 同文件 `ConfirmKeePassPermanentAsync`
+  走 `IConfirmationDialogService`，EN+ZH 两份键（`LocalizationService.cs:1201/2130/2131` 与 `:2717/3160/3161`）。
+  取消不是"什么都不发生"，它退回一条已登记的取消提示。
+- 树把这条分成三个可见项：`MoveToRecycleBinCommand`（`:79`）、`DeleteEntryPermanentlyCommand`、
+  `SelectedEntryInRecycleBin`（`:85`），由 `RefreshRowCommandVisibility`（`:374`）算出
+  `ShowsEntryRecycleItem / ShowsEntryPermanentItem / ShowsEntryPlainDeleteItem`。
+  **"有没有回收站"不由树自己声明，而由宿主接没接那条命令推出**——没接的宿主（库页）保持原来那一条删除项，
+  于是任何一只树都不可能端出一个自己跑不动的分叉。已经在夹里的条目只剩"永久"一条路。
+- 回收站行有自己的图标（`KeePassTreeRow.cs:39`：条目=钥匙、`IsRecycleBin` 的夹=垃圾桶、其余=文件夹）。
+- 会话侧新增 `IsInRecycleBin / IsInsideRecycleBin / RecycleBinUuid`，指针解析在 `ResolveRecycleBinGroup`：
+  指向零 uuid、指不到树里已有的夹 ⇒ **忽略而不是顺手修好**，所以打开一个库永远不会因为这条指针把自己标脏。
+
+### 二、顺手翻出来的两条真缺陷（都不是本轮功能自己的红）
+
+1. **点一行从来不加载**。`SelectKeePassRowAsync` 一直只靠命令走，而 `VaultFolderTree` 把选中的行直接写进绑定的
+   `SelectedItem`——也就是说真人唯一的选行方式（点）从没跑过那条加载：详情栏、复制、删除指向的还是上一次命令选中的行。
+   补 `MainWindowViewModel.KeePassBrowse.cs:125` `OnSelectedKeePassTreeRowPublicChanged`（引用相同即不回环，
+   命令自己的写不会触发第二次加载）。之前测不到，因为测试全都直接 `ExecuteAsync(row)`。
+2. **`FindGroupByUuid` 返回祖先**（`KeePassVaultSession.cs:124`）。原来是
+   `if (match || FindGroupByUuid(child, uuid) is not null) return child;`——命中子节点时把**父节点**交了出去。
+   它必然咬在回收站指针上：`RecycleBinUuid` 指着根下面一层的夹时解析出的是根，"这条目在不在回收站里"整判断作废。
+   修成命中即返回、否则返回嵌套的命中，另加一条 `A_recycle_bin_filed_below_the_root_is_still_the_bin`
+   （把回收站挪到 "Personal" 下面、导出、重开，断言指针仍落到那一层，路径 `Personal/Recycle Bin`）。
+   测试辅助里的同名查找是同一处错，一起修了。
+
+### 三、量出来的四件事（临时探针跑的，脚本已删，结论留下）
+
+- KPCLib 2.0.4 的 `PwGroup.AddGroup(sub, takeOwnership)` 还有第三个参数，它是 `bUpdateLocationChangedOfSub`，
+  不是"要不要动时间戳"的开关——按猜的传过一次 `false`，量出来没作用，已还原。
+- 移动**不碰** `LastModificationTime`（夹与条目都实测 `touched=False`）；`LocationChanged` 的 setter、
+  `PreviousParentGroup` 的 setter、`AddEntry` 同理。所以"搬家留没留痕迹"只能靠 `LocationChanged` 自己写。
+- KDBX 的时间字段**存到整秒**。一条刚建在上一秒的条目搬到回收站再读回来，`LastModificationTime` 与原文件逐字节相同——
+  这是格式不是 bug，但它会让"移动后时间变了"这类断言在同一秒内假绿。两条移动测试因此先把对象压到 2016 年再动它
+  （`Aged(...)`），而不是把断言放宽。
+- `PreviousParentGroup` KPCLib 2.0.4 **不写进文件**（上一轮确认，本轮沿用）。Android 的
+  `RESTORE_FROM_RECYCLE_BIN` 靠的是它自己 change set 里带的 `previousParentGroupUuid`
+  （`KeePassChangeSetApplier.kt:805` 起要求它），不是文件字段——**两边在"还原回哪儿"这件事上没有一条共同的磁盘依据**。
+
+### 四、证据
+
+- 单测：新文件 `KeePassVaultRecycleBinTests` 9 条。三条负控各红在该红的那几条，还原后 9/9 绿：
+  ① 把回收分支的 `Relocate(entry, bin)` 换成 `source.Entries.Remove(entry)` ⇒ **6 红**
+  （`Recycling_an_entry_creates_the_bin_under_the_root_and_keeps_the_entry`、
+  `A_recycled_entry_survives_the_file_and_reopens_inside_the_bin`、
+  `Recycling_leaves_no_deletion_record_while_a_permanent_delete_writes_one`、
+  `The_same_recycle_bin_serves_every_delete_and_a_dangling_pointer_gets_a_new_one`、
+  `A_pointer_at_the_root_is_not_allowed_to_swallow_deleted_entries`、`A_recycle_bin_filed_below_the_root_is_still_the_bin`）；
+  ② 把 `FindGroupByUuid` 换回返回祖先 ⇒ **恰好 1 红**，红在 `A_recycle_bin_filed_below_the_root_is_still_the_bin`；
+  ③ 把永久分支的 `RecordDeletions` 去掉 ⇒ **2 红**（`Recycling_leaves_no_deletion_record_while_a_permanent_delete_writes_one`、
+  `A_recycled_entry_survives_the_file_and_reopens_inside_the_bin`）。
+- 无头 UI：`KeePassEditWorkflowUiTests` 3/3（接线断言换成"接的是那两条分开的命令"，并量三个 `Shows*Item` 随
+  `SelectedEntryInRecycleBin` 翻转、库页用的那条普通删除项在这个宿主上是灭的）；`VaultFolderTreeUiTests` 16/16；
+  `NoteWorkflowUiTests` 11/11。
+- 真产物：`--smoke-ui-keepass-manage` 多三个读数并全部进 `success` 的与门——
+  `binShown=True, entryInBin=True, binDeleteSplit=True, treeRows=11, folderRows=6, entryRows=5, vaultBytes=3294, frameBytes=105299`。
+  seam 走的是生产那一条删除，确认以"立即同意"的回调注入（弹窗会压在要拍的那一帧上；`App.axaml.cs:262` 注册的是真弹窗服务，
+  `DisabledConfirmationDialogService` 不在出厂路径上）。**负控打在发出去的二进制上**：把 `Relocate(entry, bin)` 换成 detach、
+  重新 publish、重跑门 ⇒ `entryInBin=False, binDeleteSplit=False, success=False`，整串不再出现 `UI SMOKE passed`；还原后重跑绿。
+- 人眼复核 1600x1000 那张 `KeePassManage_*.png`（127521 字节）：树里看得见带垃圾桶图标的 `Recycle Bin` 行、条目就在它下面、
+  详情栏 "KeePass 分组 = Recycle Bin"、状态栏「已将条目「Smoke Managed Entry」移入该数据库的回收站文件夹，点击保存才会写入文件。」，
+  `vaultBytes` 仍是打开那一份 3294（没保存就不落盘）。屏上无明文：用户名被截断、密码字段这一屏根本不显示，
+  出现的两个名字都是 seam 自己写的 fixture 字面量。
+
+### 五、门禁
+
+跑在本轮最后那份字节上（三条源码负控全部还原之后）：格式 0 改动、Release `--warnaserror` 0 warning / 0 error、
+commercial-release `passed`（300 行结构门通过、NuGet 漏洞审计通过、单测 10 `perf-budget` + **1010** 常规 0 红、
+UI 整串 266 条 0 红＝`perf-budget` 17 + 常规 249）、产物门 `RUNTIME SMOKE passed`：
+`CANONICAL VAULT passed` native=`mdbx_ffi.dll`、库载入 556ms 对 4000、KeePass 20000 条
+`openMs=893 / streamMs=230 / growthMB=4.2` 对 24、edit 帧 `success=True frameBytes=103437`、
+manage 帧 `success=True, binShown=True, entryInBin=True, binDeleteSplit=True, treeRows=11, folderRows=6,
+entryRows=5, vaultBytes=3294, frameBytes=105370`、锁定态 114.8MB 对 120、锁环 25/14/1/4 全部还原、
+`release gate completed success=True`。
+
+### 六、仍然没做到（欠账，不是决定）
+
+- **回收站里没有"还原"，也没有"清空"**。条目进了那个夹，界面上能做的只有"永久删除"。Android 有
+  `RESTORE_FROM_RECYCLE_BIN`，但它的入口在 change set 那条链上，`KeePassNativeManagerScreen` 没给出
+  "打开回收站点一下还原"的面板（本轮只核到这里）。
+- 跨会话还原缺磁盘依据：`PreviousParentGroup` 不落盘（第三节），要做就得自己带一层记录。
+- **右键菜单与拖放仍然没在真机屏幕上走过**。本轮的帧证明的是"命令跑得通、树会长会缩"，看不见菜单弹开的样子，
+  也看不见一次拖到回收站夹上被 `CanMoveKeePassEntry`（`KeePassManage.cs:188`）拒掉时的无高亮环——只有无头证据。
+- "把条目拖出回收站"没有正向入口（拖进去被拒，拖出来则要靠拖放且没有菜单退路）。
+- KeePass 树的条目搬家仍只有拖放；库页反过来只有选择器、不能拖。（#118 已登记，未动）
+- #120：1280x800 的库面板外层滚动会把标题与标签页顶出视口，1600x1000 不复现。
+- 片 D（历史、自定义图标、AutoType 序列、过期策略、标签、前景/背景色在读模型里仍丢）、
+  片 F（桌面端**新建**空库与 kotpass 磁盘形状未对拍、`<Generator>` 那条仍只推理未实测）沿用。
+- `KeePassVaultError.NoSourceFile` 在 `KeePassWriteFailureKey` 里映射到通用 key，当前分支走不到它（沿用 #117 的登记）。

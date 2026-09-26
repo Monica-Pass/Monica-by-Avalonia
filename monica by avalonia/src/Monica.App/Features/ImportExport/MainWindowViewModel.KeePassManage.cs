@@ -65,8 +65,49 @@ public sealed partial class MainWindowViewModel
         return (session.RootGroupUuid, session.RootGroupRow.Name);
     }
 
+    /// <summary>
+    /// Whether the entry the menu is open on already sits in the recycle bin. Out of there the only way
+    /// out is permanent, so the tree drops the recycle item and keeps the other one.
+    /// </summary>
+    public bool KeePassSelectedEntryInRecycleBin =>
+        _keePassVaultSession is { } session
+        && _selectedKeePassTreeRow?.Entry is { } entry
+        && session.IsInRecycleBin(entry.GroupUuid);
+
+    /// <summary>
+    /// Deleting an entry asks first and offers two depths: into the bin, where a KeePass file keeps it
+    /// until something else takes it out, and permanent, which also writes the database's record that
+    /// this entry is gone rather than merely hidden.
+    /// </summary>
     [RelayCommand]
-    private async Task DeleteKeePassEntryAsync()
+    private Task DeleteKeePassEntryAsync() =>
+        DeleteKeePassEntryAsync(KeePassDeleteMode.RecycleBin, ConfirmKeePassRecycleAsync);
+
+    [RelayCommand]
+    private Task DeleteKeePassEntryPermanentlyAsync() =>
+        DeleteKeePassEntryAsync(KeePassDeleteMode.Permanent, ConfirmKeePassPermanentAsync);
+
+    private Task<bool> ConfirmKeePassRecycleAsync(string entryTitle) =>
+        _confirmationDialogService.ConfirmAsync(
+            _localization.Get("MoveToRecycleBin"),
+            _localization.Format("KeePassRecycleEntryConfirmFormat", entryTitle),
+            _localization.Get("MoveToRecycleBin"),
+            _localization.Cancel);
+
+    private Task<bool> ConfirmKeePassPermanentAsync(string entryTitle) =>
+        _confirmationDialogService.ConfirmAsync(
+            _localization.Get("DeletePermanentlyConfirmationTitle"),
+            _localization.Format("DeletePermanentlyConfirmationMessageFormat", entryTitle),
+            _localization.Get("DeletePermanently"),
+            _localization.Cancel);
+
+    /// <summary>
+    /// The confirmation arrives as a callback so the artifact smoke run can walk the whole delete - the
+    /// one place a shipped binary is asked to prove it - without a modal sitting on the screen it photos.
+    /// </summary>
+    private async Task DeleteKeePassEntryAsync(
+        KeePassDeleteMode mode,
+        Func<string, Task<bool>> confirmAsync)
     {
         var session = _keePassVaultSession;
         var entry = _selectedKeePassTreeRow?.Entry;
@@ -76,15 +117,31 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        if (!await confirmAsync(entry.Title))
+        {
+            SetStatusNotice("KeePassImportCanceled");
+            return;
+        }
+
         try
         {
-            if (!await session.DeleteEntryAsync(entry.EntryUuid))
+            var status = await session.DeleteEntryAsync(entry.EntryUuid, mode);
+            if (status == KeePassEntryDeleteStatus.NotFound)
             {
                 SetStatusFailure("KeePassEntryGone");
                 return;
             }
 
             ClearKeePassSelectedRow();
+            if (status == KeePassEntryDeleteStatus.Recycled && session.RecycleBinUuid is { } binUuid)
+            {
+                // The entry left the folder it was opened in, so the folder it arrived in is the one to
+                // leave open - otherwise the row the user just acted on vanishes with no trace.
+                _keePassOpenFolders.Add(binUuid);
+                await RefreshKeePassAfterManageAsync(session, "KeePassEntryRecycledFormat", entry.Title);
+                return;
+            }
+
             await RefreshKeePassAfterManageAsync(session, "KeePassEntryDeletedFormat", entry.Title);
         }
         catch (Exception error)
@@ -95,7 +152,9 @@ public sealed partial class MainWindowViewModel
 
     /// <summary>
     /// Entries move the same way folders do - dragged onto the folder that should hold them - and a
-    /// drop on the folder the entry already sits in is not a move worth reporting.
+    /// drop on the folder the entry already sits in is not a move worth reporting. The recycle bin is
+    /// not a destination here: putting an entry in there is deleting it, and the delete path is the one
+    /// that says so.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanMoveKeePassEntry))]
     private async Task MoveKeePassEntryAsync(FolderMoveRequest? request)
@@ -127,10 +186,11 @@ public sealed partial class MainWindowViewModel
     }
 
     private bool CanMoveKeePassEntry(FolderMoveRequest? request) =>
-        _keePassVaultSession is not null
+        _keePassVaultSession is { } session
         && request?.Source is KeePassTreeRow { Entry: { } entry }
         && request.Target is KeePassTreeRow { Group: { } target }
-        && !string.Equals(entry.GroupUuid, target.Uuid, StringComparison.OrdinalIgnoreCase);
+        && !string.Equals(entry.GroupUuid, target.Uuid, StringComparison.OrdinalIgnoreCase)
+        && !session.IsInRecycleBin(target.Uuid);
 
     /// <summary>
     /// Publishes a structural change the way every other KeePass write does: the tree is rebuilt from

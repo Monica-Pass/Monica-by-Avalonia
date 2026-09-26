@@ -217,6 +217,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(CanEditKeePassEntry));
         OnPropertyChanged(nameof(CanManageSelectedKeePassFolder));
         OnPropertyChanged(nameof(CanManageKeePassRows));
+        OnPropertyChanged(nameof(KeePassSelectedEntryInRecycleBin));
     }
 
     private static string KeePassWriteFailureKey(KeePassVaultError error) => error switch

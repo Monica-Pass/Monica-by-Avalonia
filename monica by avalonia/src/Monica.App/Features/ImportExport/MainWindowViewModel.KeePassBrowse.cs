@@ -117,6 +117,19 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    /// <summary>
+    /// The tree writes the row it selected straight into the bound property, so a click - the only way
+    /// a real user selects - has to run the same load the command does. The guard keeps the command's
+    /// own write from cycling back through here.
+    /// </summary>
+    partial void OnSelectedKeePassTreeRowPublicChanged(KeePassTreeRow? value)
+    {
+        if (!ReferenceEquals(value, _selectedKeePassTreeRow))
+        {
+            _ = SelectKeePassRowAsync(value);
+        }
+    }
+
     [RelayCommand]
     private async Task SelectKeePassRowAsync(KeePassTreeRow? row)
     {

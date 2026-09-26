@@ -177,18 +177,22 @@ public sealed class KeePassVaultManageTests
     }
 
     [Fact]
-    public async Task Deleting_an_entry_drops_it_from_the_group_and_the_counts()
+    public async Task Deleting_an_entry_permanently_drops_it_from_the_group_and_the_counts()
     {
         var fixture = KeePassTestVault.Create("keepass-manage-entry-delete");
         using var session = await OpenAsync(fixture);
         var cloud = fixture.Groups.Single(group => group.Path == "Personal/Cloud");
         var target = fixture.Entries.Single(entry => entry.Title == KeePassTestVault.CloudTitle);
 
-        Assert.True(await session.DeleteEntryAsync(target.Uuid));
+        Assert.Equal(
+            KeePassEntryDeleteStatus.PermanentlyDeleted,
+            await session.DeleteEntryAsync(target.Uuid, KeePassDeleteMode.Permanent));
         Assert.Equal(1, session.EntryCount);
         Assert.Equal([], await session.ReadGroupRowsAsync(cloud.Uuid));
         Assert.Null(await session.ReadDetailAsync(cloud.Uuid, target.Uuid));
-        Assert.False(await session.DeleteEntryAsync(target.Uuid));
+        Assert.Equal(
+            KeePassEntryDeleteStatus.NotFound,
+            await session.DeleteEntryAsync(target.Uuid, KeePassDeleteMode.Permanent));
         Assert.True(session.IsDirty);
     }
 
@@ -242,7 +246,8 @@ public sealed class KeePassVaultManageTests
                 fixture.Groups.Single(group => group.Path == "Personal/Cloud").Uuid,
                 bank.Uuid);
             await session.DeleteEntryAsync(
-                fixture.Entries.Single(entry => entry.Title == KeePassTestVault.ExistingTitle).Uuid);
+                fixture.Entries.Single(entry => entry.Title == KeePassTestVault.ExistingTitle).Uuid,
+                KeePassDeleteMode.Permanent);
             await File.WriteAllBytesAsync(path, fixture.Content);
             await session.SaveToAsync(path);
         }
