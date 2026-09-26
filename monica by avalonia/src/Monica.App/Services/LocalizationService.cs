@@ -450,6 +450,10 @@ public interface ILocalizationService : INotifyPropertyChanged
     string KeePassImportTitle { get; }
     string KeePassImportDescription { get; }
     string KeePassMasterPassword { get; }
+    string KeePassConfirmMasterPassword { get; }
+    string NewKeePassDatabase { get; }
+    string KeePassCreate { get; }
+    string KeePassCreateDescription { get; }
     string KeePassInspect { get; }
     string KeePassImportNow { get; }
     string KeePassChooseDifferentFile { get; }
@@ -969,6 +973,10 @@ public sealed class LocalizationService : ILocalizationService
     public string KeePassImportTitle => Text();
     public string KeePassImportDescription => Text();
     public string KeePassMasterPassword => Text();
+    public string KeePassConfirmMasterPassword => Text();
+    public string NewKeePassDatabase => Text();
+    public string KeePassCreate => Text();
+    public string KeePassCreateDescription => Text();
     public string KeePassInspect => Text();
     public string KeePassImportNow => Text();
     public string KeePassChooseDifferentFile => Text();
@@ -2103,6 +2111,19 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassImportTitle"] = "KeePass KDBX",
         ["KeePassImportDescription"] = "Unlock locally, review the entry count, then confirm the import. The master password is cleared immediately after inspection.",
         ["KeePassMasterPassword"] = "KeePass master password",
+        ["KeePassConfirmMasterPassword"] = "Confirm master password",
+        ["NewKeePassDatabase"] = "New database",
+        ["KeePassCreate"] = "Create database",
+        ["KeePassCreateDescription"] = "Monica writes a new, empty database to the file you name, and the database takes its display name from that file. The master password is never stored and cannot be recovered.",
+        ["KeePassCreatePasswordMismatch"] = "The two passwords do not match.",
+        ["KeePassCreatePasswordRequired"] = "Set a master password for the new database.",
+        ["KeePassCreateLocationUnavailable"] = "This system cannot choose where to save the new database.",
+        ["KeePassCreateNoLocalPath"] = "The chosen location gave no local file path, so Monica cannot create a database there.",
+        ["KeePassCreateFileExists"] = "That file already exists. Open it instead - Monica will not create over it.",
+        ["KeePassCreateWriting"] = "Writing the new KeePass database...",
+        ["KeePassCreatedFormat"] = "Created {0} and opened it.",
+        ["KeePassDiscardBeforeCreating"] = "Save or close the opened KeePass database before creating a new one.",
+        ["KeePassCreateFailed"] = "The KeePass database could not be created.",
         ["KeePassInspect"] = "Inspect",
         ["KeePassImportNow"] = "Import reviewed entries",
         ["KeePassChooseDifferentFile"] = "Choose a different file",
@@ -3141,6 +3162,19 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassImportTitle"] = "KeePass KDBX",
         ["KeePassImportDescription"] = "在本地解锁并检查条目数量，确认后再导入。检查完成后会立即清除主密码。",
         ["KeePassMasterPassword"] = "KeePass 主密码",
+        ["KeePassConfirmMasterPassword"] = "确认主密码",
+        ["NewKeePassDatabase"] = "新建数据库",
+        ["KeePassCreate"] = "创建数据库",
+        ["KeePassCreateDescription"] = "Monica 会在你指定的位置新建一个空的数据库，库名取自文件名。主密码不会被保存，也无法找回。",
+        ["KeePassCreatePasswordMismatch"] = "两次输入的主密码不一致。",
+        ["KeePassCreatePasswordRequired"] = "请为新数据库设置主密码。",
+        ["KeePassCreateLocationUnavailable"] = "当前系统无法选择新数据库的保存位置。",
+        ["KeePassCreateNoLocalPath"] = "所选位置没有给出本地文件路径，Monica 无法在那里新建数据库。",
+        ["KeePassCreateFileExists"] = "该文件已存在。请改为打开它，Monica 不会覆盖已有文件。",
+        ["KeePassCreateWriting"] = "正在写入新的 KeePass 数据库……",
+        ["KeePassCreatedFormat"] = "已创建并打开 {0}。",
+        ["KeePassDiscardBeforeCreating"] = "请先保存或关闭当前打开的 KeePass 数据库，再新建一个。",
+        ["KeePassCreateFailed"] = "KeePass 数据库创建失败。",
         ["KeePassInspect"] = "检查",
         ["KeePassImportNow"] = "导入已检查条目",
         ["KeePassChooseDifferentFile"] = "选择其他文件",

@@ -42,6 +42,13 @@ public sealed record PickedTextFile(string FileName, string Content);
 /// </param>
 public sealed record PickedBinaryFile(string FileName, byte[] Content, string? FullPath = null);
 
+/// <param name="FullPath">
+/// The local path the named file would live at, when the platform exposes one. A caller that makes the
+/// bytes itself needs this: naming a file without knowing where it goes leaves it nowhere to save back
+/// to, so every later save has to ask again.
+/// </param>
+public sealed record PickedSaveTarget(string FileName, string? FullPath = null);
+
 public interface ISecretProtector
 {
     PlatformIntegrationCapability Capability { get; }
@@ -56,6 +63,14 @@ public interface IFileSystemPickerService
     Task<PickedBinaryFile?> OpenBinaryFileAsync(string title, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default);
     Task<string?> SaveTextFileAsync(string title, string suggestedFileName, string content, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default);
     Task<string?> SaveBinaryFileAsync(string title, string suggestedFileName, ReadOnlyMemory<byte> content, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Asks where a file should go and writes nothing there. The two save methods above take the content
+    /// because they are the writer; a caller that produces the bytes itself - a brand-new database, whose
+    /// payload has to reach disk through the same atomic write every other database write uses - needs a
+    /// destination rather than a hand-off.
+    /// </summary>
+    Task<PickedSaveTarget?> PickSaveFileTargetAsync(string title, string suggestedFileName, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default);
 }
 
 public interface IBrowserBridgeService : IDisposable
@@ -309,6 +324,9 @@ public sealed class CapabilityOnlyFileSystemPickerService(IPlatformIntegrationSe
         throw CreateUnsupportedException();
 
     public Task<string?> SaveBinaryFileAsync(string title, string suggestedFileName, ReadOnlyMemory<byte> content, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
+        throw CreateUnsupportedException();
+
+    public Task<PickedSaveTarget?> PickSaveFileTargetAsync(string title, string suggestedFileName, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
         throw CreateUnsupportedException();
 
     private InvalidOperationException CreateUnsupportedException() =>

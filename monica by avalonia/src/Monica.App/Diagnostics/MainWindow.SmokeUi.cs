@@ -801,6 +801,152 @@ public partial class MainWindow
     }
 
     /// <summary>
+    /// One frame of the new-database form out of the shipped binary, with the master password typed into
+    /// the controls' own text boxes instead of set on the view model - the mask and the two-way binding are
+    /// exactly the parts that only exist once the XAML has been applied. Nothing is written to disk here:
+    /// the create command asks the operating system where the file goes, and a gate that had to dismiss a
+    /// native dialog on the way to red is not a gate. What this does prove is that the entry point is
+    /// reachable with no database open, that both fields stay masked, that the button refuses a mismatch,
+    /// and that backing out of the form takes the typed text off the screen with it.
+    /// </summary>
+    public async Task<bool> RunSmokeUiKeePassCreateShotAsync(
+        string password,
+        string? screenshotDirectory)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            return await Dispatcher.UIThread.InvokeAsync(
+                () => RunSmokeUiKeePassCreateShotAsync(password, screenshotDirectory));
+        }
+
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            AppDiagnostics.Info("Smoke UI KeePass create shot failed. reason=no-view-model");
+            return false;
+        }
+
+        try
+        {
+            var keepassTab = await RealizeSmokeKeePassImportTabAsync("create shot");
+            if (keepassTab is null)
+            {
+                return false;
+            }
+
+            await Task.Delay(250);
+            T? Find<T>(string name)
+                where T : Control =>
+                this.GetVisualDescendants().OfType<T>().FirstOrDefault(control => control.Name == name);
+
+            var entryButton = Find<Button>("NewKeePassVaultButton");
+            var entryOnScreen = entryButton is { IsVisible: true, IsEnabled: true } &&
+                entryButton.Bounds.Width > 0 &&
+                entryButton.Bounds.Height > 0;
+            var collapsedBefore = Find<StackPanel>("KeePassCreateForm") is { IsVisible: false };
+
+            entryButton?.Command?.Execute(null);
+            await Task.Delay(250);
+
+            var form = Find<StackPanel>("KeePassCreateForm");
+            var passwordBox = Find<TextBox>("KeePassCreatePasswordBox");
+            var confirmBox = Find<TextBox>("KeePassCreateConfirmPasswordBox");
+            var mismatch = Find<TextBlock>("KeePassCreatePasswordMismatchText");
+            var createButton = Find<Button>("CreateKeePassVaultButton");
+            var cancelButton = Find<Button>("CancelKeePassVaultCreateButton");
+
+            var formOnScreen = form is { IsVisible: true } &&
+                form.Bounds.Width > 0 &&
+                form.Bounds.Height > 0;
+            var boxesOnScreen = passwordBox is { IsVisible: true } &&
+                passwordBox.Bounds.Width > 0 &&
+                confirmBox is { IsVisible: true } &&
+                confirmBox.Bounds.Width > 0;
+            var masked = passwordBox?.PasswordChar == '*' && confirmBox?.PasswordChar == '*';
+            var darkUntilTyped = createButton is { IsVisible: true, IsEnabled: false };
+
+            if (passwordBox is not null && confirmBox is not null)
+            {
+                passwordBox.Text = password;
+                confirmBox.Text = password + "x";
+            }
+
+            await Task.Delay(250);
+            var mismatchShown = mismatch is { IsVisible: true } && !string.IsNullOrEmpty(mismatch.Text);
+            var darkWhileMismatching = createButton is { IsEnabled: false };
+
+            if (confirmBox is not null)
+            {
+                confirmBox.Text = password;
+            }
+
+            await Task.Delay(250);
+            var mismatchGone = mismatch is { IsVisible: false };
+            var readyToCreate = createButton is { IsEnabled: true };
+
+            var painted = form is not null
+                ? form.GetVisualDescendants().OfType<TextBlock>().Select(text => text.Text ?? "").ToList()
+                : [];
+            var paintedSecretFree = password.Length == 0 ||
+                !painted.Any(text => text.Contains(password, StringComparison.Ordinal));
+
+            var frame = await CaptureSmokeFrameAsync();
+            var frameBytes = frame?.Length ?? 0;
+            var wantedFile = !string.IsNullOrWhiteSpace(screenshotDirectory);
+            var written = false;
+            var fileName = "";
+            if (wantedFile && frameBytes > 0)
+            {
+                Directory.CreateDirectory(screenshotDirectory!);
+                fileName = $"KeePassCreate_{Math.Max(1, (int)Math.Round(Bounds.Width))}x" +
+                    $"{Math.Max(1, (int)Math.Round(Bounds.Height))}.png";
+                var path = Path.Combine(screenshotDirectory!, fileName);
+                File.WriteAllBytes(path, frame!);
+                written = new FileInfo(path).Length > 0;
+            }
+
+            cancelButton?.Command?.Execute(null);
+            await Task.Delay(250);
+            var wipedOnCancel = form is { IsVisible: false } &&
+                string.IsNullOrEmpty(passwordBox?.Text) &&
+                string.IsNullOrEmpty(confirmBox?.Text) &&
+                viewModel.KeePassCreatePassword.Length == 0 &&
+                viewModel.KeePassCreateConfirmation.Length == 0;
+
+            var success = entryOnScreen &&
+                collapsedBefore &&
+                formOnScreen &&
+                boxesOnScreen &&
+                masked &&
+                darkUntilTyped &&
+                mismatchShown &&
+                darkWhileMismatching &&
+                mismatchGone &&
+                readyToCreate &&
+                paintedSecretFree &&
+                wipedOnCancel &&
+                keepassTab.IsSelected &&
+                frameBytes > 0 &&
+                (!wantedFile || written);
+            AppDiagnostics.Info(
+                $"Smoke UI KeePass create shot result. success={success}, entryOnScreen={entryOnScreen}, " +
+                $"collapsedBefore={collapsedBefore}, formOnScreen={formOnScreen}, " +
+                $"boxesOnScreen={boxesOnScreen}, masked={masked}, darkUntilTyped={darkUntilTyped}, " +
+                $"mismatchShown={mismatchShown}, darkWhileMismatching={darkWhileMismatching}, " +
+                $"mismatchGone={mismatchGone}, readyToCreate={readyToCreate}, " +
+                $"typedChars={password.Length}, paintedTexts={painted.Count}, " +
+                $"paintedSecretFree={paintedSecretFree}, wipedOnCancel={wipedOnCancel}, " +
+                $"tabSelected={keepassTab.IsSelected}, frameBytes={frameBytes}, " +
+                $"written={written}, file={fileName}");
+            return success;
+        }
+        catch (Exception ex)
+        {
+            AppDiagnostics.Error("Smoke UI KeePass create shot failed", ex);
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Walks the window to the opened-database tab both KeePass shots capture from. Returns the tab so
     /// a caller can prove it stayed selected in the frame it captured, or null after logging why it
     /// could not get there.

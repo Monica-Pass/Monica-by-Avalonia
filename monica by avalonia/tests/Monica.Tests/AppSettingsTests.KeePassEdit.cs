@@ -298,7 +298,7 @@ public sealed partial class AppSettingsTests
 
         Assert.True(viewModel.HasKeePassImportPreview);
         Assert.False(viewModel.ShowKeePassOpenForm);
-        Assert.Equal("", viewModel.KeePassImportPassword);
+        Assert.Equal(0, viewModel.KeePassImportPassword.Length);
     }
 
     private static async Task OpenKeePassVaultAsync(MainWindowViewModel viewModel, string password)
@@ -366,5 +366,8 @@ public sealed partial class AppSettingsTests
             File.WriteAllBytes(saveTarget, content.ToArray());
             return Task.FromResult<string?>(Path.GetFileName(saveTarget));
         }
+
+        public Task<PickedSaveTarget?> PickSaveFileTargetAsync(string title, string suggestedFileName, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
+            Task.FromResult<PickedSaveTarget?>(null);
     }
 }

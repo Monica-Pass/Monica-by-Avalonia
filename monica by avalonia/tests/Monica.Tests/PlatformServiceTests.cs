@@ -510,10 +510,13 @@ public sealed partial class PlatformServiceTests
             service.SaveTextFileAsync("Save", "monica.json", "{}", [new PlatformFilePickerFileType("JSON", ["*.json"])]));
         var binarySaveError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.SaveBinaryFileAsync("Save", "attachment.bin", new byte[] { 1, 2, 3 }, [new PlatformFilePickerFileType("Binary", ["*.bin"])]));
+        var targetError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.PickSaveFileTargetAsync("Save", "vault.kdbx", [new PlatformFilePickerFileType("KDBX", ["*.kdbx"])]));
 
         Assert.Contains("No picker", openError.Message);
         Assert.Contains("No picker", saveError.Message);
         Assert.Contains("No picker", binarySaveError.Message);
+        Assert.Contains("No picker", targetError.Message);
     }
 
     [Fact]

@@ -468,5 +468,11 @@ public sealed class KeePassEditWorkflowUiTests
             ReadOnlyMemory<byte> content,
             IReadOnlyList<PlatformFilePickerFileType> fileTypes,
             CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
+
+        public Task<PickedSaveTarget?> PickSaveFileTargetAsync(
+            string title,
+            string suggestedFileName,
+            IReadOnlyList<PlatformFilePickerFileType> fileTypes,
+            CancellationToken cancellationToken = default) => Task.FromResult<PickedSaveTarget?>(null);
     }
 }

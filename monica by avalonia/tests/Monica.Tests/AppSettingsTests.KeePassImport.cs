@@ -173,5 +173,8 @@ public sealed partial class AppSettingsTests
 
         public Task<string?> SaveBinaryFileAsync(string title, string suggestedFileName, ReadOnlyMemory<byte> content, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
             Task.FromResult<string?>(null);
+
+        public Task<PickedSaveTarget?> PickSaveFileTargetAsync(string title, string suggestedFileName, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
+            Task.FromResult<PickedSaveTarget?>(null);
     }
 }

@@ -238,6 +238,7 @@ try {
             '--smoke-ui-keepass-manage', $keepassShotPath,
             '--smoke-ui-keepass-search', $keepassShotPath,
             '--smoke-ui-keepass-search-query', 'example.com',
+            '--smoke-ui-keepass-create',
             '--smoke-ui-lock-after-checks',
             '--smoke-ui-exit-after-checks'
         )
@@ -249,7 +250,8 @@ try {
         $gateLines = @(Get-Content -LiteralPath $uiLog | Select-String -SimpleMatch `
             'release gate completed', 'budget result', 'check failed', 'lock cycle result',
             'KeePass probe', 'status notice retirement', 'locked settle result',
-            'KeePass edit shot', 'KeePass manage shot', 'KeePass search shot')
+            'KeePass edit shot', 'KeePass manage shot', 'KeePass search shot',
+            'KeePass create shot')
         foreach ($line in $gateLines) { Write-Host ($line.Line -replace '^\[[^\]]+\]\s*', '') }
         $gateLine = $gateLines | Where-Object { $_.Line -match 'release gate completed' } | Select-Object -Last 1
         if ($null -eq $gateLine) {
@@ -273,9 +275,10 @@ try {
 
         # The edit form, the row commands and the search box are reachable only behind a native file
         # dialog, so these in-process frames are the whole proof that the shipped binary draws them - the
-        # search one also holds the only check that a rendered row never carries a protected value. A run
-        # where any of them stopped painting would otherwise leave the gate green.
-        foreach ($shot in @('KeePass edit shot', 'KeePass manage shot', 'KeePass search shot')) {
+        # search one also holds the only check that a rendered row never carries a protected value, and the
+        # create one is the only frame that ever shows the new-database form. A run where any of them
+        # stopped painting would otherwise leave the gate green.
+        foreach ($shot in @('KeePass edit shot', 'KeePass manage shot', 'KeePass search shot', 'KeePass create shot')) {
             $shotLine = @($gateLines | Where-Object { $_.Line -match "$shot result" }) | Select-Object -Last 1
             if ($null -eq $shotLine) {
                 throw "smoke-ui produced no $shot result line."
@@ -303,6 +306,31 @@ try {
 
         if ($manageLine.Line -notmatch 'recycleBinEmptied=True') {
             throw "KeePass manage shot did not empty the recycle bin folder: $($manageLine.Line)"
+        }
+
+        # The create form is the only path that can produce a .kdbx, and its three promises are all
+        # things a unit test cannot make: the master password is never drawn in the clear, disagreeing
+        # confirmations keep the command dark, and cancelling wipes what was typed. Each is named so a
+        # build that quietly stopped honouring one of them fails here instead of only in the log.
+        $createLine = @($gateLines | Where-Object { $_.Line -match 'KeePass create shot result' }) | Select-Object -Last 1
+        if ($createLine.Line -notmatch 'masked=True') {
+            throw "KeePass create shot drew the master password in the clear: $($createLine.Line)"
+        }
+
+        if ($createLine.Line -notmatch 'mismatchShown=True' -or $createLine.Line -notmatch 'darkWhileMismatching=True') {
+            throw "KeePass create shot let a mismatched confirmation through: $($createLine.Line)"
+        }
+
+        if ($createLine.Line -notmatch 'readyToCreate=True') {
+            throw "KeePass create shot never armed create once the passwords agreed: $($createLine.Line)"
+        }
+
+        if ($createLine.Line -notmatch 'paintedSecretFree=True') {
+            throw "KeePass create shot painted a typed secret somewhere it should not appear: $($createLine.Line)"
+        }
+
+        if ($createLine.Line -notmatch 'wipedOnCancel=True') {
+            throw "KeePass create shot left the typed passwords behind after cancel: $($createLine.Line)"
         }
 
         # Same reason: the dispatcher timer that retires status acknowledgements only exists in a

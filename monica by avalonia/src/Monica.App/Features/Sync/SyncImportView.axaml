@@ -68,12 +68,20 @@
                         <TextBlock Text="{Binding L.KeePassImportTitle}" FontSize="20" FontWeight="SemiBold" />
                         <TextBlock Text="{Binding L.KeePassImportDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
-                    <Button x:Name="SelectKeePassFileButton" Classes="workspaceCommand" Command="{Binding SelectKeePassFileCommand}" IsEnabled="{Binding IsKeePassImportIdle}" HorizontalAlignment="Left" AutomationProperties.Name="{Binding L.SelectKeePassFile}">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:FluentIcon Icon="Folder" FontSize="18" />
-                            <TextBlock Text="{Binding L.SelectKeePassFile}" />
-                        </StackPanel>
-                    </Button>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="SelectKeePassFileButton" Classes="workspaceCommand" Command="{Binding SelectKeePassFileCommand}" IsEnabled="{Binding IsKeePassImportIdle}" HorizontalAlignment="Left" AutomationProperties.Name="{Binding L.SelectKeePassFile}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="Folder" FontSize="18" />
+                                <TextBlock Text="{Binding L.SelectKeePassFile}" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="NewKeePassVaultButton" Classes="workspaceCommand" Command="{Binding NewKeePassVaultCommand}" IsEnabled="{Binding IsKeePassImportIdle}" HorizontalAlignment="Left" AutomationProperties.Name="{Binding L.NewKeePassDatabase}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="Add" FontSize="18" />
+                                <TextBlock Text="{Binding L.NewKeePassDatabase}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                     <TextBlock x:Name="KeePassSelectedFileText" Text="{Binding KeePassSelectedFileName}" IsVisible="{Binding HasKeePassSelectedFile}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                     <StackPanel Spacing="8" IsVisible="{Binding ShowKeePassOpenForm}" IsEnabled="{Binding IsKeePassImportIdle}">
                         <TextBlock Text="{Binding L.KeePassMasterPassword}" FontSize="12" FontWeight="SemiBold" />
@@ -81,6 +89,22 @@
                         <Button x:Name="PreviewKeePassImportButton" Classes="workspacePrimaryCommand" Command="{Binding PreviewKeePassImportCommand}" HorizontalAlignment="Left" AutomationProperties.Name="{Binding L.KeePassInspect}">
                             <TextBlock Text="{Binding L.KeePassInspect}" />
                         </Button>
+                    </StackPanel>
+                    <StackPanel x:Name="KeePassCreateForm" Spacing="8" IsVisible="{Binding ShowKeePassCreateForm}" IsEnabled="{Binding IsKeePassImportIdle}">
+                        <TextBlock Text="{Binding L.KeePassCreateDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Text="{Binding L.KeePassMasterPassword}" FontSize="12" FontWeight="SemiBold" />
+                        <TextBox x:Name="KeePassCreatePasswordBox" MaxWidth="420" PasswordChar="*" Text="{Binding KeePassCreatePassword}" AutomationProperties.Name="{Binding L.KeePassMasterPassword}" />
+                        <TextBlock Text="{Binding L.KeePassConfirmMasterPassword}" FontSize="12" FontWeight="SemiBold" />
+                        <TextBox x:Name="KeePassCreateConfirmPasswordBox" MaxWidth="420" PasswordChar="*" Text="{Binding KeePassCreateConfirmation}" AutomationProperties.Name="{Binding L.KeePassConfirmMasterPassword}" />
+                        <TextBlock x:Name="KeePassCreatePasswordMismatchText" Text="{Binding KeePassCreatePasswordErrorText}" IsVisible="{Binding ShowsKeePassCreatePasswordMismatch}" FontSize="12" Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="CreateKeePassVaultButton" Classes="workspacePrimaryCommand" Command="{Binding CreateKeePassVaultCommand}" IsEnabled="{Binding CanCreateKeePassVault}" HorizontalAlignment="Left" AutomationProperties.Name="{Binding L.KeePassCreate}">
+                                <TextBlock Text="{Binding L.KeePassCreate}" />
+                            </Button>
+                            <Button x:Name="CancelKeePassVaultCreateButton" Classes="workspaceCommand" Command="{Binding CancelKeePassVaultCreateCommand}" HorizontalAlignment="Left">
+                                <TextBlock Text="{Binding L.Cancel}" />
+                            </Button>
+                        </StackPanel>
                     </StackPanel>
                     <StackPanel Spacing="7" IsVisible="{Binding IsKeePassImportBusy}">
                         <ProgressBar x:Name="KeePassImportProgress" IsIndeterminate="{Binding IsKeePassImportProgressIndeterminate}" Maximum="{Binding KeePassImportProgressMaximum}" Value="{Binding KeePassImportProgress}" AutomationProperties.Name="{Binding KeePassImportProgressText}" />

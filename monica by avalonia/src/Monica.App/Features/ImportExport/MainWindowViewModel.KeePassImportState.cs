@@ -60,9 +60,11 @@ public sealed partial class MainWindowViewModel
     /// <summary>
     /// The master password is cleared the moment a database unlocks, so the field that took it can
     /// only ever render empty afterwards. Retiring it keeps the browse tree above the fold; closing
-    /// the file brings the open form back.
+    /// the file brings the open form back. The create form wants the same stretch of screen, so the
+    /// two never show at once.
     /// </summary>
-    public bool ShowKeePassOpenForm => HasKeePassSelectedFile && !HasKeePassImportPreview;
+    public bool ShowKeePassOpenForm =>
+        HasKeePassSelectedFile && !HasKeePassImportPreview && !ShowKeePassCreateForm;
     public bool IsKeePassImportIdle => !IsKeePassImportBusy;
     public string KeePassPreviewSummaryText => _keePassVaultSession is null
         ? _localization.Get("KeePassPreviewEmpty")
@@ -117,6 +119,7 @@ public sealed partial class MainWindowViewModel
     private void ClearKeePassImportState(bool cancelActiveOperation, bool keepUnsavedDatabase = false)
     {
         KeePassImportPassword = "";
+        ClearKeePassCreateForm();
         if (keepUnsavedDatabase && KeePassVaultIsDirty)
         {
             return;

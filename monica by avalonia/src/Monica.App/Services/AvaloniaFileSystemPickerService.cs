@@ -142,6 +142,28 @@ public sealed class AvaloniaFileSystemPickerService(
         return file.Name;
     }
 
+    public async Task<PickedSaveTarget?> PickSaveFileTargetAsync(
+        string title,
+        string suggestedFileName,
+        IReadOnlyList<PlatformFilePickerFileType> fileTypes,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        EnsureUsable();
+
+        var owner = ownerProvider();
+        var file = await owner.StorageProvider.SaveFilePickerAsync(CreateSaveOptions(title, suggestedFileName, fileTypes));
+        if (file is null)
+        {
+            return null;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        // Nothing is opened here on purpose: the file a Windows save dialog names may already exist, and
+        // truncating it before the caller has bytes to put in it would destroy a vault to ask a question.
+        return new PickedSaveTarget(file.Name, file.TryGetLocalPath());
+    }
+
     private void EnsureUsable()
     {
         if (!Capability.IsUsable)

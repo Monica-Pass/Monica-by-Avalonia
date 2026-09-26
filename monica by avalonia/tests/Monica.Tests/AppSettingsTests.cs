@@ -1592,6 +1592,13 @@ public sealed partial class AppSettingsTests
             SaveFileTypes = fileTypes;
             return Task.FromResult(savedFileName);
         }
+
+        public Task<PickedSaveTarget?> PickSaveFileTargetAsync(string title, string suggestedFileName, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default)
+        {
+            SuggestedFileName = suggestedFileName;
+            SaveFileTypes = fileTypes;
+            return Task.FromResult<PickedSaveTarget?>(null);
+        }
     }
 
     private sealed class CapturingWebDavBackupService(IReadOnlyList<RemoteFileEntry> entries) : IWebDavBackupService

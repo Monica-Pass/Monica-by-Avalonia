@@ -5037,6 +5037,9 @@ public sealed partial class PasswordManagementTests
             SavedBinaryContent = content.ToArray();
             return Task.FromResult(CancelBinarySave ? null : suggestedFileName);
         }
+
+        public Task<PickedSaveTarget?> PickSaveFileTargetAsync(string title, string suggestedFileName, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
+            Task.FromResult<PickedSaveTarget?>(null);
     }
 
     private sealed class BlockingImportExportService : IImportExportService

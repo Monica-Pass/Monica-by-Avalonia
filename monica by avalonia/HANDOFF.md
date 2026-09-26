@@ -2087,3 +2087,109 @@ Release `--warnaserror` 0 warning / 0 error、`Commercial release verification p
 - #120：1280x800 库面板外层滚动会把标题与标签页顶出视口。
 - 沿用上一轮：右键与拖放仍未在真机屏幕上走过；桌面还原不能人选目标夹；清空没有撤销；
   Android 侧无"清空回收站"对拍对象，删除记录集合形状仍是桌面端自定的。
+
+## 附：界面上的「新建数据库」入口（2026-09-27，**#126 片 F-2 出厂：桌面上第一次有人能真产出一个 .kdbx，并且"表单画在屏上、两栏是掩码的"本身成了断言**）
+
+### 一、这一轮把什么变成了事实
+
+- 新增 `src/Monica.App/Features/ImportExport/MainWindowViewModel.KeePassCreate.cs`（172 行）。
+  `NewKeePassVault:56` 只把表单展开，`CreateKeePassVaultAsync:69` 才走完整链子。
+- 按钮亮不亮只看表单自己的状态：`CanCreateKeePassVault:35` = 两行一致且都不是空。**为什么"这台机器能不能落盘"
+  不放进这里**（理由写在 :29-34）：按钮长期灰着、没人读得到原因，那是界面上的哑失败；这条判断留在命令里，
+  红了走状态栏（`CanUseFilePicker:71` → `KeePassCreateLocationUnavailable`）。
+- 命令里的守卫按"人看得懂"的顺序排：空/全空格密码 `:77` → 两行不一致 `:83` → 已打开的库还有没保存的改动 `:89`
+  → 另一次操作正在进行 `:95` → 选择器给的位置：没有本地路径 `:118`、**文件已经在那儿了** `:124`。
+- `:124` 拒的是覆盖，并且明确**不接受系统保存框自己的"要替换吗"**（:115-117 就是这句理由）：那个对话框问的
+  不是库，按它的期待答一次，就把一座能解锁的库清成新的空库。
+- 取消不是失败：`target is null` → `SetStatusNotice("KeePassImportCanceled")`（:109-113），8 秒自己退场。
+- 建完当场把会话挂上（:139 起）：会话拿到真 `SourcePath`，之后的保存就地写字节、**不再第二次问位置**。
+  这条本轮被证明了两遍——单测 `Creating_a_database_lands_where_the_picker_named_it_and_saves_there_afterwards:19`
+  与 UI `KeePass_create_from_the_tab_writes_a_vault_that_the_same_pane_saves_in_place:136`。
+- 平台侧只多一个动作：`PickSaveFileTargetAsync`（`PlatformIntegrationServices.cs:73` /
+  `AvaloniaFileSystemPickerService.cs:145`，返回 `PickedSaveTarget:50`）——**只要位置，不写任何字节**。
+  为什么非这样不可，见第二节。
+- 名字只有一个来源：`KeePassNewDatabaseFileName = "database.kdbx":13` 只是给人看的建议名，落盘后库名取文件基名
+  （#125 的 `ApplyAndroidShape`）。Android 那个独立的"库名"输入框和文件名清洗**没有照搬**——桌面这边保存对话框
+  本身就是命名的地方。
+- 界面：`SyncImportView.axaml:78` 入口按钮、`:93-108` 表单，两栏 `PasswordChar="*"`（:96/:98），不一致的红字 :99，
+  创建 :101、取消。本地化 4 个界面键 + 13 组中英状态文案（EN `LocalizationService.cs:2114-2126`、ZH :3165-3177）。
+- 沿用房内规矩：不用 `NotifyCanExecuteChangedFor`；嵌套面板 `IsEnabled="{Binding IsKeePassImportIdle}"`（:93）
+  与按钮自己的 `CanCreateKeePassVault`（:101）各管一层，组合出来就是"上一次操作还在跑时整块不能碰"。
+
+### 二、为什么是"只问位置"，不是"保存框一把梭"
+
+Avalonia 的 `SaveFilePicker` 拿到句柄就能直接写，看着能省掉 `PickSaveFileTargetAsync`。省不掉的理由是
+**这个文件之后还要再写很多次**：拿住路径，新建的库第一次保存就不该再问一遍，而 #117 的脏库守卫、外部改动检测、
+原子写全都按"有 `SourcePath`"工作。代价是路径与字节之间留了一段窗口（这期间文件可能被别人建出来），
+所以 `:124` 的"已经存在就拒"必须在**写入前**再判一次，而不是信对话框。
+
+### 三、真产物截图门（这轮新接的那一格）
+
+`--smoke-ui-keepass-create`（`MainWindow.SmokeUi.cs:812`，分发在 `App.SmokeUi.cs:317`）。它是**唯一一帧在什么库
+都没开的情况下走到表单**的：
+- 文本是打进控件自己的 `Text`，不是设 VM——掩码与双向绑定恰恰是"XAML 应用之后才存在"的那部分。
+- 这一帧不落盘：创建命令要问操作系统文件去哪，而一个必须先关掉原生模态框才能变红的门不配当门。
+- 走一遍：入口可达 → 表单原本是收起的 → 展开 → 两栏可见且宽 > 0 → `PasswordChar == '*'` → 未输入时按钮暗 →
+  两行不一致时红字出现且按钮仍暗 → 一致后红字退、按钮亮 → 表单画出的 10 段文字里没有一个含打过的字 → 抓帧 →
+  取消后表单收起、两个框的 `Text` 与 VM 字段全空。
+- CI 现在硬要这一行，并且逐字段命名（`verify-artifact-runtime.ps1:315-331`）：`masked` /
+  `mismatchShown`+`darkWhileMismatching` / `readyToCreate` / `paintedSecretFree` / `wipedOnCancel`。
+  任一字段软掉就停跑，而不是记一行没人看的日志。本轮实测读数：`success=True … masked=True, darkUntilTyped=True,
+  mismatchShown=True, darkWhileMismatching=True, mismatchGone=True, readyToCreate=True, paintedSecretFree=True,
+  wipedOnCancel=True, frameBytes=93604`。另外手工带 `--smoke-ui-screenshot-dir` 跑了一次（1280x800，
+  `KeePassCreate_1280x800.png`，84524 字节），人眼确认：中文界面、两栏全是星号、蓝色"创建数据库" + "取消"、无明文。
+
+### 四、负控（每条先看见红，跑完还原并核对 sha256）
+
+六道全打在**界面 seam** 上（`tests/Monica.UiTests/KeePassCreateWorkflowUiTests.cs`，每轮 `Total: 2, Failed: 1`，
+只红对应那条）：
+
+| 拆掉的东西 | 红在哪 | 实测 |
+|---|---|---|
+| A 表单 `IsVisible="{Binding ShowKeePassCreateForm}"` 钉成 False | 表单从没在屏上出现 | 1 红（test 1），消息就是那句"the create form never came up on screen" |
+| B 第一个密码框去掉 `PasswordChar="*"` | 掩码 | 1 红（test 1）；test 2 不查掩码所以照绿——掩码这一条只由 test 1 承重 |
+| C 创建按钮去掉 `IsEnabled="{Binding CanCreateKeePassVault}"` | 没输完就该是暗的 | 1 红：`Assert.False()` Expected False / Actual True |
+| D 命令里的不一致守卫 :83-87 删掉 | 深度防线 | 1 红，正好红在 `Assert.Equal(0, picker.TargetCalls)`（Expected 0 / Actual 1）——"按钮灰着"与"命令拒了"被分开了 |
+| E `CreateAsync` 的 `target.FullPath` 换成 `null` | 建完就地保存 | test 2 更早就红：`Assert.True(File.Exists(targetPath))`，即没有路径时**那个位置一个字节都没写出** |
+| F `ClearKeePassCreateForm` 里两句擦除删掉 | 取消要带走打过的字 | test 1 红在 `Assert.Equal("", passwordBox.Text)` |
+
+F 这一条留下一个必须记的口子：xunit 自己把那个框的内容打进了失败输出
+（`Actual: "created-vault-fixture-not-a-secret"`）。这里是 CI 的 fixture 字面量、不是秘密，但**泄漏路径是真的**——
+以后这类断言不能回显值。本轮随即把三处改成不回显的写法——新 seam 的两处换成 `Assert.True(string.IsNullOrEmpty(…))`、VM 的两处换成 `Assert.Equal(0, ….Length)`，另把 #117 留在 `AppSettingsTests.KeePassEdit.cs:301` 的同一形状一起改掉——复跑 UI 类 `Total: 2, Failed: 0`、那条单测 1 绿、`dotnet format` 0 改动。
+
+还原后核对：`MainWindowViewModel.KeePassCreate.cs` sha256 `30979184a8281791d09fc8331644…`、
+`SyncImportView.axaml` `1dde2c1d9f839d422c27444ce7bc…`，与动手前快照逐字节一致（每轮只用 Edit 工具打补丁，
+跑完立即还原并核哈希；上一轮 `sed -i` 吃掉 CRLF 的教训沿用）。
+
+### 五、测试与证据
+
+- 单测 `tests/Monica.Tests/AppSettingsTests.KeePassCreate.cs`（新增 310 行，8 条全绿）：
+  落在选择器命名的位置并在那儿保存 `:19`、已存在就拒 `:86`、位置给不出本地路径时说明原因 `:114`、
+  取消选址不算失败 `:133`、表单等两行一致 `:153`、全空格主控密码到不了磁盘 `:197`、
+  离开导入工作区会擦掉打过的密码 `:218`、退出表单不动已解锁的库 `:239`。
+  已有测试文件里 13 处 picker 假实现各补了 `PickSaveFileTargetAsync`（分布在 11 个文件里）。
+- UI `tests/Monica.UiTests/KeePassCreateWorkflowUiTests.cs`（新增 360 行，2 条）：第三节说的那两件事——
+  表单真的被画出来且是掩码的、以及"建完同一块面板能塞条目并就地保存回去"。断言只碰布尔、计数、id、字节数和标题；
+  `AssertPaintedWithoutSecrets` 先要求收集到的可见文字**非空**（不然"什么都没画"也能算过），再要求没有一段含打过的字。
+- 假选择器 `CreateTargetFilePicker` 记 `TargetCalls / ReceivedSuggestedFileName / ReceivedFileTypes`，
+  "只问一次位置"就是保存前后 `TargetCalls` 都等于 1。
+
+### 六、门禁
+
+跑在本轮最后那份字节上（六道负控全部还原、哈希核对之后）：`dotnet format --verify-no-changes` exit 0、
+Release `--warnaserror` 0 warning / 0 error、`Commercial release verification passed.`
+（单测 11 条 perf-budget + 1045 条 0 红；UI 17 条 perf-budget + 常规 **255** 条 0 红，比上轮多的 2 条就是这片的）、
+publish win-x64 jit 之后 `UI SMOKE passed` + `RUNTIME SMOKE passed`。读数：库加载 1103ms 对 4000、
+20000 条 `openMs=2060 / streamMs=565 / growthMB=6.6` 对 24、锁定态中位 115.0MB 对 120、锁环 25/14/1/4 全部还原。
+
+### 七、仍然没做到（欠账，不是决定）
+
+- **原生保存对话框本身从没在真屏幕上走过**：所有测试都用假 picker seam。真机上那个模态框的行为——选一个已存在的
+  文件、网络盘/云盘路径给不给本地路径、它的"要替换吗"长什么样——没有一份人眼证据。这是本片最大的一块未验。
+- 建完没有"最近/列表"可出现：桌面根本还没有 `.kdbx` 的最近文件列表（#116 老账）。现在的落点是"这一页的会话
+  直接被换过去"。
+- 服务侧 `CreateAsync` 仍然接受一个已存在的路径，覆盖守卫只在 VM（`:124`）——换别的入口调它还是能覆盖。
+- KDF 参数仍钉死 Android 默认值，无自定义面板；Android 的独立"库名"输入与文件名清洗没照搬（第一节记了理由）。
+- 片 D 余下（历史视图与从历史还原、标签、过期/已过期、可编辑图标与 AutoType、CustomData 只读）、搜索的键盘入口
+  （`Ctrl+F`、↑↓、Enter）与 Android 那几个搜索选项、右键与拖放从未在真机屏幕上走过、桌面还原不能人选目标夹、
+  清空没有撤销、#120 的 1280x800 外层滚动把标题与标签页顶出视口——全部沿用。

@@ -314,6 +314,26 @@ public partial class App
                 smokeSuccess &= searchShotSuccess;
             }
 
+            if (HasSmokeUiFlag(Environment.GetCommandLineArgs(), "--smoke-ui-keepass-create"))
+            {
+                // No vault argument: this frame is the form a person reaches with nothing open yet, and the
+                // password only has to be something to type, so it reuses the fixture's own literal.
+                var keepassPassword = GetSmokeUiArgument(
+                    Environment.GetCommandLineArgs(), "--smoke-ui-keepass-password");
+                if (string.IsNullOrEmpty(keepassPassword))
+                {
+                    AppDiagnostics.Info(
+                        "Smoke UI KeePass create shot failed. reason=no-password-argument");
+                    smokeSuccess = false;
+                }
+                else
+                {
+                    smokeSuccess &= await mainWindow.RunSmokeUiKeePassCreateShotAsync(
+                        keepassPassword,
+                        smokeScreenshotDirectory);
+                }
+            }
+
             if (HasSmokeUiFlag(Environment.GetCommandLineArgs(), "--smoke-ui-autotype"))
             {
                 smokeSuccess &= await RunSmokeUiAutoTypeProbeAsync(viewModel, desktopIntegration);

@@ -102,6 +102,13 @@ public sealed partial class AppSettingsTests
             IReadOnlyList<PlatformFilePickerFileType> fileTypes,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<string?>(suggestedFileName);
+
+        public Task<PickedSaveTarget?> PickSaveFileTargetAsync(
+            string title,
+            string suggestedFileName,
+            IReadOnlyList<PlatformFilePickerFileType> fileTypes,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<PickedSaveTarget?>(null);
     }
 
     private sealed class ThrowingAuthenticatorImportExportService(
