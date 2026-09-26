@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" xmlns:controls="using:Monica.App.Controls" x:Class="Monica.App.Features.Sync.SyncImportView" x:DataType="vm:MainWindowViewModel">
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" xmlns:controls="using:Monica.App.Controls" xmlns:sync="using:Monica.App.Features.Sync" x:Class="Monica.App.Features.Sync.SyncImportView" x:DataType="vm:MainWindowViewModel">
     <Grid IsVisible="{Binding IsSyncImportSelected}" RowDefinitions="Auto,*" MinWidth="0">
         <ProgressBar x:Name="ImportBusyIndicator" IsIndeterminate="True" IsVisible="{Binding IsImportExportBusy}" AutomationProperties.Name="{Binding StatusMessage}" Margin="0,0,0,10" />
         <TabControl x:Name="ImportSourceTabs" Grid.Row="1" TabStripPlacement="Left" AutomationProperties.Name="{Binding L.ImportData}">
@@ -114,96 +114,7 @@
                                     <TextBlock Text="{Binding L.KeePassCloseFile}" />
                                 </Button>
                             </WrapPanel>
-                            <Grid Grid.Row="2" ColumnDefinitions="320,*" ColumnSpacing="12" MinHeight="280">
-                                <Border Grid.Column="0" Classes="workspaceTreeRail">
-                                    <controls:VaultFolderTree x:Name="KeePassBrowseTree"
-                                                              Text="{Binding L}"
-                                                              ItemsSource="{Binding KeePassTreeRowsPublic}"
-                                                              SelectedItem="{Binding SelectedKeePassTreeRowPublic, Mode=TwoWay}"
-                                                              ToggleExpansionCommand="{Binding ToggleKeePassFolderCommand}"
-                                                              CreateFolderCommand="{Binding CreateKeePassFolderCommand}"
-                                                              RenameFolderCommand="{Binding RenameKeePassFolderCommand}"
-                                                              DeleteFolderCommand="{Binding DeleteKeePassFolderCommand}"
-                                                              MoveFolderCommand="{Binding MoveKeePassFolderCommand}"
-                                                              MoveEntryToFolderCommand="{Binding MoveKeePassEntryCommand}"
-                                                              EditEntryCommand="{Binding EditKeePassEntryCommand}"
-                                                              MoveToRecycleBinCommand="{Binding DeleteKeePassEntryCommand}"
-                                                              DeleteEntryPermanentlyCommand="{Binding DeleteKeePassEntryPermanentlyCommand}"
-                                                              SelectedEntryInRecycleBin="{Binding KeePassSelectedEntryInRecycleBin}"
-                                                              CanManageSelected="{Binding CanManageSelectedKeePassFolder}"
-                                                              CanManageRows="{Binding CanManageKeePassRows}"
-                                                              FolderName="{Binding KeePassFolderName, Mode=TwoWay}"
-                                                              CopyRowUsernameCommand="{Binding CopyKeePassRowUsernameCommand}"
-                                                              CopyRowSecretCommand="{Binding CopyKeePassRowSecretCommand}" />
-                                </Border>
-                                <Border Grid.Column="1" Classes="workspaceDetail" IsVisible="{Binding KeePassEntryDetailsPublic, Converter={x:Static ObjectConverters.IsNotNull}}">
-                                    <ScrollViewer>
-                                        <StackPanel Spacing="12">
-                                            <StackPanel x:Name="KeePassEntryEditorPane" Spacing="8" IsVisible="{Binding HasKeePassEditor}">
-                                                <TextBlock Text="{Binding KeePassEditorPublic.GroupPath}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                                                <Grid ColumnDefinitions="110,*" ColumnSpacing="8" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
-                                                    <TextBlock Grid.Row="0" Text="{Binding L.KeePassEntryTitleLabel}" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                    <TextBox Grid.Row="0" Grid.Column="1" x:Name="KeePassEditTitleBox" Text="{Binding KeePassEditorPublic.Title}" AutomationProperties.Name="{Binding L.KeePassEntryTitleLabel}" />
-                                                    <TextBlock Grid.Row="1" Text="{Binding L.Username}" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="KeePassEditUserBox" Text="{Binding KeePassEditorPublic.UserName}" AutomationProperties.Name="{Binding L.Username}" />
-                                                    <TextBlock Grid.Row="2" Text="{Binding L.Password}" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                    <StackPanel Grid.Row="2" Grid.Column="1" Spacing="4">
-                                                        <TextBox x:Name="KeePassEditPasswordBox" PasswordChar="*" Text="{Binding KeePassEditorPublic.Password}" IsVisible="{Binding !KeePassEditorPublic.IsPasswordVisible}" AutomationProperties.Name="{Binding L.Password}" />
-                                                        <TextBox x:Name="KeePassEditPasswordRevealedBox" Text="{Binding KeePassEditorPublic.Password}" IsVisible="{Binding KeePassEditorPublic.IsPasswordVisible}" AutomationProperties.Name="{Binding L.Password}" />
-                                                        <ToggleButton x:Name="KeePassPasswordVisibilityToggle" Content="{Binding L.KeePassShowSecrets}" IsChecked="{Binding KeePassEditorPublic.IsPasswordVisible}" HorizontalAlignment="Left" />
-                                                    </StackPanel>
-                                                    <TextBlock Grid.Row="3" Text="{Binding L.Website}" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                    <TextBox Grid.Row="3" Grid.Column="1" x:Name="KeePassEditUrlBox" Text="{Binding KeePassEditorPublic.Url}" AutomationProperties.Name="{Binding L.Website}" />
-                                                    <TextBlock Grid.Row="4" Text="{Binding L.AuthenticatorKey}" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                    <StackPanel Grid.Row="4" Grid.Column="1" Spacing="4">
-                                                        <TextBox x:Name="KeePassEditTotpBox" PasswordChar="*" Text="{Binding KeePassEditorPublic.AuthenticatorKey}" IsVisible="{Binding !KeePassEditorPublic.IsPasswordVisible}" AutomationProperties.Name="{Binding L.AuthenticatorKey}" />
-                                                        <TextBox x:Name="KeePassEditTotpRevealedBox" Text="{Binding KeePassEditorPublic.AuthenticatorKey}" IsVisible="{Binding KeePassEditorPublic.IsPasswordVisible}" AutomationProperties.Name="{Binding L.AuthenticatorKey}" />
-                                                    </StackPanel>
-                                                    <TextBlock Grid.Row="5" Text="{Binding L.Notes}" VerticalAlignment="Top" Margin="0,6,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                    <TextBox Grid.Row="5" Grid.Column="1" x:Name="KeePassEditNotesBox" Text="{Binding KeePassEditorPublic.Notes}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" AutomationProperties.Name="{Binding L.Notes}" />
-                                                </Grid>
-                                                <WrapPanel>
-                                                    <Button x:Name="ApplyKeePassEditButton" Classes="workspacePrimaryCommand" Command="{Binding ApplyKeePassEntryEditCommand}" Margin="0,0,8,0">
-                                                        <TextBlock Text="{Binding L.KeePassApplyEdit}" />
-                                                    </Button>
-                                                    <Button x:Name="CancelKeePassEditButton" Classes="workspaceCommand" Command="{Binding CancelKeePassEntryEditCommand}">
-                                                        <TextBlock Text="{Binding L.Cancel}" />
-                                                    </Button>
-                                                </WrapPanel>
-                                            </StackPanel>
-                                            <ContentControl Content="{Binding KeePassEntryDetailsPublic}" Margin="0,0,0,24" IsVisible="{Binding HasKeePassEditor, Converter={x:Static BoolConverters.Not}}">
-                                            <ContentControl.ContentTemplate>
-                                                <DataTemplate x:DataType="vm:PasswordDetailViewModel">
-                                                    <StackPanel Spacing="8">
-                                                        <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="SemiBold" />
-                                                        <TextBlock Text="{Binding Subtitle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                                                        <ItemsControl ItemsSource="{Binding Groups}">
-                                                            <ItemsControl.ItemTemplate>
-                                                                <DataTemplate x:DataType="vm:PasswordDetailGroup">
-                                                                    <StackPanel Spacing="4" Margin="0,6,0,0">
-                                                                        <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                                        <ItemsControl ItemsSource="{Binding Fields}">
-                                                                            <ItemsControl.ItemTemplate>
-                                                                                <DataTemplate x:DataType="vm:PasswordDetailField">
-                                                                                    <Grid ColumnDefinitions="120,*" ColumnSpacing="8" Margin="0,2,0,0">
-                                                                                        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                                                        <TextBlock Grid.Column="1" Text="{Binding DisplayValue}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                                                                    </Grid>
-                                                                                </DataTemplate>
-                                                                            </ItemsControl.ItemTemplate>
-                                                                        </ItemsControl>
-                                                                    </StackPanel>
-                                                                </DataTemplate>
-                                                            </ItemsControl.ItemTemplate>
-                                                        </ItemsControl>
-                                                    </StackPanel>
-                                                </DataTemplate>
-                                            </ContentControl.ContentTemplate>
-                                        </ContentControl>
-                                        </StackPanel>
-                                    </ScrollViewer>
-                                </Border>
-                            </Grid>
+                            <sync:KeePassBrowsePane Grid.Row="2" />
                         </Grid>
                     </Border>
                 </StackPanel>

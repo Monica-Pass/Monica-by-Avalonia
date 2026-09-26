@@ -58,6 +58,20 @@ public sealed record KeePassAttachmentContent(
     ReadOnlyMemory<byte> Content);
 
 /// <summary>
+/// What one search found: the rows to show, in the order to show them, and how many matched in all.
+/// The two numbers differ whenever the list was cut short, which is the difference between a screen
+/// that says "first 200 of 1.234" and one that quietly pretends the database is smaller than it is.
+/// </summary>
+public sealed record KeePassSearchResults(
+    IReadOnlyList<KeePassEntryRow> Entries,
+    int TotalMatches)
+{
+    public static KeePassSearchResults Empty { get; } = new([], 0);
+
+    public bool HasMore => Entries.Count < TotalMatches;
+}
+
+/// <summary>
 /// The complete editable content of one entry. Applying an edit replaces the entry's standard
 /// fields, its TOTP field and its whole custom field set, so a caller has to build it from a detail
 /// it just read; whatever the edit leaves out is dropped when the file is saved.

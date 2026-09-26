@@ -40,7 +40,16 @@ public sealed partial class MainWindowViewModel
             cancellationToken);
 
         _keePassTreeRows = rows;
+        if (HasKeePassSearchText)
+        {
+            // The hierarchy was just recomputed, so the query is re-run over it rather than the flat
+            // list being kept as it was: a renamed or moved entry has to drop out of the results.
+            await PublishKeePassSearchRowsAsync(session, KeePassSearchText, cancellationToken);
+            return;
+        }
+
         KeePassTreeRowsPublic = rows;
+        OnPropertyChanged(nameof(KeePassSearchSummaryText));
     }
 
     private async Task EmitKeePassFolderAsync(
@@ -149,6 +158,9 @@ public sealed partial class MainWindowViewModel
 
         if (!row.IsEntryRow || row.Entry is null)
         {
+            // A folder has no detail of its own, and the entry browsed a moment ago is not it. Leaving
+            // that projection up would have the panel answer a row the tree no longer selects.
+            ClearKeePassEntryDetail();
             return;
         }
 

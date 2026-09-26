@@ -43,8 +43,14 @@ public sealed record KeePassTreeRow : IVaultTreeRow
             : Symbol.Folder;
 
     public string EntryDetail => Kind == KeePassTreeRowKind.Entry
-        ? Entry?.UserName ?? ""
+        ? ShowsGroupPath ? Entry?.GroupPath ?? "" : Entry?.UserName ?? ""
         : "";
+
+    /// <summary>
+    /// Search flattens the tree, so the folder a hit came from is the one thing the row cannot show by
+    /// its indentation. The subtitle takes it instead of the user name, which the person just typed.
+    /// </summary>
+    public bool ShowsGroupPath { get; init; }
 
     public bool IsBatchable => false;
 

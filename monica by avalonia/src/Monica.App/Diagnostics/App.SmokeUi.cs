@@ -296,6 +296,24 @@ public partial class App
                 smokeSuccess &= manageShotSuccess;
             }
 
+            var keepassSearchPath = GetSmokeUiArgument(
+                Environment.GetCommandLineArgs(), "--smoke-ui-keepass-search");
+            if (!string.IsNullOrWhiteSpace(keepassSearchPath))
+            {
+                var keepassPassword = GetSmokeUiArgument(
+                    Environment.GetCommandLineArgs(), "--smoke-ui-keepass-password");
+                // The default hits the address field of every fixture entry, which is the case the folded
+                // tree cannot show at all until something is typed.
+                var keepassQuery = GetSmokeUiArgument(
+                    Environment.GetCommandLineArgs(), "--smoke-ui-keepass-search-query") ?? "example.com";
+                var searchShotSuccess = await mainWindow.RunSmokeUiKeePassSearchShotAsync(
+                    keepassSearchPath,
+                    keepassPassword ?? "",
+                    keepassQuery,
+                    smokeScreenshotDirectory);
+                smokeSuccess &= searchShotSuccess;
+            }
+
             if (HasSmokeUiFlag(Environment.GetCommandLineArgs(), "--smoke-ui-autotype"))
             {
                 smokeSuccess &= await RunSmokeUiAutoTypeProbeAsync(viewModel, desktopIntegration);

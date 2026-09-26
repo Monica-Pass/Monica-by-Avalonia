@@ -1744,3 +1744,115 @@ entryRows=5, vaultBytes=3294, frameBytes=105370`、锁定态 114.8MB 对 120、�
 - 片 D（历史、自定义图标、AutoType 序列、过期策略、标签、前景/背景色在读模型里仍丢）、
   片 F（桌面端**新建**空库与 kotpass 磁盘形状未对拍、`<Generator>` 那条仍只推理未实测）沿用。
 - `KeePassVaultError.NoSourceFile` 在 `KeePassWriteFailureKey` 里映射到通用 key，当前分支走不到它（沿用 #117 的登记）。
+
+## 附：桌面端 .kdbx 的库内搜索（2026-09-26，**#122 出厂：打开的库第一次能搜，并且"画在屏上"从此成了断言的一部分**）
+
+### 一、这一轮把什么变成了事实
+
+- 会话侧新增 `KeePassVaultSession.Search.cs`：`SearchEntriesAsync(query)` 深度优先走树、边走边把每层夹的
+  显示路径算好（`CollectSearchHits`，命中即带 `GroupPath`，不用二次爬父节点），字段口径与 Android 同一套——
+  标题、用户名、网址、备注、自定义字段（值或标签）、条目所在夹；**受保护的值一律不读**
+  （`IsSearchableField:171`：`value.IsProtected` 直接排除，密码字段再单独兜一层），所以搜密码搜不到持有它的条目。
+  回收站里（含被回收的整棵子树）不进结果：`IsInsideRecycleBin(group)` 在 `:82` 整层跳过。
+- 排序是桌面端自己加的一层：`RankSearchHit:128` 给出 0/1/2/3——标题以查询开头、标题含查询、任一明文
+  字段（值或自定义标签）含查询、只有夹路径含查询。同一档内按标题（忽略大小写）再按 uuid 定序，所以
+  同一个查询在同一份文件上永远得到同一个列表。
+- 截断不静默：`SearchResultCap = 200`（`:13`），**过了上限继续走、继续数，只是不再建行**（`:104`），
+  于是 `TotalMatches` 始终是真正的命中数；界面据此说"显示前 200 条，共 1.234 条"
+  （`MainWindowViewModel.KeePassSearch.cs:31` 三档文案：无命中 / 截断 / 命中数）。
+- 界面：搜索框在浏览面板顶部（`KeePassBrowsePane.axaml:11` 的 `KeePassSearchField`），每次键入都扫
+  （实测 20000 条 18ms，加 debounce 只会让人多等），上一次扫描在 `RunKeePassSearchAsync:72` 被取消，
+  免得十个在途扫描压在第第十一次后面。命中态把树**平铺**成条目行（`PublishKeePassSearchRowsAsync:122`：
+  `Kind=Entry`、`Group=null`、`ShowsGroupPath=true`，副标题就是所在夹路径），清空查询才回层级；
+  查询还挂着时的建夹/搬家/保存仍走平铺而不是回层级，所以不会闪回树。
+  摘要行只带计数、**不回显查询**（产物门里 `echoesQuery=False` 是被断言的）。
+- 平铺行**结构上带不出密码**：`KeePassEntryRow` 只有标题/用户名/网址/时间/附件指针，没有密码、TOTP、
+  备注、自定义字段——这是"搜索结果不泄漏"的构造性理由，不是靠约定。
+- 顺带把浏览面板抽成 `KeePassBrowsePane`（300 行结构门：`SyncImportView.axaml` 317 → 209，新面板 115 行）。
+  这一步有个没预料到的后果，而且是好的那一种：`x:Name` 落在 UserControl 自己的名字作用域里，
+  测试原来的 13 处 `FindControl` 全部失效，改成走可视树的 `InPane`（`tests/Monica.UiTests/KeePassViewProbe.cs`）
+  ——**折叠面板里的控件从此不再算"在屏上"**。正是这条变化当场抓出了第二节那两个真缺陷。
+
+### 二、当场翻出来的两条真缺陷（都不是搜索自己的红）
+
+1. **点"新建条目"表单根本没画出来**。详情列整列的 `IsVisible` 绑的是
+   `KeePassEntryDetailsPublic != null`，而草稿只写 `KeePassEditorPublic`、不填那一栏：选中夹（或刚打开库时
+   的根）点新建，`HasKeePassEditor=True`、`IsDraft=True`，可视树里那一整棵子树**一个节点都没有**。
+   人看到的是一片空白面板，光标不知道在哪儿。#118/#121 的 manage 帧一直没发现，因为它的
+   `draftOpened` 读的是 view model 的旗标；无头测试也没发现，因为它断的是 `editorPane.IsVisible`
+   （控件自己的属性），而 `FindControl` 能穿过折叠的祖先拿到那个对象。
+   修成 `ShowsKeePassDetailColumn = 详情非空 || 有编辑器`（`MainWindowViewModel.KeePassEdit.cs:16`），
+   两处通知挂在 `_keePassEditorPublic` 与 `_keePassEntryDetailsPublic` 上。
+2. **点一个夹不会把上一条条目放下来**。`SelectKeePassRowAsync` 只在条目分支加载详情，夹分支直接 return，
+   于是选中变了、右侧还在回答刚才那条条目。补 `ClearKeePassEntryDetail()`（同文件 `:211`），
+   `ClearKeePassSelectedRow` 一起改用它。
+
+### 三、负控（每条都跑在真字节上）
+
+- 无头 UI 两条，各红在该红的那一条、恰好一条：
+  ① 把详情列的绑回 `KeePassEntryDetailsPublic, Converter=IsNotNull` ⇒
+  `InvalidOperationException: no StackPanel named 'KeePassEntryEditorPane' is realized on screen`；
+  ② 去掉夹分支里的 `ClearKeePassEntryDetail()` ⇒ `Assert.Null() Failure: Value is not null`。
+  两条还原后 `KeePassEditWorkflowUiTests` 3/3 绿。
+- 产物门两条（本轮早些时候量的，仍成立）：查询无命中 ⇒ `flatRows=0, success=False`；把平铺行的
+  `EntryDetail` 换成带保护值的字段 ⇒ `paintedSecretFree=False, success=False`。
+- 本轮把 `KeePass search shot` 补进了 `verify-artifact-runtime.ps1:278` 那个"必须有 result 行且
+  `success=True`"的循环——它之前只被打印、不被强制；另加一条显式字段断言
+  `draftFormOnScreen=True`（`:290`），免得将来 `success` 自己变软把这一路又放回绿灯。
+
+### 四、证据
+
+- 单测：新文件 `tests/Monica.Tests/KeePassVaultSearchTests.cs` **11 条**，含
+  `A_protected_value_stays_out_of_reach_of_the_query`、
+  `A_title_that_starts_with_the_query_outranks_the_rest_of_the_matches`、
+  `A_folder_hit_reports_the_path_the_entry_was_found_under`、
+  `A_recycled_entry_leaves_the_results_with_the_tree` / `A_hit_inside_a_recycled_folder_is_out_too`、
+  `A_long_list_reports_what_it_did_not_show`（250 条只交 200 条，计数仍是 250）、
+  `Scanning_a_large_database_stays_inside_its_budget`（`perf-budget` 通道）。
+- 无头 UI：新文件 `KeePassSearchWorkflowUiTests` **2 条**——① 平铺 + 计数 + 每条报出所在夹 + 屏上文字扫过
+  `secret-`/`ticket-`/`otpauth` 三个 fixture 标记都不出现 + 搜索态建夹仍保持平铺 + 清空回层级；
+  ② 250 条命中只交 200 条且摘要同时报出 200 与 250、不回显查询。
+  另外 `KeePassEditWorkflowUiTests` 的那条管理事实重写为量"在屏上"：草稿的
+  `KeePassEntryEditorPane` 与 `KeePassEditTitleBox` 必须被真实化且 `Bounds` 非零，
+  并在同一条里量"点夹会把上一条条目的详情放下来"。
+- 真产物（`RUNTIME SMOKE passed`，win-x64 jit）：manage 帧新增 `draftFormOnScreen=True`，
+  `folderAdded=True, draftOpened=True, entryAdded=True, unsavedNotice=True, binShown=True, entryInBin=True,
+  binDeleteSplit=True, treeRows=11, folderRows=6, entryRows=5, vaultBytes=3294, frameBytes=105497`；
+  search 帧 `success=True, boxOnScreen=True, treeRowsBefore=8, folderRowsBefore=4, flatRows=12,
+  everyHitSaysWhere=True, summaryChars=11, echoesQuery=False, paintedTexts=14, paintedSecretFree=True,
+  backToHierarchy=True, vaultBytes=3294, frameBytes=91327`。
+- 人眼复核两张 1280x800：`KeePassManageForm_1280x800.png`（94412 字节）——右侧新建表单六个空字段
+  （标题/用户名/密码/网站/验证器密钥/备注）加"记入改动/取消"，密码那一栏只有"显示密码与密钥"的开关；
+  `KeePassSearch_1280x800.png`（91487 字节）——框里 `example.com`、下面"匹配到 12 个条目。"、
+  平铺条目右列 `Folder 1/Folder 2`。两张屏上都没有明文口令，出现的名字全是 seam 自己写的 fixture 字面量。
+  同一张帧也再次看见 #120：顶部"导入 Aegis JSON / Smoke Fixture: 已打开…"那一条被外层滚动切掉半行。
+
+### 五、与 Android 的分歧（搜索这一面，点名）
+
+- 桌面端有前缀优先（`RankSearchHit` 的 rank 0），Android 的匹配器只有 `contains` / regex
+  （`KeePassNativeBrowser.kt:621`）——**排序两边不同**，同一查询同一文件可能给出不同次序。
+- Android 的搜索选项 `groupScope / caseSensitive / useRegex`（`KeePassNativeBrowser.kt:455-458`）与
+  `TAGS` 字段（`:566`）桌面端**没做**：桌面端只有整库、忽略大小写、纯 contains，标签/模板/过期这些筛选都没有。
+- 平铺态下"把条目拖到某个夹上"没有落点（列表里没有夹行可放），要搬家得先清空查询。
+- 相同的一点：受保护字段两边都是整字段跳过，不是只跳值。
+
+### 六、门禁
+
+跑在本轮最后那份字节上（两条源码负控全部还原之后）：格式 0 改动、Release `--warnaserror` 0 warning / 0 error、
+commercial-release `passed`（300 行结构门通过、NuGet 漏洞审计通过、单测 11 `perf-budget` + **1020** 常规 0 红、
+UI 整串 268 条 0 红＝`perf-budget` 17 + 常规 251）、产物门 `RUNTIME SMOKE passed`：
+`CANONICAL VAULT passed`、库载入 233ms 对 4000、KeePass 20000 条 `openMs=893 / streamMs=230 / growthMB=4.2` 对 24、
+edit 帧 `success=True frameBytes=102032`、manage 帧与 search 帧见第四节、
+锁定态中位 107.7MB 对 120、锁环 25/14/1/4 全部还原、`release gate completed success=True`。
+
+### 七、仍然没做到（欠账，不是决定）
+
+- **搜索没有键盘入口**：没有 `Ctrl+F` 聚焦、没有 ↑↓ 选结果、没有 Enter 打开，全靠手点。
+- Android 那套搜索选项（限层、区分大小写、正则、按标签）桌面端整块缺（第五节）。
+- 平铺态不能拖放搬家（第五节），也不能在结果里直接把新夹建到某个命中所在的夹（建夹仍落在"当前看着的夹"）。
+- 摘要只报数、不报"哪些夹被跳过"，回收站里的命中被静默排除（口径与 Android 一致，但界面上没解释）。
+- #120：1280x800 的库面板外层滚动会把标题与标签页顶出视口，本轮两张帧里又看得见一次。
+- 片 D（历史、自定义图标、AutoType 序列、过期策略、标签、前景/背景色在读模型里仍丢）、
+  片 F（桌面端**新建**空库与 kotpass 磁盘形状未对拍、`<Generator>` 那条仍只推理未实测）沿用。
+- 回收站仍没有"还原/清空"入口；右键与拖放仍没在真机屏幕上走过；`.kdbx` 还没成一等公民（最近文件、文件关联）。
+- `KeePassVaultError.NoSourceFile` 在 `KeePassWriteFailureKey` 里映射到通用 key，当前分支走不到它（沿用 #117 的登记）。

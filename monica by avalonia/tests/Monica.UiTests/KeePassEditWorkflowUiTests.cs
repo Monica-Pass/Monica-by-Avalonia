@@ -78,7 +78,7 @@ public sealed class KeePassEditWorkflowUiTests
                 Assert.True(
                     view.FindControl<Border>("KeePassPreviewCard")!.IsVisible,
                     "the opened database summary is not on screen");
-                var tree = view.FindControl<VaultFolderTree>("KeePassBrowseTree")!;
+                var tree = view.InPane<VaultFolderTree>("KeePassBrowseTree")!;
                 Assert.True(tree.IsVisible);
                 Assert.True(tree.Bounds.Width > 0 && tree.Bounds.Height > 0);
 
@@ -97,7 +97,7 @@ public sealed class KeePassEditWorkflowUiTests
                 Dispatcher.UIThread.RunJobs();
 
                 Assert.True(editButton.IsVisible);
-                var editorPane = view.FindControl<StackPanel>("KeePassEntryEditorPane")!;
+                var editorPane = view.InPane<StackPanel>("KeePassEntryEditorPane")!;
                 Assert.False(editorPane.IsVisible);
 
                 await viewModel.EditKeePassEntryCommand.ExecuteAsync(null);
@@ -105,17 +105,17 @@ public sealed class KeePassEditWorkflowUiTests
 
                 Assert.True(viewModel.HasKeePassEditor);
                 Assert.True(editorPane.IsVisible);
-                var titleBox = view.FindControl<TextBox>("KeePassEditTitleBox")!;
+                var titleBox = view.InPane<TextBox>("KeePassEditTitleBox")!;
                 Assert.Equal("Entry 000001", titleBox.Text);
                 Assert.True(titleBox.Bounds.Width > 0);
                 Assert.Equal(
                     "user1@example.com",
-                    view.FindControl<TextBox>("KeePassEditUserBox")!.Text);
+                    view.InPane<TextBox>("KeePassEditUserBox")!.Text);
 
-                var maskedBox = view.FindControl<TextBox>("KeePassEditPasswordBox")!;
-                var revealedBox = view.FindControl<TextBox>("KeePassEditPasswordRevealedBox")!;
-                var maskedTotpBox = view.FindControl<TextBox>("KeePassEditTotpBox")!;
-                var revealedTotpBox = view.FindControl<TextBox>("KeePassEditTotpRevealedBox")!;
+                var maskedBox = view.InPane<TextBox>("KeePassEditPasswordBox")!;
+                var revealedBox = view.InPane<TextBox>("KeePassEditPasswordRevealedBox")!;
+                var maskedTotpBox = view.InPane<TextBox>("KeePassEditTotpBox")!;
+                var revealedTotpBox = view.InPane<TextBox>("KeePassEditTotpRevealedBox")!;
                 Assert.Equal('*', maskedBox.PasswordChar);
                 Assert.Equal('*', maskedTotpBox.PasswordChar);
                 Assert.True(maskedBox.IsVisible);
@@ -123,7 +123,7 @@ public sealed class KeePassEditWorkflowUiTests
                 Assert.False(revealedBox.IsVisible);
                 Assert.False(revealedTotpBox.IsVisible);
 
-                view.FindControl<ToggleButton>("KeePassPasswordVisibilityToggle")!.IsChecked = true;
+                view.InPane<ToggleButton>("KeePassPasswordVisibilityToggle")!.IsChecked = true;
                 Dispatcher.UIThread.RunJobs();
 
                 Assert.False(maskedBox.IsVisible);
@@ -135,7 +135,7 @@ public sealed class KeePassEditWorkflowUiTests
                 // out of the test run.
                 Assert.True(revealedTotpBox.Text?.StartsWith("otpauth://", StringComparison.Ordinal) == true);
 
-                view.FindControl<ToggleButton>("KeePassPasswordVisibilityToggle")!.IsChecked = false;
+                view.InPane<ToggleButton>("KeePassPasswordVisibilityToggle")!.IsChecked = false;
                 Dispatcher.UIThread.RunJobs();
                 Assert.True(maskedBox.IsVisible);
                 Assert.True(maskedTotpBox.IsVisible);
@@ -214,7 +214,7 @@ public sealed class KeePassEditWorkflowUiTests
             Dispatcher.UIThread.RunJobs();
             try
             {
-                var tree = view.FindControl<VaultFolderTree>("KeePassBrowseTree")!;
+                var tree = view.InPane<VaultFolderTree>("KeePassBrowseTree")!;
                 Assert.True(tree.Bounds.Width > 0 && tree.Bounds.Height > 0);
                 Assert.True(tree.CanManageRows);
                 // Each of these is the exact command the panel declares, so a binding that lands on a
@@ -233,8 +233,10 @@ public sealed class KeePassEditWorkflowUiTests
                 // The root is selected at open and the root is not something a user may delete.
                 Assert.False(tree.CanManageSelected);
 
-                var editorPane = view.FindControl<StackPanel>("KeePassEntryEditorPane")!;
-                Assert.False(editorPane.IsVisible);
+                // Only the root is selected, and a folder has no detail of its own, so the column beside
+                // the tree is down: nothing is painted there, and nothing here claims otherwise.
+                Assert.False(viewModel.ShowsKeePassDetailColumn);
+                Assert.Null(view.TryInPane<StackPanel>("KeePassEntryEditorPane"));
                 // Raising Button.ClickEvent was measured not to run a Command-bound button - only the
                 // pointer pipeline calls OnClick - so the hop proved here is the one the template owns:
                 // the binding resolved to the live command, and clicking it is what opens the form.
@@ -245,10 +247,17 @@ public sealed class KeePassEditWorkflowUiTests
                 newEntryButton.Command.Execute(null);
                 Dispatcher.UIThread.RunJobs();
 
+                // The draft used to land in the view model while the column hosting it stayed collapsed:
+                // a person clicked 新建条目 and faced an empty panel with the cursor nowhere. So this is
+                // measured on screen, not on the property - the form is realized and has room to type in.
                 Assert.True(viewModel.HasKeePassEditor);
+                Assert.True(viewModel.ShowsKeePassDetailColumn);
+                var editorPane = view.InPane<StackPanel>("KeePassEntryEditorPane");
                 Assert.True(editorPane.IsVisible);
-                var titleBox = view.FindControl<TextBox>("KeePassEditTitleBox")!;
+                Assert.True(editorPane.Bounds.Width > 0 && editorPane.Bounds.Height > 0);
+                var titleBox = view.InPane<TextBox>("KeePassEditTitleBox");
                 Assert.Equal("", titleBox.Text);
+                Assert.True(titleBox.Bounds.Width > 0);
                 titleBox.Text = "Filed from the UI test";
                 await viewModel.ApplyKeePassEntryEditCommand.ExecuteAsync(null);
                 Dispatcher.UIThread.RunJobs();
@@ -280,6 +289,22 @@ public sealed class KeePassEditWorkflowUiTests
                 Assert.True(tree.ShowsEntryPermanentItem);
                 tree.SelectedEntryInRecycleBin = false;
                 Assert.True(tree.ShowsEntryRecycleItem);
+
+                // That entry fills the column beside the tree. A folder has no detail of its own, so
+                // selecting one has to step the old projection down rather than leave the panel
+                // answering a row nobody has selected.
+                Assert.NotNull(viewModel.KeePassEntryDetailsPublic);
+                var folderRow = Assert.Single(
+                    viewModel.KeePassTreeRowsPublic,
+                    row => row.IsEntryRow is false && row.Label == "Folder 1");
+                await viewModel.SelectKeePassRowCommand.ExecuteAsync(folderRow);
+                Dispatcher.UIThread.RunJobs();
+                Assert.Null(viewModel.KeePassEntryDetailsPublic);
+                Assert.False(viewModel.ShowsKeePassDetailColumn);
+                await viewModel.SelectKeePassRowCommand.ExecuteAsync(filedRow);
+                Dispatcher.UIThread.RunJobs();
+                Assert.NotNull(viewModel.KeePassEntryDetailsPublic);
+                Assert.True(viewModel.ShowsKeePassDetailColumn);
 
                 // The inline naming box is the tree's own property; the view model has to receive what
                 // the user types into it and put the next name back for the box to show it.

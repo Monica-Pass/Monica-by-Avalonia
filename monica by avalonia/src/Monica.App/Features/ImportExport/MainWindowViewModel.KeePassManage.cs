@@ -208,9 +208,7 @@ public sealed partial class MainWindowViewModel
 
     private void ClearKeePassSelectedRow()
     {
-        _keePassEntryDetails?.Dispose();
-        _keePassEntryDetails = null;
-        KeePassEntryDetailsPublic = null;
+        ClearKeePassEntryDetail();
         KeePassEditorPublic = null;
         _selectedKeePassTreeRow = null;
         SelectedKeePassTreeRowPublic = null;

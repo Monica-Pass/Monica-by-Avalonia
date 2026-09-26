@@ -236,6 +236,8 @@ try {
             '--smoke-ui-keepass-max-growth-mb', "$MaxKeePassGrowthMb",
             '--smoke-ui-keepass-edit', $keepassShotPath,
             '--smoke-ui-keepass-manage', $keepassShotPath,
+            '--smoke-ui-keepass-search', $keepassShotPath,
+            '--smoke-ui-keepass-search-query', 'example.com',
             '--smoke-ui-lock-after-checks',
             '--smoke-ui-exit-after-checks'
         )
@@ -247,7 +249,7 @@ try {
         $gateLines = @(Get-Content -LiteralPath $uiLog | Select-String -SimpleMatch `
             'release gate completed', 'budget result', 'check failed', 'lock cycle result',
             'KeePass probe', 'status notice retirement', 'locked settle result',
-            'KeePass edit shot', 'KeePass manage shot')
+            'KeePass edit shot', 'KeePass manage shot', 'KeePass search shot')
         foreach ($line in $gateLines) { Write-Host ($line.Line -replace '^\[[^\]]+\]\s*', '') }
         $gateLine = $gateLines | Where-Object { $_.Line -match 'release gate completed' } | Select-Object -Last 1
         if ($null -eq $gateLine) {
@@ -269,10 +271,11 @@ try {
             throw "KeePass memory probe reported failure: $($keepassLine.Line)"
         }
 
-        # The edit form and the row commands are reachable only behind a native file dialog, so these
-        # two in-process frames are the whole proof that the shipped binary draws them. A run where
-        # either stopped painting would otherwise leave the gate green.
-        foreach ($shot in @('KeePass edit shot', 'KeePass manage shot')) {
+        # The edit form, the row commands and the search box are reachable only behind a native file
+        # dialog, so these in-process frames are the whole proof that the shipped binary draws them - the
+        # search one also holds the only check that a rendered row never carries a protected value. A run
+        # where any of them stopped painting would otherwise leave the gate green.
+        foreach ($shot in @('KeePass edit shot', 'KeePass manage shot', 'KeePass search shot')) {
             $shotLine = @($gateLines | Where-Object { $_.Line -match "$shot result" }) | Select-Object -Last 1
             if ($null -eq $shotLine) {
                 throw "smoke-ui produced no $shot result line."
@@ -281,6 +284,14 @@ try {
             if ($shotLine.Line -notmatch 'success=True') {
                 throw "$shot reported failure: $($shotLine.Line)"
             }
+        }
+
+        # The manage shot's own success flag already requires the new-entry form to be painted, but the
+        # flag is what this gate exists to catch going soft, so name the field: a draft that is opened in
+        # the view model and never drawn has to stop the run here rather than be logged and passed.
+        $manageLine = @($gateLines | Where-Object { $_.Line -match 'KeePass manage shot result' }) | Select-Object -Last 1
+        if ($manageLine.Line -notmatch 'draftFormOnScreen=True') {
+            throw "KeePass manage shot did not paint the new-entry form: $($manageLine.Line)"
         }
 
         # Same reason: the dispatcher timer that retires status acknowledgements only exists in a

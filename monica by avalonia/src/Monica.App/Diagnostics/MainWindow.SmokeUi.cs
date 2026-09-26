@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Monica.App.Controls;
 using Monica.App.Features.Authenticator;
 using Monica.App.Features.Notes;
 using Monica.App.Features.Passwords;
@@ -558,11 +559,12 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// One frame of the row-management surface: a folder added to the tree, an entry filed into it and
+    /// The row-management surface as two frames: a folder added to the tree, an entry filed into it and
     /// that entry then recycled, with the unsaved-changes notice lit and the file on disk still the one
-    /// that was opened. Both halves of that are the point of the shot - the tree growing and shrinking
-    /// proves the commands run against the browsed database, and the file being untouched proves nothing
-    /// was saved to get there.
+    /// that was opened - and then the new-entry form itself, which the tree frame cannot show at all.
+    /// Both halves are the point: the tree growing and shrinking proves the commands run against the
+    /// browsed database, the file being untouched proves nothing was saved to get there, and the form
+    /// being on screen proves a draft is something a person can type into.
     /// </summary>
     public async Task<bool> RunSmokeUiKeePassManageShotAsync(
         string vaultPath,
@@ -607,6 +609,43 @@ public partial class MainWindow
                 written = new FileInfo(path).Length > 0;
             }
 
+            // The frame above is the tree, so it cannot show the half of this surface that matters most
+            // when a row is added: the form. A draft used to be reported as opened by a view model flag
+            // while the column hosting it stayed collapsed, which is the difference between filing an
+            // entry and staring at an empty panel - so the shipped binary is asked whether the fields are
+            // on screen with room to type in, and a second frame keeps the answer inspectable.
+            viewModel.NewKeePassEntryCommand.Execute(null);
+            await Task.Delay(250);
+            var formPane = this.GetVisualDescendants()
+                .OfType<StackPanel>()
+                .FirstOrDefault(control => control.Name == "KeePassEntryEditorPane");
+            var formTitleBox = this.GetVisualDescendants()
+                .OfType<TextBox>()
+                .FirstOrDefault(control => control.Name == "KeePassEditTitleBox");
+            var formOnScreen = formPane is { IsVisible: true } &&
+                formPane.Bounds.Width > 0 &&
+                formPane.Bounds.Height > 0 &&
+                formTitleBox is { IsVisible: true } &&
+                formTitleBox.Bounds.Width > 0 &&
+                formTitleBox.Bounds.Height > 0;
+            var formWritten = false;
+            var formFileName = "";
+            if (wantedFile && formOnScreen)
+            {
+                var formFrame = await CaptureSmokeFrameAsync();
+                if (formFrame is { Length: > 0 })
+                {
+                    formFileName = $"KeePassManageForm_{Math.Max(1, (int)Math.Round(Bounds.Width))}x" +
+                        $"{Math.Max(1, (int)Math.Round(Bounds.Height))}.png";
+                    var formPath = Path.Combine(screenshotDirectory!, formFileName);
+                    File.WriteAllBytes(formPath, formFrame);
+                    formWritten = new FileInfo(formPath).Length > 0;
+                }
+            }
+
+            viewModel.CancelKeePassEntryEditCommand.Execute(null);
+            await Task.Delay(150);
+
             var success = state.DatabaseOpened &&
                 state.FolderShown &&
                 state.DraftShown &&
@@ -615,23 +654,145 @@ public partial class MainWindow
                 state.BinShown &&
                 state.EntryInBin &&
                 state.BinDeleteSplit &&
+                formOnScreen &&
                 keepassTab.IsSelected &&
                 frameBytes > 0 &&
-                (!wantedFile || written);
+                (!wantedFile || written) &&
+                (!wantedFile || formWritten);
             AppDiagnostics.Info(
                 $"Smoke UI KeePass manage shot result. success={success}, opened={state.DatabaseOpened}, " +
                 $"folderAdded={state.FolderShown}, draftOpened={state.DraftShown}, " +
+                $"draftFormOnScreen={formOnScreen}, " +
                 $"entryAdded={state.EntryShown}, unsavedNotice={state.UnsavedNoticeShown}, " +
                 $"binShown={state.BinShown}, entryInBin={state.EntryInBin}, " +
                 $"binDeleteSplit={state.BinDeleteSplit}, " +
                 $"treeRows={state.TreeRows}, folderRows={state.FolderRows}, entryRows={state.EntryRows}, " +
                 $"vaultBytes={state.FileBytes}, tabSelected={keepassTab.IsSelected}, " +
-                $"frameBytes={frameBytes}, written={written}, file={fileName}");
+                $"frameBytes={frameBytes}, written={written}, file={fileName}, " +
+                $"formFile={formFileName}");
             return success;
         }
         catch (Exception ex)
         {
             AppDiagnostics.Error("Smoke UI KeePass manage shot failed", ex);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// One frame of the searched tree. The query is typed into the shipped control's own text box instead
+    /// of being set on the view model, because the binding is the part only an installed binary has. The
+    /// tree's rendered text is scanned for the fixture's protected values and reported as one boolean, so
+    /// a build that ever paints a secret goes red rather than printing it.
+    /// </summary>
+    public async Task<bool> RunSmokeUiKeePassSearchShotAsync(
+        string vaultPath,
+        string password,
+        string query,
+        string? screenshotDirectory)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            return await Dispatcher.UIThread.InvokeAsync(
+                () => RunSmokeUiKeePassSearchShotAsync(vaultPath, password, query, screenshotDirectory));
+        }
+
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            AppDiagnostics.Info("Smoke UI KeePass search shot failed. reason=no-view-model");
+            return false;
+        }
+
+        try
+        {
+            var keepassTab = await RealizeSmokeKeePassImportTabAsync("search shot");
+            if (keepassTab is null)
+            {
+                return false;
+            }
+
+            var opened = await viewModel.SmokeOpenKeePassForSearchAsync(vaultPath, password);
+            await Task.Delay(250);
+
+            var field = this.GetVisualDescendants()
+                .OfType<SearchField>()
+                .FirstOrDefault(control => control.Name == "KeePassSearchField");
+            var boxOnScreen = field is { IsVisible: true } && field.Bounds.Width > 0 && field.Bounds.Height > 0;
+            if (boxOnScreen)
+            {
+                field!.InnerSearchBox!.Text = query;
+            }
+
+            await Task.Delay(250);
+            var rows = viewModel.KeePassTreeRowsPublic;
+            var flat = rows.Count > 0 && rows.All(row => row.IsEntryRow);
+            // With the indentation gone the subtitle is the only place a folder can appear, and a hit
+            // that cannot say where it came from is a hit the user has to go find by hand.
+            var everyHitSaysWhere = rows.Count > 0 && rows.All(row =>
+                row.ShowsGroupPath && !string.IsNullOrEmpty(row.EntryDetail));
+            var summary = viewModel.KeePassSearchSummaryText;
+            var painted = field is not null
+                ? this.GetVisualDescendants()
+                    .OfType<VaultFolderTree>()
+                    .FirstOrDefault(control => control.Name == "KeePassBrowseTree")
+                    ?.GetVisualDescendants()
+                    .OfType<TextBlock>()
+                    .Select(text => text.Text ?? "")
+                    .ToList() ?? []
+                : [];
+            var paintedSecretFree = !painted.Any(text =>
+                text.Contains("secret-", StringComparison.Ordinal) ||
+                text.Contains("ticket-", StringComparison.Ordinal) ||
+                text.Contains("otpauth", StringComparison.Ordinal));
+
+            var frame = await CaptureSmokeFrameAsync();
+            var frameBytes = frame?.Length ?? 0;
+            var wantedFile = !string.IsNullOrWhiteSpace(screenshotDirectory);
+            var written = false;
+            var fileName = "";
+            if (wantedFile && frameBytes > 0)
+            {
+                Directory.CreateDirectory(screenshotDirectory!);
+                fileName = $"KeePassSearch_{Math.Max(1, (int)Math.Round(Bounds.Width))}x" +
+                    $"{Math.Max(1, (int)Math.Round(Bounds.Height))}.png";
+                var path = Path.Combine(screenshotDirectory!, fileName);
+                File.WriteAllBytes(path, frame!);
+                written = new FileInfo(path).Length > 0;
+            }
+
+            // The query has to be put down again in the same session: a flat list you cannot leave is a
+            // broken browser no matter how good the frame looks.
+            field?.InnerClearButton?.Command?.Execute(null);
+            await Task.Delay(250);
+            var backToHierarchy = viewModel.KeePassSearchText.Length == 0 &&
+                viewModel.KeePassTreeRowsPublic.Count(row => row.IsEntryRow is false) == opened.FolderRows;
+
+            var success = opened.DatabaseOpened &&
+                boxOnScreen &&
+                flat &&
+                everyHitSaysWhere &&
+                summary.Length > 0 &&
+                !summary.Contains(query, StringComparison.OrdinalIgnoreCase) &&
+                paintedSecretFree &&
+                backToHierarchy &&
+                keepassTab.IsSelected &&
+                frameBytes > 0 &&
+                (!wantedFile || written);
+            AppDiagnostics.Info(
+                $"Smoke UI KeePass search shot result. success={success}, opened={opened.DatabaseOpened}, " +
+                $"boxOnScreen={boxOnScreen}, treeRowsBefore={opened.TreeRows}, " +
+                $"folderRowsBefore={opened.FolderRows}, flatRows={rows.Count}, " +
+                $"everyHitSaysWhere={everyHitSaysWhere}, summaryChars={summary.Length}, " +
+                $"echoesQuery={summary.Contains(query, StringComparison.OrdinalIgnoreCase)}, " +
+                $"paintedTexts={painted.Count}, paintedSecretFree={paintedSecretFree}, " +
+                $"backToHierarchy={backToHierarchy}, vaultBytes={opened.FileBytes}, " +
+                $"tabSelected={keepassTab.IsSelected}, frameBytes={frameBytes}, " +
+                $"written={written}, file={fileName}");
+            return success;
+        }
+        catch (Exception ex)
+        {
+            AppDiagnostics.Error("Smoke UI KeePass search shot failed", ex);
             return false;
         }
     }

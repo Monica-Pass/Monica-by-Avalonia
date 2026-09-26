@@ -51,6 +51,7 @@ public sealed partial class MainWindowViewModel
     private KeePassTreeRow? _selectedKeePassTreeRowPublic;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsKeePassDetailColumn))]
     private PasswordDetailViewModel? _keePassEntryDetailsPublic;
 
     public bool HasKeePassSelectedFile => !string.IsNullOrWhiteSpace(KeePassSelectedFileName);
@@ -137,8 +138,16 @@ public sealed partial class MainWindowViewModel
 
     private void ClearKeePassImportPreview()
     {
+        // A search walking a database that is already gone would publish rows against a disposed
+        // session, so the scan is cancelled first and the query is dropped once the session is gone -
+        // setting it while a database is still open would simply start another one.
+        _keePassSearchCancellation?.Cancel();
+        _keePassSearchCancellation?.Dispose();
+        _keePassSearchCancellation = null;
         _keePassVaultSession?.Dispose();
         _keePassVaultSession = null;
+        KeePassSearchText = "";
+        _keePassSearchTotalMatches = 0;
         _keePassEntryDetails?.Dispose();
         _keePassEntryDetails = null;
         KeePassEntryDetailsPublic = null;

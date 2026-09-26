@@ -131,6 +131,28 @@ public sealed partial class MainWindowViewModel
     }
 
     /// <summary>
+    /// Opens the file for the search shot and stops before typing. The query goes in through the window's
+    /// own search box, because a seam that set the view model property would prove the wrong thing - the
+    /// binding is the part only the shipped binary has.
+    /// </summary>
+    internal async Task<KeePassSearchSmokeState> SmokeOpenKeePassForSearchAsync(
+        string path,
+        string password,
+        CancellationToken cancellationToken = default)
+    {
+        // The shots that ran before this one leave their edits staged in the session, and opening
+        // refuses to run over them. Closing first is what a person does before opening another file,
+        // and it is what makes the rows below belong to this run.
+        ClearKeePassImportState(cancelActiveOperation: true);
+        var opened = await SmokeOpenKeePassDatabaseAsync(path, password, cancellationToken);
+        return new KeePassSearchSmokeState(
+            opened.DatabaseOpened,
+            _keePassTreeRows.Count,
+            _keePassTreeRows.Count(row => row.IsEntryRow is false),
+            opened.FileBytes);
+    }
+
+    /// <summary>
     /// Opens the database and browses until an entry row is visible, which is what both seams need
     /// before they can do anything with a row. The loop rather than a single toggle because a fixture
     /// nests as deep as its author left it.
@@ -203,4 +225,14 @@ internal sealed record KeePassManageSmokeState(
 internal sealed record KeePassSmokeOpenState(
     bool DatabaseOpened,
     KeePassTreeRow? EntryRow,
+    long FileBytes);
+
+/// <summary>
+/// The shape of the tree before anything is typed, as counts only. A search shot is worthless unless the
+/// hierarchy it replaced was on screen first, and these two numbers are what say it was.
+/// </summary>
+internal sealed record KeePassSearchSmokeState(
+    bool DatabaseOpened,
+    int TreeRows,
+    int FolderRows,
     long FileBytes);

@@ -9,9 +9,17 @@ public sealed partial class MainWindowViewModel
 {
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasKeePassEditor))]
+    [NotifyPropertyChangedFor(nameof(ShowsKeePassDetailColumn))]
     private KeePassEntryEditorViewModel? _keePassEditorPublic;
 
     public bool HasKeePassEditor => KeePassEditorPublic is not null;
+
+    /// <summary>
+    /// The right-hand column answers whatever the person is looking at: an entry's detail, or the form
+    /// they are filling in. It used to open only for a detail, which left a brand new entry being typed
+    /// into a panel that was not on screen at all - the draft existed, the fields did not.
+    /// </summary>
+    public bool ShowsKeePassDetailColumn => KeePassEntryDetailsPublic is not null || HasKeePassEditor;
 
     public bool KeePassVaultIsDirty => _keePassVaultSession?.IsDirty == true;
 
@@ -197,6 +205,17 @@ public sealed partial class MainWindowViewModel
             [],
             secretsAlreadyPlaintext: true);
         KeePassEntryDetailsPublic = _keePassEntryDetails;
+    }
+
+    /// <summary>
+    /// Steps the detail projection down. The column it fills is shared with the edit form, so whoever
+    /// drops the detail has to drop the same instance the panel is holding - not just stop naming it.
+    /// </summary>
+    private void ClearKeePassEntryDetail()
+    {
+        _keePassEntryDetails?.Dispose();
+        _keePassEntryDetails = null;
+        KeePassEntryDetailsPublic = null;
     }
 
     private void RaiseKeePassWriteState()
