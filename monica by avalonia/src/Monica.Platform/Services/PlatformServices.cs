@@ -186,6 +186,21 @@ public interface IKeePassVaultService
         string? password,
         string? localPath = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Builds a new database in the shape Monica for Android writes one and hands back an unlocked
+    /// session for it.
+    /// </summary>
+    /// <param name="targetPath">
+    /// Where the file is going to live. Passing it writes the new database there, so the session can
+    /// save in place afterwards; leaving it out builds the payload only and leaves the caller to
+    /// publish the bytes.
+    /// </param>
+    Task<KeePassVaultSession> CreateAsync(
+        string fileName,
+        string password,
+        string? targetPath = null,
+        CancellationToken cancellationToken = default);
 }
 
 public interface IMdbxVaultService

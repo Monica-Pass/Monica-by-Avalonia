@@ -148,6 +148,13 @@ public sealed partial class AppSettingsTests
             OpenedSession = session;
             return session;
         }
+
+        public Task<KeePassVaultSession> CreateAsync(
+            string fileName,
+            string password,
+            string? targetPath = null,
+            CancellationToken cancellationToken = default) =>
+            _inner.CreateAsync(fileName, password, targetPath, cancellationToken);
     }
 
     private sealed class KeePassFilePicker(PickedBinaryFile? file) : IFileSystemPickerService

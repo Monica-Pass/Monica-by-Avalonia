@@ -78,3 +78,27 @@ is the matching shape, and why a restore has to read the pointer off the entry i
 Every timestamp in the file is pinned, so the decoded shape above is stable across regenerations. The
 bytes are not: kotpass draws a fresh KDF salt each time it builds a database, so the hash above records
 the committed copy rather than asserting on a rebuild.
+
+# What the desktop writes, as measured by kotpass reading it back
+
+`tests/Monica.Tests/KeePassVaultCreateShapeTests.cs` pins a desktop-created database against
+`android-kotpass-v1.kdbx` field by field, and the pinned shape was read off this harness rather than off
+the spec. Landing one on disk and running `build-kotpass-fixture.sh dump` on it reports:
+
+| Shape | Measured |
+|---|---|
+| Format version | KDBX 4.1 - pinned at create, because KPCLib's own default is 3.1 |
+| Outer cipher | AES-256, uuid `31c1f2e6-bf71-4350-be58-05216afc5aff` |
+| KDF | Argon2d, parallelism 2, memory 33554432 bytes, iterations 8, algorithm version 0x13, 32-byte salt |
+| Compression | GZip |
+| Inner random stream | ChaCha20, 64-byte key |
+| Recycle bin / deleted objects | disabled / none |
+| Root group | name `Root` |
+
+The same harness then read the Android fixture re-saved through the desktop's ordinary save path with
+nothing edited, and every field above still matched - including `name`, `historyMaxItems/historyMaxSize`,
+`memoryProtection`, the attachment count and `settingsChanged`. The one field that did not survive is
+`<Generator>`: kotpass reads `Monica Password Manager` from its own write and reads nothing back from a
+KPCLib write. That is a property of every desktop save, not of the create path, and
+`KeePassLib.PwDatabase` exposes no member (public or otherwise) that could carry the value through, so it
+is recorded rather than repaired - neither Monica client reads that string.

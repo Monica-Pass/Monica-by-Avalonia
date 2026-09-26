@@ -23,6 +23,58 @@ public sealed class KeePassVaultService : IKeePassVaultService
             cancellationToken);
     }
 
+    public Task<KeePassVaultSession> CreateAsync(
+        string fileName,
+        string password,
+        string? targetPath = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // A master key made only of spaces is a vault that looks protected on screen and is not one on
+        // disk, so it is refused rather than trimmed into something else.
+        ArgumentException.ThrowIfNullOrWhiteSpace(password);
+        var safeFileName = KeePassVaultText.NormalizeFileName(fileName);
+        var destination = string.IsNullOrWhiteSpace(targetPath)
+            ? null
+            : KeePassVaultWrite.NormalizePath(targetPath);
+        return Task.Run(
+            () => CreateCore(safeFileName, password, destination, cancellationToken),
+            cancellationToken);
+    }
+
+    private static async Task<KeePassVaultSession> CreateCore(
+        string fileName,
+        string password,
+        string? targetPath,
+        CancellationToken cancellationToken)
+    {
+        var (database, payload) = KeePassVaultCreate.Build(
+            fileName,
+            password,
+            databaseName: Path.GetFileNameWithoutExtension(fileName));
+        var ownershipTransferred = false;
+        try
+        {
+            if (targetPath is { } path)
+            {
+                await KeePassVaultWrite.WriteAtomicAsync(path, payload, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            var session = new KeePassVaultSession(database, fileName, targetPath, payload, cancellationToken);
+            ownershipTransferred = true;
+            return session;
+        }
+        finally
+        {
+            if (!ownershipTransferred && database.IsOpen)
+            {
+                database.Close();
+            }
+        }
+    }
+
     private static KeePassVaultSession OpenCore(
         byte[] ciphertext,
         string fileName,

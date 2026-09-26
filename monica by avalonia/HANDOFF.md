@@ -1974,3 +1974,116 @@ publish win-x64 jit 后 `UI SMOKE passed` + `RUNTIME SMOKE passed`、`PUB_EXIT=0
 - #120：1280x800 库面板外层滚动会把标题与标签页顶出视口。
 - Android 侧「清空回收站」无对拍对象（它没这个操作），所以本轮的删除记录集合形状是桌面端自定的——
   将来若要互认同步，得先定"夹自身要不要进删除列表"这一条（桌面端目前进）。
+
+## 附：桌面端**新建** .kdbx，并按 kotpass 的磁盘形状落盘（2026-09-27，**#125 片 F-1 出厂：桌面第一次写出 Android 认得的空库，并且当场量清"有一个元数据标签是每次写盘都在丢"**）
+
+### 一、这一轮把什么变成了事实
+
+- 新增 `src/Monica.Platform/Services/KeePassVaultCreate.cs`（89 行）。里面的每个数字都是从 kotpass 0.10.0
+  写出的那份文件上**读下来的**，不是照规范挑的：`FormatVersion = Kdbx41:24`、Argon2d
+  `iterations=8:26`、`memory=32MiB:27`、`parallelism=2:28`、`algorithm version=0x13:29`、`salt=32B:30`、
+  `RootGroupName="Root":22`。
+- `Build:54` 一次交出**开着的模型 + 已经验过的字节**：`BuildVerifiedPayload` 内部已经重开过一遍，
+  所以把模型交给会话时不必再付一次 KDF；"这份快捷没藏东西"由
+  `A_new_database_unlocks_with_the_password_that_created_it_and_with_no_other:72` 从普通打开路径重走一遍来兜。
+- `ApplyAndroidShape:79` 只做四件事：根夹名、库名（没给名字就用文件名，与 Android
+  `databaseName.ifBlank { file.nameWithoutExtension }` 同形）、`RecycleBinEnabled=false` +
+  `RecycleBinUuid=PwUuid.Zero`、KDF 换成 Argon2 形状。为什么恰好是这四件，见第二节。
+- 服务侧 `KeePassVaultService.CreateAsync:26` 与接口 `IKeePassVaultService.CreateAsync`
+  （`PlatformServices.cs:199`）。`targetPath` 非空时当场原子落盘，会话于是能就地保存；不给路径就只在内存里，
+  导出才写字节。主控密码是**全空格**直接拒（`ThrowIfNullOrWhiteSpace:36`）：屏上看着是设了密码的库、
+  磁盘上不是，这种库不能悄悄写出去。这一条是本轮唯一先由测试红、再回去改产品的。
+- 原子写与路径规范化从 `KeePassVaultSession.Write.cs` 上移到
+  `KeePassVaultWrite.WriteAtomicAsync:105` / `NormalizePath:134`，新建与保存共用同一份，
+  不留第二份"看起来一样"的落盘代码。
+
+### 二、先量后写：什么都不管的话，KPCLib 写出的是另一副样子
+
+`PwDatabase.New()` 之后直接保存，实测与 kotpass 的差是四项 + 版本：KDF 是 **AES-KDF
+`C9D9F39A628A4460BF740D08C18A4FEA`**（不是 Argon2d）、`RecycleBinEnabled=true`、根夹名=文件名、
+落盘版本 **KDBX 3.1**。这四件每件都留在文件里，另一台客户端读得到，所以 `ApplyAndroidShape` 逐条钉；
+版本另有一层理由（4.1 是唯一有 `PreviousParentGroup` 槽的一版），钉在 `FormatVersion:24` 而不是交给写盘默认。
+
+### 三、kotpass 真读开了桌面写的文件——这才是这一轮的硬证据
+
+用一次性脚手架把新建的库落盘，再交给 `eng/kdbx/build-kotpass-fixture.sh dump`（跑完已删）：
+
+```
+format=KDBX-4.1
+cipherId=31c1f2e6-bf71-4350-be58-05216afc5aff
+compression=GZip
+kdf=argon2 variant=Argon2d parallelism=2 memoryBytes=33554432 iterations=8 version=0x13 saltBytes=32
+innerStream=ChaCha20 keyBytes=64
+deletedObjects=0
+group path=Root name=Root …
+```
+
+顺手多做了一步：把 Android 那份 fixture 用桌面的**普通保存路径**一字不改地重存一遍，再让 kotpass 读。
+版本、cipher、KDF 五个数、压缩、内层流、附件数、`historyMaxItems/historyMaxSize/maintenanceHistoryDays`、
+`memoryProtection=[Password]`、库名、`settingsChanged` 全部同形——只有
+`meta generator` 从 `Monica Password Manager` 变成了 `Kotpass`。
+
+**所以 `<Generator>` 不是新建路径的毛病，是 KPCLib 每次写盘都会丢它。**反射
+`KeePassLib.PwDatabase`（public + nonpublic）里没有任何 Generator 入口，`PwDefs` 只有
+`ProductName/VersionString` 这类常量，库没有"原样带过去"的地方。kotpass 打印的 `Kotpass` 是它读不到该标签时的
+默认值；"标签不存在"与"标签在但为空"从这一侧分不开，这一条我没有再往下验。影响面：Monica 两端都不读它
+（Android 源码 grep 无 usage），KeePass 系只当它是信息位。决定：**记下不修**——为一个没人读的字段去动 KPCLib
+的私有成员，代价是每次升级重做一遍。
+
+### 四、负控（每条跑在真字节上，跑完还原并核对哈希）
+
+| 拆掉的东西 | 期望红的那条 | 实测 |
+|---|---|---|
+| ① `database.KdfParameters = Argon2Shape()` 注释掉 | 形状 | 只形状红，1 红 4 绿 |
+| ② `database.RecycleBinEnabled = false` 注释掉 | 形状 | 只形状红，1 红 4 绿 |
+| ③ 版本钉成 4.0 | 回收站记住来源夹 | 5 条中 4 红：形状、`A_recycled_entry…` 承重，另两条红在各自的 4.1 断言（`:76`） |
+| ③b 版本钉回修复前的默认 3.1 | 同上 | **5 条全红**——这就是片 F 之前桌面新建的真实状态 |
+| ④ Argon2 memory 32MiB→64MiB | 形状 | 只形状红，1 红 4 绿 |
+| ⑤ `CreateCore` 里那句原子写换成 `Task.Yield()` | 落盘后重开 | 只那一条红，1 红 4 绿 |
+
+还原后 `KeePassVaultCreate.cs` sha256 `bec7baf4e1af15343df3d2ec2b1b1595993d3b4fe8def527bd8a7464588c0553`、
+`KeePassVaultService.cs` sha256 `8a4505455049124bbc73eea8e60baa940a7f22406b8fd4fae05db2938450aac5`，
+与动手前的快照逐字节一致；脚手架文件已删。
+
+### 五、测试与证据
+
+`tests/Monica.Tests/KeePassVaultCreateShapeTests.cs`（360 行，5 条，全绿）：
+
+- 形状对照写成 `Assert.Equal(android, desktop)`（`ShapeOf:211` 对 Android fixture 与新建载荷各跑一次，
+  取回 `DiskShape:334` 这个 25 字段的 record），然后同一批数字再对字面量复述一遍——这样"两边一起漂还绿着"
+  这条路被堵掉。变体字典的**存储类型**（`System.Byte[]` / `System.UInt64` / `System.UInt32`）也是字段之一，
+  因为那就是字节形状，Android 把 memory/iterations 写成 64 位、parallelism/version 写成 32 位。
+  `K/A absent`（`secretKey`/`associatedData` 不写）同样在字段里。
+- `A_recycled_entry_in_a_new_database_remembers_the_folder_it_left:113`：新建库 → 建夹 → 建条目 → 回收 →
+  导出 → `PreviousParentGroup` 等于来源夹 → 还原 → 再导出 → 归零 → 重开列在来源夹下。这是把 #124
+  "那个槽只在 4.1 有"的结论第一次用桌面**自己新建**的库走通（负控 ③/③b 就是它的证据）。
+- `A_new_database_arrives_empty_and_clean…:87`：`EntryCount=0`、`Groups` 为空、`RecycleBinUuid=null`、
+  `IsDirty=false`、`SourcePath=null`，外加全空格主控密码抛 `ArgumentException`。
+- `A_new_database_written_to_a_path…:153`：落盘 → `PayloadSha256` 与盘上字节的哈希相同 → 就地保存 →
+  加条目再保存 → 重开 → 盘上被别人改过时抛 `ConcurrentChange`。
+
+### 六、门禁
+
+跑在本轮最后那份字节上（六条负控全部还原、哈希核对之后）：`dotnet format` 0 改动（exit 0）、
+Release `--warnaserror` 0 warning / 0 error、`Commercial release verification passed.`
+（单测 1037 条 0 红、UI `perf-budget` 17 + 常规 253 条 0 红）、publish win-x64 jit 之后
+`UI SMOKE passed` + `RUNTIME SMOKE passed`。读数：20000 条 `openMs=2139 / streamMs=574 / growthMB=-3.8`
+对 24、锁定态中位 113.5MB 对 120、锁环 25/14/1/4 全部还原。
+
+另量到一条与本片无关的抖动，记下来免得下次再当新缺陷查：手动把整套单测**连 `perf-budget` 一起**在并行模式下跑，
+`VaultTreeBuilderTests` 两条计时预算会红（本轮实测 593.6ms / 201.4ms），单独顺序复跑 37 条全绿。
+这正是 #57 把它们移进顺序通道的原因，commercial-release 走的就是那个通道。
+
+### 七、仍然没做到（欠账，不是决定）
+
+- **界面上还没有"新建数据库"入口**（片 F-2，本轮只做到服务与形状）：今天没有任何一条用户路径能产出一个
+  .kdbx——`KeePassSmokeVaultWriter` 只是产物门的种子，`UnlockView.axaml` 的 "Create Vault" 建的是 MDBX 库。
+  要接的东西：保存文件选择器、主控密码 + 确认、本地化键、建完直接把会话挂上树。
+- `<Generator>` 每次写盘都丢（第三节），已记未修。
+- 桌面新建的 KDF 参数是**钉死**的 Android 默认值，不给人调；Android 那边是按用户设置夹在范围内钳制的
+  （`LocalKeePassDatabase.kt:60-116`）。KDF 自定义面板未开工。
+- 片 D 余下（历史视图与从历史还原、标签、过期/已过期、可编辑图标与 AutoType、CustomData 只读）沿用。
+- `.kdbx` 还没成一等公民（打开/最近文件/文件关联）；搜索仍没有键盘入口（`Ctrl+F`、↑↓、Enter）。
+- #120：1280x800 库面板外层滚动会把标题与标签页顶出视口。
+- 沿用上一轮：右键与拖放仍未在真机屏幕上走过；桌面还原不能人选目标夹；清空没有撤销；
+  Android 侧无"清空回收站"对拍对象，删除记录集合形状仍是桌面端自定的。

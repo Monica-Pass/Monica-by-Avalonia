@@ -97,6 +97,66 @@ internal static class KeePassVaultWrite
         return count;
     }
 
+    /// <summary>
+    /// Replaces a file in one step: the payload lands in a temporary beside the target, is flushed to
+    /// disk, and only then becomes the target. A vault that vanished half-way through a write is the
+    /// failure this path exists to make impossible.
+    /// </summary>
+    public static async Task WriteAtomicAsync(string target, byte[] payload, CancellationToken cancellationToken)
+    {
+        var temporary = target + ".monica-tmp";
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(target) ?? ".");
+            await using (var stream = new FileStream(
+                             temporary,
+                             FileMode.Create,
+                             FileAccess.Write,
+                             FileShare.None,
+                             bufferSize: 64 * 1024,
+                             FileOptions.WriteThrough))
+            {
+                await stream.WriteAsync(payload, cancellationToken).ConfigureAwait(false);
+                // Flush(true) is the fsync that makes the temporary file durable before the rename
+                // replaces the vault with it.
+                stream.Flush(flushToDisk: true);
+            }
+
+            File.Move(temporary, target, overwrite: true);
+        }
+        catch
+        {
+            TryDelete(temporary);
+            throw;
+        }
+    }
+
+    public static string NormalizePath(string path)
+    {
+        var trimmed = path?.Trim() ?? "";
+        if (trimmed.Length == 0)
+        {
+            throw KeePassVaultFaults.InvalidFile();
+        }
+
+        return Path.GetFullPath(trimmed);
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (IOException)
+        {
+            // A leftover temporary file is untidy; the failed write is the fact the user needs.
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
+
     private static byte[] SaveOnce(PwDatabase database, uint? formatVersion)
     {
         lock (SaveGate)

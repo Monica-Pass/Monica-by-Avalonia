@@ -91,7 +91,7 @@ public sealed partial class KeePassVaultSession
 
     public Task<KeePassSaveResult> SaveToAsync(string path, CancellationToken cancellationToken = default)
     {
-        var target = NormalizePath(path);
+        var target = KeePassVaultWrite.NormalizePath(path);
         var inPlace = string.Equals(
             target,
             SourcePath,
@@ -114,7 +114,7 @@ public sealed partial class KeePassVaultSession
 
             var database = _database ?? throw new ObjectDisposedException(nameof(KeePassVaultSession));
             var payload = KeePassVaultWrite.BuildVerifiedPayload(database, database.MasterKey, FormatVersion);
-            await WriteAtomicAsync(target, payload, cancellationToken).ConfigureAwait(false);
+            await KeePassVaultWrite.WriteAtomicAsync(target, payload, cancellationToken).ConfigureAwait(false);
             PayloadSha256 = Convert.ToHexString(SHA256.HashData(payload));
             IsDirty = false;
             database.Modified = false;
@@ -234,35 +234,6 @@ public sealed partial class KeePassVaultSession
         return null;
     }
 
-    private static async Task WriteAtomicAsync(string target, byte[] payload, CancellationToken cancellationToken)
-    {
-        var temporary = target + ".monica-tmp";
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(target) ?? ".");
-            await using (var stream = new FileStream(
-                             temporary,
-                             FileMode.Create,
-                             FileAccess.Write,
-                             FileShare.None,
-                             bufferSize: 64 * 1024,
-                             FileOptions.WriteThrough))
-            {
-                await stream.WriteAsync(payload, cancellationToken).ConfigureAwait(false);
-                // Flush(true) is the fsync that makes the temporary file durable before the rename
-                // replaces the vault with it.
-                stream.Flush(flushToDisk: true);
-            }
-
-            File.Move(temporary, target, overwrite: true);
-        }
-        catch
-        {
-            TryDelete(temporary);
-            throw;
-        }
-    }
-
     private static string? HashFileIfExists(string path)
     {
         if (!File.Exists(path))
@@ -272,31 +243,5 @@ public sealed partial class KeePassVaultSession
 
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         return Convert.ToHexString(SHA256.HashData(stream));
-    }
-
-    private static void TryDelete(string path)
-    {
-        try
-        {
-            File.Delete(path);
-        }
-        catch (IOException)
-        {
-            // A leftover temporary file is untidy; the failed save is the fact the user needs.
-        }
-        catch (UnauthorizedAccessException)
-        {
-        }
-    }
-
-    private static string NormalizePath(string path)
-    {
-        var trimmed = path?.Trim() ?? "";
-        if (trimmed.Length == 0)
-        {
-            throw KeePassVaultFaults.InvalidFile();
-        }
-
-        return Path.GetFullPath(trimmed);
     }
 }
