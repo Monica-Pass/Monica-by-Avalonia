@@ -12,6 +12,48 @@ namespace Monica.Tests;
 /// </summary>
 public sealed class KeePassVaultRecycleBinTests
 {
+    /// <summary>
+    /// The date aged fixtures carry. A save that invents its own stamp instead of writing the file's
+    /// down reads as this minus a decade plus now, so the age has to be far enough away to be obvious.
+    /// </summary>
+    private static readonly DateTime AgedTo = new(2016, 5, 6, 7, 8, 9, DateTimeKind.Utc);
+
+    /// <summary>
+    /// What the time-stamp facts below assume: a save that changes nothing writes the stamps back
+    /// unchanged, at either version a file can be at. If this ever goes red, every "a move advanced the
+    /// location" assertion above has quietly stopped measuring the file.
+    /// </summary>
+    [Fact]
+    public async Task A_save_that_changed_nothing_writes_the_stamps_the_file_already_had()
+    {
+        foreach (var version in new uint?[] { null, KeePassTestVault.Kdbx41 })
+        {
+            var fixture = KeePassTestVault.Create("keepass-untouched-stamps", formatVersion: version);
+            var entry = fixture.Entries.Single(item => item.Title == KeePassTestVault.CloudTitle);
+            var group = fixture.Groups.Single(item => item.Path == "Personal/Cloud");
+            var staged = Aged(
+                Aged(fixture.Content, fixture.Password, entry.Uuid, entry: true),
+                fixture.Password,
+                group.Uuid,
+                entry: false);
+            Assert.Equal(fixture.FormatVersion, KeePassTestVault.HeaderVersion(staged));
+
+            byte[] written;
+            using (var session = await OpenForPayload(staged, fixture.Password))
+            {
+                written = await session.ExportAsync();
+            }
+
+            var times = ReadEntryTimes(written, fixture.Password, entry.Uuid);
+            Assert.Equal(AgedTo.Ticks, times.Created.Ticks);
+            Assert.Equal(AgedTo.Ticks, times.LastModified.Ticks);
+            Assert.Equal(AgedTo.Ticks, times.LocationChanged.Ticks);
+            Assert.Equal(
+                AgedTo.Ticks,
+                ReadGroupTimes(written, fixture.Password, group.Uuid).LocationChanged.Ticks);
+        }
+    }
+
     [Fact]
     public async Task Recycling_an_entry_creates_the_bin_under_the_root_and_keeps_the_entry()
     {
@@ -179,8 +221,15 @@ public sealed class KeePassVaultRecycleBinTests
         // The format stores these times to whole seconds, so a move that lands in the same second as
         // the file it came from would read back unchanged. The entry starts a decade behind.
         var start = Aged(fixture.Content, fixture.Password, target.Uuid, entry: true);
+        Assert.Equal(fixture.FormatVersion, KeePassTestVault.HeaderVersion(start));
         using var session = await OpenForPayload(start, fixture.Password);
         var before = ReadEntryTimes(start, fixture.Password, target.Uuid);
+
+        // Read the age back before moving anything. A format that does not store a location stamp leaves
+        // the field at whatever the loader invented, and the comparison below would then be measuring
+        // two load times rather than the file.
+        Assert.Equal(AgedTo.Ticks, before.LastModified.Ticks);
+        Assert.Equal(AgedTo.Ticks, before.LocationChanged.Ticks);
         var rowBefore = await session.ReadDetailAsync(
             fixture.Groups.Single(group => group.Path == "Personal/Cloud").Uuid,
             target.Uuid);
@@ -202,8 +251,14 @@ public sealed class KeePassVaultRecycleBinTests
         var fixture = KeePassTestVault.Create("keepass-recycle-group-move");
         var cloud = fixture.Groups.Single(group => group.Path == "Personal/Cloud");
         var start = Aged(fixture.Content, fixture.Password, cloud.Uuid, entry: false);
+        Assert.Equal(fixture.FormatVersion, KeePassTestVault.HeaderVersion(start));
         using var session = await OpenForPayload(start, fixture.Password);
         var before = ReadGroupTimes(start, fixture.Password, cloud.Uuid);
+
+        // Same reason as the entry move: without the age read back first, the comparison below could be
+        // two loader defaults rather than anything the file stored.
+        Assert.Equal(AgedTo.Ticks, before.LastModified.Ticks);
+        Assert.Equal(AgedTo.Ticks, before.LocationChanged.Ticks);
         var entry = fixture.Entries.Single(item => item.Title == KeePassTestVault.CloudTitle);
         var rowBefore = (await session.ReadGroupRowsAsync(cloud.Uuid)).Single();
 
@@ -283,6 +338,185 @@ public sealed class KeePassVaultRecycleBinTests
         Assert.Equal(KeePassTestVault.CloudTitle, survivor.Title);
     }
 
+    /// <summary>
+    /// The way back out. A bin a client can put entries into but nobody can leave is a one-way door, so
+    /// a restore has to land the entry in the folder it was taken from and leave the bin folder itself
+    /// in place, because that folder belongs to the database rather than to the entry passing through.
+    /// </summary>
+    [Fact]
+    public async Task Restoring_an_entry_puts_it_back_in_the_folder_it_was_recycled_from()
+    {
+        var fixture = KeePassTestVault.Create("keepass-restore-origin");
+        using var session = await OpenAsync(fixture);
+        var cloud = fixture.Groups.Single(group => group.Path == "Personal/Cloud");
+        var target = fixture.Entries.Single(entry => entry.Title == KeePassTestVault.CloudTitle);
+        var survivor = fixture.Entries.Single(entry => entry.Title == KeePassTestVault.ExistingTitle);
+        await session.DeleteEntryAsync(target.Uuid, KeePassDeleteMode.RecycleBin);
+        var binUuid = session.RecycleBinUuid!;
+
+        // An entry that never went into the bin has no restore, so the menu can never act on a row the
+        // pointer merely happened to be over.
+        Assert.Null(await session.RestoreEntryAsync(survivor.Uuid));
+
+        var restored = await session.RestoreEntryAsync(target.Uuid);
+        Assert.NotNull(restored);
+        Assert.Equal(cloud.Uuid, restored!.Row.GroupUuid);
+        Assert.Equal("Personal/Cloud", restored.Row.GroupPath);
+        Assert.Equal([], await session.ReadGroupRowsAsync(binUuid));
+        Assert.Equal(0, session.RecycleBinEntryCount);
+        Assert.Equal(2, session.EntryCount);
+        Assert.True(session.IsDirty);
+
+        Assert.Equal(binUuid, session.RecycleBinUuid);
+        // A second click on the row that already left adds nothing to the folder it went back to.
+        Assert.Null(await session.RestoreEntryAsync(target.Uuid));
+        Assert.Single(await session.ReadGroupRowsAsync(cloud.Uuid));
+    }
+
+    [Fact]
+    public async Task An_entry_the_file_arrived_in_the_bin_with_goes_back_to_the_folder_it_records()
+    {
+        // The version is the subject, not a detail: only KDBX 4.1 gives an entry a field to carry the
+        // folder it left, so this is the file shape that has to be staged here.
+        var fixture = KeePassTestVault.Create(
+            "keepass-restore-recorded-origin",
+            formatVersion: KeePassTestVault.Kdbx41);
+        Assert.Equal(KeePassTestVault.Kdbx41, fixture.FormatVersion);
+        var cloud = fixture.Entries.Single(entry => entry.Title == KeePassTestVault.CloudTitle);
+        byte[] written;
+        using (var session = await OpenAsync(fixture))
+        {
+            await session.DeleteEntryAsync(cloud.Uuid, KeePassDeleteMode.RecycleBin);
+            written = await session.ExportAsync();
+        }
+
+        // The export-and-reopen is the point. The folder an entry left is recorded on the entry itself,
+        // so a bin the file came with is not a mystery that has to fall back on the root.
+        using var reopened = await OpenForPayload(written, fixture.Password);
+        var home = reopened.Groups.Single(group => group.Path == "Personal/Cloud");
+        Assert.Equal(1, reopened.RecycleBinEntryCount);
+
+        var restored = await reopened.RestoreEntryAsync(cloud.Uuid);
+        Assert.NotNull(restored);
+        Assert.Equal(home.Uuid, restored!.Row.GroupUuid);
+        Assert.Equal("Personal/Cloud", restored.Row.GroupPath);
+        Assert.Equal([], await reopened.ReadGroupRowsAsync(reopened.RecycleBinUuid!));
+    }
+
+    /// <summary>
+    /// The same save at a version the origin field does not exist in. Nothing is being refused here -
+    /// the file simply has nowhere to write the pointer down - so the honest answer is the root rather
+    /// than a folder this client remembers from a session that has since closed.
+    /// </summary>
+    [Fact]
+    public async Task A_file_that_cannot_record_an_origin_sends_a_restored_entry_to_the_root()
+    {
+        var fixture = KeePassTestVault.Create("keepass-restore-no-origin-slot");
+        Assert.Equal(KeePassTestVault.Kdbx31, fixture.FormatVersion);
+        var cloud = fixture.Entries.Single(entry => entry.Title == KeePassTestVault.CloudTitle);
+        byte[] written;
+        using (var session = await OpenAsync(fixture))
+        {
+            await session.DeleteEntryAsync(cloud.Uuid, KeePassDeleteMode.RecycleBin);
+            written = await session.ExportAsync();
+        }
+
+        using var reopened = await OpenForPayload(written, fixture.Password);
+        Assert.Equal(1, reopened.RecycleBinEntryCount);
+
+        var restored = await reopened.RestoreEntryAsync(cloud.Uuid);
+        Assert.NotNull(restored);
+        Assert.Equal(reopened.RootGroupUuid, restored!.Row.GroupUuid);
+        Assert.Equal("", restored.Row.GroupPath);
+        Assert.Equal([], await reopened.ReadGroupRowsAsync(reopened.RecycleBinUuid!));
+    }
+
+    /// <summary>
+    /// Two origins a restore has to refuse, in the shapes another client leaves behind: a pointer at the
+    /// bin itself, and a pointer at a folder that is no longer in the file. Honouring either would put
+    /// the entry back where the person had just deleted it, or detach it from the tree altogether.
+    /// </summary>
+    [Fact]
+    public async Task Restoring_refuses_an_origin_that_points_at_the_bin_or_at_nothing()
+    {
+        var fixture = KeePassTestVault.Create(
+            "keepass-restore-refused-origin",
+            formatVersion: KeePassTestVault.Kdbx41);
+        var cloud = fixture.Entries.Single(entry => entry.Title == KeePassTestVault.CloudTitle);
+
+        foreach (var originIsBin in new[] { true, false })
+        {
+            var staged = BinWithRefusedOrigin(fixture.Content, fixture.Password, cloud.Uuid, originIsBin);
+            Assert.True(
+                string.Equals(
+                    ReadOrigin(staged.Payload, fixture.Password, cloud.Uuid),
+                    staged.OriginUuid,
+                    StringComparison.OrdinalIgnoreCase),
+                "origin_pointer_not_written");
+
+            using var session = await OpenForPayload(staged.Payload, fixture.Password);
+            var binned = Assert.Single(await session.ReadGroupRowsAsync(staged.BinUuid));
+            var restored = await session.RestoreEntryAsync(binned.EntryUuid);
+
+            Assert.NotNull(restored);
+            Assert.Equal(session.RootGroupUuid, restored!.Row.GroupUuid);
+            Assert.Equal("", restored.Row.GroupPath);
+            Assert.Equal(0, session.RecycleBinEntryCount);
+        }
+    }
+
+    [Fact]
+    public async Task Emptying_the_bin_records_every_uuid_it_took_and_clears_the_pointer()
+    {
+        var fixture = KeePassTestVault.Create("keepass-recycle-empty");
+        using var session = await OpenAsync(fixture);
+        foreach (var entry in fixture.Entries)
+        {
+            await session.DeleteEntryAsync(entry.Uuid, KeePassDeleteMode.RecycleBin);
+        }
+
+        var binUuid = session.RecycleBinUuid!;
+        Assert.Equal(2, session.RecycleBinEntryCount);
+        Assert.Equal(2, await session.EmptyRecycleBinAsync());
+
+        Assert.Null(session.RecycleBinUuid);
+        Assert.Equal(0, session.EntryCount);
+        Assert.DoesNotContain(session.Groups, group => group.IsRecycleBin);
+
+        // Emptying an emptied database answers with nothing rather than pretending a loss.
+        Assert.Equal(0, await session.EmptyRecycleBinAsync());
+
+        var tombstones = ReadDeletedObjects(await session.ExportAsync(), fixture.Password)
+            .Select(item => item.Uuid)
+            .ToArray();
+
+        // The folder that held them went with them, and it has to be on the list: a bin that emptied
+        // without recording itself would come back on the next pull.
+        Assert.Contains(binUuid, tombstones);
+        foreach (var entry in fixture.Entries)
+        {
+            Assert.Contains(entry.Uuid, tombstones);
+        }
+
+        Assert.Equal(3, tombstones.Length);
+
+        // The database still recycles afterwards - the pointer was cleared, the setting was not.
+        var created = await session.CreateEntryAsync(session.RootGroupUuid, new KeePassEntryEdit(
+            "",
+            "Replacement",
+            "",
+            "restore-draft-secret",
+            "",
+            "",
+            "",
+            []));
+        Assert.NotNull(created);
+        await session.DeleteEntryAsync(created!.Row.EntryUuid, KeePassDeleteMode.RecycleBin);
+        var reborn = Assert.Single(session.Groups, group => group.IsRecycleBin);
+        Assert.NotEqual(binUuid, reborn.Uuid);
+        Assert.Equal(1, session.RecycleBinEntryCount);
+    }
+
     private static async Task<KeePassVaultSession> OpenAsync(KeePassTestVault.Fixture fixture) =>
         await new KeePassVaultService().OpenAsync(fixture.Content, "ledger.kdbx", fixture.Password);
 
@@ -291,11 +525,13 @@ public sealed class KeePassVaultRecycleBinTests
 
     /// <summary>
     /// Pushes one object's times a decade into the past. A move stamps the place with the current
-    /// second, and a file written a moment ago would otherwise compare equal to itself.
+    /// second, and a file written a moment ago would otherwise read back unchanged. The version is
+    /// re-pinned to the one the payload already had: an aged fixture that quietly became a different
+    /// format would stop being the file the fact claimed to open.
     /// </summary>
     private static byte[] Aged(byte[] payload, string password, string uuid, bool entry)
     {
-        var past = new DateTime(2016, 5, 6, 7, 8, 9, DateTimeKind.Utc);
+        var past = AgedTo;
         var database = Load(payload, password);
         try
         {
@@ -316,7 +552,8 @@ public sealed class KeePassVaultRecycleBinTests
                 found.LocationChanged = past;
             }
 
-            return Save(database);
+            // Re-pin the version the payload came in at, so aging cannot change the format under test.
+            return Save(database, KeePassTestVault.HeaderVersion(payload));
         }
         finally
         {
@@ -336,6 +573,74 @@ public sealed class KeePassVaultRecycleBinTests
         var written = Save(database);
         database.Close();
         return written;
+    }
+
+    /// <summary>
+    /// A folder uuid that is in no vault, the shape left behind when another client deletes the folder
+    /// an entry was recycled from.
+    /// </summary>
+    private const string GoneFolderUuid = "00112233445566778899AABBCCDDEEFF";
+
+    /// <summary>
+    /// Stages a file that already holds one entry in its own recycle bin, with the origin pointer the
+    /// entry carries set to either the bin itself or the gone folder. Neither is a handover this client
+    /// produced, so only the file can say whether the pointer survived the write.
+    /// </summary>
+    private static (byte[] Payload, string BinUuid, string OriginUuid) BinWithRefusedOrigin(
+        byte[] payload,
+        string password,
+        string entryUuid,
+        bool originIsBin)
+    {
+        string? binUuid = null;
+        string? originUuid = null;
+
+        var written = KeePassTestVault.Gated(() =>
+        {
+            var database = Load(payload, password);
+            try
+            {
+                var bin = new PwGroup(true, true, KeePassVaultSession.RecycleBinGroupName, PwIcon.TrashBin);
+                database.RootGroup.AddGroup(bin, true);
+                database.RecycleBinEnabled = true;
+                database.RecycleBinUuid = bin.Uuid;
+
+                var entry = FindEntry(database.RootGroup, entryUuid);
+                entry.ParentGroup!.Entries.Remove(entry);
+                bin.AddEntry(entry, true);
+
+                originUuid = originIsBin ? bin.Uuid.ToHexString() : GoneFolderUuid;
+                entry.PreviousParentGroup = new PwUuid(Convert.FromHexString(originUuid));
+                binUuid = bin.Uuid.ToHexString();
+
+                // The origin pointer only exists on disk at 4.1, so a file that is meant to arrive with
+                // one has to be written at the version that carries it.
+                return Save(database, KeePassTestVault.Kdbx41);
+            }
+            finally
+            {
+                database.Close();
+            }
+        });
+
+        return (written, binUuid ?? throw new InvalidOperationException("bin_uuid_missing"),
+            originUuid ?? throw new InvalidOperationException("origin_uuid_missing"));
+    }
+
+    /// <summary>
+    /// Where the file says the entry used to live.
+    /// </summary>
+    private static string ReadOrigin(byte[] payload, string password, string entryUuid)
+    {
+        var database = Load(payload, password);
+        try
+        {
+            return FindEntry(database.RootGroup, entryUuid).PreviousParentGroup?.ToHexString() ?? "";
+        }
+        finally
+        {
+            database.Close();
+        }
     }
 
     private static IReadOnlyList<(string Uuid, long DeletionTicks)> ReadDeletedObjects(
@@ -443,12 +748,21 @@ public sealed class KeePassVaultRecycleBinTests
         return database;
     }
 
-    private static byte[] Save(PwDatabase database)
-    {
-        using var stream = new MemoryStream();
-        new KdbxFile(database).Save(stream, database.RootGroup, KdbxFormat.Default, null);
-        return stream.ToArray();
-    }
+    private static byte[] Save(PwDatabase database, uint? formatVersion = null) =>
+        KeePassTestVault.Gated(() =>
+        {
+            using var stream = new MemoryStream();
+            var file = new KdbxFile(database);
+            if (formatVersion is { } version)
+            {
+                typeof(KdbxFile)
+                    .GetProperty("ForceVersion", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                    .SetValue(file, version);
+            }
+
+            file.Save(stream, database.RootGroup, KdbxFormat.Default, null);
+            return stream.ToArray();
+        });
 
     private static async Task<IReadOnlyList<KeePassEntryRow>> CollectRowsAsync(KeePassVaultSession session)
     {

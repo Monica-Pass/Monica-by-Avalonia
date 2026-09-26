@@ -654,6 +654,8 @@ public partial class MainWindow
                 state.BinShown &&
                 state.EntryInBin &&
                 state.BinDeleteSplit &&
+                state.EntryRestored &&
+                state.RecycleBinEmptied &&
                 formOnScreen &&
                 keepassTab.IsSelected &&
                 frameBytes > 0 &&
@@ -666,6 +668,7 @@ public partial class MainWindow
                 $"entryAdded={state.EntryShown}, unsavedNotice={state.UnsavedNoticeShown}, " +
                 $"binShown={state.BinShown}, entryInBin={state.EntryInBin}, " +
                 $"binDeleteSplit={state.BinDeleteSplit}, " +
+                $"entryRestoredOutOfBin={state.EntryRestored}, recycleBinEmptied={state.RecycleBinEmptied}, " +
                 $"treeRows={state.TreeRows}, folderRows={state.FolderRows}, entryRows={state.EntryRows}, " +
                 $"vaultBytes={state.FileBytes}, tabSelected={keepassTab.IsSelected}, " +
                 $"frameBytes={frameBytes}, written={written}, file={fileName}, " +

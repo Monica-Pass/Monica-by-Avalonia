@@ -85,6 +85,17 @@ public partial class VaultFolderTree : UserControl
     public static readonly StyledProperty<bool> SelectedEntryInRecycleBinProperty =
         AvaloniaProperty.Register<VaultFolderTree, bool>(nameof(SelectedEntryInRecycleBin));
 
+    // The two ways out of a bin: one row back, or the whole set gone for good. A host with no bin
+    // leaves both null and the menu keeps the shape it had before a bin existed.
+    public static readonly StyledProperty<ICommand?> RestoreEntryCommandProperty =
+        AvaloniaProperty.Register<VaultFolderTree, ICommand?>(nameof(RestoreEntryCommand));
+
+    public static readonly StyledProperty<ICommand?> EmptyRecycleBinCommandProperty =
+        AvaloniaProperty.Register<VaultFolderTree, ICommand?>(nameof(EmptyRecycleBinCommand));
+
+    public static readonly StyledProperty<bool> SelectedFolderIsRecycleBinProperty =
+        AvaloniaProperty.Register<VaultFolderTree, bool>(nameof(SelectedFolderIsRecycleBin));
+
     // Copy is asked for row by row because a tree mixes the kinds that hold different values, and
     // the parameter is the row itself so a copy never waits for the selection to catch up.
     public static readonly StyledProperty<ICommand?> CopyRowUsernameCommandProperty =
@@ -123,6 +134,12 @@ public partial class VaultFolderTree : UserControl
 
     public static readonly StyledProperty<bool> ShowsEntryPlainDeleteItemProperty =
         AvaloniaProperty.Register<VaultFolderTree, bool>(nameof(ShowsEntryPlainDeleteItem));
+
+    public static readonly StyledProperty<bool> ShowsEntryRestoreItemProperty =
+        AvaloniaProperty.Register<VaultFolderTree, bool>(nameof(ShowsEntryRestoreItem));
+
+    public static readonly StyledProperty<bool> ShowsEmptyRecycleBinItemProperty =
+        AvaloniaProperty.Register<VaultFolderTree, bool>(nameof(ShowsEmptyRecycleBinItem));
 
     // The context menu is built per row, but its items live in one menu, so the menu group is chosen
     // from the row the pointer last pressed rather than from the item's own data context.
@@ -262,6 +279,24 @@ public partial class VaultFolderTree : UserControl
         set => SetValue(SelectedEntryInRecycleBinProperty, value);
     }
 
+    public ICommand? RestoreEntryCommand
+    {
+        get => GetValue(RestoreEntryCommandProperty);
+        set => SetValue(RestoreEntryCommandProperty, value);
+    }
+
+    public ICommand? EmptyRecycleBinCommand
+    {
+        get => GetValue(EmptyRecycleBinCommandProperty);
+        set => SetValue(EmptyRecycleBinCommandProperty, value);
+    }
+
+    public bool SelectedFolderIsRecycleBin
+    {
+        get => GetValue(SelectedFolderIsRecycleBinProperty);
+        set => SetValue(SelectedFolderIsRecycleBinProperty, value);
+    }
+
     public ICommand? CopyRowUsernameCommand
     {
         get => GetValue(CopyRowUsernameCommandProperty);
@@ -334,6 +369,18 @@ public partial class VaultFolderTree : UserControl
         set => SetValue(ShowsEntryPlainDeleteItemProperty, value);
     }
 
+    public bool ShowsEntryRestoreItem
+    {
+        get => GetValue(ShowsEntryRestoreItemProperty);
+        set => SetValue(ShowsEntryRestoreItemProperty, value);
+    }
+
+    public bool ShowsEmptyRecycleBinItem
+    {
+        get => GetValue(ShowsEmptyRecycleBinItemProperty);
+        set => SetValue(ShowsEmptyRecycleBinItemProperty, value);
+    }
+
     public string? FolderName
     {
         get => GetValue(FolderNameProperty);
@@ -365,7 +412,10 @@ public partial class VaultFolderTree : UserControl
                  change.Property == CanManageRowsProperty ||
                  change.Property == MoveEntryCommandProperty ||
                  change.Property == MoveToRecycleBinCommandProperty ||
-                 change.Property == SelectedEntryInRecycleBinProperty)
+                 change.Property == RestoreEntryCommandProperty ||
+                 change.Property == EmptyRecycleBinCommandProperty ||
+                 change.Property == SelectedEntryInRecycleBinProperty ||
+                 change.Property == SelectedFolderIsRecycleBinProperty)
         {
             RefreshRowCommandVisibility();
         }
@@ -384,6 +434,12 @@ public partial class VaultFolderTree : UserControl
         ShowsEntryRecycleItem = ShowsEntryCommands && supportsBin && !SelectedEntryInRecycleBin;
         ShowsEntryPermanentItem = ShowsEntryCommands && supportsBin;
         ShowsEntryPlainDeleteItem = ShowsEntryCommands && !supportsBin;
+
+        // The way out of the bin appears on the two rows that can use it: an entry already in there
+        // restores, the folder itself empties. Both are the host's call - a tree that was never given
+        // the command shows neither, so no menu item can lead to a command with nothing to run.
+        ShowsEntryRestoreItem = ShowsEntryCommands && RestoreEntryCommand is not null && SelectedEntryInRecycleBin;
+        ShowsEmptyRecycleBinItem = ShowsFolderCommands && EmptyRecycleBinCommand is not null && SelectedFolderIsRecycleBin;
     }
 
     public bool IsTreeFocused => FolderTreeList.IsFocused;

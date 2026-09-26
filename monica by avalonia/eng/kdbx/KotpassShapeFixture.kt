@@ -35,7 +35,9 @@ fun main(args: Array<String>) {
     when (args.getOrNull(0)) {
         "create" -> create(java.io.File(args[1]))
         "dump" -> dump(java.io.File(args[1]))
-        else -> error("usage: create <file> | dump <file>")
+        "probe-bin" -> probeBin(java.io.File(args[1]))
+        "verify-bin" -> verifyBin(java.io.File(args[1]))
+        else -> error("usage: create <file> | dump <file> | probe-bin <file> | verify-bin <file>")
     }
 }
 
@@ -274,3 +276,109 @@ private fun times(data: TimeData?): String {
 
 private fun iso(instant: Instant?): String =
     instant?.atZone(ZoneOffset.UTC)?.format(DateTimeFormatter.ISO_INSTANT) ?: "null"
+
+/*
+ * The recycle-bin shape the desktop's own bin has to agree with. Staged with the same pinned library
+ * rather than described, because the two questions it answers are about what Android can physically
+ * put in a file: whether an entry in the bin carries the folder it came from, and what a deletion
+ * record holds.
+ */
+
+private val probeOriginUuid = UUID.fromString("11111111-2222-3333-4444-555555555555")
+private val probeBinUuid = UUID.fromString("66666666-7777-8888-9999-000000000001")
+private val probeBinnedUuid = UUID.fromString("66666666-7777-8888-9999-000000000002")
+private val probeLiveUuid = UUID.fromString("66666666-7777-8888-9999-000000000003")
+private val probeDeletedUuid = UUID.fromString("66666666-7777-8888-9999-000000000004")
+
+private fun probeBin(output: java.io.File) {
+    val credentials = Credentials.from(EncryptedValue.fromString(FIXTURE_PASSWORD))
+    val base = KeePassDatabase.Ver4x.create(
+        rootName = "Root",
+        meta = Meta(generator = "Monica Password Manager", name = "Bin Probe"),
+        credentials = credentials
+    )
+    val salt = (base.header.kdfParameters as KdfParameters.Argon2).salt
+    val shaped = base.copy(
+        header = base.header.copy(
+            cipherId = BaseCiphers.Aes.uuid,
+            kdfParameters = KdfParameters.Argon2(
+                variant = KdfParameters.Argon2.Variant.Argon2d,
+                salt = salt,
+                parallelism = 2U,
+                memory = 32UL * 1024UL * 1024UL,
+                iterations = 8U,
+                version = 0x13U,
+                secretKey = null,
+                associatedData = null
+            )
+        )
+    )
+    val binned = Entry(
+        uuid = probeBinnedUuid,
+        times = fixedTimes(),
+        fields = fields("probe-binned", "probe-user", "probe-ticket", listOf()),
+        previousParentGroup = probeOriginUuid
+    )
+    val live = Entry(
+        uuid = probeLiveUuid,
+        times = fixedTimes(),
+        fields = fields("probe-live", "probe-user", "probe-ticket", listOf())
+    )
+    val root = shaped.content.group.copy(
+        entries = listOf(live),
+        groups = listOf(
+            Group(uuid = probeOriginUuid, name = "Probe Origin", times = fixedTimes()),
+            Group(
+                uuid = probeBinUuid,
+                name = "Recycle Bin",
+                times = fixedTimes(),
+                entries = listOf(binned)
+            )
+        )
+    )
+    val meta = shaped.content.meta.copy(
+        recycleBinEnabled = true,
+        recycleBinUuid = probeBinUuid,
+        recycleBinChanged = Instant.parse("2026-02-03T04:05:06Z")
+    )
+    val staged = shaped.copy(
+        content = app.keemobile.kotpass.models.DatabaseContent(
+            meta = meta,
+            group = root,
+            deletedObjects = listOf(
+                app.keemobile.kotpass.models.DeletedObject(
+                    probeDeletedUuid,
+                    Instant.parse("2026-02-03T04:05:06Z")
+                )
+            )
+        )
+    )
+    FileOutputStream(output).use {
+        (staged as KeePassDatabase.Ver4x).encode(it, cipherProviders = cipherProviders)
+    }
+    println("probe-bin bytes=${output.length()}")
+    verifyBin(output)
+}
+
+/// Read back through the same library, so the report is about the file rather than the model that was
+/// handed to the encoder.
+private fun verifyBin(file: java.io.File) {
+    val credentials = Credentials.from(EncryptedValue.fromString(FIXTURE_PASSWORD))
+    val database = FileInputStream(file).use {
+        KeePassDatabase.decode(it, credentials, cipherProviders = cipherProviders)
+    }
+    val meta = database.content.meta
+    println("format=KDBX-${database.header.version.major}.${database.header.version.minor} " +
+        "generator=${meta.generator}")
+    println("recycleEnabled=${meta.recycleBinEnabled} recycleUuid=${meta.recycleBinUuid} " +
+        "recycleChanged=${iso(meta.recycleBinChanged)}")
+    println("deleted=${database.content.deletedObjects.size} " +
+        "deletedIds=${database.content.deletedObjects.map { it.id.toString() }} " +
+        "deletedTimes=${database.content.deletedObjects.map { iso(it.deletionTime) }}")
+    database.content.group.groups.forEach { group ->
+        group.entries.forEach { entry ->
+            println("entry group=${group.name} title=${entry.fields.title?.content} " +
+                "origin=${entry.previousParentGroup} location=${iso(entry.times?.locationChanged)}")
+        }
+    }
+}

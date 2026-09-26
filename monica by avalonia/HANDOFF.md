@@ -1856,3 +1856,121 @@ edit 帧 `success=True frameBytes=102032`、manage 帧与 search 帧见第四节
   片 F（桌面端**新建**空库与 kotpass 磁盘形状未对拍、`<Generator>` 那条仍只推理未实测）沿用。
 - 回收站仍没有"还原/清空"入口；右键与拖放仍没在真机屏幕上走过；`.kdbx` 还没成一等公民（最近文件、文件关联）。
 - `KeePassVaultError.NoSourceFile` 在 `KeePassWriteFailureKey` 里映射到通用 key，当前分支走不到它（沿用 #117 的登记）。
+
+## 附：桌面端 .kdbx 回收站的「还原」与「清空」（2026-09-26，**#124 出厂：进了回收站的条目第一次有两条出路，并且 Android 写的回收站真的被桌面端读开过**）
+
+### 一、这一轮把什么变成了事实
+
+- 会话侧新增 `KeePassVaultSession.RecycleBin.cs`（106 行）：
+  `RecycleBinEntryCount:17` 用 `bin.GetEntriesCount(true)` **从数据库数**（含子树里的夹与条目），不是屏幕行数——
+  折叠的夹不等于空的夹，而人要在毁掉一整堆之前读到的就是这个数。
+  `RestoreEntryAsync:29` 先认"这一行确实还在回收站里"（`IsInRecycleBin(bin.Uuid)`），否则交回 `null`，
+  界面据此报 `KeePassNotInRecycleBin` 而不是假装还原成功；落点由 `ResolveRestoreTarget:95` 决定——
+  指针为空、夹已不在文件里、或指针指向回收站本身，三种一律落根（把条目送回它刚被删出来的地方不是还原）。
+  成功后 `Relocate` + `PreviousParentGroup = PwUuid.Zero`（不清的话第二次还原会把它送回它刚离开的回收站）
+  + `MarkModified` + `Reindex`，条目本体一个字段都不动。
+  `EmptyRecycleBinAsync:65` 把回收站那个夹整个从父节点摘掉、`RecordDeletions` 记下"夹自身 + 里面每一个条目与子夹"
+  的 uuid、`RecycleBinUuid = PwUuid.Zero`、`RecycleBinChanged = UtcNow`，返回条目数。
+- 界面上两个出口（`MainWindowViewModel.KeePassRecycleBin.cs`，111 行）：条目行出「还原」，回收站夹行出「清空」。
+  树那边是三个 StyledProperty（`RestoreEntryCommand` / `EmptyRecycleBinCommand` / `SelectedFolderIsRecycleBin`）
+  加两个派生旗标（`VaultFolderTree.axaml.cs:441-442`）：**宿主没接命令就不画这一项**，菜单不可能指向空命令。
+  清空走**打字确认**（`ConfirmTypedAsync`，要键入指定短语），计数来自数据库而不是屏幕。
+  确认以 `Func<int, Task<bool>>` 回调注入（`EmptyKeePassRecycleBinAsync:73`）——产物门要在屏上拍照，
+  一个模态框会把那一帧挡住；这条注入不是为了测试而测试，负控 ③ 证明把它摘掉界面就会真的毁数据。
+- 删掉一处死代码：`KeePassCanRestoreSelectedEntry` 声明了、也随选中通知了，但**没有任何绑定读它**
+  （树的可见性自己从命令与旗标推导）。连同 `MainWindowViewModel.KeePassEdit.cs` 里的那次 `OnPropertyChanged` 一起走。
+- seam 也走了这两条出路（`MainWindowViewModel.KeePassSmoke.RecycleBin.cs`，50 行）：还原 → 证明行确实离开回收站
+  且还在列 → 重新选中 → 再回收 → 清空 → 证明条目行和回收站夹行都不在了。走位写在拍照之前，
+  所以那张 manage 帧现在**看不到**被回收的条目；这一段改由布尔值和计数承担（见第五节）。
+
+### 二、把一次性的度量固化成工具和 fixture
+
+- `javap` 打 pinned 的 `app.keemobile.kotpass/0.10.0` jar：`DeletedObject` 只有 `(UUID, Instant)` 一个构造；
+  它的 xml 类里**没有** `HistoryPos`、**没有** `DeleteRemovalTime`；`FormatXml$Tags$DeletedObjects` 只认
+  `DeletedObjects/Object/DeletedObject/UUID/DeletionTime`；`PreviousParentGroup` 出现在 `EntryKt` 的
+  `marshal` 与 `unmarshalEntry` 两边。⇒「来自哪个夹」写在**条目**上，不写在删除记录上；
+  桌面端 `RecordDeletions` 只写 uuid+时间，正是同一个形状。
+- 同一个 jar 在 JVM 上自己写、自己读回来（`probe-bin` / `verify-bin`）：
+  `bytes=1597, format=KDBX-4.1, recycleEnabled=true, recycleUuid=66666666-…-000000000001,
+  recycleChanged=2026-02-03T04:05:06Z, deleted=1, entry group=Recycle Bin title=probe-binned
+  origin=11111111-2222-3333-4444-555555555555` ⇒ Android 写的回收条目确实带得走它出来的那个夹。
+  原来那份 parity fixture（`android-kotpass-v1.kdbx`）的回收站是 disabled/none，**答不了这个问题**，
+  所以这份形状落成第二份 fixture：`tests/Monica.Tests/Fixtures/Kdbx/android-kotpass-bin-v1.kdbx`
+  （1597 字节，sha256 `3241113b…f74c10`），README 补了整节，并写明"字节会随每次重新生成而变（salt 随机），
+  解码出来的形状不变"。
+- 工具改动两条，都是踩出来的：`build-kotpass-fixture.sh` 原来只编译 `harness/src/Main.kt` 那份副本，
+  现在直接编译 canonical 的 `eng/kdbx/KotpassShapeFixture.kt`，入口类名**从文件名推导**
+  （Kotlin 的 main 类跟着文件名走，硬编码 `parity.MainKt` 会在改名后 `ClassNotFoundException`）；
+  临时 scratch 目录删了，`eng/kdbx/out/`（Kotlin 编译产物）进 `.gitignore`。
+  回归确认：`create` 仍写出 1853 字节，而**已提交那份 fixture 的哈希没动**（`e9285ef6…2bffa87` 复核过）。
+
+### 三、与 Android 的契约对照（读的是 Android 源码，不是推理）
+
+- 相同：指针在条目上；还原后把 `previousParentGroup` 清成 null（`KeePassChangeSetApplier.kt:829-832` 的
+  `markEntryMoved(previousParentGroup = null)`）；落点**不允许**是回收站本身（`:811-813` 直接抛）。
+- 分歧一：Android 的 `RESTORE_FROM_RECYCLE_BIN` **要求**patch 里带 `previousParentGroupUuid`，缺了就抛
+  （`:807-810`），并且允许显式给 `targetGroupUuid`、只在其缺失时回落到 previous（`:812-813`）；
+  它还校验条目上记录的指针与请求值一致，不一致直接抛（`:821-827`）。
+  桌面端没有"人挑一个目标夹"这一步，指针读不到就落根——**同一个字段，两种失败策略**：Android 报错，桌面端兜底。
+- 分歧二：Android **没有"清空回收站"这个操作**——`emptyRecycle|clearRecycle|purgeRecycle|deleteRecycled`
+  在 `Monica for Android/app/src/main/java` 全量 grep 命中 0，只有逐条的 `permanentDelete`（`:838+`）。
+  桌面端的「清空」是本地加出来的能力，因此它的删除记录集合（夹自身 + 每个条目）也是本地决定的形状，Android 侧没有对拍对象。
+- 版本这一面（前一轮量的，本轮把它变成断言）：`PreviousParentGroup` 只在 KDBX **4.1** 有槽，3.1/4.0 写进去读回来全零。
+  而 KPCLib 的默认写出版本是 **3.1**（`0x00030001`），kotpass 写的每一份都是 4.1——
+  ⇒ 桌面端**自己新建**的库里这个字段根本没有位置，还原只能落根。这条记在第七节，是片 F 的欠账而不是本轮的缺陷。
+
+### 四、负控（每条都跑在真字节上，跑完把文件还原并核对哈希回到快照）
+
+- 无头 UI `KeePassRecycleBinWorkflowUiTests`（2 条事实），四条各红在该红的那一条、`Failed: 1`：
+  ① `VaultFolderTree.axaml.cs` 去掉 `&& SelectedEntryInRecycleBin` ⇒ restore 事实红（`:83` 那条
+  `Assert.False(tree.ShowsEntryRestoreItem)`：不在回收站的行也会长出「还原」）；
+  ② `RestoreEntryAsync` 把落点换成就根（`var target = root; _ = ResolveRestoreTarget(...)`）⇒ 同一条事实红在 `:132` 的组 uuid；
+  ③ 确认闸门换成 `if (false)` ⇒ 清空事实红（`:228`：人明确拒绝之后集合仍被毁掉）；
+  ④ `bin.ParentGroup?.Groups.Remove(bin)` 换成 `bin.Entries.Clear(); bin.Groups.Clear();` ⇒ 清空事实红
+  （`:241` `CountFolderRowsNamed("Recycle Bin")` 期望 0 实得 1：清空完了，回收站那个夹还在树上）。
+- Android 互操作单测 `KeePassAndroidBinShapeTests`（3 条事实），三条各红一条（`sha256` 回到 `154f5acd…`）：
+  ① 落点换成就根 ⇒ `Restoring_an_android_authored_entry…` 红在 Strings differ；
+  ② 不把指针清零 ⇒ 同一条事实红在 `ReadOrigin`：期望 `0000…0`、实得 `66666666777788889999000000000001`
+  （正是"再点一次会被送回它刚离开的回收站"这个坏结果，屏幕上第一次被量出来）；
+  ③ 摘掉 `RecordDeletions` ⇒ 清空那条红在 Collections differ（删除列表只剩 Android 原本那一条）。
+- 两组都还原后重跑：`Monica.UiTests Total: 2, Errors: 0, Failed: 0`（4.270s）、`Monica.Tests` 该类 3/3 绿。
+
+### 五、证据
+
+- 单测：`KeePassVaultRecycleBinTests` **15 条**（含"什么都没改的保存不能刷新时间戳"、"搬家看起来像搬家不像编辑过的条目"、
+  "被回收的条目活过文件、重开仍在回收站里"、"回收站挂在根下面也仍被认作回收站"、"4.1 记着来路的条目回到那个夹"、
+  "记不了来路的文件把还原的条目送到根"、"来路指向回收站本身或指向已不存在的夹一律拒绝"、"清空记下每一个 uuid 并清掉指针"）；
+  本轮新增 `KeePassAndroidBinShapeTests` **3 条**（上面第四节）。另把 #123 遗在工作区没提交的
+  `KeePassRichFieldTests`（3 条）一并纳入版本管理。
+- 无头 UI：`KeePassRecycleBinWorkflowUiTests` **2 条**——① 回收站里的条目行长出「还原」、不在里面的行**不**长出，
+  命令对象与 view model 的同一条命令是**同一个**（`Assert.Same`），还原后条目回到 `Folder 1`、状态里带标题与目标夹名
+  而不带 `secret-`、同一行还能再被回收、文件字节数没变；② 夹行长出「清空」，拒绝一次整堆原地不动（打字框被真的弹起、
+  要求短语非空），批准后 2 条一起消失、`Entry 000003` 那条没被碰、库仍是脏、失败态没出现、屏上无明文。
+- 真产物（win-x64 jit，`RUNTIME SMOKE passed`）：manage 帧现在报
+  `entryRestoredOutOfBin=True, recycleBinEmptied=True`，且 `treeRows=9, folderRows=5, entryRows=4`
+  （#122 那次同一段是 `11/6/5`——少的一个夹行就是被清空的回收站，少的那条条目行是走完还原后又被清掉的），
+  `frameBytes=82562`、`vaultBytes=3294`。这两枚布尔值在 `verify-artifact-runtime.ps1` 里是**强制**的
+  （`entryRestoredOutOfBin=True` / `recycleBinEmptied=True` 不满足就 throw），不是只打印。
+  同轮：edit 帧 `success=True frameBytes=101816`、search 帧 `success=True flatRows=12 paintedSecretFree=True`、
+  20000 条 `openMs=2165 / streamMs=555 / growthMB=-4.4` 对 24、锁定态中位 117.2MB 对 120、锁环 25/14/1/4 全部还原。
+
+### 六、门禁
+
+跑在本轮最后那份字节上（七条负控全部还原、哈希核对之后）：`dotnet format` 0 改动、Release `--warnaserror`
+0 warning / 0 error、commercial-release `passed`（300 行结构门通过、NuGet 漏洞审计通过、
+单测 11 `perf-budget` + **1032** 常规 0 红、UI 整串 270 条 0 红＝`perf-budget` 17 + 常规 253）、
+publish win-x64 jit 后 `UI SMOKE passed` + `RUNTIME SMOKE passed`、`PUB_EXIT=0` / `ART_EXIT=0`。
+
+### 七、仍然没做到（欠账，不是决定）
+
+- 「还原 / 清空」两个**菜单弹层本身**仍未被任何一帧拍到：无头下 `MenuItem` 不会真实化，量到的是派生旗标 +
+  `Assert.Same` 命令同一性 + 真产物上的布尔值。右键与拖放仍未在真机屏幕上走过（沿用 #121/#122 的登记）。
+- 桌面端还原**不能人选目标夹**（Android 能，见第三节分歧一）；指针落根时也只说"已还原到 <夹名>"，不解释为什么是根。
+- 清空没有撤销，也没有"清空前把这一批导出备份"的出口；一次性动作直接落进未保存的会话。
+- 桌面端**新建**的库默认仍是 KDBX 3.1，因此自己写的文件里没有 `PreviousParentGroup` 槽；
+  片 F（新建空库与 kotpass 磁盘形状对拍、`<Generator>` 元数据）仍是欠账。
+- 片 D 余下（历史视图与从历史还原、标签、过期/已过期、可编辑图标与 AutoType、CustomData 只读）沿用。
+- `.kdbx` 还没成一等公民（打开/最近文件/文件关联）；搜索仍没有键盘入口（`Ctrl+F`、↑↓、Enter）。
+- #120：1280x800 库面板外层滚动会把标题与标签页顶出视口。
+- Android 侧「清空回收站」无对拍对象（它没这个操作），所以本轮的删除记录集合形状是桌面端自定的——
+  将来若要互认同步，得先定"夹自身要不要进删除列表"这一条（桌面端目前进）。

@@ -117,6 +117,7 @@ public interface ILocalizationService : INotifyPropertyChanged
     string SortPasswords { get; }
     string MoreOptions { get; }
     string RestorePassword { get; }
+    string RestoreItem { get; }
     string DeletePermanently { get; }
     string EmptyRecycleBin { get; }
     string Delete { get; }
@@ -635,6 +636,7 @@ public sealed class LocalizationService : ILocalizationService
     public string SortPasswords => Text();
     public string MoreOptions => Text();
     public string RestorePassword => Text();
+    public string RestoreItem => Text();
     public string DeletePermanently => Text();
     public string EmptyRecycleBin => Text();
     public string Delete => Text();
@@ -2132,6 +2134,10 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassEntryMovedFormat"] = "{0} is now in folder {1}. Save writes it to the file.",
         ["KeePassEntryRecycledFormat"] = "{0} is now in the recycle bin folder of the opened database. Save writes it to the file.",
         ["KeePassRecycleEntryConfirmFormat"] = "Move “{0}” into this database's recycle bin? The entry stays in the file until you delete it permanently.",
+        ["KeePassEntryRestoredFormat"] = "{0} is back in folder {1}. Save writes it to the file.",
+        ["KeePassRecycleBinEmptiedFormat"] = "{0} entry(s) were deleted permanently from the opened database. Save writes that to the file.",
+        ["KeePassNotInRecycleBin"] = "This entry is no longer in the recycle bin folder of the opened KeePass database.",
+        ["KeePassRecycleBinEmpty"] = "The recycle bin folder of the opened KeePass database has no entries.",
         ["KeePassFolderCreatedFormat"] = "Folder {0} has been created. Save writes it to the file.",
         ["KeePassFolderRenamedFormat"] = "The folder is now named {0}. Save writes it to the file.",
         ["KeePassFolderDeletedFormat"] = "Folder {0} has been deleted. Save writes it to the file.",
@@ -3166,6 +3172,10 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassEntryMovedFormat"] = "已将条目「{0}」移入文件夹「{1}」，点击保存才会写入文件。",
         ["KeePassEntryRecycledFormat"] = "已将条目「{0}」移入该数据库的回收站文件夹，点击保存才会写入文件。",
         ["KeePassRecycleEntryConfirmFormat"] = "要将「{0}」移入该数据库的回收站吗？条目仍留在文件里，直到你永久删除它。",
+        ["KeePassEntryRestoredFormat"] = "已将条目「{0}」还原到文件夹「{1}」，点击保存才会写入文件。",
+        ["KeePassRecycleBinEmptiedFormat"] = "已从打开的数据库中永久删除 {0} 个回收站条目，点击保存才会写入文件。",
+        ["KeePassNotInRecycleBin"] = "该条目已不在当前打开的 KeePass 数据库回收站中。",
+        ["KeePassRecycleBinEmpty"] = "当前打开的 KeePass 数据库回收站中没有条目。",
         ["KeePassFolderCreatedFormat"] = "已新建文件夹「{0}」，点击保存才会写入文件。",
         ["KeePassFolderRenamedFormat"] = "文件夹已改名为「{0}」，点击保存才会写入文件。",
         ["KeePassFolderDeletedFormat"] = "已删除文件夹「{0}」，点击保存才会写入文件。",

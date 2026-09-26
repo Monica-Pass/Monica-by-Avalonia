@@ -133,6 +133,13 @@
                                           Command="{Binding #Root.DeleteFolderCommand}">
                                     <MenuItem.Icon><ic:FluentIcon Icon="Delete" FontSize="14" /></MenuItem.Icon>
                                 </MenuItem>
+                                <!-- Only the bin folder itself gets this one, and only where the host can
+                                     empty it: what it destroys is everything under the row. -->
+                                <MenuItem Header="{Binding #Root.Text.EmptyRecycleBin}"
+                                          IsVisible="{Binding #Root.ShowsEmptyRecycleBinItem}"
+                                          Command="{Binding #Root.EmptyRecycleBinCommand}">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="DeleteLines" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
                                 <!-- These replace the folder group instead of adding to it: the row under
                                      the pointer decides which set of commands applies. -->
                                 <MenuItem Header="{Binding #Root.Text.Edit}"
@@ -185,6 +192,12 @@
                                           IsVisible="{Binding #Root.ShowsEntryPermanentItem}"
                                           Command="{Binding #Root.DeleteEntryPermanentlyCommand}">
                                     <MenuItem.Icon><ic:FluentIcon Icon="DeleteLines" FontSize="14" /></MenuItem.Icon>
+                                </MenuItem>
+                                <!-- An entry in the bin has one direction left that is not destruction. -->
+                                <MenuItem Header="{Binding #Root.Text.RestoreItem}"
+                                          IsVisible="{Binding #Root.ShowsEntryRestoreItem}"
+                                          Command="{Binding #Root.RestoreEntryCommand}">
+                                    <MenuItem.Icon><ic:FluentIcon Icon="ArrowUndo" FontSize="14" /></MenuItem.Icon>
                                 </MenuItem>
                             </ContextMenu>
                         </Panel.ContextMenu>

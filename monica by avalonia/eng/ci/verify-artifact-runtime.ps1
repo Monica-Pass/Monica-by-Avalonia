@@ -294,6 +294,17 @@ try {
             throw "KeePass manage shot did not paint the new-entry form: $($manageLine.Line)"
         }
 
+        # The recycle bin's two exits are on the same surface and are the moves a person cannot undo by
+        # closing the file, so they are named here too: a build where restore leaves the row in the bin,
+        # or where emptying leaves the folder behind, stops the run instead of logging a flag nobody reads.
+        if ($manageLine.Line -notmatch 'entryRestoredOutOfBin=True') {
+            throw "KeePass manage shot did not restore the recycled entry: $($manageLine.Line)"
+        }
+
+        if ($manageLine.Line -notmatch 'recycleBinEmptied=True') {
+            throw "KeePass manage shot did not empty the recycle bin folder: $($manageLine.Line)"
+        }
+
         # Same reason: the dispatcher timer that retires status acknowledgements only exists in a
         # running app, so a build where it stopped ticking has to be caught here.
         $noticeLine = @($gateLines | Where-Object { $_.Line -match 'status notice retirement result' }) | Select-Object -Last 1

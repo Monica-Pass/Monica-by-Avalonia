@@ -39,6 +39,26 @@ public sealed partial class MainWindowViewModel
     }
 
     /// <summary>
+    /// What the shot reports when the database never opened: nothing happened, and the only number worth
+    /// logging is the one the tree already had.
+    /// </summary>
+    private static KeePassManageSmokeState NoKeePassManageState(int treeRows, long fileBytes = 0) => new(
+        DatabaseOpened: false,
+        FolderShown: false,
+        DraftShown: false,
+        EntryShown: false,
+        UnsavedNoticeShown: false,
+        BinShown: false,
+        EntryInBin: false,
+        BinDeleteSplit: false,
+        EntryRestored: false,
+        RecycleBinEmptied: false,
+        TreeRows: treeRows,
+        FolderRows: 0,
+        EntryRows: 0,
+        FileBytes: fileBytes);
+
+    /// <summary>
     /// The same seam for the management surface: create a folder, add an entry into it and recycle that
     /// entry. It exists because the whole set of row commands sits behind that file dialog, and because
     /// the result is the one frame that can show the tree growing and the unsaved-changes notice lighting
@@ -56,16 +76,14 @@ public sealed partial class MainWindowViewModel
         // are the ones this run created, and if they cannot be, the log says the database never opened.
         if (KeePassVaultIsDirty)
         {
-            return new KeePassManageSmokeState(false, false, false, false, false, false, false, false,
-                _keePassTreeRows.Count, 0, 0, 0);
+            return NoKeePassManageState(_keePassTreeRows.Count);
         }
 
         var opened = await SmokeOpenKeePassDatabaseAsync(path, password, cancellationToken);
         var fileBytes = opened.FileBytes;
         if (opened.DatabaseOpened is false)
         {
-            return new KeePassManageSmokeState(false, false, false, false, false, false, false, false,
-                _keePassTreeRows.Count, 0, 0, fileBytes);
+            return NoKeePassManageState(_keePassTreeRows.Count, fileBytes);
         }
 
         // A folder is created under what the tree currently resolves as "the folder you are looking
@@ -110,10 +128,22 @@ public sealed partial class MainWindowViewModel
         var binnedRow = _keePassTreeRows.FirstOrDefault(row => row.IsEntryRow && row.Label == managedEntry);
         var entryInBin = binRow is not null &&
             binnedRow?.Entry?.GroupUuid == binRow.Group?.Uuid;
+        var binUuid = binRow?.Group?.Uuid;
         if (binnedRow is not null)
         {
             await SelectKeePassRowCommand.ExecuteAsync(binnedRow);
         }
+
+        // Read before the row leaves the bin: the split pair is a fact about the menu on a binned row,
+        // and the restore below clears the selection by design.
+        var binDeleteSplit = binnedRow is not null && KeePassSelectedEntryInRecycleBin;
+        // The two ways out of the bin, walked here because a person reaches them by right-clicking a row
+        // in the tree, which is the part only the shipped binary has. Both confirmations arrive as an
+        // immediate yes, for the reason the delete's does: a modal would sit on the frame this seam
+        // photographs.
+        var (entryRestored, recycleBinEmptied) = binnedRow is null
+            ? (false, false)
+            : await SmokeWalkKeePassBinExitsAsync(managedEntry, binUuid);
 
         return new KeePassManageSmokeState(
             DatabaseOpened: true,
@@ -123,7 +153,9 @@ public sealed partial class MainWindowViewModel
             UnsavedNoticeShown: KeePassVaultIsDirty,
             BinShown: binRow is not null,
             EntryInBin: entryInBin,
-            BinDeleteSplit: binnedRow is not null && KeePassSelectedEntryInRecycleBin,
+            BinDeleteSplit: binDeleteSplit,
+            EntryRestored: entryRestored,
+            RecycleBinEmptied: recycleBinEmptied,
             TreeRows: _keePassTreeRows.Count,
             FolderRows: _keePassTreeRows.Count(row => row.IsEntryRow is false),
             EntryRows: _keePassTreeRows.Count(row => row.IsEntryRow),
@@ -203,7 +235,8 @@ internal sealed record KeePassSmokeEditState(
 /// <summary>
 /// Flags and counts for the same reason: the names this routine types are its own fixtures, and the
 /// ones it reads from the file stay in the image. The bin flags say the delete landed in the database's
-/// own recycle bin and that the tree offered the split pair on the way in - they carry no entry title.
+/// own recycle bin, that the tree offered the split pair on the way in, and that both ways out worked -
+/// they carry no entry title.
 /// </summary>
 internal sealed record KeePassManageSmokeState(
     bool DatabaseOpened,
@@ -214,6 +247,8 @@ internal sealed record KeePassManageSmokeState(
     bool BinShown,
     bool EntryInBin,
     bool BinDeleteSplit,
+    bool EntryRestored,
+    bool RecycleBinEmptied,
     int TreeRows,
     int FolderRows,
     int EntryRows,

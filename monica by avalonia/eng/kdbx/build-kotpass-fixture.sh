@@ -23,7 +23,10 @@ CP="$KOTPASS;$XMLB;$OKIO;$SLF4J;$STDLIB;$LANG3"
 ANNOTATIONS="$CACHE/org.jetbrains/annotations/13.0/919f0dfe192fb4e063e7dacadee7f8bb9a2672a9/annotations-13.0.jar"
 COMPILE_CP="$COMPILER;$STDLIB;$REFLECT;$SCRIPTRT;$DAEMON;$COROUTINES;$TROVE;$ANNOTATIONS"
 OUT="$ROOT/out"
-SRC="$ROOT/harness/src/Main.kt"
+SRC="$ROOT/KotpassShapeFixture.kt"
+# Kotlin names the entry class after the file, so the class follows the canonical source rather than
+# a copy of it planted under a scratch directory.
+MAIN_CLASS="parity.$(basename "$SRC" .kt)Kt"
 
 ARGS=("$@")
 if [[ "${1:-}" == "build" ]]; then
@@ -31,7 +34,7 @@ if [[ "${1:-}" == "build" ]]; then
   ARGS=("${@:2}")
 fi
 
-if [[ ! -f "$OUT/parity/MainKt.class" ]]; then
+if [[ ! -f "$OUT/parity/$(basename "$SRC" .kt)Kt.class" ]]; then
   java -cp "$COMPILE_CP" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
     -nowarn -no-stdlib -no-reflect -classpath "$CP" -d "$OUT" "$SRC" >&2
   if [[ ${#ARGS[@]} -eq 0 ]]; then
@@ -39,4 +42,4 @@ if [[ ! -f "$OUT/parity/MainKt.class" ]]; then
   fi
 fi
 
-java -cp "$OUT;$CP" parity.MainKt "${ARGS[@]}"
+java -cp "$OUT;$CP" "$MAIN_CLASS" "${ARGS[@]}"
