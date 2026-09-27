@@ -562,6 +562,142 @@ public partial class MainWindow
     }
 
     /// <summary>
+    /// One frame of the versions an entry remembers, reached from the shipped binary. The list only
+    /// exists inside a browsed <c>.kdbx</c>, so nothing in the section matrix would ever have shown it,
+    /// and the half worth photographing is the moment right after an edit: the tree has just been
+    /// republished and the panel is the thing still answering that entry. The frame scrolls the detail pane
+    /// down to the versions before it shoots, because that is the only way the list is on the image at all.
+    /// Titles and secrets stay out of the log - counts, booleans and byte sizes are what it asserts.
+    /// </summary>
+    public async Task<bool> RunSmokeUiKeePassHistoryShotAsync(
+        string vaultPath,
+        string password,
+        string? screenshotDirectory)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            return await Dispatcher.UIThread.InvokeAsync(
+                () => RunSmokeUiKeePassHistoryShotAsync(vaultPath, password, screenshotDirectory));
+        }
+
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            AppDiagnostics.Info("Smoke UI KeePass history shot failed. reason=no-view-model");
+            return false;
+        }
+
+        try
+        {
+            var keepassTab = await RealizeSmokeKeePassImportTabAsync("history shot");
+            if (keepassTab is null)
+            {
+                return false;
+            }
+
+            var state = await viewModel.SmokeShowKeePassHistoryAsync(vaultPath, password);
+            await Task.Delay(250);
+
+            var section = this.GetVisualDescendants()
+                .OfType<StackPanel>()
+                .FirstOrDefault(control => control.Name == "KeePassHistorySection");
+            var list = this.GetVisualDescendants()
+                .OfType<ItemsControl>()
+                .FirstOrDefault(control => control.Name == "KeePassHistoryList");
+            var restoreButton = list?.GetVisualDescendants()
+                .OfType<Button>()
+                .FirstOrDefault(control => control.Name == "RestoreKeePassHistoryButton");
+            var restoreButtons = list?.GetVisualDescendants()
+                .OfType<Button>()
+                .Count(control => control.Name == "RestoreKeePassHistoryButton") ?? 0;
+            // The section sits under the field dump of a detail pane that scrolls inside itself, so a
+            // layout box proves nothing: this frame used to report the list on screen while both of its
+            // photographs showed only the fields. Scrolling to it is what a person does, so the frame now
+            // does that first and only then asks where the row actually landed inside this window.
+            var detailScroller = this.GetVisualDescendants()
+                .OfType<ScrollViewer>()
+                .FirstOrDefault(control => control.Name == "KeePassDetailScroller");
+            if (section is not null && detailScroller is not null)
+            {
+                // Bring the section to the top of the pane's own viewport, which is what a person dragging
+                // that scrollbar does - Avalonia 12 has no scroll-to-element call to borrow.
+                if (section.TranslatePoint(new Point(0, 0), detailScroller) is { } sectionTop)
+                {
+                    detailScroller.Offset = new Vector(
+                        detailScroller.Offset.X,
+                        detailScroller.Offset.Y + sectionTop.Y);
+                }
+
+                await Task.Delay(250);
+            }
+
+            bool IsPaintedInsideWindow(Visual? control) =>
+                control is { IsVisible: true } && control.Bounds.Width > 0 && control.Bounds.Height > 0
+                && control.TranslatePoint(new Point(0, 0), this) is { } top
+                && control.TranslatePoint(new Point(control.Bounds.Width, control.Bounds.Height), this) is { } bottom
+                && top.X >= 0 && bottom.X <= Bounds.Width
+                && top.Y >= 0 && bottom.Y <= Bounds.Height;
+            var listOnScreen = IsPaintedInsideWindow(list);
+            var restoreOnScreen = IsPaintedInsideWindow(restoreButton);
+
+            var frame = await CaptureSmokeFrameAsync();
+            var frameBytes = frame?.Length ?? 0;
+            var wantedFile = !string.IsNullOrWhiteSpace(screenshotDirectory);
+            var written = false;
+            var fileName = "";
+            if (wantedFile && frameBytes > 0)
+            {
+                Directory.CreateDirectory(screenshotDirectory!);
+                fileName = $"KeePassHistory_{Math.Max(1, (int)Math.Round(Bounds.Width))}x" +
+                    $"{Math.Max(1, (int)Math.Round(Bounds.Height))}.png";
+                var path = Path.Combine(screenshotDirectory!, fileName);
+                File.WriteAllBytes(path, frame!);
+                written = new FileInfo(path).Length > 0;
+            }
+
+            // The revert walked on the shipped binary: the newest version is the shape the edit just
+            // replaced, and putting the entry back has to land on the title it was opened with.
+            var reverted = false;
+            if (listOnScreen && state.VersionCount > 0)
+            {
+                await viewModel.RestoreKeePassHistoryVersionCommand.ExecuteAsync(
+                    viewModel.KeePassHistoryVersions[0]);
+                await Task.Delay(250);
+                reverted = string.Equals(
+                    viewModel.KeePassEntryDetailsPublic?.Title,
+                    state.OriginalTitle,
+                    StringComparison.Ordinal);
+            }
+
+            var success = state.DatabaseOpened &&
+                state.EditStaged &&
+                state.VersionCount == 1 &&
+                state.OriginalTitle.Length > 0 &&
+                listOnScreen &&
+                restoreOnScreen &&
+                restoreButtons == 1 &&
+                section is { IsVisible: true } &&
+                keepassTab.IsSelected &&
+                reverted &&
+                frameBytes > 0 &&
+                (!wantedFile || written);
+            AppDiagnostics.Info(
+                $"Smoke UI KeePass history shot result. success={success}, opened={state.DatabaseOpened}, " +
+                $"editStaged={state.EditStaged}, versions={state.VersionCount}, " +
+                $"listOnScreen={listOnScreen}, restoreOnScreen={restoreOnScreen}, " +
+                $"restoreButtons={restoreButtons}, reverted={reverted}, " +
+                $"treeRows={state.TreeRows}, entryRows={state.EntryRows}, vaultBytes={state.FileBytes}, " +
+                $"tabSelected={keepassTab.IsSelected}, frameBytes={frameBytes}, written={written}, " +
+                $"file={fileName}");
+            return success;
+        }
+        catch (Exception ex)
+        {
+            AppDiagnostics.Error("Smoke UI KeePass history shot failed", ex);
+            return false;
+        }
+    }
+
+    /// <summary>
     /// The row-management surface as two frames: a folder added to the tree, an entry filed into it and
     /// that entry then recycled, with the unsaved-changes notice lit and the file on disk still the one
     /// that was opened - and then the new-entry form itself, which the tree frame cannot show at all.

@@ -86,6 +86,23 @@ public sealed record KeePassEntryEdit(
     string AuthenticatorKey,
     IReadOnlyList<KeePassCustomField> CustomFields);
 
+/// <summary>
+/// One remembered shape of an entry, addressed by its position in the database's own history list.
+/// The index is the address a restore has to be given, so a caller that reorders this list for display
+/// still restores the version it pointed at. No secret rides along: a history row says which version
+/// this is, and reverting to it is what brings the old password back.
+/// </summary>
+public sealed record KeePassHistoryVersion(
+    int Index,
+    string EntryUuid,
+    string Title,
+    string UserName,
+    string Url,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    int CustomFieldCount,
+    int AttachmentCount);
+
 public sealed record KeePassSaveResult(
     string Path,
     int FileBytes,

@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="using:Monica.App.Controls" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Sync.KeePassBrowsePane" x:DataType="vm:MainWindowViewModel">
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="using:Monica.App.Controls" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Sync.KeePassBrowsePane" x:Name="KeePassBrowsePaneRoot" x:DataType="vm:MainWindowViewModel">
     <!--
         The two halves of a browsed .kdbx: the folder tree with the search box above it, and the
         detail or edit form beside it. Split out because the pane is what a person lives in once the
@@ -115,6 +115,47 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
+                                <!--
+                                    What this entry used to look like, and the way back to it. Asked for
+                                    on purpose: a library mostly holds entries nobody edited twice, so
+                                    the walk of a history list happens when the button is pressed. The
+                                    section rides along with the entry detail it belongs to - it is the
+                                    panel's own entry, not whatever row the tree happens to select.
+                                -->
+                                <StackPanel x:Name="KeePassHistorySection"
+                                            Spacing="6"
+                                            Margin="0,8,0,0">
+                                    <Button x:Name="ShowKeePassHistoryButton"
+                                            Classes="workspaceCommand"
+                                            HorizontalAlignment="Left"
+                                            Command="{Binding #KeePassBrowsePaneRoot.DataContext.ShowKeePassHistoryCommand}">
+                                        <TextBlock Text="{Binding #KeePassBrowsePaneRoot.DataContext.KeePassHistoryLabel}" />
+                                    </Button>
+                                    <ItemsControl x:Name="KeePassHistoryList"
+                                                  ItemsSource="{Binding #KeePassBrowsePaneRoot.DataContext.KeePassHistoryVersions}"
+                                                  IsVisible="{Binding #KeePassBrowsePaneRoot.DataContext.HasKeePassHistory}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:KeePassHistoryRow">
+                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,3,0,0">
+                                                    <StackPanel Spacing="1">
+                                                        <TextBlock Text="{Binding PrimaryText}" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding SecondaryText}"
+                                                                   FontSize="12"
+                                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                    </StackPanel>
+                                                    <Button x:Name="RestoreKeePassHistoryButton"
+                                                            Grid.Column="1"
+                                                            Classes="workspaceCommand"
+                                                            VerticalAlignment="Center"
+                                                            Command="{Binding #KeePassBrowsePaneRoot.DataContext.RestoreKeePassHistoryVersionCommand}"
+                                                            CommandParameter="{Binding}">
+                                                        <TextBlock Text="{Binding #KeePassBrowsePaneRoot.DataContext.L.KeePassHistoryRestore}" />
+                                                    </Button>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
                             </StackPanel>
                         </DataTemplate>
                     </ContentControl.ContentTemplate>

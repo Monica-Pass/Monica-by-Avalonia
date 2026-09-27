@@ -191,6 +191,9 @@ public sealed partial class MainWindowViewModel
 
     private void ShowKeePassEntryDetail(KeePassVaultSession session, KeePassEntryDetail detail)
     {
+        // Whatever panel now answers this entry, the versions it remembers are not the previous one's.
+        _keePassDetailEntryUuid = detail.Row.EntryUuid;
+        KeePassHistoryVersions = [];
         _keePassEntryDetails?.Dispose();
         _keePassEntryDetails = new PasswordDetailViewModel(
             _localization,
@@ -213,6 +216,8 @@ public sealed partial class MainWindowViewModel
     /// </summary>
     private void ClearKeePassEntryDetail()
     {
+        _keePassDetailEntryUuid = "";
+        KeePassHistoryVersions = [];
         _keePassEntryDetails?.Dispose();
         _keePassEntryDetails = null;
         KeePassEntryDetailsPublic = null;

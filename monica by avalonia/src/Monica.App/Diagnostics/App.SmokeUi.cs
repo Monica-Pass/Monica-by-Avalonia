@@ -376,6 +376,29 @@ public partial class App
                 }
             }
 
+            // Last of the KeePass frames on purpose: this one leaves its revert staged as unsaved edits,
+            // and every frame after it would otherwise have to open over them.
+            var keepassHistoryPath = GetSmokeUiArgument(
+                Environment.GetCommandLineArgs(), "--smoke-ui-keepass-history");
+            if (!string.IsNullOrWhiteSpace(keepassHistoryPath))
+            {
+                var keepassPassword = GetSmokeUiArgument(
+                    Environment.GetCommandLineArgs(), "--smoke-ui-keepass-password");
+                if (string.IsNullOrEmpty(keepassPassword))
+                {
+                    AppDiagnostics.Info(
+                        "Smoke UI KeePass history shot failed. reason=no-password-argument");
+                    smokeSuccess = false;
+                }
+                else
+                {
+                    smokeSuccess &= await mainWindow.RunSmokeUiKeePassHistoryShotAsync(
+                        keepassHistoryPath,
+                        keepassPassword,
+                        smokeScreenshotDirectory);
+                }
+            }
+
             if (HasSmokeUiFlag(Environment.GetCommandLineArgs(), "--smoke-ui-autotype"))
             {
                 smokeSuccess &= await RunSmokeUiAutoTypeProbeAsync(viewModel, desktopIntegration);

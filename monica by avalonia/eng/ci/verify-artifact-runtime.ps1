@@ -277,6 +277,7 @@ try {
             '--smoke-ui-keepass-manage', $keepassShotPath,
             '--smoke-ui-keepass-search', $keepassShotPath,
             '--smoke-ui-keepass-search-query', 'example.com',
+            '--smoke-ui-keepass-history', $keepassShotPath,
             '--smoke-ui-keepass-create',
             '--smoke-ui-keepass-recent', $keepassRecentPath,
             '--smoke-ui-keepass-handoff', $keepassHandoffPath,
@@ -292,7 +293,8 @@ try {
             'release gate completed', 'budget result', 'check failed', 'lock cycle result',
             'KeePass probe', 'status notice retirement', 'locked settle result',
             'KeePass edit shot', 'KeePass manage shot', 'KeePass search shot',
-            'KeePass create shot', 'KeePass recent shot', 'KeePass handoff shot')
+            'KeePass create shot', 'KeePass recent shot', 'KeePass handoff shot',
+            'KeePass history shot')
         foreach ($line in $gateLines) { Write-Host ($line.Line -replace '^\[[^\]]+\]\s*', '') }
         $gateLine = $gateLines | Where-Object { $_.Line -match 'release gate completed' } | Select-Object -Last 1
         if ($null -eq $gateLine) {
@@ -314,12 +316,12 @@ try {
             throw "KeePass memory probe reported failure: $($keepassLine.Line)"
         }
 
-        # The edit form, the row commands and the search box are reachable only behind a native file
-        # dialog, so these in-process frames are the whole proof that the shipped binary draws them - the
-        # search one also holds the only check that a rendered row never carries a protected value, and the
-        # create one is the only frame that ever shows the new-database form. A run where any of them
-        # stopped painting would otherwise leave the gate green.
-        foreach ($shot in @('KeePass edit shot', 'KeePass manage shot', 'KeePass search shot', 'KeePass create shot', 'KeePass recent shot')) {
+        # The edit form, the row commands, the search box and the list of saved versions are reachable only
+        # behind a native file dialog, so these in-process frames are the whole proof that the shipped binary
+        # draws them - the search one also holds the only check that a rendered row never carries a protected
+        # value, and the create one is the only frame that ever shows the new-database form. A run where any
+        # of them stopped painting would otherwise leave the gate green.
+        foreach ($shot in @('KeePass edit shot', 'KeePass manage shot', 'KeePass search shot', 'KeePass create shot', 'KeePass recent shot', 'KeePass history shot')) {
             $shotLine = @($gateLines | Where-Object { $_.Line -match "$shot result" }) | Select-Object -Last 1
             if ($null -eq $shotLine) {
                 throw "smoke-ui produced no $shot result line."
@@ -347,6 +349,20 @@ try {
 
         if ($manageLine.Line -notmatch 'recycleBinEmptied=True') {
             throw "KeePass manage shot did not empty the recycle bin folder: $($manageLine.Line)"
+        }
+
+        # A version list that is only ever built in the view model is the failure this frame exists for, so
+        # the two things a person actually needs are named: the row and its restore button are painted inside
+        # the window after the pane is scrolled to them, and pressing one puts the entry back to the shape it
+        # was opened with. Neither is a flag the aggregate verdict can go soft on.
+        $historyLine = @($gateLines | Where-Object { $_.Line -match 'KeePass history shot result' }) | Select-Object -Last 1
+        if ($historyLine.Line -notmatch 'listOnScreen=True' -or $historyLine.Line -notmatch 'restoreOnScreen=True' `
+            -or $historyLine.Line -notmatch 'restoreButtons=1') {
+            throw "KeePass history shot did not paint the version row and its restore button: $($historyLine.Line)"
+        }
+
+        if ($historyLine.Line -notmatch 'reverted=True') {
+            throw "KeePass history shot did not put the entry back to the version it restored: $($historyLine.Line)"
         }
 
         # The create form is the only path that can produce a .kdbx, and its three promises are all

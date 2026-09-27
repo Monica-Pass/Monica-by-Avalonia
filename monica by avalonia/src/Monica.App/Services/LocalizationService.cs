@@ -470,6 +470,13 @@ public interface ILocalizationService : INotifyPropertyChanged
     string KeePassSaveToFile { get; }
     string KeePassNewEntry { get; }
     string KeePassUnsavedChanges { get; }
+    string KeePassHistory { get; }
+    string KeePassHistoryRestore { get; }
+    string KeePassHistoryNone { get; }
+    string KeePassHistoryRestoredFormat { get; }
+    string KeePassHistoryGone { get; }
+    string KeePassHistoryFailed { get; }
+
     string BitwardenImportTitle { get; }
     string BitwardenImportDescription { get; }
     string SelectBitwardenJsonFile { get; }
@@ -997,6 +1004,13 @@ public sealed class LocalizationService : ILocalizationService
     public string KeePassSaveToFile => Text();
     public string KeePassNewEntry => Text();
     public string KeePassUnsavedChanges => Text();
+    public string KeePassHistory => Text();
+    public string KeePassHistoryRestore => Text();
+    public string KeePassHistoryNone => Text();
+    public string KeePassHistoryRestoredFormat => Text();
+    public string KeePassHistoryGone => Text();
+    public string KeePassHistoryFailed => Text();
+
     public string BitwardenImportTitle => Text();
     public string BitwardenImportDescription => Text();
     public string SelectBitwardenJsonFile => Text();
@@ -2149,6 +2163,12 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassShowSecrets"] = "Show password and key",
         ["KeePassSaveToFile"] = "Save to file",
         ["KeePassUnsavedChanges"] = "Unsaved changes",
+        ["KeePassHistory"] = "Saved versions",
+        ["KeePassHistoryRestore"] = "Restore this version",
+        ["KeePassHistoryNone"] = "This entry has no saved versions yet.",
+        ["KeePassHistoryRestoredFormat"] = "{0} now holds the version from {1}. Save writes it to the file.",
+        ["KeePassHistoryGone"] = "That version is no longer in the opened KeePass database.",
+        ["KeePassHistoryFailed"] = "Reading the saved versions of the KeePass entry failed.",
         ["KeePassEntryRequired"] = "Select a KeePass entry to edit.",
         ["KeePassEntryGone"] = "This entry is no longer in the opened KeePass database.",
         ["KeePassEntryEditFailed"] = "The KeePass entry could not be prepared for editing.",
@@ -3207,6 +3227,12 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassShowSecrets"] = "显示密码与密钥",
         ["KeePassSaveToFile"] = "保存到文件",
         ["KeePassUnsavedChanges"] = "有未保存的改动",
+        ["KeePassHistory"] = "历史版本",
+        ["KeePassHistoryRestore"] = "还原到此版本",
+        ["KeePassHistoryNone"] = "这个条目还没有历史版本。",
+        ["KeePassHistoryRestoredFormat"] = "已将「{0}」还原到 {1} 的版本，点击保存才会写入文件。",
+        ["KeePassHistoryGone"] = "该版本已不在当前打开的 KeePass 数据库中。",
+        ["KeePassHistoryFailed"] = "读取 KeePass 条目的历史版本失败。",
         ["KeePassEntryRequired"] = "请先选择要编辑的 KeePass 条目。",
         ["KeePassEntryGone"] = "该条目已不在当前打开的 KeePass 数据库中。",
         ["KeePassEntryEditFailed"] = "无法准备编辑该 KeePass 条目。",

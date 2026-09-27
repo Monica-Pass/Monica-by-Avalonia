@@ -2633,3 +2633,153 @@ KeePass 20000 条 `growthMB=6.2`（预算 24）。
 - 真人拖窗口边界连续改高度没走过——跑的都是启动时定死尺寸。
 - 负控只到"常量抬上去就红"这一层；**没有一条单元/无头测试钉住 160 与 182 这组关系**，
   下一次有人改页头高度或改这个常量，靠的还是产物门那一帧的数字。
+
+---
+
+## 附：条目历史的查看与还原（2026-09-27，**#131 出厂：桌面端第一次读得回一座 .kdbx 自己记住的那些版本，而"画在屏上"这一格先骗过人、现在由帧自己钉住**）
+
+### 一、这一轮把什么变成了事实
+
+- **读侧**：`src/Monica.Platform/Services/KeePassVaultSession.History.cs`（118 行）。`ReadHistoryAsync`
+  按数据库自己的历史顺序（老→新）列每一版，行里的 `Index` 就是它在那条 `entry.History` 里的位置；
+  `KeePassHistoryVersion`（`KeePassVaultModels.cs:95-104`）只带
+  Index/EntryUuid/Title/UserName/Url/CreatedAt/UpdatedAt/CustomFieldCount/AttachmentCount，
+  **一格秘密字段都没有**。
+- **写侧只有一条漏斗**：还原不是新写路径，是把数据库里那一版读成 `KeePassEntryEdit`
+  （`CreateEdit`，:105-117，含自定义字段与 TOTP）再走 `ApplyEdit(entry, edit, keepHistory: true)`
+  （:70-77）——和 Android kotpass 的 `historical.copy(uuid = current.uuid, history = current.history)`
+  同一个形状：被换掉的那一版在进门时自己变成最新版。附件不在这条漏斗里，所以紧跟一句
+  `entry.Binaries = historical.Binaries.CloneDeep()`，深拷贝是为了让历史里那一版还留着它自己那份。
+- **界面上跟的是详情，不是树的选中**：`MainWindowViewModel.KeePassHistory.cs:15-21` 的
+  `_keePassDetailEntryUuid`。一次编辑会把树重发一遍、选中会漂，而人要点"历史版本"的恰恰是刚被改过的那条——
+  列表若绑在选中上，就会在最该看见的时候变空。这一条不是猜的：绑选中的第一版在无头 seam 上就空了。
+- `KeePassBrowsePane.axaml:125-157`：详情栏底下多一节「历史版本」，每行一条版本 + 一颗「还原到此版本」。
+  列表**显示是倒序**（最新在上），而 `Index` 仍是数据库地址，所以点最上面那条还原的是"刚被这次编辑归档的那一版"。
+- 面板上按一次才读一次（`ShowKeePassHistoryAsync`），不跟着详情一起加载：一座库里大多数条目从没被改过两次，
+  路过点一下不该付一次历史遍历。
+- 本地化 6 个键 × 4 处（`LocalizationService.cs:473-478` 接口 + 中英两份实现）：
+  `KeePassHistory`（历史版本）、`KeePassHistoryRestore`（还原到此版本）、`KeePassHistoryNone`、
+  `KeePassHistoryRestoredFormat`、`KeePassHistoryGone`、`KeePassHistoryFailed`。
+
+### 二、为什么还原不弹确认框
+
+还原不是任何事情的终点：它走的是那条**暂存**写入，文件在被保存之前一个字节都不动（无头那条把它钉成了断言），
+而它换掉的那一版在进门时就被归档成最新版——再点一次最上面那条就回去。所以这一片的可逆性不靠确认框，
+靠的是"没保存 + 自己会留底"这两件已经量过的事。边界要说清：`HistoryMaxItems` 是有上限的，
+反复还原会把旧版本挤出去，那时"回去"就不一定还回得到最初那一版。
+
+### 三、真产物截图门（这一帧被它自己抓过一次假绿）
+
+- 帧：`--smoke-ui-keepass-history`（`MainWindow.SmokeUi.cs:572-692`），输入是产物门自己那份 12 条目 / 3 分组的
+  `shots.kdbx`。**排在所有 KeePass 帧最后**（`App.SmokeUi.cs` 里那一段注释）：它把还原留在未保存状态，
+  而 `PreviewKeePassImportAsync` 拒绝在脏会话上开文件——放在前面的帧会互相咬。
+- 断言的形状：`opened / editStaged / versions=1 / listOnScreen / restoreOnScreen / restoreButtons=1 /
+  section 可见 / 页签选中 / reverted / frameBytes>0 / written`，全是布尔、计数和字节数。
+- **被抓到的那一次**：修之前同一帧报 `listOnScreen=True`，而两张 PNG（1280×800、1280×600）里只有
+  详情栏的 通用/标题/用户名/网站——版本列表在视口下沿以外，`Bounds.Height>0` 这件事完全没被画出来。
+  是**人眼**看出来的，不是数字。改法两步：先按人的做法把 `KeePassDetailScroller` 滚到那一节
+  （:616-631；Avalonia 12 的 `ScrollViewer` 没有 `OffsetToElement`，只能 `TranslatePoint` + 赋 `Offset`），
+  再把判定换成几何谓词 `IsPaintedInsideWindow`（:633-638，左上与右下两个角都得落在窗口里），并新增
+  `restoreOnScreen`。CI 里那一格现在缺任何一样就停跑（`verify-artifact-runtime.ps1`：
+  `did not paint the version row and its restore button` / `did not put the entry back …`）。
+  那两张**假绿的盘**还留着，找的时候注意目录名是被 shell 吃掉反斜杠后拼歪的：
+  `D:\Monica-kpshots\Monica-kpshotsi131-a\KeePassHistory_1280x800.png`、
+  `D:\Monica-kpshots\Monica-kpshotsi131-b\KeePassHistory_1280x600.png`。
+
+### 四、负控（每条先看见红，跑完还原并逐字节核对）
+
+五条，三条打在单测、一条同时打在单测 + 无头 + 真产物、一条打在真产物帧上：
+
+| 拆掉的东西 | 红在哪 | 实测 |
+|---|---|---|
+| NC-1 `ApplyEdit(..., keepHistory: true)` 改成 `false`（还原不再把被换掉的那版归档） | 单测第 2 条 + 无头 | 单测 `KeePassHistoryTests.cs:101` `Expected: 2 / Actual: 1`；无头 `KeePassHistoryWorkflowUiTests.cs:152` 同样 `Expected: 2 / Actual: 1`。**同一句话在两层各钉一次** |
+| NC-2 去掉 `entry.Binaries = historical.Binaries.CloneDeep()` | 单测第 2 条的附件那格 | `Expected: "elder.bin" / Actual: "live.bin"`——版本看着还原了，附件还留在被换掉那一版上 |
+| NC-3 去掉 `index < 0` 那半道守卫 | 单测第 4 条 | `System.ArgumentOutOfRangeException (Parameter 'uIndex')`：列表被列出来之后版本 aging 掉出上限，点下去不是"拒绝"而是把异常抛到界面上 |
+| NC-4 往 `KeePassHistoryVersion` 加一个叫 `Hint` 的字段、把那一版的口令放进去，并让行把它画出来 | 单测第 1 条 + 无头 | **两条守卫不是一条**：按字段名（含 Password/Secret/Notes）反射那条**没抓到**（`Hint` 不含这些词），按值扫记录里每个字符串那条红了（单测 `Failed: 1, Passed: 3`）；无头红在 `the version list rendered a secret the entry holds`。失败输出里 `keepass-smoke-fixture-not-a-secret / secret-1 / ticket-000001 / JBSWY3DPEHPK3PXP` 各 **0 处** |
+| NC-5 去掉帧里那句滚动（数据、模板都不动） | 真产物帧，两档都红 | 1280×800 与 1280×600 都是 `success=False, listOnScreen=False, restoreOnScreen=False`，而 `versions=1 / restoreButtons=1 / opened=True / editStaged=True` 照旧——**只有"画在屏上"这一格翻**，正是第三节那张假绿的形状。留下的两张红帧在 `D:\Monica-kpshots\i131-nc5-800\`、`i131-nc5-600\`，人眼看过：详情栏停在 通用/标题/用户名/网站，版本行不在画面里 |
+
+NC-4 顺带量出一件该记的事：无头那条"不出现秘密"的断言原来**只盯主密钥**（`keepass-smoke-fixture-not-a-secret`），
+而这座 fixture 库里条目自己的秘密是 `secret-{ordinal}`、`ticket-{ordinal:D6}`、TOTP 那串 Base32 和 96 个 `n`
+组成的笔记（`KeePassSmokeVaultWriter.cs:130-141`）。本轮把针从 1 根加到 5 根，`KeePassHistoryWorkflowUiTests.cs:127-138`。
+
+还原核对（就在最终字节上现测）：四份被改过的文件与改动前的备份 `sha256` 前 16 位逐字节相同——
+`KeePassVaultModels.cs 88f343d85acae79d`、`KeePassVaultSession.History.cs e2915cfad05d2f0d`、
+`MainWindowViewModel.KeePassHistory.cs ae7f14ff989da5f0`、`MainWindow.SmokeUi.cs 2025fc647280d8d4`；
+还原后单测 4/4、UI 15/15 复绿。
+
+一条**取证工具本身**不利的事实，记下来免得下次又信它：NC-5 那次发布后用
+`Select-String -SimpleMatch 'KeePass history shot result'` 在 `Monica.App.dll` 上数到 **0**，
+可同一次运行确实打出了只可能由新代码打出的 `restoreOnScreen=` 字段、dll mtime 18:47:58。
+也就是说"在二进制里 grep 字符串字面量"这件事不可靠（同一份 dll 用 `grep -a` 数得到、`Select-String` 数不到）。
+判断产物新不新鲜，要用**日志里出现了只可能由新代码打出的字段** + mtime 两件事一起证，不能只信一次 grep。
+
+### 五、测试与证据
+
+- 单测 4 条（`tests/Monica.Tests/KeePassHistoryTests.cs`，317 行）：
+  ① 版本列出来 + 记录里没有秘密（名字式 :55-57 与值式 :62-71 两层）；
+  ② 还原把整条换回来（标题/口令摘要/笔记/TOTP/自定义字段/附件），并且**当场把被换掉的那版归档**（:101），
+  保存后 KPCLib 自己读回来仍是 2 版（`:108-113`），再解锁一次读回的还是还原后的那一版（`:122-128`）；
+  ③ 编辑漏斗产出的版本就是列表看到的，老→新（`:131-161`）；
+  ④ 不存在的版本被拒且**不动条目**（`:166-185`，含 `IsDirty` 仍为 false）。
+  秘密一律摘要比对（`DigestOf`，SHA512），因为 xunit 会把失败断言的 Actual 打进日志。
+- 无头 UI 1 条（`KeePassHistoryWorkflowUiTests.cs`，216 行）：文件夹没有版本节、编辑后列表清空（不留旧版本）、
+  按一次才出现、行里那颗按钮的 `Command`/`CommandParameter` 是模板自己那一跳（`Assert.Same`，不是 `Equals`）、
+  还原落回原标题 + 树跟着变 + 版本数变 2 + 脏标记在、**文件字节一个都没动**。
+  与其余 6 个 KeePass 类串在一起跑：`Total: 15, Errors: 0, Failed: 0, Time: 14.334s`。
+- 帧的绿读数（带盘的那两次，`--smoke-ui-screenshot-dir` 单独跑，其余字段逐项相同）：
+  `success=True, opened=True, editStaged=True, versions=1, listOnScreen=True, restoreOnScreen=True,
+  restoreButtons=1, reverted=True, treeRows=8, entryRows=4, tabSelected=True, written=True`，
+  1280×800 那档 `vaultBytes=3278 / frameBytes=99597`，1280×600 那档 `vaultBytes=3294 / frameBytes=78019`。
+  （`vaultBytes` 两档不同不是缺陷：那是每次现种的 12 条目库，种子里有随机 uuid 与时间戳，尺寸会差十几字节。）
+  两张 PNG 人眼看过，画面上是
+  「历史版本」+「Entry 000001 / 2026/9/27 …」+「还原到此版本」，中文在画面上，屏上没有任何明文凭据。
+  盘就在 `D:\Monica-kpshots\i131-c\`、`D:\Monica-kpshots\i131-d\`。
+- 复现脚本：`D:\Monica-kpshots\i131-shot.ps1`（一次性 `MONICA_APPDATA_DIR`，种子 12/3 的 `history.kdbx`，
+  跑一帧并把 PNG 落到 `-Out`）。**它把 fixture 字面量放在 argv 上**（`--seed-smoke-keepass-vault`、
+  `--smoke-ui-keepass-password`），那些是本轮/本轮之前造的一次性 fixture，不是真人凭据；
+  产品那条命令行永远不读口令。本轮新出现的字面量，全部按"不是秘密"记在这里：
+  `history-fixture-not-a-secret`、`history-elder-secret`、`history-live-secret`、`renamed-once-secret`、
+  `Elder shape`、`Live shape`、`Elder field`、`Live field`、`Elder note`、`Live note`、`elder.bin`、`live.bin`、
+  `https://history.example.com`、`history@example.com`、`otpauth://totp/Elder?secret=JBSWY3DPEHPK3PXP`、
+  `Smoke Renamed Entry`、`Renamed in the UI test`、`History Fixture`、`History Root`。
+
+### 六、门禁
+
+最终字节（7 改 5 新）整串一次过，`D:\Monica-kpshots\` 侧日志 `/tmp/i131-final-chain.log`：
+**`fmt_rc=0`、`cr_rc=0`（`Commercial release verification passed.`）、`pub_rc=0`、`art_rc=0`（`RUNTIME SMOKE passed`）**。
+
+- 结构门（300 行）这次也过：新增的四份聚焦文件都在 300 行以下
+  （`KeePassVaultSession.History.cs` 118、`MainWindowViewModel.KeePassHistory.cs` 125、
+  `MainWindowViewModel.KeePassSmoke.History.cs` 70、`KeePassHistoryWorkflowUiTests.cs` 216），
+  单测那份 317 行不在门的覆盖范围内（门只管 `Features/*` 与 `src/Monica.Core/ImportExport`）。
+- 测试计数（就这份 trx）：单测 `perf-budget` 11/11 + 常规 **1072/1072**；UI `perf-budget` 17 + 常规 **261**，
+  全 0 红。本轮新增：单测 4 条 + 无头 1 条。
+- 产物门里那一帧（最终字节上）：
+  `success=True, opened=True, editStaged=True, versions=1, listOnScreen=True, restoreOnScreen=True,
+  restoreButtons=1, reverted=True, treeRows=8, entryRows=4, vaultBytes=3294, tabSelected=True,
+  frameBytes=98630, written=False`（门不传 screenshot-dir，所以不落盘；带盘的两张见第三节与第四节 NC-5）。
+  带 `restoreOnScreen` 这一格的读数本轮一共量到 **4 次**：`99597`（1280×800 单独跑）、`78019`（1280×600 单独跑）、
+  `99100`（上一趟产物门）、`98630`（最终字节这趟），四次其余字段逐项相同。
+- 计时/内存预算：库加载、KeePass 20000 条增长都绿，锁定态这一趟 `lockedPrivateMB=115.2`（预算 120）。
+  本轮另一趟同样形状的应用字节上量到过 `123.0`（红），**阈值没动**，见第七节最后一条。
+- 真跑门回显 argv 这件事（#130 修的）在本轮仍然成立：整份链日志里 fixture 口令字面量 **0 处**、
+  `[redacted]` **10 处**——新增的 `--smoke-ui-keepass-history` 那几格走的是同一层遮罩，没有绕过去。
+
+### 七、仍然没做到（欠账，不是决定）
+
+- `HistoryMaxItems` 与 `MaintenanceHistoryDays` 桌面端**既看不见也不改**：还原会受上限挤压，但界面上没有任何地方
+  说这座库留几版。这一格在 KeePass 系里是"数据库设置"页，桌面端整页都还没有。
+- 版本行只有标题 + 时间 + 两个计数，**还原前看不见那一版的内容**（附件叫什么、自定义字段有哪些都只能猜）。
+  主流客户端给的是"预览那一版"，这一片没有。
+- 保存之后的往返只在 KPCLib 自己身上对拍过（单测里那次 `ReadDatabase`）。**没有拿真 KeePass 客户端**
+  （KeePassDX / kp2a / KeePass 官方 / KeePassXC）读过一份"被桌面端还原过并保存"的 .kdbx。
+- Android 侧对同一座带历史的库没做真机对拍——那是 #115 一直欠着的那条口子，本轮没有新证据。
+- 帧里 `reverted` 挂在 `if (listOnScreen …)` 后面（`MainWindow.SmokeUi.cs:654`），所以 NC-5 那次它跟着变 False
+  是**连带读数**，不是还原路径的独立证明；还原路径的独立证明只有单测第 2 条和无头那一条。
+- 版本记录带了 `CreatedAt`，界面上只用了 `UpdatedAt`——那一格现在是白读的。
+- 附件跟着版本走，但**没有"只还原附件"或"还原前列出附件差异"的入口**；`CloneDeep` 之外没有别的处理，
+  一座把大附件放历史里的库，反复还原会不会把文件撑大，没量过。
+- 内存门这一片仍然看负载脸色：同一份应用字节三趟分别 `lockedPrivateMB=123.0`（红）、`117.6`（绿）、
+  最终字节这趟 `115.2`（绿），预算 120。**阈值一个没动**，欠的是一条"为什么会有 8MB 的抖动、
+  什么负载下会翻红"的机制证明——红的那一趟没有留下同时跑的东西的名字。
+
