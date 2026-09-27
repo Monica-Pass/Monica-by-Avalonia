@@ -3230,5 +3230,174 @@ NC-4 顺带量出一件该记的事：无头那条"不出现秘密"的断言原�
 - **导轨的可视高仍然只有 158px**（#133），`KeePassPreviewCard` 与导轨仍然各写一遍摘要与按钮；本轮只换了那一格的单位与标签宽度。
 - **"数据库设置"整页仍然没有**（KDF 参数、加密算法、回收站开关、数据库名），#132 那条对这一格原样成立。
 
+## 附：被拒的那次保存第一次有了出路（2026-09-28，**#135 出厂：这一轮先把自己记的案情测否了，然后量出界面上那条不存在的动作**）
+
+### 一、这一轮把什么变成了事实
+
+- **#135 立项时写的原因（"同一座库开两份，后保存会无声覆盖前一份"）被测量否掉了**。两条真实的会话、同一个盘上的
+  同一个文件（`tests/Monica.Tests/KeePassTwoSessionsOnOneFileTests.cs`，196 行 3 条事实，全部走产品自己的
+  `KeePassVaultService.OpenAsync(..., localPath)`，没有一份是手搓字节盖到文件上冒充"另一个写的人"）：
+  先保存的那份拿到文件（`:40-41` `IsDirty` 落回 false），后保存的那份**抛
+  `KeePassVaultException{ Error = KeePassVaultError.ConcurrentChange }`**（`:43-44`），
+  盘上留着的是先写的那条标题、**没有**后写的那条（`:46-48`），而被拒的那一份**自己的改动还在手上、仍然自称未保存**
+  （`:52-53`）。写侧的这道检查本来就是 #117 出厂的东西，这一轮它第一次被两条真会话从两侧夹住。
+- **另外两条是夹着它跑的**：`A_refused_session_can_write_its_edit_elsewhere_but_not_back_onto_its_source`
+  （:61-90）量到"另存到**同一个**路径"并不能绕过这道检查（:73-75 仍旧抛 `ConcurrentChange`），
+  而写到另一个路径能过（:77），两份文件的标题各自互斥（:79-83）；
+  `Refusing_a_stale_session_does_not_stop_a_current_one_from_saving`（:97-118）量到拒绝是**认字节不是认锁**——
+  被拒之后重开一份照样存得进去（盘上 `Saved first` + `Saved third`、没有 `Saved second`），
+  所以没人被锁在一座"没人占着"的库外面。
+- **真正的缺口在文案指着的那格按钮上**。`KeePassConcurrentChange` 说的是"另存到其他文件 / save to a different
+  file"，而那一刻这个动作**在界面上不存在**：`SaveToAsync(path)` 在应用层**一个调用者都没有**，
+  `WriteKeePassCopyAsync` 只在 `SourcePath is null`（从剪贴板/拖入的字节打开）时才够得着——
+  也就是说**从文件打开的库（也就是会被拒的那种）恰好走不到它**。一句指不到任何控件的提示，人只有两条路：
+  覆盖别人，或丢掉自己的改动。这两条都不该是选项。
+- **本轮补上的是那条出路**：新文件 `src/Monica.App/Features/ImportExport/MainWindowViewModel.KeePassSaveCopy.cs`
+  （78 行）里 `SaveKeePassVaultCopyCommand`（:15-55），按钮 `SaveKeePassVaultCopyButton` 落在
+  `SyncImportView.axaml:159`（就在 `SaveKeePassVaultButton` :156 旁边，即拒绝话出现的同一屏），
+  en/zh 的拒绝语改成点名这格按钮（`LocalizationService.cs:2213` / `:3289`：
+  "use Save a copy" / "或用「另存副本」把这些改动写进另一个文件"）。
+  文案与控件同名，靠的是无头那条 :234-239（找到按钮、`IsVisible`、有尺寸、`Content` 是非空 `TextBlock`、
+  `Assert.Same(viewModel.SaveKeePassVaultCopyCommand, copyButton.Command)`）。
+- **出路被走到了一次**：单测 `AppSettingsTests.KeePassConflict.cs`（55 行 1 条，:15-54）与无头
+  `KeePassEditWorkflowUiTests.cs:186-297` 各自把"改一条 → 别人盖掉源文件 → 保存被拒 → 按另存副本"跑到底：
+  副本能被同一个口令读开并带着那条新标题（单测 :44-47、无头 :278-292），
+  源文件的字节**逐字节等于**别人那份（无头 :273-276 的失败消息写的是"saving a copy reached into the file that
+  changed elsewhere"——副本不许碰别人的文件），拒绝那一步副本文件确实还不存在（无头 :262）。
+
+### 二、为什么副本不走 `SaveToAsync`，也不把会话挪到新文件上
+
+- **量到的行为决定了写法**：`SaveToAsync(另一个路径)` 会成功，但**顺手把 `IsDirty` 清成 false**，而它从哪儿打开的那个
+  文件仍然没有这些改动（`KeePassTwoSessionsOnOneFileTests.cs:85-89` 那段就是把这个记成事实，注释写"任何把它当出路的
+  东西必须在屏幕上说清楚"）。若界面上按它来做，人被拒之后按一下按钮，界面就安静地读成"已保存"——这是本轮唯一一条
+  **靠删掉代码而不是加代码**来避免的缺陷。
+- 所以副本走 `ExportAsync` + 选择器写文件（`MainWindowViewModel.KeePassSaveCopy.cs:61-77`），并且**既不重绑会话、
+  也不清脏标记**（类文档 :6-12 写明了理由）。单测 :49-53 与无头 :294-297 钉的就是这一半：
+  副本写完 `KeePassVaultIsDirty` 仍为 true、`KeePassUnsavedChangesText` 仍在原位。
+- `SaveToAsync` 的那道同源检查留着（**出厂的那一份与 HEAD 逐字节相同**：负控期间临时挪动过它，见第四节；
+  `git status` 对 `src/Monica.Platform` 为空）：
+  显式给路径**不**是绕过冲突检查的后门（:73-75）。
+- 两条守卫分支是各自独立的：无会话 → `KeePassPreviewRequired`（:19-23），当前构建选不了文件 →
+  `KeePassCopyNeedsPicker`（:25-29，新文案 `:2186`/`:3262`）。后者与 Save 那侧原有的
+  `KeePassNoSourceFile`（`MainWindowViewModel.KeePassEdit.cs:142-146`）同形——**没有文件可写回时不再让人对着一个
+  空转的按钮**，而是明说这构建做不到。
+
+### 三、真产物截图门（这一帧多出来的那一格读数）
+
+- `MainWindow.SmokeUi.cs:733-744` 新增 `saveCopyOnScreen`：按钮 `IsVisible`、有尺寸、在窗口内
+  （`TranslatePoint` 到窗口坐标后顶/底都在 `Bounds.Height` 之内）、`Content` 非空；`:774` 加进 `success` 的合取，
+  `:786` 单独打出来。
+- **这一格刻意没用 `IsPaintedInsideWindow`**：那个判据除了"在窗口内"还要求落在浏览导轨自己的视口里
+  （#131/#120 为按钮被导轨裁一半而加），而这格按钮在导轨**上方**的预览卡里——拿导轨的 clip 问它，量的就不是同一件事了。
+  这条取舍写在 `:735-736` 的注释里。
+- 链上那一帧的读数（跑的是 publish 出来的字节，不是 bin/obj）：
+  `KeePass history shot result. success=True …`，句尾带着 **`saveCopyOnScreen=True`**，与它同帧的
+  `policyOnScreen / policyBoxesUsable / policySizeReadsAsMb / policyApplied` 四条仍全 True。
+  整场 `--smoke-ui` 的 `runtime.log` 里 `Smoke UI … result` 一共 **14 格 True + 1 格 False**，
+  那唯一的 False 是内存预算（第六节），**本轮新加的这一格没有红过**。
+- 复跑到第 4、5 次时同一句话再确认一次：`KeePass history shot result. success=True … saveCopyOnScreen=True`
+  （`D:\kpprobe\logs\art-4.log`、`art-5.log`，各 12 格 True、0 格 False）。
+
+### 四、负控（每条先看见红，跑完还原并逐字节核对）
+
+| 拆掉的东西 | 红在哪 | 实测（逐字） |
+|---|---|---|
+| NC-1 那道 `ConcurrentChange` 检查永不成立（把 `HashFileIfExists(target)` 换成 `PayloadSha256` 自己比自己） | 两份会话那 3 条 | `Failed: 3, Passed: 0`，三条同形：`Assert.Throws() Failure: No exception was thrown / Expected: typeof(…KeePassVaultException)`——**这一格就是 #135 立项时写的"无声覆盖"世界**；那三条断言真的钉在 throw 上，不是钉在标题字串上 |
+| NC-2 把同一段挪到 `WriteAtomicAsync` **之后** | `--filter FullyQualifiedName~KeePass` | **14 条红**，远不止冲突那 3 条：`KeePassAndroidShapeTests` 3 条、`KeePassRichFieldTests` 2 条、`KeePassHistoryTests`、`KeePassHistoryPolicyTests`、`KeePassVaultCreateShapeTests`、`AppSettingsTests` 的 3 条保存全红。红的样子是 `Assert.Equal() Failure / Expected: "E1E68650CBC75362…" / Actual: "938C49D44832A291…"`——**挪到写之后，每一次原位保存都把自己当成冲突**（手里是旧哈希、盘上已是新字节）。这道检查的位置不是"顺手放前面"，它依赖自己读的是**写之前**的字节 |
+| NC-3 `SaveToAsync` 改成任何路径都检查（`checkForExternalChange: true`） | 同上，**恰好 1 条红**（`Failed: 1, Passed: 152, Total: 153`） | 红的正是"写到别处"那条：`A_refused_session_can_write_its_edit_elsewhere_but_not_back_onto_its_source`——**显式路径必须躲得开原位检查**，否则"另存副本"这条出路自己也是死的 |
+| NC-4 `SaveKeePassVaultCopyAsync` 对 `SourcePath != null` 的会话提前返回（复现修复前的"够不着"） | 单测 1 红 + 无头 1 红 | 两处同形：`Assert.False() Failure / Expected: False / Actual: True`（单测 :40、无头 :268）——**被拒那次的失败文案一直挂着**，按钮按了什么都没发生。这就是修复前那条提示的真实下场 |
+| NC-5 把按钮 `IsVisible="False"`（文案指着界面上没有的东西） | 无头 1 红 | 红话就是写给它的那句：`the save-a-copy button is not on screen`（`Total: 1, Errors: 0, Failed: 1, Time: 2.565s`）。真产物门那格读的是同一个谓词，但**没为 NC-5 重跑产物门**——它自身有 2/6 的与本轮无关的红概率（第六节），不必再抽一次 |
+
+- 五条拆完都改回原样并重跑：单测 `--filter "FullyQualifiedName~KeePass\|FullyQualifiedName~Localization"`
+  **157/157 绿**（34 s），7 个 KeePass 无头类一起跑 **rc=0**
+  （`KeePassCreate / KeePassEdit / KeePassHistory / KeePassOpenFromOutside / KeePassRecent / KeePassRecycleBin / KeePassSearch`）。
+
+- 还原证明：五条负控全部改回之后重新量的 sha256 前 16 位，与本节下面列出的"链构建那一份"逐字节相同
+  （`git diff` 对 untracked 文件无能为力，所以只能这么证）——
+  `MainWindowViewModel.KeePassSaveCopy.cs e3eabbe3588e98b6`（78 行）、
+  `MainWindowViewModel.KeePassEdit.cs 3ed54a36ada9cbea`（235 行）、
+  `KeePassTwoSessionsOnOneFileTests.cs 5e5f27f7c09acb8d`（196 行）、
+  `AppSettingsTests.KeePassConflict.cs cd04b540c4976951`（55 行）、
+  `KeePassEditWorkflowUiTests.cs 7215e37076d44a7f`（636 行）、
+  `SyncImportView.axaml a401a5fd63a6f85c`（261 行）、
+  `LocalizationService.cs b9488691d9cbe553`（4213 行）、
+  `MainWindow.SmokeUi.cs 83f63a3d38083b81`（1724 行）。
+- NC-1..NC-3 动过的是**另一条路子**：`src/Monica.Platform/Services/KeePassVaultSession.Write.cs` 改过两次、
+  还原后 `git status --porcelain -- src/Monica.Platform` 为空（HEAD 有它，所以这一条是 `git` 说的，不是我估的）。
+
+### 五、测试与证据
+
+- **单测新增 4 条**：`KeePassTwoSessionsOnOneFileTests`（3 条，挂 `[Collection(KeePassVaultTestCollection.Name)]`，
+  临时目录 `monica-kdbx-two-sessions-{N}`，每条自己 `Dispose`）+ `AppSettingsTests.KeePassConflict`（1 条，
+  复用 `AppSettingsTests` 既有的 `KeePassEditFilePicker`，给它加了 `saveTarget` 才写得进副本）。
+- **无头新增 1 条**（`KeePassEditWorkflowUiTests` 4 条事实里的第 2 条，:186-316）：真实控件树里找到按钮 → 编辑 → 别人盖文件 →
+  VM 保存被拒 → **执行按钮的 Command**（:264-265 `Assert.IsAssignableFrom<IAsyncRelayCommand>` 而不是硬 cast，
+  CI 是 `--warnaserror`）→ 回读两份文件。两条 key derivation 放在 `Task.Run` 里算（:198-204），
+  别把 Argon2 压到断言那根线程上（#128/#53 的老坑）。
+- **expected/actual 上没有秘密**：本轮新出现的字面量全是标题/文件名（`Saved first`、`Saved second`、`Saved third`、
+  `Kept on source`、`Rescued elsewhere`、`Owed a place to go`、`Held across the conflict`、`shared.kdbx`、
+  `competing.kdbx`、`rescued.kdbx`、`copy.kdbx`、`Folder 1`、`refused-then-copied`、`written-by-someone-else`、
+  `monica-kdbx-two-sessions-`）与界面字（"Save a copy" / "另存副本"），**没有一个是口令**；口令仍用已登记的
+  `kdbx-parity-fixture-not-a-secret` 与 `KeePassTestVault` 自造的。断言一律用布尔/计数/`SequenceEqual`/`Assert.Same`，
+  唯一带集合的是标题列表（`TitlesOfAsync` 读的是 `Row.Title`）。
+- **链日志泄密审计**（对 `D:\Monica-kpshots\i135-final-chain8.log`（12,754 字节）逐字面量数命中）：
+  18 个已登记的字面量（`keepass-smoke-fixture-not-a-secret`、`kdbx-parity-fixture-not-a-secret`、
+  `policy-*`、`history-*`、`concurrent-unlock-fixture-not-a-secret`、`created-*`、`create-shape-*`、
+  `keepass-search-perf-not-a-secret`、`not-the-password`、`CiRuntime!2026`、`secret-1`、`ticket-000001`、
+  `JBSWY3DPEHPK3PXP`、`Renamed in the UI test`）**各 0 次**；本轮新出现的 7 个标题字
+  （`Saved first/second/third`、`Kept on source`、`Rescued elsewhere`、`Held across the conflict`）与两地的界面字
+  （`Save a copy`、`另存副本`）也**各 0 次**；`[redacted]` **11 次**（产品命令行仍不读口令）。
+  复跑的三份 `D:\kpprobe\logs\art-{4,5,6}.log` 同样 0 命中，只有 `definitely-wrong-password` 各 1 次——
+  那是"拿错口令该被拒"探针故意传进去的**错**口令（既有约定，不是秘密）。
+
+### 六、门禁（这一轮的链**红在内存预算**，并且量到那格红的原因不是采样竞态）
+
+链：`D:\Monica-kpshots\h2-gate-chain.ps1`，日志 `D:\Monica-kpshots\i135-final-chain8.log`：
+`fmt_rc=0`、`cr_rc=0`、`pub_rc=0`、**`art_rc=1`**。
+
+- **前三道全绿**：`dotnet format --verify-no-changes` 干净；结构门绿（新文件 78 行、
+  `MainWindowViewModel.KeePassEdit.cs` 从 257 → 235 行、`SyncImportView.axaml` 261 行，都在 300 以内）；
+  `--warnaserror` 构建 `0 Warning(s) / 0 Error(s)`（本轮把无头里那处硬 cast 换成了 `Assert.IsAssignableFrom`、
+  两处 `TestContext.Current.CancellationToken` 补上，就是为了这一格）。
+- **红的这一格**：`Smoke UI memory budget result. success=False, lockedPrivateMB=121.1, maxMB=120`。
+  除此之外那场 `--smoke-ui` 的 `Smoke UI … result` **14 格全 True**（含本轮新加的 `saveCopyOnScreen=True`）。
+- **按既定纪律复跑，阈值一动不动**：拿**同一份** `artifacts\publish\win-x64\jit` 再跑 6 次产物门
+  （第 1-3 次的输出只在终端里、未落盘；第 4-6 次落盘为 `D:\kpprobe\logs\art-{4,5,6}.log`），
+  读数 `117.1 / 118.4 / 115.6 / 116.9 / 111.0 / 121.0`，加链里那一次 121.1 共 7 次——
+  **5 次全绿、2 次红，而且两次红的是两个不同的地方**：内存台阶（121.1、121.0）与 #80 那条瞬态文案自行退场
+  （`status notice retirement result. success=False, raised=True, armedForNotice=True, retired=False`）。
+- **关键判别：那一格不是"单次读数抖一下"**。它自己已经够稳了——锁定态连采 10 轮、每轮两次
+  `GC.Collect(Aggressive)` + 5 s 间隔、取后半 5 轮的中位数（`App.SmokeUi.cs:425-427、455-471、631-633`）。
+  而同一份字节的**整条轨迹**是：链那次
+  `126.7/121.5/121.6/120.1/120.4/121.1/121.1/121.9/121.9/116.5`（中位 **121.1**）、第 4 次落在 **116.9**、
+  第 5 次落在 **111.0**。**进程整体停在 110 / 117 / 121 三个不同台阶上，每个台阶内部是稳的**——
+  10 MB 的差不是一次采样的竞态能解释的。也就是说：120 这条线离最高那个台阶只有 1 MB，撞上就红。
+  台阶由什么决定**本轮没查**，开成 **#140**；本轮没有改阈值，也没有把 `maxMB` 往上调一格蒙过去。
+- **不能排除本轮的份**：没有拿**改动前**（HEAD `90c1ca3`）的字节做过同样的 6 次分布，上一轮留下的只是
+  单次读数（118.3、118.9）。所以"这三个台阶不是本轮造出来的"目前**只是推断**，写在第七节第一条。
+- 本轮改动前后的自建验证（不依赖链）：单测 `~KeePass|~Localization` **157/157**、7 个 KeePass 无头类 **rc=0**、
+  `~KeePassTwoSessionsOnOneFileTests` **3/3**、无头 `KeePass_refused_save_offers_a_working_save_a_copy` **1/1**。
+
+### 七、仍然没做到（欠账，不是决定）
+
+- **锁定态内存的三个台阶（110 / 117 / 121 MB）由什么决定，本轮没查**——这是第六节那句"不能排除本轮的份"的正面说法：
+  没有拿改动前（HEAD `90c1ca3`）的字节跑过同样的 6 次分布，所以"这三个台阶是既有现象、不是本轮造的"**只是推断**；
+  而 120 这条线离最高台阶只差 1 MB，产物门因此在**同一份字节**上约 2/7 概率红（#140，先量对照分布，再压成因，
+  **不许动阈值**）。
+- **"两处打开同一座库"仍然是同进程内的两个 session 对象**。这个客户端是单实例（#86），所以现实中真正的并发写者是
+  **另一个客户端**（KeePassXC / 另一台机器上的 kotpass / 网盘上的另一份 Monica）。本轮那三条证的是检查与文案的形状，
+  跨进程与跨机器的场景**一次也没实测过**（归 #115）。
+- **无头那条按的是 `Command`，不是鼠标**。真实点一下那格按钮、真弹出系统"另存为"对话框，没人走过；
+  真产物门这一轮也只读了按钮在不在（`saveCopyOnScreen`），没按它。
+- **拒绝后只有两条出路**（另存副本 / 放弃改动），**没有"重新载入盘上那份再改"**——主流 KeePass 客户端给的是三条。
+  本轮没做，也没在文案里承诺。
+- **副本写完后会话不搬家**：脏标记留着是对的（第二节），但"我就想继续编辑这份新文件"的人只能关掉重开，界面上没说这话。
+- **两条守卫分支没各自被走过**：`KeePassPreviewRequired`（无会话）与 `KeePassCopyNeedsPicker`
+  （`CanUseFilePicker == false`）都只在代码里；本轮没有"选择器不可用"的构建变体去按那格。
+- **没拿别的客户端读过这份副本**：`ExportAsync` 与导出按钮同一条编码路径，本轮只证它能被**本客户端 + 同一个口令**读开。
+- **`saveCopyOnScreen` 与 #133 撞在同一格里**：这格按钮所在的预览卡正是被导入页压到 158px 的那块，本轮把 WrapPanel
+  从 5 个按钮加到 6 个——**"在窗口内可见"不等于"不用滚就够得着"**，#133 下一轮必须把这 6 个按钮一起算。
+- **写侧那道检查仍然只在"从文件打开"时有意义**：`SourcePath == null` 的会话永远不检查（没地方可比）。
+
 
 

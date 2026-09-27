@@ -139,6 +139,12 @@ public sealed partial class MainWindowViewModel
             }
             else
             {
+                if (!CanUseFilePicker)
+                {
+                    SetStatusFailure("KeePassNoSourceFile");
+                    return;
+                }
+
                 await WriteKeePassCopyAsync(session, cancellationToken);
             }
 
@@ -160,34 +166,6 @@ public sealed partial class MainWindowViewModel
         {
             EndKeePassOperation();
         }
-    }
-
-    /// <summary>
-    /// A session opened from bytes has nowhere to save to, so the save command asks for a file and
-    /// hands it the verified payload instead of failing on an error the user cannot act on.
-    /// </summary>
-    private async Task WriteKeePassCopyAsync(KeePassVaultSession session, CancellationToken cancellationToken)
-    {
-        if (!CanUseFilePicker)
-        {
-            SetStatusFailure("KeePassNoSourceFile");
-            return;
-        }
-
-        var payload = await session.ExportAsync(cancellationToken);
-        var savedName = await _fileSystemPickerService.SaveBinaryFileAsync(
-            _localization.Get("KeePassSaveToFile"),
-            session.SourceFileName,
-            payload,
-            KeePassFileTypes,
-            cancellationToken);
-        if (savedName is null)
-        {
-            SetStatusNotice("KeePassImportCanceled");
-            return;
-        }
-
-        SetStatusNotice("KeePassSavedCopyFormat", savedName);
     }
 
     private void ShowKeePassEntryDetail(KeePassVaultSession session, KeePassEntryDetail detail)

@@ -730,6 +730,19 @@ public partial class MainWindow
                     && maxItemsBox.Text == "7" && daysBox.Text == "90" && sizeBox.Text == "7";
             }
 
+            // The way out of a refused save has to be on the same screen the refusal is spoken on: a
+            // message that points at an action nobody can find is the dead end this reading exists to
+            // catch. These buttons live in the card above the rail, so the rail's own viewport clip -
+            // what IsPaintedInsideWindow adds further down - is not a question to ask of them.
+            var saveCopyButton = this.GetVisualDescendants()
+                .OfType<Button>()
+                .FirstOrDefault(control => control.Name == "SaveKeePassVaultCopyButton");
+            var saveCopyOnScreen = saveCopyButton is { IsVisible: true }
+                && saveCopyButton.Bounds.Width > 0 && saveCopyButton.Bounds.Height > 0
+                && saveCopyButton.TranslatePoint(new Point(0, 0), this) is { } copyTop
+                && copyTop.Y >= 0 && copyTop.Y + saveCopyButton.Bounds.Height <= Bounds.Height
+                && saveCopyButton.Content is not null;
+
             // The revert walked on the shipped binary: the newest version is the shape the edit just
             // replaced, and putting the entry back has to land on the title it was opened with.
             var reverted = false;
@@ -758,6 +771,7 @@ public partial class MainWindow
                 policyBoxesUsable &&
                 policySizeReadsAsMegabytes &&
                 policyApplied &&
+                saveCopyOnScreen &&
                 historyShot.Bytes > 0 &&
                 historyShot.Written &&
                 policyShot.Written;
@@ -769,6 +783,7 @@ public partial class MainWindow
                 $"policyOnScreen={policyOnScreen}, policyBoxesUsable={policyBoxesUsable}, " +
                 $"policySizeReadsAsMb={policySizeReadsAsMegabytes}, " +
                 $"policyApplied={policyApplied}, " +
+                $"saveCopyOnScreen={saveCopyOnScreen}, " +
                 $"treeRows={state.TreeRows}, entryRows={state.EntryRows}, vaultBytes={state.FileBytes}, " +
                 $"tabSelected={keepassTab.IsSelected}, frameBytes={historyShot.Bytes}, " +
                 $"policyFrameBytes={policyShot.Bytes}, " +

@@ -468,6 +468,7 @@ public interface ILocalizationService : INotifyPropertyChanged
     string KeePassApplyEdit { get; }
     string KeePassShowSecrets { get; }
     string KeePassSaveToFile { get; }
+    string KeePassSaveACopy { get; }
     string KeePassNewEntry { get; }
     string KeePassUnsavedChanges { get; }
     string KeePassHistory { get; }
@@ -1011,6 +1012,7 @@ public sealed class LocalizationService : ILocalizationService
     public string KeePassApplyEdit => Text();
     public string KeePassShowSecrets => Text();
     public string KeePassSaveToFile => Text();
+    public string KeePassSaveACopy => Text();
     public string KeePassNewEntry => Text();
     public string KeePassUnsavedChanges => Text();
     public string KeePassHistory => Text();
@@ -2180,6 +2182,8 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassApplyEdit"] = "Apply changes",
         ["KeePassShowSecrets"] = "Show password and key",
         ["KeePassSaveToFile"] = "Save to file",
+        ["KeePassSaveACopy"] = "Save a copy",
+        ["KeePassCopyNeedsPicker"] = "This build cannot ask for a file, so a copy cannot be written from here.",
         ["KeePassUnsavedChanges"] = "Unsaved changes",
         ["KeePassHistory"] = "Saved versions",
         ["KeePassHistoryRestore"] = "Restore this version",
@@ -2204,8 +2208,9 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassSavedFormat"] = "KeePass database saved ({0} bytes).",
         ["KeePassSavedCopyFormat"] = "Saved a copy of the KeePass database to {0}.",
         ["KeePassSaveFailed"] = "The KeePass database could not be saved.",
+        ["KeePassSaveCopyFailed"] = "A copy of the KeePass database could not be saved.",
         ["KeePassWriteFailed"] = "The KeePass database could not be written in a state that verifies. The file was left unchanged.",
-        ["KeePassConcurrentChange"] = "The KeePass file changed outside Monica. Close it elsewhere, or save to a different file.",
+        ["KeePassConcurrentChange"] = "The KeePass file changed outside Monica. Close it elsewhere, or use Save a copy to write these changes into a different file.",
         ["KeePassNoSourceFile"] = "The opened KeePass database has no file to write back to.",
         ["KeePassDiscardBeforeOpening"] = "Save or close the opened KeePass database before opening another file.",
         ["KeePassDiscardTitle"] = "Close the KeePass database?",
@@ -3253,6 +3258,8 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassApplyEdit"] = "记入改动",
         ["KeePassShowSecrets"] = "显示密码与密钥",
         ["KeePassSaveToFile"] = "保存到文件",
+        ["KeePassSaveACopy"] = "另存副本",
+        ["KeePassCopyNeedsPicker"] = "当前环境无法选择文件，因此不能在这里写出副本。",
         ["KeePassUnsavedChanges"] = "有未保存的改动",
         ["KeePassHistory"] = "历史版本",
         ["KeePassHistoryRestore"] = "还原到此版本",
@@ -3277,8 +3284,9 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassSavedFormat"] = "KeePass 数据库已保存（{0} 字节）。",
         ["KeePassSavedCopyFormat"] = "已将 KeePass 数据库的副本保存到 {0}。",
         ["KeePassSaveFailed"] = "无法保存 KeePass 数据库。",
+        ["KeePassSaveCopyFailed"] = "无法保存 KeePass 数据库的副本。",
         ["KeePassWriteFailed"] = "无法写出可通过自检验证的 KeePass 数据库，原文件保持不变。",
-        ["KeePassConcurrentChange"] = "该 KeePass 文件已被其他程序改动，请先在别处关闭它，或另存到其他文件。",
+        ["KeePassConcurrentChange"] = "该 KeePass 文件已被其他程序改动。请先在别处关闭它，或用「另存副本」把这些改动写进另一个文件。",
         ["KeePassNoSourceFile"] = "当前打开的 KeePass 数据库没有可写回的文件。",
         ["KeePassDiscardBeforeOpening"] = "请先保存或关闭当前打开的 KeePass 数据库，再打开其他文件。",
         ["KeePassDiscardTitle"] = "关闭 KeePass 数据库？",

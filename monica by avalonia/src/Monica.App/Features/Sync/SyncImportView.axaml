@@ -156,6 +156,9 @@
                                 <Button x:Name="SaveKeePassVaultButton" Classes="workspaceCommand" Command="{Binding SaveKeePassVaultCommand}" Margin="0,0,8,8">
                                     <TextBlock Text="{Binding L.KeePassSaveToFile}" />
                                 </Button>
+                                <Button x:Name="SaveKeePassVaultCopyButton" Classes="workspaceCommand" Command="{Binding SaveKeePassVaultCopyCommand}" Margin="0,0,8,8">
+                                    <TextBlock Text="{Binding L.KeePassSaveACopy}" />
+                                </Button>
                                 <Button x:Name="ImportKeePassVaultButton" Classes="workspacePrimaryCommand" Command="{Binding ImportKeePassVaultCommand}" Margin="0,0,8,8">
                                     <TextBlock Text="{Binding L.KeePassImportNow}" />
                                 </Button>

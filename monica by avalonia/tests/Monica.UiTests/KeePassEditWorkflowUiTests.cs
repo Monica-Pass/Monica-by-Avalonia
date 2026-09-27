@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.App.Controls;
 using Monica.App.Features.ImportExport;
@@ -172,6 +173,144 @@ public sealed class KeePassEditWorkflowUiTests
         finally
         {
             TryDelete(fixturePath);
+        }
+    }
+
+    /// <summary>
+    /// The way out of a refused save, asked where it is rendered. A database is opened from a real
+    /// file, that file is then replaced by one another session wrote, and the question is whether the
+    /// screen offers somewhere else to put the edits - and whether the button on it actually writes
+    /// them there without undoing what the other writer did.
+    /// </summary>
+    [Fact]
+    public async Task KeePass_refused_save_offers_a_working_save_a_copy()
+    {
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            "monica-uitests",
+            $"keepass-conflict-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var fixturePath = Path.Combine(directory, "shared.kdbx");
+        var competingPath = Path.Combine(directory, "competing.kdbx");
+        var copyPath = Path.Combine(directory, "rescued.kdbx");
+        try
+        {
+            // Two key derivations, so both are built off the thread the assertions pump.
+            var info = await Task.Run(() =>
+            {
+                var opened = KeePassSmokeVaultWriter.Write(fixturePath, FixturePassword, entries: 3, groups: 2);
+                KeePassSmokeVaultWriter.Write(competingPath, FixturePassword, entries: 1, groups: 1);
+                return opened;
+            });
+            var content = await File.ReadAllBytesAsync(fixturePath, TestContext.Current.CancellationToken);
+            var competing = await File.ReadAllBytesAsync(competingPath, TestContext.Current.CancellationToken);
+            var picker = new SingleKeePassFileService(
+                new PickedBinaryFile(info.FileName, content, fixturePath),
+                copyPath);
+
+            var window = new Monica.App.MainWindow();
+            using var services = Monica.App.App.ConfigureServices(window, collection =>
+            {
+                collection.AddSingleton<IFileSystemPickerService>(picker);
+            });
+            var viewModel = services.GetRequiredService<MainWindowViewModel>();
+
+            await viewModel.SelectKeePassFileCommand.ExecuteAsync(null);
+            viewModel.KeePassImportPassword = FixturePassword;
+            await viewModel.PreviewKeePassImportCommand.ExecuteAsync(null);
+            Assert.True(viewModel.HasKeePassImportPreview);
+
+            var view = new SyncImportView { DataContext = viewModel };
+            var host = new Window { Width = 1280, Height = 800, Content = view };
+            viewModel.SelectedSyncPage = "Import";
+            host.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            var tabs = view.FindControl<TabControl>("ImportSourceTabs")!;
+            tabs.SelectedItem = view.FindControl<TabItem>("KeePassImportTab")!;
+            Dispatcher.UIThread.RunJobs();
+            try
+            {
+                var copyButton = view.FindControl<Button>("SaveKeePassVaultCopyButton")!;
+                Assert.True(copyButton.IsVisible, "the save-a-copy button is not on screen");
+                Assert.True(copyButton.Bounds.Width > 0 && copyButton.Bounds.Height > 0);
+                var copyLabel = Assert.IsType<TextBlock>(copyButton.Content);
+                Assert.False(string.IsNullOrWhiteSpace(copyLabel.Text));
+                Assert.Same(viewModel.SaveKeePassVaultCopyCommand, copyButton.Command);
+
+                var folder = Assert.Single(
+                    viewModel.KeePassTreeRowsPublic,
+                    row => row.Kind == KeePassTreeRowKind.Folder && row.Group!.Name == "Folder 1");
+                await viewModel.ToggleKeePassFolderCommand.ExecuteAsync(folder);
+                var entryRow = Assert.Single(
+                    viewModel.KeePassTreeRowsPublic,
+                    row => row.IsEntryRow && row.Entry!.Title == "Entry 000001");
+                await viewModel.SelectKeePassRowCommand.ExecuteAsync(entryRow);
+                await viewModel.EditKeePassEntryCommand.ExecuteAsync(null);
+                viewModel.KeePassEditorPublic!.Title = "Held across the conflict";
+                await viewModel.ApplyKeePassEntryEditCommand.ExecuteAsync(null);
+
+                // Another client saves to the same path while this session holds its own edit.
+                await File.WriteAllBytesAsync(
+                    fixturePath,
+                    competing,
+                    TestContext.Current.CancellationToken);
+                await viewModel.SaveKeePassVaultCommand.ExecuteAsync(null);
+
+                Assert.True(viewModel.IsStatusMessageFailure);
+                Assert.True(viewModel.KeePassVaultIsDirty);
+                Assert.False(File.Exists(copyPath));
+
+                var command = Assert.IsAssignableFrom<IAsyncRelayCommand>(copyButton.Command);
+                await command.ExecuteAsync(null);
+                Dispatcher.UIThread.RunJobs();
+
+                Assert.False(viewModel.IsStatusMessageFailure);
+                Assert.True(File.Exists(copyPath));
+                var copy = await File.ReadAllBytesAsync(copyPath, TestContext.Current.CancellationToken);
+                Assert.False(copy.AsSpan().SequenceEqual(content));
+                Assert.False(copy.AsSpan().SequenceEqual(competing));
+                Assert.True(
+                    (await File.ReadAllBytesAsync(fixturePath, TestContext.Current.CancellationToken))
+                    .AsSpan().SequenceEqual(competing),
+                    "saving a copy reached into the file that changed elsewhere");
+
+                var titles = new List<string>();
+                using (var reopened = await new KeePassVaultService().OpenAsync(
+                           copy,
+                           "rescued.kdbx",
+                           FixturePassword,
+                           null,
+                           TestContext.Current.CancellationToken))
+                {
+                    await foreach (var detail in reopened.ReadDetailsAsync(TestContext.Current.CancellationToken))
+                    {
+                        titles.Add(detail.Row.Title);
+                    }
+                }
+
+                Assert.Contains("Held across the conflict", titles);
+
+                // The copy is not a save, so the unsaved marker has to stay where it is.
+                var unsaved = view.FindControl<TextBlock>("KeePassUnsavedChangesText")!;
+                Assert.True(unsaved.IsVisible);
+                Assert.True(viewModel.KeePassVaultIsDirty);
+            }
+            finally
+            {
+                host.Close();
+                Dispatcher.UIThread.RunJobs();
+            }
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
         }
     }
 
@@ -445,7 +584,11 @@ public sealed class KeePassEditWorkflowUiTests
         }
     }
 
-    private sealed class SingleKeePassFileService(PickedBinaryFile file) : IFileSystemPickerService
+    /// <param name="saveTarget">
+    /// Where a save-a-copy is asked to write, or null when the test never gets that far and the picker
+    /// is meant to answer "cancelled".
+    /// </param>
+    private sealed class SingleKeePassFileService(PickedBinaryFile file, string? saveTarget = null) : IFileSystemPickerService
     {
         public PlatformIntegrationCapability Capability { get; } = PlatformIntegrationService.Available(
             PlatformFeatureKeys.FilePicker,
@@ -473,7 +616,16 @@ public sealed class KeePassEditWorkflowUiTests
             string suggestedFileName,
             ReadOnlyMemory<byte> content,
             IReadOnlyList<PlatformFilePickerFileType> fileTypes,
-            CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
+            CancellationToken cancellationToken = default)
+        {
+            if (saveTarget is null)
+            {
+                return Task.FromResult<string?>(null);
+            }
+
+            File.WriteAllBytes(saveTarget, content.ToArray());
+            return Task.FromResult<string?>(Path.GetFileName(saveTarget));
+        }
 
         public Task<PickedSaveTarget?> PickSaveFileTargetAsync(
             string title,
