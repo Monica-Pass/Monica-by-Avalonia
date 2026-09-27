@@ -11,7 +11,8 @@ namespace Monica.Platform.Services;
 /// <summary>
 /// Writes a decoded database back out. <see cref="KdbxFile.Save"/> is not thread safe process-wide -
 /// parallel saves have produced databases that reject the key that created them - so payloads are
-/// built under a gate and re-opened before a caller is allowed to publish them.
+/// built under <see cref="KeePassVaultParseGate"/> and re-opened before a caller is allowed to
+/// publish them.
 /// </summary>
 internal static class KeePassVaultWrite
 {
@@ -19,7 +20,6 @@ internal static class KeePassVaultWrite
     public const uint Kdbx40 = 0x0004_0000;
     public const uint Kdbx41 = 0x0004_0001;
 
-    private static readonly object SaveGate = new();
     private const int MaximumWriteAttempts = 5;
 
     private static readonly PropertyInfo? ForceVersionProperty = typeof(KdbxFile).GetProperty(
@@ -159,7 +159,7 @@ internal static class KeePassVaultWrite
 
     private static byte[] SaveOnce(PwDatabase database, uint? formatVersion)
     {
-        lock (SaveGate)
+        lock (KeePassVaultParseGate.Gate)
         {
             using var stream = new MemoryStream();
             var file = new KdbxFile(database);
@@ -179,7 +179,13 @@ internal static class KeePassVaultWrite
         {
             var probe = new PwDatabase();
             probe.MasterKey = key;
-            new KdbxFile(probe).Load(new MemoryStream(payload, writable: false), KdbxFormat.Default, null);
+            lock (KeePassVaultParseGate.Gate)
+            {
+                new KdbxFile(probe).Load(
+                    new MemoryStream(payload, writable: false),
+                    KdbxFormat.Default,
+                    null);
+            }
             try
             {
                 return probe.RootGroup is { } root

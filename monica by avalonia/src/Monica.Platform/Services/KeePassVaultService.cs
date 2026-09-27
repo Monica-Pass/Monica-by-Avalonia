@@ -86,15 +86,23 @@ public sealed class KeePassVaultService : IKeePassVaultService
         var ownershipTransferred = false;
         try
         {
-            var key = new CompositeKey();
-            if (password is not null)
+            using var stream = new MemoryStream(ciphertext, writable: false);
+            // Building the key and parsing the file go through the gate as one unit. With only the
+            // parse gated, a cold process still refused the correct master key for every unlock in a
+            // burst of two and of twelve, while a lone cold load always passed - the shared state
+            // KPCLib touches first is reached before KdbxFile.Load is.
+            lock (KeePassVaultParseGate.Gate)
             {
-                key.AddUserKey(new KcpPassword(password));
+                var key = new CompositeKey();
+                if (password is not null)
+                {
+                    key.AddUserKey(new KcpPassword(password));
+                }
+
+                database.MasterKey = key;
+                new KdbxFile(database).Load(stream, KdbxFormat.Default, null);
             }
 
-            database.MasterKey = key;
-            using var stream = new MemoryStream(ciphertext, writable: false);
-            new KdbxFile(database).Load(stream, KdbxFormat.Default, null);
             cancellationToken.ThrowIfCancellationRequested();
             var session = new KeePassVaultSession(database, fileName, sourcePath, ciphertext, cancellationToken);
             ownershipTransferred = true;

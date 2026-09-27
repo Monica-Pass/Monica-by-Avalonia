@@ -276,7 +276,9 @@ public sealed class KeePassRichFieldTests : IDisposable
 
         var snapshot = entry.CloneDeep();
         snapshot.History.Clear();
-        snapshot.LastModificationTime = new DateTime(2024, 5, 6, 7, 8, 9, DateTimeKind.Utc);
+        // Dated from the run: the writer prunes versions older than the database's 365-day window, so
+        // a fixed year would eventually stop being the elder generation the assertions expect.
+        snapshot.LastModificationTime = DateTime.UtcNow.AddDays(-3);
         entry.History.Add(snapshot);
 
         database.RootGroup.AddEntry(entry, true);

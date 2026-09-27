@@ -61,6 +61,7 @@ public sealed partial class MainWindowViewModel
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsKeePassDetailColumn))]
+    [NotifyPropertyChangedFor(nameof(ShowsKeePassRail))]
     private PasswordDetailViewModel? _keePassEntryDetailsPublic;
 
     public bool HasKeePassSelectedFile => !string.IsNullOrWhiteSpace(KeePassSelectedFileName);
@@ -169,7 +170,10 @@ public sealed partial class MainWindowViewModel
         KeePassTreeRowsPublic = [];
         _selectedKeePassTreeRow = null;
         SelectedKeePassTreeRowPublic = null;
-        OnPropertyChanged(nameof(HasKeePassImportPreview));
+        KeePassPolicyMaxItemsText = "";
+        KeePassPolicyMaxSizeBytesText = "";
+        KeePassPolicyMaintenanceDaysText = "";
+        RaiseKeePassRail();
         OnPropertyChanged(nameof(ShowKeePassOpenForm));
         OnPropertyChanged(nameof(KeePassPreviewSummaryText));
         RaiseKeePassWriteState();

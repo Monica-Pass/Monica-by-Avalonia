@@ -233,10 +233,16 @@ public sealed class KeePassEditWorkflowUiTests
                 // The root is selected at open and the root is not something a user may delete.
                 Assert.False(tree.CanManageSelected);
 
-                // Only the root is selected, and a folder has no detail of its own, so the column beside
-                // the tree is down: nothing is painted there, and nothing here claims otherwise.
+                // Only the root is selected, and a folder has no detail of its own, so nothing is painted
+                // beside the tree. The rail itself is up now - a browsed library carries its own history
+                // policy there even with no entry selected - so what this owns is "no editor on screen":
+                // the pane is not visible and has taken no room, rather than not existing in the tree.
+                // Measured, not assumed: with the rail realized this control is found with Bounds 0,0,0,0.
                 Assert.False(viewModel.ShowsKeePassDetailColumn);
-                Assert.Null(view.TryInPane<StackPanel>("KeePassEntryEditorPane"));
+                Assert.True(viewModel.ShowsKeePassRail);
+                var unopenedEditor = view.TryInPane<StackPanel>("KeePassEntryEditorPane");
+                Assert.False(unopenedEditor?.IsVisible == true);
+                Assert.True(unopenedEditor is null || unopenedEditor.Bounds is { Width: 0, Height: 0 });
                 // Raising Button.ClickEvent was measured not to run a Command-bound button - only the
                 // pointer pipeline calls OnClick - so the hop proved here is the one the template owns:
                 // the binding resolved to the live command, and clicking it is what opens the form.

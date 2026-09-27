@@ -30,11 +30,6 @@ public static class KeePassSmokeVaultWriter
 
     private const int AttachmentBytes = 2_048;
 
-    // KdbxFile.Save is not thread safe process-wide: parallel saves have produced databases that
-    // reject the key that created them. A fixture that unlocks only by luck would make the gate
-    // flaky rather than meaningful, so writes are gated and each payload is verified before use.
-    private static readonly object SaveGate = new();
-
     public static KeePassSmokeVaultInfo Write(string filePath, string password, int entries, int groups)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
@@ -45,28 +40,25 @@ public static class KeePassSmokeVaultWriter
         ArgumentOutOfRangeException.ThrowIfGreaterThan(groups, KeePassVaultLimits.MaximumGroupCount);
 
         var stopwatch = Stopwatch.StartNew();
-        lock (SaveGate)
+        for (var attempt = 0; attempt < MaximumWriteAttempts; attempt++)
         {
-            for (var attempt = 0; attempt < MaximumWriteAttempts; attempt++)
+            var payload = BuildPayload(entries, groups, password);
+            if (Unlocks(payload, password, entries))
             {
-                var payload = BuildPayload(entries, groups, password);
-                if (Unlocks(payload, password, entries))
+                var directory = Path.GetDirectoryName(Path.GetFullPath(filePath));
+                if (!string.IsNullOrEmpty(directory))
                 {
-                    var directory = Path.GetDirectoryName(Path.GetFullPath(filePath));
-                    if (!string.IsNullOrEmpty(directory))
-                    {
-                        Directory.CreateDirectory(directory);
-                    }
-
-                    File.WriteAllBytes(filePath, payload);
-                    stopwatch.Stop();
-                    return new KeePassSmokeVaultInfo(
-                        Path.GetFileName(filePath),
-                        payload.Length,
-                        entries,
-                        groups,
-                        stopwatch.ElapsedMilliseconds);
+                    Directory.CreateDirectory(directory);
                 }
+
+                File.WriteAllBytes(filePath, payload);
+                stopwatch.Stop();
+                return new KeePassSmokeVaultInfo(
+                    Path.GetFileName(filePath),
+                    payload.Length,
+                    entries,
+                    groups,
+                    stopwatch.ElapsedMilliseconds);
             }
         }
 
@@ -76,6 +68,9 @@ public static class KeePassSmokeVaultWriter
 
     private static bool Unlocks(byte[] payload, string password, int expectedEntries)
     {
+        // Called with the gate NOT held. The check runs through the service, which takes the gate on
+        // another thread and returns the task to this one; holding the gate across that wait would
+        // make the writer block on itself and the fixture would never be written.
         try
         {
             using var session = new KeePassVaultService()
@@ -92,37 +87,42 @@ public static class KeePassSmokeVaultWriter
 
     private static byte[] BuildPayload(int entries, int groups, string password)
     {
-        var key = new CompositeKey();
-        key.AddUserKey(new KcpPassword(password));
-        var database = new PwDatabase();
-        database.New(IOConnectionInfo.FromPath("smoke.kdbx"), key);
-        database.Name = "Smoke Fixture";
-        database.RootGroup.Name = "Smoke Root";
-
-        try
+        // Gated like every other key build and serialize: a fixture that unlocks only by luck would
+        // make the runtime gate flaky rather than meaningful.
+        lock (KeePassVaultParseGate.Gate)
         {
-            var perGroup = Math.Max(1, (int)Math.Ceiling(entries / (double)groups));
-            var placed = 0;
-            for (var groupIndex = 0; placed < entries; groupIndex++)
+            var key = new CompositeKey();
+            key.AddUserKey(new KcpPassword(password));
+            var database = new PwDatabase();
+            database.New(IOConnectionInfo.FromPath("smoke.kdbx"), key);
+            database.Name = "Smoke Fixture";
+            database.RootGroup.Name = "Smoke Root";
+
+            try
             {
-                var group = new PwGroup(true, true, $"Folder {groupIndex % groups + 1}", PwIcon.Folder);
-                database.RootGroup.AddGroup(group, true);
-                var groupEnd = Math.Min(entries, placed + perGroup);
-                for (; placed < groupEnd; placed++)
+                var perGroup = Math.Max(1, (int)Math.Ceiling(entries / (double)groups));
+                var placed = 0;
+                for (var groupIndex = 0; placed < entries; groupIndex++)
                 {
-                    group.AddEntry(BuildEntry(placed + 1), true);
+                    var group = new PwGroup(true, true, $"Folder {groupIndex % groups + 1}", PwIcon.Folder);
+                    database.RootGroup.AddGroup(group, true);
+                    var groupEnd = Math.Min(entries, placed + perGroup);
+                    for (; placed < groupEnd; placed++)
+                    {
+                        group.AddEntry(BuildEntry(placed + 1), true);
+                    }
                 }
-            }
 
-            using var stream = new MemoryStream();
-            new KdbxFile(database).Save(stream, database.RootGroup, KdbxFormat.Default, null);
-            return stream.ToArray();
-        }
-        finally
-        {
-            if (database.IsOpen)
+                using var stream = new MemoryStream();
+                new KdbxFile(database).Save(stream, database.RootGroup, KdbxFormat.Default, null);
+                return stream.ToArray();
+            }
+            finally
             {
-                database.Close();
+                if (database.IsOpen)
+                {
+                    database.Close();
+                }
             }
         }
     }

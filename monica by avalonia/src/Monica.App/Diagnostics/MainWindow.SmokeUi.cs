@@ -562,12 +562,13 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// One frame of the versions an entry remembers, reached from the shipped binary. The list only
-    /// exists inside a browsed <c>.kdbx</c>, so nothing in the section matrix would ever have shown it,
-    /// and the half worth photographing is the moment right after an edit: the tree has just been
-    /// republished and the panel is the thing still answering that entry. The frame scrolls the detail pane
-    /// down to the versions before it shoots, because that is the only way the list is on the image at all.
-    /// Titles and secrets stay out of the log - counts, booleans and byte sizes are what it asserts.
+    /// One frame of the versions an entry remembers and a second of the limits the library keeps them
+    /// under, reached from the shipped binary. The list only exists inside a browsed <c>.kdbx</c>, so
+    /// nothing in the section matrix would ever have shown it, and the half worth photographing is the
+    /// moment right after an edit: the tree has just been republished and the panel is the thing still
+    /// answering that entry. Both frames scroll the detail pane down to what they shoot, because that is
+    /// the only way either is on an image at all. Titles and secrets stay out of the log - counts,
+    /// booleans and byte sizes are what it asserts.
     /// </summary>
     public async Task<bool> RunSmokeUiKeePassHistoryShotAsync(
         string vaultPath,
@@ -616,42 +617,106 @@ public partial class MainWindow
             var detailScroller = this.GetVisualDescendants()
                 .OfType<ScrollViewer>()
                 .FirstOrDefault(control => control.Name == "KeePassDetailScroller");
-            if (section is not null && detailScroller is not null)
+            async Task ScrollToAsync(Visual? target)
             {
-                // Bring the section to the top of the pane's own viewport, which is what a person dragging
+                // Bring the target to the top of the pane's own viewport, which is what a person dragging
                 // that scrollbar does - Avalonia 12 has no scroll-to-element call to borrow.
-                if (section.TranslatePoint(new Point(0, 0), detailScroller) is { } sectionTop)
+                if (target is null || detailScroller is null
+                    || target.TranslatePoint(new Point(0, 0), detailScroller) is not { } targetTop)
                 {
-                    detailScroller.Offset = new Vector(
-                        detailScroller.Offset.X,
-                        detailScroller.Offset.Y + sectionTop.Y);
+                    return;
                 }
 
+                detailScroller.Offset = new Vector(
+                    detailScroller.Offset.X,
+                    detailScroller.Offset.Y + targetTop.Y);
                 await Task.Delay(250);
             }
+
+            await ScrollToAsync(section);
 
             bool IsPaintedInsideWindow(Visual? control) =>
                 control is { IsVisible: true } && control.Bounds.Width > 0 && control.Bounds.Height > 0
                 && control.TranslatePoint(new Point(0, 0), this) is { } top
                 && control.TranslatePoint(new Point(control.Bounds.Width, control.Bounds.Height), this) is { } bottom
                 && top.X >= 0 && bottom.X <= Bounds.Width
-                && top.Y >= 0 && bottom.Y <= Bounds.Height;
+                && top.Y >= 0 && bottom.Y <= Bounds.Height
+                // Being inside the window is not being on screen: the rail clips what it holds, and a
+                // control hanging past the bottom of that viewport is drawn only as far as the rail lets
+                // it be - which is how a section this frame had just called painted came out of the
+                // photograph with its button cut in half.
+                && (detailScroller is null
+                    || (control.TranslatePoint(new Point(0, 0), detailScroller) is { } railTop
+                        && control.TranslatePoint(new Point(0, control.Bounds.Height), detailScroller) is { } railBottom
+                        && railTop.Y >= 0 && railBottom.Y <= detailScroller.Bounds.Height));
             var listOnScreen = IsPaintedInsideWindow(list);
             var restoreOnScreen = IsPaintedInsideWindow(restoreButton);
 
-            var frame = await CaptureSmokeFrameAsync();
-            var frameBytes = frame?.Length ?? 0;
             var wantedFile = !string.IsNullOrWhiteSpace(screenshotDirectory);
-            var written = false;
-            var fileName = "";
-            if (wantedFile && frameBytes > 0)
+            async Task<(int Bytes, bool Written, string Name)> ShootAsync(string prefix)
             {
+                var frame = await CaptureSmokeFrameAsync();
+                var bytes = frame?.Length ?? 0;
+                if (!wantedFile || bytes == 0)
+                {
+                    return (bytes, !wantedFile, "");
+                }
+
                 Directory.CreateDirectory(screenshotDirectory!);
-                fileName = $"KeePassHistory_{Math.Max(1, (int)Math.Round(Bounds.Width))}x" +
+                var name = $"{prefix}_{Math.Max(1, (int)Math.Round(Bounds.Width))}x" +
                     $"{Math.Max(1, (int)Math.Round(Bounds.Height))}.png";
-                var path = Path.Combine(screenshotDirectory!, fileName);
+                var path = Path.Combine(screenshotDirectory!, name);
                 File.WriteAllBytes(path, frame!);
-                written = new FileInfo(path).Length > 0;
+                return (bytes, new FileInfo(path).Length > 0, name);
+            }
+
+            var historyShot = await ShootAsync("KeePassHistory");
+
+            // The library's own history limits ride on the same rail, and this is the only place the
+            // shipped binary is made to reach them: the section sits below the field dump, and the three
+            // boxes are the sole proof on screen that the numbers came out of the file rather than out of
+            // a default. The typed triple is not what a new database ships with, and the days box is the
+            // one the file stores unsigned, so an apply that rounded or refused it shows up here.
+            var policySection = this.GetVisualDescendants()
+                .OfType<StackPanel>()
+                .FirstOrDefault(control => control.Name == "KeePassPolicySection");
+            TextBox? FindBox(string name) => this.GetVisualDescendants()
+                .OfType<TextBox>()
+                .FirstOrDefault(control => control.Name == name);
+            var maxItemsBox = FindBox("KeePassPolicyMaxItemsBox");
+            var daysBox = FindBox("KeePassPolicyDaysBox");
+            var sizeBox = FindBox("KeePassPolicySizeBox");
+            var applyPolicyButton = this.GetVisualDescendants()
+                .OfType<Button>()
+                .FirstOrDefault(control => control.Name == "ApplyKeePassPolicyButton");
+            await ScrollToAsync(policySection);
+            // What has to be on the image is the part a person acts on: the three numbers and the button
+            // that writes them. The explanation trails them in the rail's own scroll, so the section as a
+            // whole is taller than the column it lives in and is not the thing under test here.
+            var policyOnScreen = policySection is { IsVisible: true }
+                && IsPaintedInsideWindow(maxItemsBox)
+                && IsPaintedInsideWindow(daysBox)
+                && IsPaintedInsideWindow(sizeBox)
+                && IsPaintedInsideWindow(applyPolicyButton);
+            // A label column copied from a wider pane left these boxes 31px across: painted, but not a
+            // number a person can read or type into, so the width is asserted rather than assumed.
+            var policyBoxesUsable = new[] { maxItemsBox, daysBox, sizeBox }
+                .All(box => box is { Bounds.Width: >= 96 });
+            var policyApplied = false;
+            var policyShot = (Bytes: 0, Written: true, Name: "");
+            if (policyOnScreen)
+            {
+                maxItemsBox!.Text = "7";
+                daysBox!.Text = "90";
+                sizeBox!.Text = "-1";
+                await viewModel.ApplyKeePassHistoryPolicyCommand.ExecuteAsync(null);
+                policyShot = await ShootAsync("KeePassPolicy");
+                // The view model re-reads the three numbers from the database once an apply lands, so what
+                // it carries now is what the open file holds rather than an echo of what was typed at it.
+                policyApplied = viewModel.KeePassPolicyMaxItemsText == "7"
+                    && viewModel.KeePassPolicyMaintenanceDaysText == "90"
+                    && viewModel.KeePassPolicyMaxSizeBytesText == "-1"
+                    && maxItemsBox.Text == "7" && daysBox.Text == "90" && sizeBox.Text == "-1";
             }
 
             // The revert walked on the shipped binary: the newest version is the shape the edit just
@@ -678,16 +743,23 @@ public partial class MainWindow
                 section is { IsVisible: true } &&
                 keepassTab.IsSelected &&
                 reverted &&
-                frameBytes > 0 &&
-                (!wantedFile || written);
+                policyOnScreen &&
+                policyBoxesUsable &&
+                policyApplied &&
+                historyShot.Bytes > 0 &&
+                historyShot.Written &&
+                policyShot.Written;
             AppDiagnostics.Info(
                 $"Smoke UI KeePass history shot result. success={success}, opened={state.DatabaseOpened}, " +
                 $"editStaged={state.EditStaged}, versions={state.VersionCount}, " +
                 $"listOnScreen={listOnScreen}, restoreOnScreen={restoreOnScreen}, " +
                 $"restoreButtons={restoreButtons}, reverted={reverted}, " +
+                $"policyOnScreen={policyOnScreen}, policyBoxesUsable={policyBoxesUsable}, " +
+                $"policyApplied={policyApplied}, " +
                 $"treeRows={state.TreeRows}, entryRows={state.EntryRows}, vaultBytes={state.FileBytes}, " +
-                $"tabSelected={keepassTab.IsSelected}, frameBytes={frameBytes}, written={written}, " +
-                $"file={fileName}");
+                $"tabSelected={keepassTab.IsSelected}, frameBytes={historyShot.Bytes}, " +
+                $"policyFrameBytes={policyShot.Bytes}, " +
+                $"file={historyShot.Name};{policyShot.Name}");
             return success;
         }
         catch (Exception ex)

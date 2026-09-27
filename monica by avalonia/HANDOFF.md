@@ -2783,3 +2783,316 @@ NC-4 顺带量出一件该记的事：无头那条"不出现秘密"的断言原�
   最终字节这趟 `115.2`（绿），预算 120。**阈值一个没动**，欠的是一条"为什么会有 8MB 的抖动、
   什么负载下会翻红"的机制证明——红的那一趟没有留下同时跑的东西的名字。
 
+---
+
+## 附：历史保留策略（2026-09-27，**#132 出厂：三格数字第一次既有读的地方也有写的地方，而"改得动"这件事的根子在写侧那条只看条数的小循环里**）
+
+### 一、这一轮把什么变成了事实
+
+- **#131 欠的那格补上了**：上一条第七节写"`HistoryMaxItems` 与 `MaintenanceHistoryDays` 桌面端既看不见也不改"。
+  这一轮三格数字（条数 / 天数 / 字节数）从文件里读出来、摆在导轨上、能改、改完真的参与写入裁剪。
+- **读侧**：`src/Monica.Platform/Services/KeePassVaultSession.Settings.cs`（215 行）。
+  `ReadHistoryPolicyAsync`（:26）把 `PwDatabase` 自己的三个字段读成 `KeePassHistoryPolicy`
+  （`KeePassVaultModels.cs:112-115`，`int MaxItems` / `long MaxSizeBytes` / **`uint MaintenanceDays`**）。
+- **写侧只有一条漏斗**：`ApplyHistoryPolicyAsync`（:47-69）先把下限挡在门口
+  （:51-52，`ArgumentOutOfRangeException.ThrowIfLessThan(…, -1)` 两格；天数那格类型已经是 `uint`，
+  负数在这里根本没有写法），再落字段 + `MarkModified()`。
+- **真正生效的地方在 `AddHistorySnapshot`**（`KeePassVaultSession.Write.cs:192-198`）：
+  snapshot → `MaintainHistory(entry)`。这轮删掉的是那条旧小循环——它读 `HistoryMaxItems`，
+  `maximum <= 0` 就直接 `return`，然后 `while (Count() > maximum) RemoveAt(0)`。
+  三条毛病都在这一片：字节数与天数**完全没参与**；丢的是**列表位置最靠前的**那一版而不是时间最老的
+  （一座按时间排好的库看不出差别，而 `entry.History` 并不保证是那个顺序——#131 的还原就会往里塞进时间更新的一版）；
+  最要命的是 **`-1`（不限制）和 `0`（不保留）在旧代码里是同一件事**，都掉进 `<= 0` 那个 return，
+  于是"我要全留着"被写成了"一版都不留"。NC-B 量到的就是这个。
+- **三段裁剪的顺序与 Android 客户端一致**：天数窗口（:96-106）→ 条数（:110-121）→ 字节（:123-134），
+  每一段丢的都是"上一段幸存者里时间最老的那一个"（`OldestKept`，:146-166），
+  最后**从后往前** `entry.History.RemoveAt((uint)index)`（:137-143）——倒着删是为了让更小的下标在列表收缩时仍指向同一版。
+  时间统一按 `KeePassVaultText.ToDateTimeOffset` 读，不信 `DateTime.Kind`（:98-101）：文件没写自己的时区。
+- **字节估算**（`SizeOf`，:187-211）：`HistoryEntryOverheadBytes = 128` 平摊 + 字段名/字段值/附件名/附件字节/tag/customData 的长度。
+  这里只读长度，**不把受保护字段取成明文来量**（:182-186 的注释就是原因）。
+- **界面**：`KeePassBrowsePane.axaml:171-198`。标题与「应用策略」同一行、三格输入用 `84,*` 的栅格、
+  说明文字放在格子**下面**（XAML 里留了注释：导轨是窄柱，说明是唯一能一边滚一边把三个数和按钮一起看见的东西）。
+  导轨那层 `Border` 的可见性从 `ShowsKeePassDetailColumn` 换成了新的 `ShowsKeePassRail`
+  （:58；`MainWindowViewModel.KeePassPolicy.cs:28` = 详情列 ∨ 预览在）——这三格说的是**库**，不选任何一条也必须在。
+- **接线**：`LoadKeePassHistoryPolicyAsync`（:34）在打开（`KeePassImport.cs:86-87`）与新建
+  （`KeePassCreate.cs:146-147`）各读一次；关闭时三格清空（`KeePassImportState.cs:173-176`）；
+  应用走 `ApplyKeePassHistoryPolicyAsync`（:48），解析与下限在 :97-99。
+- **本地化 9 个键 × 3 处**（接口 `LocalizationService.cs:479-487`、实现 :1022-1030、
+  英文 :2190-2198、中文 :3263-3271）：`KeePassHistoryPolicy`（条目历史保留策略）、`KeePassPolicyMaxItems`（保留条数）、
+  `KeePassPolicyMaintenanceDays`（保留天数）、`KeePassPolicyMaxSizeBytes`（保留字节数）、`KeePassPolicyApply`（应用策略）、
+  `KeePassPolicyHint`、`KeePassPolicyInvalid`、`KeePassPolicyApplied`、`KeePassPolicyFailed`。
+
+### 二、为什么"保留天数"没有"不限制"的写法，以及为什么改它不弹确认框
+
+- KPCLib 这个字段是 **`uint`**，而 Android 自己的表单三格下限都写在 `>= -1`
+  （`fdroid/app/src/main/java/takagi/ru/monica/keepass/KeePassDatabaseSettings.kt:295-297`），
+  它的裁剪代码也确实按负数当"不管"（同目录 `KeePassNativeMutation.kt:128` 条数、`:144` 天数：
+  `if (meta.maintenanceHistoryDays < 0) return true`，也就是"永远不老"）。桌面端如果放 `-1` 过去，
+  强转就是 `4294967295` 天写进文件——NC-D 量到的正是这个读数。所以这一格在界面上就被拒掉，并把话说明白（中文提示里那句
+  "保留天数按无符号存储，下限为 0 天，而 0 天会裁掉所有版本"）。**Android 的 `-1` 落到磁盘上究竟是什么写法，本轮仍然没量到**，
+  这条不对称是 #115 的口子（见第七节）。
+- 应用策略不弹确认框，理由与 #131 同源且更硬：它只动**当前打开的库**并打脏标记，文件在被保存之前一个字节都不动
+  （无头那条把"逐字节相同"钉成了断言，:224-226），而且收紧上限**不会删掉已经记住的任何一版**
+  （`ApplyHistoryPolicyAsync` 的注释 :42-46：上限管的是下一次快照）。真正裁下去的时机是编辑，
+  而编辑本身在 #131 就是可逆的。
+
+### 三、真产物截图门（这一帧第一次因为"人眼"多要了一张盘）
+
+- 帧还是 `--smoke-ui-keepass-history`（`MainWindow.SmokeUi.cs:573-779`），但现在**打两张**：
+  `KeePassHistory_*` 与 `KeePassPolicy_*`；`ScrollToAsync`（:620-634）从 #131 那段里抽出来复用。
+- **第一次跑就红**：`policyOnScreen=False`。没有猜，用一次性探针把几何打出来——
+  section `259.33×244.67`、内容 Y=737、窗口相对 top `y=584`、`viewport=259.33×158`、`extent=259.33×1006`。
+  也就是说导轨的可视高只有 **158px**（1280×800 下，上面那叠汇总卡片 + KeePass 导入卡片吃掉 ~570px），
+  而这一节要 244px：永远塞不下。改法是把密度压下来——标题与按钮并成一行、标签列 `220→84`、说明挪到格子下面
+  → section **219.33**、格子宽 **31 → 167.33**。（158px 那格本身是新账，另立 #133。）
+- **第二次是被数字骗过去的一次**：`policyOnScreen=True`，而 `KeePassPolicy_1280x800.png` 上「应用策略」
+  按钮被裁掉半截——`IsPaintedInsideWindow` 只对着**窗口**判，没对着 `ScrollViewer` 的裁剪判。
+  补法是把导轨内的第二组角点判定并进去（:648-651，注释里写明起因），并且新加 `policyBoxesUsable`
+  （:703，三格宽度都得 ≥96）：标签列是从更宽的面板抄来的，格子被压到 31px 时它仍然是"画出来了"，
+  但那不是一个读得出、也点不进去的数字。这两格都留在代码里。
+- 断言形状仍是布尔与计数：`… / reverted / policyOnScreen / policyBoxesUsable / policyApplied /
+  treeRows / entryRows / vaultBytes / frameBytes / policyFrameBytes / written`。
+  产物门里两格缺任何一样就停跑（`eng/ci/verify-artifact-runtime.ps1:372-378`：
+  `never painted or applied the library's history policy` / `painted the policy boxes too narrow to read or type`）。
+- 留下的盘：`D:\Monica-kpshots\i132-probe\`（第一次红，没有策略那张）、
+  `i132-probe2\KeePassPolicy_1280x800.png`（**假绿的那张**，按钮半截在画面外）、
+  `i132-probe3\KeePassPolicy_1280x800.png`（最终：标题 + 应用策略 + 保留条数 7 / 保留天数 90 / 保留字节数 -1 全在画面里，
+  屏上没有任何明文凭据）。三张都人眼看过。
+
+### 四、负控（每条先看见红，跑完还原并复绿）
+
+四条，两条打在单测、两条打在无头：
+
+| 拆掉的东西 | 红在哪 | 实测 |
+|---|---|---|
+| NC-A `MaintainHistory` 开头直接 `return`（三段全不生效） | 单测 | `Failed: 4, Passed: 4`——条数、字节、天数窗口、"0 什么都不留"四条各咬住一段，没有一条能替另一条说话 |
+| NC-B 把旧的 `maximum <= 0 → return` 请回来（`-1` 当成 `0`） | 单测 | `Failed: 2, Passed: 6`：设 `-1` 的两条红（`An_uncapped_policy_keeps_every_version…` 与那条同样用 `-1/-1` 的窗口测试），其余 6 条照绿。**这正是历史 bug 的判别力：它不会把整片掀红，只把"不限制"这一格变成"全删"** |
+| NC-C `ShowsKeePassRail => ShowsKeePassDetailColumn`（丢掉预览那半） | 无头第 2 条 | `Expected: True / Actual: False`——一条都没选时导轨不再出现，三格数字随之消失 |
+| NC-D 天数的 `uint` 下限放开（`long.TryParse` + `(uint)` 强转） | 无头第 2 条第二次拒绝 | `Expected: "30" / Actual: "4294967295"`——界面上输 `-1`，文件里就是 42.9 亿天 |
+
+两件事得记下来，因为它们是关于**证据**的：
+
+1. NC-C 与 NC-D 第一次**都没红**。原因是那条拒绝用例把两格坏输入写在同一次 apply 里，任一格里坏就够满足断言。
+   先把用例拆成"一次只犯一格"（`KeePassHistoryWorkflowUiTests.cs:231-243`）、复绿 2/2，再去拆代码——
+   否则"红没红"这件事本身没有判别力。
+2. `KeePassVaultSession.Settings.cs` 与 `MainWindowViewModel.KeePassPolicy.cs` 是本轮的**新文件（untracked）**，
+   `git diff` 上看不见它们的改动——所以"跑完还原"这一句**不能用 diff 证**。这里用的是两件事：
+   每条负控拆完都立刻改回原样并重跑套件（单测回到 8/8、无头回到 2/2，第六节那份 trx 就是最终字节打的），
+   以及把最终字节的 `sha256` 前 16 位记在这里供下次对拍：
+   `Settings.cs 05fcb255be97fcf3`、`MainWindowViewModel.KeePassPolicy.cs 3b808980240b66fd`、
+   `KeePassHistoryPolicyTests.cs 012f79c4cf5327fd`、`KeePassHistoryWorkflowUiTests.cs e853744e6f5fcfd2`。
+   记下来的原因是上一轮就上过当：判断"跑的是不是新代码"不能只看一次 grep，也不能只看 diff。
+
+顺带一条被这轮牵出来的旧问题：`KeePassHistoryTests.cs` 与 `KeePassRichFieldTests.cs` 的 fixture 把版本时间写死成
+2024 年。它们以前一直绿，是因为写侧压根不看天数；这轮看了，那两版就落在库自带的 365 天窗口外面被裁掉。
+改法是把时间锚到运行日（`KeePassHistoryTests.cs:33-37` + `:264-275`，`KeePassRichFieldTests.cs:276-281`：
+`DateTime.UtcNow.AddDays(-6 / -2 / -3)`）。这是一次**真实的行为变化**牵出来的测试改动，不是修修补补——
+下次谁把写侧的某一段关掉，这两条会立刻变红，这一点也算被 NC-A 覆盖了一次。
+
+### 五、测试与证据
+
+- **单测 8 条**（`tests/Monica.Tests/KeePassHistoryPolicyTests.cs`，298 行）：
+  ① 新建库的出厂值就是 Android 客户端写的那三个数（:41-59；常数 10 / 6 MiB / 365 **钉在测试里**而不是从文件读，
+  免得两边一起漂还都绿）；② `-1/-1` 全留：文件本来记住 3 版 + 编辑 3 次 = 6 版（:62-75）；
+  ③ 条数上限留下 `edited-1 / edited-2`（:78-89）；④ 字节上限在"条数根本不会动刀"时咬下去
+  （每版带一个 2000 字节附件、上限 5000，:92-106，断言只说 `0 < n < 6` 并点名最老的那版已不在）；
+  ⑤ 900 天前那一版活不过下一次编辑（:109-122，**幸存者是 2 版不是 3 版**：条目自己进第一次编辑前的那一版也在窗口外面）；
+  ⑥ `0 / 0` 让条目一版不剩（:125-134）；⑦ 应用过的策略跟着保存活过一次重开（:136-155，`4 / 123456 / 30`）；
+  ⑧ 下限之外的负数被拒且**不动库**（:158-171：条数 `-2` 与字节 `-2` 各试一次，都抛
+  `ArgumentOutOfRangeException`，读回来的策略与原来相等、`IsDirty` 仍 false）。
+  全程没有一次把秘密放上 expected/actual。
+- **无头 2 条**（`tests/Monica.UiTests/KeePassHistoryWorkflowUiTests.cs`，350 行；策略这条 :155-261）：
+  三格显示的是**平台从这座文件的字节里现读回来的数**（:180-189 现场再 `OpenAsync` 一次对拍，不是抄常数）；
+  一节文字里 3 个秘密字面量各出现 **0** 次（:191-201，`Assert.False(rendered.Contains(...))`，不带 actual）；
+  按钮的 `Command` 就是 VM 那条（`Assert.Same`）；**手打进格子**的 3 / 30 / -1 一路走到 VM 再回到格子；
+  应用之后脏标记在、**文件字节逐字节没动**（:221-226）；两次拒绝各钉一格（:231-243）；
+  拒绝没有把已应用的策略盖掉（:245-253）。
+- **一次性量到的磁盘形状**（本轮写过又删掉的 `tests/Monica.Tests/TempKeePassPolicyProbe.cs`）：
+  产物门那份 fixture 库（`KeePassSmokeVaultWriter`，12 条目 / 3 分组）在磁盘上是
+  **`items=10 size=6291456 days=365`**——和 Android 客户端的出厂常数逐字相同。这条不是推断，是那次探针打出来的读数；
+  探针文件已删，因为它唯一的用处是说清"我们读的是不是同一份数"。
+- 复现脚本：`D:\Monica-kpshots\i132-shot.ps1`（从 `i131-shot.ps1` 拷来的一次性跑法：
+  一次性 `MONICA_APPDATA_DIR` + 种 12/3 的库 + 单帧带 `--smoke-ui-screenshot-dir`）。
+  本轮新出现的字面量，全部按"不是秘密"记在这里：`policy-fixture-not-a-secret`、`policy-live-secret`、
+  `policy-elder-secret`、`Policy Fixture`、`Policy Root`、`policy@example.com`、`https://policy.example.com`、
+  `payload.bin`（2000 字节附件名）、`Live shape`、`edited-1`、`edited-2`、`aged-1`、`saved once`、
+  `KeePass history policy fixture`、以及帧里手打进格子的 `7 / 90 / -1`、无头里的 `3 / 30 / -1`。
+  产品那条命令行永远不读口令；fixture 口令只在 argv 上以 `[redacted]` 出现（第六节核对）。
+
+### 六、门禁
+
+链：`D:\Monica-kpshots\h2-gate-chain.ps1`（format 校验 → `verify-commercial-release.ps1 -Configuration Release`
+→ `publish-desktop.ps1 win-x64 jit 0.1.0-ci.0` → `verify-artifact-runtime.ps1`），日志
+`C:\Users\joyins\AppData\Local\Temp\i132-final-chain6.log`。**四个 rc 全 0**：`fmt_rc=0`、`cr_rc=0`、`pub_rc=0`、`art_rc=0`。
+
+- **结构门**：`Focused vault, security, storage, recycle bin, and import/export files are within 300 lines.`
+  ——本轮新增的 `KeePassVaultSession.Settings.cs`（215 行）、`MainWindowViewModel.KeePassPolicy.cs`（117 行）都在闸内。
+- **单测**：perf-budget 通道 **11/11**（48 s），常规通道 **1082/1082**（5 m 18 s，含本轮新增的 2 条并发解锁）。
+- **无头**：perf-budget **17** 条执行、常规 **262** 条执行，TRX 落盘（`TestResults/Monica.UiTests/*.trx`）。
+- **产物真跑门**（跑的是 publish 出来的字节，不是 bin/obj）：**12 个 `success=True` 探针**，其中策略这一格是
+  `policyOnScreen=True, policyBoxesUsable=True, policyApplied=True`（`frameBytes=98372`、`policyFrameBytes=98727`）；
+  内存预算 `lockedPrivateMB=118.9 / maxMB=120`——**余量只有 1.1 MB**，而同一台机器上一次链读到的是 115.8、再上次 119.1，
+  按既定纪律这格**不许动阈值**，只许认这次没超；单次读数不可信这条仍然有效（见「Perf Gate Flakiness」）。
+  kdbx 大库探针 `collectedMB=110.9`、`growthMB=5.5 / maxGrowthMB=24`。
+- **泄密审计**（对整份链日志逐字面量数命中）：`[redacted]` 出现 **11** 次；
+  `keepass-smoke-fixture-not-a-secret`、`kdbx-parity-fixture-not-a-secret`、`policy-fixture-not-a-secret`、
+  `policy-live-secret`、`policy-elder-secret`、`concurrent-unlock-fixture-not-a-secret`、
+  `created-vault-fixture-not-a-secret`、`create-shape-fixture-not-a-secret`、`history-fixture-not-a-secret`、
+  `history-live-secret`、`history-elder-secret`、`keepass-search-perf-not-a-secret`、`not-the-password`、
+  `CiRuntime!2026` **各 0 次**。
+- **这一轮链的真实经过**（不是"一次就绿"）：`chain4` 停在 perf-budget 段 **28 分钟不动**（testhost CPU 累计 26.9 s、
+  隔 20 s 再取一秒没涨），根因是本轮 Gate 引出的自死锁，见 #128 那节「三之二」；`chain5` 单测全绿 1082/1082，
+  但 UI 常规段红一条 `TrayHintUiTests.A_settings_reload_mid_run_does_not_earn_the_explanation_back`
+  （`Assert.False() Expected: False Actual: True`）——**该条单独跑 3/3 绿、整段单独复跑 2/2 绿**，
+  查下来是测试自己的构造在赛跑：上面那次最小化排入的 150 ms 防抖保存（带 `TrayHintShown = true`）与测试手写的
+  `false` 保存**同时往一个文件里落**，旧快照可能后到。修法是**先让防抖落地再摆这个不匹配**
+  （`TrayHintUiTests.cs:147` 后加 `await Task.Delay(450, ...)`，与 `DesktopSettingsUiTests.cs:279` 的既有做法一致），
+  不是放宽断言、也不是重排测试顺序；修后该类单跑 3/3 绿、整条链 `chain6` 全绿。
+
+### 七、仍然没做到（欠账，不是决定）
+
+- **"保留字节数"这一格是裸字节，而 Android 那一格是 MB**：桌面让人看到并敲出 `6291456` 这样的数；
+  Android 的表单字段叫 `historyMaxSizeMb`，显示时 `/ (1024*1024)`、写回时 `* 1024*1024`
+  （`fdroid/app/src/main/java/takagi/ru/monica/ui/screens/KeePassNativeDatabaseSettingsScreen.kt:320-321`、
+  `:910`、`:922`、`:947-948`，标签 `strings.xml:4472` "Maximum history size per entry (MB)"）。
+  界面上没有单位、没有换算，单位错一次就是三个数量级。**本轮帧里手打的是 `7 / 90 / -1`、无头里是 `3 / 30 / -1`——
+  一座真的带 6 MiB 上限的库把 `6291456` 摆上屏幕让人读过，这件事一次也没做过。**
+  对齐成 MB 那一格是 #134（顺手要一起处理的下条 hazard 就在下面）。
+- **同一格在两边的类型宽度不一样**：Android 的 `historyMaxSizeBytes` 是 **`Int`**
+  （`KeePassDatabaseSettings.kt:42`、`:87`，解析处还专门挡了 `> Int.MAX_VALUE / (1024*1024)`），
+  而桌面这侧 KPCLib 的 `HistoryMaxSize` 是 **`long`**。桌面写一个超过 2 GiB 的字节上限，Android 的模型装不下——
+  这条本轮只是**读两边代码读出来的**，没有拿一座真库对拍过（归 #115）。
+- **`SizeOf` 没有和 kotpass 的 `estimateSize` 逐字对拍**。桌面这版按字段值的**字符数**
+  （`ProtectedString.Length`，`Settings.cs:190-193`）而不是 UTF-8 字节数计，含中文的笔记那格会估小；
+  128 的平摊常数是照着 Android 的形状取的。**两边在同一座库上会不会裁掉不同版数，没量过。**
+- **收紧上限不会回头清理已经记住的版本**（这是决定，见第二节），但因此也**没有任何入口**说"这座库现在实际记了
+  多少版、按新策略会变成多少版"——"按新策略立即整理"这件事没有，版本数的现状也没有。
+- **三格没有即时校验**：打字过程中不红，只有按「应用策略」才用状态文案说话。
+  另外 `days=0`（把版本全裁光）与 `items=-1` 这种**单闸门**组合没测——单测里那两个 0 是一起设的（第 ⑥ 条）。
+- **保存之后的往返只在 KPCLib 自己身上对拍过**（单测第 ⑦ 条那次重开）。**没有拿真 KeePass 客户端**
+  （KeePassDX / kp2a / KeePass 官方 / KeePassXC）读过一份"被桌面端改过历史保留策略并保存"的 .kdbx——
+  #131 那条欠账对策略这一格同样成立，而且策略是写进 Meta 的，比版本列表更容易被别的客户端重排。
+- **Android 的 `-1` 天数落到磁盘上是什么写法，仍然没量到**（#115）。本轮只读到 Android 侧的语义：
+  表单三格都放 `>= -1`（`KeePassDatabaseSettings.kt:295-297`），裁剪按负数=不管
+  （`KeePassNativeMutation.kt:128`、`:144`）。桌面端把这格读成 `uint`，所以那座库若真带着回绕出来的巨大无符号数，
+  界面上会显示一个天文数字而不是"不限制"——这个显示行为本轮**没测**。
+- 帧里 `policyApplied` 挂在 `if (policyOnScreen)` 里面（`MainWindow.SmokeUi.cs:707`），
+  所以"画在屏上"和"改得动"是**同一格的连带读数**，不是两件独立被证的事；
+  策略写侧的独立证明只有单测那 8 条与无头那一条。
+- **导轨的可视高仍然只有 158px**（#133）。这一节能画全，是因为密度被压到 `219.33`、格子宽 `167.33`——
+  同一条导轨还要放条目编辑器和 #131 的版本列表，下一次谁往导轨里再加一节就会再撞一次这个 158。
+  真正的修法（收掉上面那叠和导轨/树重复的卡片）本轮没做。
+- **"数据库设置"整页仍然没有**：KDF 参数、加密算法、回收站开关、数据库名都看不见也改不动，
+  这一轮只补了"历史"那一节。`MaintenanceHistoryDays` 之外的那几格 Android 是有的
+  （同文件 :298-299 的 master-key 建议/强制天数），桌面端连读的地方都没有。
+
+
+
+## 附：一次开两座库时报"主密钥无效"（2026-09-27，**#128 出厂：正确的密码第一次不会因为"赶在同一刻"被判成错的，而 KPCLib 里坏掉的那一段仍然只是被围住、没有被看懂**）
+
+### 一、这一轮把什么变成了事实
+
+- **症状是真的，而且不是偶发**：#132 的门禁连红两轮（`cr_rc=1`，单测 1079/1080），倒下的那条是
+  `KeePassVaultCreateShapeTests.A_new_database_has_the_disk_shape_the_android_client_writes`，抛的
+  是 `InvalidCompositeKeyException`——**用常数口令打开一座自己刚写的库，钥匙被判成错的**。
+  先确认它不属于 #132（那条测试全程不跑本轮任何新代码，只是加载 Android fixture），再当作缺陷查。
+- **复现条件是"冷"**：一个进程里**头两件 kdbx 工作**同时开工就会中。上一段用一次性探针在同一台机器上量到
+  冷启动的两路并发 **2/2 全被拒**、十二路 **12/12 全被拒**（探针原文 `warm=False refused=12 other=0 ok=0 ms=968`），
+  而**同一时刻只要先让任意一路单独跑完**，同样的爆发 **12/12 全过**；单独一路冷加载从来不过不了。
+  爆发在测试里能编出来，在真机上是这两条用户动作：**最近打开那一行接力 + 手动再开一次**、**双击 .kdbx 时托盘那份正好在启动**。
+- **围住的位置由红/绿决定，不由猜决定**：第一版只把 `KdbxFile.Load` 关进锁里，冷爆发**照旧 2/2 与 12/12 被拒**
+  （同时测到串行确实在生效，故不是"锁没生效"）——坏掉的那一段在 `Load` **之前**。把
+  `CompositeKey` / `KcpPassword` 的构造一起挪进同一把锁之后，爆发全绿。
+- **出厂的东西**：`src/Monica.Platform/Services/KeePassVaultParseGate.cs`（一把进程级 `Gate`）；
+  `KeePassVaultService.OpenCore`（键构造 + 解析成一个整体，:89-104）；
+  `KeePassVaultWrite`（删掉私有的 `SaveGate`，`SaveOnce` 与 `Matches` 的复检探针 Load 都改用共享 Gate）；
+  `KeePassSmokeVaultWriter`（同样并入共享 Gate——**fixture 若只靠运气才打得开，门禁的红就没有意义**）；
+  `tests/Monica.Tests/KeePassConcurrentUnlockTests.cs`（常驻回归，2 条）。
+- **今天用常驻测试重新量到的一轮**（不靠记忆）：把 `OpenCore` 的锁临时换成 `if (true)` 后
+  `dotnet test --filter FullyQualifiedName~KeePassConcurrentUnlockTests` 连跑三次 **3/3 红**
+  （`Failed: 1, Passed: 1`），失败详情只给了数——
+  `Expected: 4 / Actual: 0`，即爆发里 4 次**正确口令**解锁**一次都没成**；
+  把锁原样放回去再连跑三次 **3/3 绿**（`Failed: 0, Passed: 2`）。红灯那轮另一条事实（边建库边解锁）仍然绿。
+
+### 二、为什么是"一把全局锁"而不是"每个库一把锁"
+
+被破坏的不是文件、是 **KPCLib 这段代码自己的进程级状态**：两个**不同**的库、不同的口令，撞在同一段懒初始化的东西上，
+于是两个都被判成错钥。按库加锁恰好挡不住这种撞法——需要串起来的是"第一次碰到那段状态"，而不是"同一座库"。
+代价说得清：开库和保存都挂在用户动作上、不在循环里，排在后面的那一路最多多等一次 KDF。
+**没有**为此加超时、重试、并发上限，也没有把红转成"稍后再试"的文案——那只会把同一个缺陷换个说法留给用户。
+
+### 三、这条为什么没有截图门
+
+缺陷长在一句错误提示上，而"提示说的是对的"那格本轮没有新做：界面把 `InvalidCompositeKeyException`
+翻成"主密钥无效或文件已损坏"这条文案的通路，#42/#117 那几轮已经画过。
+本轮的证据是**数**（4→0、12/12→0/12）不是像素；把两条解锁真的摆到同一个 GUI 进程里同时开工，见第七节。
+
+### 三之二：把围法从"只锁 parse"改成"锁到建键"时，我自己引进过一次死锁
+
+这条必须写在同一片里，因为它就是同一个 Gate 造成的，而且**先咬到的是门禁自己**：
+
+- **现象（量的，不是推的）**：21:35 那一轮链停在 perf-budget 段，**28 分钟没有一条新输出**；
+  testhost 的 CPU 累计停在 26.9s，隔 20s 再取**一秒都没涨**（0% 推进 = 阻塞，不是慢）。
+  把同一段单独再跑一次，前 10 条照常绿，**第 11 条 `KeePassVaultSearchTests.Scanning_a_large_database_stays_inside_its_budget` 又停在同一处**。
+- **原因**：`KeePassSmokeVaultWriter.Write` 整段重试循环握着共享 Gate，而循环体里的 `Unlocks`
+  要经 `KeePassVaultService.OpenAsync` 把解析甩到 `Task.Run`（**另一条线程**）再 `GetAwaiter().GetResult()` 等它回来；
+  那条线程要拿的正是**等它的人手里那把** Gate。`lock` 的递归只在同一线程内成立，跨线程就是自己等自己。
+  之前那位作者用自己的私有 `SaveGate` 时不炸，是因为服务里那把锁是**另一把**——我"统一到一把 Gate"正是这次死锁的成因。
+- **收法**：锁只包住 `BuildPayload` 里的建键 + 序列化，**验证那一步留在锁外**（它自己会排队拿锁）。
+  重试循环不再握锁。产品侧那两把（`OpenCore`、`KeePassVaultWrite`）没有跨线程等待，逐条核过：
+  `grep -n "GetResult\|GetAwaiter\|\.Wait()\|Task.Run" src/Monica.Platform/Services/KeePass*.cs` 今天只剩
+  `KeePassSmokeVaultWriter.cs:80-81`（锁外）与三处 `Task.Run`（锁外发起）。
+- **本来会咬到哪儿**：真产物内存门（#58/#59）用同一个 writer 在**发布进程里**建 20,000 条目的库——
+  也就是说这不是测试洁癖，而是发布门禁会挂死在那儿。
+
+### 四、负控（就是第一节那组 `if (true)`）
+
+- **唯一一次负控**：拆掉 `OpenCore` 的锁（其余代码一字未动）→ 常驻测试 **3/3 红**、`Actual: 0`；
+  放回去 → **3/3 绿**。拆完再建、装完再跑，跑完用 `grep -n` 核对源码只剩 `lock (KeePassVaultParseGate.Gate)` 一处、
+  没有残留 `if (true)`。
+- **另一条负控是缺的**：本轮只证了"没有锁会红"，**没有**分别证"只锁 parse 会红""键构造在锁外但 parse 在锁内会红"
+  ——那是上一段一次性探针量的，探针文件已删、今天无法复跑（跑它要先动产品源码，会撞正在跑的门禁链）。
+  欠账写在第七节。
+
+### 五、测试与证据
+
+- **常驻 2 条**（`KeePassConcurrentUnlockTests`，99 行）：
+  ① 8 路并发**交替**正确与错误口令，断言恰好 `4` 路拿到条目数 2、`4` 路拿到 `Rejected`——
+  错误口令那一半是防止"大家共享同一个结果所以全绿"这种假绿；
+  ② 一座库正在解锁时新建另一座，两条都拿到会话、新文件用**造它的那句口令**再打开一次成功。
+  全程 expected/actual 上只有整数，没有任何秘密字面量。
+- **本轮新出现的字面量，全部按"不是秘密"记在这里**：`concurrent-unlock-fixture-not-a-secret`（新建那座的口令）、
+  `created-while-unlocking.kdbx`、临时目录前缀 `monica-keepass-concurrent-`；重复用到的 `kdbx-parity-fixture-not-a-secret`、
+  `not-the-password`、`android-kotpass-v1.kdbx` 是前几轮已登记的。
+- **KPCLib 侧的机理没有查明**，只圈定了范围：坏在 `KdbxFile.Load` **之前**（只锁 parse 无效），
+  **不是** `KdfPool` 那张引擎注册表的懒初始化（上一段用反射把 `KeyDerivation.KdfPool.EnsureInitialized` 预热过，
+  爆发照旧 12/12 被拒）。产品里 `MonicaCryptoNative.DeriveArgon2id` 那条 Rust 边界**不在这条路上**
+  （只有 `BitwardenKeyDerivation.cs:124` 与 `CryptoService.cs:194` 用它）。
+
+### 六、门禁
+
+同 #132 第六节那条链，`chain6`：`fmt_rc=0 / cr_rc=0 / pub_rc=0 / art_rc=0`，单测 1082/1082（含本节那 2 条常驻）、
+无头 17 + 262、产物真跑门 12 个 `success=True`。**本轮的红正是那两轮链回不来时才被迫当成缺陷查的**：
+`chain4` 卡在 perf-budget 段 28 分钟（见「三之二」的死锁），`chain3` 之前那两轮 `cr_rc=1` 是本节主症状。
+死锁与 Gate 都归这把锁管，所以那 2 条常驻测试绿**不等于**冷爆发被复现过——见第七节第一条。
+
+### 七、仍然没做到（欠账，不是决定）
+
+- **常驻那条是 canary，不是爆发器**：整套跑时进程早已被前面的测试焐热，**复现不出冷爆发**——
+  也就是说这一轮的绿灯**并不证明**锁在关键时刻挡住过什么，红证明只来自**过滤后的冷进程**那 3/3。
+  下一位如果动了 kdbx 路径又只跑全量，这条测试可能一直是绿的而什么都没测到。
+- **"只锁 parse 仍然会红"这句话没能用可复跑的方式复量**（第四节）。想复量要先改产品源码，
+  最好在下一次动 `OpenCore` 的切片里顺手做，别在门禁链跑动时做。
+- **真实 GUI 里的两路并发解锁没人走过**：本轮的量都在平台 API 上。"双击 .kdbx 时托盘那份正好在启动"这条
+  真实时序，仍然只有代码形状，没有一次真机演示。
+- **锁的代价没有数**：本轮只知"排在后面的一路最多等一次 KDF"，**没有量过**一次真库解锁的墙钟（fixture 太小，
+  量了也不代表用户那座的 6 MiB / Argon2 参数）。也**没有加**"等待超过 N 秒就给一条可见状态"，
+  用户在两路都慢的时候看到的是**没有反馈**，不是"正在排队"。
+- **`KeePassVaultSession` 自身的读改写没有进这把锁**：本轮只围住"建键 + 解析 + 序列化"。
+  同一座库两个会话并存（接力窗口开过一次、手动又开一次）会各自持有一份解码数据库，
+  谁后保存谁覆盖——这条**本轮没查、没测**（属 #116 的保存路径，不属这把锁的范围）。
+- **KPCLib 里那一段状态到底是什么，没人知道**：升级 KPCLib 版本时，这把锁**不该被当作"已修复"而删掉**，
+  它只是把不确定围住了。删锁之前要先把上面那条"冷爆发 3/3 红"重新量出来。
+
+
+

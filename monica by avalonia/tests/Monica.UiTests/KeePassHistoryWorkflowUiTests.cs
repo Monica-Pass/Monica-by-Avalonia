@@ -32,31 +32,7 @@ public sealed class KeePassHistoryWorkflowUiTests
         Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
         try
         {
-            var info = await Task.Run(() =>
-                KeePassSmokeVaultWriter.Write(fixturePath, FixturePassword, entries: 2, groups: 1));
-            var content = await File.ReadAllBytesAsync(fixturePath, TestContext.Current.CancellationToken);
-            var picker = new SingleKeePassFileService(new PickedBinaryFile(info.FileName, content, fixturePath));
-
-            var window = new Monica.App.MainWindow();
-            using var services = Monica.App.App.ConfigureServices(window, collection =>
-            {
-                collection.AddSingleton<IFileSystemPickerService>(picker);
-            });
-            var viewModel = services.GetRequiredService<MainWindowViewModel>();
-
-            await viewModel.SelectKeePassFileCommand.ExecuteAsync(null);
-            viewModel.KeePassImportPassword = FixturePassword;
-            await viewModel.PreviewKeePassImportCommand.ExecuteAsync(null);
-
-            var view = new SyncImportView { DataContext = viewModel };
-            var host = new Window { Width = 1280, Height = 800, Content = view };
-            viewModel.SelectedSyncPage = "Import";
-            host.Show();
-            Dispatcher.UIThread.RunJobs();
-
-            var tabs = view.FindControl<TabControl>("ImportSourceTabs")!;
-            tabs.SelectedItem = view.FindControl<TabItem>("KeePassImportTab")!;
-            Dispatcher.UIThread.RunJobs();
+            var (host, view, viewModel, content) = await OpenVaultOnKeePassTabAsync(fixturePath);
 
             // A folder has no versions of its own, so the section is not realized for one at all.
             var folder = Assert.Single(
@@ -166,14 +142,172 @@ public sealed class KeePassHistoryWorkflowUiTests
         }
         finally
         {
+            TryDelete(fixturePath);
+        }
+    }
+
+    /// <summary>
+    /// The three numbers the file carries about how much of an entry's past it keeps, shown and changed
+    /// from the pane. The platform suite proves the writer honours them; this proves they reach the
+    /// screen, that typing into a box is what reaches the database, and that a box the file cannot hold
+    /// is refused rather than guessed at.
+    /// </summary>
+    [Fact]
+    public async Task KeePass_history_policy_shows_the_file_s_numbers_and_takes_back_what_is_typed()
+    {
+        var fixturePath = Path.Combine(
+            Path.GetTempPath(),
+            "monica-uitests",
+            $"keepass-policy-{Guid.NewGuid():N}.kdbx");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixturePath)!);
+        try
+        {
+            var (host, view, viewModel, content) = await OpenVaultOnKeePassTabAsync(fixturePath);
             try
             {
-                File.Delete(fixturePath);
+                // No entry is selected at all: these numbers describe the library, so the rail that
+                // carries them has to be up on its own.
+                Assert.True(viewModel.ShowsKeePassRail);
+                var section = view.InPane<StackPanel>("KeePassPolicySection")!;
+                Assert.True(section.IsVisible);
+
+                var maxItemsBox = view.InPane<TextBox>("KeePassPolicyMaxItemsBox")!;
+                var daysBox = view.InPane<TextBox>("KeePassPolicyDaysBox")!;
+                var sizeBox = view.InPane<TextBox>("KeePassPolicySizeBox")!;
+
+                // What the screen shows is what the file holds, read back off the bytes by the platform
+                // rather than recited from a constant that could drift with the fixture.
+                using var probe = await new KeePassVaultService().OpenAsync(
+                    content,
+                    Path.GetFileName(fixturePath),
+                    FixturePassword,
+                    fixturePath,
+                    TestContext.Current.CancellationToken);
+                var fromFile = await probe.ReadHistoryPolicyAsync(TestContext.Current.CancellationToken);
+                Assert.Equal(fromFile.MaxItems.ToString(), maxItemsBox.Text);
+                Assert.Equal(fromFile.MaintenanceDays.ToString(), daysBox.Text);
+                Assert.Equal(fromFile.MaxSizeBytes.ToString(), sizeBox.Text);
+
+                var rendered = string.Join(
+                    "|",
+                    section.GetVisualDescendants().OfType<TextBlock>().Select(text => text.Text));
+                foreach (var secret in new[] { FixturePassword, "secret-1", "ticket-000001" })
+                {
+                    Assert.False(
+                        rendered.Contains(secret, StringComparison.Ordinal),
+                        "the policy rail rendered a secret the library holds");
+                }
+
+                var applyButton = view.InPane<Button>("ApplyKeePassPolicyButton")!;
+                Assert.Same(viewModel.ApplyKeePassHistoryPolicyCommand, applyButton.Command);
+                Assert.True(applyButton.Command!.CanExecute(null));
+
+                // Typed into the box, not set on the view model: the hop from the screen to the value is
+                // the one a person uses.
+                maxItemsBox.Text = "3";
+                daysBox.Text = "30";
+                sizeBox.Text = "-1";
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal("3", viewModel.KeePassPolicyMaxItemsText);
+                Assert.Equal("30", viewModel.KeePassPolicyMaintenanceDaysText);
+                Assert.Equal("-1", viewModel.KeePassPolicyMaxSizeBytesText);
+
+                await viewModel.ApplyKeePassHistoryPolicyCommand.ExecuteAsync(null);
+                Dispatcher.UIThread.RunJobs();
+
+                // The boxes keep what was applied - the screen does not quietly round -1 to something the
+                // file cannot spell - and the change is staged, not saved.
+                Assert.Equal("3", maxItemsBox.Text);
+                Assert.Equal("30", daysBox.Text);
+                Assert.Equal("-1", sizeBox.Text);
+                Assert.True(viewModel.KeePassVaultIsDirty);
+                Assert.True(
+                    (await File.ReadAllBytesAsync(fixturePath, TestContext.Current.CancellationToken))
+                    .AsSpan().SequenceEqual(content));
+
+                // Two floors, refused one at a time so each one names the box it belongs to: a box the
+                // file has no spelling for reloads from the database rather than being half-applied, and
+                // the age is stored unsigned, so the -1 the other two boxes accept is not a day count.
+                maxItemsBox.Text = "not-a-number";
+                Dispatcher.UIThread.RunJobs();
+                await viewModel.ApplyKeePassHistoryPolicyCommand.ExecuteAsync(null);
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal("3", maxItemsBox.Text);
+
+                daysBox.Text = "-1";
+                Dispatcher.UIThread.RunJobs();
+                await viewModel.ApplyKeePassHistoryPolicyCommand.ExecuteAsync(null);
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal("30", daysBox.Text);
+                Assert.Equal("-1", sizeBox.Text);
+
+                // The refusal left the applied policy alone rather than writing a default over it.
+                await probe.ApplyHistoryPolicyAsync(
+                    new KeePassHistoryPolicy(3, -1, 30),
+                    TestContext.Current.CancellationToken);
+                var held = await probe.ReadHistoryPolicyAsync(TestContext.Current.CancellationToken);
+                Assert.Equal(3, held.MaxItems);
+                Assert.Equal(-1L, held.MaxSizeBytes);
+                Assert.Equal(30u, held.MaintenanceDays);
             }
-            catch (IOException)
+            finally
             {
-                // Best effort: a fixture the OS still holds is not worth failing a green run over.
+                host.Close();
+                Dispatcher.UIThread.RunJobs();
             }
+        }
+        finally
+        {
+            TryDelete(fixturePath);
+        }
+    }
+
+    /// <summary>
+    /// Opens a smoke fixture through the real command path and lands on the KeePass tab of the import
+    /// page, where a browsed library is read. The bytes it was opened from come back along with the
+    /// view so a test can say what the file still holds.
+    /// </summary>
+    private static async Task<(Window Host, SyncImportView View, MainWindowViewModel ViewModel, byte[] Content)>
+        OpenVaultOnKeePassTabAsync(string fixturePath)
+    {
+        var info = await Task.Run(() =>
+            KeePassSmokeVaultWriter.Write(fixturePath, FixturePassword, entries: 2, groups: 1));
+        var content = await File.ReadAllBytesAsync(fixturePath, TestContext.Current.CancellationToken);
+        var picker = new SingleKeePassFileService(new PickedBinaryFile(info.FileName, content, fixturePath));
+
+        var window = new Monica.App.MainWindow();
+        var services = Monica.App.App.ConfigureServices(window, collection =>
+        {
+            collection.AddSingleton<IFileSystemPickerService>(picker);
+        });
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+
+        await viewModel.SelectKeePassFileCommand.ExecuteAsync(null);
+        viewModel.KeePassImportPassword = FixturePassword;
+        await viewModel.PreviewKeePassImportCommand.ExecuteAsync(null);
+
+        var view = new SyncImportView { DataContext = viewModel };
+        var host = new Window { Width = 1280, Height = 800, Content = view };
+        viewModel.SelectedSyncPage = "Import";
+        host.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var tabs = view.FindControl<TabControl>("ImportSourceTabs")!;
+        tabs.SelectedItem = view.FindControl<TabItem>("KeePassImportTab")!;
+        Dispatcher.UIThread.RunJobs();
+        GC.KeepAlive(services);
+        return (host, view, viewModel, content);
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (IOException)
+        {
+            // Best effort: a fixture the OS still holds is not worth failing a green run over.
         }
     }
 

@@ -365,6 +365,18 @@ try {
             throw "KeePass history shot did not put the entry back to the version it restored: $($historyLine.Line)"
         }
 
+        # The three history limits are read out of the file and written back through the same rail, and a
+        # build where the section is declared but never drawn, or where an apply is swallowed by the view
+        # model, has to stop the run here. The apply is proven by what the view model re-read from the
+        # database, so a flag that went soft on either half is named.
+        if ($historyLine.Line -notmatch 'policyOnScreen=True' -or $historyLine.Line -notmatch 'policyApplied=True') {
+            throw "KeePass history shot never painted or applied the library's history policy: $($historyLine.Line)"
+        }
+
+        if ($historyLine.Line -notmatch 'policyBoxesUsable=True') {
+            throw "KeePass history shot painted the policy boxes too narrow to read or type: $($historyLine.Line)"
+        }
+
         # The create form is the only path that can produce a .kdbx, and its three promises are all
         # things a unit test cannot make: the master password is never drawn in the clear, disagreeing
         # confirmations keep the command dark, and cancelling wipes what was typed. Each is named so a

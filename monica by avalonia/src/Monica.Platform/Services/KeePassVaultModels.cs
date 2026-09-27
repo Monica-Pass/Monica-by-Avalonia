@@ -103,6 +103,17 @@ public sealed record KeePassHistoryVersion(
     int CustomFieldCount,
     int AttachmentCount);
 
+/// <summary>
+/// How much of an entry's past the database keeps. The three limits live in the file's own settings
+/// block, which is why the days have no "unlimited" spelling: on disk that one is an unsigned number,
+/// so a client that writes -1 there writes something the other clients have to make sense of.
+/// A count or size of -1 means no cap, and 0 in either of them means the entry keeps no past.
+/// </summary>
+public sealed record KeePassHistoryPolicy(
+    int MaxItems,
+    long MaxSizeBytes,
+    uint MaintenanceDays);
+
 public sealed record KeePassSaveResult(
     string Path,
     int FileBytes,

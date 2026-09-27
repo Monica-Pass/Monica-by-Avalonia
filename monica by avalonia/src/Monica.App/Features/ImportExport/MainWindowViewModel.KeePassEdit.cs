@@ -10,6 +10,7 @@ public sealed partial class MainWindowViewModel
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasKeePassEditor))]
     [NotifyPropertyChangedFor(nameof(ShowsKeePassDetailColumn))]
+    [NotifyPropertyChangedFor(nameof(ShowsKeePassRail))]
     private KeePassEntryEditorViewModel? _keePassEditorPublic;
 
     public bool HasKeePassEditor => KeePassEditorPublic is not null;

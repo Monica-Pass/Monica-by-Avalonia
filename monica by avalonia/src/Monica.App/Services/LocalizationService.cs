@@ -476,6 +476,15 @@ public interface ILocalizationService : INotifyPropertyChanged
     string KeePassHistoryRestoredFormat { get; }
     string KeePassHistoryGone { get; }
     string KeePassHistoryFailed { get; }
+    string KeePassHistoryPolicy { get; }
+    string KeePassPolicyMaxItems { get; }
+    string KeePassPolicyMaintenanceDays { get; }
+    string KeePassPolicyMaxSizeBytes { get; }
+    string KeePassPolicyApply { get; }
+    string KeePassPolicyHint { get; }
+    string KeePassPolicyInvalid { get; }
+    string KeePassPolicyApplied { get; }
+    string KeePassPolicyFailed { get; }
 
     string BitwardenImportTitle { get; }
     string BitwardenImportDescription { get; }
@@ -1010,6 +1019,15 @@ public sealed class LocalizationService : ILocalizationService
     public string KeePassHistoryRestoredFormat => Text();
     public string KeePassHistoryGone => Text();
     public string KeePassHistoryFailed => Text();
+    public string KeePassHistoryPolicy => Text();
+    public string KeePassPolicyMaxItems => Text();
+    public string KeePassPolicyMaintenanceDays => Text();
+    public string KeePassPolicyMaxSizeBytes => Text();
+    public string KeePassPolicyApply => Text();
+    public string KeePassPolicyHint => Text();
+    public string KeePassPolicyInvalid => Text();
+    public string KeePassPolicyApplied => Text();
+    public string KeePassPolicyFailed => Text();
 
     public string BitwardenImportTitle => Text();
     public string BitwardenImportDescription => Text();
@@ -2169,6 +2187,15 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassHistoryRestoredFormat"] = "{0} now holds the version from {1}. Save writes it to the file.",
         ["KeePassHistoryGone"] = "That version is no longer in the opened KeePass database.",
         ["KeePassHistoryFailed"] = "Reading the saved versions of the KeePass entry failed.",
+        ["KeePassHistoryPolicy"] = "History of every entry",
+        ["KeePassPolicyMaxItems"] = "Versions kept",
+        ["KeePassPolicyMaintenanceDays"] = "Days kept",
+        ["KeePassPolicyMaxSizeBytes"] = "Bytes kept",
+        ["KeePassPolicyApply"] = "Apply policy",
+        ["KeePassPolicyHint"] = "-1 keeps everything and 0 keeps nothing. The age is stored unsigned, so its floor is 0 days. The limits trim an entry's saved versions on the next edit, and only reach the file on save.",
+        ["KeePassPolicyInvalid"] = "Enter a whole number: -1 or more for the two limits, 0 or more for the days.",
+        ["KeePassPolicyApplied"] = "The history policy is recorded in the opened database. Save writes it to the file.",
+        ["KeePassPolicyFailed"] = "The KeePass history policy could not be read or applied.",
         ["KeePassEntryRequired"] = "Select a KeePass entry to edit.",
         ["KeePassEntryGone"] = "This entry is no longer in the opened KeePass database.",
         ["KeePassEntryEditFailed"] = "The KeePass entry could not be prepared for editing.",
@@ -3233,6 +3260,15 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassHistoryRestoredFormat"] = "已将「{0}」还原到 {1} 的版本，点击保存才会写入文件。",
         ["KeePassHistoryGone"] = "该版本已不在当前打开的 KeePass 数据库中。",
         ["KeePassHistoryFailed"] = "读取 KeePass 条目的历史版本失败。",
+        ["KeePassHistoryPolicy"] = "条目历史保留策略",
+        ["KeePassPolicyMaxItems"] = "保留条数",
+        ["KeePassPolicyMaintenanceDays"] = "保留天数",
+        ["KeePassPolicyMaxSizeBytes"] = "保留字节数",
+        ["KeePassPolicyApply"] = "应用策略",
+        ["KeePassPolicyHint"] = "-1 表示不限制，0 表示不保留。保留天数按无符号存储，下限为 0 天，而 0 天会裁掉所有版本。上限会在下一次编辑时裁剪条目的历史版本，只有点击保存才会写入文件。",
+        ["KeePassPolicyInvalid"] = "请输入整数：条数与字节数不小于 -1，天数不小于 0。",
+        ["KeePassPolicyApplied"] = "历史保留策略已记录在当前打开的数据库中，点击保存才会写入文件。",
+        ["KeePassPolicyFailed"] = "读取或应用 KeePass 历史保留策略失败。",
         ["KeePassEntryRequired"] = "请先选择要编辑的 KeePass 条目。",
         ["KeePassEntryGone"] = "该条目已不在当前打开的 KeePass 数据库中。",
         ["KeePassEntryEditFailed"] = "无法准备编辑该 KeePass 条目。",

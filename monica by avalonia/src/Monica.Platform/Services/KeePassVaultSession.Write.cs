@@ -186,23 +186,15 @@ public sealed partial class KeePassVaultSession
 
     /// <summary>
     /// Keeps the pre-edit shape of the entry, the way a KeePass client is expected to. The snapshot
-    /// drops its own history, otherwise every edit would carry forward the whole previous chain.
+    /// drops its own history, otherwise every edit would carry forward the whole previous chain, and
+    /// the entry's list is pruned to the database's own policy straight after it grew by one.
     /// </summary>
     private void AddHistorySnapshot(PwEntry entry)
     {
-        var maximum = (int)(_database?.HistoryMaxItems ?? 0);
-        if (maximum <= 0)
-        {
-            return;
-        }
-
         var snapshot = entry.CloneDeep();
         snapshot.History.Clear();
         entry.History.Add(snapshot);
-        while (entry.History.Count() > maximum)
-        {
-            entry.History.RemoveAt(0);
-        }
+        MaintainHistory(entry);
     }
 
     private static PwEntry? FindEntry(PwGroup group, string entryUuid, CancellationToken cancellationToken)

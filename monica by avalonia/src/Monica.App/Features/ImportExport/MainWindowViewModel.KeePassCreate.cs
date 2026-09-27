@@ -143,7 +143,8 @@ public sealed partial class MainWindowViewModel
             RememberKeePassVault(session);
             _keePassOpenFolders.Add(session.RootGroupUuid);
             await RebuildKeePassTreeAsync(session, cancellationToken);
-            OnPropertyChanged(nameof(HasKeePassImportPreview));
+            await LoadKeePassHistoryPolicyAsync(session);
+            RaiseKeePassRail();
             OnPropertyChanged(nameof(KeePassPreviewSummaryText));
             RaiseKeePassWriteState();
             SetStatusNotice("KeePassCreatedFormat", target.FileName);

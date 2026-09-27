@@ -145,6 +145,10 @@ public sealed class TrayHintUiTests
             Assert.True(window.IsTrayHintVisible);
 
             window.ShowFromDesktopIntegration();
+            // The minimize above queued a debounced save carrying TrayHintShown = true. Let it land
+            // first: two saves racing on one file can write the older snapshot last, and the reload
+            // would then read true for a reason that has nothing to do with the guard under test.
+            await Task.Delay(450, TestContext.Current.CancellationToken);
             // Hand the reload the mismatch the debounced save produces in the wild: this run has been
             // told, the file has not. Putting the flag back in memory would only re-open the race with
             // the save still in flight, so the reload starts from the file's answer and the guard under

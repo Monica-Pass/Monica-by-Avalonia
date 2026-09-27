@@ -30,6 +30,12 @@ public sealed class KeePassHistoryTests : IDisposable
     private const string LiveAttachment = "live.bin";
     private const string EntryUrl = "https://history.example.com";
 
+    // The two generations the fixture ships with, dated from the run rather than from the calendar:
+    // the database carries a 365-day window on saved versions, so a fixed year would one day fall out
+    // of it and the suite would report a version the writer pruned as a version it lost.
+    private static readonly DateTime ElderTime = DateTime.UtcNow.AddDays(-6);
+    private static readonly DateTime LiveTime = DateTime.UtcNow.AddDays(-2);
+
     private readonly string _directory = Path.Combine(
         Path.GetTempPath(),
         $"monica-kdbx-history-{Guid.NewGuid():N}");
@@ -258,11 +264,15 @@ public sealed class KeePassHistoryTests : IDisposable
 
         var snapshot = entry.CloneDeep();
         snapshot.History.Clear();
-        snapshot.LastModificationTime = new DateTime(2024, 1, 2, 3, 4, 5, DateTimeKind.Utc);
+        // The dates are anchored to the run, not to the calendar: the database this fixture carries
+        // remembers versions for 365 days, and the writer prunes anything older than that window. A
+        // fixed year here would quietly age out of the window one day and the test would report a
+        // lost version rather than a stale constant.
+        snapshot.LastModificationTime = ElderTime;
         entry.History.Add(snapshot);
 
         Shape(entry, LiveTitle, LivePassword, "Live note", LiveField, "", LiveAttachment);
-        entry.LastModificationTime = new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc);
+        entry.LastModificationTime = LiveTime;
         database.RootGroup.AddEntry(entry, true);
 
         using var stream = new MemoryStream();
