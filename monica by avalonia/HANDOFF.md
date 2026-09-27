@@ -3598,5 +3598,30 @@ standingArmed=False, standingLength=6`——#80 那句"瞬态状态文案自己�
   锁定地板 `privateMB=117.2 / gcCommitted 49.2 / nonGc 68.0 / live 25.1 / threads 19`，判定 `117.2 ≤ 120`。
   也就是说 120 的余量确实只剩 2.8MB，与第二节测到的那个 3.1MB 段数量子化台阶同量级——这是下一刀必须知道的。
 
+### 八、那 2,196 个合成视觉是谁根住的：查完了，#143 的前提被否掉一半
+
+用留着的 `locked.dmp` 继续查第四节那句"约 4,700 个合成服务器视觉常驻"：
+
+- 数量先坐实。`dumpheap -stat` 给 2,196，另用 `dumpheap -type
+  Avalonia.Rendering.Composition.CompositionDrawListVisual -short` 单独列地址也是 2,196 行。
+  两个独立命令同一个数——这次不再犯第五节的错。
+- `gcroot` 抽了两个实例（`009358c1d978`、`00935cb9ff58`），各 5 条路径，**根全部落在 11 个 strong handle
+  上**，形状是两条：
+  `strong handle → MicroComShadow → OleDropTarget → PresentationSource → LayoutManager → ScrollViewer →
+  ScrollBar → CompositionDrawListVisual`，以及 `Compositor → MediaContext → MediaContextClock →
+  IObserver<TimeSpan>[] → Animation.Clock`。
+- 路径里出现的 `Monica.App!Unknown`（方法表 `7ff9e379f458`、`7ff9e3c7bd60`）只在**中间**，
+  不是挂在某个 Monica 字段上的引用。
+
+结论要反过来说：把这些视觉根住的是 **Avalonia 合成器与动画时钟自己那套句柄**，不是"Monica 还抓着旧外壳"。
+一个当前显示中的 1280×800 锁页窗口本来就有一棵自己的合成树，2,196 个视觉对象里有多少是"该在的"、
+多少是"锁后多出来的"，**这一份快照回答不了**——它只有一个时刻、一种历史（解锁过、又锁上）。
+缺的是**基线**：从没解锁过的同一份产物、同一台机器上抓一次同样口径的数。
+
+所以 #143 从"锁定后仍有约 4,700 个 composition 视觉对象常驻，释放它们"改写成"**先测基线，再谈释放**"。
+基线若与现在同量级，这一刀就没有可省的，120 地板的构成回到第四节那 12.3MB 移不动的空隙上；
+基线若明显更低，才轮到查 Avalonia 版本里的树回收、再谈我们这一侧能做什么。
+第四节末尾那句"下一刀记在 #143"按这个口径理解，不是按"已经定位到一处泄漏"理解。
+
 
 
