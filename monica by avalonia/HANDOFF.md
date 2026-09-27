@@ -3227,7 +3227,8 @@ NC-4 顺带量出一件该记的事：无头那条"不出现秘密"的断言原�
 - **`SizeOf` 的估法仍未与 kotpass 的 `estimateSize` 对拍**（#132 原样欠着）：也就是说"7 MiB 这一格到底裁掉哪些版本"两边可以不同；
   本轮改的是**怎么把 7 说清楚**，不是**裁得一样**。
 - **三格仍然没有即时校验**（打字过程中不红，只有按「应用策略」才用状态文案说话），`days=0` 与 `items=-1` 的单闸门组合仍只在单测里成对测。
-- **导轨的可视高仍然只有 158px**（#133），`KeePassPreviewCard` 与导轨仍然各写一遍摘要与按钮；本轮只换了那一格的单位与标签宽度。
+- **导轨的可视高当时仍然只有 158px**（#133 已在下一轮出厂：现在同一格里是 8 行、298px 树视口），
+  `KeePassPreviewCard` 与导轨仍然各写一遍摘要与按钮；#134 本轮只换了那一格的单位与标签宽度。
 - **"数据库设置"整页仍然没有**（KDF 参数、加密算法、回收站开关、数据库名），#132 那条对这一格原样成立。
 
 ## 附：被拒的那次保存第一次有了出路（2026-09-28，**#135 出厂：这一轮先把自己记的案情测否了，然后量出界面上那条不存在的动作**）
@@ -3397,7 +3398,104 @@ NC-4 顺带量出一件该记的事：无头那条"不出现秘密"的断言原�
 - **没拿别的客户端读过这份副本**：`ExportAsync` 与导出按钮同一条编码路径，本轮只证它能被**本客户端 + 同一个口令**读开。
 - **`saveCopyOnScreen` 与 #133 撞在同一格里**：这格按钮所在的预览卡正是被导入页压到 158px 的那块，本轮把 WrapPanel
   从 5 个按钮加到 6 个——**"在窗口内可见"不等于"不用滚就够得着"**，#133 下一轮必须把这 6 个按钮一起算。
+  （**#133 已经把这格算了**：真产物帧里那 6 个按钮在同一行内全部落地、导轨从 5 行到 8 行，见本节末尾的 #133。）
 - **写侧那道检查仍然只在"从文件打开"时有意义**：`SourcePath == null` 的会话永远不检查（没地方可比）。
+
+## 附：导轨第一次按"行"来量（2026-09-28，**#133 出厂：立项那格 158px 被人找错了地方，真正的 177px 在导库页的头顶上；这一轮买回来的是高度，不是去重**）
+
+### 一、这一轮把什么变成了事实
+
+- **吃掉导轨的不是导库页自己的散文，是它头顶上那格同步页头**。1280×800、zh-CN、真实 `MainWindow` 里量到
+  `Border/SyncOperationsCommandSurface` 高 **177px**（六张 180×64 的远端健康卡 + 一行恢复摘要），而它和
+  `SyncContentRegion`（滚动视口 554px）**不在同一块屏面上却 1:1 从导轨里扣走**。扣的式子是有名字的：
+  `KeePassBrowsePane.ApplyWorkspaceHeight` 拿 `room = 页面 Scroller 的 Viewport.Height − pane 在页内的 Y − 20`，
+  再 clamp 到 `≥160`——所以页头每多一行字，导轨就少一行条目，**这笔账以前没人念过**。
+- **三条各自量过的减法**（同一个真实窗口、开着一座 8 条目的库）：
+  1. 那六张卡在**导入 / 导出**两页退场（`ShowsSyncHealthOverview`，`SyncWorkspaceView.axaml` 上一格 `IsVisible`）：
+     页头 `177px → 89px`，`SyncContentRegion` 视口 `554 → 642`。
+  2. 库已经开着的时候，"解锁后会怎样"那段散文不再站在预览上方（`StackPanel IsVisible="{Binding !HasKeePassImportPreview}"`），
+     选中的文件名也跟着退到只在"选了文件但还没预览"时出现（`ShowsKeePassSelectedFileName`）。
+  3. "最近打开"从无限长改成**封顶 148px 可滚**（`ScrollViewer MaxHeight="148"`）。这条是**封顶不是隐藏**，
+     因为 #127 出厂的真产物门要求"开着库时那一格仍然画着"——隐藏它就是把上一轮的证据拆了。
+- **改动前后各有一个读数，而且读数说的是行不是像素**：出厂产物上 `browseRowsInView=5 → 8`、
+  树的滚动视口 `197.3px → 298.0px`（`success=False → True`）；无头同一条式子 `7 行 → 10 行`（树视口 `273 → 361`）。
+  两边数字不同是因为无头那格与出厂那格的窗口高度差不同，**各自量各自的，没有哪一条是换算出来的**。
+- **立案的 158px 没有被复现，但真实读数比它更低**。最早那两次一次性探针（`i133-geom-real.log`）在真实窗口里量到
+  pane 高 199px、树视口 131px、**只有 3 行**。也就是说这条欠账被记小了。
+  ⚠️ 那两个探针文件在页头那一步之前就删掉了（`KeePassGeometryProbeUiTests.cs` 已删），所以**这个 3 行现在钉不回具体的字节**，
+  它只作为"当时的观察比 158px 更糟"留着，不作为证据。
+
+### 二、为什么按页退场，不按"开着库"退场
+
+- 最直觉的规则是"一座 .kdbx 开着的时候，人不需要看见六张远端健康卡"。**这条没采用**，因为它把耦合做反了：
+  同一个判据会连带改掉**备份页与数据源页**，而那两页每张卡都指着**同一屏上的一个控件**，人在移数据前恰恰需要它。
+- 采用的说法是**"这格条带只在它的卡片命名了同一屏上的控件时留着"**：配置 / 备份 / 数据源留，导入 / 导出退。
+  导库与导库出去那两页里，六张卡点不到本页任何东西——它们各自的名字在导轨里已经能点开。
+- 所以 `ShowsSyncHealthOverview` 只看 `SelectedSyncPage`，**不看** `HasKeePassImportPreview`：KeePass 会话开合不影响它，
+  这一条由无头那格的 `IsVisible==false / ==true` 双向断言钉住（第五节），防止后来人"顺手两页都藏"。
+
+### 三、真产物门里多出来的那一格读数
+
+- `MainWindow.SmokeUi.cs` 新增 `browseRailHasRoom`：分子是**导轨自己的** `ScrollViewer.Viewport.Height`，
+  分母是**一个已实例化行的实际高**（`ListBoxItem.Bounds.Height`），取整后 `>= 8`。
+  注释里写的是改之前真读到的那个数（197.3px / 36px = 5 行），不是谁估的预算。
+- **为什么按行不按像素**：像素预算是被估计出来的数（158/160 那一格就是这么来的），而行是人在屏上数得出来的；
+  这也正好接上 #134 立的那条规则——**没被人改过的那一格不许被屏幕改写**。
+- 8 行的由来，写在测试里：*"八行是最短的一眼读起来像库而不像预览的列表"*——它是这一轮选的下限，不是问来的（见第七节）。
+- `browseRailHasRoom &&` 挂在 `success` 的合取里、位置紧跟 `saveCopyOnScreen`，所以 #135 那 6 个按钮够不够得着与导轨行数是**同一格判据**，
+  这正是 #135 结尾要求的那件事。
+- 出帧两格（`KeePassHistory_1280x800.png` / `KeePassPolicy_1280x800.png`，人眼看过）：8 条完整的树行、
+  六格命令按钮落在**同一行**内、策略导轨整格可见。
+
+### 四、负控（先看见红，再还原）
+
+- 把 `ShowsSyncHealthOverview` 的绑定摘掉，无头那条**恰好红在 7 行**，报错自带读数：
+  `the library shows 7 rows of 36 at 1280x800, below the 8 this page has to leave standing.`；绑定装回去绿在 10 行。
+- **没有把 8 降到实测的 5 来让门通过**。这一轮唯一一次"红是好消息"用去找空间，不是改数字（120MB 那格同理，见第六节）。
+
+### 五、测试与证据
+
+- `tests/Monica.UiTests/KeePassLibraryDensityUiTests.cs`（新增 159 行，1 条主要事实 + 2 条附属）：真实 `MainWindow`、
+  1280×800、zh-CN，全程走产品自己的命令链（`SelectSectionCommand "Sync"` → `SelectedSyncPage "Import"` →
+  `KeePassImportTabSelected` → `SelectKeePassFileCommand` → `PreviewKeePassImportCommand`），
+  文件由私有嵌套 `DensityFileService` 递进选择器，不弹真系统框。三条断言：导轨 `≥8` 行；
+  `pane` 下沿经 `TranslatePoint` 折算**不越过窗口下沿**（"画得出来"与"够得着"分开钉）；
+  健康条带在导入页不可见而在配置页可见（钉住第二节的规则本身）。
+- 这条是**从一次性量具转成常驻守卫**：`KeePassGeometryProbeUiTests.cs`（只打印不判定）删掉，量到的东西换成会红的断言。
+- 无头 10 个 KeePass / 存储 / 密度类全绿；链的 UI 套 264 条、单测 1118 + 11 perf 全绿。
+- 泄漏审计：链日志里 `CiRuntime` / `not-a-secret` / `live-secret` / `elder-secret` **零命中**；exec 行对真口令显示
+  `[redacted]`，只有故意的错钥哨兵 `definitely-wrong-password` 露出来（那是设计如此）；新测试用命名常量
+  `KeePassSmokeVaultWriter.DefaultPassword`，**仓库里没有口令字面量**。新增的临时库前缀
+  `monica-uitests/keepass-density-{guid}` 与帧里出现的 `Entry 000002` / `user2@example…` / `Folder 2` / `Folder 3` /
+  `history.kdbx` / `Smoke Fixture` / `Smoke Root` 都不是秘密。
+
+### 六、门禁（红还是红在内存，而且这一轮的"无关"只有一半证据）
+
+- 链：`fmt_rc=0`、`cr_rc=0`、`pub_rc=0`、`art_rc=1`。**唯一的红仍是内存**：`lockedPrivateMB=120.1, maxMB=120`（#140 的台阶）。
+  阈值**没有动**。同一份出厂产物连跑 4 趟：`110.3 / 116.1 / 111.6 / 115.6`，**4/4 全部 rc=0 且都在 120 以下**，
+  所以链里那一次 120.1 是分布的上沿不是这一轮的常数。
+- ⚠️ **但这条分布是在"已经改过的产物"上跑的，没有改动前的对照**。所以"120.1 与 #133 无关"目前的证据只是
+  "同一份字节 4/4 次远低于 120" + "这一轮没有新增常驻分配（一条 `IsVisible` 绑定、一个 `MaxHeight`、一段无头测试）"，
+  **不是**"改动前也这样"。#140 该量的是改动前那条对照。
+- 300 行结构门：`SyncWorkspaceView.axaml` 109、`SyncImportView.axaml` 275、`MainWindowViewModel.SyncProperties.cs` 215、
+  `MainWindowViewModel.KeePassImportState.cs` 213、`…KeePassPolicy.cs` 139、新测试 159，全在门内。
+  `MainWindow.SmokeUi.cs` 1747 行**不构成红，因为门只覆盖 `verify-commercial-release.ps1:77-85` 列出的那些 feature 目录，
+  `Diagnostics/` 不在 `$featurePaths`（`verify-commercial-release.ps1:70-85`）名单上**——这是门的覆盖面事实，不是它被放宽。
+- 一次流程上的自我纠正：链跑起来之后我又去改了 `MainWindow.SmokeUi.cs` 的一条注释，于是**停掉正在跑的链**
+  （`b248rj3lw`）重启（`ba1bbca2o`），让门验的正是将要提交的那份字节。
+
+### 七、仍然没做到（欠账，不是决定）
+
+- **立项的第二半"预览卡片与导轨重复"完全没做**：这一轮只买回了高度，`KeePassPreviewCard` 与导轨仍然各写一遍摘要与按钮。
+- **左边那格 `TabStripPlacement="Left"` 的导航条约值 300px 页宽**：1280×800 上导入列只剩 590px、树那一列 **299px**，
+  邮箱被裁成 `user2@example…`；同步侧栏下面还有一大片空白。本轮一行没动，留给未来的密度切片。
+- **8 行这个下限是这一轮选的，不是问来的**；而且只在 **1280×800 + zh-CN** 一条式子上绿。125% DPI、
+  英文标签（第一轮就量到英文让命令 WrapPanel 变成 160px/5 行）、更矮的窗口，都没人量过。
+- **只在"开库 + 选中一条有历史的条目"这一刻读导轨**：空库、搜索进行中、回收站页各自行数没人量；
+  `browseRailHasRoom` 挂在历史那格 smoke 帧里，不是独立的一格。
+- **没把"可视行数"报给人看过**：界面上没有一处说"这里能放几行"，人只能自己数。
+- **内存那格的红仍然挂着**（#140），跨进程写冲突（#139）与"重新载入盘上那份"（#138）不变；
+  三格策略数字仍然没有即时校验（#132/#134 原样）。
 
 
 

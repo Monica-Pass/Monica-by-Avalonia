@@ -67,6 +67,15 @@ public sealed partial class MainWindowViewModel
     public bool IsSyncSourcesSelected => IsWorkspacePageSelected(SelectedSyncPage, "Sources");
     public bool IsSyncImportSelected => IsWorkspacePageSelected(SelectedSyncPage, "Import");
     public bool IsSyncExportSelected => IsWorkspacePageSelected(SelectedSyncPage, "Export");
+
+    /// <summary>
+    /// The health cards say how each remote source is configured. On the two pages where a person
+    /// moves data in or out, those six cards are a fifth of the window standing between them and
+    /// the library they came to work in, and every one of them names something a click in the rail
+    /// already opens. The configuration, backup and sources pages keep the strip, because there each
+    /// card points at a control on the same screen.
+    /// </summary>
+    public bool ShowsSyncHealthOverview => !IsSyncImportSelected && !IsSyncExportSelected;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelectedWebDavBackupHistoryItem))]
     private WebDavBackupHistoryItem? _selectedWebDavBackupHistoryItem;
@@ -77,6 +86,7 @@ public sealed partial class MainWindowViewModel
     [NotifyPropertyChangedFor(nameof(IsSyncSourcesSelected))]
     [NotifyPropertyChangedFor(nameof(IsSyncImportSelected))]
     [NotifyPropertyChangedFor(nameof(IsSyncExportSelected))]
+    [NotifyPropertyChangedFor(nameof(ShowsSyncHealthOverview))]
     private string _selectedSyncPage = "Configuration";
 
     [ObservableProperty]

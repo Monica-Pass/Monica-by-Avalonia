@@ -127,11 +127,13 @@ public sealed partial class MainWindowViewModel
     /// <summary>
     /// Opening and closing a database decides both whether the rail is up and whether what is in the
     /// library can be managed, so the two are raised together - a rail left up over a database that is
-    /// gone is a form pointing at nothing.
+    /// gone is a form pointing at nothing. The file name in the launcher retires on the same signal:
+    /// once the database is open, the summary line is the one place that name is written.
     /// </summary>
     private void RaiseKeePassRail()
     {
         OnPropertyChanged(nameof(HasKeePassImportPreview));
         OnPropertyChanged(nameof(ShowsKeePassRail));
+        OnPropertyChanged(nameof(ShowsKeePassSelectedFileName));
     }
 }

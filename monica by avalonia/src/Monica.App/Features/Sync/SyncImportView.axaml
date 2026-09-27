@@ -64,7 +64,13 @@
                     </StackPanel>
                 </TabItem.Header>
                 <StackPanel x:Name="KeePassImportCard" Spacing="14" Margin="20,4,4,4">
-                    <StackPanel Spacing="4">
+                    <!--
+                        The heading and its instructions are for the state of "nothing is open yet": they
+                        say what unlocking does and that the password is cleared afterwards. Once a database
+                        is open they are 71px of prose standing between the person and the library, and the
+                        tab header already says which page this is. Closing the file brings them back.
+                    -->
+                    <StackPanel Spacing="4" IsVisible="{Binding !HasKeePassImportPreview}">
                         <TextBlock Text="{Binding L.KeePassImportTitle}" FontSize="20" FontWeight="SemiBold" />
                         <TextBlock Text="{Binding L.KeePassImportDescription}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
@@ -84,30 +90,38 @@
                     </StackPanel>
                     <StackPanel x:Name="KeePassRecentSection" Spacing="6" IsVisible="{Binding HasKeePassRecentVaults}">
                         <TextBlock Text="{Binding L.KeePassRecentTitle}" FontSize="12" FontWeight="SemiBold" />
-                        <ItemsControl x:Name="KeePassRecentVaultsList" ItemsSource="{Binding KeePassRecentVaultRows}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:KeePassRecentVaultRow">
-                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                                        <Button x:Name="OpenKeePassRecentVaultButton" Classes="workspaceListRowButton" Command="{Binding #SyncImportRoot.DataContext.OpenKeePassRecentVaultCommand}" CommandParameter="{Binding}" AutomationProperties.Name="{Binding Label}">
-                                            <StackPanel Spacing="2" HorizontalAlignment="Left">
-                                                <TextBlock Text="{Binding Label}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                                    <TextBlock Text="{Binding #SyncImportRoot.DataContext.L.KeePassRecentLastOpened}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding ShowsLastOpened}" />
-                                                    <TextBlock Text="{Binding LastOpenedText}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding ShowsLastOpened}" />
-                                                    <TextBlock x:Name="KeePassRecentFileMissingText" Text="{Binding #SyncImportRoot.DataContext.L.KeePassRecentFileMissing}" FontSize="12" Foreground="{DynamicResource SystemFillColorCautionBrush}" IsVisible="{Binding IsFileMissing}" />
+                        <!--
+                            The launcher is capped, not grown: every remembered file is two or three lines
+                            tall, and a person who has opened eight databases would otherwise find the
+                            library pushed below the bottom edge of the window. Rows past the cap scroll,
+                            which is what a list is for.
+                        -->
+                        <ScrollViewer MaxHeight="148" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl x:Name="KeePassRecentVaultsList" ItemsSource="{Binding KeePassRecentVaultRows}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:KeePassRecentVaultRow">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                            <Button x:Name="OpenKeePassRecentVaultButton" Classes="workspaceListRowButton" Command="{Binding #SyncImportRoot.DataContext.OpenKeePassRecentVaultCommand}" CommandParameter="{Binding}" AutomationProperties.Name="{Binding Label}">
+                                                <StackPanel Spacing="2" HorizontalAlignment="Left">
+                                                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <TextBlock Text="{Binding #SyncImportRoot.DataContext.L.KeePassRecentLastOpened}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding ShowsLastOpened}" />
+                                                        <TextBlock Text="{Binding LastOpenedText}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding ShowsLastOpened}" />
+                                                        <TextBlock x:Name="KeePassRecentFileMissingText" Text="{Binding #SyncImportRoot.DataContext.L.KeePassRecentFileMissing}" FontSize="12" Foreground="{DynamicResource SystemFillColorCautionBrush}" IsVisible="{Binding IsFileMissing}" />
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding DirectoryText}" FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" IsVisible="{Binding ShowsLocation}" TextTrimming="CharacterEllipsis" />
                                                 </StackPanel>
-                                                <TextBlock Text="{Binding DirectoryText}" FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" IsVisible="{Binding ShowsLocation}" TextTrimming="CharacterEllipsis" />
-                                            </StackPanel>
-                                        </Button>
-                                        <Button x:Name="ForgetKeePassRecentVaultButton" Grid.Column="1" Classes="workspaceCommand" VerticalAlignment="Top" Padding="8,4" Command="{Binding #SyncImportRoot.DataContext.ForgetKeePassRecentVaultCommand}" CommandParameter="{Binding}" AutomationProperties.Name="{Binding #SyncImportRoot.DataContext.L.KeePassRecentForget}">
-                                            <ic:FluentIcon Icon="Dismiss" FontSize="14" />
-                                        </Button>
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                                            </Button>
+                                            <Button x:Name="ForgetKeePassRecentVaultButton" Grid.Column="1" Classes="workspaceCommand" VerticalAlignment="Top" Padding="8,4" Command="{Binding #SyncImportRoot.DataContext.ForgetKeePassRecentVaultCommand}" CommandParameter="{Binding}" AutomationProperties.Name="{Binding #SyncImportRoot.DataContext.L.KeePassRecentForget}">
+                                                <ic:FluentIcon Icon="Dismiss" FontSize="14" />
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
                     </StackPanel>
-                    <TextBlock x:Name="KeePassSelectedFileText" Text="{Binding KeePassSelectedFileName}" IsVisible="{Binding HasKeePassSelectedFile}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="KeePassSelectedFileText" Text="{Binding KeePassSelectedFileName}" IsVisible="{Binding ShowsKeePassSelectedFileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                     <StackPanel Spacing="8" IsVisible="{Binding ShowKeePassOpenForm}" IsEnabled="{Binding IsKeePassImportIdle}">
                         <TextBlock Text="{Binding L.KeePassMasterPassword}" FontSize="12" FontWeight="SemiBold" />
                         <TextBox x:Name="KeePassImportPasswordBox" MaxWidth="420" PasswordChar="*" Text="{Binding KeePassImportPassword}" AutomationProperties.Name="{Binding L.KeePassMasterPassword}" />
@@ -140,8 +154,8 @@
                             </Button>
                         </Grid>
                     </StackPanel>
-                    <Border x:Name="KeePassPreviewCard" Padding="14,12" BorderBrush="{DynamicResource AccentFillColorSecondaryBrush}" BorderThickness="0,1,0,0" IsVisible="{Binding HasKeePassImportPreview}">
-                        <Grid RowDefinitions="Auto,Auto,*" RowSpacing="10">
+                    <Border x:Name="KeePassPreviewCard" Padding="14,8" BorderBrush="{DynamicResource AccentFillColorSecondaryBrush}" BorderThickness="0,1,0,0" IsVisible="{Binding HasKeePassImportPreview}">
+                        <Grid RowDefinitions="Auto,Auto,*" RowSpacing="6">
                             <StackPanel Spacing="2">
                                 <TextBlock Text="{Binding KeePassPreviewSummaryText}" TextWrapping="Wrap" />
                                 <TextBlock x:Name="KeePassUnsavedChangesText" Text="{Binding KeePassUnsavedChangesText}" IsVisible="{Binding KeePassVaultIsDirty}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorCautionBrush}" />

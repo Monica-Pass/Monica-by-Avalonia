@@ -33,6 +33,7 @@ public sealed partial class MainWindowViewModel
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasKeePassSelectedFile))]
+    [NotifyPropertyChangedFor(nameof(ShowsKeePassSelectedFileName))]
     [NotifyPropertyChangedFor(nameof(ShowKeePassOpenForm))]
     private string _keePassSelectedFileName = "";
 
@@ -66,6 +67,13 @@ public sealed partial class MainWindowViewModel
 
     public bool HasKeePassSelectedFile => !string.IsNullOrWhiteSpace(KeePassSelectedFileName);
     public bool HasKeePassImportPreview => _keePassVaultSession is not null;
+
+    /// <summary>
+    /// The line the opened database writes for itself already names the file it came from, so the second
+    /// copy of the name retires with the open form and hands its row to the browse tree. It comes back the
+    /// moment a file is picked and not yet opened, where it is the only place the name is spelled out.
+    /// </summary>
+    public bool ShowsKeePassSelectedFileName => HasKeePassSelectedFile && !HasKeePassImportPreview;
 
     /// <summary>
     /// The master password is cleared the moment a database unlocks, so the field that took it can

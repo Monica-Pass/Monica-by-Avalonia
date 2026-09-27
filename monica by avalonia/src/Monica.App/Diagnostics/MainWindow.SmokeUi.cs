@@ -743,6 +743,26 @@ public partial class MainWindow
                 && copyTop.Y >= 0 && copyTop.Y + saveCopyButton.Bounds.Height <= Bounds.Height
                 && saveCopyButton.Content is not null;
 
+            // How much of the library is actually standing on screen. Everything stacked above the rail
+            // takes its height from the tree rather than from itself, and with this page's own prose
+            // already retired the browser still stood five rows tall in an 800-pixel window (viewport
+            // 197.3px over 36px rows) - a file manager you scroll to see. The reading is in rows, from
+            // the rail's own viewport over the height of a realized row, so it says what a person counts
+            // rather than what a pixel budget someone guessed at would allow.
+            var browseTree = this.GetVisualDescendants()
+                .OfType<Control>()
+                .FirstOrDefault(control => control.Name == "KeePassBrowseTree");
+            var treeScroller = browseTree?.GetVisualDescendants()
+                .OfType<ScrollViewer>()
+                .FirstOrDefault();
+            var treeRowHeight = browseTree?.GetVisualDescendants()
+                .OfType<ListBoxItem>()
+                .FirstOrDefault(item => item.Bounds.Height > 0)?.Bounds.Height ?? 0;
+            var browseRowsInView = treeScroller is null || treeRowHeight <= 0
+                ? 0
+                : (int)Math.Floor(treeScroller.Viewport.Height / treeRowHeight);
+            var browseRailHasRoom = browseRowsInView >= 8;
+
             // The revert walked on the shipped binary: the newest version is the shape the edit just
             // replaced, and putting the entry back has to land on the title it was opened with.
             var reverted = false;
@@ -772,6 +792,7 @@ public partial class MainWindow
                 policySizeReadsAsMegabytes &&
                 policyApplied &&
                 saveCopyOnScreen &&
+                browseRailHasRoom &&
                 historyShot.Bytes > 0 &&
                 historyShot.Written &&
                 policyShot.Written;
@@ -784,6 +805,8 @@ public partial class MainWindow
                 $"policySizeReadsAsMb={policySizeReadsAsMegabytes}, " +
                 $"policyApplied={policyApplied}, " +
                 $"saveCopyOnScreen={saveCopyOnScreen}, " +
+                $"browseRowsInView={browseRowsInView}, browseRowHeight={treeRowHeight:F1}, " +
+                $"browseViewport={treeScroller?.Viewport.Height ?? 0:F1}, " +
                 $"treeRows={state.TreeRows}, entryRows={state.EntryRows}, vaultBytes={state.FileBytes}, " +
                 $"tabSelected={keepassTab.IsSelected}, frameBytes={historyShot.Bytes}, " +
                 $"policyFrameBytes={policyShot.Bytes}, " +
