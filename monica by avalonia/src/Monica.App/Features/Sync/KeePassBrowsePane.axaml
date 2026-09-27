@@ -3,8 +3,16 @@
         The two halves of a browsed .kdbx: the folder tree with the search box above it, and the
         detail or edit form beside it. Split out because the pane is what a person lives in once the
         file is open, and because the import tab it sits on has no more room to grow.
+
+        Both halves scroll inside themselves, which only works while something above this gives it a
+        height to fit: the tree and the form are measured against the row the host hands over, and an
+        unbounded row means neither ever needs a scrollbar. ApplyWorkspaceHeight in the code-behind is
+        what measures the room left under the page heading and hands it over, and it is also what lets
+        the page scroll again when a window is too short for even that - together they keep the tab
+        strip, the "KeePass KDBX" heading and the top fields of a new entry on the screen in a long
+        library.
     -->
-    <Grid ColumnDefinitions="320,*" ColumnSpacing="12" MinHeight="280">
+    <Grid ColumnDefinitions="320,*" ColumnSpacing="12">
         <Border Grid.Column="0" Classes="workspaceTreeRail">
             <DockPanel LastChildFill="True">
                 <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,8">
@@ -48,7 +56,7 @@
             </DockPanel>
         </Border>
         <Border Grid.Column="1" Classes="workspaceDetail" IsVisible="{Binding ShowsKeePassDetailColumn}">
-            <ScrollViewer>
+            <ScrollViewer x:Name="KeePassDetailScroller">
                 <StackPanel Spacing="12">
                     <StackPanel x:Name="KeePassEntryEditorPane" Spacing="8" IsVisible="{Binding HasKeePassEditor}">
                         <TextBlock Text="{Binding KeePassEditorPublic.GroupPath}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />

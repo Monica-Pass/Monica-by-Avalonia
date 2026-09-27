@@ -2496,3 +2496,140 @@ retired=True, standingArmed=False`）。红的那一次是"第一次跑链"，�
 - 拖到任务栏图标、从资源管理器拖进窗口：没做。
 - #120 的外层滚动、片 D 余下（历史/标签/过期/图标与 AutoType/CustomData 只读）、搜索键盘入口、右键与拖放、
   桌面还原不能选目标夹、清空没有撤销、原生保存对话框从没在真屏幕上走过——全部沿用。
+
+## 附：库面板的外层滚动把标题顶出视口（2026-09-27，**#120 出厂：两栏第一次拿到一个真高度，而"暂时看不见"和"根本够不到"被拆成两条不同的断言**）
+
+### 一、这一轮把什么变成了事实
+
+- **复现先在真产物上做**：`D:\Monica-kpshots\i120-run.ps1` 起一次性 appdata，种子 40 条目 / 3 分组，
+  `--smoke-ui-keepass-manage` + `--smoke-ui-width/-height`，1280×800 当场红：
+  `draftFormOnScreen=False, toolbarOnScreen=False, pageScrollY=575.99…`。
+  576 这个数不是估算——是页面自己滚掉的像素，而它滚走的正是"新建条目"要用的那半屏。
+- **机制量出来了**：同步页根部是 `ScrollViewer(SyncContentRegion) + StackPanel(SyncPageContainer)`。
+  StackPanel 用**无限高度**量孩子，所以两栏里的 `KeePassBrowsePane` 永远不知道自己该多高 → 它按需长大到
+  整棵树的高度 → 两栏永远不需要自己的滚动条 → 整页被 40 行顶到一两千像素 → 页面滚动接管，
+  把 tab 条、"KeePass KDBX"标题和表单上半截一起带走。焦点落进表单还会**再自己滚一次**。
+- **两条空间读数**（同一份产物，`--smoke-ui-width 1280`）：
+  高 800 时页面视口 **535**、页头（标题 + 云端状态卡那一行 + 分隔线 + 提示行）占 **333**、留给两栏 **182**；
+  高 600 时视口 **335**、剩余是**负数**。也就是说 800 高的窗口本来就只够放 182 的两栏。
+- **现在的机制**：`KeePassBrowsePane.ApplyWorkspaceHeight` 把自己在**文档坐标**里的顶点量出来
+  （不是视口坐标——页面会因焦点自己滚），算出剩余空间当作本面板的高度交下去，两栏于是各自内部滚动；
+  剩余 ≥ **160** 时页面 `VerticalScrollBarVisibility=Disabled`，放不下时改回 `Auto`。
+- **断言从"截图给人看"变成"数字"**：`draftFormOnScreen`（平移点整块落在窗口内）、`toolbarOnScreen`、
+  `workspaceBounded`（面板高度 ≤ 窗口高度）、`pageScrollY`、`pageKeepsStill`、
+  `formReachable`（短窗口下把页面滚到底，再看表单是否完整可见）。
+
+### 二、为什么"放不下"要还回页面滚动，而不是把两栏压扁
+
+一屏 .kdbx 是**工作区**，不是文档：它的两栏自己滚，页面就不该再滚。但这条只在放得下的时候成立。
+窗口矮到放不下时，如果还硬把页面钉住，被裁掉的会是整块两栏——**内容够不到**；
+而把页面滚动还给用户，代价是页头暂时滚出视野——**看得见但需要滚一下**。
+这两件事不对等，所以底线不是"好不好看"，是"够不够得到"。
+
+底线 160 也不是设计值：800 高的窗口实测剩余 182，那一档是走过人眼的（树带自己的滚动条，
+标题/用户名/密码同屏），所以底线必须落在 182 之下、而不是像第一版那样把它设成 280——
+280 比可用空间还大，等于自己把 #120 又请回来了。
+
+### 三、真产物截图门（这一轮新接的那两格）
+
+**最终字节**（`SyncImportView.axaml` 已回退成 `StackPanel`、机制只剩面板显式高度那一半）重新发布后各跑一档，
+`--smoke-ui-screenshot-dir` 两张帧都落盘：
+
+- `1280x800`：`KeePassManage_1280x800.png` `frameBytes=91676` + `KeePassManageForm_1280x800.png`；
+  帧里 tab 条、"KeePass KDBX"标题、`最近打开`、工具栏（新建条目/保存到文件/导入已检查条目/关闭文件）、
+  带自己滚动条的树、以及表单的 标题/用户名/密码 + `显示密码与密钥` 同屏。
+  读数：`pageScrollY=0`、`pageKeepsStill=True`、`workspaceHeight=182`、`pageViewportHeight=535`、
+  `treeRows=19 / folderRows=5 / entryRows=14 / vaultBytes=7294`。
+- `1280x600`：`KeePassManage_1280x600.png` `frameBytes=71539` + `KeePassManageForm_1280x600.png`；
+  页头与 tab 条滚出视野（`pageScrollY=168`），但 `manage.kdbx` 那一行、工具栏、树和表单的
+  标题/用户名/密码都在，页面滚动条在右侧可见。
+  读数：`pageKeepsStill=False`、`workspaceHeight=160`、`pageViewportHeight=335`、
+  `draftFormOnScreen=True`、`formReachable=True`、`vaultBytes=7166`。
+- 产物门自带的那一帧（同一份字节、12 条目的 shots 库、800 高）：
+  `draftFormOnScreen=True, formReachable=True, toolbarOnScreen=True, pageScrollY=0, pageKeepsStill=True,
+  workspaceBounded=True, workspaceHeight=182, pageViewportHeight=535, frameBytes=91249`。
+
+两档的 `success=` 都是 True，`treeRows/folderRows/entryRows` 在两档之间一致——差别只在布局，不在数据。
+`workspaceHeight` 从带 `Grid` 那版的 196 变成 182：回退之后页头多回一行 `Spacing=14` 的间距，
+真实剩余空间少了 14 像素，机制照原样把这一档量出来交给两栏。
+
+### 四、负控（每条都先看见红）
+
+1. **把底线抬到比真实剩余大**（`WorkspaceMinHeight` 160 → 280）：800 高当场退回 #120 原症状——
+   `pageScrollY=575.99…`、`draftFormOnScreen=False`、`toolbarOnScreen=False`、`success=False`。
+   这一条是机制本身的反证：绿色不是因为"页面被钉住了"，是因为两栏真的拿到了那 182 像素。
+   要说清的是：**这条红是在还带 `Grid` 的那版上量的**（当时真实剩余 196）；回退之后剩余变成 182，
+   280 依旧大于可用空间，所以结论不会翻，但**没有在新字节上重跑一次**。
+2. **`Math.Abs(NaN - x) > 0.5` 恒为 false**：Avalonia 里未赋值的 `Height` 读回来是 NaN，
+   所以"只在变化时赋值"那句守卫让**第一次赋值永远不发生**。当时的表现是 800 高那档 `success=True`
+   而 `workspaceHeight=785`（面板根本没被约束），绿帧其实是**裁剪**出来的。
+   发现方式是在面板里加一行 `bounds= / declared=` 自证——不加这行就会一直以为是布局不认显式高度。
+   修好后同一档：`declared=196 / bounds=196`。
+
+这两条红都不是刻意设计的负控，是实现过程中当场量到的；记在这里是因为它们各自否掉了一种假绿：
+"页面钉住了"不等于"内容被约束住了"。
+
+3. **中途试过的那颗 `Grid` 被测试当场拒收**：最初把 `KeePassImportCard` 从 `StackPanel` 换成
+   `RowDefinitions="Auto,*"` 的 `Grid`，想让"页头/工作区"各占一行。等机制改成面板自己声明高度之后，
+   那次结构改动就成了**多余**——而它的代价是无头测试按类型取名字：同一份产物跑三个类
+   （`KeePassEditWorkflowUiTests` / `KeePassCreateWorkflowUiTests` / `StorageWorkflowUiTests`）实测
+   `Total: 11, Failed: 3`，三条红分别是 `Expected control 'KeePassImportCard' to be
+   'Avalonia.Controls.StackPanel' but it was 'Avalonia.Controls.Grid'` 与
+   `no StackPanel named 'KeePassImportCard' is realized on screen`。
+   于是把 `SyncImportView.axaml` 整个 `git checkout` 回 HEAD（不是改测试去迁就一个不需要的改动），
+   重新构建复跑同一串：**`Total: 11, Errors: 0, Failed: 0, Time: 8.877s`**。
+   最终 diff 只剩 4 个文件：`KeePassBrowsePane.axaml(.cs)`、`SyncWorkspaceView.axaml.cs`、`MainWindow.SmokeUi.cs`。
+
+### 五、测试与证据
+
+- 复现/量测脚本：`D:\Monica-kpshots\i120-run.ps1`（`-RunRoot -Entries -Groups -Width -Height`）。
+  口令走 `--smoke-ui-unlock-env` + 环境变量，帧目录里只有界面，没有明文凭据。
+- 本轮跑过的 run root：`i120-h600`（第一版机制，红）、`i120-h800b/c/d`（NaN 缺陷期间）、
+  `i120-e800/e600`（底线 160，800 绿 / 600 仍红）、`i120-g800/g600`（带 `Grid` 的那版，两档都绿）、
+  **`i120-f800/f600`（最终字节，两档都绿，就是上面那四张帧）**。
+- 产物门里那一帧（`verify-artifact-runtime.ps1` 的 KeePass manage 帧）现在带
+  `formReachable / pageKeepsStill / workspaceBounded / workspaceHeight / pageViewportHeight`。
+- 计时预算单独复跑 4 次全绿：`dotnet tests/Monica.UiTests/bin/Release/net10.0/Monica.UiTests.dll
+  -filter /[Category=perf-budget] -reporter verbose` → `Total: 17, Errors: 0, Failed: 0, Time: 5.638s`。
+  上一串里那 4 条红是负载读数，**阈值一个没动**。
+
+### 六、门禁
+
+最终字节（4 个文件：`KeePassBrowsePane.axaml(.cs)`、`SyncWorkspaceView.axaml.cs`、`MainWindow.SmokeUi.cs`；
+`SyncImportView.axaml` 已回退到 HEAD，见上面第四节第 3 条）跑整串，`D:\Monica-kpshots\i120-chain2.log`：
+`fmt_rc=0`、`cr_rc=0`（`Commercial release verification passed.`）、`pub_rc=0`、**`art_rc=1`**。
+
+结构门这次没拦：`Focused vault, security, storage, recycle bin, and import/export files are within 300 lines.`
+四份 trx 里 `outcome="NotPassed"` 计数**全 0**——单测 11 条 perf-budget + 1068 条常规，UI 17 条 perf-budget +
+260 条常规。**这一片没有新增任何无头测试**：断言全在真产物那一帧里（无头测试拿不到"页面自己会不会滚"这件事）。
+
+`art_rc=1` 的唯一一条红是**退场帧**：`Smoke UI status notice retirement result. success=False, raised=True,
+armedForNotice=True, retired=False, standingArmed=False, standingLength=6`——就是片 H-2 交接里已经记过
+"红一次/绿两次、没当缺陷修也没放宽预算"的那一条。同一次跑里其余每一格都是绿的，包括本片那一帧：
+`draftFormOnScreen=True, formReachable=True, toolbarOnScreen=True, pageScrollY=0, pageKeepsStill=True,
+workspaceBounded=True, workspaceHeight=182, pageViewportHeight=535, frameBytes=91249`，
+以及三条预算读数：库加载 `actualMs=1068`（预算 4000）、锁定态 `lockedPrivateMB=118.3`（预算 120）、
+KeePass 20000 条 `growthMB=6.2`（预算 24）。
+
+**没有动那个 15 秒，也没有动任何阈值**：同一份产物只重跑产物门（`D:\Monica-kpshots\i120-art-2.log`，rc=0），
+退场帧这次绿（`retired=True, standingArmed=False`），整份日志里 `success=False` 一条都没有，
+`KeePass manage shot` 读数与上一趟逐项相同（`workspaceHeight=182`、`pageScrollY=0`、`frameBytes=91245`），
+末行 `RUNTIME SMOKE passed`。所以在最终字节上这条帧的观测是**红一次/绿一次**——比片 H-2 记的还差一档，
+欠的那条机制证明（它在任意负载下都退得掉）仍然欠着。
+
+### 七、仍然没做到（欠账，不是决定）
+
+- 600 高那一档只证明了"够得到"：两栏被压到 160，树里只看得见两行半。**没有为短窗口重排**——
+  页头那 333px 里有一整行云端状态卡（WebDAV / 远程同步 / 备份历史 / OneDrive / Bitwarden / MDBX），
+  浏览本地 .kdbx 时它其实没用，这一轮没动它。
+- **800 高那一档也不宽裕**：两栏拿到 182px，帧里表单只到 标题/用户名/密码 三个框，
+  `显示密码与密钥` 那颗按钮正好压在窗口下沿上——**能填，但一屏填不完一个完整条目**，
+  剩下的字段要靠在列里滚。这一档没有单独为"编辑态"给过更多空间。
+- 160 这条底线只有一个样本撑着（800 高时真实剩余 196）。没量过 900/1000/1100 高，
+  也没量过窄宽度——宽度 <760 走的是另一套行布局（`SyncWorkspaceView.UpdateResponsiveLayoutForWidth`），
+  那一套下两栏拿到多高，没有读数。
+- 面板高度是命令式赋的，挂在 `LayoutUpdated` 上每趟都算一次；**没有量过它在滚动/动画期间的开销**，
+  只观测到它在两档窗口下各自收敛到稳定值（没有来回翻）。
+- 真人拖窗口边界连续改高度没走过——跑的都是启动时定死尺寸。
+- 负控只到"常量抬上去就红"这一层；**没有一条单元/无头测试钉住 160 与 182 这组关系**，
+  下一次有人改页头高度或改这个常量，靠的还是产物门那一帧的数字。

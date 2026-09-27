@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
@@ -10,6 +11,7 @@ using Monica.App.Controls;
 using Monica.App.Features.Authenticator;
 using Monica.App.Features.Notes;
 using Monica.App.Features.Passwords;
+using Monica.App.Features.Sync;
 using Monica.App.Features.Vault;
 using Monica.App.Features.Wallet;
 using Monica.App.ViewModels;
@@ -623,15 +625,50 @@ public partial class MainWindow
             var formTitleBox = this.GetVisualDescendants()
                 .OfType<TextBox>()
                 .FirstOrDefault(control => control.Name == "KeePassEditTitleBox");
-            var formOnScreen = formPane is { IsVisible: true } &&
-                formPane.Bounds.Width > 0 &&
-                formPane.Bounds.Height > 0 &&
-                formTitleBox is { IsVisible: true } &&
-                formTitleBox.Bounds.Width > 0 &&
-                formTitleBox.Bounds.Height > 0;
+            var toolbarButton = this.GetVisualDescendants()
+                .OfType<Button>()
+                .FirstOrDefault(control => control.Name == "NewKeePassEntryButton");
+            // Bounds > 0 only says the layout gave the field a box somewhere. A 40-row library used to
+            // push this column below the fold of the page's own scroll, so the form was "on screen" with
+            // its title field off it - which is the difference between a draft you can fill in and one
+            // you can only see the bottom edge of. Ask where the box actually lands inside this window.
+            bool IsPaintedInsideWindow(Visual? control) =>
+                control is { IsVisible: true } && control.Bounds.Width > 0 && control.Bounds.Height > 0
+                && control.TranslatePoint(new Point(0, 0), this) is { } top
+                && control.TranslatePoint(new Point(control.Bounds.Width, control.Bounds.Height), this) is { } bottom
+                && top.X >= 0 && bottom.X <= Bounds.Width
+                && top.Y >= 0 && bottom.Y <= Bounds.Height;
+            // The pane itself is taller than a short window can show at once and is meant to scroll, so
+            // all it has to prove is that it starts on the window; the field to type in has to be whole.
+            bool StartsOnWindow(Visual? control) =>
+                control is { IsVisible: true } && control.Bounds.Width > 0 && control.Bounds.Height > 0
+                && control.TranslatePoint(new Point(0, 0), this) is { } top
+                && top.Y >= 0 && top.Y < Bounds.Height;
+            var formOnScreen = StartsOnWindow(formPane) && IsPaintedInsideWindow(formTitleBox);
+            // The heading and the tab strip ride the same scroll as this column, so the toolbar row is
+            // the witness that the page stopped taking the top of the tab out of view.
+            var toolbarOnScreen = IsPaintedInsideWindow(toolbarButton);
+            var pageScroller = this.GetVisualDescendants()
+                .OfType<ScrollViewer>()
+                .FirstOrDefault(control => control.Name == "SyncContentRegion");
+            var pageScrollOffset = pageScroller?.Offset.Y ?? -1;
+            // While the workspace fits, the page holds still and the offset has to stay at the top. When
+            // the window is too short for it, the page is allowed to scroll - but then the proof is that
+            // scrolling reaches the form, not that the form was visible without trying.
+            var pageKeepsStill = pageScroller?.VerticalScrollBarVisibility == ScrollBarVisibility.Disabled;
+            var workspace = this.GetVisualDescendants().OfType<KeePassBrowsePane>().FirstOrDefault();
+            var workspaceBounded = workspace is { Bounds.Height: > 0 } && workspace.Bounds.Height <= Bounds.Height;
+            var formReachable = formOnScreen;
+            if (!formReachable && pageScroller is { } scroller && !pageKeepsStill)
+            {
+                scroller.Offset = new Vector(scroller.Offset.X, scroller.Extent.Height);
+                await Task.Delay(250);
+                formReachable = StartsOnWindow(formPane) && IsPaintedInsideWindow(formTitleBox);
+            }
+
             var formWritten = false;
             var formFileName = "";
-            if (wantedFile && formOnScreen)
+            if (wantedFile && formReachable)
             {
                 var formFrame = await CaptureSmokeFrameAsync();
                 if (formFrame is { Length: > 0 })
@@ -647,6 +684,9 @@ public partial class MainWindow
             viewModel.CancelKeePassEntryEditCommand.Execute(null);
             await Task.Delay(150);
 
+            var pageHeldTheTop = pageKeepsStill
+                ? pageScrollOffset >= 0 && pageScrollOffset <= 1
+                : pageScrollOffset >= 0;
             var success = state.DatabaseOpened &&
                 state.FolderShown &&
                 state.DraftShown &&
@@ -657,7 +697,10 @@ public partial class MainWindow
                 state.BinDeleteSplit &&
                 state.EntryRestored &&
                 state.RecycleBinEmptied &&
-                formOnScreen &&
+                formReachable &&
+                toolbarOnScreen &&
+                workspaceBounded &&
+                pageHeldTheTop &&
                 keepassTab.IsSelected &&
                 frameBytes > 0 &&
                 (!wantedFile || written) &&
@@ -666,6 +709,11 @@ public partial class MainWindow
                 $"Smoke UI KeePass manage shot result. success={success}, opened={state.DatabaseOpened}, " +
                 $"folderAdded={state.FolderShown}, draftOpened={state.DraftShown}, " +
                 $"draftFormOnScreen={formOnScreen}, " +
+                $"formReachable={formReachable}, toolbarOnScreen={toolbarOnScreen}, " +
+                $"pageScrollY={pageScrollOffset}, pageKeepsStill={pageKeepsStill}, " +
+                $"workspaceBounded={workspaceBounded}, " +
+                $"workspaceHeight={workspace?.Bounds.Height ?? 0:0}, " +
+                $"pageViewportHeight={pageScroller?.Viewport.Height ?? 0:0}, " +
                 $"entryAdded={state.EntryShown}, unsavedNotice={state.UnsavedNoticeShown}, " +
                 $"binShown={state.BinShown}, entryInBin={state.EntryInBin}, " +
                 $"binDeleteSplit={state.BinDeleteSplit}, " +

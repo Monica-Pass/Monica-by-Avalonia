@@ -17,6 +17,8 @@ public partial class SyncWorkspaceView : UserControl
     public bool IsNarrowLayout { get; private set; }
     public bool IsMediumLayout { get; private set; }
 
+    // The scroll policy for a browsed .kdbx belongs to the pane that needs the bounded height, not here:
+    // see ApplyWorkspaceHeight in KeePassBrowsePane.
     public void UpdateResponsiveLayoutForWidth(double width)
     {
         IsNarrowLayout = width > 0 && width < NarrowBreakpoint;
