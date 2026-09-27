@@ -1,3 +1,4 @@
+using System.Runtime;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
@@ -627,10 +628,12 @@ public partial class App
     private static void CompactSmokeUiMemory()
     {
         // A private-bytes sample only means "what this process still holds" once the heap has been
-        // compacted; otherwise it reports whatever the GC had not bothered to collect yet.
-        GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, true);
+        // compacted; otherwise it reports whatever the GC had not bothered to collect yet. The recipe is
+        // the product's own lock-time shedding rather than a stronger one only the probe knows about, so
+        // the gate grades the compaction a locked user actually gets.
+        MainWindowViewModel.CompactShellMemory();
         GC.WaitForPendingFinalizers();
-        GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, true);
+        MainWindowViewModel.CompactShellMemory();
     }
 
     private static double ReportSmokeUiMemory(MainWindowViewModel viewModel, string stage)
@@ -640,11 +643,21 @@ public partial class App
         var privateMb = process.PrivateMemorySize64 / 1048576d;
         var peakWorkingSetMb = process.PeakWorkingSet64 / 1048576d;
         var managedMb = GC.GetTotalMemory(forceFullCollection: false) / 1048576d;
+        // `managedHeapMB` is live object bytes, which is not what the process still holds: the runtime
+        // keeps segments it committed while the unlocked shell was filling the heap. Until the locked
+        // floor is split into "committed by the GC" and "not the GC's", the 87-100MB of private bytes
+        // outside the live heap has no name, and the run-to-run step cannot be attributed to anything.
+        var gcInfo = GC.GetGCMemoryInfo();
+        var gcCommittedMb = gcInfo.TotalCommittedBytes / 1048576d;
+        var gcHeapMb = gcInfo.HeapSizeBytes / 1048576d;
         AppDiagnostics.Info(
             $"Smoke UI memory. stage={stage}, unlocked={viewModel.IsUnlocked}, " +
             $"workingSetMB={workingSetMb:F1}, privateMB={privateMb:F1}, " +
             $"peakWorkingSetMB={peakWorkingSetMb:F1}, managedHeapMB={managedMb:F1}, " +
-            $"threads={process.Threads.Count}");
+            $"gcCommittedMB={gcCommittedMb:F1}, gcHeapMB={gcHeapMb:F1}, " +
+            $"nonGcPrivateMB={privateMb - gcCommittedMb:F1}, " +
+            $"serverGC={GCSettings.IsServerGC}, cpuCount={Environment.ProcessorCount}, " +
+            $"handles={process.HandleCount}, threads={process.Threads.Count}");
         return privateMb;
     }
 

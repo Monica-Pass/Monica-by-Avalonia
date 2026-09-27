@@ -289,12 +289,16 @@ try {
             throw "smoke-ui produced no runtime log at $uiLog."
         }
 
+        # The locked floor is a median of a settling window. Without the individual rounds next to it,
+        # a run reading 110 and a run reading 121 cannot be told apart by anything the gate prints, and
+        # a successful run deletes its evidence directory - so today the trajectory only survives on a
+        # red run. 'stage=locked-settling' puts every round on the console for all runs.
         $gateLines = @(Get-Content -LiteralPath $uiLog | Select-String -SimpleMatch `
             'release gate completed', 'budget result', 'check failed', 'lock cycle result',
             'KeePass probe', 'status notice retirement', 'locked settle result',
             'KeePass edit shot', 'KeePass manage shot', 'KeePass search shot',
             'KeePass create shot', 'KeePass recent shot', 'KeePass handoff shot',
-            'KeePass history shot')
+            'KeePass history shot', 'stage=locked-settling')
         foreach ($line in $gateLines) { Write-Host ($line.Line -replace '^\[[^\]]+\]\s*', '') }
         $gateLine = $gateLines | Where-Object { $_.Line -match 'release gate completed' } | Select-Object -Last 1
         if ($null -eq $gateLine) {

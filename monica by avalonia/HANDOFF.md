@@ -3228,7 +3228,8 @@ NC-4 顺带量出一件该记的事：无头那条"不出现秘密"的断言原�
   本轮改的是**怎么把 7 说清楚**，不是**裁得一样**。
 - **三格仍然没有即时校验**（打字过程中不红，只有按「应用策略」才用状态文案说话），`days=0` 与 `items=-1` 的单闸门组合仍只在单测里成对测。
 - **导轨的可视高当时仍然只有 158px**（#133 已在下一轮出厂：现在同一格里是 8 行、298px 树视口），
-  `KeePassPreviewCard` 与导轨仍然各写一遍摘要与按钮；#134 本轮只换了那一格的单位与标签宽度。
+  当时记的"`KeePassPreviewCard` 与导轨各写一遍摘要与按钮"到 #133 复查时**已经不成立**（见 #133 第七节的逐格计数）；
+  #134 本轮只换了那一格的单位与标签宽度。
 - **"数据库设置"整页仍然没有**（KDF 参数、加密算法、回收站开关、数据库名），#132 那条对这一格原样成立。
 
 ## 附：被拒的那次保存第一次有了出路（2026-09-28，**#135 出厂：这一轮先把自己记的案情测否了，然后量出界面上那条不存在的动作**）
@@ -3486,7 +3487,11 @@ NC-4 顺带量出一件该记的事：无头那条"不出现秘密"的断言原�
 
 ### 七、仍然没做到（欠账，不是决定）
 
-- **立项的第二半"预览卡片与导轨重复"完全没做**：这一轮只买回了高度，`KeePassPreviewCard` 与导轨仍然各写一遍摘要与按钮。
+- **立项的第二半"预览卡片与导轨重复"经查已经不成立（#141 因此改写，不是被实现）**。逐格数过当前标记：
+  六格命令（新建条目 / 编辑 / 保存到文件 / 另存副本 / 立即导入 / 关闭文件）在 `SyncImportView.axaml` 里**各只出现 1 次**、
+  在 `KeePassBrowsePane.axaml` 里 **0 次**；摘要也只有 `SyncImportView.axaml:160` 那一格
+  （导轨里的 `KeePassSearchSummaryText` 说的是搜索结果条数，不是库摘要，不是同一句话的副本）。
+  这一半早在 #120/#133 就已经被减掉了，立项文本比代码旧。
 - **左边那格 `TabStripPlacement="Left"` 的导航条约值 300px 页宽**：1280×800 上导入列只剩 590px、树那一列 **299px**，
   邮箱被裁成 `user2@example…`；同步侧栏下面还有一大片空白。本轮一行没动，留给未来的密度切片。
 - **8 行这个下限是这一轮选的，不是问来的**；而且只在 **1280×800 + zh-CN** 一条式子上绿。125% DPI、
@@ -3496,6 +3501,102 @@ NC-4 顺带量出一件该记的事：无头那条"不出现秘密"的断言原�
 - **没把"可视行数"报给人看过**：界面上没有一处说"这里能放几行"，人只能自己数。
 - **内存那格的红仍然挂着**（#140），跨进程写冲突（#139）与"重新载入盘上那份"（#138）不变；
   三格策略数字仍然没有即时校验（#132/#134 原样）。
+
+## 附：把台阶拆开看（2026-09-28，**#140 第一轮：门现在自己会报分解；台阶不在原生那一侧，在 GC 提交量的量子化上；第一刀（LOH 压缩）试了，测出来是空的，已撤回**）
+
+### 一、先让门自己把分解说出来（不然每一趟都在删自己的证据）
+
+之前 8 趟复跑只留下一个 `lockedPrivateMB=…`，因为 `verify-artifact-runtime.ps1` 成功即删 run root
+（`:477-484`），而回显应用日志的 `Write-AppLogEvidence`（`:90-116`）**只在超时或非零退出时调用**。
+所以这一轮先把分解读进"成功也会保留"的那条路：
+
+- `src/Monica.App/Diagnostics/App.SmokeUi.cs`：`ReportSmokeUiMemory` 每行多了
+  `gcCommittedMB / gcHeapMB / nonGcPrivateMB / serverGC / cpuCount / handles / threads`
+  （`nonGcPrivateMB = privateMB - gcCommittedMB`，即"这块私有内存不是 GC 拥有的"）。
+- `eng/ci/verify-artifact-runtime.ps1`：UI 阶段那串无条件控制台回声（`$gateLines`）加了
+  `'stage=locked-settling'`。**注释放在语句外面**，不塞进反引号续行的参数列表里——PS 5.1 那种续行里
+  插 `#` 能过语法检查但语义不稳，这条构造是拿一份四行假日志实测过的（`matched=3`，两条 settling 都出来）。
+
+### 二、同一份字节 5 趟的地板：飘的不是原生，是 GC 提交
+
+`i140-mem-4..8`（每趟 `settlingRounds=10`，取第 10 轮=地板）：
+
+| 趟 | 判定值 | 地板 private | gcCommitted | nonGc | live managed | threads |
+|----|--------|--------------|-------------|-------|--------------|---------|
+| 4  | 115.7  | 115.7        | 48.8        | 66.9  | 25.1         | 21      |
+| 5  | 112.8  | 112.7        | **45.7**    | 67.0  | 28.1         | 20      |
+| 6  | 115.4  | 115.4        | 48.6        | 66.8  | 25.0         | 20      |
+| 7  | 117.6  | 116.9        | 48.8        | 68.0  | 25.0         | 19      |
+| 8  | 115.3  | 115.9        | 48.8        | 67.1  | 25.0         | 21      |
+
+读出来的形状和 #133 那次的猜测相反：
+
+- **一趟之内**衰减的是 nonGc（首轮 76.x → 地板 67.x，跟着 threads 26→20、handles 600→578 掉）；
+  窗口够用，地板是平的，判定没有"采早了"。
+- **趟与趟之间**nonGc 稳到 1.2MB（66.8–68.0），而 gcCommitted 在 45.7 与 48.6/48.8 之间跳。
+  也就是说预算 120 上面那 3–4MB 的余量，赌的是 **GC 提交段数的量子化台阶**（一约 3.1MB 的跳变），
+  不是原生残留。原生那一侧 67MB 是这套 Avalonia 外壳的常数底。
+
+### 三、第一刀（LOH 压缩）落空，并且已经撤回
+
+台阶既然在 GC 提交，先去试最像元凶的那把锁：大对象堆默认不压缩，而一次会话全是 MB 级的 `byte[]`
+（`.kdbx` 文件字节、解密流、历史块、附件、图片预览）。于是给产品自己的锁后压缩
+（`MainWindowViewModel.BackgroundMemory.cs` 的 `ShedLockedMemoryAsync`）和探针都加上
+`GCSettings.LargeObjectHeapCompactionMode = CompactOnce`。
+
+**测下来是空的**：`i140-gate-dump.log` 地板 `privateMB=116.3, gcCommittedMB=48.7, live 25.0`，
+判定 `115.8`，对比上表 115.7/48.8/25.0 —— 一位小数以内没动。所以那行已撤回，注释留在代码里当路牌。
+
+撤回时**留下**的是另一件事：探针的 `CompactSmokeUiMemory()` 现在调用产品的
+`MainWindowViewModel.CompactShellMemory()`，不再自带一套"只有探针会做"的压缩。之前它做的是
+`GC.Collect(..., Aggressive, true)` ×2，而产品做 `blocking: true`——**门一直是在给自己量一把比产品更强的压缩**，
+现在两边同一配方，120MB 这个预算说的才是锁定用户实际会得到什么。
+
+### 四、真堆快照：52.7MB 提交里有 12.3MB 是移不动的空隙
+
+拿 `dotnet-dump --type Heap` 在 `stage=locked-settling-3` 那一刻（即产品自己的压缩刚做完）抓了锁定态：
+
+- `eeheap -gc`：`GC Allocated 52,733,216` / `GC Committed 52,776,960`（提交里几乎没留未分配的段）。
+- `dumpheap -stat`：`Total 395,902 objects, 52,602,291 bytes`，其中 **`Free` 12,287,624 字节 / 122 块**；
+  >0.5MB 的六块（2.02/0.99/0.94/2.10/1.88/3.81MB）后面紧跟的**全是 `System.Byte[]`**。
+  → 活对象约 40.3MB，另有 12.3MB 空隙夹在大 `byte[]` 中间，`Aggressive + blocking + compacting` 和
+  `CompactOnce` 都清不掉。台阶的"段数"就是这么被顶住的。
+- 活对象头部：`Byte[] 7.45MB(3,911)`、`String 2.04MB(30,101)`、
+  `ServerCompositionDrawListVisual 1.63MB(2,196)`、`CompositionDrawListVisual 0.98MB(2,196)`、
+  `ServerCompositionVisual+ReadbackData 0.77MB(5,070)`、`DynamicResourceExpression 0.91MB(6,675)`、
+  `ServerBorderVisual 0.26MB(339)`。**约 4,700 个 Avalonia 合成服务器视觉对象在"已锁 + 外壳休眠"下常驻**
+  → 下一刀记在 #143。
+
+### 五、一次自我更正，记下来是因为它差点就成了结论
+
+把 `eeheap -gc` 和 `gchandles` 串在同一次 `dotnet-dump analyze` 里，我读到过一段
+"1,335 个 `MainWindowViewModel` / 780 个 `VaultFolderTree` / Total 26,517 objects"，
+据此写了一句"锁定进程里养着上千个废弃视图模型"。**那是同一条命令行里被过滤掉的部分视图**。
+用干净命令重测（`dumpheap -stat -type MainWindowViewModel`）：`Monica.App.ViewModels.MainWindowViewModel`
+**只有 1 个（4,680 字节）**，名字含 MainWindowViewModel 的对象一共 17 个（嵌套类型 + 异步状态机 box）。
+上面第四节只采信单次、单一命令、能复现的输出。
+
+### 六、顺带量到的第二条飘红（不是内存）
+
+第 10 趟在同一份字节上 `rc=1`，但内存是绿的（112.7/120）：
+`Smoke UI status notice retirement result. success=False, raised=True, armedForNotice=True, retired=False,
+standingArmed=False, standingLength=6`——#80 那句"瞬态状态文案自己退场"在真跑门里偶发不退场，
+11 趟 1 红（约 9%）。已单独立项 #142，不并进 #140。
+
+### 七、这一轮没做、没证
+
+- **台阶没消除**，120MB 预算原样未动。这一轮买到的是"它到底由什么构成"和一个否证（LOH）。
+- **地板分布是改前字节测的（5 趟），改后只测了 1 趟**（且那一趟带 CompactOnce，之后又撤了）。
+  撤回后的字节还需要一整串复跑才能说"红了没红"。
+- **快照只有一份、一个时刻（settling-3）**：空隙是不是每趟都在、大小多少，没测；
+  合成视觉常驻也没做"锁前/锁后"对照，只证了"锁后还在"。
+- **抓 dump 会挂起被测进程几秒**：这一趟的门因此不能同时用作计时预算的证据。
+- **#139/#138/#141/#94/#115/#91 原样不动**；快照留在 `D:\kpprobe\dumps\locked.dmp`（157MB，库外，不在 git 里）。
+  本轮**没有删**它：#143 要用 `gcroot`/`gchandles` 继续查那 4,700 个合成视觉对象是谁根住的，重抓一次要再跑一趟门。
+  里面是锁定态的堆（库已锁、会话已 Dispose），但截图缓冲和字符串池在里头，别外传、查完删。
+- **撤回 CompactOnce 之后的这一串门链是全绿的**：`fmt_rc=0 cr_rc=0 pub_rc=0 art_rc=0`，
+  锁定地板 `privateMB=117.2 / gcCommitted 49.2 / nonGc 68.0 / live 25.1 / threads 19`，判定 `117.2 ≤ 120`。
+  也就是说 120 的余量确实只剩 2.8MB，与第二节测到的那个 3.1MB 段数量子化台阶同量级——这是下一刀必须知道的。
 
 
 

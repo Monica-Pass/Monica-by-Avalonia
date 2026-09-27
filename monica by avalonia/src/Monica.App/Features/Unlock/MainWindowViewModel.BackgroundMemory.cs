@@ -74,6 +74,18 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        CompactShellMemory();
+    }
+
+    // The probe reads the same recipe instead of its own stronger one, so the budget it grades is the
+    // compaction a locked user actually gets.
+    //
+    // Measured on the artifact gate, an extra GCSettings.LargeObjectHeapCompactionMode = CompactOnce in
+    // front of this collect did not move anything: the locked plateau read 116.3 MB private with 48.7 MB
+    // of it committed by the GC, against a baseline of 115.7 MB and 48.8 MB. The large-object heap is
+    // therefore not what keeps those segments committed, and the knob is not worth its blocking pause.
+    internal static void CompactShellMemory()
+    {
         GC.Collect(
             GC.MaxGeneration,
             GCCollectionMode.Aggressive,
