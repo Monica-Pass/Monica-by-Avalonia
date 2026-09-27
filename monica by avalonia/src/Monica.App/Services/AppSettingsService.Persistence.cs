@@ -177,6 +177,7 @@ public sealed partial class AppSettingsService
         SyncConflictStrategy = source.SyncConflictStrategy,
         OneDriveEnabled = source.OneDriveEnabled,
         MdbxLocalCacheEnabled = source.MdbxLocalCacheEnabled,
+        KeePassRecentVaults = [.. source.KeePassRecentVaults],
         FeatureToggles = new Dictionary<string, bool>(source.FeatureToggles, StringComparer.OrdinalIgnoreCase)
     };
 }

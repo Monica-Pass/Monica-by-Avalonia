@@ -219,6 +219,16 @@ try {
             throw 'ui-seed-smoke-keepass-vault-shot did not report success.'
         }
 
+        # The remembered-list frame moves its own file out of the way to paint the row's gone state, so it
+        # gets a database of its own rather than borrowing one a later frame still has to read.
+        $keepassRecentPath = Join-Path $keepassDirectory 'remembered.kdbx'
+        $keepassRecentSeed = Invoke-ArtifactCommand -Label 'ui-seed-smoke-keepass-vault-recent' -Arguments @(
+            '--seed-smoke-keepass-vault', $keepassRecentPath, 'keepass-smoke-fixture-not-a-secret',
+            '4', '2')
+        if ($keepassRecentSeed -notmatch 'Smoke KeePass vault seeded') {
+            throw 'ui-seed-smoke-keepass-vault-recent did not report success.'
+        }
+
         $null = Invoke-ArtifactCommand -Label 'smoke-ui' -TimeoutSeconds $UiTimeoutSeconds -AppLogPath $uiLog -Arguments @(
             '--smoke-ui-unlock', $MasterPassword,
             '--smoke-ui-width', '1280',
@@ -239,6 +249,7 @@ try {
             '--smoke-ui-keepass-search', $keepassShotPath,
             '--smoke-ui-keepass-search-query', 'example.com',
             '--smoke-ui-keepass-create',
+            '--smoke-ui-keepass-recent', $keepassRecentPath,
             '--smoke-ui-lock-after-checks',
             '--smoke-ui-exit-after-checks'
         )
@@ -251,7 +262,7 @@ try {
             'release gate completed', 'budget result', 'check failed', 'lock cycle result',
             'KeePass probe', 'status notice retirement', 'locked settle result',
             'KeePass edit shot', 'KeePass manage shot', 'KeePass search shot',
-            'KeePass create shot')
+            'KeePass create shot', 'KeePass recent shot')
         foreach ($line in $gateLines) { Write-Host ($line.Line -replace '^\[[^\]]+\]\s*', '') }
         $gateLine = $gateLines | Where-Object { $_.Line -match 'release gate completed' } | Select-Object -Last 1
         if ($null -eq $gateLine) {
@@ -278,7 +289,7 @@ try {
         # search one also holds the only check that a rendered row never carries a protected value, and the
         # create one is the only frame that ever shows the new-database form. A run where any of them
         # stopped painting would otherwise leave the gate green.
-        foreach ($shot in @('KeePass edit shot', 'KeePass manage shot', 'KeePass search shot', 'KeePass create shot')) {
+        foreach ($shot in @('KeePass edit shot', 'KeePass manage shot', 'KeePass search shot', 'KeePass create shot', 'KeePass recent shot')) {
             $shotLine = @($gateLines | Where-Object { $_.Line -match "$shot result" }) | Select-Object -Last 1
             if ($null -eq $shotLine) {
                 throw "smoke-ui produced no $shot result line."
@@ -331,6 +342,32 @@ try {
 
         if ($createLine.Line -notmatch 'wipedOnCancel=True') {
             throw "KeePass create shot left the typed passwords behind after cancel: $($createLine.Line)"
+        }
+
+        # The remembered list is the one KeePass surface that survives a person leaving the page, so its
+        # own promises are named here rather than left to one aggregate flag: a row is a file name and not
+        # a path, it never carries the master password, tapping it returns a blank masked prompt instead of
+        # a stored one, a file that has gone is still listed and says where it lived, and dismissing a row
+        # takes the section away with it.
+        $recentLine = @($gateLines | Where-Object { $_.Line -match 'KeePass recent shot result' }) | Select-Object -Last 1
+        if ($recentLine.Line -notmatch 'namedByFile=True' -or $recentLine.Line -notmatch 'noFolderShown=True') {
+            throw "KeePass recent shot did not paint the row as a file name: $($recentLine.Line)"
+        }
+
+        if ($recentLine.Line -notmatch 'paintedSecretFree=True') {
+            throw "KeePass recent shot painted the master password: $($recentLine.Line)"
+        }
+
+        if ($recentLine.Line -notmatch 'rowSurvivesClose=True' -or $recentLine.Line -notmatch 'promptMaskedAndEmpty=True') {
+            throw "KeePass recent shot did not hand the master password prompt back: $($recentLine.Line)"
+        }
+
+        if ($recentLine.Line -notmatch 'goneRowSaysWhereItLived=True' -or $recentLine.Line -notmatch 'goneRowRefusedTheForm=True') {
+            throw "KeePass recent shot misreported a database that is no longer there: $($recentLine.Line)"
+        }
+
+        if ($recentLine.Line -notmatch 'listHiddenAfterDismiss=True') {
+            throw "KeePass recent shot left the remembered list up after its last row was dismissed: $($recentLine.Line)"
         }
 
         # Same reason: the dispatcher timer that retires status acknowledgements only exists in a

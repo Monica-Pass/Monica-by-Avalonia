@@ -454,6 +454,10 @@ public interface ILocalizationService : INotifyPropertyChanged
     string NewKeePassDatabase { get; }
     string KeePassCreate { get; }
     string KeePassCreateDescription { get; }
+    string KeePassRecentTitle { get; }
+    string KeePassRecentLastOpened { get; }
+    string KeePassRecentFileMissing { get; }
+    string KeePassRecentForget { get; }
     string KeePassInspect { get; }
     string KeePassImportNow { get; }
     string KeePassChooseDifferentFile { get; }
@@ -977,6 +981,10 @@ public sealed class LocalizationService : ILocalizationService
     public string NewKeePassDatabase => Text();
     public string KeePassCreate => Text();
     public string KeePassCreateDescription => Text();
+    public string KeePassRecentTitle => Text();
+    public string KeePassRecentLastOpened => Text();
+    public string KeePassRecentFileMissing => Text();
+    public string KeePassRecentForget => Text();
     public string KeePassInspect => Text();
     public string KeePassImportNow => Text();
     public string KeePassChooseDifferentFile => Text();
@@ -2124,6 +2132,12 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassCreatedFormat"] = "Created {0} and opened it.",
         ["KeePassDiscardBeforeCreating"] = "Save or close the opened KeePass database before creating a new one.",
         ["KeePassCreateFailed"] = "The KeePass database could not be created.",
+        ["KeePassRecentTitle"] = "Recently opened",
+        ["KeePassRecentLastOpened"] = "Last opened",
+        ["KeePassRecentFileMissing"] = "Not where it was last opened",
+        ["KeePassRecentForget"] = "Remove from this list",
+        ["KeePassRecentRemovedFormat"] = "Removed {0} from this list. The file itself was not touched.",
+        ["KeePassRecentReadFailed"] = "That KeePass file could not be read.",
         ["KeePassInspect"] = "Inspect",
         ["KeePassImportNow"] = "Import reviewed entries",
         ["KeePassChooseDifferentFile"] = "Choose a different file",
@@ -3175,6 +3189,12 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassCreatedFormat"] = "已创建并打开 {0}。",
         ["KeePassDiscardBeforeCreating"] = "请先保存或关闭当前打开的 KeePass 数据库，再新建一个。",
         ["KeePassCreateFailed"] = "KeePass 数据库创建失败。",
+        ["KeePassRecentTitle"] = "最近打开",
+        ["KeePassRecentLastOpened"] = "上次打开",
+        ["KeePassRecentFileMissing"] = "不在上次打开的位置",
+        ["KeePassRecentForget"] = "从列表移除",
+        ["KeePassRecentRemovedFormat"] = "已从列表移除 {0}，文件本身未做任何改动。",
+        ["KeePassRecentReadFailed"] = "无法读取该 KeePass 文件。",
         ["KeePassInspect"] = "检查",
         ["KeePassImportNow"] = "导入已检查条目",
         ["KeePassChooseDifferentFile"] = "选择其他文件",

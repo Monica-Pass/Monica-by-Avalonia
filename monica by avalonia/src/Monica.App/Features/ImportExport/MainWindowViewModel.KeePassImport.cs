@@ -80,6 +80,7 @@ public sealed partial class MainWindowViewModel
                 cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             _keePassVaultSession = session;
+            RememberKeePassVault(session);
             _keePassOpenFolders.Add(session.RootGroupUuid);
             await RebuildKeePassTreeAsync(session, cancellationToken);
             OnPropertyChanged(nameof(HasKeePassImportPreview));

@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" xmlns:controls="using:Monica.App.Controls" xmlns:sync="using:Monica.App.Features.Sync" x:Class="Monica.App.Features.Sync.SyncImportView" x:DataType="vm:MainWindowViewModel">
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" xmlns:controls="using:Monica.App.Controls" xmlns:sync="using:Monica.App.Features.Sync" x:Class="Monica.App.Features.Sync.SyncImportView" x:Name="SyncImportRoot" x:DataType="vm:MainWindowViewModel">
     <Grid IsVisible="{Binding IsSyncImportSelected}" RowDefinitions="Auto,*" MinWidth="0">
         <ProgressBar x:Name="ImportBusyIndicator" IsIndeterminate="True" IsVisible="{Binding IsImportExportBusy}" AutomationProperties.Name="{Binding StatusMessage}" Margin="0,0,0,10" />
         <TabControl x:Name="ImportSourceTabs" Grid.Row="1" TabStripPlacement="Left" AutomationProperties.Name="{Binding L.ImportData}">
@@ -81,6 +81,31 @@
                                 <TextBlock Text="{Binding L.NewKeePassDatabase}" />
                             </StackPanel>
                         </Button>
+                    </StackPanel>
+                    <StackPanel x:Name="KeePassRecentSection" Spacing="6" IsVisible="{Binding HasKeePassRecentVaults}">
+                        <TextBlock Text="{Binding L.KeePassRecentTitle}" FontSize="12" FontWeight="SemiBold" />
+                        <ItemsControl x:Name="KeePassRecentVaultsList" ItemsSource="{Binding KeePassRecentVaultRows}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:KeePassRecentVaultRow">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                        <Button x:Name="OpenKeePassRecentVaultButton" Classes="workspaceListRowButton" Command="{Binding #SyncImportRoot.DataContext.OpenKeePassRecentVaultCommand}" CommandParameter="{Binding}" AutomationProperties.Name="{Binding Label}">
+                                            <StackPanel Spacing="2" HorizontalAlignment="Left">
+                                                <TextBlock Text="{Binding Label}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <TextBlock Text="{Binding #SyncImportRoot.DataContext.L.KeePassRecentLastOpened}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding ShowsLastOpened}" />
+                                                    <TextBlock Text="{Binding LastOpenedText}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding ShowsLastOpened}" />
+                                                    <TextBlock x:Name="KeePassRecentFileMissingText" Text="{Binding #SyncImportRoot.DataContext.L.KeePassRecentFileMissing}" FontSize="12" Foreground="{DynamicResource SystemFillColorCautionBrush}" IsVisible="{Binding IsFileMissing}" />
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding DirectoryText}" FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" IsVisible="{Binding ShowsLocation}" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button x:Name="ForgetKeePassRecentVaultButton" Grid.Column="1" Classes="workspaceCommand" VerticalAlignment="Top" Padding="8,4" Command="{Binding #SyncImportRoot.DataContext.ForgetKeePassRecentVaultCommand}" CommandParameter="{Binding}" AutomationProperties.Name="{Binding #SyncImportRoot.DataContext.L.KeePassRecentForget}">
+                                            <ic:FluentIcon Icon="Dismiss" FontSize="14" />
+                                        </Button>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
                     <TextBlock x:Name="KeePassSelectedFileText" Text="{Binding KeePassSelectedFileName}" IsVisible="{Binding HasKeePassSelectedFile}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                     <StackPanel Spacing="8" IsVisible="{Binding ShowKeePassOpenForm}" IsEnabled="{Binding IsKeePassImportIdle}">

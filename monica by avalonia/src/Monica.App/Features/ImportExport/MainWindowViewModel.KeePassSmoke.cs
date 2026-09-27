@@ -185,6 +185,22 @@ public sealed partial class MainWindowViewModel
     }
 
     /// <summary>
+    /// Opens the file for the remembered-list shot and stops there. Which databases this machine has opened
+    /// is the tab's own business, so this seam contributes exactly one thing: a database that did open,
+    /// which is what puts a row on the list. Everything the frame then claims is read from the painted row
+    /// and driven through the painted controls.
+    /// </summary>
+    internal async Task<bool> SmokeOpenKeePassForRecentAsync(
+        string path,
+        string password,
+        CancellationToken cancellationToken = default)
+    {
+        ClearKeePassImportState(cancelActiveOperation: true);
+        var opened = await SmokeOpenKeePassDatabaseAsync(path, password, cancellationToken);
+        return opened.DatabaseOpened;
+    }
+
+    /// <summary>
     /// Opens the database and browses until an entry row is visible, which is what both seams need
     /// before they can do anything with a row. The loop rather than a single toggle because a fixture
     /// nests as deep as its author left it.

@@ -2193,3 +2193,135 @@ publish win-x64 jit 之后 `UI SMOKE passed` + `RUNTIME SMOKE passed`。读数�
 - 片 D 余下（历史视图与从历史还原、标签、过期/已过期、可编辑图标与 AutoType、CustomData 只读）、搜索的键盘入口
   （`Ctrl+F`、↑↓、Enter）与 Android 那几个搜索选项、右键与拖放从未在真机屏幕上走过、桌面还原不能人选目标夹、
   清空没有撤销、#120 的 1280x800 外层滚动把标题与标签页顶出视口——全部沿用。
+
+## 附：记住打开过的 .kdbx（2026-09-27，**#127 片 H-1 出厂：桌面上第一次有"最近打开"，而"点一行就替你把密码填好"这件事被明确拒掉**）
+
+### 一、这一轮把什么变成了事实
+
+- 新增 `src/Monica.App/Services/KeePassRecentVaultRegistry.cs`（136 行）是列表唯一的规则处：`Limit = 12`（:26）、
+  `Remember:28`（先 Forget 再插到 0，**保留这条最早的到达时间**）、`Forget:60`（`RemoveAll`，按 OrdinalIgnoreCase）、
+  `Ordered:71`（去重、"早到达 / 晚打开"合并、`Take(Limit)`）、`Find:109`、`DisplayNameFor:123`（没名字就用文件基名）。
+- 存的地方是 `settings.json`，不是库：`AppSettingsService.cs:63` 一个 `List<KeePassRecentVaultSetting>`，
+  `Normalize:177` → `NormalizeKeePassRecentVaults:235` 每次读盘都重过一遍 `Ordered`（:239）——手改坏的、重复的、
+  超过 12 条的设置文件在**加载时**就收成合法形状，而不是等到界面上出错；`Clone` 也带上它
+  （`AppSettingsService.Persistence.cs:180`）。**.kdbx 载荷一个字节都没多**，所以 #115 的跨端文件格式结论不受影响。
+- 记的时机是"证明解得开"，不是"选中了文件"：`RememberKeePassVault:164` 只在拿到带 `SourcePath` 的会话时调用，
+  调用点在 `KeePassImport.cs:83`（解锁成功之后）与 `KeePassCreate.cs:143`（新建出来之后）。没有本地路径的会话
+  （导入的字节、云盘句柄）不记（:166-169）——单测 `A_file_with_no_local_path_has_no_row_to_remember:251`。
+- **点一行不等于打开**：`OpenKeePassRecentVaultAsync:94` 只把文件读成待检查的字节（:121-128），掩码的主控密码框
+  照旧要人敲。顺序按"人看得懂"排：正在忙就什么也不做（:96）→ 已开的库还有没保存的改动就拒（:101，
+  `KeePassDiscardBeforeOpening`）→ 点的就是当前已开那本只回一句提示（:107）→ 读不到（没了/没权限）时
+  **刷新列表并说明原因**（:134-140），而不是留一行没人看得懂的状态文字。
+- 行的信息量按"要不要说"决定：`DirectoryText` 只在**文件不在了**或**两行同名**时才画（:66-68），
+  `IsFileMissing` 用 `File.Exists` 现算（:59），时间戳按当前语言区域格式化（`FormatKeePassRecentTimestamp:77`）。
+  进"导入数据"页就重算一次（`SyncCallbacks.cs:16`），因为文件可能就在这期间被移走。
+- 界面：`SyncImportView.axaml:85-109`。整段 `IsVisible="{Binding HasKeePassRecentVaults}"`（:85，VM :41），
+  行本身是按钮（:91，`CommandParameter="{Binding}"`、`AutomationProperties.Name` 用文件基名），右侧 × 是
+  `ForgetKeePassRecentVaultButton`（:102）。沿用房内规矩：行命令走 `#SyncImportRoot.DataContext`，
+  不用 `NotifyCanExecuteChangedFor`。本地化 4 个界面键（EN :2135-2138 / ZH :3192-3195）+ 2 个状态文案
+  （`KeePassRecentRemovedFormat` :2139/:3196 明说"文件本身未做任何改动"、`KeePassRecentReadFailed` :2140/:3197）。
+- 与 Android 的关系：**查过了，Android 没有 .kdbx 的最近文件列表可对位**——`lastOpened` 在 Android 源码里的命中
+  全是条目级 quick access（`PasswordQuickAccessManager.kt`、`VaultOverviewUsageManager.kt`）。所以这一片没有
+  "照搬数据形状"的对象，也没有新的互通面。
+
+### 二、为什么"记住文件"不滑成"记住密码"
+
+设置里那行只有三样：路径、给人看的名字、两个时间戳。这条边界不是注释，是断言：
+`Unlocking_a_file_remembers_where_it_is_and_nothing_that_opens_it:19` 在解锁一次之后把 `settings.json` 落盘，
+再要求文件文本里**不含**两个 fixture 口令——并且这条检查排在所有"形状"断言**之前**，因为负控 NC-1 证明过：
+把口令拼进 `LastOpenedText` 之后，排在后面的检查照样红，但红得晚，一次"行里带出口令"的改动会先被形状断言吃掉。
+不做"存了口令下次自动解锁"的理由写在同一处：那会把主密码的可信边界从"人脑 + 一次性输入"换成"这台机器的磁盘"，
+而 .kdbx 存在的全部意义就是前者。KeePass 与 Android 都没开这个头，桌面也不开。
+
+### 三、真产物截图门（这轮新接的那一帧）
+
+`--smoke-ui-keepass-recent <path>`（帧在 `MainWindow.SmokeUi.cs:959`，分发在 `App.SmokeUi.cs:338/:351`，
+VM seam 是 `MainWindowViewModel.KeePassSmoke.cs` 的 `SmokeOpenKeePassForRecentAsync`）。16 项声明按屏幕顺序走：
+先用**画出来的 ×** 把列表清空（`emptiedThroughTheControl`，≤24 次）→ 空列表时整段不该在屏上（`listHiddenBefore`）→
+开一次库（`opened`）→ 行在屏上且 bounds>0（`rowOnScreen`）→ 行用文件基名命名、不画目录（`namedByFile`/`noFolderShown`）→
+画出的文字里没有口令（`paintedSecretFree`）→ 说得出上次打开的时间（`saysWhenItWasOpened`）→ 关库之后行还在
+（`rowSurvivesClose`）→ 点它把**掩码且空**的口令框带回来（`promptCameBack`/`promptMaskedAndEmpty`/`fileNameRestored`）→
+把文件挪走再回来时那一行说得出它原来在哪、点它不给表单（`goneRowSaysWhereItLived`/`goneRowRefusedTheForm`）→
+最后一行被 × 掉之后整段消失（`listHiddenAfterDismiss`）。
+- 这一帧**自带一次性 fixture**（`verify-artifact-runtime.ps1` 的 `ui-seed-smoke-keepass-vault-recent`，4 条 2 夹），
+  因为它会移动自己的输入文件；借别人的 .kdbx 会把后面那帧的输入弄没。
+- CI 现在硬要这一行并逐字段点名（:341-365），任一字段软掉就停跑，而不是记一行没人看的日志。
+- 实测（还原后的字节，三次跑）：`success=True`、16 项全 True、`paintedTexts=4`、`frameBytes=91947`。
+- **要 PNG 得单独再跑一帧**：产物门成功跑完会删掉 run root，而且它不传 `--smoke-ui-screenshot-dir`，所以
+  门里那一帧是 `written=False`（字节数照报）。本轮用一个一次性 appdata（`D:\kpprobe\recent-shot\`）单独跑了
+  `D:\kpprobe\recent-shot.ps1`（口令走 `--smoke-ui-unlock-env`，不进 argv），拿到
+  `D:\Monica-kpshots\KeePassRecent_1280x800.png`（91845 字节，10:22:45）并**人眼看过**：中文界面、
+  "最近打开 / remembered.kdbx / 上次打开 2026/9/27 10:22" + 右侧 ×、下面那一格是文件名不是口令、库里 4 条
+  Smoke Fixture 条目，屏幕上没有任何明文凭据。
+
+### 四、负控（每条先看见红，跑完还原并核对 sha256）
+
+十条。九条打在无头界面 seam（`tests/Monica.UiTests/KeePassRecentWorkflowUiTests.cs`，每轮只红对应那条），
+最后一条打在**真产物**上：
+
+| 拆掉的东西 | 红在哪 | 实测 |
+|---|---|---|
+| NC-1 把口令拼进 `LastOpenedText`（让秘密被画出来） | 画出的文字里不许有口令 | 红在 `:222` 那条布尔。失败输出只有 `Expected/Actual` 两个布尔，`grep -c not-a-secret` = 0 |
+| NC-2 `Label = item.Path`（行改用全路径命名） | 行只用文件名 | 红在 `:219`，两条用例都红，消息是固定句子、不回显路径 |
+| NC-3 `IsFileMissing = false`（不现算存在性） | 没了的文件要说自己没了 | 红在 `:152` `Assert.True(row.IsFileMissing)` |
+| NC-4 XAML：× 按钮的 `Command` 换成打开命令 | 每根行控件得是它声称的那个动作 | 红在 `:101` `Assert.Same()`（"not the same instance"） |
+| NC-5 XAML：行按钮去掉 `CommandParameter` | 命令拿到的是被点的那一行 | 红在 `:61`（`ReferenceEquals` 那句固定消息） |
+| NC-6 `HasKeePassRecentVaults => true`（整段常驻） | 没得可显示时段落不该在屏上 | 红在 `:48`（经 `AssertRecentSectionHidden` `:234`） |
+| NC-7 删掉 `KeePassImport.cs:83` 的 `RememberKeePassVault(session);` | 解锁过一次就该留下一行 | 红在 `:53` 与 `:151`：`Assert.Single() The collection was empty` |
+| NC-8 读不到的那一行在 catch 里被顺手忘掉 | 打不开的行要留在列表里说清楚位置 | **只**红在 `:170`（fact 1 不受影响） |
+| NC-9 点行改走一次文件选择器（try 开头插 `SelectKeePassFileAsync()`） | 点行不许再去问操作系统要文件 | 红在 `:75`（`Expected: 1 / Actual: 2`，只报计数）与 fact 2 的 `:166` |
+| NC-10 `DirectoryText` 规则改成"永远显示目录" | 行只用文件名命名 | 无头：红在 `:225`（`Expected: False / Actual: True`）。**真产物**：重新 publish 后 `verify-artifact-runtime.ps1` **停跑**（`chain_rc=1`，`success=False`，唯一翻掉的是 `noFolderShown=False`、`paintedTexts` 4→5），证据留在 `…Temp\monica-runtime-smoke-win-x64-5e4cd75c…` |
+
+还原核对：`MainWindowViewModel.KeePassRecent.cs` sha256 `ac8c5658…` 与动手前逐字节一致，四份产物帧文件
+（`MainWindow.SmokeUi.cs` `c1b97bc2…` / `App.SmokeUi.cs` `a1912c1c…` / `MainWindowViewModel.KeePassSmoke.cs`
+`32fcd504…` / `verify-artifact-runtime.ps1` `e8298a54…`）`sha256sum -c` 全 OK；还原后 UI 类重跑 `Total: 2, Failed: 0`，
+重新 publish 的产物再跑门 `success=True`。
+**一条对不上的哈希要记清**：`tests/Monica.Tests/AppSettingsTests.KeePassRecent.cs` 相对基线（`c08f8652…`）变了
+（现在 `9d53f01b…`）。这不是漏还原——把当初整文件写出来的那份从会话记录里抽出来做真 diff，改动全是**加强**：
+泄漏检查挪到所有形状断言之前并多两条（`row.Label`、`StatusMessage`）、删掉一条形如
+`Assert.Equal(2, Count * 0 + Count)` 的空断言换成三条明确的顺序断言、"离开再回来才问磁盘"补上真的回一次 Import 页、
+假 picker 去掉多余的 `Path` 字段。少了一条 `AddedAtUtc ≠ LastOpenedAtUtc`（同一 tick 会假红），该主张由
+`KeePassRecentVaultRegistryTests.A_duplicate_keeps_the_earliest_arrival_and_the_latest_opening` 承重。
+
+### 五、测试与证据
+
+- 单测 14 条：`tests/Monica.Tests/KeePassRecentVaultRegistryTests.cs`（137 行，6 条）——记两次只留一行并回到最前 `:16`、
+  12 条封顶丢最旧 `:41`、没名字用文件基名 `:64`、Windows 大小写/斜杠拼法算同一个文件 `:75`、
+  重复项保留最早到达与最晚打开 `:89`、忘掉一行不动其他行 `:113`；
+  `tests/Monica.Tests/AppSettingsTests.KeePassRecent.cs`（358 行，8 条）——第二节那条边界断言 `:19`、
+  再开一次回到最前且仍是一行 `:70`、**点行要的是它从来没有过的口令** `:113`、移除一行不碰文件也不碰已开的库 `:152`、
+  文件移走仍留在列表并说明 `:188`、没解开的库永远不进列表 `:228`、没有本地路径就没有行 `:251`、
+  新建的库记住它写出的那个文件 `:275`。
+- UI `tests/Monica.UiTests/KeePassRecentWorkflowUiTests.cs`（394 行，2 条）：行真的按文件名画在屏上且把掩码口令框
+  带回来（含"点行不许多问一次操作系统"），以及"文件没了的那一行说得出它原来在哪、点它不给表单"。
+  断言只碰布尔、计数、id 与字节数；`AssertPainting`（:219/:222/:225）三条都是布尔，失败不回显任何文字。
+- 串扰：五个 KeePass UI 类**同进程合跑** `Total: 11, Errors: 0, Failed: 0, 13.3s`（`-class` 可重复传）。
+  顺带记一条工具坑：`-reporter quiet` 连汇总行都不打，退出码 0 不等于跑了东西——要总数就别用 quiet。
+
+### 六、门禁
+
+跑在本轮最后那份字节上（NC-10 还原、哈希核对之后）：`verify-commercial-release.ps1 -Configuration Release`
+⇒ `cr_rc=0`、`Commercial release verification passed.`（单测 11 条 perf-budget + 1059 条常规 0 红；
+UI 17 条 perf-budget + 常规 **257** 条 0 红，比 #126 多的 2 条就是这片的）、两份 trx 里 `outcome="Failed"` 计数分别 0；
+publish win-x64 jit ⇒ `pub_rc=0`，`verify-artifact-runtime.ps1` ⇒ `art_rc=0`（`UI SMOKE passed` + `RUNTIME SMOKE passed`）。
+产物门在**同一份字节**上跑了三次，读数分布：锁定态 `lockedPrivateMB` **115.2 / 119.9 / 117.0**（预算 120）、
+KeePass 20000 条 `growthMB` 5.0 / 2.6 / 4.2（预算 24）、库加载 `actualMs` 559 / 579 / 1206（预算 4000）、
+锁/解往返三次都是 25/14/1/4。**这条要写在前头**：119.9 距 120 只有 0.1MB，是这条预算长期靠采样噪声吃饭的老问题
+（见"计时/内存门单次读数不可信"），本轮**没有**动阈值；再遇到红先复跑取分布，别按单次读数定罪。
+
+### 七、仍然没做到（欠账，不是决定）
+
+- **列表本身从没在真人的鼠标下工作过**：真截图是产物帧抓的（4 条 Smoke Fixture 条目、一次性 appdata），
+  不是人开自己的库。跨重启的持久化只有单测证明（`settings.json` 落盘 + 重新 `LoadAsync`），
+  真机上"关掉应用再打开，行还在不在"没人走过。
+- 行上没有任何"这本书长什么样"的信息：Android/kotpass 的库名与图标没照搬（现在只有文件基名 + 上次打开时间），
+  同名文件靠画目录区分——两本同名不同目录的库并排时够不够用，没在真屏幕上判断过。
+- 满了 12 条是**静默**丢最旧：界面上没有"这条被挤掉了"的说明，也没有"清空全部"。
+- 打不开的行只说"读不到"（`KeePassRecentReadFailed`），不区分被别的程序锁住 / 权限不够 / 云盘占位文件；
+  网络盘与可移动盘拔走之后的表现没有任何证据。
+- 片 H-2 没动：双击 .kdbx 交给应用（`Program.cs` 的 argv 接力 + Inno 的文件关联注册项都还没有）、
+  "重新选择位置"的修复流程、以及把行拖到库页的入口。
+- #128 那条负载相关的 `master key is invalid` 仍未复现：本轮整串 1070 条与 `--filter KeePass` 的 94 条各跑过，
+  只在并行压满时出现过一次，没有第二份样本。
+- #126 记的"原生保存对话框从没在真屏幕上走过"、#120 的外层滚动、片 D 余下（历史/标签/过期/图标与 AutoType/
+  CustomData 只读）、搜索键盘入口、右键与拖放、桌面还原不能选目标夹、清空没有撤销——全部沿用。

@@ -947,6 +947,204 @@ public partial class MainWindow
     }
 
     /// <summary>
+    /// Walks the remembered-database list on the shipped binary. The tab keeps that list to itself, so the
+    /// only thing the view model seam does here is open a file; every claim is then read off the screen or
+    /// driven through a painted control - the row is named by its file and not its folder, the row is still
+    /// there after the database is closed, tapping it brings the masked master-password prompt back, a row
+    /// whose file has gone says so and refuses the prompt, and the small dismiss control takes it off the
+    /// list. The list is emptied through that same dismiss control first, so a machine that has run this
+    /// frame before still starts from nothing. The master password is only ever looked for in the painted
+    /// text and reported as one boolean.
+    /// </summary>
+    public async Task<bool> RunSmokeUiKeePassRecentShotAsync(
+        string vaultPath,
+        string password,
+        string? screenshotDirectory)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            return await Dispatcher.UIThread.InvokeAsync(
+                () => RunSmokeUiKeePassRecentShotAsync(vaultPath, password, screenshotDirectory));
+        }
+
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            AppDiagnostics.Info("Smoke UI KeePass recent shot failed. reason=no-view-model");
+            return false;
+        }
+
+        // The gone-row half of the frame moves the file out of the way, and a run that threw halfway would
+        // otherwise leave the fixture unrecognisable to the gate that reads its exit code.
+        var movedAside = vaultPath + ".moved-aside";
+        var fileIsMoved = false;
+        try
+        {
+            var keepassTab = await RealizeSmokeKeePassImportTabAsync("recent shot");
+            if (keepassTab is null)
+            {
+                return false;
+            }
+
+            await Task.Delay(250);
+            T? Find<T>(string name)
+                where T : Control =>
+                this.GetVisualDescendants().OfType<T>().FirstOrDefault(control => control.Name == name);
+            List<string> Painted(Control? root) =>
+                root is null
+                    ? new List<string>()
+                    : root.GetVisualDescendants()
+                        .OfType<TextBlock>()
+                        .Where(text => text.IsEffectivelyVisible)
+                        .Select(text => text.Text ?? "")
+                        .ToList();
+
+            var emptiedThroughTheControl = false;
+            for (var pass = 0; pass < 24; pass++)
+            {
+                var remembered = Find<Button>("ForgetKeePassRecentVaultButton");
+                if (remembered is null)
+                {
+                    emptiedThroughTheControl = true;
+                    break;
+                }
+
+                remembered.Command?.Execute(remembered.CommandParameter);
+                await Task.Delay(120);
+            }
+
+            var beforeSection = Find<StackPanel>("KeePassRecentSection");
+            var listHiddenBefore = beforeSection is null || !beforeSection.IsEffectivelyVisible;
+
+            var opened = await viewModel.SmokeOpenKeePassForRecentAsync(vaultPath, password);
+            await Task.Delay(250);
+
+            var fileName = Path.GetFileName(vaultPath);
+            var directory = Path.GetDirectoryName(vaultPath) ?? "";
+            var section = Find<StackPanel>("KeePassRecentSection");
+            var rowButton = Find<Button>("OpenKeePassRecentVaultButton");
+            var row = rowButton?.CommandParameter as KeePassRecentVaultRow;
+            var rowOnScreen = section is { IsVisible: true } &&
+                section.Bounds.Width > 0 &&
+                section.Bounds.Height > 0 &&
+                rowButton is { IsVisible: true } &&
+                rowButton.Bounds.Width > 0 &&
+                rowButton.Bounds.Height > 0;
+            var painted = Painted(section);
+            var namedByFile = painted.Any(text => text == fileName);
+            var noFolderShown = !painted.Any(text => text.Contains(directory, StringComparison.Ordinal));
+            var paintedSecretFree = !painted.Any(text => text.Contains(password, StringComparison.Ordinal));
+            var saysWhenItWasOpened = row is { ShowsLastOpened: true, IsFileMissing: false } &&
+                row.LastOpenedText.Length > 0;
+
+            var frame = await CaptureSmokeFrameAsync();
+            var frameBytes = frame?.Length ?? 0;
+            var wantedFile = !string.IsNullOrWhiteSpace(screenshotDirectory);
+            var written = false;
+            var shotName = "";
+            if (wantedFile && frameBytes > 0)
+            {
+                Directory.CreateDirectory(screenshotDirectory!);
+                shotName = $"KeePassRecent_{Math.Max(1, (int)Math.Round(Bounds.Width))}x" +
+                    $"{Math.Max(1, (int)Math.Round(Bounds.Height))}.png";
+                var path = Path.Combine(screenshotDirectory!, shotName);
+                File.WriteAllBytes(path, frame!);
+                written = new FileInfo(path).Length > 0;
+            }
+
+            await viewModel.ResetKeePassImportCommand.ExecuteAsync(null);
+            await Task.Delay(250);
+            // Closing the database is not the same as being told it is gone: the row outlives the session.
+            var rowSurvivesClose = Painted(Find<StackPanel>("KeePassRecentSection"))
+                .Any(text => text == fileName);
+
+            rowButton = Find<Button>("OpenKeePassRecentVaultButton");
+            rowButton?.Command?.Execute(rowButton?.CommandParameter);
+            await Task.Delay(250);
+            var prompt = Find<TextBox>("KeePassImportPasswordBox");
+            var promptCameBack = prompt is { IsEffectivelyVisible: true };
+            var promptMaskedAndEmpty = prompt?.PasswordChar == '*' &&
+                (prompt.Text is null || prompt.Text.Length == 0);
+            var fileNameRestored = viewModel.KeePassSelectedFileName == fileName;
+
+            await viewModel.ResetKeePassImportCommand.ExecuteAsync(null);
+            await Task.Delay(150);
+            File.Move(vaultPath, movedAside);
+            fileIsMoved = true;
+            viewModel.SelectedSyncPage = "Export";
+            await Task.Delay(150);
+            // Leaving and returning is what asks the disk again, and the walk back has to re-pick the tab
+            // the page swap dropped.
+            keepassTab = await RealizeSmokeKeePassImportTabAsync("recent shot") ?? keepassTab;
+            await Task.Delay(250);
+            var missingText = Find<TextBlock>("KeePassRecentFileMissingText");
+            var goneRowSaysWhereItLived = missingText is { IsEffectivelyVisible: true } &&
+                !string.IsNullOrEmpty(missingText.Text) &&
+                Painted(Find<StackPanel>("KeePassRecentSection"))
+                    .Any(text => text.Contains(directory, StringComparison.Ordinal));
+
+            rowButton = Find<Button>("OpenKeePassRecentVaultButton");
+            rowButton?.Command?.Execute(rowButton?.CommandParameter);
+            await Task.Delay(250);
+            var goneRowRefusedTheForm = viewModel.IsStatusMessageFailure &&
+                Find<TextBox>("KeePassImportPasswordBox")?.IsEffectivelyVisible != true;
+
+            File.Move(movedAside, vaultPath, overwrite: true);
+            fileIsMoved = false;
+
+            var dismiss = Find<Button>("ForgetKeePassRecentVaultButton");
+            dismiss?.Command?.Execute(dismiss.CommandParameter);
+            await Task.Delay(250);
+            var listHiddenAfterDismiss = Find<Button>("ForgetKeePassRecentVaultButton") is null &&
+                Find<StackPanel>("KeePassRecentSection") is not { IsEffectivelyVisible: true };
+
+            var success = emptiedThroughTheControl &&
+                listHiddenBefore &&
+                opened &&
+                rowOnScreen &&
+                namedByFile &&
+                noFolderShown &&
+                paintedSecretFree &&
+                saysWhenItWasOpened &&
+                rowSurvivesClose &&
+                promptCameBack &&
+                promptMaskedAndEmpty &&
+                fileNameRestored &&
+                goneRowSaysWhereItLived &&
+                goneRowRefusedTheForm &&
+                listHiddenAfterDismiss &&
+                keepassTab.IsSelected &&
+                frameBytes > 0 &&
+                (!wantedFile || written);
+            AppDiagnostics.Info(
+                $"Smoke UI KeePass recent shot result. success={success}, " +
+                $"emptiedThroughTheControl={emptiedThroughTheControl}, " +
+                $"listHiddenBefore={listHiddenBefore}, opened={opened}, rowOnScreen={rowOnScreen}, " +
+                $"namedByFile={namedByFile}, noFolderShown={noFolderShown}, " +
+                $"paintedSecretFree={paintedSecretFree}, saysWhenItWasOpened={saysWhenItWasOpened}, " +
+                $"rowSurvivesClose={rowSurvivesClose}, promptCameBack={promptCameBack}, " +
+                $"promptMaskedAndEmpty={promptMaskedAndEmpty}, fileNameRestored={fileNameRestored}, " +
+                $"goneRowSaysWhereItLived={goneRowSaysWhereItLived}, " +
+                $"goneRowRefusedTheForm={goneRowRefusedTheForm}, " +
+                $"listHiddenAfterDismiss={listHiddenAfterDismiss}, " +
+                $"paintedTexts={painted.Count}, tabSelected={keepassTab.IsSelected}, " +
+                $"frameBytes={frameBytes}, written={written}, file={shotName}");
+            return success;
+        }
+        catch (Exception ex)
+        {
+            AppDiagnostics.Error("Smoke UI KeePass recent shot failed", ex);
+            return false;
+        }
+        finally
+        {
+            if (fileIsMoved && File.Exists(movedAside))
+            {
+                File.Move(movedAside, vaultPath, overwrite: true);
+            }
+        }
+    }
+
+    /// <summary>
     /// Walks the window to the opened-database tab both KeePass shots capture from. Returns the tab so
     /// a caller can prove it stayed selected in the frame it captured, or null after logging why it
     /// could not get there.

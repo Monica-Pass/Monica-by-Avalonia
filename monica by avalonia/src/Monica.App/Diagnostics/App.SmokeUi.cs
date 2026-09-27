@@ -334,6 +334,27 @@ public partial class App
                 }
             }
 
+            var keepassRecentPath = GetSmokeUiArgument(
+                Environment.GetCommandLineArgs(), "--smoke-ui-keepass-recent");
+            if (!string.IsNullOrWhiteSpace(keepassRecentPath))
+            {
+                var keepassPassword = GetSmokeUiArgument(
+                    Environment.GetCommandLineArgs(), "--smoke-ui-keepass-password");
+                if (string.IsNullOrEmpty(keepassPassword))
+                {
+                    AppDiagnostics.Info(
+                        "Smoke UI KeePass recent shot failed. reason=no-password-argument");
+                    smokeSuccess = false;
+                }
+                else
+                {
+                    smokeSuccess &= await mainWindow.RunSmokeUiKeePassRecentShotAsync(
+                        keepassRecentPath,
+                        keepassPassword,
+                        smokeScreenshotDirectory);
+                }
+            }
+
             if (HasSmokeUiFlag(Environment.GetCommandLineArgs(), "--smoke-ui-autotype"))
             {
                 smokeSuccess &= await RunSmokeUiAutoTypeProbeAsync(viewModel, desktopIntegration);

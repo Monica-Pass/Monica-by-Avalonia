@@ -57,6 +57,10 @@ public sealed class DesktopAppSettings
     public string SyncConflictStrategy { get; set; } = "ask";
     public bool OneDriveEnabled { get; set; }
     public bool MdbxLocalCacheEnabled { get; set; } = true;
+    // Which .kdbx files this machine has unlocked, so the KeePass page can offer them again without
+    // walking the save dialog from scratch. Where a file lives is not a secret; what opens it is, and
+    // no master password or key-file content is ever kept here.
+    public List<KeePassRecentVaultSetting> KeePassRecentVaults { get; set; } = [];
     public Dictionary<string, bool> FeatureToggles { get; set; } = [];
 }
 
@@ -170,6 +174,7 @@ public sealed partial class AppSettingsService : IAppSettingsService
         // becomes live the moment the collision goes away.
 
         NormalizeFeatureToggles(settings);
+        NormalizeKeePassRecentVaults(settings);
     }
 
     private static void Migrate(DesktopAppSettings settings)
@@ -227,6 +232,13 @@ public sealed partial class AppSettingsService : IAppSettingsService
         }
     }
 
+    private static void NormalizeKeePassRecentVaults(DesktopAppSettings settings)
+    {
+        // Rebuilt rather than trimmed in place: a settings file can name one file twice under two
+        // spellings, and the registry is the only place that decides which row survives.
+        settings.KeePassRecentVaults = [.. KeePassRecentVaultRegistry.Ordered(settings.KeePassRecentVaults)];
+    }
+
     private static void NormalizeFeatureToggles(DesktopAppSettings settings)
     {
         var normalized = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
@@ -252,5 +264,6 @@ public sealed partial class AppSettingsService : IAppSettingsService
 
 [JsonSerializable(typeof(DesktopAppSettings))]
 [JsonSerializable(typeof(Dictionary<string, bool>))]
+[JsonSerializable(typeof(List<KeePassRecentVaultSetting>))]
 [JsonSerializable(typeof(SecurityRecoverySettings))]
 internal sealed partial class AppSettingsJsonContext : JsonSerializerContext;

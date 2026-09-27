@@ -8,6 +8,13 @@ public sealed partial class MainWindowViewModel
         {
             ClearSensitiveImportBuffers(keepUnsavedKeePassDatabase: true);
         }
+        else
+        {
+            // The remembered files are asked about the disk here rather than at startup: the list is
+            // nowhere in sight before this page opens, and a stale network location should not be able
+            // to hold up the unlock screen.
+            RefreshKeePassRecentVaults();
+        }
 
         if (!IsWorkspacePageSelected(value, "Export"))
         {
