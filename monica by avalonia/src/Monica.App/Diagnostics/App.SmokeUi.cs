@@ -355,6 +355,27 @@ public partial class App
                 }
             }
 
+            var keepassHandoffPath = GetSmokeUiArgument(
+                Environment.GetCommandLineArgs(), "--smoke-ui-keepass-handoff");
+            if (!string.IsNullOrWhiteSpace(keepassHandoffPath))
+            {
+                var keepassPassword = GetSmokeUiArgument(
+                    Environment.GetCommandLineArgs(), "--smoke-ui-keepass-password");
+                if (string.IsNullOrEmpty(keepassPassword))
+                {
+                    AppDiagnostics.Info(
+                        "Smoke UI KeePass handoff shot failed. reason=no-password-argument");
+                    smokeSuccess = false;
+                }
+                else
+                {
+                    smokeSuccess &= await mainWindow.RunSmokeUiKeePassHandoffShotAsync(
+                        keepassHandoffPath,
+                        keepassPassword,
+                        smokeScreenshotDirectory);
+                }
+            }
+
             if (HasSmokeUiFlag(Environment.GetCommandLineArgs(), "--smoke-ui-autotype"))
             {
                 smokeSuccess &= await RunSmokeUiAutoTypeProbeAsync(viewModel, desktopIntegration);

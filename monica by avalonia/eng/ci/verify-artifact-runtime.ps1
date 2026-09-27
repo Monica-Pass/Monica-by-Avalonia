@@ -25,6 +25,25 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# The password the artifact writes its own databases with. It is a fixture, but it is the only thing
+# that unlocks every file this run creates, so it is treated as a secret everywhere it can be seen.
+$keepassFixturePassword = 'keepass-smoke-fixture-not-a-secret'
+
+# This gate's console is the CI job log: it gets uploaded, kept and pasted around by people who never
+# touched the vault. Every step starts by echoing the command it is about to run, and six of those
+# commands carry a password as plain argv - measured on the previous version of this file, one run
+# printed the master password and the KeePass fixture password 6 times in total. Only arguments equal
+# to a registered secret disappear; paths, counts and flags stay readable.
+$secretArguments = @($MasterPassword, $keepassFixturePassword)
+
+function Protect-CommandEcho {
+    param([string[]] $Arguments)
+
+    return (@($Arguments | ForEach-Object {
+        if ($secretArguments -contains $_) { '[redacted]' } else { $_ }
+    }) -join ' ')
+}
+
 $exeName = if ($RuntimeIdentifier -like 'win-*') { 'Monica.App.exe' } else { 'Monica.App' }
 $publishRoot = (Resolve-Path -LiteralPath $PublishDirectory).Path
 $exePath = Join-Path $publishRoot $exeName
@@ -95,7 +114,7 @@ function Invoke-ArtifactCommand {
     )
 
     Write-Host "::group=$Label"
-    Write-Host "exec: $exePath $($Arguments -join ' ')"
+    Write-Host "exec: $exePath $(Protect-CommandEcho -Arguments $Arguments)"
 
     # The apphost is a GUI-subsystem executable: `& exe` would not wait for it and would
     # leave $LASTEXITCODE unset, so a broken artifact could report a green run.
@@ -202,7 +221,7 @@ try {
         New-Item -ItemType Directory -Force -Path $keepassDirectory | Out-Null
         $keepassPath = Join-Path $keepassDirectory 'probe.kdbx'
         $keepassSeed = Invoke-ArtifactCommand -Label 'ui-seed-smoke-keepass-vault' -Arguments @(
-            '--seed-smoke-keepass-vault', $keepassPath, 'keepass-smoke-fixture-not-a-secret',
+            '--seed-smoke-keepass-vault', $keepassPath, $keepassFixturePassword,
             "$KeePassProbeEntries", "$KeePassProbeGroups")
         if ($keepassSeed -notmatch 'Smoke KeePass vault seeded') {
             throw 'ui-seed-smoke-keepass-vault did not report success.'
@@ -213,7 +232,7 @@ try {
         # shot slow enough that someone turns it off. This one is sized like a screen.
         $keepassShotPath = Join-Path $keepassDirectory 'shots.kdbx'
         $keepassShotSeed = Invoke-ArtifactCommand -Label 'ui-seed-smoke-keepass-vault-shot' -Arguments @(
-            '--seed-smoke-keepass-vault', $keepassShotPath, 'keepass-smoke-fixture-not-a-secret',
+            '--seed-smoke-keepass-vault', $keepassShotPath, $keepassFixturePassword,
             '12', '3')
         if ($keepassShotSeed -notmatch 'Smoke KeePass vault seeded') {
             throw 'ui-seed-smoke-keepass-vault-shot did not report success.'
@@ -223,10 +242,20 @@ try {
         # gets a database of its own rather than borrowing one a later frame still has to read.
         $keepassRecentPath = Join-Path $keepassDirectory 'remembered.kdbx'
         $keepassRecentSeed = Invoke-ArtifactCommand -Label 'ui-seed-smoke-keepass-vault-recent' -Arguments @(
-            '--seed-smoke-keepass-vault', $keepassRecentPath, 'keepass-smoke-fixture-not-a-secret',
+            '--seed-smoke-keepass-vault', $keepassRecentPath, $keepassFixturePassword,
             '4', '2')
         if ($keepassRecentSeed -notmatch 'Smoke KeePass vault seeded') {
             throw 'ui-seed-smoke-keepass-vault-recent did not report success.'
+        }
+
+        # The handoff frame is read by a *second* copy of the executable, so it needs a file that no other
+        # frame has unlocked, moved aside or left a remembered row behind for.
+        $keepassHandoffPath = Join-Path $keepassDirectory 'handed.kdbx'
+        $keepassHandoffSeed = Invoke-ArtifactCommand -Label 'ui-seed-smoke-keepass-vault-handoff' -Arguments @(
+            '--seed-smoke-keepass-vault', $keepassHandoffPath, $keepassFixturePassword,
+            '3', '2')
+        if ($keepassHandoffSeed -notmatch 'Smoke KeePass vault seeded') {
+            throw 'ui-seed-smoke-keepass-vault-handoff did not report success.'
         }
 
         $null = Invoke-ArtifactCommand -Label 'smoke-ui' -TimeoutSeconds $UiTimeoutSeconds -AppLogPath $uiLog -Arguments @(
@@ -241,7 +270,7 @@ try {
             '--smoke-ui-max-vault-load-ms', '4000',
             '--smoke-ui-max-memory-mb', "$MaxLockedMemoryMb",
             '--smoke-ui-keepass-file', $keepassPath,
-            '--smoke-ui-keepass-password', 'keepass-smoke-fixture-not-a-secret',
+            '--smoke-ui-keepass-password', $keepassFixturePassword,
             '--smoke-ui-keepass-stream-details',
             '--smoke-ui-keepass-max-growth-mb', "$MaxKeePassGrowthMb",
             '--smoke-ui-keepass-edit', $keepassShotPath,
@@ -250,6 +279,7 @@ try {
             '--smoke-ui-keepass-search-query', 'example.com',
             '--smoke-ui-keepass-create',
             '--smoke-ui-keepass-recent', $keepassRecentPath,
+            '--smoke-ui-keepass-handoff', $keepassHandoffPath,
             '--smoke-ui-lock-after-checks',
             '--smoke-ui-exit-after-checks'
         )
@@ -262,7 +292,7 @@ try {
             'release gate completed', 'budget result', 'check failed', 'lock cycle result',
             'KeePass probe', 'status notice retirement', 'locked settle result',
             'KeePass edit shot', 'KeePass manage shot', 'KeePass search shot',
-            'KeePass create shot', 'KeePass recent shot')
+            'KeePass create shot', 'KeePass recent shot', 'KeePass handoff shot')
         foreach ($line in $gateLines) { Write-Host ($line.Line -replace '^\[[^\]]+\]\s*', '') }
         $gateLine = $gateLines | Where-Object { $_.Line -match 'release gate completed' } | Select-Object -Last 1
         if ($null -eq $gateLine) {
@@ -368,6 +398,32 @@ try {
 
         if ($recentLine.Line -notmatch 'listHiddenAfterDismiss=True') {
             throw "KeePass recent shot left the remembered list up after its last row was dismissed: $($recentLine.Line)"
+        }
+
+        # A second copy of the executable is a real process here, so this is the only frame that asks the
+        # shipped binary the question a double-click actually poses. Its promises are named one by one
+        # because each is a thing a later change could quietly drop: the file reaches the screen, the window
+        # that was out of sight comes back, the master password is asked for rather than filled in, nothing
+        # is decrypted for arriving on a command line, and no secret is painted.
+        $handoffLine = @($gateLines | Where-Object { $_.Line -match 'KeePass handoff shot result' }) | Select-Object -Last 1
+        if ($handoffLine.Line -notmatch 'namedTheFile=True' -or $handoffLine.Line -notmatch 'cameBack=True') {
+            throw "KeePass handoff shot did not bring the file and the window back: $($handoffLine.Line)"
+        }
+
+        if ($handoffLine.Line -notmatch 'askedForTheKey=True' -or $handoffLine.Line -notmatch 'promptMaskedAndEmpty=True') {
+            throw "KeePass handoff shot did not hand back a blank masked master-password prompt: $($handoffLine.Line)"
+        }
+
+        if ($handoffLine.Line -notmatch 'stayedShut=True') {
+            throw "KeePass handoff shot opened a database from a command-line path: $($handoffLine.Line)"
+        }
+
+        if ($handoffLine.Line -notmatch 'listUntouched=True') {
+            throw "KeePass handoff shot wrote to the remembered list without unlocking anything: $($handoffLine.Line)"
+        }
+
+        if ($handoffLine.Line -notmatch 'paintedSecretFree=True') {
+            throw "KeePass handoff shot painted the master password: $($handoffLine.Line)"
         }
 
         # Same reason: the dispatcher timer that retires status acknowledgements only exists in a

@@ -48,12 +48,23 @@ public partial class App : Application
             desktop.Exit += OnDesktopExit;
 
             // A second launch exits as soon as it asks for this window, so the handoff callback is
-            // the only notice there is that the user wants Monica in front. It arrives off the UI thread.
+            // the only notice there is that the user wants Monica in front. It arrives off the UI thread,
+            // and it may have left a database behind for this instance to open on the way out.
+            var openRequests = new KeePassOpenRequestQueue(MonicaAppDataPaths.GetRootDirectory());
             SingleInstanceGate.Active?.ListenForReopen(() =>
             {
                 AppDiagnostics.Info("Single instance reopen received; surfacing the window.");
-                Dispatcher.UIThread.Post(() => _mainWindow?.ShowFromDesktopIntegration());
+                Dispatcher.UIThread.Post(() =>
+                {
+                    AcceptQueuedKeePassOpenRequests(viewModel, openRequests);
+                    _mainWindow?.ShowFromDesktopIntegration();
+                });
             });
+
+            // Queued first, then this launch's own argument, so a file left behind by an older launch
+            // cannot win over the one the person just double-clicked.
+            AcceptQueuedKeePassOpenRequests(viewModel, openRequests);
+            viewModel.RequestKeePassFileOpen(KeePassOpenRequestQueue.TryReadCommandLinePath(desktop.Args));
 
             var smokePassword = GetSmokeUiUnlockPassword(desktop.Args);
             var smokeSection = GetSmokeUiSection(desktop.Args);
@@ -98,6 +109,16 @@ public partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static void AcceptQueuedKeePassOpenRequests(
+        MainWindowViewModel viewModel,
+        KeePassOpenRequestQueue openRequests)
+    {
+        foreach (var path in openRequests.Drain())
+        {
+            viewModel.RequestKeePassFileOpen(path);
+        }
     }
 
     private Task EnsureShutdownAsync(MainWindowViewModel viewModel)

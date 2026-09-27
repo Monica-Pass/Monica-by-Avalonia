@@ -2325,3 +2325,174 @@ KeePass 20000 条 `growthMB` 5.0 / 2.6 / 4.2（预算 24）、库加载 `actualM
   只在并行压满时出现过一次，没有第二份样本。
 - #126 记的"原生保存对话框从没在真屏幕上走过"、#120 的外层滚动、片 D 余下（历史/标签/过期/图标与 AutoType/
   CustomData 只读）、搜索键盘入口、右键与拖放、桌面还原不能选目标夹、清空没有撤销——全部沿用。
+
+## 附：双击 .kdbx 交给已经开着的那一份（2026-09-27，**#129 片 H-2 出厂：文件第一次可以从窗口外面递进来，而"argv 不是钥匙"由三条互不重叠的断言钉住**）
+
+### 一、这一轮把什么变成了事实
+
+- 新增 `src/Monica.App/Services/KeePassOpenRequestQueue.cs`（131 行）是"从外面进来"唯一的落盘规则处：
+  `TryReadCommandLinePath:31`（**只认整条命令行就是一个 .kdbx 的情况**——带 dash 的参数一律不抢，所以 smoke 自己那串
+  vault 参数还是它的；相对路径在这里就 `GetFullPath` 成窗口将要打开的那个样子）、
+  `TryEnqueue:59`（先写 `<ticks:x16>-<guid>.req.tmp` 再 `File.Move` 成 `.req`：读者要么看到完整路径，要么什么都看不到）、
+  `Drain:83`（按 `StringComparer.Ordinal` 的名字序=最旧优先，**读过即消费**，哪怕内容读不出来也不留到下次）、
+  `RequestDirectory:23`（`<dataRoot>\pending-kdbx-open`）。一条请求一个文件，所以两次双击在第一份读到之前不会互相盖掉。
+- `Program.cs:72-83` 是第二份进程唯一做的事：`TryReadCommandLinePath(args)` → `TryEnqueue` → `NotifyExistingInstance` →
+  `return 0`。**先落请求、再发信号**这个顺序写在注释里，因为它是承重的（NC-1）。日志只报布尔：
+  `databaseQueued={queued}`（:82-83），路径不进日志。
+- `App.axaml.cs:53-67`：启动时 drain 一次（:66）并且读自己的 `desktop.Args`（:67）；`ListenForReopen:54` 的回调里
+  **再 drain**（:59，`AcceptQueuedKeePassOpenRequests:114`）然后才 `ShowFromDesktopIntegration()`（:60）。
+  也就是说"窗口浮回来"和"文件被读进来"是两件事，NC-2 拆掉后者时窗口照样浮。
+- 落点单独成文件：`src/Monica.App/Features/ImportExport/MainWindowViewModel.KeePassOpenRequest.cs`（117 行）——
+  `RequestKeePassFileOpen:18`（空路径直接不动）→ `ApplyIncomingKeePassFilesAsync:34`（**锁着就原地等**，
+  解锁时由 `MainWindowViewModel.Security.cs:105` 补放）→ 走到 `SelectedSection="Sync"` /
+  `SelectedSyncPage="Import"` / `KeePassImportTabSelected=true`（:47-49）→ `StageKeePassFileForOpenAsync:63`。
+  拆出来是因为这一片把 `KeePassImport.cs` 顶到 382 行，撞了 `verify-commercial-release.ps1:87` 那条
+  "聚焦文件 ≤300 行"的门；抬阈值不算修，动刀把门拆成单独一份 partial 才算。
+- **只到"文件名 + 掩码空框"为止**：`StageKeePassFileForOpenAsync:92` 读字节、:98 只把 `Path.GetFileName` 写进
+  `KeePassSelectedFileName`。顺序按人看得懂排：正在忙→`KeePassOperationBusy`（新键，EN `LocalizationService.cs:2141` /
+  ZH `:3199`）→ 已开的库还脏→`KeePassDiscardBeforeOpening` → 点的就是当前那本→只回一句提示（:78-81）→
+  读不到→刷新最近列表并说明（:105-111，复用 `KeePassRecentReadFailed`），而不是留一行没人看得懂的状态文字。
+- 三个入口收成一道门：`OpenKeePassRecentVaultAsync`（`MainWindowViewModel.KeePassRecent.cs:94`）现在只剩
+  `await StageKeePassFileForOpenAsync(row.Path)`；文件选择器走 `SelectKeePassFileAsync`；argv 走这一条。
+  同一处规矩（忙/脏/已开/读不到）因此不会有三份各写一遍的版本。
+- `SyncImportView.axaml:59` 的 `IsSelected="{Binding KeePassImportTabSelected, Mode=TwoWay}"`：命令行来了要把页签
+  按下去，人自己点回来时也要把 VM 的标志放掉——`KeePassImportState.cs:32` 那个字段是页签与 VM 之间唯一的桥。
+- 安装包：`eng/package/package-windows-inno.ps1:81-92` 新 `[Registry]` 段——ProgID `Monica.KeePassDatabase`
+  （:85 给人看的标签、:86 `DefaultIcon` 指向 `{app}\Assets\AppIcon.ico`、:87 `shell\open\command` =
+  `"""{app}\{#AppExeName}"" ""%1"""`）+ `Software\Classes\.kdbx\OpenWithProgids` 挂上这个 ProgID（:92）。
+  `uninsdeletekey` / `uninsdeletevalue` 负责卸载干净。**故意不写 `.kdbx` 的默认值**：Windows 的默认应用由
+  `UserChoice` 的哈希保护着，不是安装程序该抢的东西，抢了只会得到一个 Windows 自己不接受的注册表。
+
+### 二、为什么"文件到了"不等于"库开了"
+
+递进来的东西全程只有一个路径：队列文件里一行路径、`Program.cs` 的 argv 里一个路径、`App` 递给 VM 的还是路径。
+主控密码永远由**看到那个文件名的人**敲，这一条不是注释，是四处断言：
+
+- `KeePassOpenFromOutsideUiTests.cs:73` 框是掩码的（`PasswordChar == '*'`）、`:74` 框里 `Text is null || Length == 0`、
+  `:75` `KeePassImportPassword` 为空、`:78` `HasKeePassImportPreview == false`（没解出任何东西）、
+  真产物帧的 `stayedShut=True`。
+- NC-3 把"顺手把口令也填上"写进 staging，红就只红在 `:74` 那一条，失败输出只有两个布尔。
+- 为什么不干脆做"存了口令下次自动解锁"：#127 第二节那条理由照旧成立，这一片还多一条——**argv 是任何能启动这个
+  进程的人都能给的东西**。把钥匙放在那里，等于把 .kdbx 的保护等级从"人脑 + 一次性输入"降成"文件在不在"。
+- 锁着的时候递进来不会丢：请求留在磁盘上，`OnIsUnlockedChanged` 解锁那一刻才补放（`Security.cs:105`）。
+  UI 第一条事实（`:37`）专门走的就是这条路。
+
+### 三、真产物截图门（这一片新接的那一帧）
+
+`--smoke-ui-keepass-handoff <path>`（分发 `App.SmokeUi.cs:359`，帧 `MainWindow.SmokeUi.cs:1158`，body 到 :1299）。
+16 项 AND：`leftBehind, outOfSight, namedTheFile, peerEnded, cameBack, onItsPage, tabSelected, askedForTheKey,
+promptMaskedAndEmpty, stayedShut, !IsStatusMessageFailure, listUntouched, namedOnScreen, paintedSecretFree,
+frameBytes>0, (!wantedFile||written)`。
+
+- 帧**故意先把自己弄坏**：走开页面、放开签、把窗口最小化到看不见，所以落地只能来自接力本身；peer 用
+  `Process.Start(自身 exe, 只有路径)` 起，跟 Explorer 交给 CreateProcess 的形状一样。
+- 口令只在进程内传，日志只报 `typedChars=34`（:1296）。
+- 一次性 fixture `ui-seed-smoke-keepass-vault-handoff`（`verify-artifact-runtime.ps1:251-258`，`handed.kdbx`，3 条 2 夹）：
+  这帧会消耗自己的输入，不借别人的 .kdbx。
+- CI 逐字段点名（:408-426）：`namedTheFile/cameBack`、`askedForTheKey/promptMaskedAndEmpty`、`stayedShut`、
+  `listUntouched`、`paintedSecretFree` 任一软掉就停跑，而不是记一行没人看的日志。
+- 实测（最终字节）：`success=True`、16 项全 True、`paintedTexts=63`、`paintedSecretFree=True`、`frameBytes=75613`
+  （门本身不传 screenshot-dir，所以 `written=False`，字节数照报）。
+- **要 PNG 得单独再跑一帧**：`D:\Monica-kpshots\handoff1-run.ps1`（一次性 appdata；解锁口令走
+  `--smoke-ui-unlock-env` + 子进程环境变量，**不进 argv**）→ `D:\Monica-kpshots\handoff1\shots\KeePassHandoff_1280x800.png`。
+  留在盘上的这一张是**最终字节上重跑的绿帧**（`success=True`、`written=True`、`frameBytes=75183`），人眼看过：
+  导入数据页 + KeePass KDBX 页签自己认领、`handed.kdbx` 点名、空的掩码"KeePass 主密码"框、状态栏
+  "已选择 KeePass 数据库：handed.kdbx"，屏上没有任何明文凭据。**为什么数字和 CI 那张不一样要写清**：产物门不传
+  `--smoke-ui-screenshot-dir`，它报的 75613 是内存里那次捕获的编码字节数；落盘这张走的是同一段像素、不同一次编码。
+  中途它被 NC-1 的复跑覆盖成过一张 9061 字节的红帧（第四节用），现已由这次重跑替掉。
+  还有一条没遮：这条脚本里 `--seed-smoke-vault` / `--smoke-ui-keepass-password` 仍把字面量放在 argv 上，
+  那是本轮新造的一次性 fixture（`handoff-manual-fixture-not-a-secret` / `keepass-smoke-fixture-not-a-secret`），
+  只存在于 `D:\Monica-kpshots\handoff1\` 里，跟产品无关；产品那条命令行（`Program.cs`）永远不读口令。
+
+
+### 三之二：真跑门自己漏过口令（#130，接这一帧时当场量出来的）
+
+`verify-artifact-runtime.ps1` 原来把整条 argv 打进日志，而它自己就是**用 argv 传口令**的：
+一次跑在 `exec:` 行里明文印出凭据槽 **5 处**（`D:\Monica-kpshots\exec-echo-before.txt`，10 条 exec 行、`[redacted]` 0 处）。
+修法是加一层只影响回显的遮罩，不动任何一条被执行的参数：`$keepassFixturePassword:30`（把散在 5 处的字面量收成一处）、
+`$secretArguments:37`、`Protect-CommandEcho:39-45`（**逐参数全等**才遮，不做子串猜测）、回显处 :117 用它。
+同一份跑法重测：凭据槽明文 **0 处**、`[redacted]` 11 处、exec 行仍是 10 条（`exec-echo-after.txt`）。
+一条都不能靠"反正那是 CI 的 fixture"过去：那 5 处里任何一处换个值就是真人的口令。
+
+### 四、负控（每条先看见红，跑完还原并核对 sha256）
+
+三条，两条打在**真产物帧**上，一条打在无头 UI 事实上：
+
+| 拆掉的东西 | 红在哪 | 实测 |
+|---|---|---|
+| NC-1 `Program.cs` 换成"先发信号、再落请求" | 帧必须说得出文件名 | `success=False`：`cameBack=True`（窗口照样浮）但 `namedTheFile/onItsPage/tabSelected/askedForTheKey/namedOnScreen` 全 False，`frameBytes=9061`、`paintedTexts=51`——画面基本是空的 |
+| NC-2 去掉 `App.axaml.cs:59` 重开回调里的 drain | 同上 | `success=False`，同一组字段翻掉，`frameBytes=9024`、`paintedTexts=59`。**两条读数形状一样，要记清**：都留下一个没被读的请求文件，区别在 NC-1 是"信号先走、请求还没落地"，NC-2 是"信号到了、没人去读盘"，所以各自证明一行不同的代码是承重的 |
+| NC-3 staging 时顺手把口令填进 `KeePassImportPassword` | 掩码且空的口令框 | 3 条 UI 事实里**只**红 `KeePassOpenFromOutsideUiTests.cs:74`，失败输出只有 Expected/Actual 两个布尔 |
+
+还原核对（就在最终字节上现测）：`sha256sum -c /d/Monica-kpshots/h2-baseline.sha` ⇒ `Program.cs` / `App.axaml.cs` /
+`MainWindow.SmokeUi.cs` 三份 **OK**，`MainWindowViewModel.KeePassImport.cs` **FAILED**——这条不是漏还原，是它之后被
+300 行门逼着拆了文件。逐行核过：相对基线 382 行，现在 275 行，`diff` 只删不加（removed 107 / added 0），
+其中 102 行逐字搬进 `MainWindowViewModel.KeePassOpenRequest.cs`，剩 5 行是那段"一道门"的注释被提到新文件的
+文件头上并轻微改写（`outside the window`→`outside this window` 等）。UI 三条事实重跑 `Failed: 0`。
+
+### 五、测试与证据
+
+- 单测 9 条 `tests/Monica.Tests/KeePassOpenRequestQueueTests.cs`（126 行）：双击只有一个参数 `:18`、
+  相对路径按窗口要打开的样子命名 `:28`、不是交接文件的参数不抢 `:39`、读过就不再等 `:52`、
+  窗口还没听时留下的请求之后还在 `:63`、两次双击都到且最新的后读 `:76`、还在写的请求不会被读 `:89`、
+  空请求按消费处理 `:103`、没建过落点不算错误 `:115`。
+- UI 3 条 `tests/Monica.UiTests/KeePassOpenFromOutsideUiTests.cs`（372 行）：交给**锁着**的窗口→解锁才出现 `:37`、
+  交两次到两次且页签自己认领 `:100`、空请求什么都不动而去了的文件要说出为什么 `:161`。
+  断言只碰布尔、计数与 id；口令字面量只做比较、从不进 expected/actual 对。
+- **安装包真机走查**（不是测试，是量出来的）：日志 `D:\Monica-kpshots\assoc-walk.log`，帧
+  `D:\Monica-kpshots\assoc\shots\assoc-01-before.png`（125034 字节）/ `assoc-02-handed.png`（99683 字节）。
+  装到 `D:\Monica-assoc`（installer exit=0）→ 注册表回读
+  `OpenCommand = "D:\Monica-assoc\Monica.App.exe" "%1"`、`OpenWithListedMonica=True`、
+  `DefaultIcon=D:\Monica-assoc\Assets\AppIcon.ico`（**装机前那三项全 False**）→
+  **拿注册表里那条原样字符串**起第二份，文件放在带空格的目录
+  （`D:\Monica-kpshots\assoc\a folder with spaces\handed real.kdbx`）→ `peer exited=True exit=0`、
+  `Single instance reopen received; surfacing the window.`、落点 `leftoverRequests=0` →
+  两张图人眼看过：交接地那张画出 `handed real.kdbx`、空的掩码"KeePass 主密码"框、状态栏
+  "已选择 KeePass 数据库：handed real.kdbx"，屏上没有任何明文凭据；before 那张是库页，没有文件名也没有口令框 →
+  卸载 exit=0 → 注册表三项**全 False**、`installDirectoryStillThere=False`。
+- 走查脚本自己的三个坑记下来（都是工具，不是产品）：`Process.MainWindowHandle` 在起进程时被缓存，要 `Refresh()`
+  轮询才有窗口；PowerShell 非 DPI-aware 时 `GetWindowRect` 给的是虚拟化矩形而 `CopyFromScreen` 读物理像素，
+  抓出来是放大且偏移的裁片，`SetProcessDPIAware()` 之后才对得上；`"%1"` 的引号本来就在注册表那条里，
+  替换时再包一层引号会把引号变成路径字符。
+
+### 六、门禁
+
+**先记不体面的那两条**：同一份改动第一次跑链是 `fmt_rc=0 / cr_rc=1 / pub_rc=0 / art_rc=1`。
+`cr_rc=1` 是结构门赢的——`MainWindowViewModel.KeePassImport.cs` 被这片的入口顶到 382 行，超了
+`verify-commercial-release.ps1:87` 那条"聚焦文件 ≤300 行"（`Focused vault, security, storage, recycle bin,
+and import/export files are within 300 lines.`）。**没有动阈值**：把"从窗口外面递进来"这一道门整个抽成
+`MainWindowViewModel.KeePassOpenRequest.cs`（117 行），原文件回到 275 行、与 HEAD 逐字节相同（所以它在
+`git diff --stat` 里干脆不出现）。`art_rc=1` 是退场帧单次红（见下），复跑没再出现。
+
+最终字节（拆文件 + NC 全部还原 + `sha256sum -c` 核对之后）实测，`D:\Monica-kpshots\h2-gate-chain-2.log`
+与只重跑产物门的 `h2-art-3.log`：`fmt_rc=0`、`cr_rc=0`、`pub_rc=0`、`art_rc=0`（**产物门在同一份字节上绿了两次**）。
+`Commercial release verification passed.`；四份 trx 里 `outcome="NotPassed"` 计数**全 0**：
+单测 11 条 perf-budget + 1068 条常规（比 #127 多的 9 条就是本片的队列单测），UI 17 条 perf-budget + 260 条常规
+（多的 3 条是本片的 UI 事实）。产物门两行都在：`UI SMOKE passed` + `RUNTIME SMOKE passed`。
+**#130 的遮罩在这两份日志里当场可见**：`exec:` 行是 `[redacted]`，一条凭据槽都没漏出来。
+
+读数分布（两次）：锁定态 `lockedPrivateMB` **115.3 / 109.2**（预算 120）、KeePass 20000 条 `growthMB`
+**6.4 / 6.5**（预算 24）、库加载 `actualMs` **1187 / 1319**（预算 4000）。交接帧两次读数**一模一样**：
+`frameBytes=75613`、`paintedTexts=63`、`paintedSecretFree=True`、16 项全 True——这一帧是自带的确定性最好的一条证据。
+
+退场帧（`Smoke UI status notice retirement`）：**第一次红、后面两次绿**（`raised=True, armedForNotice=True,
+retired=True, standingArmed=False`）。红的那一次是"第一次跑链"，机器正被同一串里的单测压满，而那 15 秒等的
+是**一个 dispatcher 计时器**（无头测试里唯一只能由真窗口证明的东西），线程被别的工作拖住就会到点晚。
+这一条**没有当缺陷修，也没有放宽预算**——先复跑取样本，两次都在真产物上绿。要写清它还欠的：
+只观测到"红一次/绿两次"，没有一条机制证明它在任意负载下都退得掉；再遇到红先数次数，别看一眼就去动那个 15 秒。
+
+### 七、仍然没做到（欠账，不是决定）
+
+- **真正的"双击"那一下没走过**：走查跑的是注册表里那条命令行本身（Explorer 交给 CreateProcess 的就是它），
+  但没有真人右键→"打开方式"→选 Monica→双击。`UserChoice` 不能程序化设置，所以"默认应用"这一格只能靠人点。
+- 非管理员安装没量过：走查是管理员跑 installer，`Root: HKA` 解析到 `HKLM\SOFTWARE\Classes`；装给用户时会落在
+  HKCU，那条路径上的注册与卸载后清理都没有证据。
+- 卸载只清了自己写的三处；如果人在装机期间把 Monica 设成 `.kdbx` 的默认应用，Windows 的 `UserChoice` 不会由
+  卸载器去动——这条既没测也没打算测。
+- 路径形状只覆盖了一种：带空格的目录。中文目录、网络盘、可移动盘拔走、被别的程序独占锁住的 .kdbx，
+  递进来各自什么表现，没有样本。
+- "锁着的时候双击、然后手输主密码"这条真人顺序只有 UI 事实证明过（无头），真机上没人走过。
+- 最近列表里那行没了的文件的**"重新选择位置"修复流程**没做（#127 就记了这条）。
+- 拖到任务栏图标、从资源管理器拖进窗口：没做。
+- #120 的外层滚动、片 D 余下（历史/标签/过期/图标与 AutoType/CustomData 只读）、搜索键盘入口、右键与拖放、
+  桌面还原不能选目标夹、清空没有撤销、原生保存对话框从没在真屏幕上走过——全部沿用。

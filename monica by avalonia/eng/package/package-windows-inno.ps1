@@ -78,6 +78,19 @@ Name: "{commondesktop}\Monica"; Filename: "{app}\{#AppExeName}"; Tasks: desktopi
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
+[Registry]
+; The application's own name for a KeePass database, and the one command Windows runs to open one. The
+; path goes in quotes because a double-clicked file may have spaces in it, and the whole thing is quoted
+; the way Inno expects so {app} still expands at install time.
+Root: HKA; Subkey: "Software\Classes\Monica.KeePassDatabase"; ValueType: string; ValueName: ""; ValueData: "KeePass Database"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\Monica.KeePassDatabase\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\Assets\AppIcon.ico"
+Root: HKA; Subkey: "Software\Classes\Monica.KeePassDatabase\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExeName}"" ""%1"""
+; Offered, never forced: writing a default for .kdbx or its UserChoice is not this installer's to do
+; (Windows hashes UserChoice and rejects foreign writes), and a vault program that takes over an
+; extension nobody asked it to take is one people stop trusting. Adding a ProgID here is what puts
+; "Monica" in the right-click Open with list.
+Root: HKA; Subkey: "Software\Classes\.kdbx\OpenWithProgids"; ValueType: string; ValueName: "Monica.KeePassDatabase"; ValueData: ""; Flags: uninsdeletevalue
+
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "Launch Monica"; Flags: nowait postinstall skipifsilent
 "@

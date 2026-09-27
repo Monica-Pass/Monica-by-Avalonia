@@ -56,7 +56,7 @@
                     </Border>
                 </StackPanel>
             </TabItem>
-            <TabItem x:Name="KeePassImportTab">
+            <TabItem x:Name="KeePassImportTab" IsSelected="{Binding KeePassImportTabSelected, Mode=TwoWay}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal" Spacing="9">
                         <ic:FluentIcon Icon="Database" FontSize="16" />

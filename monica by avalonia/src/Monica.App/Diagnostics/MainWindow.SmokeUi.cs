@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using Avalonia;
 using Avalonia.Controls;
@@ -1142,6 +1143,159 @@ public partial class MainWindow
                 File.Move(movedAside, vaultPath, overwrite: true);
             }
         }
+    }
+
+    /// <summary>
+    /// Hands a database to the shipped window the way Explorer does: a second copy of this same executable is
+    /// started with nothing but the file's path, and that copy is expected to disappear into the one already
+    /// running. Everything before it is set up to be lost - the page walked away from, the tab left, the
+    /// window minimised out of sight - so the frame after can only come from the handoff itself. What has to
+    /// be true when it lands: the window is back on screen and on the page and tab that open a file, the file
+    /// is named, the master password is asked for in a masked and empty box, the database is still shut, and
+    /// the remembered list is exactly the length it was before, because arriving by command line has not
+    /// opened anything. The fixture's password is looked for in the painted text and reported as one boolean.
+    /// </summary>
+    public async Task<bool> RunSmokeUiKeePassHandoffShotAsync(
+        string vaultPath,
+        string password,
+        string? screenshotDirectory)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            return await Dispatcher.UIThread.InvokeAsync(
+                () => RunSmokeUiKeePassHandoffShotAsync(vaultPath, password, screenshotDirectory));
+        }
+
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            AppDiagnostics.Info("Smoke UI KeePass handoff shot failed. reason=no-view-model");
+            return false;
+        }
+
+        var executablePath = Environment.ProcessPath;
+        if (string.IsNullOrEmpty(executablePath))
+        {
+            AppDiagnostics.Info("Smoke UI KeePass handoff shot failed. reason=no-process-path");
+            return false;
+        }
+
+        var keepassTab = await RealizeSmokeKeePassImportTabAsync("handoff shot");
+        if (keepassTab is null)
+        {
+            return false;
+        }
+
+        await Task.Delay(250);
+        T? Find<T>(string name)
+            where T : Control =>
+            this.GetVisualDescendants().OfType<T>().FirstOrDefault(control => control.Name == name);
+
+        var fileName = Path.GetFileName(vaultPath);
+        var rememberedBefore = viewModel.KeePassRecentVaultRows.Count;
+        // Give back everything the arrival is going to claim, so that none of it can be credited to the
+        // frames that ran before this one.
+        viewModel.SelectedSyncPage = "Export";
+        viewModel.KeePassImportTabSelected = false;
+        await Task.Delay(250);
+        var leftBehind = string.IsNullOrEmpty(viewModel.KeePassSelectedFileName) && !keepassTab.IsSelected;
+        WindowState = WindowState.Minimized;
+        await Task.Delay(900);
+        var outOfSight = WindowState != WindowState.Normal || !IsVisible;
+
+        Process? started;
+        try
+        {
+            started = Process.Start(new ProcessStartInfo
+            {
+                FileName = executablePath,
+                ArgumentList = { vaultPath },
+                UseShellExecute = false
+            });
+        }
+        catch (Exception ex)
+        {
+            AppDiagnostics.Error("Smoke UI KeePass handoff shot could not start the second copy", ex);
+            return false;
+        }
+
+        if (started is null)
+        {
+            AppDiagnostics.Info("Smoke UI KeePass handoff shot failed. reason=peer-not-started");
+            return false;
+        }
+
+        using var peer = started;
+        var namedTheFile = await WaitForSmokeWindowConditionAsync(
+            () => viewModel.KeePassSelectedFileName == fileName,
+            TimeSpan.FromSeconds(60));
+        await Task.Delay(700);
+        var cameBack = IsVisible && WindowState == WindowState.Normal;
+        var peerEnded = peer.HasExited;
+        var peerExitCode = peerEnded ? peer.ExitCode : -1;
+        var prompt = Find<TextBox>("KeePassImportPasswordBox");
+
+        var onItsPage = viewModel.SelectedSyncPage == "Import";
+        var askedForTheKey = prompt is { IsEffectivelyVisible: true };
+        var promptMaskedAndEmpty = prompt?.PasswordChar == '*' &&
+            (prompt.Text is null || prompt.Text.Length == 0);
+        // The whole point of the seam: a path in the argument list is a request for the open form, not a key.
+        var stayedShut = !viewModel.HasKeePassImportPreview;
+        var listUntouched = viewModel.KeePassRecentVaultRows.Count == rememberedBefore;
+        var painted = this.GetVisualDescendants()
+            .OfType<TextBlock>()
+            .Where(text => text.IsEffectivelyVisible)
+            .Select(text => text.Text ?? "")
+            .ToList();
+        var namedOnScreen = painted.Any(text => text == fileName);
+        var paintedSecretFree = !painted.Any(text => text.Contains(password, StringComparison.Ordinal));
+
+        var frame = await CaptureSmokeFrameAsync();
+        var frameBytes = frame?.Length ?? 0;
+        var wantedFile = !string.IsNullOrWhiteSpace(screenshotDirectory);
+        var written = false;
+        var shotName = "";
+        if (wantedFile && frameBytes > 0)
+        {
+            Directory.CreateDirectory(screenshotDirectory!);
+            shotName = $"KeePassHandoff_{Math.Max(1, (int)Math.Round(Bounds.Width))}x" +
+                $"{Math.Max(1, (int)Math.Round(Bounds.Height))}.png";
+            var path = Path.Combine(screenshotDirectory!, shotName);
+            File.WriteAllBytes(path, frame!);
+            written = new FileInfo(path).Length > 0;
+        }
+
+        await viewModel.ResetKeePassImportCommand.ExecuteAsync(null);
+        ShowFromDesktopIntegration();
+        await Task.Delay(200);
+
+        var success = leftBehind &&
+            outOfSight &&
+            namedTheFile &&
+            peerEnded &&
+            cameBack &&
+            onItsPage &&
+            keepassTab.IsSelected &&
+            askedForTheKey &&
+            promptMaskedAndEmpty &&
+            stayedShut &&
+            !viewModel.IsStatusMessageFailure &&
+            listUntouched &&
+            namedOnScreen &&
+            paintedSecretFree &&
+            frameBytes > 0 &&
+            (!wantedFile || written);
+        AppDiagnostics.Info(
+            $"Smoke UI KeePass handoff shot result. success={success}, " +
+            $"leftBehind={leftBehind}, outOfSight={outOfSight}, namedTheFile={namedTheFile}, " +
+            $"peerEnded={peerEnded}, peerExitCode={peerExitCode}, cameBack={cameBack}, " +
+            $"onItsPage={onItsPage}, tabSelected={keepassTab.IsSelected}, " +
+            $"askedForTheKey={askedForTheKey}, promptMaskedAndEmpty={promptMaskedAndEmpty}, " +
+            $"stayedShut={stayedShut}, listUntouched={listUntouched}, " +
+            $"rememberedRows={rememberedBefore}, " +
+            $"namedOnScreen={namedOnScreen}, paintedTexts={painted.Count}, " +
+            $"paintedSecretFree={paintedSecretFree}, typedChars={password.Length}, " +
+            $"frameBytes={frameBytes}, written={written}, file={shotName}");
+        return success;
     }
 
     /// <summary>

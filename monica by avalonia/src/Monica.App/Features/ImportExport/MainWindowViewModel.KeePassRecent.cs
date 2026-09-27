@@ -93,54 +93,9 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private async Task OpenKeePassRecentVaultAsync(KeePassRecentVaultRow? row)
     {
-        if (row is null || IsKeePassImportBusy)
+        if (row is not null)
         {
-            return;
-        }
-
-        if (KeePassVaultIsDirty)
-        {
-            SetStatusFailure("KeePassDiscardBeforeOpening");
-            return;
-        }
-
-        if (_keePassVaultSession?.SourcePath is { } openPath &&
-            string.Equals(openPath, row.Path, StringComparison.OrdinalIgnoreCase))
-        {
-            SetStatusNotice("KeePassFileSelectedFormat", row.Label);
-            return;
-        }
-
-        if (!TryBeginKeePassOperation(out var cancellationToken))
-        {
-            return;
-        }
-
-        try
-        {
-            var bytes = await File.ReadAllBytesAsync(row.Path, cancellationToken);
-            ClearKeePassImportPreview();
-            _keePassPendingFile = new PickedBinaryFile(
-                System.IO.Path.GetFileName(row.Path),
-                bytes,
-                row.Path);
-            KeePassSelectedFileName = _keePassPendingFile.FileName;
-            SetStatusNotice("KeePassFileSelectedFormat", _keePassPendingFile.FileName);
-        }
-        catch (OperationCanceledException)
-        {
-            SetStatusNotice("KeePassImportCanceled");
-        }
-        catch (Exception error)
-        {
-            // The file was not there, or was not ours to read. Say which, and let the list show a row
-            // that cannot be opened instead of a status line nobody can act on.
-            RefreshKeePassRecentVaults();
-            ReportImportExportFailure("Opening a remembered KeePass database failed", "KeePassRecentReadFailed", error);
-        }
-        finally
-        {
-            EndKeePassOperation();
+            await StageKeePassFileForOpenAsync(row.Path);
         }
     }
 

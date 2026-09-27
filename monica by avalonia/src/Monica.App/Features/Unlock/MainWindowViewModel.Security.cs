@@ -100,6 +100,9 @@ public sealed partial class MainWindowViewModel
             _vaultSessionService.MarkUnlocked();
             IsPrivacyScreenVisible = false;
             NotifyAutoLockScheduleChanged();
+            // A database handed to the window while it sat at the lock screen is asked for here, once
+            // the page that opens a .kdbx is actually reachable.
+            _ = ApplyIncomingKeePassFilesAsync();
             return;
         }
 

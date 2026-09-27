@@ -21,6 +21,15 @@ public sealed partial class MainWindowViewModel
     private IReadOnlyList<KeePassTreeRow> _keePassTreeRows = [];
     private KeePassTreeRow? _selectedKeePassTreeRow;
     private PasswordDetailViewModel? _keePassEntryDetails;
+    private string? _incomingKeePassFilePath;
+    private bool _applyingIncomingKeePassFiles;
+
+    /// <summary>
+    /// Which of the import tabs is showing. The view mirrors it both ways, so the page a database
+    /// arrives on is the page that stays up when the tab is opened again.
+    /// </summary>
+    [ObservableProperty]
+    private bool _keePassImportTabSelected;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasKeePassSelectedFile))]

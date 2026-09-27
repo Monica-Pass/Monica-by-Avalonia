@@ -66,6 +66,12 @@ class Program
             var singleInstance = SingleInstanceGate.TryStartAsPrimary(dataRootDirectory);
             if (singleInstance is null)
             {
+                // A double-clicked database still belongs to the copy that owns the directory, so this
+                // launch leaves it there rather than swallowing the file it was handed. The request goes
+                // down before the signal, because the owner reads the drop-zone the moment it hears it.
+                var openRequest = KeePassOpenRequestQueue.TryReadCommandLinePath(args);
+                var queued = openRequest is null ||
+                             new KeePassOpenRequestQueue(dataRootDirectory).TryEnqueue(openRequest);
                 // This launch shows nothing, so the log line is the only trace it leaves. HandedOff=false
                 // means the owner released its handle between the two calls, i.e. it had just exited; the
                 // next launch gets in, and opening a rival window here would not help.
@@ -73,8 +79,8 @@ class Program
                 // is what it did before the handover existed.
                 var handoff = SingleInstanceGate.NotifyExistingInstance(dataRootDirectory);
                 AppDiagnostics.Info(handoff.HandedOff
-                    ? $"Single instance handoff sent to the running copy (foreground right handed over={handoff.GrantedForeground}); exiting."
-                    : "Single instance handoff did not land; exiting.");
+                    ? $"Single instance handoff sent to the running copy (foreground right handed over={handoff.GrantedForeground}, databaseQueued={queued}); exiting."
+                    : $"Single instance handoff did not land; exiting. databaseQueued={queued}");
 
                 return 0;
             }
