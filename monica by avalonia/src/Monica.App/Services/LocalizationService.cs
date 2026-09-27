@@ -479,7 +479,7 @@ public interface ILocalizationService : INotifyPropertyChanged
     string KeePassHistoryPolicy { get; }
     string KeePassPolicyMaxItems { get; }
     string KeePassPolicyMaintenanceDays { get; }
-    string KeePassPolicyMaxSizeBytes { get; }
+    string KeePassPolicyMaxSizeMb { get; }
     string KeePassPolicyApply { get; }
     string KeePassPolicyHint { get; }
     string KeePassPolicyInvalid { get; }
@@ -1022,7 +1022,7 @@ public sealed class LocalizationService : ILocalizationService
     public string KeePassHistoryPolicy => Text();
     public string KeePassPolicyMaxItems => Text();
     public string KeePassPolicyMaintenanceDays => Text();
-    public string KeePassPolicyMaxSizeBytes => Text();
+    public string KeePassPolicyMaxSizeMb => Text();
     public string KeePassPolicyApply => Text();
     public string KeePassPolicyHint => Text();
     public string KeePassPolicyInvalid => Text();
@@ -2190,10 +2190,10 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassHistoryPolicy"] = "History of every entry",
         ["KeePassPolicyMaxItems"] = "Versions kept",
         ["KeePassPolicyMaintenanceDays"] = "Days kept",
-        ["KeePassPolicyMaxSizeBytes"] = "Bytes kept",
+        ["KeePassPolicyMaxSizeMb"] = "MB kept",
         ["KeePassPolicyApply"] = "Apply policy",
-        ["KeePassPolicyHint"] = "-1 keeps everything and 0 keeps nothing. The age is stored unsigned, so its floor is 0 days. The limits trim an entry's saved versions on the next edit, and only reach the file on save.",
-        ["KeePassPolicyInvalid"] = "Enter a whole number: -1 or more for the two limits, 0 or more for the days.",
+        ["KeePassPolicyHint"] = "-1 keeps everything and 0 keeps nothing. The size is in megabytes; the age is stored unsigned, so its floor is 0 days. Editing the size box rewrites the limit as whole megabytes, while leaving it alone keeps the exact bytes the file holds. The limits trim an entry's saved versions on the next edit, and only reach the file on save.",
+        ["KeePassPolicyInvalid"] = "Enter a whole number: -1 or more for the two limits (the size in MB, up to 2047), 0 or more for the days.",
         ["KeePassPolicyApplied"] = "The history policy is recorded in the opened database. Save writes it to the file.",
         ["KeePassPolicyFailed"] = "The KeePass history policy could not be read or applied.",
         ["KeePassEntryRequired"] = "Select a KeePass entry to edit.",
@@ -3263,10 +3263,10 @@ public sealed class LocalizationService : ILocalizationService
         ["KeePassHistoryPolicy"] = "条目历史保留策略",
         ["KeePassPolicyMaxItems"] = "保留条数",
         ["KeePassPolicyMaintenanceDays"] = "保留天数",
-        ["KeePassPolicyMaxSizeBytes"] = "保留字节数",
+        ["KeePassPolicyMaxSizeMb"] = "保留大小（MB）",
         ["KeePassPolicyApply"] = "应用策略",
-        ["KeePassPolicyHint"] = "-1 表示不限制，0 表示不保留。保留天数按无符号存储，下限为 0 天，而 0 天会裁掉所有版本。上限会在下一次编辑时裁剪条目的历史版本，只有点击保存才会写入文件。",
-        ["KeePassPolicyInvalid"] = "请输入整数：条数与字节数不小于 -1，天数不小于 0。",
+        ["KeePassPolicyHint"] = "-1 表示不限制，0 表示不保留。容量以 MB 计；天数按无符号存储，下限为 0 天，而 0 天会裁掉所有版本。改动容量格会把上限重写成整 MB，不动它则保留文件里的精确字节数。上限会在下一次编辑时裁剪条目的历史版本，只有点击保存才会写入文件。",
+        ["KeePassPolicyInvalid"] = "请输入整数：条数与容量不小于 -1，容量以 MB 计、上限 2047；天数不小于 0。",
         ["KeePassPolicyApplied"] = "历史保留策略已记录在当前打开的数据库中，点击保存才会写入文件。",
         ["KeePassPolicyFailed"] = "读取或应用 KeePass 历史保留策略失败。",
         ["KeePassEntryRequired"] = "请先选择要编辑的 KeePass 条目。",

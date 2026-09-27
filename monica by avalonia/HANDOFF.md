@@ -3094,5 +3094,141 @@ NC-4 顺带量出一件该记的事：无头那条"不出现秘密"的断言原�
 - **KPCLib 里那一段状态到底是什么，没人知道**：升级 KPCLib 版本时，这把锁**不该被当作"已修复"而删掉**，
   它只是把不确定围住了。删锁之前要先把上面那条"冷爆发 3/3 红"重新量出来。
 
+## 附：历史容量那一格改用 MB 说话（2026-09-28，**#134 出厂：`6291456` 第一次没有摆上人眼，而"没被人改过的那一格不许被屏幕改写"成了一条有名字的规则**）
+
+### 一、这一轮把什么变成了事实
+
+- **#132 欠账第一条现在有了反着写的断言**：打开一座真的带 6 MiB 上限的库，那一格里是 `6`，而
+  **`6291456` 这个字串被断言"不许出现在那一格"**（`KeePassHistoryWorkflowUiTests.cs:196`
+  `Assert.NotEqual(fromFile.MaxSizeBytes.ToString(), sizeBox.Text)`）。这座库不是手搓的形状，是产品自己写的
+  `KeePassSmokeVaultWriter.Write`（无头 :306），所以读到的 6 MiB 就是 Android 客户端出厂的那三个数
+  （#132 第五节量到磁盘上 `items=10 size=6291456 days=365`）。
+- **新增的换算只有一处**：`src/Monica.App/Services/KeePassHistorySizeUnits.cs`（66 行，纯函数、无状态）。
+  显示 `:26-29` 负数写作 `-1`、其余**截断整除**，与 Android 的 `bytes / (1024*1024)` 逐字同形
+  （`KeePassNativeDatabaseSettingsScreen.kt:947-948`）；解析 `:38-64` 只收不变文化的整数、`-1` 直通、2047 封顶；
+  上限 `:20` `MaximumMegabytes = int.MaxValue / BytesPerMegabyte`（= 2047）——因为对面那端把字节数装在 `Int` 里
+  （`KeePassDatabaseSettings.kt:42`、`:87`，解析处 `:915` 挡的是同一个数）。**不设这格上限，桌面能写出一座 Android 装不下的库**；
+  #132 把这条记成"只是读两边代码读出来的"，这一轮它变成界面上会被拒的一次输入。
+- **显示是有损的**（`6291457` 和 `6291456` 都读作 `6`），所以格子背后带着一份文件自己的字节数
+  （`MainWindowViewModel.KeePassPolicy.cs:30` 的 `_keePassPolicyMaxSizeBytes`）：
+  **没碰那一格 → 回写文件自己的字节**（`KeePassHistorySizeUnits.cs:56-60` 的保真分支），
+  **碰了那一格 → 按整 MB 重写**（`:62`）。无头把两条都走到底并回读磁盘：手打 `3` 条 / `30` 天、大小格不碰 →
+  保存 → 重开 → `saved.MaxSizeBytes == fromFile.MaxSizeBytes`（:270-273）；把格子改成 `7` → 保存 → 重开 →
+  `7 * 1048576`（:276-283）。
+- **界面与文案**：`KeePassBrowsePane.axaml:187-188` 的 label 换 `L.KeePassPolicyMaxSizeMb`、绑定换
+  `KeePassPolicyMaxSizeMbText`，`KeePassPolicyGrid` 列宽 `104,*`（新标签短，才放得进那一列）；
+  `LocalizationService.cs` 键 `:482`（接口）/`:1025`（实现）/`:2193`（en `"MB kept"`）/`:3266`（zh `保留大小（MB）`），
+  提示语 `:2195`/`:3268` 明写"改动容量格会把上限重写成整 MB，不动它则保留文件里的精确字节数"，
+  拒绝语 `:2196`/`:3269` 点名单位与 2047 上限。
+
+### 二、为什么不显示精确字节、也不钳制超上限的输入
+
+- 精确字节的写法就是 #132 那一屏——让人自己猜单位。带小数（`6.01 MB`）也不行：Android 的显示是整数除法，
+  两边对同一座库读出**同一个字**才算互通；造一个小数位等于造一种没人这么写的拼法。
+- "没改动就不换算"承担的是另一半风险：屏幕把 `6291457` 显示成 `6`，若 apply 一律按 `6 * 1048576` 写回，
+  那么**只是改了保留条数的人**会把库里的容量上限悄悄换掉。NC-B 量到这一格的红正是
+  `Expected: 6291457 / Actual: 6291456`——差一个字节也是悄悄改写，而且没人会看见。
+- 2047 以上是**拒绝**，不是钳制。钳成 2047 会写进一个用户从没输入的数；拒绝把"这座库的另一端装不下"说在状态栏
+  （`KeePassPolicyInvalid`），并且**不动库**——无头那次拒绝之后格子重新读回 `6`（:258-262）。
+
+### 三、真产物截图门（这一帧多出来的那一格读数）
+
+- `MainWindow.SmokeUi.cs:716-718`：在**手打**（`:719-721`）**之前**取那一格的文本，要求它自己 `int.TryParse` 得过、回读逐字相同
+  （`7` 而不是 `7.0`）、且不超过 2047 → `policySizeReadsAsMb`；`:727-730` 的 `policyApplied` 现在同时要求
+  VM 的 `KeePassPolicyMaxSizeMbText == "7"` **和**格子里是 `7`（打进 MB 的字真的走到了 VM，不是格子自己留着字）；
+  `:759-760` 把它加进 `success` 的合取，`:770` 把它单独打出来。
+- 本轮链的读数（跑的是 publish 出来的字节，不是 bin/obj）：
+  `policyOnScreen=True, policyBoxesUsable=True, policySizeReadsAsMb=True, policyApplied=True`。
+- 仍然要说清：这几格挂在同一个 `if (policyOnScreen)` 里，是**同一格的连带读数**，不是各自独立被证的事
+  （#132 第七节那条欠账对这一格原样成立）。
+
+### 四、负控（每条先看见红，跑完还原并逐字节核对）
+
+| 拆掉的东西 | 红在哪 | 实测 |
+|---|---|---|
+| NC-A `ToDisplayMegabytes` 直接回 `bytes.ToString()`（把裸字节请回屏幕） | 无头第 2 条 | `Expected: Not "6291456" / Actual: "6291456"`——**这就是 #132 说"一次也没做过"的那一格被钉住的证明** |
+| NC-B 删掉 `TryParseMegabytes` 的保真分支（一律 `mb * 1048576`） | 单测 | `Failed: 4, Passed: 28`：`("0", 1048575)` → `Expected: 1048575 / Actual: 0`、`("11", 12582911)` → `Actual: 11534336`、`("6", 6291457)` → `Actual: 6291456`，外加往返那条 `Expected: 1 / Actual: 0`。**注意 `("6", 6291456)` 那行没红**——它本来就整 MB 对齐，所以"保住精确字节"必须由不对齐的行说话，这张表里刻意放 `Megabyte - 1`、`12 * Megabyte - 1`、`6 * Megabyte + 1` 就是这个原因 |
+| NC-C 去掉 `megabytes > MaximumMegabytes` 的封顶 | 单测 | `Failed: 1, Passed: 31`，红的正是 `("2048")` 那一行；其余 12 种写法（`6.5`、`1,048`、`1e2`、`0x10`、空、`six`、`6 MB`……）照绿——说明这格上限**只由那一行钉住**（见第七节） |
+
+- 三条拆完都立刻改回原样并重跑：单测 `--filter FullyQualifiedName~KeePass` **149/149 绿**、无头该类 **2/2 绿**（rc=0）。
+- "还原"不能用 `git diff` 证（`KeePassHistorySizeUnits.cs` 与 `KeePassHistorySizeUnitsTests.cs`、
+  `KeePassVaultTestCollection.cs` 是本轮**新文件（untracked）**），所以量的是 sha256 前 16 位，与链构建那一份逐字节相同：
+  `KeePassHistorySizeUnits.cs 985eb6070cf26d93`、`KeePassHistoryWorkflowUiTests.cs f5642cde999dabb6`；
+  本轮负控没动过的另两份记在这里供下次对拍：`MainWindowViewModel.KeePassPolicy.cs 00e07dc42ff8572a`、
+  `MainWindow.SmokeUi.cs f1ed07ef2d2eeafa`、`KeePassHistorySizeUnitsTests.cs daac62fb1148bc7a`。
+
+### 四之二：门禁里那条"偶发"红，这一轮量到了原因（#128 残留在测试侧）
+
+- **现象**：`--filter "FullyQualifiedName~KeePass"` 稳定红 1 条
+  （`KeePassVaultCreateShapeTests.A_new_database_has_the_disk_shape_the_android_client_writes`，抛
+  `InvalidCompositeKeyException`），同一个类单独跑绿，全量链里也绿。上一段还留下一条**错误线索**——以为是某个测试
+  把共享数据目录里的库文件覆盖或删掉了。
+- **本轮量的判别**（同一台机器、同一份字节、间隔两分钟）：
+  `xUnit.ParallelizeTestCollections=false xUnit.MaxParallelThreads=1` → **149/149 绿**；
+  默认并行 → **148 绿 / 1 红**，红固定在同一处。加上 fixture 的 sha256 与 mtime 前后一致（`e9285ef6…`、1853 字节），
+  **不是文件被动了，是排期**：并行时两个集合同时进 KPCLib 那段进程级状态，撞法与 #128 的产品侧一模一样。
+- **收法按仓库既有约定**（`SmokeVaultSeedTests` / `VaultCredentialTests` / `PasswordManagementTests` 就是这么写的）：
+  新增 `tests/Monica.Tests/KeePassVaultTestCollection.cs`（`DisableParallelization = true`），把 **13 个真读写 .kdbx 的类**挂进去
+  （11 个 `KeePass*` + `AppSettingsTests` + `PlatformServiceTests`，后两者也调 `KeePassTestVault.Create` 与
+  `KeePassVaultService`）。
+- **代价是数的不是猜的**：`~KeePass` 这一片并行从 23 s → 30 s；全量单测常规通道 1114/1114、6 m 17 s。
+- **没有改产品那把锁的围法**：`KeePassVaultCreateShapeTests.cs:331` 里那把
+  `lock (KeePassVaultParseGate.Gate)` 留着——它是"直接调库就排在产品那把锁后面"这条约定本身的写法；
+  但**约定不是编译期强制**，见第七节第二条。
+
+### 五、测试与证据
+
+- **单测 32 条**（`tests/Monica.Tests/KeePassHistorySizeUnitsTests.cs`，140 行、7 个成员、29 行 `InlineData`）：
+  ① `The_box_shows_megabytes`（7 行：`-1`、`long.MinValue`、`0`、`6*MB`、`6*MB+1`、`MB-1`、`int.MaxValue`→`2047`，
+  并断言显示出来的每个字全是数字，任何文化下都不带分隔符与小数点）；
+  ② `A_box_nobody_edited_gives_the_file_its_own_bytes_back`（4 行，**每行先断言** `text == ToDisplayMegabytes(fileBytes)`——
+  表的每一行必须真的是"没改动"那种情形，否则它说保住的是另一件事：这张表最初的 spec bug 就是这么被抓出来的，
+  `("6", 12*MB-1)` 那行其实显示 `11`，被改判进 ③）；
+  ③ `A_number_typed_into_the_box_becomes_that_many_bytes`（6 行，**每行先断言** `text != ToDisplayMegabytes(fileBytes)`）；
+  ④ 没有库可保时（`fileBytes = null`）`6` 与 `" 6 "` 照样换算成整 MB；⑤ 12 种写法被拒且 `bytes` 留在 `0`；
+  ⑥ `MaximumMegabytes == 2047` 且 `2047 * 1 MiB <= int.MaxValue`；⑦ 0..2047 每个整 MB 与 +1 都往返。
+  全程 expected/actual 上只有整数与单位数串，没有任何秘密字面量。
+- **无头 2 条**（`KeePassHistoryWorkflowUiTests.cs`，策略那条 :157-297）本轮新增：格子里的 `6` 与
+  `ToDisplayMegabytes(fromFile.MaxSizeBytes)` 一致、且**不等于**裸字节串、并且这座库的上限确实大于 1 MiB
+  （:194-199——第三条是防前两条形同空转）；保存/重开读回磁盘两次（新 helper `ReopenPolicyAsync` :338-347）。
+- **本轮没有新出现的秘密字面量**：用的仍是已登记的 fixture 口令与 `3 / 30 / 7 / 6 / 2048` 这些整数
+  （`2048` 与 `MaximumMegabytes + 1` 只作为界面上的拒绝输入，不落盘）。
+- **链日志泄密审计**（对 `chain7.log` 逐字面量数命中）：`keepass-smoke-fixture-not-a-secret`、
+  `kdbx-parity-fixture-not-a-secret`、`policy-fixture-not-a-secret`、`policy-live-secret`、`policy-elder-secret`、
+  `concurrent-unlock-fixture-not-a-secret`、`created-vault-fixture-not-a-secret`、`create-shape-fixture-not-a-secret`、
+  `history-fixture-not-a-secret`、`history-live-secret`、`history-elder-secret`、`keepass-search-perf-not-a-secret`、
+  `not-the-password`、`CiRuntime!2026`、`secret-1`、`ticket-000001`、`JBSWY3DPEHPK3PXP`、`Renamed in the UI test`
+  **各 0 次**；`[redacted]` **10 次**（产品命令行仍不读口令）。
+
+### 六、门禁
+
+链：`D:\Monica-kpshots\h2-gate-chain.ps1`（本轮日志 `D:\kpprobe\logs\chain7.log`）：**四个 rc 全 0** —
+`fmt_rc=0`、`cr_rc=0`、`pub_rc=0`、`art_rc=0`。
+
+- **结构门**：`Focused vault, security, storage, recycle bin, and import/export files are within 300 lines.`
+  ——本轮新增的 `KeePassHistorySizeUnits.cs`（66 行）在闸内，`MainWindowViewModel.KeePassPolicy.cs` 从 117 行涨到 137 行、仍在闸内。
+- **单测**：perf-budget 通道 **11/11**（53 s），常规通道 **1114/1114**（6 m 17 s，含本轮新增的 32 条与那 13 个类的串行化）。
+- **无头**：perf-budget **17** 条执行、常规 **262** 条执行（TRX 落盘 `TestResults/Monica.UiTests/*.trx`）。
+- **产物真跑门**：**12 个 `success=True`**；内存 `lockedPrivateMB=118.3 / maxMB=120`（上一轮 118.9，阈值一动不动——
+  按既定纪律只认"这次没超"，单次读数仍不可信）；kdbx 大库探针 `collectedMB=110.3`、`growthMB=5.1 / maxGrowthMB=24`。
+
+### 七、仍然没做到（欠账，不是决定）
+
+- **非整 MB 的上限不能被"请求"**：一座库带着 `1048575`（显示 `0`），人不碰那格能保住它，但**想要另一个不到 1 MB 的值**
+  （例如 500 KB）做不到——打 `0` 得到的是 0 字节。这是决定（别的客户端也拼不出小数 MB），但它意味着要精确设容量的人只能去别的客户端。
+- **无头那两条对"保住精确字节"其实不咬**：fixture 的 6 MiB 本来就对齐（NC-B 里 `("6", 6291456)` 那行不红是同一件事的另一面）。
+  这一格的真证据只在单测那张表；无头只证了"没改动 → 文件字节不变"。
+- **文案里的 `2047` 是死的字**：en/zh 的拒绝语把上限写死在文字里，只有单测 ⑥ 钉住数值——**改常数时本地化不会跟着红**。
+- **测试侧的围法不是编译期强制**：`[Collection(KeePassVaultTestCollection.Name)]` 靠人记得挂。下一个直接调 KPCLib 的新测试类
+  若忘了，就会再拿到同一条红（本轮那 4 次并行各 1 红，就是没挂上的样子）。**没有**加"扫一遍所有调 KPCLib 的类是否都在集合里"的守卫。
+- **产品侧并发的代价仍然没有数**（#128 第七节原样欠着），真实 GUI 里两路同时解锁也仍然没人走过。
+- **没有拿别的客户端读过这份被改过容量的库**：本轮只保证"桌面的读法与 Android 的写法逐条对应（截断、`Int` 上限、`-1` 直通）"。
+  用 kotpass / KeePassDX / KeePassXC 打开一份"被桌面端把上限从 6 MiB 改成 7 MiB"的 .kdbx——**一次也没做过**（归 #115）。
+- **`SizeOf` 的估法仍未与 kotpass 的 `estimateSize` 对拍**（#132 原样欠着）：也就是说"7 MiB 这一格到底裁掉哪些版本"两边可以不同；
+  本轮改的是**怎么把 7 说清楚**，不是**裁得一样**。
+- **三格仍然没有即时校验**（打字过程中不红，只有按「应用策略」才用状态文案说话），`days=0` 与 `items=-1` 的单闸门组合仍只在单测里成对测。
+- **导轨的可视高仍然只有 158px**（#133），`KeePassPreviewCard` 与导轨仍然各写一遍摘要与按钮；本轮只换了那一格的单位与标签宽度。
+- **"数据库设置"整页仍然没有**（KDF 参数、加密算法、回收站开关、数据库名），#132 那条对这一格原样成立。
+
 
 

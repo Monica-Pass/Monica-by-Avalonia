@@ -8,6 +8,7 @@ using System.Net.Http.Headers;
 
 namespace Monica.Tests;
 
+[Collection(KeePassVaultTestCollection.Name)]
 public sealed partial class PlatformServiceTests
 {
     [Fact]

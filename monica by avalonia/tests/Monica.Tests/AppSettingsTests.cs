@@ -12,6 +12,7 @@ using Microsoft.Data.Sqlite;
 
 namespace Monica.Tests;
 
+[Collection(KeePassVaultTestCollection.Name)]
 public sealed partial class AppSettingsTests
 {
     [Fact]

@@ -162,11 +162,12 @@
                 </ContentControl>
                 <!--
                     How much of an entry's past this particular database asks for. The three numbers are
-                    the file's own, carried in its settings block and read by every KeePass client, so
-                    the screen says them in the unit the file holds them: a friendlier one would round
-                    a value and write the rounding back. They sit below the entry rather than in the
-                    application settings because a limit belongs to a library, and two libraries can
-                    disagree about it.
+                    the file's own, carried in its settings block and read by every KeePass client, so the
+                    size one is shown in megabytes - the unit every other client of this file spells it in,
+                    including the Android one that writes the databases people open here. The byte count
+                    behind that box is kept, not rounded, as long as nobody edits it. They sit below the
+                    entry rather than in the application settings because a limit belongs to a library, and
+                    two libraries can disagree about it.
                 -->
                 <StackPanel x:Name="KeePassPolicySection" Spacing="6" Margin="0,0,0,24" IsVisible="{Binding HasKeePassImportPreview}">
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
@@ -178,13 +179,13 @@
                             <TextBlock Text="{Binding L.KeePassPolicyApply}" />
                         </Button>
                     </Grid>
-                    <Grid x:Name="KeePassPolicyGrid" ColumnDefinitions="84,*" ColumnSpacing="8" RowDefinitions="Auto,Auto,Auto" RowSpacing="6">
+                    <Grid x:Name="KeePassPolicyGrid" ColumnDefinitions="104,*" ColumnSpacing="8" RowDefinitions="Auto,Auto,Auto" RowSpacing="6">
                         <TextBlock Grid.Row="0" Text="{Binding L.KeePassPolicyMaxItems}" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         <TextBox Grid.Row="0" Grid.Column="1" x:Name="KeePassPolicyMaxItemsBox" Text="{Binding KeePassPolicyMaxItemsText, Mode=TwoWay}" AutomationProperties.Name="{Binding L.KeePassPolicyMaxItems}" />
                         <TextBlock Grid.Row="1" Text="{Binding L.KeePassPolicyMaintenanceDays}" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         <TextBox Grid.Row="1" Grid.Column="1" x:Name="KeePassPolicyDaysBox" Text="{Binding KeePassPolicyMaintenanceDaysText, Mode=TwoWay}" AutomationProperties.Name="{Binding L.KeePassPolicyMaintenanceDays}" />
-                        <TextBlock Grid.Row="2" Text="{Binding L.KeePassPolicyMaxSizeBytes}" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="KeePassPolicySizeBox" Text="{Binding KeePassPolicyMaxSizeBytesText, Mode=TwoWay}" AutomationProperties.Name="{Binding L.KeePassPolicyMaxSizeBytes}" />
+                        <TextBlock Grid.Row="2" Text="{Binding L.KeePassPolicyMaxSizeMb}" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="KeePassPolicySizeBox" Text="{Binding KeePassPolicyMaxSizeMbText, Mode=TwoWay}" AutomationProperties.Name="{Binding L.KeePassPolicyMaxSizeMb}" />
                     </Grid>
                     <!--
                         Under the boxes rather than over them: the rail is a short column inside a tall

@@ -9,6 +9,7 @@ namespace Monica.Tests;
 /// parses the file as one gated unit, so a right password stops being refused for arriving at the
 /// same time as another.
 /// </summary>
+[Collection(KeePassVaultTestCollection.Name)]
 public sealed class KeePassConcurrentUnlockTests
 {
     private const string FixturePassword = "kdbx-parity-fixture-not-a-secret";

@@ -11,6 +11,7 @@ namespace Monica.Tests;
 /// is. The last test proves a mutation survives the trip to disk, because an in-memory tree nobody
 /// can re-open is not a KeePass client.
 /// </summary>
+[Collection(KeePassVaultTestCollection.Name)]
 public sealed class KeePassVaultManageTests
 {
     [Fact]

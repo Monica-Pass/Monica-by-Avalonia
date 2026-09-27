@@ -17,6 +17,7 @@ namespace Monica.Tests;
 /// cap" to every KeePass client, while 0 means "keep nothing", and reading them as one behaviour was
 /// how a vault that remembered versions without limit ended up with none.
 /// </summary>
+[Collection(KeePassVaultTestCollection.Name)]
 public sealed class KeePassHistoryPolicyTests : IDisposable
 {
     private const string FixturePassword = "policy-fixture-not-a-secret";

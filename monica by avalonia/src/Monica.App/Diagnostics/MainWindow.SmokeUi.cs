@@ -14,6 +14,7 @@ using Monica.App.Features.Passwords;
 using Monica.App.Features.Sync;
 using Monica.App.Features.Vault;
 using Monica.App.Features.Wallet;
+using Monica.App.Services;
 using Monica.App.ViewModels;
 
 namespace Monica.App;
@@ -675,8 +676,9 @@ public partial class MainWindow
             // The library's own history limits ride on the same rail, and this is the only place the
             // shipped binary is made to reach them: the section sits below the field dump, and the three
             // boxes are the sole proof on screen that the numbers came out of the file rather than out of
-            // a default. The typed triple is not what a new database ships with, and the days box is the
-            // one the file stores unsigned, so an apply that rounded or refused it shows up here.
+            // a default. The typed triple is not what a new database ships with, the size box speaks
+            // megabytes like every other client of this file, and the days box is the one the file stores
+            // unsigned, so an apply that rounded or refused either shows up here.
             var policySection = this.GetVisualDescendants()
                 .OfType<StackPanel>()
                 .FirstOrDefault(control => control.Name == "KeePassPolicySection");
@@ -702,21 +704,30 @@ public partial class MainWindow
             // number a person can read or type into, so the width is asserted rather than assumed.
             var policyBoxesUsable = new[] { maxItemsBox, daysBox, sizeBox }
                 .All(box => box is { Bounds.Width: >= 96 });
+            // What this box must read as is a number of megabytes, so it has to sit inside the range the
+            // unit allows. The library this frame opens caps history at 6 MiB, and the byte count the file
+            // really carries is seven digits - this is the one reading where a person's eye, and the
+            // shipped binary's own layout, decide which of the two is on screen.
+            var policySizeReadsAsMegabytes = false;
             var policyApplied = false;
             var policyShot = (Bytes: 0, Written: true, Name: "");
             if (policyOnScreen)
             {
+                policySizeReadsAsMegabytes = int.TryParse(sizeBox!.Text, out var shownSizeMb)
+                    && shownSizeMb.ToString() == sizeBox.Text
+                    && shownSizeMb <= KeePassHistorySizeUnits.MaximumMegabytes;
                 maxItemsBox!.Text = "7";
                 daysBox!.Text = "90";
-                sizeBox!.Text = "-1";
+                sizeBox!.Text = "7";
                 await viewModel.ApplyKeePassHistoryPolicyCommand.ExecuteAsync(null);
                 policyShot = await ShootAsync("KeePassPolicy");
                 // The view model re-reads the three numbers from the database once an apply lands, so what
-                // it carries now is what the open file holds rather than an echo of what was typed at it.
+                // it carries now is what the open file holds rather than an echo of what was typed at it -
+                // including this one, which it spells back in megabytes.
                 policyApplied = viewModel.KeePassPolicyMaxItemsText == "7"
                     && viewModel.KeePassPolicyMaintenanceDaysText == "90"
-                    && viewModel.KeePassPolicyMaxSizeBytesText == "-1"
-                    && maxItemsBox.Text == "7" && daysBox.Text == "90" && sizeBox.Text == "-1";
+                    && viewModel.KeePassPolicyMaxSizeMbText == "7"
+                    && maxItemsBox.Text == "7" && daysBox.Text == "90" && sizeBox.Text == "7";
             }
 
             // The revert walked on the shipped binary: the newest version is the shape the edit just
@@ -745,6 +756,7 @@ public partial class MainWindow
                 reverted &&
                 policyOnScreen &&
                 policyBoxesUsable &&
+                policySizeReadsAsMegabytes &&
                 policyApplied &&
                 historyShot.Bytes > 0 &&
                 historyShot.Written &&
@@ -755,6 +767,7 @@ public partial class MainWindow
                 $"listOnScreen={listOnScreen}, restoreOnScreen={restoreOnScreen}, " +
                 $"restoreButtons={restoreButtons}, reverted={reverted}, " +
                 $"policyOnScreen={policyOnScreen}, policyBoxesUsable={policyBoxesUsable}, " +
+                $"policySizeReadsAsMb={policySizeReadsAsMegabytes}, " +
                 $"policyApplied={policyApplied}, " +
                 $"treeRows={state.TreeRows}, entryRows={state.EntryRows}, vaultBytes={state.FileBytes}, " +
                 $"tabSelected={keepassTab.IsSelected}, frameBytes={historyShot.Bytes}, " +

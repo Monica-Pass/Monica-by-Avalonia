@@ -171,7 +171,8 @@ public sealed partial class MainWindowViewModel
         _selectedKeePassTreeRow = null;
         SelectedKeePassTreeRowPublic = null;
         KeePassPolicyMaxItemsText = "";
-        KeePassPolicyMaxSizeBytesText = "";
+        KeePassPolicyMaxSizeMbText = "";
+        _keePassPolicyMaxSizeBytes = null;
         KeePassPolicyMaintenanceDaysText = "";
         RaiseKeePassRail();
         OnPropertyChanged(nameof(ShowKeePassOpenForm));

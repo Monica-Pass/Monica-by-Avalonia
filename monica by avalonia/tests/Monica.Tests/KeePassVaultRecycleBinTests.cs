@@ -10,6 +10,7 @@ namespace Monica.Tests;
 /// recycle and reused after that, deletion records for the shapes that genuinely leave the database,
 /// and a move that says "this changed place" without pretending the entry was edited.
 /// </summary>
+[Collection(KeePassVaultTestCollection.Name)]
 public sealed class KeePassVaultRecycleBinTests
 {
     /// <summary>

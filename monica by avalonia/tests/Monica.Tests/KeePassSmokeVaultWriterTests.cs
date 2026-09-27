@@ -6,6 +6,7 @@ namespace Monica.Tests;
 /// Guards the fixture generator the artifact memory gate depends on. The gate itself cannot tell a
 /// wrong shape from a regression, so the shape is asserted here instead.
 /// </summary>
+[Collection(KeePassVaultTestCollection.Name)]
 public sealed class KeePassSmokeVaultWriterTests : IDisposable
 {
     private readonly string _directory = Path.Combine(

@@ -16,6 +16,7 @@ namespace Monica.Tests;
 /// have to survive an edit and a save anyway, because a person who opens a real vault here and writes
 /// it back must not lose the parts this client never displayed.
 /// </summary>
+[Collection(KeePassVaultTestCollection.Name)]
 public sealed class KeePassRichFieldTests : IDisposable
 {
     private const string FixturePassword = "rich-fields-fixture-not-a-secret";

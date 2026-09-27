@@ -13,6 +13,7 @@ namespace Monica.Tests;
 /// kotpass 0.10.0 - the exact library coordinate Monica for Android pins - so every assertion here is
 /// about a file the other client really produced, not a stand-in.
 /// </summary>
+[Collection(KeePassVaultTestCollection.Name)]
 public sealed class KeePassAndroidShapeTests : IDisposable
 {
     private const string FixturePassword = "kdbx-parity-fixture-not-a-secret";

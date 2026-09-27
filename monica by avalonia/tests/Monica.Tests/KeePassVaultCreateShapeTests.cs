@@ -16,6 +16,7 @@ namespace Monica.Tests;
 /// the folder layout and the recycle semantics the phone expects - and, for KDBX 4.1 specifically,
 /// that the file has a slot for the folder a recycled entry left, which 3.1 has not got.
 /// </summary>
+[Collection(KeePassVaultTestCollection.Name)]
 public sealed class KeePassVaultCreateShapeTests
 {
     private const string CreatedPassword = "created-vault-fixture-not-a-secret";
@@ -324,11 +325,17 @@ public sealed class KeePassVaultCreateShapeTests
 
     private static PwDatabase Load(byte[] payload, string password)
     {
-        var key = new CompositeKey();
-        key.AddUserKey(new KcpPassword(password));
-        var database = new PwDatabase { MasterKey = key };
-        new KdbxFile(database).Load(new MemoryStream(payload, writable: false), KdbxFormat.Default, null);
-        return database;
+        // The same unit the product guards: a key build and a parse that interleave with another thread's
+        // are the failure #128 measured, and a test that reads a .kdbx outside the gate can be broken by
+        // - or break - a concurrent unlock the way any other caller can.
+        lock (KeePassVaultParseGate.Gate)
+        {
+            var key = new CompositeKey();
+            key.AddUserKey(new KcpPassword(password));
+            var database = new PwDatabase { MasterKey = key };
+            new KdbxFile(database).Load(new MemoryStream(payload, writable: false), KdbxFormat.Default, null);
+            return database;
+        }
     }
 
     private sealed record DiskShape(

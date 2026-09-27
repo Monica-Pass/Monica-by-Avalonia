@@ -15,6 +15,7 @@ namespace Monica.Tests;
 /// those versions and revert to one, with the revert landing on the file as a version the next
 /// KeePass client reads - and without the list ever showing a password.
 /// </summary>
+[Collection(KeePassVaultTestCollection.Name)]
 public sealed class KeePassHistoryTests : IDisposable
 {
     private const string FixturePassword = "history-fixture-not-a-secret";

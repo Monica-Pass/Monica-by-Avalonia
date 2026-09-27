@@ -1,14 +1,16 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Monica.App.Services;
 using Monica.Platform.Services;
 
 namespace Monica.App.ViewModels;
 
 /// <summary>
 /// The three numbers a KeePass database carries about how much of an entry's past to keep, shown and
-/// edited where the library is browsed. They are the file's own settings rather than this client's,
-/// which is why the byte limit is asked for in bytes: a conversion to a friendlier unit would round a
-/// number the file holds exactly, and applying what the screen showed would then change it.
+/// edited where the library is browsed. They are the file's own settings rather than this client's, and
+/// the size one is asked for in megabytes because that is the unit every other client of this file
+/// spells it in. <see cref="KeePassHistorySizeUnits"/> keeps the conversion honest: what the box shows
+/// is a truncated view of a byte count, so a box nobody edited gives the file its own number back.
 /// </summary>
 public sealed partial class MainWindowViewModel
 {
@@ -16,10 +18,16 @@ public sealed partial class MainWindowViewModel
     private string _keePassPolicyMaxItemsText = "";
 
     [ObservableProperty]
-    private string _keePassPolicyMaxSizeBytesText = "";
+    private string _keePassPolicyMaxSizeMbText = "";
 
     [ObservableProperty]
     private string _keePassPolicyMaintenanceDaysText = "";
+
+    /// <summary>
+    /// The size limit as the open database holds it, in the bytes the file actually carries. The box
+    /// above shows megabytes, so this is what a re-applied box must not silently round.
+    /// </summary>
+    private long? _keePassPolicyMaxSizeBytes;
 
     /// <summary>
     /// The rail is also where a person reads the library's own settings, so it stays up with a database
@@ -35,7 +43,7 @@ public sealed partial class MainWindowViewModel
     {
         var policy = await session.ReadHistoryPolicyAsync();
         KeePassPolicyMaxItemsText = policy.MaxItems.ToString();
-        KeePassPolicyMaxSizeBytesText = policy.MaxSizeBytes.ToString();
+        SetKeePassPolicyMaxSize(policy.MaxSizeBytes);
         KeePassPolicyMaintenanceDaysText = policy.MaintenanceDays.ToString();
         OnPropertyChanged(nameof(ShowsKeePassRail));
     }
@@ -57,7 +65,8 @@ public sealed partial class MainWindowViewModel
 
         var policy = ReadPolicy(
             KeePassPolicyMaxItemsText,
-            KeePassPolicyMaxSizeBytesText,
+            KeePassPolicyMaxSizeMbText,
+            _keePassPolicyMaxSizeBytes,
             KeePassPolicyMaintenanceDaysText);
         if (policy is null)
         {
@@ -70,7 +79,7 @@ public sealed partial class MainWindowViewModel
         {
             var applied = await session.ApplyHistoryPolicyAsync(policy);
             KeePassPolicyMaxItemsText = applied.MaxItems.ToString();
-            KeePassPolicyMaxSizeBytesText = applied.MaxSizeBytes.ToString();
+            SetKeePassPolicyMaxSize(applied.MaxSizeBytes);
             KeePassPolicyMaintenanceDaysText = applied.MaintenanceDays.ToString();
             RaiseKeePassWriteState();
             SetStatusNotice("KeePassPolicyApplied");
@@ -84,24 +93,35 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    private void SetKeePassPolicyMaxSize(long bytes)
+    {
+        _keePassPolicyMaxSizeBytes = bytes;
+        KeePassPolicyMaxSizeMbText = KeePassHistorySizeUnits.ToDisplayMegabytes(bytes);
+    }
+
     /// <summary>
-    /// The floors are the ones the file can hold: a count or a size below -1 has no meaning to any
-    /// KeePass client, and the age is stored as an unsigned number, so it has no negative spelling at
-    /// all. A box that is not a plain integer returns null rather than a default.
+    /// The floors are the ones the file can hold: a count below -1 has no meaning to any KeePass client,
+    /// the size is capped at what the other clients of this file can carry, and the age is stored as an
+    /// unsigned number, so it has no negative spelling at all. A box that is not a plain integer returns
+    /// null rather than a default.
     /// </summary>
     private static KeePassHistoryPolicy? ReadPolicy(
         string maxItemsText,
-        string maxSizeText,
+        string maxSizeMbText,
+        long? fileMaxSizeBytes,
         string maintenanceDaysText)
     {
         if (!int.TryParse(maxItemsText.Trim(), out var maxItems) || maxItems < -1
-            || !long.TryParse(maxSizeText.Trim(), out var maxSize) || maxSize < -1
+            || !KeePassHistorySizeUnits.TryParseMegabytes(
+                maxSizeMbText,
+                fileMaxSizeBytes,
+                out var maxSizeBytes)
             || !uint.TryParse(maintenanceDaysText.Trim(), out var maintenanceDays))
         {
             return null;
         }
 
-        return new KeePassHistoryPolicy(maxItems, maxSize, maintenanceDays);
+        return new KeePassHistoryPolicy(maxItems, maxSizeBytes, maintenanceDays);
     }
 
     /// <summary>

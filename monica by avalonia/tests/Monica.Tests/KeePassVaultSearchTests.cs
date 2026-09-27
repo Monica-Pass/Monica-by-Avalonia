@@ -7,6 +7,7 @@ namespace Monica.Tests;
 /// What a search over an opened database answers: which fields it reads, what it refuses to read, how
 /// it orders what it found, and how many it hands back when the answer is too big for one list.
 /// </summary>
+[Collection(KeePassVaultTestCollection.Name)]
 public sealed class KeePassVaultSearchTests
 {
     [Fact]

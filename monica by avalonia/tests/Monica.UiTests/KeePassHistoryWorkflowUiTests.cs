@@ -4,6 +4,7 @@ using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
 using Monica.App.Features.ImportExport;
 using Monica.App.Features.Sync;
+using Monica.App.Services;
 using Monica.App.ViewModels;
 using Monica.Platform.Services;
 
@@ -149,8 +150,9 @@ public sealed class KeePassHistoryWorkflowUiTests
     /// <summary>
     /// The three numbers the file carries about how much of an entry's past it keeps, shown and changed
     /// from the pane. The platform suite proves the writer honours them; this proves they reach the
-    /// screen, that typing into a box is what reaches the database, and that a box the file cannot hold
-    /// is refused rather than guessed at.
+    /// screen in the unit a person reads them in, that typing into a box is what reaches the database and
+    /// that the byte count behind the megabyte box survives a round trip untouched, and that a box the
+    /// file cannot hold is refused rather than guessed at.
     /// </summary>
     [Fact]
     public async Task KeePass_history_policy_shows_the_file_s_numbers_and_takes_back_what_is_typed()
@@ -176,7 +178,9 @@ public sealed class KeePassHistoryWorkflowUiTests
                 var sizeBox = view.InPane<TextBox>("KeePassPolicySizeBox")!;
 
                 // What the screen shows is what the file holds, read back off the bytes by the platform
-                // rather than recited from a constant that could drift with the fixture.
+                // rather than recited from a constant that could drift with the fixture. The size is the
+                // one number the file does not hold in the unit it shows: the box speaks megabytes, and
+                // the byte count it was converted from must not be what a person reads or has to type.
                 using var probe = await new KeePassVaultService().OpenAsync(
                     content,
                     Path.GetFileName(fixturePath),
@@ -186,7 +190,14 @@ public sealed class KeePassHistoryWorkflowUiTests
                 var fromFile = await probe.ReadHistoryPolicyAsync(TestContext.Current.CancellationToken);
                 Assert.Equal(fromFile.MaxItems.ToString(), maxItemsBox.Text);
                 Assert.Equal(fromFile.MaintenanceDays.ToString(), daysBox.Text);
-                Assert.Equal(fromFile.MaxSizeBytes.ToString(), sizeBox.Text);
+                Assert.Equal(
+                    KeePassHistorySizeUnits.ToDisplayMegabytes(fromFile.MaxSizeBytes),
+                    sizeBox.Text);
+                Assert.NotEqual(fromFile.MaxSizeBytes.ToString(), sizeBox.Text);
+                Assert.True(
+                    fromFile.MaxSizeBytes > KeePassHistorySizeUnits.BytesPerMegabyte,
+                    "the fixture no longer carries a size cap worth more than a megabyte, so the "
+                        + "assertion above has nothing to be about");
 
                 var rendered = string.Join(
                     "|",
@@ -202,32 +213,35 @@ public sealed class KeePassHistoryWorkflowUiTests
                 Assert.Same(viewModel.ApplyKeePassHistoryPolicyCommand, applyButton.Command);
                 Assert.True(applyButton.Command!.CanExecute(null));
 
-                // Typed into the box, not set on the view model: the hop from the screen to the value is
-                // the one a person uses.
+                // Typed into the boxes, not set on the view model: the hop from the screen to the value is
+                // the one a person uses. The size box is deliberately left alone, because that is the
+                // case the megabyte spelling makes ambiguous - a truncated view that must not come back
+                // as a rounded number.
                 maxItemsBox.Text = "3";
                 daysBox.Text = "30";
-                sizeBox.Text = "-1";
                 Dispatcher.UIThread.RunJobs();
                 Assert.Equal("3", viewModel.KeePassPolicyMaxItemsText);
                 Assert.Equal("30", viewModel.KeePassPolicyMaintenanceDaysText);
-                Assert.Equal("-1", viewModel.KeePassPolicyMaxSizeBytesText);
+                Assert.Equal("6", viewModel.KeePassPolicyMaxSizeMbText);
 
                 await viewModel.ApplyKeePassHistoryPolicyCommand.ExecuteAsync(null);
                 Dispatcher.UIThread.RunJobs();
 
-                // The boxes keep what was applied - the screen does not quietly round -1 to something the
-                // file cannot spell - and the change is staged, not saved.
+                // The boxes keep what was applied - the screen does not quietly round the untouched one -
+                // and the change is staged, not saved.
                 Assert.Equal("3", maxItemsBox.Text);
                 Assert.Equal("30", daysBox.Text);
-                Assert.Equal("-1", sizeBox.Text);
+                Assert.Equal("6", sizeBox.Text);
                 Assert.True(viewModel.KeePassVaultIsDirty);
                 Assert.True(
                     (await File.ReadAllBytesAsync(fixturePath, TestContext.Current.CancellationToken))
                     .AsSpan().SequenceEqual(content));
 
                 // Two floors, refused one at a time so each one names the box it belongs to: a box the
-                // file has no spelling for reloads from the database rather than being half-applied, and
-                // the age is stored unsigned, so the -1 the other two boxes accept is not a day count.
+                // file has no spelling for reloads from the database rather than being half-applied, the
+                // age is stored unsigned so the -1 the other two boxes accept is not a day count, and the
+                // size stops at what the other clients of this file can carry - one over it reloads the
+                // box instead of writing a number they would have to make sense of.
                 maxItemsBox.Text = "not-a-number";
                 Dispatcher.UIThread.RunJobs();
                 await viewModel.ApplyKeePassHistoryPolicyCommand.ExecuteAsync(null);
@@ -239,16 +253,34 @@ public sealed class KeePassHistoryWorkflowUiTests
                 await viewModel.ApplyKeePassHistoryPolicyCommand.ExecuteAsync(null);
                 Dispatcher.UIThread.RunJobs();
                 Assert.Equal("30", daysBox.Text);
-                Assert.Equal("-1", sizeBox.Text);
+                Assert.Equal("6", sizeBox.Text);
 
-                // The refusal left the applied policy alone rather than writing a default over it.
-                await probe.ApplyHistoryPolicyAsync(
-                    new KeePassHistoryPolicy(3, -1, 30),
-                    TestContext.Current.CancellationToken);
-                var held = await probe.ReadHistoryPolicyAsync(TestContext.Current.CancellationToken);
-                Assert.Equal(3, held.MaxItems);
-                Assert.Equal(-1L, held.MaxSizeBytes);
-                Assert.Equal(30u, held.MaintenanceDays);
+                sizeBox.Text = (KeePassHistorySizeUnits.MaximumMegabytes + 1).ToString();
+                Dispatcher.UIThread.RunJobs();
+                await viewModel.ApplyKeePassHistoryPolicyCommand.ExecuteAsync(null);
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal("6", sizeBox.Text);
+                Assert.Equal("3", maxItemsBox.Text);
+
+                // What reaches the file is checked off the disk, through the save the person presses, so
+                // the claim is about bytes and not about a box echoing what was typed into it.
+                await viewModel.SaveKeePassVaultCommand.ExecuteAsync(null);
+                Dispatcher.UIThread.RunJobs();
+                Assert.False(viewModel.KeePassVaultIsDirty);
+                var saved = await ReopenPolicyAsync(fixturePath);
+                Assert.Equal(3, saved.MaxItems);
+                Assert.Equal(30u, saved.MaintenanceDays);
+                Assert.Equal(fromFile.MaxSizeBytes, saved.MaxSizeBytes);
+
+                // Now the size box is edited, and the megabyte it was given becomes that many bytes.
+                sizeBox.Text = "7";
+                Dispatcher.UIThread.RunJobs();
+                await viewModel.ApplyKeePassHistoryPolicyCommand.ExecuteAsync(null);
+                await viewModel.SaveKeePassVaultCommand.ExecuteAsync(null);
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal("7", sizeBox.Text);
+                var resized = await ReopenPolicyAsync(fixturePath);
+                Assert.Equal(7 * KeePassHistorySizeUnits.BytesPerMegabyte, resized.MaxSizeBytes);
             }
             finally
             {
@@ -297,6 +329,22 @@ public sealed class KeePassHistoryWorkflowUiTests
         Dispatcher.UIThread.RunJobs();
         GC.KeepAlive(services);
         return (host, view, viewModel, content);
+    }
+
+    /// <summary>
+    /// Reads the history policy back off the file on disk, through the platform rather than through the
+    /// screen, so what the save wrote can be compared with what the box showed.
+    /// </summary>
+    private static async Task<KeePassHistoryPolicy> ReopenPolicyAsync(string fixturePath)
+    {
+        var content = await File.ReadAllBytesAsync(fixturePath, TestContext.Current.CancellationToken);
+        using var session = await new KeePassVaultService().OpenAsync(
+            content,
+            Path.GetFileName(fixturePath),
+            FixturePassword,
+            fixturePath,
+            TestContext.Current.CancellationToken);
+        return await session.ReadHistoryPolicyAsync(TestContext.Current.CancellationToken);
     }
 
     private static void TryDelete(string path)

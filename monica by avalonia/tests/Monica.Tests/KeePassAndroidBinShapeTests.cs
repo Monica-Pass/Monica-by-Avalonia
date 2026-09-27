@@ -12,6 +12,7 @@ namespace Monica.Tests;
 /// folder pointer it leaves on a deleted entry is honoured by the way back out. The file ships with a
 /// deletion record already inside it, so the two clients' deletion lists are compared in one database.
 /// </summary>
+[Collection(KeePassVaultTestCollection.Name)]
 public sealed class KeePassAndroidBinShapeTests
 {
     private const string FixturePassword = "kdbx-parity-fixture-not-a-secret";
