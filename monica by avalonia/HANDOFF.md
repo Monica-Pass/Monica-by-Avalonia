@@ -3759,5 +3759,71 @@ standingArmed=False, standingLength=6`——#80 那句"瞬态状态文案自己�
   别外传，大小依赖那趟跑完就一起删。
 - 台阶与 120 预算照旧一字未动；#144 的复跑还没做。
 
+## 附：残留到底随不随库大小走（2026-09-28，**#145：不随，而且顺手抓到探针自己的污染**）
+
+### 一、跑法
+
+`verify-artifact-runtime.ps1` 的探针库大小本来就是参数（`:19-20`
+`$KeePassProbeEntries = 20000` / `$KeePassProbeGroups = 20`），所以**源码一字未动**、
+不需要重新 publish，只换趟参数：`-KeePassProbeEntries 40 -KeePassProbeGroups 5` 与默认 `20000/20`
+各跑一趟门，都在 `stage=locked-settling-3` 抓 `dotnet-dump collect --type Heap`。
+`-MaxLockedMemoryMb` 用默认 120，没传别的。脚本 `D:\Monica-kpshots\i145-size.ps1`，
+报告 `D:\kpprobe\i145\report.log`，每命令单次 analyze、`-short` 独立交叉核对。
+
+### 二、结论一：残留是固定的，不是库树
+
+| 量 | 40 条目 / 5 组 | 20,000 条目 / 20 组 | 倍数 |
+| --- | --- | --- | --- |
+| `CompositionDrawListVisual` | **2,221** | **2,212** | 0.4% 差 |
+| `ServerCompositionDrawListVisual` | 2,221 | 2,212 | 同上 |
+| `ServerCompositionVisual+ReadbackData` | 5,120 | 5,102 | — |
+| `DynamicResourceExpression` | 6,675 | 6,672 | — |
+| `System.String` | 30,100 / 2,042,904 B | 30,104 / 2,043,148 B | — |
+| 堆对象总数 | 396,367 / 44,544,191 B | 395,391 / 48,792,799 B | — |
+| GC Committed（dump 时刻） | 44,716,032 | 48,967,680 | +4.3MB |
+| `Free` | 6,764,656 / 125 块 | 8,791,784 / 133 块 | — |
+| `MainWindowViewModel` | 1 | 1 | — |
+| `Monica.App.Views.VaultFolderTree` | ABSENT | ABSENT | — |
+
+条目数差 **500 倍**，视觉对象数差 **9 个**。`-short` 两条独立命令分别给 2,221 / 2,212。
+所以 #143 那 2,108 个"用过没还"**不随库大小走**：它是外壳/分区页一类的固定残留
+（门走过十个分区、编辑、搜索、历史、截图），不是 20,000 行库树没释放。
+相对同页地板 88，固定残留约 **2,100 个视觉 + 6,670 个 `DynamicResourceExpression`**，
+库大小只在 GC 那侧加约 4MB。这一刀因此是有界可改的：目标量与用户库大小无关，
+大库用户不会更糟，但也不会自己好起来。
+
+### 三、结论二：**带 dump 的那趟不能同时用作 120 预算的判决**（我造的红）
+
+20,000 那一趟门报 `success=False, lockedPrivateMB=120.6, maxMB=120`，且**不是尖峰**：
+第 3–10 轮全在 119.7–120.6 的平台上（判定取后五轮中位数，故 120.6）。
+但拆开看归因就不属于产品：
+
+| | 未抓 dump 的绿色串（#140 第二、三节） | 本次 40 条目（抓 dump） | 本次 20,000（抓 dump） |
+| --- | --- | --- | --- |
+| gcCommittedMB | 45.7–48.8 | 41.4 | 45.2–45.5 |
+| nonGcPrivateMB | **66.8–68.0** | **71.5** | **74.4–75.4** |
+| privateMB 判定 | 115.3–117.6 绿 | 117.0 绿 | **120.6 红** |
+| threads / handles | 19–21 / ~575 | 33 / 690–693 | — |
+
+两趟 dump 的**非 GC 侧都比未 dump 的绿色串高 4–7MB**，线程从 19 涨到 33、句柄从 ~575 涨到 ~693，
+而 GC 那侧 41.4 vs 45.3 恰好只反映库大小差。机制就是 #140 记过的那条：
+`dotnet-dump collect` 会挂起被测进程几秒，而这几秒正掉在锁定后 1 秒压缩 + 线程池自行退摊的
+稳定窗口里——线程没来得及退，栈与句柄就留在私有字节里被记分。
+所以**这条红是探针自伤，不是回归**；#140 里"抓 dump 的趟不能用作计时预算"那句要扩一句：
+**也不能用作内存预算判决**。要库大小的内存结论，得跑不 dump 的趟，只读门自己回显的
+`stage=locked-settling-*` 行；要堆构成结论，就得接受那一趟不判预算。
+（顺带把 #140 记的"趟间非 GC 稳定到 1.2MB"也证否了：同库大小下非 GC 能因探针自身移动 7MB。）
+
+### 四、这轮没做、没证
+
+- 固定残留**没定位到具体是哪几页**：只知道它与库大小无关、与走过十个分区/编辑/搜索/历史/截图有关。
+  便宜的下一步是二分——同一趟门只少给一个旗标（例如去掉 `--smoke-ui-keepass-history` 或
+  `--smoke-ui-other-pages-checks`），看 2,212 掉多少，掉得多的那一页就是残留来源。
+- 40 条目与 20,000 各只 1 趟，且两趟都带 dump；未 dump 的库大小内存对照还没跑。
+- 那条红把 run root 留在 `C:\Users\joyins\AppData\Local\Temp\monica-runtime-smoke-win-x64-f736ceaec29f4ccaac0489838366f558`，
+  本节十轮采样就是从它的 `runtime.log` 取的；自伤已经解释清楚，该目录与 `D:\kpprobe\i143\dumps\`
+  那两个 dump 一并删掉（都是 fixture 库与探针自身堆，没有真实用户数据）。
+- 台阶、120 预算、#144 的 ≥10 趟复跑照旧未动。
+
 
 
