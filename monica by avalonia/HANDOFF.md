@@ -3699,5 +3699,65 @@ standingArmed=False, standingLength=6`——#80 那句"瞬态状态文案自己�
 - `baseline.dmp`（90.8MB，库外，appdata 是空的：无库无口令）留在 `D:\kpprobe\i143\dumps\` 供同页对照
   复用；同页对照跑完就删。
 
+## 附：同页对照跑完了（2026-09-28，**#143 第二轮：余量按同页算坐实**）
+
+### 一、怎么把"同一张页"造出来的
+
+上一节那条否自己的话是对的：空 appdata 的首启页 ≠ 带已注册库的解锁页。这一趟把变量消掉：
+
+- 用**门自己那两条播种命令**把 appdata 喂成门的样子：`--init-empty-smoke-vault <门里的固定值>`、
+  `--seed-smoke-vault <同>`（口令从 `verify-artifact-runtime.ps1` 的 param 默认值里读，脚本只打印
+  `resolved=True length=14` 这种布尔和长度，不打印值；跑完把那个 appdata 目录整个删掉，因为口令走过 argv）。
+- 然后**只带视口旗标**启动：`--smoke-ui-width 1280 --smoke-ui-height 800`，**不带** `--smoke-ui-unlock`。
+  于是这一进程停在真正的解锁页上、库已在册、却从未解密过任何东西。
+- 静置 45 秒，`dotnet-dump collect --type Heap`，每条 analyze 只喂一条子命令。
+- 脚本 `D:\Monica-kpshots\i143-samepage.ps1`，输出 `D:\kpprobe\i143\samepage-*.txt`，
+  dump `D:\kpprobe\i143\dumps\samepage.dmp`（77.3MB）。
+
+### 二、三把数并排：用过没还的量是 2,108 个视觉 + 40.9MB 提交
+
+| 量 | 空 appdata 从未解锁 | **同页从未解锁（本次）** | 锁定态（第四节） |
+| --- | --- | --- | --- |
+| `CompositionDrawListVisual` | 123 | **88** | 2,196 |
+| `ServerCompositionDrawListVisual` | 123 | **88** | 2,196 |
+| `ServerCompositionVisual+ReadbackData` | 284 | **204** | 5,070 |
+| `DynamicResourceExpression` | 999 | **755** | 6,675 |
+| 堆对象总数 | 90,992 / 11,414,623 B | **88,566 / 11,441,222 B** | 395,902 / 52,602,291 B |
+| GC Committed | 11,931,648 | **11,898,880** | 52,776,960 |
+| `Free` | 964,216 / 1,497 块 | **1,343,000 / 1,449 块** | 12,287,624 / 122 块 |
+| `System.Byte[]` | 673 / 1,036,293 B | **418 / 3,572,160 B** | 3,911 / 7.45MB |
+| `System.String` | 12,793 / 1,036,210 B | **12,410 / 998,912 B** | 30,101 / 2.04MB |
+| `ImmutablePen` | 2 | **44** | — |
+| `MainWindowViewModel` | 1 | **1** | 1 |
+| 进程 privateMB / 线程 / 句柄 | 69.8 / 31 / 612 | **56.5 / 19 / 480** | 117.2 / 19–21 / ~575 |
+
+`dumpheap -stat` 给 88，`dumpheap -type …CompositionDrawListVisual -short` 也列了 88 个地址——两条独立命令一致。
+
+**同页地板就是 88**。锁定态那 2,196 里有 **2,108 个（96%）是"用过没还"**，不是那张页本来该有的样子。
+同一趟还给出另外两条同向的量：GC 提交 11.9MB → 52.8MB（**+40.9MB 回不去**），
+`Free` 1.34MB → 12.29MB，且块数从 1,449 **降到** 122——空隙不是零碎垃圾，是十几块百万字节级的大洞，
+`Aggressive+blocking+compacting` 顶不动它们，正好解释了第四节那个现象。
+
+顺带一个反直觉但自洽的点：同页进程的 privateMB（56.5）比空 appdata 进程（69.8）还低，
+线程也从 31 掉到 19——空 appdata 那趟还在忙首启建库建设置，静置时间不够它收尾。
+所以**地板只认同页那一列**，第一节那列只能当参考。
+
+### 三、这轮还是没证的（下一步按这个走）
+
+- **同页 ≠ 完全同史**。锁定态那一趟是门自己的进程：它开过 20,000 条目/20 组的 `probe.kdbx`、
+  走过十个分区、编辑/搜索/历史/截过图。同页进程只停在解锁页。所以 2,108 个残留视觉里有多少
+  **随库大小走**，还不知道——这决定这一刀往哪使：若大致成比例，就是库树/行视觉没还；
+  若几乎不随大小走，那是分区页/对话框一类的固定残留，量级小得多也好改得多。
+  便宜的判法：同一套旗标跑两趟门，只把 `--seed-smoke-keepass-vault` 的条目数从 20,000 换成几十，
+  各抓一次 `stage=locked-settling-3` 的同口径计数，比 `CompositionDrawListVisual` 与 `Free`。
+- 每列仍然只有 1 趟、1 个时刻（45 秒静置）；锁定那一列是压缩后的读数，地板这列没有对应压缩动作
+  （外部没法让一个活进程做 `Aggressive` 压缩），所以地板的活对象数可能被**低估**了一点点首启垃圾。
+- `VaultFolderTree` / `VaultLibrary` 在同页进程里 **ABSENT**，与空 appdata 那趟一样——
+  说明这两类只在解锁后才出现，也说明"锁定态还留着 2,196 个视觉"里必然包含已经看不见的库页树。
+- `baseline.dmp`（90.8MB）与 `samepage.dmp`（77.3MB）都留在 `D:\kpprobe\i143\dumps\`：
+  两个 appdata 里都没有真实库（一个空、一个是门的 fixture 库且从未解密），但截图缓冲/字符串池可能在，
+  别外传，大小依赖那趟跑完就一起删。
+- 台阶与 120 预算照旧一字未动；#144 的复跑还没做。
+
 
 
