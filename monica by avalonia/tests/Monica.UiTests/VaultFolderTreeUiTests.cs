@@ -530,6 +530,48 @@ public sealed class VaultFolderTreeUiTests
     }
 
     [Fact]
+    public void A_row_with_a_host_keeps_the_glyph_and_carries_the_picture_slot()
+    {
+        var entry = new FakeEntryRow("p:1", "Checking")
+        {
+            WebsiteIconHost = "example.com",
+        };
+        var tree = new VaultFolderTree
+        {
+            ItemsSource = new IFolderTreeRow[] { entry },
+        };
+        var window = new Window { Content = tree };
+        window.Show();
+        try
+        {
+            Dispatcher.UIThread.RunJobs();
+
+            var list = tree.FindControl<ListBox>("FolderTreeList")!;
+            var picture = RowPicture(list, entry);
+
+            // The row hands the host over verbatim, which is the only part the control owns: the cache
+            // decides whether that host is worth asking about.
+            Assert.Equal("example.com", picture.Host);
+
+            // An automated run is kept offline, so nothing can arrive to be shown. The picture still
+            // has to stay hidden instead of flashing an empty box, and the type glyph it sits on top of
+            // has to keep painting - a row that loses its shape when a website has no icon is worse
+            // than a row with no icon.
+            Assert.False(picture.IsVisible);
+            Assert.False(picture.IsHitTestVisible);
+            // The slot is measured before a picture exists, so an answer that lands later fills a box
+            // that is already there instead of pushing the rest of the row sideways.
+            Assert.Equal(16d, picture.Width);
+            Assert.Equal(16d, picture.Height);
+            Assert.Equal(Symbol.Key, RowGlyph(list, entry));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [Fact]
     public void Expanding_accepts_any_row_kind_the_template_hands_it()
     {
         var folder = new FakeFolderRow("alpha", "Alpha");
@@ -609,13 +651,25 @@ public sealed class VaultFolderTreeUiTests
     private static ListBoxItem RowContainer(ListBox list, IFolderTreeRow row) =>
         (ListBoxItem)list.ContainerFromItem(row)!;
 
-    // The row glyph is the one icon placed directly in the row grid; the chevrons hang off a button.
+    // The glyph is read out of the named slot rather than guessed from the tree shape.
     private static Symbol RowGlyph(ListBox list, IFolderTreeRow row)
     {
-        var glyph = Assert.Single(
-            RowContainer(list, row).GetVisualDescendants().OfType<FluentIcon>(),
-            icon => icon.GetVisualParent() is Grid);
+        var slot = RowIconSlot(list, row);
+        var glyph = Assert.Single(slot.GetVisualChildren().OfType<FluentIcon>());
         return (Symbol)glyph.Icon;
+    }
+
+    private static WebsiteIconImage RowPicture(ListBox list, IFolderTreeRow row) =>
+        Assert.Single(RowIconSlot(list, row).GetVisualChildren().OfType<WebsiteIconImage>());
+
+    private static Panel RowIconSlot(ListBox list, IFolderTreeRow row)
+    {
+        // The slot is named, not guessed by shape: the row keeps its chevron in a panel of its own, and a
+        // picture sits in the glyph's slot on top of it, so "the first icon in a Grid" stopped being the
+        // row's type glyph the moment the fallback layer appeared.
+        return Assert.Single(
+            RowContainer(list, row).GetVisualDescendants().OfType<Panel>(),
+            panel => panel.Name == "RowIconSlot");
     }
 
     // The whole row is the right-click target, so the menu hangs off its background panel.
@@ -659,6 +713,8 @@ public sealed class VaultFolderTreeUiTests
 
         public bool CanCopyCode => false;
 
+        public string? WebsiteIconHost => null;
+
         public bool IsSelected
         {
             get => false;
@@ -689,6 +745,8 @@ public sealed class VaultFolderTreeUiTests
         public bool CanCopySecret { get; init; }
 
         public bool CanCopyCode { get; init; }
+
+        public string? WebsiteIconHost { get; init; }
 
         public bool IsSelected { get; set; }
     }

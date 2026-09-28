@@ -3970,6 +3970,79 @@ locked-settling-10 private=111.3 gcCommitted=43.2 nonGc=68.1 handles=574 threads
   重建后的计数（第四轮第四节已经挂了这条）。
 - 线程退摊慢是本机负载还是产品行为，仍未查（第四轮同样挂着）。
 
+## 附：库行第一次带上网站图标（2026-09-28，**#146 出厂：照 Android 走 Google s2、默认开；负控抓到"关掉开关后缓存里的图标还在画"，于是把"是否显示"与"是否联网"拆成两个闸**）
+
+### 一、要的是什么，以及两处定死的取舍
+
+用户原话："密码列表能不能显示网站图标，就和 Android 那样"。两件事先问清再动手，两处都没走我推荐的方案：
+
+- **取图端点 = 照搬 Android 的 Google s2**：`https://www.google.com/s2/favicons?domain=<host>&sz=64`。
+  我提过"端点可配置、默认换成不经过 Google 的来源"，被否——这条线要的是与 Android 一致，不是隐私再设计。
+- **默认开**：我提过"默认关、首字母兜底"，也被否。Android 打开就画，桌面端也打开就画。
+
+### 二、落地的形状
+
+- 新 `Services/WebsiteIconCache.cs`：内存 LRU 50 + 磁盘 `favicons/<sha256("v2:"+host) hex>.png`；失败进 15
+  分钟冷却；同 host 单飞；响应必须 `<500` 状态、`image/*`、`≤512KB`。**图标一律不入库**，`.kdbx`/mdbx 的
+  字节形状因此一点没动。
+- 新 `Controls/WebsiteIconImage.cs`：树是 `VirtualizingStackPanel`，所以取图挂在 `OnAttachedToVisualTree`、
+  取消挂在 `OnDetachedFromVisualTree`——一行滚出视野就把没回来的请求丢掉，几千行的库只为屏幕上那几行付请求。
+- `VaultFolderTree.axaml` 的图标位改成一个命名插槽 `RowIconSlot`：字形在下、图片盖在上，取不到图就还是
+  原来那个类型字形。行的 host 由 `IVaultTreeRow.WebsiteIconHost` 提供，本地库行从条目的网站字段现推，
+  `.kdbx` 行从条目的 URL 现推。
+- 设置里 `ShowWebsiteIcons` 默认 `true`，中英双语文案写明"会向 Google 请求、取不到时保留类型图标、
+  图标不写入保险库"。
+- 度量跑的联网策略：任何 `--smoke-ui*` 参数即视为被测量的进程，图标路径不出网；要一张真的图标截图，
+  用新旗标 `--smoke-ui-website-icons` 点名放行。
+
+### 三、门禁与真机读数（出货的那份字节）
+
+- `dotnet format --verify-no-changes` ⇒ **0**；`verify-commercial-release.ps1` ⇒ **cr_rc=0**，末行
+  `Commercial release verification passed.`：300 行结构门绿、Release **0 warning**、单测 **11 `perf-budget` +
+  1148 常规**、UI **17 `perf-budget` + 266 常规**（日志 `D:\kpprobe\i146\cr-run3.log`、`cr-run4.log`）。
+  新用例让常规 UI 通道从 264→265→266。
+- `publish-desktop.ps1` ⇒ **pub_rc=0**，产物 `artifacts/publish/win-x64/jit`。
+- 真机取证用一次性 `.kdbx`（`D:\kpprobe\i146\icons.kdbx`，2,398 字节，10 行：7 个真域名 + 1 个无图标的
+  公网域名 + 1 个内网域名 + 1 段垃圾文本），全新 `MONICA_APPDATA_DIR` 走 seed→warm→shot→off：
+  - **取图→写盘**：`cache warm files=6 bytes=9697`，再跑一趟仍是 6/9697（不再增长）。
+  - **读盘→渲染**：`KeePassManage_1280x800.png`（95,720 B）里 5 行画出 GitHub / GitLab / Firefox /
+    Wikipedia / archive.org 的真图标，其余行保持类型字形。人眼看过。
+  - **负控**：把设置里的开关改成关，同一份缓存（`cache off files=6 bytes=9697`）之下
+    `KeePassManage_1280x800.png`（95,787 B）里那 5 行**全部退回字形**——修之前这张图是反的。
+
+### 四、这一轮的一次自我改判（记下来，因为它改的是设计而不是拼写）
+
+负控第一次跑出来时图标照画，我顺手把"探针不许联网"和"用户不许显示"合并成了一个 `Allowed`。新写的
+UiTest 立刻红在第一条断言上：**合并之后探针把显示也关了**，缓存里那张图根本不该出现，测试想证的东西
+在套件里永远无法成立。改回两个独立的量：
+
+- `IconsWanted`（只看用户开关）——**读缓存之前**问，这就是修的那条缺陷；
+- `NetworkAllowed`（用户开关 ∧ 探针允许）——**发请求之前**问。
+
+被测量的进程仍然一行都不出网，但"这张图已经在盘上了"不再被探针管着。
+
+负控读数：把 `IconsWanted` 那条判断短路掉，`Monica.UiTests` 18 条里只有新用例红，红在
+`WebsiteIconImageUiTests.cs:44` 的 `Assert.Null(image.Source)`（正是"关了还在画"）；改回后 18/18 绿。
+另一条更早的负控：把行模板的 `Host="{Binding WebsiteIconHost}"` 改成 `Host="{Binding Label}"`，
+17 条里只红 `A_row_with_a_host_keeps_the_glyph_and_carries_the_picture_slot` 一条。
+
+顺带修掉一条被结构变化打红的旧用例：`Rows_paint_the_glyph_the_row_asked_for` 原来靠"Grid 里第一个图标"
+认字形，图片层一出现就不再成立；现在按插槽名字找，再取它唯一的 `FluentIcon`。
+
+### 五、这轮没证
+
+- **本地库（mdbx）那一侧没有真机 PNG**：smoke 种子条目的网站都是 `*.smoke.local` / `example.internal`，
+  按规则本就不该出网，所以 `Vault_1280x800.png` 里全是字形——这张图既没证明"能画"也没证明"不该画"。
+  本地行的 host 推导改用两条单测覆盖（`https://github.com/...` → `github.com`、
+  `https://192.168.0.1/admin` → 无），它们与 `.kdbx` 行共用同一个模板，但**"本地库页真的画出图标"这件事
+  仍未被人眼看过**。
+- 7 个真域名里 6 个落盘：少的那一个没查是哪个域名、也没查 s2 为什么不给（不影响结论，但别说成"7 个全有"）。
+- 与 Android 的**互通面**没验：图标不进库，所以理论上不影响任何格式，但这一轮没跑过一次
+  "Android 建库→桌面打开→行上出现图标"的跨端实跑（属 #115）。
+- 磁盘缓存的**上限与淘汰**只有代码路径（写满 N 个才 trim），没量过 trim 真的收；`favicons/` 长到几百兆
+  会发生什么，没测。
+
+
 
 
 

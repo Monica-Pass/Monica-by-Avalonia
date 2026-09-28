@@ -195,6 +195,19 @@
                     </fa:FASettingsExpanderItem.Footer>
                 </fa:FASettingsExpanderItem>
             </Border>
+            <Border Classes="settingsFlatGroup">
+                <fa:FASettingsExpanderItem Content="{Binding L.ShowWebsiteIcons}"
+                                           Description="{Binding L.ShowWebsiteIconsDescription}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <ToggleSwitch x:Name="ShowWebsiteIconsToggle"
+                                      IsChecked="{Binding ShowWebsiteIcons}"
+                                      OnContent="{Binding L.FeatureEnabled}"
+                                      OffContent="{Binding L.FeatureDisabled}"
+                                      AutomationProperties.Name="{Binding L.ShowWebsiteIcons}"
+                                      AutomationProperties.HelpText="{Binding L.ShowWebsiteIconsDescription}" />
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+            </Border>
         </StackPanel>
     </StackPanel>
 </UserControl>

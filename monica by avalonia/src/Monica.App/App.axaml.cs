@@ -66,6 +66,11 @@ public partial class App : Application
             AcceptQueuedKeePassOpenRequests(viewModel, openRequests);
             viewModel.RequestKeePassFileOpen(KeePassOpenRequestQueue.TryReadCommandLinePath(desktop.Args));
 
+            // A gated run leaves every row its type glyph, so a measurement never pays for a picture; a
+            // screenshot of the pictures asks for them by name and is online again.
+            WebsiteIconCache.SetAutomatedRunNetworkAllowed(
+                !IsSmokeUiRun(desktop.Args) || AllowsSmokeUiWebsiteIcons(desktop.Args));
+
             var smokePassword = GetSmokeUiUnlockPassword(desktop.Args);
             var smokeSection = GetSmokeUiSection(desktop.Args);
             var smokePasswordSelectionCount = GetSmokeUiSelectPasswordCount(desktop.Args);

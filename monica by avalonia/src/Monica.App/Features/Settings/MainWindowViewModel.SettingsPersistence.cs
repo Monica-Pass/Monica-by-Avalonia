@@ -35,6 +35,8 @@ public sealed partial class MainWindowViewModel
             BrowserIntegrationEnabled = settings.BrowserIntegrationEnabled && CanUseBrowserBridgeIntegration;
             BrowserIntegrationPort = settings.BrowserIntegrationPort;
             CompactPasswordList = settings.CompactPasswordList;
+            ShowWebsiteIcons = settings.ShowWebsiteIcons;
+            WebsiteIconCache.SetUserWantsIcons(settings.ShowWebsiteIcons);
             SelectedPasswordSort = settings.PasswordSortOrder;
             WebDavEnabled = settings.WebDavEnabled;
             WebDavServerUrl = settings.WebDavServerUrl;

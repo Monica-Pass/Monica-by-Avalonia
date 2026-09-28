@@ -33,6 +33,9 @@ public sealed class DesktopAppSettings
     public bool BrowserIntegrationEnabled { get; set; }
     public int BrowserIntegrationPort { get; set; } = 49152;
     public bool CompactPasswordList { get; set; }
+    // Matches Android, where the list asks for a site picture per row and falls back to the letter
+    // avatar when there is none. Nothing about it is stored in the vault.
+    public bool ShowWebsiteIcons { get; set; } = true;
     public string PasswordSortOrder { get; set; } = "updated-desc";
     public bool WebDavEnabled { get; set; }
     public string WebDavServerUrl { get; set; } = "";

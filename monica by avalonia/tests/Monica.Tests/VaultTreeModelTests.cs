@@ -107,6 +107,38 @@ public class VaultTreeModelTests
     }
 
     [Fact]
+    public void A_local_row_carries_the_host_that_its_website_field_names()
+    {
+        // The library page is the surface a person asked about, and its rows come from the local tables
+        // rather than a .kdbx, so the host has to be read off the password entry itself.
+        var row = new VaultTreeEntryRow
+        {
+            Kind = VaultEntryKind.Password,
+            Label = "GitHub",
+            Indent = new Thickness(0),
+            Password = new PasswordEntry { Website = "https://github.com/Monica-Pass" },
+        };
+
+        Assert.Equal("github.com", row.WebsiteIconHost);
+    }
+
+    [Fact]
+    public void A_local_row_on_a_host_with_no_picture_to_ask_for_carries_none()
+    {
+        // A router admin page is a real entry and a host the picture service is never asked about; the
+        // row keeps its type glyph instead of sending a private address out.
+        var row = new VaultTreeEntryRow
+        {
+            Kind = VaultEntryKind.Password,
+            Label = "Router",
+            Indent = new Thickness(0),
+            Password = new PasswordEntry { Website = "https://192.168.0.1/admin" },
+        };
+
+        Assert.Null(row.WebsiteIconHost);
+    }
+
+    [Fact]
     public void Shared_controls_expose_nothing_from_the_vault_model()
     {
         // The tree control renders presentation primitives only. Letting a storage enum through

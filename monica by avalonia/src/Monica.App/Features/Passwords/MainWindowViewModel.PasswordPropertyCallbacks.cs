@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Threading;
+using Monica.App.Services;
 using Monica.Core.Models;
 
 namespace Monica.App.ViewModels;
@@ -45,6 +46,12 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(PasswordListAvatarCornerRadius));
         OnPropertyChanged(nameof(PasswordListContentMargin));
         OnPropertyChanged(nameof(ShowPasswordListDetails));
+    }
+
+    partial void OnShowWebsiteIconsChanged(bool value)
+    {
+        UpdateSettings(settings => settings.ShowWebsiteIcons = value);
+        WebsiteIconCache.SetUserWantsIcons(value);
     }
 
     private void RaisePasswordSortText()

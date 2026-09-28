@@ -49,6 +49,7 @@ public sealed record PasswordFolderFilterChoice(
     public bool CanCopyUsername => false;
     public bool CanCopySecret => false;
     public bool CanCopyCode => false;
+    public string? WebsiteIconHost => null;
     public bool IsSelected
     {
         get => false;

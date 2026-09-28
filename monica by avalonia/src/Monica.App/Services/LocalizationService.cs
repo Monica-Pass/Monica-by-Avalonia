@@ -401,6 +401,8 @@ public interface ILocalizationService : INotifyPropertyChanged
     string BrowserBridgeSessionTokenDescription { get; }
     string CompactPasswordList { get; }
     string CompactPasswordListDescription { get; }
+    string ShowWebsiteIcons { get; }
+    string ShowWebsiteIconsDescription { get; }
     string SyncSubtitle { get; }
     string RemoteSync { get; }
     string RemoteSyncDescription { get; }
@@ -945,6 +947,8 @@ public sealed class LocalizationService : ILocalizationService
     public string BrowserBridgeSessionTokenDescription => Text();
     public string CompactPasswordList => Text();
     public string CompactPasswordListDescription => Text();
+    public string ShowWebsiteIcons => Text();
+    public string ShowWebsiteIconsDescription => Text();
     public string SyncSubtitle => Text();
     public string RemoteSync => Text();
     public string RemoteSyncDescription => Text();
@@ -1945,6 +1949,8 @@ public sealed class LocalizationService : ILocalizationService
         ["CopyBrowserPairingToken"] = "Copy browser pairing token",
         ["CompactPasswordList"] = "Compact password list",
         ["CompactPasswordListDescription"] = "Use denser password rows for scanning large vaults.",
+        ["ShowWebsiteIcons"] = "Show website icons",
+        ["ShowWebsiteIconsDescription"] = "A row asks Google for its site's picture, the way the Android app does, and keeps the type icon when nothing comes back. Icons are never stored in the vault.",
         ["PlatformIntegrations"] = "Platform integrations",
         ["PlatformIntegrationsDescriptionFormat"] = "{0}: {1}/{2} desktop integrations available or mapped.",
         ["Integration.auto-type.Title"] = "Auto-typing",
@@ -3634,6 +3640,8 @@ public sealed class LocalizationService : ILocalizationService
         ["CopyBrowserPairingToken"] = "复制浏览器配对令牌",
         ["CompactPasswordList"] = "紧凑密码列表",
         ["CompactPasswordListDescription"] = "让密码列表显示得更紧凑，适合小窗口和高密度浏览。",
+        ["ShowWebsiteIcons"] = "显示网站图标",
+        ["ShowWebsiteIconsDescription"] = "列表行会像 Android 那样向 Google 请求该网站的图标，取不到时仍显示类型图标。图标不会写入保险库。",
         ["PlatformIntegrations"] = "平台集成",
         ["PlatformIntegrationsDescriptionFormat"] = "{0}：{1}/{2} 个桌面集成可用或已有等价能力。",
         ["Integration.auto-type.Title"] = "自动输入",

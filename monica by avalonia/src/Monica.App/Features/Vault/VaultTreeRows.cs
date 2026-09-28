@@ -2,6 +2,7 @@ using System.ComponentModel;
 using Avalonia;
 using FluentIcons.Common;
 using Monica.App.Controls;
+using Monica.App.Services;
 using Monica.Core.Models;
 
 namespace Monica.App.Features.Vault;
@@ -149,6 +150,8 @@ public sealed record VaultTreeFolderRow : IVaultTreeRow
 
     public bool CanCopyCode => false;
 
+    public string? WebsiteIconHost => null;
+
     // A folder has no checkbox, so the only way this is ever reached is a stray write; dropping it
     // keeps the row template free of a per-kind guard.
     public bool IsSelected
@@ -206,6 +209,13 @@ public sealed record VaultTreeEntryRow : IVaultTreeRow, INotifyPropertyChanged
     // A code lives either on the authenticator item itself or inside a password's TOTP seed.
     public bool CanCopyCode =>
         Kind == VaultEntryKind.Totp || Password is { HasAuthenticator: true };
+
+    /// Asked for only when a row is realized, so a vault of thousands parses the hosts on screen rather
+    /// than every website in the library on each rebuild.
+    public string? WebsiteIconHost =>
+        Password is { } password && WebsiteIconCache.TryExtractHost(password.Website, out var host)
+            ? host
+            : null;
 
     /// The entry, not the row, owns the check mark: the library tree and the detail pages have to
     /// report one selection, and a rebuild reads it back from here.

@@ -41,6 +41,11 @@ public interface IVaultTreeRow : IFolderTreeRow
     bool CanCopyUsername { get; }
     bool CanCopySecret { get; }
     bool CanCopyCode { get; }
+
+    // The host whose site icon a row may show. It travels as a host rather than as the website the
+    // person typed, because turning that text into a request is a decision with a security edge in it,
+    // and it is made once, in the row, for the rows the tree actually realizes.
+    string? WebsiteIconHost { get; }
 }
 
 // Dropping one folder row onto another asks the host to reparent the source; whether the move is

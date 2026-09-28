@@ -16,6 +16,19 @@ public partial class App
 
     internal readonly record struct SmokeUiViewportSize(double Width, double Height);
 
+    // Every smoke flag starts with the same token, so an automated run is recognizable before any of its
+    // individual checks are read. Nothing here is a product switch: it says a machine is measuring this
+    // process, and a measurement must not add a network round trip to every host it walks past.
+    internal static bool IsSmokeUiRun(string[]? args) =>
+        args is { Length: > 0 } && Array.Exists(
+            args,
+            arg => arg.StartsWith("--smoke-ui", StringComparison.OrdinalIgnoreCase));
+
+    // Asking for the picture path by name is what puts a run back online: a measurement must not pay a
+    // round trip per host, but a screenshot of those pictures cannot show one it never fetched.
+    internal static bool AllowsSmokeUiWebsiteIcons(string[]? args) =>
+        HasSmokeUiFlag(args, "--smoke-ui-website-icons");
+
     internal static string? GetSmokeUiUnlockPassword(string[]? args)
     {
         var passwordEnvironmentVariable = GetSmokeUiArgument(args, "--smoke-ui-unlock-env");

@@ -1,6 +1,7 @@
 using Avalonia;
 using FluentIcons.Common;
 using Monica.App.Controls;
+using Monica.App.Services;
 using Monica.Platform.Services;
 
 namespace Monica.App.Features.ImportExport;
@@ -62,6 +63,10 @@ public sealed record KeePassTreeRow : IVaultTreeRow
     public bool CanCopySecret => Kind == KeePassTreeRowKind.Entry;
 
     public bool CanCopyCode => false;
+
+    /// A .kdbx entry keeps its site in the Url string a person typed by hand, so the same refusal of
+    /// anything that is not a single host applies here as in the vault's own rows.
+    public string? WebsiteIconHost => WebsiteIconCache.TryExtractHost(Entry?.Url, out var host) ? host : null;
 }
 
 public enum KeePassTreeRowKind

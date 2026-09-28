@@ -59,6 +59,9 @@ public sealed partial class MainWindowViewModel
     private bool _compactPasswordList;
 
     [ObservableProperty]
+    private bool _showWebsiteIcons = true;
+
+    [ObservableProperty]
     private bool _quickFilter2Fa;
 
     [ObservableProperty]

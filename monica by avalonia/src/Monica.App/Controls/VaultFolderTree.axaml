@@ -231,11 +231,22 @@
                                                    IsVisible="{Binding IsExpanded, Converter={x:Static local:BoolConverters.Not}}" />
                                 </Panel>
                             </Button>
-                            <!-- Every row names its own glyph, so a folder and a leaf share one shape. -->
-                            <ic:FluentIcon Grid.Column="1"
-                                           Icon="{Binding EntrySymbol, Converter={x:Static local:IconConverters.FromSymbol}}"
-                                           FontSize="14"
-                                           VerticalAlignment="Center" />
+                            <!-- Every row names its own glyph, so a folder and a leaf share one shape.
+                                 A site icon lands on top of it when the row has a host to ask for, and the
+                                 glyph stays underneath as the picture's fallback. -->
+                            <Panel x:Name="RowIconSlot" Grid.Column="1">
+                                <ic:FluentIcon Icon="{Binding EntrySymbol, Converter={x:Static local:IconConverters.FromSymbol}}"
+                                               FontSize="14"
+                                               VerticalAlignment="Center" />
+                                <controls:WebsiteIconImage Host="{Binding WebsiteIconHost}"
+                                                           Width="16"
+                                                           Height="16"
+                                                           Stretch="Uniform"
+                                                           IsVisible="False"
+                                                           IsHitTestVisible="False"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center" />
+                            </Panel>
                             <TextBlock Grid.Column="2"
                                        Text="{Binding Label}"
                                        TextTrimming="CharacterEllipsis"

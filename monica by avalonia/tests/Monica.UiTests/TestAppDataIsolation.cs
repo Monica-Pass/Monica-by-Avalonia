@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using Monica.App.Services;
 using Monica.Data;
 
 namespace Monica.UiTests;
@@ -26,6 +27,9 @@ internal static class TestAppDataIsolation
         DeleteExitedRoots();
         Directory.CreateDirectory(RootPath);
         Environment.SetEnvironmentVariable(MonicaAppDataPaths.OverrideEnvironmentVariable, RootPath);
+        // The suite asserts on rows the tree realizes, so a real request per host would make every
+        // assertion wait on the network; the rows keep the type glyph they were written against.
+        WebsiteIconCache.SetAutomatedRunNetworkAllowed(false);
         AppDomain.CurrentDomain.ProcessExit += (_, _) => TryDelete(RootPath);
     }
 
