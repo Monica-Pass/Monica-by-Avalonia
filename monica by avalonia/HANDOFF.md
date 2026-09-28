@@ -4151,6 +4151,94 @@ Release 只验构建；且明确写了"不能把要求当作已通过的验收"�
 - passkey 不入引擎对现有备份/同步文件的实际缺口，未测（只确认它在 SQLite）。
 - 第 5 条的 WAL 撕裂是否真的产出了坏快照，未做实验；本轮只证明"上传主文件、无视 WAL"这条代码路径存在。
 
+## 附：片0 台架 + 片2 无损写回（2026-09-28，**#153/#148：先红后绿的那两类丢失已经修了；顺带发现桌面此前编辑他端建的 `identity`/`ssh-key` 条目是直接抛异常**）
+
+### 一、片0：跨端验收台架落地了
+
+契约 §8 那张 11 行表，桌面之前能自证 0 行，因为从没跑过"另一端建 → 桌面读 → 桌面改 → 重开比对"。
+现在有了：`tests/Monica.Tests/MdbxCrossClientCompatTests.cs`（314 行，6 条用例）。它跑的是**真的
+`mdbx_ffi.dll`**，不是 `FakeMdbxNativeVault`——伪造件只能证明它在模仿什么，证不了引擎。台架自己充当"他端"：
+用裸 `CreateEntryAsync` 按 Android 的载荷形状建条目（含契约 §3.5 那批字段），dispose 掉桥，再以桌面自己的
+`MdbxVaultStore` 走正常 `SavePasswordAsync`/`SaveSecureItemAsync` 编辑，然后重开比对。断言只出布尔、键名、
+计数和字节数，载荷值一个都不打印（xunit 会把 actual 打出来，这是硬红线）。
+
+6 条用例：
+- `Editing_an_android_authored_password_keeps_the_top_level_fields_the_desktop_does_not_understand`（:85）
+- `Editing_an_android_authored_password_keeps_the_native_entry_type`（:102）
+- `An_explicitly_cleared_password_stays_cleared_instead_of_falling_back_to_the_legacy_field`（:113）
+- `A_password_edit_leaves_ssh_key_material_alone_when_the_desktop_writes_no_value_for_it`（:133）
+- `Editing_an_android_authored_secure_item_keeps_unknown_fields_and_the_native_entry_type`（:151）
+- `A_desktop_edit_does_not_touch_a_record_whose_type_it_cannot_read`（:172）
+
+首跑 6 条全红，红成两类：① 未知顶层字段被丢（对应体检清单第 1 条）；② legacy `password` 在读取时把显式清空
+覆盖掉（第 2 条）。**这两条从机制推断变成了观测到的丢失**，本轮已修。第 ③ 类红是
+`System.InvalidOperationException : @message=constraint violation: entry <uuid> cannot be updated`，见下节。
+
+### 二、这一轮新证的两条引擎事实（都推翻了旧结论）
+
+1. **原生 entry type 建完就不能改。** `MdbxWriteCommand.UpdateEntry` 带一个与盘上不同的 `entryType` 直接抛
+   constraint violation，带原类型则成功。后果比"不优雅"严重：桌面按自己的白名单把类型改写回引擎，是**异常**
+   不是降级——编辑他端建的 `identity` 或 `ssh-key` 条目会整条失败。修法：写回一律沿用盘上读到的
+   `existing.EntryType`（`MdbxVaultStore.cs:1061-1076` 的 `UpdateStoredEntryAsync`），调用点不再自己算类型；
+   `UnassignCategoryAsync` 的两处批量重写（`:767`、`:799`）同规则，并删掉了它们原来各自算好的
+   `var entryType = ...`。
+2. **契约-30 这条绑定没有可用的 CAS。** `EntryRecord`（`mdbx_ffi.cs:11915-11923`）只有
+   EntryId/ProjectId/EntryType/Title/PayloadJson/Deleted，无修订号也无头提交；`MdbxWriteCommand.UpdateEntry`
+   （`:19161-19167`）不接期望修订号；桥还把 `ExecuteWriteOperation` 返回的 `CommitId`/`AlreadyCommitted` 丢掉
+   （`MdbxUniffiNativeBridge.cs:240-241`）。所以体检清单第 9 条想要的"写前带提交身份比对"现在**做不到**，
+   只能"同一会话内写前重读盘上对象再合并"——本轮的合并正是基于重读到的 `existing`，但这是缓解不是 CAS。
+
+另外确认：引擎会规范化 JSON 键序。台架第 6 条一开始用文本比对判"未知类型的记录没被动过"，被键序规范化打成
+假红；改成逐字段按键断言。跨端比对一律不能按文本字节比。
+
+### 三、片2：无损写回的机制
+
+新文件 `src/Monica.Data/Mdbx/AndroidMdbxPayloadMerge.cs`（158 行）。`AndroidMdbxPayloadFamily` 分 Password /
+SecureItem 两套 own 键集（对齐 `AndroidMdbxPayloadCodec` 的编码法）。规则次序：
+1. 新载荷带有的键一律用新值——本端会写的字段绝不能被盘上旧值压住，否则改动静默不生效。
+2. 新载荷没有的键：本端 own 才当"用户删了"丢弃，否则**逐字保留**（外来字段、未来字段都走这条）。
+3. 键名按 snake_case 规范化匹配，`password_plain` 与 `passwordPlain` 视为同一字段。
+4. 值走 `GetRawText`/`WriteTo` 原文复制，所以 `false`、`""`、数组里的 `null` 元素、
+   `9007199254740993` 这种大整数不会经过模型被舍入或归一化。
+5. 盘上载荷解析失败就退回新载荷（不把坏 JSON 传染给写回）。
+
+`InheritOnAbsence = ["ssh_key_data"]`（:67）：编解码法在桌面不持有密钥时**省略**这个键，而 Android 把"缺席"
+读成"没有"，所以它属于 own 也不能按缺席即清空处理——否则编辑口令会把别人的 SSH 私钥清成空。
+
+读取侧（契约 §3.5）：`AndroidMdbxPayloadCodec.cs:130` 改走新增的 `GetPasswordPlain`（`:358-361`），
+`password_plain` 优先、legacy `password` 只在 `password_plain` 完全缺席时才看，**没有 ifBlank 回退**；
+legacy `password` 仍在 own 键集里，所以桌面一写回它就消失，不再和他端互相盖。
+
+### 四、撤销过一个自己加的开关
+
+第一版给合并加了 `preserveForeignFields = entry.DeletedAt is null`，想"只有墓碑写入才不带外来字段"。
+grep 后发现软删同样带 `DeletedAt`（`MdbxBackedMonicaRepository.cs:81/91/633`），那条判据会把**可恢复的回收站
+删除**变成毁数据——回收站条目外来字段被剥掉，还原就回不来了。开关删掉，写回一律保留。
+
+### 五、门禁读数（本轮实测，不是推断）
+
+- `dotnet format --verify-no-changes`：`fmt_rc=0`。
+- `eng/ci/verify-commercial-release.ps1`：`cr_rc=0` + `Commercial release verification passed.`；
+  Release 构建 `0 Warning(s) 0 Error(s)`（warnaserror）。
+- Monica.Tests：perf-budget 11/11、常规 1156/1156。Monica.UiTests：perf-budget 17/17、常规 266/266。
+- 第一次整道门是红的，红在 `BitwardenLocalChangeQueueTests.Scanning_a_large_bound_vault_for_drift_stays_within_its_budget`：
+  单次 814ms 撞 800ms 预算，而这台机器的典型读数是 214–272ms。按「预算门单次读数不可信」的规矩，单条复跑
+  3 次全绿（日志 `D:\kpprobe\i115p2\perf-1..3.log`），定性为负载竞态不是台阶。**阈值 800 没有动**，整道门重跑
+  通过（`cr-run2.log`）。
+
+### 六、这一轮没证（别算成已验收）
+
+- `custom_fields` **项内**的外来元数据仍然会丢，是有意选择：那些项没有稳定 id，按下标配对会把别人的元数据挂到
+  错误的行上，比丢弃更糟。契约 §3.5 对这一层的要求桌面目前仍不满足。
+- 台架里的"他端"是桌面自己按 Android 的载荷形状伪造的。**真 Android 建的 .mdbx 依然没有实跑解锁**——本机那
+  两份样本的密码不在手上。所以 §8 表里凡是"另一端"的行仍是自证，不是互操作。
+- 未知类型仍然不可见：列表按 own 白名单在内存里筛（体检清单第 6 条，片1 的活），台架第 6 条只证明"桌面编辑
+  口令时不会连带覆写读不了的记录"，没证明它能被显示或被保留地列出。
+- 带提交身份的写前校验（片6）没做，引擎这条绑定也没给接口。
+- 同步/备份的一致性快照（片3）、summary + disclosure（片4）、passkey 与附件入引擎（片5）、
+  `payload_schema_version`（片6）都没碰。
+- 真实云端多设备分段未验；`Tailscale`/WebDAV 侧只跑到本地自托管。
+
 
 
 

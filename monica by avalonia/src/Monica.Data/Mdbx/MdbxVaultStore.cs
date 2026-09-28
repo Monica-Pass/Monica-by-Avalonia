@@ -189,7 +189,16 @@ public sealed partial class MdbxVaultStore(
             boundNoteEntryId,
             portableHistory,
             NormalizeAttachments(entry.Id, attachments).ToList());
-        var record = await SaveEntryAsync(vault, project.ProjectId, entry.MdbxFolderId, PasswordEntryTypes, entryType, entry.Title, payload, cancellationToken);
+        var record = await SaveEntryAsync(
+            vault,
+            project.ProjectId,
+            entry.MdbxFolderId,
+            PasswordEntryTypes,
+            entryType,
+            entry.Title,
+            payload,
+            AndroidMdbxPayloadFamily.Password,
+            cancellationToken);
 
         entry.MdbxDatabaseId = database.Id;
         entry.MdbxFolderId = record.EntryId;
@@ -565,7 +574,16 @@ public sealed partial class MdbxVaultStore(
             await PayloadFolderIdAsync(vault, project, cancellationToken),
             boundPasswordEntryId,
             NormalizeSecureItemAttachments(item.Id, DecodeSecureItemImagePaths(item)).ToList());
-        var record = await SaveEntryAsync(vault, project.ProjectId, item.MdbxFolderId, SecureEntryTypes, entryType, item.Title, payload, cancellationToken);
+        var record = await SaveEntryAsync(
+            vault,
+            project.ProjectId,
+            item.MdbxFolderId,
+            SecureEntryTypes,
+            entryType,
+            item.Title,
+            payload,
+            AndroidMdbxPayloadFamily.SecureItem,
+            cancellationToken);
         await DeleteUnreferencedEntryAttachmentsAsync(vault, record, DecodeSecureItemImagePaths(item), cancellationToken);
 
         item.MdbxDatabaseId = database.Id;
@@ -734,7 +752,6 @@ public sealed partial class MdbxVaultStore(
             payload.Entry.CategoryId = null;
             payload.Entry.MdbxDatabaseId = database.Id;
             payload.Entry.MdbxFolderId = record.EntryId;
-            var entryType = PasswordEntryType;
             var payloadJson = AndroidMdbxPayloadCodec.EncodePassword(
                 ClonePasswordEntryForPayload(payload.Entry),
                 payload.CustomFields ?? [],
@@ -747,7 +764,14 @@ public sealed partial class MdbxVaultStore(
                 await vault.MoveEntryAsync(record.ProjectId, record.EntryId, defaultProject.ProjectId, cancellationToken);
             }
 
-            await vault.UpdateEntryAsync(defaultProject.ProjectId, record.EntryId, entryType, payload.Entry.Title, payloadJson, cancellationToken);
+            await UpdateStoredEntryAsync(
+                vault,
+                defaultProject.ProjectId,
+                record,
+                payload.Entry.Title,
+                payloadJson,
+                AndroidMdbxPayloadFamily.Password,
+                cancellationToken);
         }
 
         foreach (var record in await ListSecureRecordsAsync(vault, [categoryProject], includeDeleted: true, cancellationToken))
@@ -762,7 +786,6 @@ public sealed partial class MdbxVaultStore(
             item.CategoryId = null;
             item.MdbxDatabaseId = database.Id;
             item.MdbxFolderId = record.EntryId;
-            var entryType = ToMdbxEntryType(item.ItemType);
             var payloadJson = AndroidMdbxPayloadCodec.EncodeSecureItem(
                 CloneSecureItemForPayload(item),
                 folderId: null,
@@ -773,7 +796,14 @@ public sealed partial class MdbxVaultStore(
                 await vault.MoveEntryAsync(record.ProjectId, record.EntryId, defaultProject.ProjectId, cancellationToken);
             }
 
-            await vault.UpdateEntryAsync(defaultProject.ProjectId, record.EntryId, entryType, item.Title, payloadJson, cancellationToken);
+            await UpdateStoredEntryAsync(
+                vault,
+                defaultProject.ProjectId,
+                record,
+                item.Title,
+                payloadJson,
+                AndroidMdbxPayloadFamily.SecureItem,
+                cancellationToken);
         }
     }
 
@@ -993,6 +1023,7 @@ public sealed partial class MdbxVaultStore(
         string entryType,
         string title,
         string payloadJson,
+        AndroidMdbxPayloadFamily payloadFamily,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(entryId))
@@ -1011,8 +1042,37 @@ public sealed partial class MdbxVaultStore(
             await vault.MoveEntryAsync(existing.ProjectId, entryId, targetProjectId, cancellationToken);
         }
 
-        return await vault.UpdateEntryAsync(targetProjectId, entryId, entryType, title, payloadJson, cancellationToken);
+        return await UpdateStoredEntryAsync(
+            vault,
+            targetProjectId,
+            existing,
+            title,
+            payloadJson,
+            payloadFamily,
+            cancellationToken);
     }
+
+    /// <summary>
+    /// Rewrites a record that already exists, keeping everything about it this client does not own: the
+    /// native type, which the engine refuses to change in the first place, and the payload fields it never
+    /// read. The payload is re-read on every write instead of being trusted from a caller, so a batch that
+    /// touches the same record twice cannot carry a stale document over a newer one.
+    /// </summary>
+    private static Task<MdbxNativeEntryRecord> UpdateStoredEntryAsync(
+        IMdbxNativeVault vault,
+        string targetProjectId,
+        MdbxNativeEntryRecord existing,
+        string title,
+        string payloadJson,
+        AndroidMdbxPayloadFamily payloadFamily,
+        CancellationToken cancellationToken) =>
+        vault.UpdateEntryAsync(
+            targetProjectId,
+            existing.EntryId,
+            existing.EntryType,
+            title,
+            AndroidMdbxPayloadMerge.PreserveForeignFields(existing.PayloadJson, payloadJson, payloadFamily),
+            cancellationToken);
 
     private static async Task<MdbxNativeEntryRecord?> FindEntryAsync(
         IMdbxNativeVault vault,

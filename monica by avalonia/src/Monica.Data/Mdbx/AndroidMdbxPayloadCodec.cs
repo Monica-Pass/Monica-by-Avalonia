@@ -127,7 +127,7 @@ public static class AndroidMdbxPayloadCodec
                 Username = GetString(root, "username"),
                 AppPackageName = GetString(root, "app_package_name", "appPackageName"),
                 AppName = GetString(root, "app_name", "appName"),
-                Password = GetPreferredString(root, "password_plain", "password"),
+                Password = GetPasswordPlain(root),
                 Notes = GetString(root, "notes"),
                 SortOrder = checked((int)(GetInt64(root, "sort_order", "sortOrder") ?? 0)),
                 CategoryId = GetInt64(root, "category_id", "categoryId"),
@@ -349,6 +349,16 @@ public static class AndroidMdbxPayloadCodec
 
     private static string? NormalizeOptionalText(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>
+    /// An explicit password_plain is the current value even when it is empty; the legacy password field
+    /// only applies to payloads written before that field existed. Treating a blank read as missing would
+    /// hand back a password the user cleared.
+    /// </summary>
+    private static string GetPasswordPlain(JsonElement root) =>
+        GetNullableString(root, "password_plain", "passwordPlain") ??
+        GetNullableString(root, "password") ??
+        "";
 
     /// <summary>
     /// Mirrors Android's readMdbxSshKeyData: an absent key means "leave the local value alone",
