@@ -3081,6 +3081,12 @@ public sealed class MdbxRepositoryTests
         public bool IsAvailable => true;
         public string? AvailabilityError => null;
         public string WritableStorageFormat => "MDBX-2";
+        public IReadOnlyList<string> ReadableStorageFormats => ["MDBX-2"];
+
+        // No header to read in a fake: the store then falls back to what the open itself established.
+        public Task<MdbxNativeMigrationInfo?> InspectMigrationAsync(string path, CancellationToken cancellationToken = default) =>
+            Task.FromResult<MdbxNativeMigrationInfo?>(null);
+
         public List<string> OpenedPaths { get; } = [];
         public int DisposedVaultCount => _vaults.Values.Sum(vault => vault.DisposeCount);
 
@@ -3191,6 +3197,7 @@ public sealed class MdbxRepositoryTests
 
     private sealed class FakeMdbxNativeVault(string deviceId) : IMdbxNativeVault
     {
+        public bool IsReadOnly => false;
         private readonly List<MdbxNativeProjectRecord> _projects = [];
         private readonly List<MdbxNativeEntryRecord> _entries = [];
         private readonly List<MdbxNativeAttachmentRecord> _attachments = [];

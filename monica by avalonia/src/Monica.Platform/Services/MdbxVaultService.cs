@@ -33,7 +33,10 @@ public sealed class MdbxVaultService(IMdbxVaultEngine? engine = null, IMdbxNativ
             using var vault = File.Exists(fullPath)
                 ? await _nativeBridge.OpenVaultAsync(fullPath, password, DeviceId, cancellationToken)
                 : await _nativeBridge.CreateVaultAsync(fullPath, password, DeviceId, mode, cancellationToken);
-            inspection = await InspectNativeVaultAsync(fullPath, vault, _nativeBridge.WritableStorageFormat, cancellationToken);
+            (inspection, _) = await InspectNativeVaultAsync(fullPath, vault, cancellationToken);
+            // A file this client just wrote has to be one it owns; anything else means the create did
+            // not produce the envelope we think it does.
+            EnsureExpectedFormat(inspection);
         }
         else
         {
@@ -43,9 +46,9 @@ public sealed class MdbxVaultService(IMdbxVaultEngine? engine = null, IMdbxNativ
             }
 
             inspection = await _engine.InspectAsync(fullPath, cancellationToken);
+            EnsureExpectedFormat(inspection);
         }
 
-        EnsureExpectedFormat(inspection);
         var database = new LocalMdbxDatabase
         {
             Name = name,
@@ -78,24 +81,41 @@ public sealed class MdbxVaultService(IMdbxVaultEngine? engine = null, IMdbxNativ
         if (_nativeBridge.IsAvailable)
         {
             using var vault = await _nativeBridge.OpenVaultAsync(path, database.EncryptedPassword, DeviceId, cancellationToken);
-            inspection = await InspectNativeVaultAsync(path, vault, _nativeBridge.WritableStorageFormat, cancellationToken);
+            (inspection, _) = await InspectNativeVaultAsync(path, vault, cancellationToken);
         }
         else
         {
             await _engine.OpenVaultAsync(path, database.EncryptedPassword, cancellationToken);
             inspection = await _engine.InspectAsync(path, cancellationToken);
+            EnsureExpectedFormat(inspection);
         }
-
-        EnsureExpectedFormat(inspection);
 
         Stream stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
         return stream;
     }
 
-    private static async Task<MdbxVaultInspection> InspectNativeVaultAsync(string path, IMdbxNativeVault vault, string writableStorageFormat, CancellationToken cancellationToken)
+    // The format this method used to report was this build's own writable format, so comparing it
+    // against a constant could only ever pass. It now reports what the file declares; when the engine
+    // cannot read a header at all there is no verdict to add, and the caller falls back on the format
+    // the open itself established.
+    private async Task<(MdbxVaultInspection Inspection, MdbxNativeAccessDecision Access)> InspectNativeVaultAsync(
+        string path,
+        IMdbxNativeVault vault,
+        CancellationToken cancellationToken)
     {
         var info = await vault.GetInfoAsync(cancellationToken);
-        return new MdbxVaultInspection(path, true, writableStorageFormat, info.VaultId, "Available");
+        var header = await _nativeBridge.InspectMigrationAsync(path, cancellationToken);
+        var access = MdbxNativeFormatGate.Assess(
+            header,
+            _nativeBridge.WritableStorageFormat,
+            _nativeBridge.ReadableStorageFormats);
+        if (access.Access == MdbxNativeVaultAccess.Refused)
+        {
+            throw new MdbxVaultFormatException(access.Detail);
+        }
+
+        var foundFormat = header?.FormatVersion ?? _nativeBridge.WritableStorageFormat;
+        return (new MdbxVaultInspection(path, true, foundFormat, info.VaultId, access.Access.ToString()), access);
     }
 
     private static void EnsureExpectedFormat(MdbxVaultInspection inspection)

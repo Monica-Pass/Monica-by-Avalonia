@@ -988,7 +988,14 @@ public sealed partial class MdbxVaultStore(
 
     private static async Task<IReadOnlyList<MdbxNativeProjectRecord>> EnsureProjectsForReadAsync(IMdbxNativeVault vault, CancellationToken cancellationToken)
     {
-        await EnsureRootProjectAsync(vault, cancellationToken);
+        // Reading normally materializes Android's root project because the engine rejects folder-less
+        // writes without it. On a restricted session that create is exactly the write the gate forbids,
+        // and a read never needs it — the projects on disk are what there is to show.
+        if (!vault.IsReadOnly)
+        {
+            await EnsureRootProjectAsync(vault, cancellationToken);
+        }
+
         return await vault.ListProjectsAsync(cancellationToken);
     }
 

@@ -579,6 +579,9 @@ public sealed partial class PlatformServiceTests
         public bool IsAvailable => true;
         public string? AvailabilityError => null;
         public string WritableStorageFormat => "MDBX-2";
+        public IReadOnlyList<string> ReadableStorageFormats => ["MDBX-2"];
+        public Task<MdbxNativeMigrationInfo?> InspectMigrationAsync(string path, CancellationToken cancellationToken = default) =>
+            Task.FromResult<MdbxNativeMigrationInfo?>(null);
         public int CreateCalls { get; private set; }
         public int OpenCalls { get; private set; }
 
@@ -599,6 +602,7 @@ public sealed partial class PlatformServiceTests
 
     private sealed class RecordingNativeVault : IMdbxNativeVault
     {
+        public bool IsReadOnly => false;
         public Task<MdbxNativeVaultInfo> GetInfoAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(new MdbxNativeVaultInfo("native-vault", "native-device"));
 

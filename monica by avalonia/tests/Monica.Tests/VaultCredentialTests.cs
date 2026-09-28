@@ -790,6 +790,11 @@ public sealed partial class VaultCredentialTests
 
         public string WritableStorageFormat => "MDBX-2";
 
+        public IReadOnlyList<string> ReadableStorageFormats => ["MDBX-2"];
+
+        public Task<MdbxNativeMigrationInfo?> InspectMigrationAsync(string path, CancellationToken cancellationToken = default) =>
+            Task.FromResult<MdbxNativeMigrationInfo?>(null);
+
         public Task<IMdbxNativeVault> CreateVaultAsync(
             string path,
             string password,

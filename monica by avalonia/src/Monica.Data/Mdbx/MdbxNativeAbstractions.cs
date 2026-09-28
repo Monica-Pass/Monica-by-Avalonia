@@ -13,12 +13,41 @@ public interface IMdbxNativeBridge
     /// <summary>Storage format the loaded native runtime writes, or empty when it could not be probed.</summary>
     string WritableStorageFormat { get; }
 
+    /// <summary>Storage formats the loaded native runtime can read. A file outside this set cannot be
+    /// trusted even by a read, because the runtime only promises to understand the listed formats.</summary>
+    IReadOnlyList<string> ReadableStorageFormats { get; }
+
+    /// <summary>
+    /// Reads the format header of <paramref name="path"/> without opening the vault for writing, so the
+    /// client can decide what it may do with the file before touching it. Null when the engine could not
+    /// read the header at all.
+    /// </summary>
+    Task<MdbxNativeMigrationInfo?> InspectMigrationAsync(string path, CancellationToken cancellationToken = default);
+
     Task<IMdbxNativeVault> CreateVaultAsync(string path, string password, string deviceId, MdbxTigaMode mode, CancellationToken cancellationToken = default);
     Task<IMdbxNativeVault> OpenVaultAsync(string path, string password, string deviceId, CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// What the file itself declares, as measured by the engine rather than by this build's own constants.
+/// </summary>
+public sealed record MdbxNativeMigrationInfo(
+    bool Initialized,
+    string? FormatVersion,
+    uint? SchemaVersion,
+    string? MinReaderVersion,
+    string? MinWriterVersion,
+    bool RequiresUpgrade,
+    bool UnknownCriticalExtensions,
+    string TargetFormatVersion,
+    uint TargetSchemaVersion);
+
 public interface IMdbxNativeVault : IDisposable
 {
+    /// <summary>True when this handle may only be read. Callers use it to skip the writes that a normal
+    /// read path performs to materialize state, because on a foreign file those writes are the damage.</summary>
+    bool IsReadOnly { get; }
+
     Task<MdbxNativeVaultInfo> GetInfoAsync(CancellationToken cancellationToken = default);
     Task<MdbxNativeProjectRecord> CreateProjectAsync(string title, CancellationToken cancellationToken = default);
 

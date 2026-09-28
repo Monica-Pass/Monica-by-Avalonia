@@ -43,6 +43,35 @@ public sealed class MdbxUniffiNativeBridge : IMdbxNativeBridge
 
     public string WritableStorageFormat => Runtime.Value.Manifest?.WritableStorageFormat ?? "";
 
+    public IReadOnlyList<string> ReadableStorageFormats =>
+        Runtime.Value.Manifest?.ReadableStorageFormats ?? Array.Empty<string>();
+
+    // Reads the header the file itself declares, without opening it for writing and without the vault
+    // password. Failure is reported as "no verdict" rather than an exception: the caller then falls back
+    // to what the open itself established instead of locking a perfectly good vault out.
+    public Task<MdbxNativeMigrationInfo?> InspectMigrationAsync(string path, CancellationToken cancellationToken = default) =>
+        RunBlockingNativeAsync<MdbxNativeMigrationInfo?>(() =>
+        {
+            try
+            {
+                var info = MdbxFfi.InspectVaultMigration(path);
+                return new MdbxNativeMigrationInfo(
+                    info.Initialized,
+                    info.FormatVersion,
+                    info.SchemaVersion,
+                    info.MinReaderVersion,
+                    info.MinWriterVersion,
+                    info.RequiresUpgrade,
+                    info.UnknownCriticalExtensions,
+                    info.TargetFormatVersion,
+                    info.TargetSchemaVersion);
+            }
+            catch (UniffiException)
+            {
+                return null;
+            }
+        }, cancellationToken);
+
     private static string DescribeLoadFailure(Exception ex) =>
         $"The native vault engine ({ExpectedLibraryName()}) could not be loaded: {ex.GetType().Name}: {ex.Message}";
 
@@ -139,6 +168,10 @@ public sealed class MdbxUniffiNativeBridge : IMdbxNativeBridge
                 var info = vault.Info();
                 return new MdbxNativeVaultInfo(info.VaultId, info.DeviceId);
             }, cancellationToken);
+
+        // The store decides whether a session is restricted and wraps the handle; a raw engine handle
+        // carries no such limit.
+        public bool IsReadOnly => false;
 
         public Task<MdbxNativeProjectRecord> CreateProjectAsync(string title, CancellationToken cancellationToken = default) =>
             RunBlockingNativeAsync(() => ToProject(vault.CreateProject(title)), cancellationToken);

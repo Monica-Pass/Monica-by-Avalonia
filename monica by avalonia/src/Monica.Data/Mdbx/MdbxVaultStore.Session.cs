@@ -31,8 +31,8 @@ public sealed partial class MdbxVaultStore
 
         if (_vaultSessionService is null)
         {
-            var ownedVault = await _nativeBridge.OpenVaultAsync(path, database.EncryptedPassword, DeviceId, cancellationToken);
-            return new MdbxVaultLease(ownedVault);
+            var ownedDecision = await AssessFileAccessAsync(path, cancellationToken);
+            return new MdbxVaultLease(await OpenGatedVaultAsync(path, database.EncryptedPassword, ownedDecision, cancellationToken));
         }
 
         var sessionToken = _vaultSessionService.SessionCancellationToken;
@@ -62,11 +62,8 @@ public sealed partial class MdbxVaultStore
 
             if (_cachedVault is null)
             {
-                _cachedVault = await _nativeBridge.OpenVaultAsync(
-                    path,
-                    database.EncryptedPassword,
-                    DeviceId,
-                    effectiveCancellationToken);
+                var decision = await AssessFileAccessAsync(path, effectiveCancellationToken);
+                _cachedVault = await OpenGatedVaultAsync(path, database.EncryptedPassword, decision, effectiveCancellationToken);
                 _cachedVaultPath = path;
                 _cachedVaultCredentialFingerprint = credentialFingerprint;
                 credentialFingerprint = null;
@@ -90,6 +87,44 @@ public sealed partial class MdbxVaultStore
                 CryptographicOperations.ZeroMemory(credentialFingerprint);
             }
         }
+    }
+
+    /// <summary>
+    /// What the last opened file was allowed to do, kept so the shell can tell the user the session is
+    /// read-only instead of letting them discover it when a save fails. Null until a vault is opened.
+    /// </summary>
+    public MdbxNativeAccessDecision? LastVaultAccess { get; private set; }
+
+    private async Task<MdbxNativeAccessDecision> AssessFileAccessAsync(string path, CancellationToken cancellationToken)
+    {
+        var decision = MdbxNativeFormatGate.Assess(
+            await _nativeBridge.InspectMigrationAsync(path, cancellationToken),
+            _nativeBridge.WritableStorageFormat,
+            _nativeBridge.ReadableStorageFormats);
+        LastVaultAccess = decision;
+        return decision;
+    }
+
+    /// <summary>
+    /// Opens with the gate's verdict already in hand. A refusal has to land before the engine is asked to
+    /// open: opening runs the vault KDF and materializes native state, and spending that on a file this
+    /// build has already declared unreadable buys nothing.
+    /// </summary>
+    private async Task<IMdbxNativeVault> OpenGatedVaultAsync(
+        string path,
+        string password,
+        MdbxNativeAccessDecision decision,
+        CancellationToken cancellationToken)
+    {
+        if (decision.Access == MdbxNativeVaultAccess.Refused)
+        {
+            throw new MdbxVaultFormatException(decision.Detail);
+        }
+
+        var vault = await _nativeBridge.OpenVaultAsync(path, password, DeviceId, cancellationToken);
+        return decision.Access == MdbxNativeVaultAccess.ReadOnly
+            ? new MdbxReadOnlyNativeVault(vault, decision)
+            : vault;
     }
 
     public void Dispose()
@@ -192,6 +227,9 @@ public sealed partial class MdbxVaultStore
             _vault = vault;
             _owner = owner;
         }
+
+        // The lease wraps whatever the format gate handed back, so the restriction travels with it.
+        public bool IsReadOnly => _vault.IsReadOnly;
 
         public Task<MdbxNativeVaultInfo> GetInfoAsync(CancellationToken cancellationToken = default) =>
             _vault.GetInfoAsync(cancellationToken);

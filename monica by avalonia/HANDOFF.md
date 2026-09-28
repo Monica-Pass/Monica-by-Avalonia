@@ -4239,6 +4239,93 @@ grep 后发现软删同样带 `DeletedAt`（`MdbxBackedMonicaRepository.cs:81/91
   `payload_schema_version`（片6）都没碰。
 - 真实云端多设备分段未验；`Tailscale`/WebDAV 侧只跑到本地自托管。
 
+## 附：片1a 格式闸（2026-09-28，**#147 的前一半：桌面第一次按「那份文件自己声明的信封」决定能做什么，而不是按本构建的常量**）
+
+### 一、修掉的是一条恒真检查
+
+体检清单第 4 条说"关键扩展闸 0 命中"，复核时发现更基本：`MdbxVaultService.InspectNativeVaultAsync`
+报出来的 format **本来就是本构建自己的 `WritableStorageFormat`**，再拿它去和常量 `ExpectedFormatVersion`
+比——只能永远通过，谁都拦不住。现在吃的是引擎读那份文件 header 得到的字段（`MdbxNativeFormatGate.Assess`），
+本构建的常量只作为"我能写到哪"的一侧参与比较。
+
+### 二、实测的引擎事实（真 `mdbx_ffi.dll`，全部不需要密码）
+
+`MdbxFfi.InspectVaultMigration(path)` 只读 header：不做 vault KDF、能在文件被别的句柄占用时调用，给
+`Initialized / FormatVersion / SchemaVersion / MinReaderVersion / MinWriterVersion / RequiresUpgrade /
+UnknownCriticalExtensions / TargetFormatVersion / TargetSchemaVersion`（绑定 `mdbx_ffi.cs:14788-14798`、
+静态法 `:22588`）。runtime manifest：readable = `[MDBX-1, MDBX-1-DRAFT, MDBX-2]`、writable = `MDBX-2`、
+current schema = 17。
+
+四种 header 篡改下的引擎行为（真跑，不是读码推断；`tests/Monica.Tests/MdbxVaultFormatGateTests.cs` 里
+每条都重言了一遍）：
+
+| 篡改 | inspect 给什么 | 闸门结论 | open 实测 |
+| --- | --- | --- | --- |
+| `format_version='MDBX-3'` | **null**（读不出信封就没有结论） | 不加限制 | 抛 `unsupported MDBX format version: MDBX-3` |
+| `critical_extensions=1` | `UnknownCriticalExtensions=true` | ReadOnly/`unknown-critical-extensions` | 抛 |
+| `schema_version=999` | `SchemaVersion=999` | ReadOnly/`schema-newer` | 抛 |
+| 篡改过的文件再解锁 | — | — | `incorrect credential`（header 进了完整性摘要，所以改信封等于改凭证） |
+
+顺带第一次由桌面测了本机那两份**真 Android 建**的样本
+（`Monica-all/.codex-tasks/20260731-mdbx2-local-create-failure/raw/`）：`MDBX-2 / schema 17 /
+minReader MDBX-1 / minWriter MDBX-2 / requiresUpgrade false / unknownCriticalExtensions false`。
+信封层对得上；**密码不在手，所以这不等于解锁成功**（[[avalonia-native-mdbx-bridge]] 那条仍然成立）。
+
+### 三、判定次序就是优先级（`MdbxNativeFormatGate.cs:32-69`）
+
+无 verdict → ReadWrite（引擎读不出 header 时闸门**不另立门槛**）；`!Initialized` → Refused/`not-initialized`；
+format 不在 readable 集（`StringComparison.Ordinal`）→ Refused/`format-unreadable`；
+`UnknownCriticalExtensions` → ReadOnly；`RequiresUpgrade` → ReadOnly；`SchemaVersion > TargetSchemaVersion`
+→ ReadOnly；format ≠ writable → ReadOnly/`format-not-writable`；否则 ReadWrite。
+
+### 四、"只读"是真只读，不是提示
+
+- `MdbxReadOnlyNativeVault`：6 个读口原样转发（含附件内容，所以受限库照样能看、能搜、能复制），
+  9 个写口全部 `Task.FromException(MdbxVaultReadOnlyException)`，异常带 `ReasonCode`。
+- 读路径自带一次"补 Android 根项目"的写（`EnsureProjectsForReadAsync` → `CreateProjectWithIdentityAsync`）。
+  只读会话里那次 create 正是闸门禁止的写，所以 `IMdbxNativeVault` 加了 `IsReadOnly`，只读时跳过补根、
+  直接列盘上项目——**不然只读会话连列表都跑不出来**（这条是被单条用例盯住的，不是注释里说说）。
+- Refused 落在**引擎 open 之前**（`MdbxVaultStore.Session.cs` 的 `OpenGatedVaultAsync`）：open 要跑整趟
+  vault KDF，为一个已经判定读不了的文件花这笔钱买不到任何东西。
+  用例 `An_unreadable_file_is_refused_before_the_engine_is_asked_to_open_it` 断言的就是 `bridge.OpenCalled == false`。
+- 结论留在 `MdbxVaultStore.LastVaultAccess`，界面上的"本次只读"文案还没接它（见第七节）。
+- `MdbxVaultService.OpenLocalStreamAsync`（同步/备份取流）现在也走闸：Refused 直接抛。查了四个调用点，
+  全部只读该流（WebDAV 那处是拿引擎验一遍刚下载的那份能不能打开），所以这次改动只会让坏文件**更早可见**。
+
+### 五、撤销过一个自己加的设计
+
+第一版把 `InspectMigrationAsync` 失败当成 Refused。这会把三个测试假桥和纯 CLI 引擎路径（都不给 header）
+全打死，也会让"引擎读 header 的手法变了但 open 完全正常"的正常库进不去。改成 **null = 不给结论**：
+闸门只负责在看得懂信封时**加**限制，看得懂之外一律交给 open 本身。
+
+### 六、门禁读数（实测，两轮）
+
+- `dotnet format --verify-no-changes`：`fmt_rc=0`。
+- 新增 `tests/Monica.Tests/MdbxVaultFormatGateTests.cs` 单条串：**10/10 绿**（其中 4 条真引擎篡改）。
+- 第一轮 `verify-commercial-release`：`gate_rc=1`，Release 构建 `0 Warning(s) 0 Error(s)`、
+  Monica.Tests perf 11/11 + 常规 **1166/1166**，红在 UI perf-budget **2 条**：
+  `Cold_note_editor_constructor_reports_first_use_cost` 759ms 撞 700，
+  `Unlocked_navigation_shell_materialization_stays_within_budget` 1579ms 撞 1200。
+- 复跑取分布（全部单独跑，无并发重活）：整类单跑 2/2 绿；perf 通道单跑 3 趟 = 红（note editor 1209ms）、
+  红（**另一条** `Note_editor_large_note_projection` 262ms）、绿。红点在不同用例之间游走且有一趟全绿
+  → 判为串扰/负载敏感，不是本片的台阶（本片没往 note editor 构造路径加一行代码）。
+- 第二轮整道门单独重跑：`gate_rc=0` + `Commercial release verification passed.`，
+  Monica.Tests 11 + **1166**、Monica.UiTests perf **17/17** + 常规 **266/266**，`[FAIL]` 计数 0。
+  **两条预算阈值（700/1200）都没动**。日志 `D:\kpprobe\i115p2\gate-p1b.log`、`gate-p1b-run2.log`、
+  `uitest-perf-alone*.log`。
+
+### 七、这一轮没证 / 没做（别算成已验收）
+
+- **未知类型仍然不可见**（#147 的另一半，契约 §3.1）：列表按 own 白名单在内存筛，解码不认识的 kind
+  返回 null 再被 `.Where(Payload is not null)` 丢弃；而且过滤用 `OrdinalIgnoreCase`，契约要求区分大小写。
+- **ReadOnly 会话在界面上看不见**：`LastVaultAccess` 暂无消费者，用户目前只在保存失败时撞到英文异常文本。
+  按「提示语要带按钮」的规矩，这条得配一条状态文案和一个出口（另存副本那种），否则宁可不写。
+- **更老格式的真文件没测**：本构建写不出 MDBX-1 信封，所以 `format-not-writable` 只有纯函数用例，
+  store 级的 ReadOnly 拒绝也是**合成 verdict**（`VerdictBridge`）——真跨端"他端老库来了"仍没跑过。
+- 原始凭证层面的只读保证没做：闸门管的是引擎句柄，直接拿 `File.Open` 读那份文件的旁路（片3 要换成
+  引擎导出快照的那条）仍然绕得过去。
+- 真 Android 建库解锁、契约 §8 表其余行仍未验；`custom_fields` 项内元数据仍丢（片2 就写明是有意选择）。
+
 
 
 
