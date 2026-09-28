@@ -4042,6 +4042,115 @@ UiTest 立刻红在第一条断言上：**合并之后探针把显示也关了**
 - 磁盘缓存的**上限与淘汰**只有代码路径（写满 N 个才 trim），没量过 trim 真的收；`favicons/` 长到几百兆
   会发生什么，没测。
 
+---
+
+## 附：#115 拿跨端兼容契约对桌面 MDBX 层做了一次全量体检（2026-09-28，只出清单，未改一行业务代码）
+
+依据是 Android 仓库 `docs/storage/MDBX-CROSS-CLIENT-CONTRACT.zh-CN.md`（201 行，同日由 Android 那个会话写下，
+我这边**只读不动它**）与同目录 `MDBX-VERIFICATION-2026-09-28.zh-CN.md`。契约 §9 要求接入方"修改前列出当前
+实现与本契约的差异"，这一节就是那份差异清单。所有行号都是本轮打开文件核对过的，不是转抄。
+
+### 一、先讲桌面**已经**守住的（免得清单看着全红）
+
+- 业务读写只走原生引擎，没有第二套 SQL 写法：`MdbxBackedMonicaRepository.cs:47-69` 全量转 `MdbxVaultStore`；
+  全仓 `INSERT OR REPLACE` / `REPLACE INTO` 0 命中。SQLite 只剩凭据、`local_mdbx_databases` 指针、日志、
+  快速访问、`bitwarden_*`。
+- 写入走通用 write-operation，不碰 legacy 便捷 API：`MdbxUniffiNativeBridge.cs:197/228/240-241`；
+  生成绑定里的 legacy `CreateEntry`/`UpdateEntry`（`mdbx_ffi.cs:9787/9925`）无手写调用方。
+- 自定义类型真跑得通：`tests/Monica.Tests/MdbxUniffiBindingTests.cs:47-60` 用真 `mdbx_ffi.dll` 把
+  `billing-address` 建、改、读回来；`:192` 与 `:239` 记录了 legacy 侧为什么必须绕开。
+- 删除是引擎 tombstone，不是删行：`MdbxUniffiNativeBridge.cs:252-256` + `ListDeletedEntriesAsync`/
+  `RestoreEntryAsync` 都在用（`MdbxVaultStore.cs:525-528/541-544/884/1043`）；`PurgeTombstone` 0 调用。
+- root collection 按 vault id 确定性推导，没自创随机 root：`MdbxAndroidRoot.cs:19-37`。
+- 明文没进日志：`AppDiagnostics.cs:90/201` 只带 caller 串与异常，实际调用点全是 id/计数；JSON 解析失败被
+  静默吞掉（`MdbxVaultStore.cs:1271-1285`），载荷片段不会随异常文本出门。
+- 锁定与收进托盘确实清明文：`SecurityStateClearing.cs:10-14` → `MdbxBackedMonicaRepository.cs:1078-1082`
+  把两份快照置空；剪贴板按自持文本清除（`SecureClipboardService.cs:17/39`）。
+
+### 二、差异清单（按"会不会毁掉对端数据"排序，1–5 是毁数据级）
+
+1. **写回不保留未知字段**（契约 §4 第一句）。编码器按硬编码键表从类型化模型重新生成 JSON：
+   `AndroidMdbxPayloadCodec.cs:25-106`；解码器根本不携带原文（`:108-160`，模型 `:492-497`）。顶层未知键、
+   嵌套未知对象、数组项自带元数据三种全丢（自定义字段只读四个键：`:247-283`，`MdbxVaultStore.cs:1336-1338`
+   还会丢掉空值字段）。现有测试只断言"产出的键 ⊆ 已知键"（`AndroidMdbxPayloadCodecTests.cs:247`），
+   它恰好证明不了无损。后果：桌面编辑一条 Android 写的条目，就把 Android 的字段删了。
+2. **明确清空密码会被旧值复活**（契约 §4 点名禁止 `ifBlank` 回退）。`AndroidMdbxPayloadCodec.cs:130`
+   `GetPreferredString(root, "password_plain", "password")`，而 `:396-405` 用 `string.IsNullOrEmpty` 判空，
+   于是 `password_plain: ""` 与"缺字段"同等、回落到历史 `password`。写侧 `:45` 只写 `password_plain`、
+   从不写 `password`，所以一次编辑顺手把 legacy 键洗掉——语义上正好反了。
+3. **写回会改原生类型**（契约 §3.2）。读入的 `identity`/`ssh-key` 行保存时一律写成 `login` /
+   `billing-address` / `payment-account`：`MdbxVaultStore.cs:166`、`:1443`、`:565/765/776`。这不是"投影时不改
+   原生类型"的问题，是真的改写。
+4. **格式闸门是自我体检，没看被打开的那份文件**（契约 §6）。`MdbxVaultService.cs:81/95-107`
+   比的是运行时自己的 `WritableStorageFormat` 常量 `"MDBX-2"`，永远通过；被开库的 `format_version`
+   从没参与判断，`MdbxVaultStore.OpenAsync` 里没有闸（`MdbxVaultStore.Session.cs:34/65`）。
+   `critical_extensions` / `min_reader_version` / `min_writer_version` / `InspectVaultMigration`
+   在生产代码 0 调用（只有测试 `MdbxVaultShapeParityTests.cs:42-45/67-68`）。叠加 1–3：桌面可以打开一份
+   更新或外来格式的库并按自己的理解覆写。
+5. **同步把正在使用的引擎文件直接流式上传**（契约 §7.1 明令禁止）。`MdbxVaultService.cs:91`
+   以 `FileShare.ReadWrite` 打开主文件，`MainWindowViewModel.MdbxWebDavSync.cs:25-32` 与
+   `MdbxOneDriveSync.cs:160` 上传它，下载只覆写主文件（`MdbxWebDavSync.cs:92`），产品代码里没有任何
+   `-wal` / `-shm` 处理，而引擎确实开 WAL（`artifacts/hover-1/appdata/mdbx/local.mdbx-wal`）。
+   引擎的 `CreateBackup`（`mdbx_ffi.cs:10737`）0 调用方；界面那个"备份"是加密 JSON（`SyncCommands.cs:112-125`），
+   不是 MDBX 备份。
+6. **未知类型静默蒸发**（契约 §3.1「不能 else → skip」）。列表在内存里按 9 项白名单过滤
+   （`MdbxVaultStore.cs:1113-1114`），解码器对不认识的 kind 返回 null（`AndroidMdbxPayloadCodec.cs:215-219`），
+   再由 `.Where(Payload is not null)` 丢掉（`MdbxVaultStore.cs:220/590`）——无日志、无行、无错误。
+   另外过滤用 `OrdinalIgnoreCase`，契约要求类型区分大小写。
+7. **没有通用只读查看器，也没有 payload 版本概念**（契约 §3.7 / §4）。raw-field viewer 全仓 absent；
+   `payload_schema_version` 在非生成代码里 0 命中，高版本载荷既没被识别也没被降级——是被丢掉。
+8. **列表即全量载荷，摘要与授权 disclosure 都没用**（契约 §6）。抽象层 `ListEntriesAsync` 返回整份
+   `PayloadJson`（`MdbxNativeAbstractions.cs:39`），每一行都被解码（`MdbxVaultStore.cs:219`），标题/用户名/
+   备注全进内存并缓存两分钟。生成绑定里 `ListObjectSummaries`（`mdbx_ffi.cs:11110`）和
+   `RevealObjectWithLimits`（`:11278`）手写代码 0 调用；唯一用到的摘要是目录那侧的
+   `ListCollectionSummaries`（`MdbxUniffiNativeBridge.cs:175`）。口令字段本身仍在主密钥之下
+   （只有选中项解一次，`PasswordDetailViewModel.Formatting.cs:45`），所以这不是"泄露明文口令"，
+   是"未经授权就把整份业务载荷变成明文对象"。
+9. **写回没有版本/提交身份，也没有并发守卫**（契约 §4）。`UpdateEntry` 命令不接修订号
+   （`mdbx_ffi.cs:19160-19166`），`ExecuteWriteOperation` 返回的 `CommitId`/`AlreadyCommitted`
+   被丢弃（`MdbxUniffiNativeBridge.cs:240-241`），编辑基线是内存快照而非重读的原对象
+   （`MainWindowViewModel.PasswordCrudCommands.cs:104-107`、`MdbxBackedMonicaRepository.cs:14/1006-1021`）。
+10. **passkey 私钥活在 SQLite，不在引擎里**（契约 §2 单一持久化模型 / §3 把 `passkey` 列为原生类型）：
+    `DatabaseMigrator.cs:347/388`。跨设备同步和上条 5 说的备份都不会带它。笔记图片另有一个临时违规窗口：
+    先写成 `secure_attachments/<guid>.monicaattachment` 并把**文件路径**嵌进 markdown
+    （`PasswordAttachmentFileService.cs:61-77`、`NoteMarkdownCommands.cs:90`），保存时才转原生附件
+    （`MdbxBackedMonicaRepository.cs:1159-1193`），落进载荷的只有 `mdbx:<id>`（`MdbxVaultStore.cs:1374/1480`）。
+11. **把 room_id 当身份用**（契约 §5）。原生 `object_id` 确实保住了（`EntryId` → `MdbxFolderId`，
+    `MdbxVaultStore.cs:195/226/286/572/602/649`，跨移动与重开不变），但 `room_id` 是桌面自分配的域 id
+    且是查找键（`AndroidMdbxPayloadCodec.cs:40/178`、`MdbxVaultStore.cs:280`、
+    `MdbxBackedMonicaRepository.cs:853-865`），`category_id` 每设备重算（`MdbxVaultStore.cs:1216-1235`）。
+12. **没接引擎的载荷迁移接口**（契约 §4 末条）：`CreatePayloadMigrationPlan` / `ExecutePayloadMigration`
+    （`mdbx_ffi.cs:9698-9716`）在 src 与 tests 里都 0 调用。
+
+### 三、别把这些算成桌面的独有缺陷
+
+Android 的验证报告自己列了同样没做完的项：冲突双方历史 payload 没有受控 disclosure；已知类型的任意未来字段
+无损写回、更高 payload 版本自动只读、所有历史 Adapter 的 UUID 写回都还只是要求；缓存导入仍走全量读取；
+Release 只验构建；且明确写了"不能把要求当作已通过的验收"。
+
+### 四、验收面差距（一句话）
+
+契约 §8 那张跨端验收表有 11 行，桌面目前能自证的是 **0 行**——从未跑过一次
+"另一端建 → 桌面读 → 桌面编辑 → 另一端重开比对"。上面的 1–5 之所以按毁数据排，正是因为没有这条实跑兜着。
+
+### 五、建议的修次序（先止血再补形，每片都要跨端实跑当证据）
+
+片1 只读保护：真去读被打开那份的格式与关键扩展，不匹配就强制只读，并让未知类型至少**可见**（治 4/6/7）。
+片2 无损写回：解码时携带原文、编码时按原对象合并（治 1/2/3/9）。
+片3 同步与备份改用引擎导出的一致性快照（治 5/10 的备份面）。
+片4 列表走 Object summary，详情走授权 disclosure（治 8）。
+片5 passkey 与附件路径入引擎（治 10/11）。
+片6 接载荷迁移与提交身份（治 12/9）。
+
+### 六、这一轮没证
+
+- 清单全部来自读代码（4 个只读子代理 + 本人逐条复核 5 处：摘要/disclosure 0 调用、
+  `payload_schema_version` 0 命中、关键扩展闸 0 命中、`password_plain` 回落、列表白名单过滤）。
+  **没有一次跨端 fixture 实跑**，所以"会毁数据"目前是机制推断 + 已有单测形状，不是观测到的丢失。
+- `identity` → `billing-address` 改写后 Android 到底是看不见、还是按 kind 仍能显示，未测。
+- passkey 不入引擎对现有备份/同步文件的实际缺口，未测（只确认它在 SQLite）。
+- 第 5 条的 WAL 撕裂是否真的产出了坏快照，未做实验；本轮只证明"上传主文件、无视 WAL"这条代码路径存在。
+
 
 
 
