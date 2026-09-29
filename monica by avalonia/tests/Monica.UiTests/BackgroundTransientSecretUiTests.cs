@@ -40,17 +40,17 @@ public sealed class BackgroundTransientSecretUiTests
 
             AssertSettingsSecretsCleared(viewModel);
             AssertTransferSecretsCleared(viewModel);
-            Assert.Equal("", viewModel.GeneratedPassword);
-            Assert.Empty(viewModel.GeneratedPasswordHistory);
+            Assert.Equal("", viewModel.Generator.GeneratedPassword);
+            Assert.Empty(viewModel.Generator.GeneratedPasswordHistory);
             Assert.Same(sourcePassword, Assert.Single(viewModel.Passwords));
             Assert.Equal("preserved-vault-secret", sourcePassword.Password);
 
             window.WindowState = WindowState.Normal;
             Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
 
-            Assert.NotEmpty(viewModel.GeneratedPassword);
-            Assert.NotEqual("retained-generator-secret", viewModel.GeneratedPassword);
-            Assert.Empty(viewModel.GeneratedPasswordHistory);
+            Assert.NotEmpty(viewModel.Generator.GeneratedPassword);
+            Assert.NotEqual("retained-generator-secret", viewModel.Generator.GeneratedPassword);
+            Assert.Empty(viewModel.Generator.GeneratedPasswordHistory);
         }
         finally
         {
@@ -87,8 +87,8 @@ public sealed class BackgroundTransientSecretUiTests
         viewModel.ExportWalletCsvPreview = "wallet-export-secret";
         viewModel.ExportTimelinePreview = "timeline-export-secret";
 
-        viewModel.GeneratedPassword = "retained-generator-secret";
-        viewModel.GeneratedPasswordHistory.Add(new GeneratorHistoryItem(
+        viewModel.Generator.GeneratedPassword = "retained-generator-secret";
+        viewModel.Generator.GeneratedPasswordHistory.Add(new GeneratorHistoryItem(
             "retained-history-secret",
             "Random",
             "Strong",

@@ -49,7 +49,7 @@ public sealed partial class VaultCredentialTests
         viewModel.AegisImportPassword = AegisEncryptedTestData.Password;
         viewModel.IsAegisImportPasswordRequired = true;
         viewModel.ExportPreview = "plain export";
-        viewModel.GeneratedPassword = "generated-secret";
+        viewModel.Generator.GeneratedPassword = "generated-secret";
         viewModel.VaultSearchText = "private account query";
         viewModel.WebDavPassword = "webdav-secret";
         viewModel.CurrentMasterPassword = "old-master-password";
@@ -79,7 +79,7 @@ public sealed partial class VaultCredentialTests
         Assert.Equal("", viewModel.AegisImportPassword);
         Assert.False(viewModel.IsAegisImportPasswordRequired);
         Assert.Equal("", viewModel.ExportPreview);
-        Assert.Equal("", viewModel.GeneratedPassword);
+        Assert.Equal("", viewModel.Generator.GeneratedPassword);
         Assert.Equal("", viewModel.VaultSearchText);
         Assert.Equal("", viewModel.WebDavPassword);
         Assert.Equal("", settings.Current.WebDavPassword);

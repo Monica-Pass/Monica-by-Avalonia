@@ -190,13 +190,13 @@ public partial class MainWindow
 
             viewModel.SelectSectionCommand.Execute("Generator");
             await Task.Delay(50);
-            viewModel.GeneratedPassword = "";
+            viewModel.Generator.GeneratedPassword = "";
             var generatorNewExecuted = TryExecuteCurrentSectionNewCommand(viewModel);
             await Task.Delay(50);
             Check(
                 "ctrl-n-generator-generates",
-                generatorNewExecuted && !string.IsNullOrWhiteSpace(viewModel.GeneratedPassword),
-                $"generatedLength={viewModel.GeneratedPassword?.Length ?? 0}");
+                generatorNewExecuted && !string.IsNullOrWhiteSpace(viewModel.Generator.GeneratedPassword),
+                $"generatedLength={viewModel.Generator.GeneratedPassword?.Length ?? 0}");
 
             viewModel.SelectSectionCommand.Execute("Totp");
             await Task.Delay(50);

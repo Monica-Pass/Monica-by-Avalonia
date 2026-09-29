@@ -9,9 +9,9 @@ public partial class MainWindow
     {
         if (e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.Control)
         {
-            if (viewModel.GeneratePasswordCommand.CanExecute(null))
+            if (viewModel.Generator.GeneratePasswordCommand.CanExecute(null))
             {
-                viewModel.GeneratePasswordCommand.Execute(null);
+                viewModel.Generator.GeneratePasswordCommand.Execute(null);
                 GeneratorWorkspaceView.FocusGeneratedPassword();
                 e.Handled = true;
             }
@@ -29,9 +29,9 @@ public partial class MainWindow
             return;
         }
 
-        if (viewModel.CopyGeneratedPasswordCommand.CanExecute(null))
+        if (viewModel.Generator.CopyGeneratedPasswordCommand.CanExecute(null))
         {
-            viewModel.CopyGeneratedPasswordCommand.Execute(null);
+            viewModel.Generator.CopyGeneratedPasswordCommand.Execute(null);
             e.Handled = true;
         }
     }

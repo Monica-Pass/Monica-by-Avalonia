@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 
 namespace Monica.App.ViewModels;
 
-public sealed partial class MainWindowViewModel
+public sealed partial class GeneratorWorkspaceViewModel
 {
     private string CreateGeneratedPasswordValue() => GeneratorMode switch
     {

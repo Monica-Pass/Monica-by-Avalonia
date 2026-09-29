@@ -14,7 +14,7 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private async Task AddPasswordAsync()
     {
-        var initialPassword = string.IsNullOrWhiteSpace(GeneratedPassword) ? "" : GeneratedPassword;
+        var initialPassword = string.IsNullOrWhiteSpace(Generator.GeneratedPassword) ? "" : Generator.GeneratedPassword;
         var editor = await _passwordEditorDialogService.ShowAsync(
             null,
             Categories.ToList(),

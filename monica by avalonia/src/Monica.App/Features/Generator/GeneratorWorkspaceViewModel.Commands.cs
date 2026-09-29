@@ -4,13 +4,13 @@ using Monica.App.Services;
 
 namespace Monica.App.ViewModels;
 
-public sealed partial class MainWindowViewModel
+public sealed partial class GeneratorWorkspaceViewModel
 {
     [RelayCommand(CanExecute = nameof(CanGeneratePassword))]
     private void GeneratePassword()
     {
         RegeneratePassword(addToHistory: true);
-        SetStatusNotice("GeneratedPassword");
+        _showNotice("GeneratedPassword");
     }
 
     [RelayCommand]
@@ -30,7 +30,7 @@ public sealed partial class MainWindowViewModel
     private void ClearGeneratedPasswordHistory()
     {
         ClearGeneratedPasswordHistorySecrets();
-        SetStatusNotice("GeneratedPasswordHistoryCleared");
+        _showNotice("GeneratedPasswordHistoryCleared");
     }
 
     [RelayCommand]
@@ -42,7 +42,7 @@ public sealed partial class MainWindowViewModel
         }
 
         GeneratedPassword = item.Value;
-        SetStatusNotice("GeneratedPasswordRestoredFromHistory");
+        _showNotice("GeneratedPasswordRestoredFromHistory");
     }
 
     [RelayCommand]
@@ -54,17 +54,17 @@ public sealed partial class MainWindowViewModel
         }
 
         await _clipboardService.SetSensitiveTextAsync(item.Value);
-        SetStatusNotice("CopiedGeneratedPassword");
+        _showNotice("CopiedGeneratedPassword");
     }
 
     [RelayCommand(CanExecute = nameof(CanCopyGeneratedPassword))]
     private async Task CopyGeneratedPasswordAsync()
     {
         await _clipboardService.SetSensitiveTextAsync(GeneratedPassword);
-        SetStatusNotice("CopiedGeneratedPassword");
+        _showNotice("CopiedGeneratedPassword");
     }
 
-    private void EnsureGeneratedPassword()
+    public void EnsureGeneratedPassword()
     {
         if (string.IsNullOrEmpty(GeneratedPassword) && CanGeneratePassword)
         {

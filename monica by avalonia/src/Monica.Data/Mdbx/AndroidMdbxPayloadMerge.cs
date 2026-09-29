@@ -29,8 +29,9 @@ public enum AndroidMdbxPayloadFamily
 /// element, <c>false</c>, an empty string and a big integer survive without passing through a model that
 /// would round or normalize them.</item>
 /// </list>
-/// Metadata inside <c>custom_fields</c> items is not preserved: those items have no stable id, so matching
-/// them by index could attach a foreign item's metadata to the wrong row, which is worse than dropping it.
+/// An unchanged <c>custom_fields</c> sequence is copied whole, including foreign metadata. Once the
+/// modeled sequence changes, use the new array: without stable item ids, guessing which row owns
+/// metadata could attach it to the wrong item.
 /// </remarks>
 public static class AndroidMdbxPayloadMerge
 {
@@ -111,7 +112,16 @@ public static class AndroidMdbxPayloadMerge
 
                 foreach (var property in @new.RootElement.EnumerateObject())
                 {
-                    WriteRaw(writer, property.Name, property.Value);
+                    var value = property.Value;
+                    if (family == AndroidMdbxPayloadFamily.Password &&
+                        Canonical(property.Name) == "custom_fields" &&
+                        TryGetUniqueProperty(stored.RootElement, "custom_fields", out var original) &&
+                        CustomFieldsUnchanged(original, value))
+                    {
+                        value = original;
+                    }
+
+                    WriteRaw(writer, property.Name, value);
                 }
 
                 writer.WriteEndObject();
@@ -125,6 +135,64 @@ public static class AndroidMdbxPayloadMerge
             // document, which is what happened before merging existed.
             return newPayloadJson;
         }
+    }
+
+    private static readonly HashSet<string> CustomFieldKeys =
+        ["title", "value", "is_protected", "sort_order"];
+
+    private static bool CustomFieldsUnchanged(JsonElement stored, JsonElement updated)
+    {
+        if (stored.ValueKind != JsonValueKind.Array || updated.ValueKind != JsonValueKind.Array ||
+            stored.GetArrayLength() != updated.GetArrayLength())
+        {
+            return false;
+        }
+
+        for (var index = 0; index < stored.GetArrayLength(); index++)
+        {
+            var before = stored[index];
+            var after = updated[index];
+            if (before.ValueKind != JsonValueKind.Object || after.ValueKind != JsonValueKind.Object ||
+                after.EnumerateObject().Any(property => !CustomFieldKeys.Contains(Canonical(property.Name))))
+            {
+                return false;
+            }
+
+            foreach (var key in CustomFieldKeys)
+            {
+                if (!TryGetUniqueProperty(before, key, out var oldValue) ||
+                    !TryGetUniqueProperty(after, key, out var newValue) ||
+                    !JsonElement.DeepEquals(oldValue, newValue))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryGetUniqueProperty(JsonElement owner, string name, out JsonElement value)
+    {
+        value = default;
+        var found = false;
+        foreach (var property in owner.EnumerateObject())
+        {
+            if (Canonical(property.Name) != name)
+            {
+                continue;
+            }
+
+            if (found)
+            {
+                return false;
+            }
+
+            value = property.Value;
+            found = true;
+        }
+
+        return found;
     }
 
     private static void WriteRaw(Utf8JsonWriter writer, string name, JsonElement value)

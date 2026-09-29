@@ -136,13 +136,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(IsOtherWorkspaceCompact));
         OnPropertyChanged(nameof(TotpCodeConsolePadding));
         OnPropertyChanged(nameof(TotpCodeFontSize));
-        OnPropertyChanged(nameof(GeneratorResultPanelPadding));
-        OnPropertyChanged(nameof(GeneratorOptionsPanelPadding));
-        OnPropertyChanged(nameof(GeneratorOptionsSpacing));
-        OnPropertyChanged(nameof(GeneratorCheckboxSpacing));
-        OnPropertyChanged(nameof(GeneratorPasswordBoxMinHeight));
-        OnPropertyChanged(nameof(GeneratorHistoryPanelMaxHeight));
-        OnPropertyChanged(nameof(ShowGeneratorStrengthSummaryCard));
+        Generator.IsCompact = IsOtherWorkspaceCompact;
     }
 
     private void RaiseNoteTreeState()

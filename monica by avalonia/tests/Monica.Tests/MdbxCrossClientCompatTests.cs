@@ -99,6 +99,19 @@ public sealed class MdbxCrossClientCompatTests
     }
 
     [Fact]
+    public async Task Editing_only_notes_preserves_unknown_metadata_inside_custom_fields()
+    {
+        var authored = await AuthorAsync(new ForeignEntry("login", "Compat login", ForeignPasswordPayload));
+        await EditPasswordOnDesktopAsync(authored);
+
+        var stored = await ReadEntryAsync(authored.Path, authored.EntryIds[0]);
+        using var before = JsonDocument.Parse(ForeignPasswordPayload);
+        using var after = JsonDocument.Parse(stored.PayloadJson);
+        Assert.True(JsonElement.DeepEquals(before.RootElement.GetProperty("custom_fields"),
+            after.RootElement.GetProperty("custom_fields")), "untouched custom field metadata changed");
+    }
+
+    [Fact]
     public async Task Editing_an_android_authored_password_keeps_the_native_entry_type()
     {
         var authored = await AuthorAsync(new ForeignEntry("ssh-key", "Compat ssh login", SshKeyPasswordPayload));

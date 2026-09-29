@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Data;
 using Avalonia.Layout;
 using Avalonia.Threading;
 using Monica.App.Features.Archive;
@@ -21,7 +22,10 @@ public sealed class WorkspaceHostView : ContentControl
         new Dictionary<string, Func<Control>>(StringComparer.OrdinalIgnoreCase)
         {
             ["Vault"] = static () => new VaultWorkspaceView(),
-            ["Generator"] = static () => new GeneratorWorkspaceView(),
+            ["Generator"] = static () => new GeneratorWorkspaceView
+            {
+                [!DataContextProperty] = new Binding("Generator")
+            },
             ["Archive"] = static () => new ArchiveWorkspaceView(),
             ["RecycleBin"] = static () => new RecycleBinWorkspaceView(),
             ["SecurityAnalysis"] = static () => new SecurityAnalysisWorkspaceView(),

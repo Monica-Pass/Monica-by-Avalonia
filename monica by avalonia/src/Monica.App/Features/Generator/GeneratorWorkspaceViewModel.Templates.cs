@@ -1,6 +1,7 @@
+using static Monica.App.ViewModels.SettingsChoices;
 namespace Monica.App.ViewModels;
 
-public sealed partial class MainWindowViewModel
+public sealed partial class GeneratorWorkspaceViewModel
 {
     private void ApplyGeneratorTemplate(string value)
     {
@@ -60,7 +61,7 @@ public sealed partial class MainWindowViewModel
         GeneratorExcludeSimilarCharacters = excludeSimilar;
     }
 
-    private void RefreshGeneratorChoiceLabels()
+    public void RefreshLocalization()
     {
         ReplaceOptions(GeneratorModeOptions,
             new(GeneratorModeRandom, _localization.Get("GeneratorModeRandom")),
@@ -78,5 +79,4 @@ public sealed partial class MainWindowViewModel
         RaiseGeneratorState();
     }
 
-    private void RefreshGeneratorLocalizedState() => RaiseGeneratorState();
 }

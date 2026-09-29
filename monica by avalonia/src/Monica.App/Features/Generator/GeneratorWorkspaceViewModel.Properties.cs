@@ -1,3 +1,4 @@
+using static Monica.App.ViewModels.SettingsChoices;
 using System.Collections.ObjectModel;
 using Avalonia;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -5,7 +6,7 @@ using Monica.App.Services;
 
 namespace Monica.App.ViewModels;
 
-public sealed partial class MainWindowViewModel
+public sealed partial class GeneratorWorkspaceViewModel
 {
     private const int MaxGeneratorHistoryItems = 8;
     private const string GeneratorModeRandom = "random";
@@ -63,17 +64,17 @@ public sealed partial class MainWindowViewModel
     [ObservableProperty]
     private int _generatorWordCount = 4;
 
-    public Thickness GeneratorResultPanelPadding => IsOtherWorkspaceCompact
+    public Thickness GeneratorResultPanelPadding => IsCompact
         ? new Thickness(18)
         : new Thickness(24);
-    public Thickness GeneratorOptionsPanelPadding => IsOtherWorkspaceCompact
+    public Thickness GeneratorOptionsPanelPadding => IsCompact
         ? new Thickness(14)
         : new Thickness(18);
-    public double GeneratorOptionsSpacing => IsOtherWorkspaceCompact ? 12 : 18;
-    public double GeneratorCheckboxSpacing => IsOtherWorkspaceCompact ? 6 : 10;
-    public double GeneratorPasswordBoxMinHeight => IsOtherWorkspaceCompact ? 96 : 170;
-    public double GeneratorHistoryPanelMaxHeight => IsOtherWorkspaceCompact ? 78 : 104;
-    public bool ShowGeneratorStrengthSummaryCard => !IsOtherWorkspaceCompact;
+    public double GeneratorOptionsSpacing => IsCompact ? 12 : 18;
+    public double GeneratorCheckboxSpacing => IsCompact ? 6 : 10;
+    public double GeneratorPasswordBoxMinHeight => IsCompact ? 96 : 170;
+    public double GeneratorHistoryPanelMaxHeight => IsCompact ? 78 : 104;
+    public bool ShowGeneratorStrengthSummaryCard => !IsCompact;
 
     public string GeneratorLengthText => _localization.Format("GeneratorLengthFormat", GeneratorLength);
     public string GeneratorWordCountText => _localization.Format("GeneratorWordCountFormat", GeneratorWordCount);

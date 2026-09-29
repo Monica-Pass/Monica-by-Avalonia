@@ -57,6 +57,31 @@ public sealed class DesktopPublishingTests
         }
     }
 
+    [Theory]
+    [InlineData("Pack portable artifact")]
+    [InlineData("Upload artifact")]
+    public void Build_workflow_only_distributes_artifacts_after_successful_runtime_smoke(string stepName)
+    {
+        var workflow = File.ReadAllText(FindRepositoryFile(".github", "workflows", "build.yml"));
+        var step = workflow.Split("      - name: ", StringSplitOptions.None)
+            .Single(block => block.StartsWith(stepName, StringComparison.Ordinal));
+
+        Assert.Contains("if: ${{ steps.runtime-smoke.outcome == 'success' }}", step, StringComparison.Ordinal);
+        Assert.DoesNotContain("steps.runtime-smoke.conclusion", step, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Publish_failure_is_checked_before_reporting_or_exporting_the_artifact_path()
+    {
+        var script = File.ReadAllText(FindRepositoryFile("eng", "ci", "publish-desktop.ps1"));
+        var publish = script.IndexOf("dotnet publish $Project", StringComparison.Ordinal);
+        var check = script.IndexOf("if ($LASTEXITCODE -ne 0)", publish, StringComparison.Ordinal);
+        var report = script.IndexOf("$resolved =", publish, StringComparison.Ordinal);
+
+        Assert.True(check > publish && check < report, "A failed native command must not report a published artifact.");
+        Assert.Contains("throw", script[check..report], StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryFile(params string[] pathSegments)
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory);

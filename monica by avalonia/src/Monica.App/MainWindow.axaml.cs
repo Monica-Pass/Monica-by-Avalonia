@@ -104,7 +104,7 @@ public partial class MainWindow : Window
 
         return viewModel.SelectedSection switch
         {
-            "Generator" => TryExecuteNewCommand(viewModel.GeneratePasswordCommand),
+            "Generator" => TryExecuteNewCommand(viewModel.Generator.GeneratePasswordCommand),
             "Mdbx" => TryExecuteNewCommand(viewModel.CreateMdbxVaultCommand),
             _ => false
         };

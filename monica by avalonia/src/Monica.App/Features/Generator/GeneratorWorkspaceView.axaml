@@ -5,13 +5,12 @@
              xmlns:vm="using:Monica.App.ViewModels"
              x:Class="Monica.App.Features.Generator.GeneratorWorkspaceView"
              x:Name="GeneratorWorkspaceRoot"
-             x:DataType="vm:MainWindowViewModel">
+             x:DataType="vm:GeneratorWorkspaceViewModel">
     <UserControl.Styles>
         <StyleInclude Source="/Features/Generator/GeneratorStyles.axaml" />
     </UserControl.Styles>
 
-    <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsGenerator}}"
-          RowDefinitions="Auto,*"
+    <Grid RowDefinitions="Auto,*"
           HorizontalAlignment="Stretch"
           ClipToBounds="True">
         <Border Classes="generatorPageHeader">

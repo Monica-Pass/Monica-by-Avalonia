@@ -66,10 +66,19 @@ public sealed partial class MainWindowViewModel
 
     private async Task LoadTimelineAsync()
     {
+        if (!IsUnlocked)
+        {
+            return;
+        }
+
+        var sessionCancellationToken = _vaultSessionService.SessionCancellationToken;
         var logs = await AppDiagnostics.MeasureAsync(
             "Load timeline",
             () => _repository.GetOperationLogsAsync(150));
-        ApplyTimelineLogs(logs);
+        if (IsUnlocked && !sessionCancellationToken.IsCancellationRequested)
+        {
+            ApplyTimelineLogs(logs);
+        }
     }
 
     private async Task LogOperationAsync(OperationLog log, CancellationToken cancellationToken = default)

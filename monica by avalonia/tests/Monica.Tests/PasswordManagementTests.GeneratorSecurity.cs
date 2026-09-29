@@ -6,13 +6,13 @@ public sealed partial class PasswordManagementTests
     public void ViewModel_generator_history_clear_wipes_retained_secret_state()
     {
         var harness = CreateHarness();
-        harness.ViewModel.GeneratePasswordCommand.Execute(null);
-        var historyItem = Assert.Single(harness.ViewModel.GeneratedPasswordHistory);
+        harness.ViewModel.Generator.GeneratePasswordCommand.Execute(null);
+        var historyItem = Assert.Single(harness.ViewModel.Generator.GeneratedPasswordHistory);
         historyItem.ToggleVisibilityCommand.Execute(null);
 
-        harness.ViewModel.ClearGeneratedPasswordHistoryCommand.Execute(null);
+        harness.ViewModel.Generator.ClearGeneratedPasswordHistoryCommand.Execute(null);
 
-        Assert.Empty(harness.ViewModel.GeneratedPasswordHistory);
+        Assert.Empty(harness.ViewModel.Generator.GeneratedPasswordHistory);
         Assert.Empty(historyItem.Value);
         Assert.Empty(historyItem.DisplayValue);
         Assert.False(historyItem.IsRevealed);
@@ -23,14 +23,14 @@ public sealed partial class PasswordManagementTests
     {
         var harness = CreateHarness();
         harness.ViewModel.IsUnlocked = true;
-        harness.ViewModel.GeneratePasswordCommand.Execute(null);
-        var historyItem = Assert.Single(harness.ViewModel.GeneratedPasswordHistory);
+        harness.ViewModel.Generator.GeneratePasswordCommand.Execute(null);
+        var historyItem = Assert.Single(harness.ViewModel.Generator.GeneratedPasswordHistory);
         historyItem.ToggleVisibilityCommand.Execute(null);
 
         harness.ViewModel.SetShellHibernatedByWindow(true);
 
-        Assert.Empty(harness.ViewModel.GeneratedPassword);
-        Assert.Empty(harness.ViewModel.GeneratedPasswordHistory);
+        Assert.Empty(harness.ViewModel.Generator.GeneratedPassword);
+        Assert.Empty(harness.ViewModel.Generator.GeneratedPasswordHistory);
         Assert.Empty(historyItem.Value);
         Assert.Empty(historyItem.DisplayValue);
         Assert.False(historyItem.IsRevealed);

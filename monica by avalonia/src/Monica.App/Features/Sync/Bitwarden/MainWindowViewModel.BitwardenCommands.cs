@@ -19,14 +19,25 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        var loadVersion = ++_bitwardenAccountsLoadVersion;
+        var sessionCancellationToken = _vaultSessionService.SessionCancellationToken;
         IsLoadingBitwardenAccounts = true;
         var selectedId = SelectedBitwardenAccount?.Id;
         var operationError = BitwardenOperationError;
         try
         {
             var accounts = await _bitwardenAccountStore.GetAllAsync(
-                _vaultSessionService.SessionCancellationToken);
+                sessionCancellationToken);
+            if (!IsCurrentLoad())
+            {
+                return;
+            }
+
             var displayItems = await Task.WhenAll(accounts.Select(CreateBitwardenAccountDisplayItemAsync));
+            if (!IsCurrentLoad())
+            {
+                return;
+            }
             BitwardenAccounts.Clear();
             foreach (var item in displayItems)
             {
@@ -39,21 +50,31 @@ public sealed partial class MainWindowViewModel
             BitwardenOperationError = operationError;
             IsBitwardenConnectionEditorVisible = BitwardenAccounts.Count == 0;
         }
-        catch (OperationCanceledException) when (!IsUnlocked)
+        catch (OperationCanceledException) when (sessionCancellationToken.IsCancellationRequested)
         {
-            BitwardenOperationError = _localization.Get("BitwardenRequiresUnlockedVault");
+            // Locking already cleared this session's presentation state.
         }
         catch (Exception exception)
         {
-            AppDiagnostics.Error("Bitwarden account list could not be loaded", exception);
-            BitwardenOperationError = _localization.Get("BitwardenLoadAccountsFailed");
+            if (IsCurrentLoad())
+            {
+                AppDiagnostics.Error("Bitwarden account list could not be loaded", exception);
+                BitwardenOperationError = _localization.Get("BitwardenLoadAccountsFailed");
+            }
         }
         finally
         {
-            IsLoadingBitwardenAccounts = false;
-            Interlocked.Exchange(ref _bitwardenAccountsLoadActive, 0);
-            RaiseBitwardenState();
+            if (loadVersion == _bitwardenAccountsLoadVersion)
+            {
+                IsLoadingBitwardenAccounts = false;
+                Interlocked.Exchange(ref _bitwardenAccountsLoadActive, 0);
+                RaiseBitwardenState();
+            }
         }
+
+        bool IsCurrentLoad() =>
+            loadVersion == _bitwardenAccountsLoadVersion && IsUnlocked &&
+            !sessionCancellationToken.IsCancellationRequested;
     }
 
     [RelayCommand]

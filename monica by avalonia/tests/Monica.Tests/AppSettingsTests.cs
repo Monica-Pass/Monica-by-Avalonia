@@ -1371,7 +1371,8 @@ public sealed partial class AppSettingsTests
         IAppSettingsService? settingsService = null,
         IClipboardService? clipboardService = null,
         IWindowPrivacyService? windowPrivacyService = null,
-        ITotpEditorDialogService? totpEditorDialogService = null)
+        ITotpEditorDialogService? totpEditorDialogService = null,
+        Monica.Data.Bitwarden.IBitwardenAccountStore? bitwardenAccountStore = null)
     {
         var databasePath = TestTempPaths.CreateFilePath(".db");
         var factory = new SqliteConnectionFactory(databasePath);
@@ -1406,7 +1407,8 @@ public sealed partial class AppSettingsTests
             exportAuthorizationService: new ApprovingExportAuthorizationService(),
             windowPrivacyService: windowPrivacyService,
             oneDriveBackupService: oneDriveBackupService,
-            keePassVaultService: keePassVaultService);
+            keePassVaultService: keePassVaultService,
+            bitwardenAccountStore: bitwardenAccountStore);
     }
 
     private static string GetTempPath()

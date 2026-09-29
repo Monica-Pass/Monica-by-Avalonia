@@ -111,7 +111,7 @@ public sealed partial class MainWindowViewModel
         RestoreActiveWorkspaceState();
         if (IsUnlocked && string.Equals(SelectedSection, "Generator", StringComparison.OrdinalIgnoreCase))
         {
-            EnsureGeneratedPassword();
+            Generator.EnsureGeneratedPassword();
         }
 
         if (IsUnlocked && string.Equals(SelectedSection, "Notes", StringComparison.OrdinalIgnoreCase))
@@ -140,8 +140,7 @@ public sealed partial class MainWindowViewModel
     {
         ClearTransientSettingsSecurityInputs();
         ClearTransferBuffers();
-        GeneratedPassword = "";
-        ClearGeneratedPasswordHistorySecrets();
+        Generator.ClearSensitiveState();
     }
 
     private void RestoreActiveWorkspaceState()

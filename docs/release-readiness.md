@@ -1,6 +1,6 @@
 # Monica Avalonia 发布就绪与证据矩阵
 
-审计日期：2026-07-26
+最近本地验证：2026-09-29；历史远端配置审计：2026-07-26（本轮未重新查询远端）
 
 本文件区分四种状态，避免把“代码已存在”“自动化测试通过”和“可以公开分发”
 混为一谈：
@@ -46,7 +46,7 @@
 | 冷启动与首次导航 | 已验证（当前预算） | `ColdStartupPerformanceTests.cs`、延迟工作区物化和编辑器预热 | 必须在发布硬件上继续记录真实启动、解锁和大 vault 指标 |
 | MDBX UI 响应性 | 已验证 | blocking UniFFI 工作移出 Avalonia dispatcher | `MdbxUiResponsivenessTests.cs` |
 | 后台内存 | 已验证（行为） | 最小化释放可重建视觉树、投影和图片缓存 | 自动化验证对象可回收，不替代多小时进程 RSS/working-set soak test |
-| 功能拆分 | 已验证 | 商业质量门限制重点功能源文件不超过 300 行 | 跨功能共享规则必须继续下沉到 Core/Data/Platform |
+| 功能拆分 | 渐进进行 | 生成器已独立为 `GeneratorWorkspaceViewModel`；保留 300 行文件门与独立实例、绑定、锁定清理测试 | 其他工作区仍有大量共享 partial 状态；文件门不代表职责已经隔离 |
 
 真实 AppHost 截图烟雾测试使用临时 canonical MDBX vault，验证了 26 个密码、
 14 个笔记、1 个 TOTP、2 个钱包项目和 12 个页面截图。一次审计中的 vault 加载为
@@ -58,8 +58,8 @@
 | --- | --- | --- |
 | 统一商业质量门 | 已验证 | `eng/ci/verify-commercial-release.ps1` 执行卫生、文件体积、格式、漏洞、零警告构建、核心和 Headless UI 测试 |
 | Windows JIT 包 | 已验证（默认） | Build/Release 工作流覆盖 `win-x64`；产物门真跑 canonical vault 与带窗口冒烟 |
-| Linux / macOS JIT 包 | 受阻 | 缺自研原生引擎：产物里没有 `libmdbx_ffi.so` / `libmdbx_ffi.dylib`，应用能启动但打不开保险库。引擎需由 Rust 源仓库 `crates/mdbx-ffi` 交叉编译后放入 `src/Monica.Platform/Mdbx/runtimes/<rid>/`；产物门现在会因缺引擎直接失败，不再警告后跳过 |
-| NativeAOT 包 | 实验性 | CI 保留 AOT 构建信号，但 Release 输入明确标为 experimental，且不再默认选择 |
+| Linux / macOS JIT 包 | 受阻 | 缺自研原生引擎：产物里没有 `libmdbx_ffi.so` / `libmdbx_ffi.dylib`，还缺对应 `monica_crypto` 平台库，不能作为可用 vault 客户端交付。MDBX 引擎需由 Rust 源仓库 `crates/mdbx-ffi` 交叉编译后放入 `src/Monica.Platform/Mdbx/runtimes/<rid>/`；产物门现在会因缺引擎直接失败，不再警告后跳过 |
+| NativeAOT 包 | 实验性 | 保留构建/冒烟信号，但 Build 打包与上传必须检查 smoke 的原始 outcome；`continue-on-error` 不再放行失败产物 |
 | Action 供应链固定 | 已验证 | 所有第三方 Action 固定完整 commit SHA，checkout 不保留凭据 |
 | 依赖更新 | 已验证（配置） | `.github/dependabot.yml` 每周检查 GitHub Actions 与 NuGet |
 | 产物校验 | 已验证（工作流） | Draft Release 生成 `SHA256SUMS` 并执行 GitHub build provenance attestation |
@@ -82,9 +82,9 @@
 仓库管理员应明确批准并配置分支保护、必需状态检查、漏洞警报、秘密扫描、推送保护、
 Dependabot security updates，以及组织允许的 Action 策略。
 
-## 当前验证快照
+## 历史验证快照（2026-07-26）
 
-在文档与工作流修订前的最后一次 Release 商业质量门结果：
+以下为历史结果，不能视为本轮变更后的证据：
 
 - `630/630` 个核心与集成测试通过。
 - Cold-start 测试进程通过。
@@ -99,6 +99,71 @@ Dependabot security updates，以及组织允许的 Action 策略。
 cd ".\monica by avalonia"
 .\eng\ci\verify-commercial-release.ps1 -Configuration Release
 ```
+
+## 2026-09-29 增量改进与验证
+
+范围仅限本仓库，未改 Android、外部 MDBX 引擎或真实个人 vault；本地验证未触发发行发布。
+
+- **数据保真**：自定义字段的 title/value/is_protected/sort_order 均显式存在、值和顺序相等时，
+  保留整个原始数组的未知元数据；
+  `AndroidMdbxPayloadMergeTests` 与真实 native `MdbxCrossClientCompatTests` 覆盖备注编辑往返。
+  编辑、删除、重排仍无稳定 ID 可安全归属未知元数据，这一边界没有被宣称解决。
+- **旧会话隔离**：加载流程在异步恢复点校验版本/取消信号，旧 catch/finally 不清空或锁定
+  新会话；账户列表和延迟时间线同样拒绝旧结果。`AppSettingsTests.VaultLoadLifecycle.cs`
+  用显式阻塞/释放覆盖晚成功、取消、异常、锁后重新解锁和新旧加载重叠，而非用 sleep 赌时序。
+- **生成器独立化**：选项、历史、算法与命令由子 ViewModel 持有；主窗口只提供生命周期及
+  “保存为登录项”接点。现有控件、算法与布局保持不变。新增独立实例测试和真实绑定/锁定
+  Headless 测试，保留既有生成规则、导航、最小化和快捷键验证。
+- **失败产物门禁**：Build 的 pack/upload 检查 `steps.runtime-smoke.outcome`；publish
+  命令非零退出直接失败。除静态回归外，本地 PowerShell 探针模拟“已有部分输出目录但
+  publish 返回 23”，确认不会导出产物路径；返回 0 才报告路径。
+- **支持范围**：当前库创建格式为 MDBX-2 / schema 17，可读清单来自运行时 manifest，
+  文件自己的格式、schema、critical extensions 决定实际访问权限。Windows x64 是当前
+  原生库齐全的验证目标，Linux/macOS 仍受原生库阻塞；Linux arm64 尚不在当前 Build 矩阵。
+
+修改前基线：2026-09-28，`ade0e18cee5eca4aca2b806187c7dbbbc38dd99a`，
+核心功能 1,166、核心性能 11、UI 功能 266、UI 性能 17，全部通过。
+基线原始日志与 TRX 位于本地 `monica by avalonia/artifacts/improvement-20260928-baseline/`。
+
+本轮修改后完整质量门（2026-09-29）通过：
+
+| 通道 | 通过 / 执行 | 失败 / 跳过 |
+| --- | --- | --- |
+| 核心功能 | 1,200 / 1,200 | 0 / 0 |
+| 核心性能预算（独占） | 11 / 11 | 0 / 0 |
+| UI 功能 | 267 / 267 | 0 / 0 |
+| UI 性能预算（独占） | 17 / 17 | 0 / 0 |
+
+合计 **1,495 项**，格式、NuGet 直接/传递依赖漏洞审计与 Release warnings-as-errors
+构建同时通过。该证据不是代码覆盖率报告，未测量覆盖率百分比。对应四份 TRX 为
+`TestResults/Monica.Tests/{Monica.Tests,PerfBudget}.trx` 与
+`TestResults/Monica.UiTests/{Monica.UiTests,PerfBudget}.trx`。
+
+新的 Windows x64 self-contained JIT 产物已实际通过 `verify-artifact-runtime.ps1`
+默认门限（未放宽任何预算）：
+
+- canonical MDBX 初始化、填充、正确/错误密码与读写冒烟通过。
+- 1280×800 真实窗口的页面、键盘、笔记编辑、状态通知、锁定/重新解锁通过。
+- 首轮 vault 加载 **782 ms / 4,000 ms**；锁定稳定窗口私有字节中位数
+  **117.0 MB / 120 MB**。这是本机本次样本，不是跨硬件性能保证。
+- 20,000 项 KeePass 读取/详情流式访问后回收增量 **3.5 MB / 24 MB**；
+  新建、编辑、回收站、搜索、历史与第二进程文件交接检查通过。
+- 解锁前后数量一致：密码 25、笔记 14、TOTP 1、钱包 4。
+
+开发期先复现了 11 项旧会话缺陷回归与 3 项发布门禁回归的失败，修复后均通过；
+最终结论以完整质量门及真实产物门为准。原始开发日志仍保留于当前会话工具记录，
+失败的尝试未作为通过证据。退出码探针结果见 `publish-failure-probe.log`。
+
+补充截图验收通过：浅色 **1280×800** 与深色 **900×700** 各捕获 13 个页面，共 26 张。
+两轮均通过页面、键盘与锁定/重新解锁检查，进程退出码为 0。生成器两张截图已目视检查：
+选项、生成结果、历史遮罩及生成/复制/保存命令正常显示，无空白页面；本次没有重新设计
+布局。截图目录为 `shots-1280-light/` 与 `shots-900-dark/`，日志为 `shots-*.runtime.log`。
+本任务启动的 AppHost 进程均已退出，使用的 vault、配置和截图均为隔离合成数据。
+
+本地日志目录：`monica by avalonia/artifacts/improvement-20260929/`（不纳入版本控制）。
+
+本轮不证明所有网络同步/切库/退出竞态已被穷尽，也不替代屏幕阅读器、系统高对比度、
+多显示器缩放、安装升级与多小时内存 soak 验收；这些仍需单独执行。
 
 ## 发布决策
 

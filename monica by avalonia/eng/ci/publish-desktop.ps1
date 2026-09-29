@@ -63,6 +63,10 @@ dotnet publish $Project `
     /p:FileVersion=$FileVersion `
     /p:InformationalVersion=$InformationalVersion
 
+if ($LASTEXITCODE -ne 0) {
+    throw "dotnet publish failed for $RuntimeIdentifier/$Mode with exit code $LASTEXITCODE."
+}
+
 $resolved = (Resolve-Path -LiteralPath $publishDir).Path
 Write-Host "Published $RuntimeIdentifier $Mode to $resolved"
 

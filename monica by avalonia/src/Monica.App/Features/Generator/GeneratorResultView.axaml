@@ -6,7 +6,7 @@
              xmlns:vm="using:Monica.App.ViewModels"
              x:Class="Monica.App.Features.Generator.GeneratorResultView"
              x:Name="GeneratorWorkspaceRoot"
-             x:DataType="vm:MainWindowViewModel">
+             x:DataType="vm:GeneratorWorkspaceViewModel">
     <Border x:Name="GeneratorResultRegion" Classes="generatorResultPanel" Padding="{Binding GeneratorResultPanelPadding}" MinWidth="0">
         <ScrollViewer x:Name="GeneratorResultScrollViewer"
                       HorizontalScrollBarVisibility="Disabled"

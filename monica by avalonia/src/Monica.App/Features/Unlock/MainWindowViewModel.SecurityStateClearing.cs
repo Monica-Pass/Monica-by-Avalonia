@@ -40,7 +40,7 @@ public sealed partial class MainWindowViewModel
         ClearItems(Categories);
         ClearItems(OpenNoteTabs);
         ReplaceNoteImagePreviews([]);
-        ClearGeneratedPasswordHistorySecrets();
+        Generator.ClearSensitiveState();
         ClearItems(TimelineEntries);
         ClearItems(SecuritySummaryItems);
         ClearItems(SecurityIssueItems);
@@ -72,7 +72,6 @@ public sealed partial class MainWindowViewModel
         TotpNarrowShowsList = true;
         WalletSearchText = "";
         WalletNarrowShowsList = true;
-        GeneratedPassword = "";
         ClearTransferBuffers();
     }
 

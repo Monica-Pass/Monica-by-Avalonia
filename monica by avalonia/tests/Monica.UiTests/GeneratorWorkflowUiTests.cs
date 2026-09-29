@@ -1,4 +1,9 @@
 using Avalonia.Controls;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
+using FluentAvalonia.UI.Controls;
+using Microsoft.Extensions.DependencyInjection;
+using Monica.App.Controls;
 using Monica.App.Features.Generator;
 using Monica.App.ViewModels;
 
@@ -119,6 +124,50 @@ public sealed class GeneratorWorkflowUiTests
         Assert.False(view.IsMediumLayout);
         Assert.Equal(340, content.ColumnDefinitions[0].Width.Value);
         Assert.True(content.ColumnDefinitions[1].Width.IsStar);
+    }
+
+    [Fact]
+    public void Generator_host_binds_child_state_and_releases_it_on_lock()
+    {
+        var window = new Monica.App.MainWindow { Width = 1280, Height = 800 };
+        using var services = Monica.App.App.ConfigureServices(window);
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        window.Show();
+        try
+        {
+            window.DataContext = viewModel;
+            viewModel.IsUnlocked = true;
+            viewModel.SelectedSection = "Generator";
+            Dispatcher.UIThread.RunJobs();
+            var host = Assert.Single(window.GetVisualDescendants().OfType<WorkspaceHostView>());
+            var view = Assert.IsType<GeneratorWorkspaceView>(host.CurrentWorkspace);
+            var result = view.FindControl<GeneratorResultView>("GeneratorResultView")!;
+            var options = view.FindControl<GeneratorOptionsView>("GeneratorOptionsView")!;
+            Assert.Same(viewModel.Generator, view.DataContext);
+            Assert.Same(viewModel.Generator, result.DataContext);
+            Assert.Same(viewModel.Generator, options.DataContext);
+
+            var generate = result.FindControl<FACommandBarButton>("GeneratePasswordButton")!;
+            Assert.Same(viewModel.Generator.GeneratePasswordCommand, generate.Command);
+            generate.Command!.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(viewModel.Generator.GeneratedPassword, result.GeneratedPasswordBox.Text);
+            var retained = Assert.Single(viewModel.Generator.GeneratedPasswordHistory);
+            var save = result.FindControl<FACommandBarButton>("SaveGeneratedPasswordButton")!;
+            Assert.Same(viewModel.AddPasswordCommand, viewModel.Generator.AddPasswordCommand);
+            Assert.Same(viewModel.Generator, save.DataContext);
+            Assert.Same(viewModel.AddPasswordCommand, save.Command);
+
+            viewModel.IsUnlocked = false;
+            Dispatcher.UIThread.RunJobs();
+            Assert.Empty(viewModel.Generator.GeneratedPassword);
+            Assert.Empty(retained.Value);
+            Assert.Null(view.DataContext);
+        }
+        finally
+        {
+            window.Close();
+        }
     }
 
     private static string FindGeneratorFeatureFile(string fileName) =>

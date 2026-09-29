@@ -38,6 +38,9 @@ public sealed partial class MainWindowViewModel
 
     private void CancelBitwardenOperationAndClearSecrets()
     {
+        _bitwardenAccountsLoadVersion++;
+        Interlocked.Exchange(ref _bitwardenAccountsLoadActive, 0);
+        IsLoadingBitwardenAccounts = false;
         _bitwardenSyncOperationCancellation?.Cancel();
         ClearBitwardenAuthenticationFields(preserveIdentity: false);
         BitwardenAccounts.Clear();

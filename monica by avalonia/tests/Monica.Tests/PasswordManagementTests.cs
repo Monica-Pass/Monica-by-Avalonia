@@ -4028,23 +4028,23 @@ public sealed partial class PasswordManagementTests
     public async Task ViewModel_generates_configurable_password_and_copies_it()
     {
         var harness = CreateHarness();
-        harness.ViewModel.GeneratorLength = 18;
-        harness.ViewModel.GeneratorIncludeUppercase = false;
-        harness.ViewModel.GeneratorIncludeLowercase = true;
-        harness.ViewModel.GeneratorIncludeNumbers = true;
-        harness.ViewModel.GeneratorIncludeSymbols = false;
+        harness.ViewModel.Generator.GeneratorLength = 18;
+        harness.ViewModel.Generator.GeneratorIncludeUppercase = false;
+        harness.ViewModel.Generator.GeneratorIncludeLowercase = true;
+        harness.ViewModel.Generator.GeneratorIncludeNumbers = true;
+        harness.ViewModel.Generator.GeneratorIncludeSymbols = false;
 
-        harness.ViewModel.GeneratePasswordCommand.Execute(null);
-        await harness.ViewModel.CopyGeneratedPasswordCommand.ExecuteAsync(null);
+        harness.ViewModel.Generator.GeneratePasswordCommand.Execute(null);
+        await harness.ViewModel.Generator.CopyGeneratedPasswordCommand.ExecuteAsync(null);
 
-        Assert.Equal(18, harness.ViewModel.GeneratedPassword.Length);
-        Assert.DoesNotContain(harness.ViewModel.GeneratedPassword, char.IsUpper);
-        Assert.DoesNotContain(harness.ViewModel.GeneratedPassword, c => !char.IsLetterOrDigit(c));
-        Assert.Contains(harness.ViewModel.GeneratedPassword, char.IsDigit);
-        Assert.Equal(harness.ViewModel.GeneratedPassword, harness.Clipboard.Text);
-        Assert.Contains("5", harness.ViewModel.GeneratedPasswordStrengthText);
-        Assert.True(harness.ViewModel.HasGeneratedPasswordHistory);
-        Assert.Equal(harness.ViewModel.GeneratedPassword, harness.ViewModel.GeneratedPasswordHistory.First().Value);
+        Assert.Equal(18, harness.ViewModel.Generator.GeneratedPassword.Length);
+        Assert.DoesNotContain(harness.ViewModel.Generator.GeneratedPassword, char.IsUpper);
+        Assert.DoesNotContain(harness.ViewModel.Generator.GeneratedPassword, c => !char.IsLetterOrDigit(c));
+        Assert.Contains(harness.ViewModel.Generator.GeneratedPassword, char.IsDigit);
+        Assert.Equal(harness.ViewModel.Generator.GeneratedPassword, harness.Clipboard.Text);
+        Assert.Contains("5", harness.ViewModel.Generator.GeneratedPasswordStrengthText);
+        Assert.True(harness.ViewModel.Generator.HasGeneratedPasswordHistory);
+        Assert.Equal(harness.ViewModel.Generator.GeneratedPassword, harness.ViewModel.Generator.GeneratedPasswordHistory.First().Value);
     }
 
     [Fact]
@@ -4053,77 +4053,77 @@ public sealed partial class PasswordManagementTests
         var harness = CreateHarness();
         const string similarCharacters = "0OolI1|`";
 
-        harness.ViewModel.GeneratorExcludeSimilarCharacters = true;
-        harness.ViewModel.GeneratorLength = 64;
-        harness.ViewModel.GeneratePasswordCommand.Execute(null);
+        harness.ViewModel.Generator.GeneratorExcludeSimilarCharacters = true;
+        harness.ViewModel.Generator.GeneratorLength = 64;
+        harness.ViewModel.Generator.GeneratePasswordCommand.Execute(null);
 
-        Assert.DoesNotContain(harness.ViewModel.GeneratedPassword, similarCharacters.Contains);
+        Assert.DoesNotContain(harness.ViewModel.Generator.GeneratedPassword, similarCharacters.Contains);
 
-        harness.ViewModel.GeneratorTemplate = "pin";
-        harness.ViewModel.GeneratePasswordCommand.Execute(null);
+        harness.ViewModel.Generator.GeneratorTemplate = "pin";
+        harness.ViewModel.Generator.GeneratePasswordCommand.Execute(null);
 
-        Assert.Equal(6, harness.ViewModel.GeneratedPassword.Length);
-        Assert.All(harness.ViewModel.GeneratedPassword, character => Assert.True(char.IsDigit(character)));
+        Assert.Equal(6, harness.ViewModel.Generator.GeneratedPassword.Length);
+        Assert.All(harness.ViewModel.Generator.GeneratedPassword, character => Assert.True(char.IsDigit(character)));
 
-        harness.ViewModel.GeneratorTemplate = "memorable";
-        harness.ViewModel.GeneratorWordCount = 5;
-        harness.ViewModel.GeneratePasswordCommand.Execute(null);
+        harness.ViewModel.Generator.GeneratorTemplate = "memorable";
+        harness.ViewModel.Generator.GeneratorWordCount = 5;
+        harness.ViewModel.Generator.GeneratePasswordCommand.Execute(null);
 
-        Assert.Equal("passphrase", harness.ViewModel.GeneratorMode);
-        Assert.True(harness.ViewModel.GeneratedPassword.Count(character => character == '-') >= 4);
+        Assert.Equal("passphrase", harness.ViewModel.Generator.GeneratorMode);
+        Assert.True(harness.ViewModel.Generator.GeneratedPassword.Count(character => character == '-') >= 4);
 
-        var historyItem = harness.ViewModel.GeneratedPasswordHistory.Last();
-        harness.ViewModel.UseGeneratedPasswordHistoryItemCommand.Execute(historyItem);
+        var historyItem = harness.ViewModel.Generator.GeneratedPasswordHistory.Last();
+        harness.ViewModel.Generator.UseGeneratedPasswordHistoryItemCommand.Execute(historyItem);
 
-        Assert.Equal(historyItem.Value, harness.ViewModel.GeneratedPassword);
-        Assert.True(harness.ViewModel.GeneratedPasswordHistory.Count <= 8);
+        Assert.Equal(historyItem.Value, harness.ViewModel.Generator.GeneratedPassword);
+        Assert.True(harness.ViewModel.Generator.GeneratedPasswordHistory.Count <= 8);
     }
 
     [Fact]
     public void ViewModel_generator_rejects_an_empty_random_character_set()
     {
         var harness = CreateHarness();
-        harness.ViewModel.GeneratePasswordCommand.Execute(null);
+        harness.ViewModel.Generator.GeneratePasswordCommand.Execute(null);
 
-        harness.ViewModel.GeneratorIncludeUppercase = false;
-        harness.ViewModel.GeneratorIncludeLowercase = false;
-        harness.ViewModel.GeneratorIncludeNumbers = false;
-        harness.ViewModel.GeneratorIncludeSymbols = false;
+        harness.ViewModel.Generator.GeneratorIncludeUppercase = false;
+        harness.ViewModel.Generator.GeneratorIncludeLowercase = false;
+        harness.ViewModel.Generator.GeneratorIncludeNumbers = false;
+        harness.ViewModel.Generator.GeneratorIncludeSymbols = false;
 
-        Assert.False(harness.ViewModel.CanGeneratePassword);
-        Assert.True(harness.ViewModel.HasGeneratorValidationError);
-        Assert.Empty(harness.ViewModel.GeneratedPassword);
-        Assert.False(harness.ViewModel.GeneratePasswordCommand.CanExecute(null));
-        Assert.False(harness.ViewModel.CopyGeneratedPasswordCommand.CanExecute(null));
+        Assert.False(harness.ViewModel.Generator.CanGeneratePassword);
+        Assert.True(harness.ViewModel.Generator.HasGeneratorValidationError);
+        Assert.Empty(harness.ViewModel.Generator.GeneratedPassword);
+        Assert.False(harness.ViewModel.Generator.GeneratePasswordCommand.CanExecute(null));
+        Assert.False(harness.ViewModel.Generator.CopyGeneratedPasswordCommand.CanExecute(null));
     }
 
     [Fact]
     public void ViewModel_generator_refreshes_an_existing_result_when_options_change()
     {
         var harness = CreateHarness();
-        harness.ViewModel.GeneratePasswordCommand.Execute(null);
+        harness.ViewModel.Generator.GeneratePasswordCommand.Execute(null);
 
-        harness.ViewModel.GeneratorLength = 31;
+        harness.ViewModel.Generator.GeneratorLength = 31;
 
-        Assert.Equal(31, harness.ViewModel.GeneratedPassword.Length);
-        Assert.Single(harness.ViewModel.GeneratedPasswordHistory);
+        Assert.Equal(31, harness.ViewModel.Generator.GeneratedPassword.Length);
+        Assert.Single(harness.ViewModel.Generator.GeneratedPasswordHistory);
     }
 
     [Fact]
     public void ViewModel_generator_uses_android_compatible_length_ranges()
     {
         var harness = CreateHarness();
-        harness.ViewModel.GeneratorMode = "random";
-        harness.ViewModel.GeneratorLength = 1;
-        Assert.Equal(4, harness.ViewModel.GeneratorLength);
+        harness.ViewModel.Generator.GeneratorMode = "random";
+        harness.ViewModel.Generator.GeneratorLength = 1;
+        Assert.Equal(4, harness.ViewModel.Generator.GeneratorLength);
 
-        harness.ViewModel.GeneratorMode = "pin";
-        harness.ViewModel.GeneratorLength = 20;
-        Assert.Equal(9, harness.ViewModel.GeneratorLength);
+        harness.ViewModel.Generator.GeneratorMode = "pin";
+        harness.ViewModel.Generator.GeneratorLength = 20;
+        Assert.Equal(9, harness.ViewModel.Generator.GeneratorLength);
 
-        harness.ViewModel.GeneratorMode = "passphrase";
-        harness.ViewModel.GeneratorWordCount = 30;
-        Assert.Equal(20, harness.ViewModel.GeneratorWordCount);
+        harness.ViewModel.Generator.GeneratorMode = "passphrase";
+        harness.ViewModel.Generator.GeneratorWordCount = 30;
+        Assert.Equal(20, harness.ViewModel.Generator.GeneratorWordCount);
     }
 
     [Fact]
@@ -4133,13 +4133,13 @@ public sealed partial class PasswordManagementTests
 
         harness.ViewModel.SelectSectionCommand.Execute("Generator");
 
-        Assert.NotEmpty(harness.ViewModel.GeneratedPassword);
-        Assert.False(harness.ViewModel.HasGeneratedPasswordHistory);
-        harness.ViewModel.GeneratePasswordCommand.Execute(null);
-        Assert.True(harness.ViewModel.HasGeneratedPasswordHistory);
-        harness.ViewModel.ClearGeneratedPasswordHistoryCommand.Execute(null);
-        Assert.Empty(harness.ViewModel.GeneratedPasswordHistory);
-        Assert.False(harness.ViewModel.HasGeneratedPasswordHistory);
+        Assert.NotEmpty(harness.ViewModel.Generator.GeneratedPassword);
+        Assert.False(harness.ViewModel.Generator.HasGeneratedPasswordHistory);
+        harness.ViewModel.Generator.GeneratePasswordCommand.Execute(null);
+        Assert.True(harness.ViewModel.Generator.HasGeneratedPasswordHistory);
+        harness.ViewModel.Generator.ClearGeneratedPasswordHistoryCommand.Execute(null);
+        Assert.Empty(harness.ViewModel.Generator.GeneratedPasswordHistory);
+        Assert.False(harness.ViewModel.Generator.HasGeneratedPasswordHistory);
     }
 
     [Fact]

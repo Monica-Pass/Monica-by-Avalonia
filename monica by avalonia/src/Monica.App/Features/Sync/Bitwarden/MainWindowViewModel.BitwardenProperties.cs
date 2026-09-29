@@ -20,6 +20,7 @@ public sealed partial class MainWindowViewModel
     private readonly IBitwardenPurgeQueue? _bitwardenPurgeQueue;
     private int _bitwardenSyncOperationActive;
     private int _bitwardenAccountsLoadActive;
+    private int _bitwardenAccountsLoadVersion;
     private CancellationTokenSource? _bitwardenSyncOperationCancellation;
 
     public ObservableCollection<BitwardenAccountDisplayItem> BitwardenAccounts { get; } = [];

@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -130,6 +130,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
             legacyVaultDetector ?? new NoLegacyVaultDetector());
         _settingsService = settingsService;
         _localization = localization;
+        Generator = new GeneratorWorkspaceViewModel(
+            _passwordGenerator, _clipboardService, _localization,
+            key => SetStatusNotice(key), AddPasswordCommand);
         _localization.PropertyChanged += (_, _) => RefreshLocalizedProperties();
         SetStatusMessage("Locked");
         _sourceCapabilities = platformCapabilityService.GetCapabilities();
@@ -147,6 +150,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     public ILocalizationService L => _localization;
+
+    public GeneratorWorkspaceViewModel Generator { get; }
 
     // The library is the whole vault in one tree, so it is what an unlocked vault should show;
     // every single type is a filter on it rather than a destination of its own.
@@ -223,7 +228,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         if (string.Equals(value, "Generator", StringComparison.OrdinalIgnoreCase))
         {
-            EnsureGeneratedPassword();
+            Generator.EnsureGeneratedPassword();
         }
 
         if (string.Equals(value, "RecycleBin", StringComparison.OrdinalIgnoreCase))
@@ -282,6 +287,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 var delay = Math.Clamp(SmokeVaultLoadDelayMilliseconds, 0, 30000);
                 AppDiagnostics.Info($"Smoke UI vault load delay started. milliseconds={delay}");
                 await Task.Delay(delay, sessionCancellationToken);
+                if (!IsCurrentLoad())
+                {
+                    return;
+                }
+
                 AppDiagnostics.Info("Smoke UI vault load delay completed");
             }
 
@@ -298,9 +308,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     sessionCancellationToken);
                 return loadedSnapshot with { PreparedTotpItems = preparedTotpItems };
             }, sessionCancellationToken);
-            sessionCancellationToken.ThrowIfCancellationRequested();
+            if (!IsCurrentLoad())
+            {
+                return;
+            }
+
             VaultLoadStageText = _localization.Get("VaultLoadProjectingPasswords");
             await YieldVaultLoadUiAsync();
+            if (!IsCurrentLoad())
+            {
+                return;
+            }
+
             _passwordCustomFields = new Dictionary<long, IReadOnlyList<CustomField>>();
             _passwordCustomFieldSearchMatches = new HashSet<long>();
             _passwordCustomFieldSearchQuery = "";
@@ -317,6 +336,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 }
             });
             await YieldVaultLoadUiAsync();
+            if (!IsCurrentLoad())
+            {
+                return;
+            }
+
             AppDiagnostics.Measure("Replace password collections", () =>
             {
                 ReplaceItems(Passwords, snapshot.ActivePasswords);
@@ -326,9 +350,19 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 RaisePasswordQuickAccessState();
             });
             await YieldVaultLoadUiAsync();
+            if (!IsCurrentLoad())
+            {
+                return;
+            }
+
 
             VaultLoadStageText = _localization.Get("VaultLoadSecureItems");
             await YieldVaultLoadUiAsync();
+            if (!IsCurrentLoad())
+            {
+                return;
+            }
+
             AppDiagnostics.Measure("Replace secure item collections", () =>
             {
                 ReplaceItems(NoteItems, snapshot.NoteItems);
@@ -343,9 +377,19 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 ReplaceItems(WalletItems, snapshot.WalletItems);
             });
             await YieldVaultLoadUiAsync();
+            if (!IsCurrentLoad())
+            {
+                return;
+            }
+
 
             VaultLoadStageText = _localization.Get("VaultLoadSources");
             await YieldVaultLoadUiAsync();
+            if (!IsCurrentLoad())
+            {
+                return;
+            }
+
             AppDiagnostics.Measure("Replace folder and source collections", () =>
             {
                 ReplaceItems(Categories, snapshot.Categories);
@@ -356,8 +400,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 RefreshVaultSources();
             });
             await YieldVaultLoadUiAsync();
+            if (!IsCurrentLoad())
+            {
+                return;
+            }
+
             VaultLoadStageText = _localization.Get("VaultLoadAuthenticators");
             await YieldVaultLoadUiAsync();
+            if (!IsCurrentLoad())
+            {
+                return;
+            }
+
             AppDiagnostics.Measure("Apply TOTP collections", () => ApplyPreparedTotpItems(snapshot.PreparedTotpItems));
             AppDiagnostics.Measure("Finalize vault load UI state", () =>
             {
@@ -386,11 +440,19 @@ public sealed partial class MainWindowViewModel : ObservableObject
         catch (OperationCanceledException) when (sessionCancellationToken.IsCancellationRequested)
         {
             AppDiagnostics.Info("Vault load canceled because the session was locked");
-            ClearSensitiveSessionState();
-            VaultLoadStageText = "";
+            if (loadVersion == _vaultLoadVersion)
+            {
+                ClearSensitiveSessionState();
+            }
         }
         catch (Exception ex)
         {
+            if (!IsCurrentLoad())
+            {
+                AppDiagnostics.Info("Discarded a failed load from a retired vault session");
+                return;
+            }
+
             LastVaultLoadDurationMilliseconds = loadStopwatch.ElapsedMilliseconds;
             AppDiagnostics.Error($"Vault load failed after {loadStopwatch.ElapsedMilliseconds} ms", ex);
             IsUnlocked = false;
@@ -404,6 +466,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 IsLoadingVault = false;
             }
         }
+
+        bool IsCurrentLoad() =>
+            loadVersion == _vaultLoadVersion && !sessionCancellationToken.IsCancellationRequested;
     }
 
     [RelayCommand]
@@ -461,7 +526,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ToggleMasterPasswordVisibilityLabel));
         OnPropertyChanged(nameof(ToggleConfirmMasterPasswordVisibilityLabel));
         OnPropertyChanged(nameof(LockVaultText));
-        RefreshGeneratorLocalizedState();
         OnPropertyChanged(nameof(LegacyVaultImportPromptText));
         OnPropertyChanged(nameof(WebDavBackupOptionsSummaryText));
         RaiseSyncPageState();
