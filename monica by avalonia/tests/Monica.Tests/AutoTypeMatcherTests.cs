@@ -50,6 +50,16 @@ public sealed class AutoTypeMatcherTests
         Assert.Same(populated, Assert.Single(matches));
     }
 
+    [Fact]
+    public void Match_excludes_api_keys_from_auto_type()
+    {
+        var apiKey = Entry("API service", "https://github.com", "", "sk-secret");
+        apiKey.LoginType = PasswordLoginType.ApiKey;
+
+        Assert.Empty(AutoTypeMatcher.Match([apiKey], "github.com - Sign in"));
+        Assert.Empty(AutoTypeMatcher.Candidates([apiKey]));
+    }
+
     [Theory]
     [InlineData("Sign in to GitHub · GitHub", "")]
     [InlineData("Monica 2.0 release notes", "")]

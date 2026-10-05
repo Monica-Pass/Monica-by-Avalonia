@@ -40,7 +40,7 @@ public static partial class BitwardenCipherPayloadBuilder
                 "Monica can only write back Bitwarden login ciphers.");
         }
 
-        if (entry.LoginType != PasswordLoginType.Password)
+        if (entry.LoginType is not (PasswordLoginType.Password or PasswordLoginType.ApiKey))
         {
             return Unsupported(BitwardenPayloadRefusal.UnsupportedShape,
                 "Monica cannot write back this login type to Bitwarden.");
@@ -106,7 +106,7 @@ public static partial class BitwardenCipherPayloadBuilder
                     : [new UriRequestDto { Uri = EncryptOptional(entry.Website, key) }],
                 Fido2Credentials = BuildPasskeys(entry.PasskeyBindings, key)
             },
-            Fields = BuildFields(customFields, key),
+            Fields = BuildFields(customFields, key, entry.LoginType),
             PasswordHistory = BuildHistory(history, key)
         };
 
@@ -222,14 +222,30 @@ public static partial class BitwardenCipherPayloadBuilder
 
     private static List<FieldRequestDto>? BuildFields(
         IReadOnlyList<CustomField> customFields,
-        BitwardenSymmetricKey key)
+        BitwardenSymmetricKey key,
+        PasswordLoginType loginType)
     {
-        if (customFields.Count == 0)
+        var fieldsToWrite = customFields;
+        if (loginType == PasswordLoginType.ApiKey)
+        {
+            fieldsToWrite = customFields
+                .Where(field => !ApiKeyEntryFields.Owns(field.Title))
+                .Append(new CustomField
+                {
+                    Title = ApiKeyEntryFields.Marker,
+                    Value = ApiKeyEntryFields.Type,
+                    IsProtected = false,
+                    SortOrder = customFields.Count
+                })
+                .ToArray();
+        }
+
+        if (fieldsToWrite.Count == 0)
         {
             return null;
         }
 
-        var ordered = customFields
+        var ordered = fieldsToWrite
             .OrderBy(field => field.SortOrder)
             .ThenBy(field => field.Title, StringComparer.Ordinal)
             .ToList();

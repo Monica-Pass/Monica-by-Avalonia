@@ -100,9 +100,13 @@ public sealed partial class MainWindowViewModel
         }
 
         PasswordEntry[] exportPasswords;
+        IReadOnlyDictionary<long, IReadOnlyList<CustomField>> customFields;
         try
         {
-            exportPasswords = (await _repository.GetPasswordsAsync())
+            var sourcePasswords = (await _repository.GetPasswordsAsync()).ToArray();
+            customFields = await _repository.GetCustomFieldsByEntryIdsAsync(
+                sourcePasswords.Select(item => item.Id).ToArray());
+            exportPasswords = sourcePasswords
                 .Select(item => ClonePasswordForExport(item))
                 .ToArray();
         }
@@ -113,7 +117,7 @@ public sealed partial class MainWindowViewModel
             return false;
         }
 
-        ExportCsvPreview = await Task.Run(() => _importExportService.ExportPasswordCsv(exportPasswords));
+        ExportCsvPreview = await Task.Run(() => _importExportService.ExportPasswordCsv(exportPasswords, customFields));
         SetStatusNotice("ExportedPasswordCsv");
         return true;
     }

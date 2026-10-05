@@ -298,7 +298,7 @@ public sealed partial class CoreServicesTests
     }
 
     [Fact]
-    public void Import_export_exports_totp_items_as_winui_compatible_csv()
+    public void Import_export_exports_totp_items_as_desktop_compatible_csv()
     {
         var service = new ImportExportService();
         var items = new[]
@@ -329,7 +329,7 @@ public sealed partial class CoreServicesTests
     }
 
     [Fact]
-    public void Import_export_exports_notes_as_winui_compatible_csv()
+    public void Import_export_exports_notes_as_desktop_compatible_csv()
     {
         var service = new ImportExportService();
         var payload = NoteContentCodec.BuildSavePayload("Recovery", "# backup codes\nalpha", "ops, personal", true, ["inline.png", "mdbx:note-image-1"]);
@@ -387,7 +387,7 @@ public sealed partial class CoreServicesTests
     }
 
     [Fact]
-    public void Import_export_imports_winui_compatible_note_csv()
+    public void Import_export_imports_desktop_compatible_note_csv()
     {
         var service = new ImportExportService();
         var payload = NoteContentCodec.BuildSavePayload("Recovery", "# backup codes\nalpha", "ops, personal", true, ["inline.png", "mdbx:note-image-1"]);
@@ -424,7 +424,7 @@ public sealed partial class CoreServicesTests
     }
 
     [Fact]
-    public void Import_export_imports_winui_compatible_totp_csv()
+    public void Import_export_imports_desktop_compatible_totp_csv()
     {
         var service = new ImportExportService();
         var csv = service.ExportTotpCsv(

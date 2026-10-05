@@ -123,6 +123,15 @@ public sealed partial class MainWindowViewModel
                 SetStatusNotice("BitwardenSyncedFormat", account.DisplayName);
             }
 
+            if (result.Merge.SuppressedResurrections > 0)
+            {
+                // The sync reports success, but one thing it deliberately did not do is grow back the cipher
+                // the user already deleted here. That choice needs to be visible, not absorbed into "1 added
+                // and everything is fine" - the entry the server still holds has not come back, and never
+                // will until the user takes the decision the list now offers.
+                await LoadBitwardenStuckErasuresAsync();
+            }
+
             if (result.Unsyncable.Count > 0)
             {
                 // Last word on the status line, because it is the part the user still has to act on. The

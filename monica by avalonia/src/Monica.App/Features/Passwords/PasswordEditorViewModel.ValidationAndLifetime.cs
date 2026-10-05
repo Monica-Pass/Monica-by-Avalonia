@@ -7,7 +7,8 @@ public enum PasswordEditorValidationTarget
 {
     None,
     Title,
-    Password
+    Password,
+    ApiKeyUrl
 }
 
 public sealed partial class PasswordEditorViewModel
@@ -18,8 +19,10 @@ public sealed partial class PasswordEditorViewModel
     public PasswordEditorValidationTarget ValidationTarget { get; private set; }
     public bool HasTitleValidationError => ValidationTarget == PasswordEditorValidationTarget.Title;
     public bool HasPasswordValidationError => ValidationTarget == PasswordEditorValidationTarget.Password;
+    public bool HasApiKeyUrlValidationError => ValidationTarget == PasswordEditorValidationTarget.ApiKeyUrl;
     public string TitleValidationMessage => HasTitleValidationError ? L.Get("PasswordTitleRequired") : "";
     public string PasswordValidationMessage => HasPasswordValidationError ? L.Get("PasswordValueRequired") : "";
+    public string ApiKeyUrlValidationMessage => HasApiKeyUrlValidationError ? L.Get("ApiKeyUrlInvalid") : "";
     public bool IsSensitiveStateCleared { get; private set; }
 
     public bool Validate()
@@ -33,6 +36,12 @@ public sealed partial class PasswordEditorViewModel
         if (GetPasswordRows().Count == 0 && SelectedLoginType?.Value != PasswordLoginType.Sso)
         {
             SetValidation(PasswordEditorValidationTarget.Password, L.Get("PasswordValueRequired"));
+            return false;
+        }
+
+        if (SelectedLoginType?.Value == PasswordLoginType.ApiKey && !ApiKeyEntryFields.IsValidOptionalUrl(ApiKeyUrl))
+        {
+            SetValidation(PasswordEditorValidationTarget.ApiKeyUrl, L.Get("ApiKeyUrlInvalid"));
             return false;
         }
 
@@ -71,6 +80,7 @@ public sealed partial class PasswordEditorViewModel
         SshKeyData = "";
         SsoProvider = "";
         WifiMetadata = "";
+        ApiKeyUrl = "";
         CustomFieldsText = "";
         CustomIconValue = "";
         IsPasswordVisible = false;
@@ -95,10 +105,24 @@ public sealed partial class PasswordEditorViewModel
         }
     }
 
+    partial void OnApiKeyUrlChanged(string value)
+    {
+        if (HasApiKeyUrlValidationError && ApiKeyEntryFields.IsValidOptionalUrl(value))
+        {
+            ClearValidation();
+        }
+    }
+
     partial void OnSelectedLoginTypeChanged(PasswordLoginTypeChoice? value)
     {
+        if (value?.Value != PasswordLoginType.ApiKey && HasApiKeyUrlValidationError)
+        {
+            ClearValidation();
+        }
+
         ClearCorrectedPasswordValidation();
         OnPropertyChanged(nameof(IsBarcode));
+        OnPropertyChanged(nameof(IsApiKey));
         OnPropertyChanged(nameof(PasswordFieldLabel));
     }
 
@@ -125,7 +149,9 @@ public sealed partial class PasswordEditorViewModel
         OnPropertyChanged(nameof(ValidationTarget));
         OnPropertyChanged(nameof(HasTitleValidationError));
         OnPropertyChanged(nameof(HasPasswordValidationError));
+        OnPropertyChanged(nameof(HasApiKeyUrlValidationError));
         OnPropertyChanged(nameof(TitleValidationMessage));
         OnPropertyChanged(nameof(PasswordValidationMessage));
+        OnPropertyChanged(nameof(ApiKeyUrlValidationMessage));
     }
 }

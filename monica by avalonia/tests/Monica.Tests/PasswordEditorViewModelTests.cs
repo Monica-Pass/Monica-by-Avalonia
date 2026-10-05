@@ -36,6 +36,27 @@ public sealed class PasswordEditorViewModelTests
     }
 
     [Fact]
+    public void Api_key_editor_writes_android_marker_and_optional_endpoint_without_exposing_the_marker_field()
+    {
+        var editor = CreateEditor();
+        editor.Title = "OpenAI";
+        editor.PasswordLines = "sk-secret";
+        editor.ApiKeyUrl = "https://api.example.test/v1";
+        editor.CustomFieldsText = "Environment=prod\nmonica_api_key_type=WRONG";
+        editor.SelectedLoginType = editor.LoginTypeOptions.Single(option => option.Value == PasswordLoginType.ApiKey);
+
+        var entry = Assert.Single(editor.BuildEntries(editor.GetPasswordRows()));
+        var fields = editor.GetCustomFields();
+
+        Assert.Equal(PasswordLoginType.ApiKey, entry.LoginType);
+        Assert.Equal("sk-secret", entry.Password);
+        Assert.Contains(fields, field => field.Title == ApiKeyEntryFields.Marker && field.Value == ApiKeyEntryFields.Type);
+        Assert.Contains(fields, field => field.Title == ApiKeyEntryFields.ApiUrl && field.Value == editor.ApiKeyUrl);
+        Assert.Contains(fields, field => field.Title == "Environment" && field.Value == "prod");
+        Assert.DoesNotContain(fields, field => field.Title == ApiKeyEntryFields.Marker && field.Value == "WRONG");
+    }
+
+    [Fact]
     public void Password_editor_validation_targets_the_first_invalid_field_and_clears_when_corrected()
     {
         var editor = CreateEditor();

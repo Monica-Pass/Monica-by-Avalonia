@@ -45,6 +45,7 @@ internal static class AutoTypeMatcher
     private static bool IsTypeable(PasswordEntry entry) =>
         !entry.IsDeleted &&
         !entry.IsArchived &&
+        entry.LoginType != PasswordLoginType.ApiKey &&
         (!string.IsNullOrWhiteSpace(entry.Username) || !string.IsNullOrWhiteSpace(entry.Password));
 
     internal static IReadOnlyList<string> HostLabels(string websites) =>

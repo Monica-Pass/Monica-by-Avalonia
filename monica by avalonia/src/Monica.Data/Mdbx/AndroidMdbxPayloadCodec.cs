@@ -30,6 +30,22 @@ public static class AndroidMdbxPayloadCodec
         IReadOnlyList<PasswordHistoryEntry>? passwordHistory = null,
         IReadOnlyList<Attachment>? attachments = null)
     {
+        var fieldsToWrite = customFields.ToList();
+        if (entry.LoginType == PasswordLoginType.ApiKey &&
+            !fieldsToWrite.Any(ApiKeyEntryFields.IsMarker))
+        {
+            fieldsToWrite = fieldsToWrite
+                .Where(field => !ApiKeyEntryFields.Owns(field.Title))
+                .Append(new CustomField
+                {
+                    EntryId = entry.Id,
+                    Title = ApiKeyEntryFields.Marker,
+                    Value = ApiKeyEntryFields.Type,
+                    SortOrder = fieldsToWrite.Count
+                })
+                .ToList();
+        }
+
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream))
         {
@@ -58,7 +74,7 @@ public static class AndroidMdbxPayloadCodec
             writer.WriteString("passkey_bindings", entry.PasskeyBindings ?? "");
             writer.WritePropertyName("custom_fields");
             writer.WriteStartArray();
-            foreach (var field in customFields
+            foreach (var field in fieldsToWrite
                          .Where(field => !string.IsNullOrWhiteSpace(field.Title))
                          .OrderBy(field => field.SortOrder)
                          .ThenBy(field => field.Id))
@@ -144,6 +160,14 @@ public static class AndroidMdbxPayloadCodec
             };
 
             var customFields = DecodeCustomFields(root, entryId);
+            // Android API-key records identify themselves twice: the login_type discriminator is
+            // canonical, while older records may carry only the marker custom field. Treat the
+            // marker as a compatibility fallback so those records do not reopen as passwords.
+            if (entry.LoginType == PasswordLoginType.Password &&
+                customFields.Any(ApiKeyEntryFields.IsMarker))
+            {
+                entry.LoginType = PasswordLoginType.ApiKey;
+            }
             var passwordHistory = DeserializeExtensionList<PasswordHistoryEntry>(root, "password_history", "passwordHistory");
             var attachments = DeserializeExtensionList<Attachment>(root, "attachments");
             return new AndroidMdbxPasswordPayload(
@@ -294,6 +318,7 @@ public static class AndroidMdbxPayloadCodec
 
     private static PasswordLoginType ParseLoginType(string value) => value.Trim().ToUpperInvariant() switch
     {
+        "APIKEY" or "API_KEY" => PasswordLoginType.ApiKey,
         "SSO" => PasswordLoginType.Sso,
         "WIFI" => PasswordLoginType.Wifi,
         "SSH_KEY" or "SSH-KEY" => PasswordLoginType.SshKey,
@@ -303,6 +328,7 @@ public static class AndroidMdbxPayloadCodec
 
     private static string ToAndroidLoginType(PasswordLoginType value) => value switch
     {
+        PasswordLoginType.ApiKey => "API_KEY",
         PasswordLoginType.Sso => "SSO",
         PasswordLoginType.Wifi => "WIFI",
         PasswordLoginType.SshKey => "SSH_KEY",

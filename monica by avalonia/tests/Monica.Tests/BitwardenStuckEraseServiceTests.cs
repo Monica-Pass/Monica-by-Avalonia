@@ -14,8 +14,9 @@ public sealed class BitwardenStuckEraseServiceTests
     // The list is a decision prompt, so what it leaves out matters as much as what it shows. A delete still
     // in the queue is not stuck - the next synchronization may yet carry it - and a trashing that would not
     // land leaves the local row in the recycle bin bound to its cipher, where the pull still sees the user's
-    // choice. Offering either as "the server did not take your delete" would invite the user to drop work
-    // that was about to land, so the command must refuse them by id as well.
+    // choice. "Stuck" names the terminal state only; what the user may abandon is wider (a still-retrying
+    // erase is a decision they can take back too), and the id re-read keeps both honest without conflating
+    // the two.
     [Fact]
     public async Task Only_a_hard_delete_the_server_would_not_take_is_listed()
     {
@@ -44,8 +45,10 @@ public sealed class BitwardenStuckEraseServiceTests
         Assert.Equal(BitwardenMutationStatus.Conflict, row.Status);
         Assert.Equal(now.ToUniversalTime(), row.LastAttemptAt);
 
-        await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => service.AbandonAsync(harness.VaultId, pendingId));
+        // A still-retrying erase is abandonable elsewhere (that is a decision of its own), so the rows this
+        // test still expects to refuse are the ones that are no live decision at all from this list: the one
+        // the queue mid-send owns, the soft delete whose local row still sits in the trash, the one already
+        // granted, and the right row asked against the wrong vault.
         await Assert.ThrowsAsync<KeyNotFoundException>(
             () => service.AbandonAsync(harness.VaultId, flyingId));
         await Assert.ThrowsAsync<KeyNotFoundException>(
@@ -130,19 +133,132 @@ public sealed class BitwardenStuckEraseServiceTests
         Assert.Equal(entry.BitwardenRevisionDate, rebooked.ExpectedRemoteRevision);
     }
 
-    // The list is rendered while a synchronization is running, and a second purge of the same cipher reuses
-    // the queue's idempotency key - which lifts a Conflict row back to pending. Completing the row the screen
-    // is still showing would retire the erase the user just asked for a second time, so the row has to be
-    // re-read and the stale decision refused.
+    // The suppressed list is wider than "stuck": it is the full set of erases that can currently stand
+    // between the server's copy and the user's screen. A genuinely stuck erase and a still-pending one that
+    // just held back a resurrection are the same kind of decision - "the server keeps a copy you deleted
+    // here" - and both have to be visible, because the pending one's suppression is exactly as durable.
     [Fact]
-    public async Task A_rebooked_erase_is_not_the_row_the_screen_was_showing()
+    public async Task The_suppressed_list_covers_stuck_and_still_retrying_erasures_this_round_held_back()
+    {
+        var harness = await CreateHarnessAsync();
+        var service = new BitwardenStuckEraseService(harness.Pending);
+        var now = new DateTimeOffset(2026, 7, 22, 7, 0, 0, TimeSpan.Zero);
+        var stuckId = await BookAsync(harness, "cipher-stuck", BitwardenMutationOperationType.Delete, now);
+        var pendingId = await BookAsync(
+            harness,
+            "cipher-pending",
+            BitwardenMutationOperationType.Delete,
+            now,
+            now + TimeSpan.FromHours(1));
+        var untouchedId = await BookAsync(harness, "cipher-untouched", BitwardenMutationOperationType.Delete, now, now + TimeSpan.FromHours(1));
+        var trashId = await BookAsync(harness, "cipher-trash", BitwardenMutationOperationType.SoftDelete, now);
+        await harness.Pending.RecordFailureAsync(stuckId, BitwardenFailureClass.Conflict, "edited elsewhere", now);
+        await harness.Pending.RecordFailureAsync(trashId, BitwardenFailureClass.Conflict, "edited elsewhere", now);
+
+        // This round the merge engine held back two ciphers: the stuck one and the still-pending one. The
+        // untouched pending delete and the soft delete are unrelated to what was suppressed, so neither
+        // belongs on the list.
+        var rows = await service.GetSuppressedAsync(
+            harness.VaultId,
+            new HashSet<string>(StringComparer.Ordinal) { "cipher-stuck", "cipher-pending" });
+
+        Assert.Equal(2, rows.Count);
+        var stuck = Assert.Single(rows, row => row.CipherId == "cipher-stuck");
+        Assert.True(stuck.SuppressedThisRound);
+        Assert.Equal(stuckId, stuck.OperationId);
+        var pending = Assert.Single(rows, row => row.CipherId == "cipher-pending");
+        Assert.True(pending.SuppressedThisRound);
+        Assert.Equal(pendingId, pending.OperationId);
+        Assert.DoesNotContain(rows, row => row.CipherId == "cipher-untouched");
+        Assert.DoesNotContain(rows, row => row.CipherId == "cipher-trash");
+    }
+
+    // The suppression flag belongs to this round's merge, not to the erase. A stuck erase that held nothing
+    // back this time still renders - that is its whole point - but unflagged, so the reason text reads as
+    // the durable refusal it is rather than a resurrection the user never saw. Without the distinction the
+    // two stories flatten into one and the list lies about which entries are actively being held back.
+    [Fact]
+    public async Task A_stuck_erase_that_held_nothing_back_is_listed_unflagged()
     {
         var harness = await CreateHarnessAsync();
         var service = new BitwardenStuckEraseService(harness.Pending);
         var now = new DateTimeOffset(2026, 7, 22, 7, 0, 0, TimeSpan.Zero);
         var erase = await PurgeAndBookTheEraseAsync(harness, "cipher-erase", "Erased on this device");
         await harness.Pending.RecordFailureAsync(erase.Id, BitwardenFailureClass.Conflict, null, now);
-        var row = Assert.Single(await service.GetStuckAsync(harness.VaultId));
+
+        var flagged = await service.GetSuppressedAsync(
+            harness.VaultId,
+            new HashSet<string>(StringComparer.Ordinal));
+        var unflaggedView = Assert.Single(flagged);
+        Assert.False(unflaggedView.SuppressedThisRound);
+    }
+
+    // The decision is per cipher, and so is the flag: one erase may have just held back a resurrection while
+    // another, unrelated stuck erase did not. Both belong on the list, but only the one that actually
+    // suppressed a copy reads as "the server still holds it" - conflating them would tell the user a second
+    // entry is being held back that plainly is not.
+    [Fact]
+    public async Task The_flag_tracks_which_cipher_was_actually_held_back_this_round()
+    {
+        var harness = await CreateHarnessAsync();
+        var service = new BitwardenStuckEraseService(harness.Pending);
+        var now = new DateTimeOffset(2026, 7, 22, 7, 0, 0, TimeSpan.Zero);
+        var heldBackId = await BookAsync(harness, "cipher-held", BitwardenMutationOperationType.Delete, now);
+        var justStuckId = await BookAsync(harness, "cipher-other", BitwardenMutationOperationType.Delete, now);
+        await harness.Pending.RecordFailureAsync(heldBackId, BitwardenFailureClass.Conflict, null, now);
+        await harness.Pending.RecordFailureAsync(justStuckId, BitwardenFailureClass.Conflict, null, now);
+
+        var rows = await service.GetSuppressedAsync(
+            harness.VaultId,
+            new HashSet<string>(StringComparer.Ordinal) { "cipher-held" });
+
+        Assert.True(Assert.Single(rows, row => row.CipherId == "cipher-held").SuppressedThisRound);
+        Assert.False(Assert.Single(rows, row => row.CipherId == "cipher-other").SuppressedThisRound);
+    }
+
+    // A still-pending erase can be abandoned only while it is alive in the queue - completing it retires
+    // the suppression, which is the whole point. But an in-flight erase is mid-send, and completing it from
+    // under the queue would drop a delete the server is about to answer. The re-read by id, against the live
+    // operations rather than a stale screen, is what refuses the one the queue owns.
+    [Fact]
+    public async Task Abandoning_a_pending_erase_works_but_an_in_flight_one_is_refused()
+    {
+        var harness = await CreateHarnessAsync();
+        var service = new BitwardenStuckEraseService(harness.Pending);
+        var now = new DateTimeOffset(2026, 7, 22, 7, 0, 0, TimeSpan.Zero);
+        var pendingId = await BookAsync(
+            harness,
+            "cipher-pending",
+            BitwardenMutationOperationType.Delete,
+            now,
+            now + TimeSpan.FromHours(1));
+        var flyingId = await BookAsync(harness, "cipher-flying", BitwardenMutationOperationType.Delete, now);
+        _ = await harness.Pending.ClaimReadyAsync(harness.VaultId, now);
+
+        await service.AbandonAsync(harness.VaultId, pendingId);
+        Assert.Equal(
+            BitwardenMutationStatus.Completed,
+            (await harness.Pending.GetAsync(harness.VaultId))
+            .Single(operation => operation.Id == pendingId).Status);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => service.AbandonAsync(harness.VaultId, flyingId));
+    }
+
+    // The list is rendered while a synchronization is running, and a second purge of the same cipher reuses
+    // the queue's idempotency key - which lifts a Conflict row back to pending. The screen is then showing a
+    // stale row: it still reads "the server refused it" while the queue is about to try the delete again.
+    // Re-reading by id is what stops an abandon made against that stale text from landing on a row whose
+    // meaning already changed under it.
+    [Fact]
+    public async Task A_rebooked_erase_disappears_from_the_stuck_list_it_no_longer_matches()
+    {
+        var harness = await CreateHarnessAsync();
+        var service = new BitwardenStuckEraseService(harness.Pending);
+        var now = new DateTimeOffset(2026, 7, 22, 7, 0, 0, TimeSpan.Zero);
+        var erase = await PurgeAndBookTheEraseAsync(harness, "cipher-erase", "Erased on this device");
+        await harness.Pending.RecordFailureAsync(erase.Id, BitwardenFailureClass.Conflict, null, now);
+        Assert.Single(await service.GetStuckAsync(harness.VaultId));
 
         var carried = new PasswordEntry
         {
@@ -155,12 +271,37 @@ public sealed class BitwardenStuckEraseServiceTests
         };
         Assert.True(await new BitwardenPurgeQueue(harness.Pending).EnqueuePasswordAsync(carried));
 
-        await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => service.AbandonAsync(harness.VaultId, row.OperationId));
+        // The re-purge lifted the row back to pending, so it is no longer a stuck erase: the list of
+        // decisions the server refused shrinks to nothing, because the queue is now set to retry the very
+        // delete the refused row described.
         Assert.Empty(await service.GetStuckAsync(harness.VaultId));
         Assert.Equal(
             BitwardenMutationStatus.Pending,
             Assert.Single(await harness.Pending.GetAsync(harness.VaultId)).Status);
+    }
+
+    // The re-read by id is not what refuses a re-booked erase - a re-purged pending erase is, from the
+    // user's seat, just another live delete they are allowed to take back, so abandoning it is the same
+    // decision as abandoning any still-retrying one. What the id re-read refuses is the cases that are not
+    // a live decision at all: a cipher the queue mid-send owns, and an operation id that no longer belongs
+    // to this vault. Those cannot be taken back from here without dropping work the server is answering.
+    [Fact]
+    public async Task The_id_re_read_refuses_only_what_is_not_a_live_decision()
+    {
+        var harness = await CreateHarnessAsync();
+        var service = new BitwardenStuckEraseService(harness.Pending);
+        var now = new DateTimeOffset(2026, 7, 22, 7, 0, 0, TimeSpan.Zero);
+        var flyingId = await BookAsync(harness, "cipher-flying", BitwardenMutationOperationType.Delete, now);
+        var completedId = await BookAsync(harness, "cipher-done", BitwardenMutationOperationType.Delete, now);
+        await harness.Pending.CompleteAsync(completedId);
+        _ = await harness.Pending.ClaimReadyAsync(harness.VaultId, now + TimeSpan.FromMinutes(1));
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => service.AbandonAsync(harness.VaultId, flyingId));
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => service.AbandonAsync(harness.VaultId, completedId));
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => service.AbandonAsync(harness.VaultId + 1, flyingId));
     }
 
     private static async Task<long> BookAsync(

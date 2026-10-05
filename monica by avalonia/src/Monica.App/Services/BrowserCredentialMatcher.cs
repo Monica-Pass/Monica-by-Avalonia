@@ -12,6 +12,7 @@ internal static class BrowserCredentialMatcher
         var host = origin.DnsSafeHost;
         return entries
             .Where(entry => !entry.IsDeleted && !entry.IsArchived)
+            .Where(entry => entry.LoginType != PasswordLoginType.ApiKey)
             .Where(entry => !string.IsNullOrWhiteSpace(entry.Username) || !string.IsNullOrWhiteSpace(entry.Password))
             .Where(entry => EntryMatchesHost(entry.Website, host))
             .Select(entry => new BrowserBridgeCredential(

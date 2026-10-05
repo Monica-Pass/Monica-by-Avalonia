@@ -53,7 +53,7 @@ public sealed record VaultTreeFilter(
 
     public bool Matches(VaultEntryKind kind) => Group switch
     {
-        VaultEntryGroup.Passwords => kind is VaultEntryKind.Password or VaultEntryKind.Sso or
+        VaultEntryGroup.Passwords => kind is VaultEntryKind.Password or VaultEntryKind.ApiKey or VaultEntryKind.Sso or
             VaultEntryKind.Wifi or VaultEntryKind.SshKey or VaultEntryKind.Barcode,
         VaultEntryGroup.Notes => kind == VaultEntryKind.Note,
         VaultEntryGroup.Totp => kind == VaultEntryKind.Totp,

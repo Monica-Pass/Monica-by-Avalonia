@@ -229,9 +229,9 @@
         <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
     </Style>
 
-    <!-- Win11-shaped scrollbars: a slim floating thumb over no track and no arrow buttons.
-         FluentAvalonia sizes its bars from the Windows UISettings COM interop rather than from
-         application resources, so the only way to change the shape is to own the template.
+    <!-- Slim floating scrollbars: a thumb over no track and no arrow buttons.
+         FluentAvalonia's default template ignores the application-level size resources, so the
+         app owns the template to keep scrollbar geometry consistent across desktop platforms.
          Measured before this: a vertical bar rendered 14px wide with two visible 14x10 arrow
          buttons, and the app-level ScrollBarSize/ScrollBarArrowSize knobs changed nothing. -->
     <Style Selector="ScrollBar:vertical">
@@ -294,9 +294,9 @@
     </Style>
     <Style Selector="ScrollBar /template/ controls|SlimScrollBarThumb#slimThumb">
         <Setter Property="Background" Value="{DynamicResource SlimScrollBarThumbBrush}" />
-        <!-- FluentAvalonia fakes the WinUI slim bar by squeezing its Thumb with
-             scaleX(0.35) translateX(-2px), which lands on this template part too and would shrink
-             the painted strip to a third of whatever width our margins declare. -->
+        <!-- FluentAvalonia's default theme squeezes its Thumb with scaleX(0.35) translateX(-2px),
+             which lands on this template part too and would shrink the painted strip to a third
+             of whatever width our margins declare. -->
         <Setter Property="Template">
             <ControlTemplate>
                 <Border Background="{TemplateBinding Background}" CornerRadius="2" />

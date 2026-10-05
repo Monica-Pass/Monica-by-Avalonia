@@ -1209,6 +1209,20 @@ public sealed class BitwardenSyncWorkflowUiTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<BitwardenStuckErase>>(vaultId == 7 ? stuck.ToArray() : []);
 
+        public Task<IReadOnlyList<BitwardenStuckErase>> GetSuppressedAsync(
+            long vaultId,
+            IReadOnlySet<string> suppressedCipherIds,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<BitwardenStuckErase>>(
+                vaultId == 7
+                    ? stuck
+                        .Select(row => row with
+                        {
+                            SuppressedThisRound = suppressedCipherIds.Contains(row.CipherId)
+                        })
+                        .ToArray()
+                    : []);
+
         public Task AbandonAsync(long vaultId, long operationId, CancellationToken cancellationToken = default)
         {
             Abandoned.Add((vaultId, operationId));

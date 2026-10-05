@@ -8,7 +8,7 @@
 
 <p align="center">
   <strong>Monica 的本地优先桌面密码库：以 Android 主应用为功能与安全基准，
-  以 WinUI 3 作为桌面交互设计基准。</strong>
+  以 Avalonia 提供跨平台桌面体验。</strong>
 </p>
 
 <p align="center">
@@ -31,8 +31,8 @@ macOS 与 Linux 的跨平台构建目标。它不是把 Android 界面直接搬�
 
 - **产品与安全基线来自 Monica Android。** 数据格式、核心能力、安全边界和兼容路线
   以主应用为准。
-- **桌面交互遵循 WinUI 3 逻辑。** 导航、命令栏、主从布局、键盘操作、窗口生命周期和
-  平台集成按桌面使用习惯设计。
+- **桌面交互遵循 Avalonia 与平台习惯。** 导航、命令栏、主从布局、键盘操作、窗口生命周期和
+  平台集成按桌面使用习惯设计，并保持跨平台行为一致。
 - **Vault 业务数据以 canonical MDBX 为准。** SQLite 保留应用元数据、迁移状态和集成
   记账，不再作为解锁后 vault 业务数据的双重真源。
 
@@ -44,6 +44,7 @@ macOS 与 Linux 的跨平台构建目标。它不是把 Android 界面直接搬�
 | 工作区 | 已实现能力 |
 | --- | --- |
 | 密码库 | 密码、用户名、网址、自定义字段、附件、收藏、归档、回收站、批量操作和可嵌套分类目录 |
+| API Key | 与 Android 兼容的 API 密钥条目、加密密钥、提供方网址和可选请求地址；不参与自动填充 |
 | 动态口令 | TOTP/HOTP、二维码导入与扫描、搜索、收藏、编辑和安全复制 |
 | 安全笔记 | 多标签编辑、Markdown 预览、图片附件、嵌套目录和草稿恢复 |
 | 钱包 | 银行卡、身份资料、证件、登录条码、账单地址及其他 Android 对应类型 |
@@ -79,8 +80,7 @@ Bitwarden 在线同步包括账户认证、支持的双因素挑战、待上传�
 ```mermaid
 flowchart TB
     Android["Monica Android\n功能与安全基线"] --> Contract["共享产品契约"]
-    WinUI["WinUI 3\n桌面交互基线"] --> App["Monica.App\nAvalonia Views / ViewModels"]
-    Contract --> App
+    Contract --> App["Monica.App\nAvalonia Views / ViewModels"]
     App --> Core["Monica.Core\n领域模型 / 加密 / 导入导出"]
     App --> Data["Monica.Data\n仓储 / 迁移 / 同步协调"]
     App --> Platform["Monica.Platform\nOS / 网络 / Native adapters"]

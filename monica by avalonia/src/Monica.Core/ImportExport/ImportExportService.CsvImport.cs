@@ -110,11 +110,14 @@ public sealed partial class ImportExportService
     }
 
     public IReadOnlyList<PasswordEntry> ImportPasswordCsv(string csvText)
+        => ImportPasswordCsvWithCustomFields(csvText).Select(item => item.Entry).ToArray();
+
+    public IReadOnlyList<PasswordCsvImportEntry> ImportPasswordCsvWithCustomFields(string csvText)
     {
         EnsureCsvWithinResourceLimit(csvText);
         using var reader = new StringReader(csvText);
         using var csv = new CsvReader(reader, CreateCsvConfiguration());
-        var passwords = new List<PasswordEntry>();
+        var passwords = new List<PasswordCsvImportEntry>();
         if (!csv.Read())
         {
             return passwords;
@@ -130,7 +133,7 @@ public sealed partial class ImportExportService
             var title = ReadField(csv, "title", "name", "folder/name", "login_title");
             var website = ReadField(csv, "website", "url", "uri", "login_uri", "login_uri_1");
             var username = ReadField(csv, "username", "login_username", "user", "email");
-            passwords.Add(new PasswordEntry
+            var entry = new PasswordEntry
             {
                 Title = string.IsNullOrWhiteSpace(title) ? InferTitle(website, username) : title,
                 Website = website,
@@ -150,7 +153,28 @@ public sealed partial class ImportExportService
                 CreatedAt = DateTimeOffset.UtcNow,
                 UpdatedAt = DateTimeOffset.UtcNow,
                 BitwardenLocalModified = true
-            });
+            };
+            var customFields = new List<CustomField>();
+            if (entry.LoginType == PasswordLoginType.ApiKey)
+            {
+                customFields.Add(new CustomField
+                {
+                    Title = ApiKeyEntryFields.Marker,
+                    Value = ApiKeyEntryFields.Type,
+                    SortOrder = 0
+                });
+                var apiKeyUrl = ReadField(csv, "apiKeyUrl", "api_key_url");
+                if (!string.IsNullOrWhiteSpace(apiKeyUrl))
+                {
+                    customFields.Add(new CustomField
+                    {
+                        Title = ApiKeyEntryFields.ApiUrl,
+                        Value = apiKeyUrl.Trim(),
+                        SortOrder = 1
+                    });
+                }
+            }
+            passwords.Add(new PasswordCsvImportEntry(entry, customFields));
         }
 
         return passwords;
@@ -230,10 +254,15 @@ public sealed partial class ImportExportService
         return string.IsNullOrWhiteSpace(username) ? "Imported password" : username;
     }
 
-    private static PasswordLoginType ParseLoginType(string value) =>
-        Enum.TryParse<PasswordLoginType>(value, ignoreCase: true, out var loginType)
-            ? loginType
-            : PasswordLoginType.Password;
+    private static PasswordLoginType ParseLoginType(string value) => value.Trim().ToUpperInvariant() switch
+    {
+        "APIKEY" or "API_KEY" => PasswordLoginType.ApiKey,
+        "SSO" => PasswordLoginType.Sso,
+        "WIFI" => PasswordLoginType.Wifi,
+        "SSHKEY" or "SSH_KEY" or "SSH-KEY" => PasswordLoginType.SshKey,
+        "BARCODE" => PasswordLoginType.Barcode,
+        _ => PasswordLoginType.Password
+    };
 
     private static bool ParseBoolean(string value) =>
         bool.TryParse(value, out var result) ? result : value is "1" or "yes" or "YES";

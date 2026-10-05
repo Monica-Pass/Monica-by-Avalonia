@@ -10,11 +10,33 @@ public sealed partial class PasswordEditorViewModel
 
     public IReadOnlyList<CustomField> GetCustomFields()
     {
-        return SplitRows(CustomFieldsText)
+        var fields = SplitRows(CustomFieldsText)
             .Select((row, index) => ParseCustomField(row, index))
             .Where(field => field is not null)
             .Select(field => field!)
-            .ToArray();
+            .Where(field => !ApiKeyEntryFields.Owns(field.Title))
+            .ToList();
+
+        if (SelectedLoginType?.Value == PasswordLoginType.ApiKey)
+        {
+            fields.Add(new CustomField
+            {
+                Title = ApiKeyEntryFields.Marker,
+                Value = ApiKeyEntryFields.Type,
+                SortOrder = fields.Count
+            });
+            if (!string.IsNullOrWhiteSpace(ApiKeyUrl))
+            {
+                fields.Add(new CustomField
+                {
+                    Title = ApiKeyEntryFields.ApiUrl,
+                    Value = ApiKeyUrl.Trim(),
+                    SortOrder = fields.Count
+                });
+            }
+        }
+
+        return fields;
     }
 
     private string EncodeWebsites() => string.Join(", ", ParseWebsiteRows(WebsiteLines));

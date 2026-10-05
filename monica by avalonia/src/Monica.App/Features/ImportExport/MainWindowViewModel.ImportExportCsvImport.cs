@@ -15,12 +15,18 @@ public sealed partial class MainWindowViewModel
 
         try
         {
-            var entries = await Task.Run(() => _importExportService.ImportPasswordCsv(csv));
-            var importedEntries = entries.Select(item => ClonePasswordForImport(item)).ToArray();
+            var entries = await Task.Run(() => _importExportService.ImportPasswordCsvWithCustomFields(csv));
             var importedPasswords = 0;
-            foreach (var imported in importedEntries)
+            foreach (var source in entries)
             {
+                var imported = ClonePasswordForImport(source.Entry);
                 await _repository.SavePasswordAsync(imported);
+                if (source.CustomFields.Count > 0)
+                {
+                    await _repository.ReplaceCustomFieldsAsync(
+                        imported.Id,
+                        source.CustomFields.Select(field => CloneCustomFieldForImport(field, imported.Id)).ToArray());
+                }
                 importedPasswords++;
             }
 

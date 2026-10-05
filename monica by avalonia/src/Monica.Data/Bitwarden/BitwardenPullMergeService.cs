@@ -60,6 +60,7 @@ public sealed partial class BitwardenPullMergeService(
         var preserved = 0;
         var unchanged = 0;
         var suppressed = 0;
+        var suppressedCipherIds = new List<string>();
 
         foreach (var decision in decisions)
         {
@@ -78,6 +79,7 @@ public sealed partial class BitwardenPullMergeService(
                     break;
                 case BitwardenMergeAction.AddRemote when owedErasures.Contains(decision.CipherId):
                     suppressed++;
+                    suppressedCipherIds.Add(decision.CipherId);
                     break;
                 case BitwardenMergeAction.AddRemote:
                     await ApplyActiveRemoteAsync(
@@ -149,7 +151,8 @@ public sealed partial class BitwardenPullMergeService(
             markedClean,
             preserved,
             unchanged,
-            suppressed);
+            suppressed,
+            suppressedCipherIds);
     }
 
     /// <summary>

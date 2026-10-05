@@ -1484,6 +1484,7 @@ public sealed partial class MonicaRepository(
 
     private static PasswordLoginType ParseLoginType(string value) => value.ToUpperInvariant() switch
     {
+        "APIKEY" or "API_KEY" => PasswordLoginType.ApiKey,
         "SSO" => PasswordLoginType.Sso,
         "WIFI" => PasswordLoginType.Wifi,
         "SSHKEY" or "SSH_KEY" => PasswordLoginType.SshKey,

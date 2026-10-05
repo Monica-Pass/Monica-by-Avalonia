@@ -65,6 +65,7 @@ public sealed partial class PasswordDetailViewModel
     {
         return loginType switch
         {
+            PasswordLoginType.ApiKey => localization.Get("LoginTypeApiKey"),
             PasswordLoginType.Sso => localization.Get("LoginTypeSso"),
             PasswordLoginType.Wifi => localization.Get("LoginTypeWifi"),
             PasswordLoginType.SshKey => localization.Get("LoginTypeSshKey"),

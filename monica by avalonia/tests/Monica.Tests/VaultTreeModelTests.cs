@@ -13,6 +13,7 @@ public class VaultTreeModelTests
 {
     [Theory]
     [InlineData(PasswordLoginType.Password, VaultEntryKind.Password)]
+    [InlineData(PasswordLoginType.ApiKey, VaultEntryKind.ApiKey)]
     [InlineData(PasswordLoginType.Sso, VaultEntryKind.Sso)]
     [InlineData(PasswordLoginType.Wifi, VaultEntryKind.Wifi)]
     [InlineData(PasswordLoginType.SshKey, VaultEntryKind.SshKey)]

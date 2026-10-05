@@ -69,7 +69,12 @@ public sealed partial class PasswordEditorViewModel : ObservableObject, IDisposa
         WifiMetadata = source?.WifiMetadata ?? "";
         IsFavorite = source?.IsFavorite ?? false;
 
+        var sourceCustomFields = (customFields ?? []).ToArray();
+        ApiKeyUrl = sourceCustomFields
+            .FirstOrDefault(field => string.Equals(field.Title, ApiKeyEntryFields.ApiUrl, StringComparison.Ordinal))?.Value ?? "";
+
         LoginTypeOptions.Add(new PasswordLoginTypeChoice(PasswordLoginType.Password, localization.Get("LoginTypePassword")));
+        LoginTypeOptions.Add(new PasswordLoginTypeChoice(PasswordLoginType.ApiKey, localization.Get("LoginTypeApiKey")));
         LoginTypeOptions.Add(new PasswordLoginTypeChoice(PasswordLoginType.Sso, localization.Get("LoginTypeSso")));
         LoginTypeOptions.Add(new PasswordLoginTypeChoice(PasswordLoginType.Wifi, localization.Get("LoginTypeWifi")));
         LoginTypeOptions.Add(new PasswordLoginTypeChoice(PasswordLoginType.SshKey, localization.Get("LoginTypeSshKey")));
@@ -81,13 +86,14 @@ public sealed partial class PasswordEditorViewModel : ObservableObject, IDisposa
         var iconType = NormalizeCustomIconType(source?.CustomIconType);
         CustomIconValue = source?.CustomIconValue ?? "";
         SelectedCustomIconType = CustomIconTypeOptions.FirstOrDefault(item => item.Value == iconType) ?? CustomIconTypeOptions[0];
-        CustomFieldsText = EncodeCustomFields(customFields ?? []);
+        CustomFieldsText = EncodeCustomFields(sourceCustomFields.Where(field => !ApiKeyEntryFields.Owns(field.Title)));
     }
 
     public ILocalizationService L { get; }
     public PasswordEntry? Source { get; private set; }
     public bool IsNew { get; }
     public bool IsBarcode => SelectedLoginType?.Value == PasswordLoginType.Barcode;
+    public bool IsApiKey => SelectedLoginType?.Value == PasswordLoginType.ApiKey;
     public string PasswordFieldLabel => L.Get(IsBarcode ? "BarcodePayload" : "Password");
     public ObservableCollection<PasswordCategoryChoice> CategoryOptions { get; } = [];
     public ObservableCollection<PasswordLoginTypeChoice> LoginTypeOptions { get; } = [];

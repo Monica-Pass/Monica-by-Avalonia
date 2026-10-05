@@ -10,6 +10,7 @@ namespace Monica.App.Features.Vault;
 public enum VaultEntryKind
 {
     Password,
+    ApiKey,
     Sso,
     Wifi,
     SshKey,
@@ -26,6 +27,7 @@ public static class VaultEntryKinds
 {
     public static VaultEntryKind FromPassword(PasswordEntry entry) => entry.LoginType switch
     {
+        PasswordLoginType.ApiKey => VaultEntryKind.ApiKey,
         PasswordLoginType.Sso => VaultEntryKind.Sso,
         PasswordLoginType.Wifi => VaultEntryKind.Wifi,
         PasswordLoginType.SshKey => VaultEntryKind.SshKey,
@@ -60,6 +62,7 @@ public static class VaultEntryKinds
 
     public static string LabelFor(VaultEntryKind kind) => kind switch
     {
+        VaultEntryKind.ApiKey => "API key",
         VaultEntryKind.Sso => "SSO",
         VaultEntryKind.Wifi => "WiFi",
         VaultEntryKind.SshKey => "SSH",

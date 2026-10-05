@@ -15,8 +15,8 @@ The desktop application currently implements:
 - Authenticated remote vault download, bounded CipherString decoding, and local merge.
 - Nested remote folder metadata.
 - Conflict backups and retry classification for pending operations.
-- A WinUI-style account, sign-in, synchronization status, pending-change, and
-  conflict workflow.
+- A desktop account, sign-in, synchronization status, pending-change, and
+  conflict workflow implemented with Avalonia views.
 
 Only one synchronization run per account is owned at a time. Locking Monica
 stops the active run, clears the session manager, invalidates outstanding

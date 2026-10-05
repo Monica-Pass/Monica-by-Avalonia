@@ -5077,7 +5077,10 @@ public sealed partial class PasswordManagementTests
 
         public BitwardenJsonImportSnapshot ImportBitwardenJson(string json) => _inner.ImportBitwardenJson(json);
 
-        public string ExportPasswordCsv(IEnumerable<PasswordEntry> passwords) => _inner.ExportPasswordCsv(passwords);
+        public string ExportPasswordCsv(
+            IEnumerable<PasswordEntry> passwords,
+            IReadOnlyDictionary<long, IReadOnlyList<CustomField>>? passwordCustomFields = null) =>
+            _inner.ExportPasswordCsv(passwords, passwordCustomFields);
         public string ExportTotpCsv(IEnumerable<SecureItem> secureItems) => _inner.ExportTotpCsv(secureItems);
         public string ExportNoteCsv(IEnumerable<SecureItem> secureItems) => _inner.ExportNoteCsv(secureItems);
         public string ExportWalletCsv(IEnumerable<SecureItem> secureItems) => _inner.ExportWalletCsv(secureItems);
@@ -5087,6 +5090,8 @@ public sealed partial class PasswordManagementTests
         public bool IsEncryptedAegisJson(string json) => _inner.IsEncryptedAegisJson(json);
         public IReadOnlyList<SecureItem> ImportAegisJson(string json, string? password = null) => _inner.ImportAegisJson(json, password);
         public IReadOnlyList<PasswordEntry> ImportPasswordCsv(string csv) => _inner.ImportPasswordCsv(csv);
+        public IReadOnlyList<PasswordCsvImportEntry> ImportPasswordCsvWithCustomFields(string csv) =>
+            _inner.ImportPasswordCsvWithCustomFields(csv);
     }
 
     private sealed class CountingExportAuthorizationService : IExportAuthorizationService

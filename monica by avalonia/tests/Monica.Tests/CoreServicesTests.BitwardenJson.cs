@@ -83,6 +83,33 @@ public sealed partial class CoreServicesTests
     }
 
     [Fact]
+    public void BitwardenJson_imports_api_key_marker_as_type_and_preserves_its_endpoint()
+    {
+        const string json = """
+            {
+              "encrypted": false,
+              "items": [{
+                "id": "api-cipher",
+                "type": 1,
+                "name": "API service",
+                "fields": [
+                  { "name": "monica_api_key_type", "value": "API_KEY", "type": 0 },
+                  { "name": "monica_api_key_url", "value": "https://api.example.test/v1", "type": 0 }
+                ],
+                "login": { "password": "sk-secret" }
+              }]
+            }
+            """;
+
+        var snapshot = new ImportExportService().ImportBitwardenJson(json);
+        var entry = Assert.Single(snapshot.Passwords);
+        Assert.Equal(PasswordLoginType.ApiKey, entry.LoginType);
+        var fields = Assert.Single(snapshot.PasswordCustomFields).Fields;
+        Assert.Contains(fields, field => field.Title == ApiKeyEntryFields.Marker && field.Value == ApiKeyEntryFields.Type);
+        Assert.Contains(fields, field => field.Title == ApiKeyEntryFields.ApiUrl && field.Value == "https://api.example.test/v1");
+    }
+
+    [Fact]
     public void BitwardenJson_normalizes_malformed_exports()
     {
         var error = Assert.Throws<BitwardenJsonImportException>(() =>

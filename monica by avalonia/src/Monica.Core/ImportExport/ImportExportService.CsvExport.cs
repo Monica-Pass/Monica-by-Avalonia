@@ -11,7 +11,7 @@ public sealed partial class ImportExportService
     [
         "title", "website", "username", "password", "notes", "authenticatorKey",
         "appName", "appPackageName", "email", "phone", "loginType", "ssoProvider",
-        "passkeyBindings", "wifiMetadata", "sshKeyData"
+        "passkeyBindings", "wifiMetadata", "sshKeyData", "apiKeyUrl"
     ];
 
     private static readonly string[] SecureItemCsvHeaders =
@@ -19,7 +19,9 @@ public sealed partial class ImportExportService
         "ID", "Type", "Title", "Data", "Notes", "IsFavorite", "ImagePaths", "CreatedAt", "UpdatedAt"
     ];
 
-    public string ExportPasswordCsv(IEnumerable<PasswordEntry> passwords)
+    public string ExportPasswordCsv(
+        IEnumerable<PasswordEntry> passwords,
+        IReadOnlyDictionary<long, IReadOnlyList<CustomField>>? passwordCustomFields = null)
     {
         using var writer = new StringWriter(CultureInfo.InvariantCulture);
         using var csv = new CsvWriter(writer, CreateCsvConfiguration());
@@ -46,6 +48,10 @@ public sealed partial class ImportExportService
             csv.WriteField(password.PasskeyBindings);
             csv.WriteField(password.WifiMetadata);
             csv.WriteField(password.SshKeyData);
+            var apiKeyUrl = passwordCustomFields?.TryGetValue(password.Id, out var fields) == true
+                ? fields.FirstOrDefault(field => string.Equals(field.Title, ApiKeyEntryFields.ApiUrl, StringComparison.Ordinal))?.Value ?? ""
+                : "";
+            csv.WriteField(apiKeyUrl);
             csv.NextRecord();
         }
 

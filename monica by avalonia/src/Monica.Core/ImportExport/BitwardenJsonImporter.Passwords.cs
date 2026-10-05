@@ -55,6 +55,10 @@ public sealed partial class BitwardenJsonImporter
             specialFields.GetValueOrDefault("monica_login_type", ""),
             "SSH_KEY",
             StringComparison.OrdinalIgnoreCase);
+        var isApiKeyEntry = string.Equals(
+            specialFields.GetValueOrDefault(ApiKeyEntryFields.Marker, ""),
+            ApiKeyEntryFields.Type,
+            StringComparison.OrdinalIgnoreCase);
         return new PasswordEntry
         {
             Id = sourceModelId,
@@ -70,7 +74,9 @@ public sealed partial class BitwardenJsonImporter
             AppName = specialFields.GetValueOrDefault("appName", ""),
             AuthenticatorKey = login is { } totpData ? GetString(totpData, "totp") : "",
             PasskeyBindings = ReadRawArray(login, "fido2Credentials", _limits.MaximumFieldsPerItem),
-            LoginType = isSshCompatibilityEntry ? PasswordLoginType.SshKey : PasswordLoginType.Password,
+            LoginType = isSshCompatibilityEntry
+                ? PasswordLoginType.SshKey
+                : isApiKeyEntry ? PasswordLoginType.ApiKey : PasswordLoginType.Password,
             SshKeyData = isSshCompatibilityEntry ? BuildSshKeyData(specialFields) : "",
             CreatedAt = metadata.CreatedAt,
             UpdatedAt = metadata.UpdatedAt,

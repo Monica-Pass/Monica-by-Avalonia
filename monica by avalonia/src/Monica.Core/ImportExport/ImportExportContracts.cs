@@ -14,7 +14,9 @@ public interface IImportExportService
         IReadOnlyDictionary<long, IReadOnlyList<SecureItemAttachmentExport>>? secureItemAttachments = null);
     MonicaExportPackage ImportJson(string json);
     BitwardenJsonImportSnapshot ImportBitwardenJson(string json);
-    string ExportPasswordCsv(IEnumerable<PasswordEntry> passwords);
+    string ExportPasswordCsv(
+        IEnumerable<PasswordEntry> passwords,
+        IReadOnlyDictionary<long, IReadOnlyList<CustomField>>? passwordCustomFields = null);
     string ExportTotpCsv(IEnumerable<SecureItem> secureItems);
     string ExportNoteCsv(IEnumerable<SecureItem> secureItems);
     string ExportWalletCsv(IEnumerable<SecureItem> secureItems);
@@ -24,7 +26,12 @@ public interface IImportExportService
     bool IsEncryptedAegisJson(string json);
     IReadOnlyList<SecureItem> ImportAegisJson(string json, string? password = null);
     IReadOnlyList<PasswordEntry> ImportPasswordCsv(string csv);
+    IReadOnlyList<PasswordCsvImportEntry> ImportPasswordCsvWithCustomFields(string csv);
 }
+
+public sealed record PasswordCsvImportEntry(
+    PasswordEntry Entry,
+    IReadOnlyList<CustomField> CustomFields);
 
 public sealed record MonicaExportPackage(
     int SchemaVersion,

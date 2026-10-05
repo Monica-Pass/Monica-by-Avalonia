@@ -111,6 +111,12 @@ public sealed record BitwardenDecodedCipher(
 /// still owes the server an erase for that exact identity. The default keeps every caller that does not
 /// consult the outgoing queue honest about knowing nothing.
 /// </param>
+/// <param name="SuppressedCipherIds">
+/// The identities behind <paramref name="SuppressedResurrections"/>: which ciphers stayed on the shelf. The
+/// merge engine books the suppression by cipher id, so the decision list the user sees ("the server still
+/// holds a copy you deleted here") can name exactly the entries this round held back instead of only
+/// counting them. Empty by default so existing callers that never surface the list keep their meaning.
+/// </param>
 public sealed record BitwardenPullMergeResult(
     int Added,
     int Updated,
@@ -119,4 +125,10 @@ public sealed record BitwardenPullMergeResult(
     int MarkedClean,
     int PreservedLocalOnly,
     int Unchanged,
-    int SuppressedResurrections = 0);
+    int SuppressedResurrections = 0,
+    IReadOnlyList<string>? SuppressedCipherIds = null)
+{
+    /// The suppressed identities, or empty when the caller did not carry them. Normalized so consumers can
+    /// rely on a non-null read without every one of them re-doing the fallback.
+    public IReadOnlyList<string> SuppressedCipherIdsOrEmpty => SuppressedCipherIds ?? [];
+}

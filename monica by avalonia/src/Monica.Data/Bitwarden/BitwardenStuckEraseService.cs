@@ -13,12 +13,25 @@ public sealed record BitwardenStuckErase(
     long OperationId,
     string CipherId,
     BitwardenMutationStatus Status,
-    DateTimeOffset LastAttemptAt);
+    DateTimeOffset LastAttemptAt,
+    bool SuppressedThisRound = false);
 
 public interface IBitwardenStuckEraseService
 {
     Task<IReadOnlyList<BitwardenStuckErase>> GetStuckAsync(
         long vaultId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The full set the decision list offers: every erase that is terminal about (the ordinary
+    /// <see cref="GetStuckAsync"/> rows) plus any erase whose booking just suppressed a remote resurrection
+    /// this round. A still-pending erase sits in the second group only: the merge engine already honours its
+    /// suppression (<see cref="BitwardenPullMergeService"/> reads "Delete and not Completed"), so without a
+    /// row here the server copy it is holding back would have no visible owner for as long as the retries run.
+    /// </summary>
+    Task<IReadOnlyList<BitwardenStuckErase>> GetSuppressedAsync(
+        long vaultId,
+        IReadOnlySet<string> suppressedCipherIds,
         CancellationToken cancellationToken = default);
 
     Task AbandonAsync(long vaultId, long operationId, CancellationToken cancellationToken = default);
@@ -54,6 +67,31 @@ public sealed class BitwardenStuckEraseService(
             .ToList();
     }
 
+    public async Task<IReadOnlyList<BitwardenStuckErase>> GetSuppressedAsync(
+        long vaultId,
+        IReadOnlySet<string> suppressedCipherIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(suppressedCipherIds);
+        var operations = await operationStore.GetAsync(vaultId, cancellationToken);
+        return operations
+            .Where(operation => IsStuck(operation) || IsSuppressed(operation, suppressedCipherIds))
+            // An erase is one decision about one cipher; a row that is both terminal about and just
+            // suppressed a resurrection renders once, flagged, so the reason text reads "the server kept
+            // its copy" rather than leaving the user to reconcile two rows for a single delete they made.
+            .GroupBy(operation => operation.CipherId, StringComparer.Ordinal)
+            .Select(group => group
+                .Select(operation => new BitwardenStuckErase(
+                    operation.Id,
+                    operation.CipherId,
+                    operation.Status,
+                    operation.UpdatedAt,
+                    suppressedCipherIds.Contains(operation.CipherId)))
+                .OrderByDescending(erase => erase.SuppressedThisRound)
+                .First())
+            .ToList();
+    }
+
     public async Task AbandonAsync(
         long vaultId,
         long operationId,
@@ -61,12 +99,32 @@ public sealed class BitwardenStuckEraseService(
     {
         // Re-read rather than trust the row on screen: the list is rendered while a synchronization runs,
         // and a row that has since been re-booked as pending - which a re-purge does - is one the queue is
-        // about to send. Marking that completed would silently drop an erase the user just asked for.
-        var stuck = await GetStuckAsync(vaultId, cancellationToken);
-        _ = stuck.FirstOrDefault(erase => erase.OperationId == operationId) ??
-            throw new KeyNotFoundException("The Bitwarden erase is not stuck for this vault.");
+        // about to send. Marking that completed would silently drop an erase the user just asked for. The
+        // abandoned set is wider than "stuck" because a still-pending erase the user can see is one they are
+        // allowed to drop, so the re-read here is by id against the operations themselves, not the old list.
+        var operations = await operationStore.GetAsync(vaultId, cancellationToken);
+        var operation = operations.FirstOrDefault(candidate => candidate.Id == operationId);
+        if (operation is null || !IsAbandonable(operation))
+        {
+            throw new KeyNotFoundException("The Bitwarden erase is not one this vault can abandon.");
+        }
+
         await operationStore.CompleteAsync(operationId, cancellationToken);
     }
+
+    private static bool IsSuppressed(
+        BitwardenPendingOperation operation,
+        IReadOnlySet<string> suppressedCipherIds) =>
+        operation.OperationType == BitwardenMutationOperationType.Delete &&
+        suppressedCipherIds.Contains(operation.CipherId);
+
+    private static bool IsAbandonable(BitwardenPendingOperation operation) =>
+        // Completing a row the queue is mid-send on is a race the user cannot see; the send will land or
+        // fail on its own, and the row only becomes a decision once it has settled. Everything else the
+        // decision list can show - stuck or still retrying - is a choice the user is allowed to take back.
+        operation.OperationType == BitwardenMutationOperationType.Delete &&
+        operation.Status != BitwardenMutationStatus.Completed &&
+        operation.Status != BitwardenMutationStatus.InFlight;
 
     private static bool IsStuck(BitwardenPendingOperation operation) =>
         // Only a hard delete. A soft delete that would not land leaves the local row in the trash and

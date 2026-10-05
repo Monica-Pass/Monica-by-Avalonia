@@ -14,7 +14,7 @@
 
 | 要求 | 状态 | 实现证据 | 测试或决策证据 |
 | --- | --- | --- | --- |
-| Android 是功能与安全基线，桌面按 WinUI 3 交互 | 已验证 | `README.md`、`src/Monica.App/Features/` | `UiArchitectureTests.cs` 及各工作区 Headless 测试 |
+| Android 是功能与安全基线，桌面采用 Avalonia 跨平台交互 | 已验证 | `README.md`、`src/Monica.App/Features/` | `UiArchitectureTests.cs` 及各工作区 Headless 测试 |
 | 密码与笔记支持嵌套分类 | 已验证 | `LocalCategoryPath`、密码/笔记目录投影与管理命令 | `LocalCategoryPathTests.cs`、`SecureNoteTests.cs` |
 | Bitwarden 在线账户双向同步 | 已验证 | `Core/Bitwarden`、`Data/Bitwarden`、`Platform/Bitwarden`、同步工作区 | Bitwarden protocol、authentication、transport、merge、queue、conflict 和 UI 测试 |
 | 浏览器本地配对与站点凭据查询 | 已验证 | `WindowsBrowserBridgeService`、Manifest V3 扩展 | `BrowserBridgeServiceTests.cs`、`DesktopIntegrationUiTests.cs`、协议文档 |
@@ -40,7 +40,7 @@
 
 | 维度 | 状态 | 当前证据 | 剩余边界 |
 | --- | --- | --- | --- |
-| WinUI 风格任务布局 | 已验证 | 密码、笔记、动态口令、钱包、安全分析、同步、设置等拆分工作区及真实截图 | 仍需持续做人工信息层级与视觉一致性审查 |
+| Avalonia 桌面任务布局 | 已验证 | 密码、笔记、动态口令、钱包、安全分析、同步、设置等拆分工作区及真实截图 | 仍需持续做人工信息层级与视觉一致性审查 |
 | 键盘与基础辅助功能 | 已验证（自动化范围） | focusable command、AutomationProperties、live region 和焦点释放测试 | 屏幕阅读器、高对比度和系统缩放仍需真实 Windows 人工验收 |
 | 本地化 | 已验证（自动化范围） | 中英文 localization service、语言持久化和界面绑定 | 仍需逐页人工校对截断、术语和复数规则 |
 | 冷启动与首次导航 | 已验证（当前预算） | `ColdStartupPerformanceTests.cs`、延迟工作区物化和编辑器预热 | 必须在发布硬件上继续记录真实启动、解锁和大 vault 指标 |

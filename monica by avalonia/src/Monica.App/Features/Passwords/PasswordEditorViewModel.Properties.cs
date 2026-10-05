@@ -89,6 +89,9 @@ public sealed partial class PasswordEditorViewModel
     private string _ssoProvider = "";
 
     [ObservableProperty]
+    private string _apiKeyUrl = "";
+
+    [ObservableProperty]
     private string _wifiMetadata = "";
 
     [ObservableProperty]

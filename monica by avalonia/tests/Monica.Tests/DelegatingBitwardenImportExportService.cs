@@ -28,7 +28,10 @@ internal sealed class DelegatingBitwardenImportExportService(
             secureItemAttachments);
 
     public MonicaExportPackage ImportJson(string json) => _inner.ImportJson(json);
-    public string ExportPasswordCsv(IEnumerable<PasswordEntry> passwords) => _inner.ExportPasswordCsv(passwords);
+    public string ExportPasswordCsv(
+        IEnumerable<PasswordEntry> passwords,
+        IReadOnlyDictionary<long, IReadOnlyList<CustomField>>? passwordCustomFields = null) =>
+        _inner.ExportPasswordCsv(passwords, passwordCustomFields);
     public string ExportTotpCsv(IEnumerable<SecureItem> secureItems) => _inner.ExportTotpCsv(secureItems);
     public string ExportNoteCsv(IEnumerable<SecureItem> secureItems) => _inner.ExportNoteCsv(secureItems);
     public string ExportWalletCsv(IEnumerable<SecureItem> secureItems) => _inner.ExportWalletCsv(secureItems);
@@ -39,4 +42,6 @@ internal sealed class DelegatingBitwardenImportExportService(
     public IReadOnlyList<SecureItem> ImportAegisJson(string json, string? password = null) =>
         _inner.ImportAegisJson(json, password);
     public IReadOnlyList<PasswordEntry> ImportPasswordCsv(string csv) => _inner.ImportPasswordCsv(csv);
+    public IReadOnlyList<PasswordCsvImportEntry> ImportPasswordCsvWithCustomFields(string csv) =>
+        _inner.ImportPasswordCsvWithCustomFields(csv);
 }

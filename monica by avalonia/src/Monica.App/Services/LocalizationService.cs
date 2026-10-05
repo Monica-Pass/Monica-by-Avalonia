@@ -163,10 +163,12 @@ public interface ILocalizationService : INotifyPropertyChanged
     string AdvancedLogin { get; }
     string LoginType { get; }
     string LoginTypePassword { get; }
+    string LoginTypeApiKey { get; }
     string LoginTypeSso { get; }
     string LoginTypeWifi { get; }
     string LoginTypeSshKey { get; }
     string SsoProvider { get; }
+    string ApiKeyUrl { get; }
     string PasskeyBindings { get; }
     string WifiMetadata { get; }
     string SshKeyData { get; }
@@ -709,10 +711,12 @@ public sealed class LocalizationService : ILocalizationService
     public string AdvancedLogin => Text();
     public string LoginType => Text();
     public string LoginTypePassword => Text();
+    public string LoginTypeApiKey => Text();
     public string LoginTypeSso => Text();
     public string LoginTypeWifi => Text();
     public string LoginTypeSshKey => Text();
     public string SsoProvider => Text();
+    public string ApiKeyUrl => Text();
     public string PasskeyBindings => Text();
     public string WifiMetadata => Text();
     public string SshKeyData => Text();
@@ -1446,6 +1450,7 @@ public sealed class LocalizationService : ILocalizationService
         ["AdvancedLogin"] = "Advanced login",
         ["LoginType"] = "Login type",
         ["LoginTypePassword"] = "Password",
+        ["LoginTypeApiKey"] = "API key",
         ["LoginTypeSso"] = "SSO",
         ["LoginTypeWifi"] = "Wi-Fi",
         ["LoginTypeSshKey"] = "SSH key",
@@ -1457,6 +1462,8 @@ public sealed class LocalizationService : ILocalizationService
         ["BarcodeRenderFailed"] = "This payload cannot be rendered as a barcode.",
         ["CopiedBarcodePayload"] = "Barcode payload copied",
         ["SsoProvider"] = "SSO provider",
+        ["ApiKeyUrl"] = "API request URL",
+        ["ApiKeyUrlInvalid"] = "Use an http or https URL without embedded credentials.",
         ["PasskeyBindings"] = "Passkey bindings",
         ["WifiMetadata"] = "Wi-Fi metadata",
         ["SshKeyData"] = "SSH key data",
@@ -1659,7 +1666,7 @@ public sealed class LocalizationService : ILocalizationService
         ["OpenRepository"] = "Open repository",
         ["GitHubRepositoryOpened"] = "Opened the GitHub repository.",
         ["GitHubRepositoryOpenFailed"] = "Could not open the GitHub repository. Check the default browser and try again.",
-        ["DangerZoneDescription"] = "Destructive vault maintenance actions copied from the WinUI desktop settings surface.",
+        ["DangerZoneDescription"] = "Destructive vault maintenance actions provided by the Monica desktop settings surface.",
         ["ClearVaultData"] = "Clear vault data",
         ["ClearVaultDataDescription"] = "Delete passwords, secure items, or the full local Avalonia v69 vault data set. The master password record is kept.",
         ["ClearPasswordsOnly"] = "Clear passwords",
@@ -2069,12 +2076,13 @@ public sealed class LocalizationService : ILocalizationService
         ["BitwardenConflictDiscarded"] = "Discarded the local version; the server version is kept",
         ["BitwardenConflictRestoreFailed"] = "Could not restore the local version. It is still in the conflict list.",
         ["BitwardenConflictDiscardFailed"] = "Could not discard the local version. Try again.",
-        ["BitwardenStuckEraseSectionTitle"] = "Erasures the server did not take",
-        ["BitwardenStuckEraseSectionDescription"] = "These entries are gone from this device but the server still holds them, and its copy could not be deleted. Bringing one back drops that erase: the next synchronization puts the server's copy here again, where you can delete it for real.",
+        ["BitwardenStuckEraseSectionTitle"] = "Deletions the server still holds",
+        ["BitwardenStuckEraseSectionDescription"] = "These entries are gone from this device but the server still holds a copy. Bringing one back drops that erase: the next synchronization puts the server's copy here again, where you can delete it for real.",
         ["BitwardenStuckEraseAction"] = "Bring back the server's copy",
         ["BitwardenStuckEraseCipherFormat"] = "Cipher {0}",
         ["BitwardenStuckEraseReasonConflict"] = "Another client changed it after this device deleted it",
         ["BitwardenStuckEraseReasonFailed"] = "The server refused it and the queue stopped retrying",
+        ["BitwardenStuckEraseReasonSuppressed"] = "The server still holds a copy; this device is holding it back from coming back every synchronization",
         ["BitwardenStuckEraseLastAttemptFormat"] = "Last attempt {0}",
         ["BitwardenStuckEraseAbandoned"] = "Dropped that erase; the next synchronization brings the server's copy back",
         ["BitwardenStuckEraseAbandonFailed"] = "Could not drop the erase. It is still listed.",
@@ -3009,6 +3017,7 @@ public sealed class LocalizationService : ILocalizationService
         ["CreditCardCvv"] = "CVV",
         ["AdvancedLogin"] = "高级登录",
         ["LoginTypePassword"] = "密码",
+        ["LoginTypeApiKey"] = "API 密钥",
         ["LoginTypeSso"] = "SSO",
         ["LoginTypeWifi"] = "Wi-Fi",
         ["LoginTypeSshKey"] = "SSH 密钥",
@@ -3020,6 +3029,8 @@ public sealed class LocalizationService : ILocalizationService
         ["BarcodeRenderFailed"] = "此内容无法生成条码预览。",
         ["CopiedBarcodePayload"] = "条码内容已复制",
         ["SsoProvider"] = "SSO 提供商",
+        ["ApiKeyUrl"] = "API 请求地址",
+        ["ApiKeyUrlInvalid"] = "请输入不包含内嵌凭据的 http 或 https 地址。",
         ["PasskeyBindings"] = "Passkey 绑定",
         ["WifiMetadata"] = "Wi-Fi 元数据",
         ["SshKeyData"] = "SSH 密钥数据",
@@ -3359,7 +3370,7 @@ public sealed class LocalizationService : ILocalizationService
         ["OpenRepository"] = "打开仓库",
         ["GitHubRepositoryOpened"] = "已打开 GitHub 仓库。",
         ["GitHubRepositoryOpenFailed"] = "无法打开 GitHub 仓库，请检查默认浏览器后重试。",
-        ["DangerZoneDescription"] = "对齐 WinUI 桌面设置中的破坏性保险库维护操作。",
+        ["DangerZoneDescription"] = "Monica 桌面设置中的破坏性保险库维护操作。",
         ["ClearVaultData"] = "清空保险库数据",
         ["ClearVaultDataDescription"] = "删除密码、安全项目或完整的本地 Avalonia v69 保险库数据；主密码记录会保留。",
         ["ClearPasswordsOnly"] = "清空密码",
@@ -3757,12 +3768,13 @@ public sealed class LocalizationService : ILocalizationService
         ["BitwardenConflictDiscarded"] = "已丢弃本机版本，保留服务器版本",
         ["BitwardenConflictRestoreFailed"] = "无法恢复本机版本，它仍在冲突列表中。",
         ["BitwardenConflictDiscardFailed"] = "无法丢弃本机版本，请重试。",
-        ["BitwardenStuckEraseSectionTitle"] = "服务器没有接受的删除",
-        ["BitwardenStuckEraseSectionDescription"] = "这些条目已在本机被永久删除，服务器上仍留着那一份，而服务器那份没能删掉。选择放回即放弃这次删除：下次同步会把服务器上的那一份重新拉回本机，你可以再删一次。",
+        ["BitwardenStuckEraseSectionTitle"] = "服务器仍持有的删除",
+        ["BitwardenStuckEraseSectionDescription"] = "这些条目已在本机被永久删除，服务器上仍留着那一份。选择放回即放弃这次删除：下次同步会把服务器上的那一份重新拉回本机，你可以再删一次。",
         ["BitwardenStuckEraseAction"] = "把服务器那一份放回本机",
         ["BitwardenStuckEraseCipherFormat"] = "服务器条目 {0}",
         ["BitwardenStuckEraseReasonConflict"] = "本机删除之后，另一个客户端改动过它",
         ["BitwardenStuckEraseReasonFailed"] = "服务器拒绝了这次删除，队列已停止重试",
+        ["BitwardenStuckEraseReasonSuppressed"] = "服务器上仍留着那一份，本机在每次同步时都拦着它，不让它被拉回来",
         ["BitwardenStuckEraseLastAttemptFormat"] = "最后一次尝试于 {0}",
         ["BitwardenStuckEraseAbandoned"] = "已放弃这次删除，下次同步会把服务器那一份拉回本机",
         ["BitwardenStuckEraseAbandonFailed"] = "无法放弃这次删除，它仍在列表中。",

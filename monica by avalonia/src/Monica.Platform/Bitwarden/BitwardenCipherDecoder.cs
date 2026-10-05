@@ -105,6 +105,11 @@ internal sealed partial class BitwardenCipherDecoder(BitwardenSymmetricKey vault
         entry.Password = DecryptOptional(login.Password, key);
         entry.AuthenticatorKey = DecryptOptional(login.Totp, key);
         entry.PasskeyBindings = DecodePasskeys(login.Fido2Credentials, key);
+        if (fields.Any(ApiKeyEntryFields.IsMarker))
+        {
+            entry.LoginType = PasswordLoginType.ApiKey;
+        }
+
         return BuildPasswordResult(cipher, id, revision, updatedAt, entry, fields, history);
     }
 

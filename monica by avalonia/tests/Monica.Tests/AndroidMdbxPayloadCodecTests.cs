@@ -81,6 +81,32 @@ public sealed class AndroidMdbxPayloadCodecTests
     }
 
     [Fact]
+    public void Api_key_payload_round_trips_login_type_and_marker_fields()
+    {
+        var entry = new PasswordEntry
+        {
+            Id = 47,
+            Title = "API service",
+            Password = "sk-secret",
+            LoginType = PasswordLoginType.ApiKey
+        };
+        CustomField[] fields =
+        [
+            new() { EntryId = 47, Title = ApiKeyEntryFields.Marker, Value = ApiKeyEntryFields.Type },
+            new() { EntryId = 47, Title = ApiKeyEntryFields.ApiUrl, Value = "https://api.example.test/v1", SortOrder = 1 }
+        ];
+
+        var payload = AndroidMdbxPayloadCodec.EncodePassword(entry, fields, folderId: null);
+        using var document = JsonDocument.Parse(payload);
+        Assert.Equal("API_KEY", document.RootElement.GetProperty("login_type").GetString());
+
+        var decoded = AndroidMdbxPayloadCodec.DecodePassword(payload, entry.Title);
+        Assert.NotNull(decoded);
+        Assert.Equal(PasswordLoginType.ApiKey, decoded.Entry.LoginType);
+        Assert.Contains(decoded.CustomFields, field => field.Title == ApiKeyEntryFields.ApiUrl);
+    }
+
+    [Fact]
     public void Encode_password_writes_android_field_names_without_avalonia_wrapper()
     {
         var entry = new PasswordEntry

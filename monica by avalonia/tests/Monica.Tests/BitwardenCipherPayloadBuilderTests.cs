@@ -74,6 +74,19 @@ public sealed class BitwardenCipherPayloadBuilderTests
     }
 
     [Fact]
+    public void Api_key_login_cipher_round_trips_marker_and_login_type()
+    {
+        using var key = TestKey();
+        var entry = LoginEntry();
+        entry.LoginType = PasswordLoginType.ApiKey;
+        var decoded = Decode(key, entry, [], []);
+
+        Assert.Equal(PasswordLoginType.ApiKey, decoded.Password!.LoginType);
+        var marker = Assert.Single(decoded.CustomFields, field => field.Title == ApiKeyEntryFields.Marker);
+        Assert.Equal(ApiKeyEntryFields.Type, marker.Value);
+    }
+
+    [Fact]
     public void Payload_never_carries_a_plain_field_value()
     {
         using var key = TestKey();

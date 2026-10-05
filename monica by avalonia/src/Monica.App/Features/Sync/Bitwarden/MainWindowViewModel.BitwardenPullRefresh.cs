@@ -19,6 +19,11 @@ public sealed partial class MainWindowViewModel
         // all still has to say so.
         ApplyBitwardenUnsyncableChanges(result.Account.Id, result.Unsyncable);
         var merge = result.Merge;
+        // The suppressed set is applied ahead of the early return for the same reason the refusal list is:
+        // a round that moved no rows because every differing cipher was held back still has to say so.
+        // Recording it here is what turns "1 added, and one copy we quietly refused" into a row the user
+        // can actually act on, instead of a success banner that hides the delete they already made.
+        ApplyBitwardenSuppressedResurrections(result.Account.Id, merge.SuppressedCipherIdsOrEmpty);
         if (merge.Added + merge.Updated + merge.Deleted + merge.ConflictsBackedUp == 0)
         {
             return false;

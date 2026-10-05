@@ -14,6 +14,7 @@ public enum VaultItemType
 public enum PasswordLoginType
 {
     Password,
+    ApiKey,
     Sso,
     Wifi,
     SshKey,

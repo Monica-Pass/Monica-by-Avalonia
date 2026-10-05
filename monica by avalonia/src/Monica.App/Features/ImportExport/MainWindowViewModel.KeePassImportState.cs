@@ -194,6 +194,9 @@ public sealed partial class MainWindowViewModel
     private PasswordEntry CreatePasswordFromKeePass(long databaseId, KeePassEntryDetail source)
     {
         var row = source.Row;
+        var isApiKey = source.CustomFields.Any(field =>
+            string.Equals(field.Name, ApiKeyEntryFields.Marker, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(field.Value, ApiKeyEntryFields.Type, StringComparison.OrdinalIgnoreCase));
         return new PasswordEntry
         {
             Title = string.IsNullOrWhiteSpace(row.Title) ? _localization.Untitled : row.Title,
@@ -202,6 +205,7 @@ public sealed partial class MainWindowViewModel
             Password = source.Password,
             Notes = source.Notes,
             AuthenticatorKey = source.AuthenticatorKey,
+            LoginType = isApiKey ? PasswordLoginType.ApiKey : PasswordLoginType.Password,
             KeepassDatabaseId = databaseId,
             KeepassGroupPath = row.GroupPath,
             KeepassEntryUuid = row.EntryUuid,
