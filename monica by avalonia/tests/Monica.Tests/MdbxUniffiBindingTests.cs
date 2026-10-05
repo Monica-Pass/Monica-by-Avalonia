@@ -20,7 +20,7 @@ public sealed class MdbxUniffiBindingTests
         var metadata = await service.CreateLocalMetadataAsync("Native service", path, MdbxTigaMode.Multi);
         await using var stream = await service.OpenLocalStreamAsync(metadata);
 
-        Assert.True(stream.CanWrite);
+        Assert.False(stream.CanWrite);
         Assert.Equal(path, metadata.WorkingCopyPath);
         Assert.Equal("MDBX-2", await ReadFormatVersionAsync(path));
         Assert.StartsWith("MDBX-2 vault ", metadata.Description, StringComparison.Ordinal);

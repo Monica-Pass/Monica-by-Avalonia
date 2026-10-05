@@ -14,7 +14,7 @@
         <StyleInclude Source="/Features/Wallet/WalletStyles.axaml" />
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto,*">
+    <Grid RowDefinitions="Auto,*" IsEnabled="{Binding !IsMdbxBusy}">
         <!-- One strip for everything that narrows the tree; the tree itself is the only navigator. -->
         <controls:WorkspaceHeader Title="{Binding L.Library}"
                                   ColumnDefinitions="Auto,*,Auto"

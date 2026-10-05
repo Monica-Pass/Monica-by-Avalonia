@@ -15,9 +15,11 @@ public sealed partial class MdbxVaultStore
     private CancellationTokenRegistration _vaultSessionCancellationRegistration;
     private int _vaultSessionReleaseRequested;
     private int _disposed;
+    private int _fileReplacementVersion;
 
     private async Task<IMdbxNativeVault> OpenAsync(LocalMdbxDatabase database, CancellationToken cancellationToken)
     {
+        var fileVersion = Volatile.Read(ref _fileReplacementVersion);
         var path = database.WorkingCopyPath ?? database.FilePath;
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -29,13 +31,7 @@ public sealed partial class MdbxVaultStore
             throw new InvalidOperationException("MDBX vault password is missing.");
         }
 
-        if (_vaultSessionService is null)
-        {
-            var ownedDecision = await AssessFileAccessAsync(path, cancellationToken);
-            return new MdbxVaultLease(await OpenGatedVaultAsync(path, database.EncryptedPassword, ownedDecision, cancellationToken));
-        }
-
-        var sessionToken = _vaultSessionService.SessionCancellationToken;
+        var sessionToken = _vaultSessionService?.SessionCancellationToken ?? CancellationToken.None;
         using var linkedCancellation = CreateLinkedCancellation(cancellationToken, sessionToken);
         var effectiveCancellationToken = linkedCancellation?.Token ??
             (cancellationToken.CanBeCanceled ? cancellationToken : sessionToken);
@@ -44,7 +40,12 @@ public sealed partial class MdbxVaultStore
         try
         {
             ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
-            if (!_vaultSessionService.IsUnlocked)
+            if (fileVersion != Volatile.Read(ref _fileReplacementVersion))
+            {
+                throw new MdbxSnapshotException("vault-changed");
+            }
+            effectiveCancellationToken.ThrowIfCancellationRequested();
+            if (_vaultSessionService is { IsUnlocked: false })
             {
                 throw new OperationCanceledException("The MDBX vault session is locked.", effectiveCancellationToken);
             }
@@ -73,11 +74,17 @@ public sealed partial class MdbxVaultStore
                     this);
             }
 
+            effectiveCancellationToken.ThrowIfCancellationRequested();
+            if (_vaultSessionService is { IsUnlocked: false })
+            {
+                throw new OperationCanceledException("The MDBX vault session is locked.", effectiveCancellationToken);
+            }
+
             return new MdbxVaultLease(_cachedVault, this);
         }
         catch
         {
-            _vaultSessionGate.Release();
+            ReleaseVaultLease();
             throw;
         }
         finally
@@ -161,7 +168,8 @@ public sealed partial class MdbxVaultStore
     {
         try
         {
-            if (Interlocked.Exchange(ref _vaultSessionReleaseRequested, 0) != 0)
+            var releaseRequested = Interlocked.Exchange(ref _vaultSessionReleaseRequested, 0) != 0;
+            if (_vaultSessionService is null || releaseRequested || _vaultSessionService is { IsUnlocked: false })
             {
                 CloseCachedVault();
             }

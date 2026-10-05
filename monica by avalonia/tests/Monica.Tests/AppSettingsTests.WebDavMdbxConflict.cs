@@ -9,6 +9,73 @@ namespace Monica.Tests;
 public sealed partial class AppSettingsTests
 {
     [Fact]
+    public async Task ViewModel_keeps_newer_local_mdbx_changes_pending_after_snapshot_upload()
+    {
+        var databasePath = TestTempPaths.CreateFilePath(".db");
+        var factory = new SqliteConnectionFactory(databasePath);
+        var repository = new MonicaRepository(factory, new DatabaseMigrator(factory));
+        var webDav = new CapturingWebDavBackupService([]);
+        var viewModel = CreateViewModel(GetTempPath(), webDavBackupService: webDav, repository: repository);
+        ConfigureWebDav(viewModel);
+        await viewModel.CreateWebDavMdbxVaultCommand.ExecuteAsync(null);
+        var item = Assert.Single(viewModel.MdbxDatabaseItems);
+        var persisted = Assert.Single(await repository.GetMdbxDatabasesAsync());
+        persisted.LastSyncStatus = SyncStatus.PendingUpload;
+        await repository.SaveMdbxDatabaseAsync(persisted);
+        var workingCopyPath = persisted.WorkingCopyPath!;
+        var original = await File.ReadAllBytesAsync(workingCopyPath);
+        var newer = await CreateChangedMdbxFixtureAsync(original);
+        webDav.RemoteVersion = new RemoteFileVersion("\"fixture-v2\"", DateTimeOffset.UtcNow, null);
+        webDav.AfterBinaryUpload = () => File.WriteAllBytesAsync(workingCopyPath, newer);
+
+        await viewModel.SyncMdbxDatabaseCommand.ExecuteAsync(item);
+
+        var current = Assert.Single(viewModel.MdbxDatabases);
+        Assert.Equal(SyncStatus.PendingUpload, current.LastSyncStatus);
+        Assert.Equal("\"fixture-v2\"", current.RemoteETag);
+        Assert.Equal(original, webDav.UploadedBytes);
+        Assert.Equal(newer, await File.ReadAllBytesAsync(workingCopyPath));
+    }
+
+    [Fact]
+    public async Task ViewModel_preserves_default_mdbx_and_unsaved_note_when_using_remote_copy()
+    {
+        var databasePath = TestTempPaths.CreateFilePath(".db");
+        var factory = new SqliteConnectionFactory(databasePath);
+        var repository = new MonicaRepository(factory, new DatabaseMigrator(factory));
+        var webDav = new CapturingWebDavBackupService([])
+        {
+            UploadBinaryFailure = new RemoteFileConflictException("remote vault exists")
+        };
+        var viewModel = CreateViewModel(GetTempPath(), webDavBackupService: webDav,
+            repository: repository, confirmationDialogService: new ApprovingConfirmationDialogService());
+        ConfigureWebDav(viewModel, $"/Monica/{Guid.NewGuid():N}");
+        await viewModel.CreateWebDavMdbxVaultCommand.ExecuteAsync(null);
+        var database = Assert.Single(await repository.GetMdbxDatabasesAsync());
+        database.IsDefault = true;
+        await repository.SaveMdbxDatabaseAsync(database);
+        var workingCopyPath = database.WorkingCopyPath!;
+        var localBytes = await File.ReadAllBytesAsync(workingCopyPath);
+        webDav.UploadBinaryFailure = null;
+        webDav.DownloadBytes = await CreateChangedMdbxFixtureAsync(localBytes);
+        var draft = new NoteEditorTab(-1, null, "Unsaved note")
+        {
+            IsDirty = true,
+            DraftInitialized = true,
+            DraftContent = "Keep my uncommitted text"
+        };
+        viewModel.OpenNoteTabs.Add(draft);
+
+        await viewModel.UseRemoteWebDavMdbxCommand.ExecuteAsync(Assert.Single(viewModel.MdbxDatabaseItems));
+
+        Assert.Equal(localBytes, await File.ReadAllBytesAsync(workingCopyPath));
+        Assert.Same(draft, Assert.Single(viewModel.OpenNoteTabs));
+        Assert.True(draft.IsDirty);
+        Assert.Equal("Keep my uncommitted text", draft.DraftContent);
+        Assert.Contains(viewModel.L.Get("MdbxSnapshotUnsavedEdits"), viewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ViewModel_preserves_local_webdav_mdbx_when_conditional_upload_conflicts()
     {
         var databasePath = TestTempPaths.CreateFilePath(".db");
@@ -161,7 +228,7 @@ public sealed partial class AppSettingsTests
         webDav.UploadBinaryFailure = new RemoteFileConflictException("remote changed");
         await viewModel.SyncMdbxDatabaseCommand.ExecuteAsync(item);
         webDav.UploadBinaryFailure = null;
-        webDav.DownloadBytes = webDav.UploadedBytes.ToArray();
+        webDav.DownloadBytes = await CreateChangedMdbxFixtureAsync(originalLocalBytes);
         webDav.RemoteVersion = new RemoteFileVersion(
             "\"fixture-v2\"",
             DateTimeOffset.FromUnixTimeMilliseconds(1_700_000_100_000),
@@ -176,6 +243,7 @@ public sealed partial class AppSettingsTests
             Path.GetDirectoryName(workingCopyPath)!,
             $"{Path.GetFileNameWithoutExtension(workingCopyPath)}.local-conflict-*{Path.GetExtension(workingCopyPath)}"));
         Assert.Equal(originalLocalBytes, await File.ReadAllBytesAsync(recoveryFile));
+        Assert.Equal(webDav.DownloadBytes, await File.ReadAllBytesAsync(workingCopyPath));
         Assert.Contains(recoveryFile, viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
     }
 }

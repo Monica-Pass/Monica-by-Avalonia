@@ -6,6 +6,12 @@ public sealed partial class MainWindowViewModel
 {
     private bool TryBeginBitwardenOnlineOperation()
     {
+        if (IsMdbxBusy)
+        {
+            BitwardenOperationError = _localization.Get("MdbxOperationInProgress");
+            return false;
+        }
+
         if (Interlocked.CompareExchange(ref _bitwardenSyncOperationActive, 1, 0) != 0)
         {
             BitwardenOperationError = _localization.Get("BitwardenOperationInProgress");
@@ -22,6 +28,7 @@ public sealed partial class MainWindowViewModel
         _bitwardenSyncOperationCancellation?.Dispose();
         _bitwardenSyncOperationCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             _vaultSessionService.SessionCancellationToken);
+        _bitwardenOnlineOperationCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         IsBitwardenBusy = true;
         BitwardenOperationError = "";
         return true;
@@ -34,6 +41,8 @@ public sealed partial class MainWindowViewModel
         _bitwardenSyncOperationCancellation?.Dispose();
         _bitwardenSyncOperationCancellation = null;
         RaiseBitwardenState();
+        _bitwardenOnlineOperationCompletion?.TrySetResult();
+        _bitwardenOnlineOperationCompletion = null;
     }
 
     private void CancelBitwardenOperationAndClearSecrets()
@@ -119,6 +128,11 @@ public sealed partial class MainWindowViewModel
     private void OnBitwardenSyncStateChanged(object? sender, BitwardenSyncState state) =>
         _viewModelDispatcher.Post(() =>
         {
+            if (IsMdbxRestoreInProgress)
+            {
+                return;
+            }
+
             if (SelectedBitwardenAccount?.Id == state.AccountId)
             {
                 ApplyBitwardenSyncState(state);

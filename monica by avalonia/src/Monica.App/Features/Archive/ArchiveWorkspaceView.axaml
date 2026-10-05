@@ -10,7 +10,7 @@
 <UserControl.Styles>
     <StyleInclude Source="/Features/Archive/ArchiveStyles.axaml" />
 </UserControl.Styles>
-<Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsArchive}}" RowDefinitions="Auto,*" HorizontalAlignment="Stretch" ClipToBounds="True">
+<Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsArchive}}" IsEnabled="{Binding !IsMdbxBusy}" RowDefinitions="Auto,*" HorizontalAlignment="Stretch" ClipToBounds="True">
     <Border x:Name="ArchiveRecoveryCommandSurface" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,8">
         <Grid x:Name="ArchiveHeaderGrid" ColumnDefinitions="*,320,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" MinHeight="56">
             <StackPanel MinWidth="0" VerticalAlignment="Center">

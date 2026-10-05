@@ -1391,7 +1391,7 @@ public sealed partial class AppSettingsTests
             platformIntegrationService,
             clipboardService ?? new NoopClipboardService(),
             webDavBackupService ?? new NoopWebDavBackupService(),
-            mdbxVaultService ?? new MdbxVaultService(new MdbxTestVaultEngine()),
+            mdbxVaultService ?? new MdbxSnapshotTestVaultService(),
             new NoopPasswordAttachmentFileService(),
             new NoopPasswordEditorDialogService(),
             new NoopPasswordDetailDialogService(),
@@ -1620,6 +1620,7 @@ public sealed partial class AppSettingsTests
             null);
         public RemoteWriteCondition? LastWriteCondition { get; private set; }
         public int UploadBinaryCallCount { get; private set; }
+        public Func<Task>? AfterBinaryUpload { get; set; }
         public int ListCallCount { get; private set; }
 
         public string NormalizeRemotePath(string rootPath, string relativePath) => relativePath;
@@ -1663,6 +1664,7 @@ public sealed partial class AppSettingsTests
             RemoteWriteCondition condition,
             CancellationToken cancellationToken = default)
         {
+            Assert.False(content.CanWrite);
             UploadBinaryCallCount++;
             LastWriteCondition = condition;
             if (UploadBinaryFailure is not null)
@@ -1675,6 +1677,11 @@ public sealed partial class AppSettingsTests
             await using var copy = new MemoryStream();
             await content.CopyToAsync(copy, cancellationToken);
             UploadedBytes = copy.ToArray();
+            if (AfterBinaryUpload is not null)
+            {
+                await AfterBinaryUpload();
+            }
+
             return RemoteVersion;
         }
 

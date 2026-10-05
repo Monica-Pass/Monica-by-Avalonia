@@ -251,7 +251,7 @@ public sealed partial class PlatformServiceTests
         Assert.Equal("Test", metadata.Name);
         Assert.False(string.IsNullOrWhiteSpace(metadata.EncryptedPassword));
         Assert.Equal("mdbx-1/argon2id", metadata.KdfProfile);
-        Assert.True(stream.CanWrite);
+        Assert.False(stream.CanWrite);
         Assert.Equal("MDBX-2", await ReadMdbxFormatVersionAsync(path));
     }
 
@@ -268,7 +268,7 @@ public sealed partial class PlatformServiceTests
         Assert.Equal(1, bridge.CreateCalls);
         Assert.Equal(1, bridge.OpenCalls);
         Assert.Equal("MDBX-2 vault native-vault", metadata.Description);
-        Assert.True(stream.CanWrite);
+        Assert.False(stream.CanWrite);
         Assert.True(File.Exists(path));
     }
 

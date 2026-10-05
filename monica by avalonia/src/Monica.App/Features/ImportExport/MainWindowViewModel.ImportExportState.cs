@@ -29,8 +29,8 @@ public sealed partial class MainWindowViewModel
     [NotifyPropertyChangedFor(nameof(IsImportWorkspaceIdle))]
     private bool _isImportExportBusy;
 
-    public bool IsImportExportIdle => !IsImportExportBusy;
-    public bool IsImportWorkspaceIdle => !IsImportExportBusy && !IsKeePassImportBusy && !IsBitwardenImportBusy;
+    public bool IsImportExportIdle => !IsMdbxBusy && !IsImportExportBusy;
+    public bool IsImportWorkspaceIdle => !IsMdbxBusy && !IsImportExportBusy && !IsKeePassImportBusy && !IsBitwardenImportBusy;
 
     [ObservableProperty]
     private string _exportPreview = "";
@@ -52,6 +52,7 @@ public sealed partial class MainWindowViewModel
 
     private async Task RunImportExportOperationAsync(Func<Task> operation)
     {
+        if (IsMdbxBusy) return;
         if (Interlocked.CompareExchange(ref _importExportOperationActive, 1, 0) != 0)
         {
             return;

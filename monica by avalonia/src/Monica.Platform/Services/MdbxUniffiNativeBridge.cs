@@ -11,7 +11,7 @@ namespace Monica.Platform.Services;
 // native library must always come from the same mdbx-ffi revision as the one the Android
 // main repo ships (see Monica for Android/mdbx-engine/MDBX3_RUNTIME_PROVENANCE.json);
 // regenerate both with eng/mdbx/generate-csharp-bindings.ps1.
-public sealed class MdbxUniffiNativeBridge : IMdbxNativeBridge
+public sealed partial class MdbxUniffiNativeBridge : IMdbxNativeBridge, IMdbxNativeSnapshotBridge
 {
     // Android pages collection summaries at 200 per request.
     private const uint CollectionPageSize = 200;

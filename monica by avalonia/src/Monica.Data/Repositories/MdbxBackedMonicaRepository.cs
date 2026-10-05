@@ -24,6 +24,7 @@ public sealed partial class MdbxBackedMonicaRepository(
     IAttachmentContentStore? attachmentContentStore = null) : IMonicaRepository, ITransientVaultReadCache, IMdbxUnknownEntryDiagnostics
 {
     private static readonly TimeSpan ReadCacheTtl = TimeSpan.FromMinutes(2);
+    private readonly SemaphoreSlim _mdbxMetadataGate = new(1, 1);
     public bool PersistsAttachmentContent => true;
     private readonly IPasswordQuickAccessStore _quickAccessStore = inner as IPasswordQuickAccessStore
         ?? throw new ArgumentException("The local repository must provide password quick-access storage.", nameof(inner));
@@ -106,7 +107,6 @@ public sealed partial class MdbxBackedMonicaRepository(
         var entry = await FindPasswordForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
         if (entry is not null)
         {
-            await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
             var deletedAt = DateTimeOffset.UtcNow;
             entry.IsDeleted = true;
             entry.DeletedAt = deletedAt;
@@ -114,15 +114,15 @@ public sealed partial class MdbxBackedMonicaRepository(
             entry.ArchivedAt = null;
             entry.UpdatedAt = deletedAt;
             await SavePasswordAggregateAsync(database, categories, entry, cancellationToken: cancellationToken);
-            await mdbxVaultStore.SoftDeletePasswordAsync(database, entry, cancellationToken);
+            await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SoftDeletePasswordAsync(database, entry, cancellationToken));
             var boundTotps = await GetMdbxBoundTotpsByPasswordIdAsync(database, id, includeDeleted: true, cancellationToken);
             foreach (var item in boundTotps)
             {
                 item.IsDeleted = true;
                 item.DeletedAt = deletedAt;
                 item.UpdatedAt = deletedAt;
-                await mdbxVaultStore.SaveSecureItemAsync(database, item, categories.ToDictionary(category => category.Id), cancellationToken);
-                await mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken);
+                await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SaveSecureItemAsync(database, item, categories.ToDictionary(category => category.Id), cancellationToken));
+                await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken));
             }
         }
         ClearPasswordReadSnapshot();
@@ -136,8 +136,7 @@ public sealed partial class MdbxBackedMonicaRepository(
         var entry = await FindPasswordForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
         if (entry is not null && entry.DeletedAt != DateTimeOffset.UnixEpoch)
         {
-            await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
-            await mdbxVaultStore.RestorePasswordAsync(database, entry, cancellationToken);
+            await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.RestorePasswordAsync(database, entry, cancellationToken));
             entry.IsDeleted = false;
             entry.DeletedAt = null;
             entry.UpdatedAt = DateTimeOffset.UtcNow;
@@ -150,11 +149,11 @@ public sealed partial class MdbxBackedMonicaRepository(
                     continue;
                 }
 
-                await mdbxVaultStore.RestoreSecureItemAsync(database, item, cancellationToken);
+                await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.RestoreSecureItemAsync(database, item, cancellationToken));
                 item.IsDeleted = false;
                 item.DeletedAt = null;
                 item.UpdatedAt = entry.UpdatedAt;
-                await mdbxVaultStore.SaveSecureItemAsync(database, item, categories.ToDictionary(category => category.Id), cancellationToken);
+                await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SaveSecureItemAsync(database, item, categories.ToDictionary(category => category.Id), cancellationToken));
             }
         }
         ClearPasswordReadSnapshot();
@@ -168,15 +167,14 @@ public sealed partial class MdbxBackedMonicaRepository(
         var entry = await FindPasswordForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
         if (entry is not null)
         {
-            await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
             foreach (var attachment in await GetPasswordAttachmentsFromMdbxAsync(database, id, cancellationToken))
             {
-                await mdbxVaultStore.DeleteAttachmentAsync(database, attachment, cancellationToken);
+                await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.DeleteAttachmentAsync(database, attachment, cancellationToken));
             }
 
             if (entry.IsDeleted)
             {
-                await mdbxVaultStore.RestorePasswordAsync(database, entry, cancellationToken);
+                await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.RestorePasswordAsync(database, entry, cancellationToken));
             }
 
             var tombstoneAt = DateTimeOffset.UtcNow;
@@ -189,18 +187,18 @@ public sealed partial class MdbxBackedMonicaRepository(
                 passwordHistory: [],
                 attachments: [],
                 cancellationToken: cancellationToken);
-            await mdbxVaultStore.SoftDeletePasswordAsync(database, passwordTombstone, cancellationToken);
+            await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SoftDeletePasswordAsync(database, passwordTombstone, cancellationToken));
             var boundTotps = await GetMdbxBoundTotpsByPasswordIdAsync(database, id, includeDeleted: true, cancellationToken);
             foreach (var item in boundTotps)
             {
                 if (item.IsDeleted)
                 {
-                    await mdbxVaultStore.RestoreSecureItemAsync(database, item, cancellationToken);
+                    await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.RestoreSecureItemAsync(database, item, cancellationToken));
                 }
 
                 var secureItemTombstone = CreateSecureItemTombstone(item, tombstoneAt);
-                await mdbxVaultStore.SaveSecureItemAsync(database, secureItemTombstone, categories.ToDictionary(category => category.Id), cancellationToken);
-                await mdbxVaultStore.SoftDeleteSecureItemAsync(database, secureItemTombstone, cancellationToken);
+                await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SaveSecureItemAsync(database, secureItemTombstone, categories.ToDictionary(category => category.Id), cancellationToken));
+                await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SoftDeleteSecureItemAsync(database, secureItemTombstone, cancellationToken));
             }
         }
 
@@ -280,15 +278,14 @@ public sealed partial class MdbxBackedMonicaRepository(
             .ToArray();
         var passwordHistory = await mdbxVaultStore.GetPasswordHistoryAsync(database, entryId, cancellationToken) ?? [];
         var attachments = await GetPasswordAttachmentsFromMdbxAsync(database, entryId, cancellationToken);
-        await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
-        await mdbxVaultStore.SavePasswordAsync(
+        await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SavePasswordAsync(
             database,
             entry,
             normalizedFields,
             passwordHistory,
             attachments,
             categories.ToDictionary(category => category.Id),
-            cancellationToken);
+            cancellationToken));
         ClearPasswordReadSnapshot();
     }
 
@@ -404,8 +401,7 @@ public sealed partial class MdbxBackedMonicaRepository(
                 ?? throw new InvalidOperationException($"Password entry {attachment.OwnerId} was not found in the canonical MDBX vault.");
             attachment.OwnerType = "PASSWORD";
             attachment.OwnerId = entry.Id;
-            await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
-            await mdbxVaultStore.SavePasswordAttachmentAsync(database, entry, attachment, content, cancellationToken);
+            await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SavePasswordAttachmentAsync(database, entry, attachment, content, cancellationToken));
             var attachments = UpsertAttachment(await GetPasswordAttachmentsFromMdbxAsync(database, entry.Id, cancellationToken), attachment);
             await SavePasswordAggregateAsync(database, categories, entry, attachments: attachments, cancellationToken: cancellationToken);
             ClearPasswordReadSnapshot();
@@ -416,14 +412,13 @@ public sealed partial class MdbxBackedMonicaRepository(
         {
             var item = await mdbxVaultStore.FindSecureItemAsync(database, categories, attachment.OwnerId, includeDeleted: true, cancellationToken)
                 ?? throw new InvalidOperationException($"Secure item {attachment.OwnerId} was not found in the canonical MDBX vault.");
-            await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
-            await mdbxVaultStore.SaveSecureItemAttachmentAsync(database, item, attachment, content, cancellationToken);
+            await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SaveSecureItemAttachmentAsync(database, item, attachment, content, cancellationToken));
             var paths = DecodeSecureItemImagePaths(item).ToList();
             if (!paths.Contains(attachment.StoragePath, StringComparer.OrdinalIgnoreCase))
             {
                 paths.Add(attachment.StoragePath);
                 ApplySecureItemImagePaths(item, paths);
-                await mdbxVaultStore.SaveSecureItemAsync(database, item, categories.ToDictionary(category => category.Id), cancellationToken);
+                await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SaveSecureItemAsync(database, item, categories.ToDictionary(category => category.Id), cancellationToken));
             }
 
             ClearSecureItemReadSnapshot();
@@ -449,8 +444,7 @@ public sealed partial class MdbxBackedMonicaRepository(
     {
         var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
         var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
-        await mdbxVaultStore.DeleteAttachmentAsync(database, attachment, cancellationToken);
+        await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.DeleteAttachmentAsync(database, attachment, cancellationToken));
         if (IsPasswordOwnerType(attachment.OwnerType))
         {
             var entry = await mdbxVaultStore.FindPasswordAsync(database, categories, attachment.OwnerId, includeDeleted: true, cancellationToken);
@@ -475,7 +469,7 @@ public sealed partial class MdbxBackedMonicaRepository(
                     .Where(path => !string.Equals(path, attachment.StoragePath, StringComparison.OrdinalIgnoreCase))
                     .ToArray();
                 ApplySecureItemImagePaths(item, paths);
-                await mdbxVaultStore.SaveSecureItemAsync(database, item, categories.ToDictionary(category => category.Id), cancellationToken);
+                await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SaveSecureItemAsync(database, item, categories.ToDictionary(category => category.Id), cancellationToken));
             }
 
             ClearSecureItemReadSnapshot();
@@ -659,12 +653,11 @@ public sealed partial class MdbxBackedMonicaRepository(
         var item = await FindSecureItemForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
         if (item is not null)
         {
-            await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
             item.IsDeleted = true;
             item.DeletedAt = DateTimeOffset.UtcNow;
             item.UpdatedAt = DateTimeOffset.UtcNow;
-            await mdbxVaultStore.SaveSecureItemAsync(database, item, categories.ToDictionary(category => category.Id), cancellationToken);
-            await mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken);
+            await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SaveSecureItemAsync(database, item, categories.ToDictionary(category => category.Id), cancellationToken));
+            await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SoftDeleteSecureItemAsync(database, item, cancellationToken));
         }
         ClearSecureItemReadSnapshot();
     }
@@ -676,12 +669,11 @@ public sealed partial class MdbxBackedMonicaRepository(
         var item = await FindSecureItemForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
         if (item is not null && item.DeletedAt > DateTimeOffset.UnixEpoch)
         {
-            await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
-            await mdbxVaultStore.RestoreSecureItemAsync(database, item, cancellationToken);
+            await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.RestoreSecureItemAsync(database, item, cancellationToken));
             item.IsDeleted = false;
             item.DeletedAt = null;
             item.UpdatedAt = DateTimeOffset.UtcNow;
-            await mdbxVaultStore.SaveSecureItemAsync(database, item, categories.ToDictionary(category => category.Id), cancellationToken);
+            await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SaveSecureItemAsync(database, item, categories.ToDictionary(category => category.Id), cancellationToken));
         }
         ClearSecureItemReadSnapshot();
     }
@@ -693,11 +685,10 @@ public sealed partial class MdbxBackedMonicaRepository(
         var item = await FindSecureItemForMdbxOperationAsync(database, categories, id, includeDeleted: true, cancellationToken);
         if (item is not null)
         {
-            await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
-            await mdbxVaultStore.RestoreSecureItemAsync(database, item, cancellationToken);
+            await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.RestoreSecureItemAsync(database, item, cancellationToken));
             var tombstone = CreateSecureItemTombstone(item, DateTimeOffset.UtcNow);
-            await mdbxVaultStore.SaveSecureItemAsync(database, tombstone, categories.ToDictionary(category => category.Id), cancellationToken);
-            await mdbxVaultStore.SoftDeleteSecureItemAsync(database, tombstone, cancellationToken);
+            await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SaveSecureItemAsync(database, tombstone, categories.ToDictionary(category => category.Id), cancellationToken));
+            await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SoftDeleteSecureItemAsync(database, tombstone, cancellationToken));
         }
         ClearSecureItemReadSnapshot();
     }
@@ -714,8 +705,7 @@ public sealed partial class MdbxBackedMonicaRepository(
     {
         ClearForeignMdbxBindingForNewCategory(category);
         var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
-        await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
-        await mdbxVaultStore.SaveCategoryAsync(database, category, cancellationToken);
+        await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SaveCategoryAsync(database, category, cancellationToken));
         category.Id = GetStableCategoryId(category.MdbxFolderId!);
 
         ClearCategoryReadCache();
@@ -731,8 +721,7 @@ public sealed partial class MdbxBackedMonicaRepository(
         var category = categories.FirstOrDefault(category => category.Id == id);
         if (category is not null)
         {
-            await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
-            await mdbxVaultStore.UnassignCategoryAsync(database, category, cancellationToken);
+            await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.UnassignCategoryAsync(database, category, cancellationToken));
         }
         ClearCategoryReadCache();
         ClearPasswordReadSnapshot();
@@ -744,9 +733,17 @@ public sealed partial class MdbxBackedMonicaRepository(
 
     public async Task<long> SaveMdbxDatabaseAsync(LocalMdbxDatabase database, CancellationToken cancellationToken = default)
     {
-        var id = await inner.SaveMdbxDatabaseAsync(database, cancellationToken);
-        ClearMdbxReadCaches();
-        return id;
+        await _mdbxMetadataGate.WaitAsync(cancellationToken);
+        try
+        {
+            var id = await inner.SaveMdbxDatabaseAsync(database, cancellationToken);
+            ClearMdbxReadCaches();
+            return id;
+        }
+        finally
+        {
+            _mdbxMetadataGate.Release();
+        }
     }
 
     public Task<IReadOnlyList<OperationLog>> GetOperationLogsAsync(int limit = 100, string? itemType = null, CancellationToken cancellationToken = default) =>
@@ -765,19 +762,18 @@ public sealed partial class MdbxBackedMonicaRepository(
         }
 
         var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
-        await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
         switch (scope)
         {
             case VaultClearScope.Passwords:
-                await mdbxVaultStore.DetachSecureItemsFromPasswordsAsync(database, categories, cancellationToken);
-                await mdbxVaultStore.SoftDeletePasswordEntriesAsync(database, cancellationToken);
+                await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.DetachSecureItemsFromPasswordsAsync(database, categories, cancellationToken));
+                await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SoftDeletePasswordEntriesAsync(database, cancellationToken));
                 break;
             case VaultClearScope.SecureItems:
-                await mdbxVaultStore.SoftDeleteSecureItemEntriesAsync(database, cancellationToken);
+                await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SoftDeleteSecureItemEntriesAsync(database, cancellationToken));
                 break;
             default:
-                await mdbxVaultStore.SoftDeletePasswordEntriesAsync(database, cancellationToken);
-                await mdbxVaultStore.SoftDeleteSecureItemEntriesAsync(database, cancellationToken);
+                await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SoftDeletePasswordEntriesAsync(database, cancellationToken));
+                await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SoftDeleteSecureItemEntriesAsync(database, cancellationToken));
                 break;
         }
 
@@ -927,15 +923,14 @@ public sealed partial class MdbxBackedMonicaRepository(
 
         passwordHistory ??= await mdbxVaultStore.GetPasswordHistoryAsync(database, entry.Id, cancellationToken) ?? [];
         attachments ??= await GetPasswordAttachmentsFromMdbxAsync(database, entry.Id, cancellationToken);
-        await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
-        await mdbxVaultStore.SavePasswordAsync(
+        await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SavePasswordAsync(
             database,
             entry,
             customFields,
             passwordHistory,
             attachments,
             categories.ToDictionary(category => category.Id),
-            cancellationToken);
+            cancellationToken));
     }
 
     private static IReadOnlyList<Attachment> UpsertAttachment(
@@ -1170,27 +1165,77 @@ public sealed partial class MdbxBackedMonicaRepository(
         IReadOnlyDictionary<long, Category> categories,
         CancellationToken cancellationToken)
     {
-        await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
-        await mdbxVaultStore.SaveSecureItemAsync(database, item, categories, cancellationToken);
+        await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SaveSecureItemAsync(database, item, categories, cancellationToken));
         if (attachmentContentStore is not null && await MigrateSecureItemImagePathsAsync(database, item, cancellationToken))
         {
-            await mdbxVaultStore.SaveSecureItemAsync(database, item, categories, cancellationToken);
+            await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SaveSecureItemAsync(database, item, categories, cancellationToken));
         }
     }
 
-    private async Task MarkRemoteWorkingCopyPendingAsync(
-        LocalMdbxDatabase database,
-        CancellationToken cancellationToken)
+    private async Task ExecuteMdbxMutationAsync(LocalMdbxDatabase database, Func<Task> mutation)
     {
-        if (database.StorageLocation != MdbxStorageLocation.RemoteWebDav ||
-            (database.LastSyncStatus == SyncStatus.PendingUpload && database.LastSyncError is null))
+        Exception? mutationFailure = null;
+        try
+        {
+            await mutation();
+        }
+        catch (Exception exception)
+        {
+            mutationFailure = exception;
+            throw;
+        }
+        finally
+        {
+            // A store operation can commit several native changes before a later step fails.
+            // Record pending work after each attempt, including cancellation after a commit.
+            try
+            {
+                await MarkRemoteWorkingCopyPendingAsync(database);
+            }
+            catch (Exception metadataFailure) when (mutationFailure is not null)
+            {
+                // Preserve the native failure/cancellation and retain the secondary failure
+                // for callers to inspect instead of replacing the original exception.
+                mutationFailure.Data["Monica.MdbxPendingMetadataFailure"] = metadataFailure;
+            }
+        }
+    }
+
+    private async Task MarkRemoteWorkingCopyPendingAsync(LocalMdbxDatabase database)
+    {
+        if (database.StorageLocation is not (MdbxStorageLocation.RemoteWebDav or MdbxStorageLocation.RemoteOneDrive))
         {
             return;
         }
 
-        database.LastSyncStatus = SyncStatus.PendingUpload;
-        database.LastSyncError = null;
-        await inner.SaveMdbxDatabaseAsync(database, cancellationToken);
+        // Never hold the metadata gate while entering the native gate: upload/restore commits
+        // hold the native gate and then save metadata through this same semaphore.
+        await _mdbxMetadataGate.WaitAsync();
+        try
+        {
+            var current = (await inner.GetMdbxDatabasesAsync(CancellationToken.None))
+                .FirstOrDefault(item => item.Id == database.Id)
+                ?? throw new InvalidOperationException("The MDBX database metadata is no longer registered.");
+            if (current.StorageLocation is not (MdbxStorageLocation.RemoteWebDav or MdbxStorageLocation.RemoteOneDrive))
+            {
+                return;
+            }
+
+            if (current.LastSyncStatus != SyncStatus.PendingUpload || current.LastSyncError is not null)
+            {
+                current.LastSyncStatus = SyncStatus.PendingUpload;
+                current.LastSyncError = null;
+                await inner.SaveMdbxDatabaseAsync(current, CancellationToken.None);
+            }
+
+            // Drop cached metadata so a later mutation cannot reuse an old PendingUpload
+            // object and accidentally overwrite validators saved by an upload commit.
+            ClearDefaultLocalMdbxDatabaseCache();
+        }
+        finally
+        {
+            _mdbxMetadataGate.Release();
+        }
     }
 
     private async Task<bool> MigrateSecureItemImagePathsAsync(LocalMdbxDatabase database, SecureItem item, CancellationToken cancellationToken)
@@ -1225,7 +1270,7 @@ public sealed partial class MdbxBackedMonicaRepository(
             }
 
             var mdbxAttachment = CreateSecureItemImageAttachment(item, path);
-            await mdbxVaultStore.SaveSecureItemAttachmentAsync(database, item, mdbxAttachment, content, cancellationToken);
+            await ExecuteMdbxMutationAsync(database, () => mdbxVaultStore.SaveSecureItemAttachmentAsync(database, item, mdbxAttachment, content, cancellationToken));
             migratedPaths.Add(mdbxAttachment.StoragePath);
             await attachmentContentStore.DeleteAttachmentContentAsync(sourceAttachment, cancellationToken);
             changed = true;

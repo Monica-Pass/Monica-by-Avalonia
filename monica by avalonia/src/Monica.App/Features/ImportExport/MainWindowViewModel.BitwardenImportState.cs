@@ -14,6 +14,7 @@ public sealed partial class MainWindowViewModel
     private string? _bitwardenPendingJson;
     private BitwardenJsonImportSnapshot? _bitwardenImportPreview;
     private CancellationTokenSource? _bitwardenOperationCancellation;
+    private TaskCompletionSource? _bitwardenImportOperationCompletion;
     private int _bitwardenOperationActive;
 
     [ObservableProperty]
@@ -53,7 +54,7 @@ public sealed partial class MainWindowViewModel
     public bool HasBitwardenSelectedFile => !string.IsNullOrWhiteSpace(BitwardenSelectedFileName);
     public bool HasBitwardenImportPreview => _bitwardenImportPreview is not null;
     public bool HasBitwardenAttachmentMetadata => BitwardenPreviewAttachmentCount > 0;
-    public bool IsBitwardenImportIdle => !IsBitwardenImportBusy;
+    public bool IsBitwardenImportIdle => !IsMdbxBusy && !IsBitwardenImportBusy;
     public string BitwardenPreviewSummaryText => _bitwardenImportPreview is null
         ? _localization.Get("BitwardenPreviewEmpty")
         : _localization.Format(
@@ -74,6 +75,12 @@ public sealed partial class MainWindowViewModel
 
     private bool TryBeginBitwardenOperation(out CancellationToken cancellationToken)
     {
+        if (IsMdbxBusy)
+        {
+            cancellationToken = CancellationToken.None;
+            return false;
+        }
+
         if (Interlocked.CompareExchange(ref _bitwardenOperationActive, 1, 0) != 0)
         {
             cancellationToken = CancellationToken.None;
@@ -86,6 +93,7 @@ public sealed partial class MainWindowViewModel
                 ? _vaultSessionService.SessionCancellationToken
                 : CancellationToken.None);
         cancellationToken = _bitwardenOperationCancellation.Token;
+        _bitwardenImportOperationCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         IsBitwardenImportBusy = true;
         return true;
     }
@@ -96,6 +104,8 @@ public sealed partial class MainWindowViewModel
         Interlocked.Exchange(ref _bitwardenOperationActive, 0);
         _bitwardenOperationCancellation?.Dispose();
         _bitwardenOperationCancellation = null;
+        _bitwardenImportOperationCompletion?.TrySetResult();
+        _bitwardenImportOperationCompletion = null;
     }
 
     private void AdvanceBitwardenImportProgress()

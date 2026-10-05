@@ -207,4 +207,16 @@ public interface IMdbxVaultService
 {
     Task<LocalMdbxDatabase> CreateLocalMetadataAsync(string name, string filePath, MdbxTigaMode mode = MdbxTigaMode.Multi, CancellationToken cancellationToken = default);
     Task<Stream> OpenLocalStreamAsync(LocalMdbxDatabase database, CancellationToken cancellationToken = default);
+    Task<Stream> OpenSnapshotStreamAsync(LocalMdbxDatabase database, CancellationToken cancellationToken = default) =>
+        Task.FromException<Stream>(new Monica.Data.Mdbx.MdbxSnapshotException("native-unavailable"));
+    Task CreateSnapshotAsync(LocalMdbxDatabase database, string destination, CancellationToken cancellationToken = default) =>
+        Task.FromException(new Monica.Data.Mdbx.MdbxSnapshotException("native-unavailable"));
+    Task CommitSnapshotUploadAsync(LocalMdbxDatabase database, Stream snapshot,
+        Func<bool, CancellationToken, Task> commitMetadata, CancellationToken cancellationToken = default) =>
+        Task.FromException(new Monica.Data.Mdbx.MdbxSnapshotException("native-unavailable"));
+    Task<MdbxSnapshotRestoreResult> RestoreSnapshotAsync(LocalMdbxDatabase database, string incomingPath,
+        Func<CancellationToken, Task> commitMetadata, CancellationToken cancellationToken = default) =>
+        Task.FromException<MdbxSnapshotRestoreResult>(new Monica.Data.Mdbx.MdbxSnapshotException("native-unavailable"));
 }
+
+public sealed record MdbxSnapshotRestoreResult(string? RecoveryPath);

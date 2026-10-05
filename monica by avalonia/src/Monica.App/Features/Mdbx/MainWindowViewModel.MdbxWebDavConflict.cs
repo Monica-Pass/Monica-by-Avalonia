@@ -7,6 +7,8 @@ public sealed partial class MainWindowViewModel
 {
     private async Task KeepLocalWebDavMdbxCoreAsync(MdbxDatabaseDisplayItem? item)
     {
+        var cancellationToken = _vaultSessionService.SessionCancellationToken;
+        cancellationToken.ThrowIfCancellationRequested();
         var database = await GetConflictedRemoteDatabaseAsync(item);
         if (database is null)
         {
@@ -23,15 +25,16 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         if (database.StorageLocation == MdbxStorageLocation.RemoteOneDrive)
         {
-            await EnsureBoundOneDriveAccountAsync(database);
+            await EnsureBoundOneDriveAccountAsync(database, cancellationToken);
             var accountId = GetBoundOneDriveAccountId(database);
-            var currentRemote = await _oneDriveBackupService.GetFileVersionAsync(accountId, database.FilePath);
+            var currentRemote = await _oneDriveBackupService.GetFileVersionAsync(accountId, database.FilePath, cancellationToken);
             var condition = currentRemote is null
                 ? RemoteWriteCondition.CreateOnly
                 : RemoteWriteCondition.Match(currentRemote);
-            await UploadOneDriveMdbxWorkingCopyAsync(database, condition);
+            await UploadOneDriveMdbxWorkingCopyAsync(database, condition, cancellationToken);
         }
         else
         {
@@ -40,17 +43,19 @@ public sealed partial class MainWindowViewModel
                 return;
             }
 
-            var currentRemote = await _webDavBackupService.GetFileVersionAsync(profile, database.FilePath);
+            var currentRemote = await _webDavBackupService.GetFileVersionAsync(profile, database.FilePath, cancellationToken);
             var condition = currentRemote is null
                 ? RemoteWriteCondition.CreateOnly
                 : RemoteWriteCondition.Match(currentRemote);
-            await UploadWebDavMdbxWorkingCopyAsync(database, profile, condition);
+            await UploadWebDavMdbxWorkingCopyAsync(database, profile, condition, cancellationToken);
         }
         SetStatusNotice("MdbxKeepLocalSucceededFormat", database.Name);
     }
 
     private async Task UseRemoteWebDavMdbxCoreAsync(MdbxDatabaseDisplayItem? item)
     {
+        var cancellationToken = _vaultSessionService.SessionCancellationToken;
+        cancellationToken.ThrowIfCancellationRequested();
         var database = await GetConflictedRemoteDatabaseAsync(item);
         if (database is null)
         {
@@ -67,17 +72,12 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var workingCopyPath = GetMdbxWorkingCopyPath(database);
-        string? recoveryPath = null;
-        if (File.Exists(workingCopyPath))
-        {
-            recoveryPath = GetOrCreateConflictRecoveryPath(workingCopyPath);
-        }
-
+        cancellationToken.ThrowIfCancellationRequested();
+        string? recoveryPath;
         if (database.StorageLocation == MdbxStorageLocation.RemoteOneDrive)
         {
-            await EnsureBoundOneDriveAccountAsync(database);
-            await DownloadOneDriveMdbxWorkingCopyAsync(database, SyncStatus.Conflict);
+            await EnsureBoundOneDriveAccountAsync(database, cancellationToken);
+            recoveryPath = await DownloadOneDriveMdbxWorkingCopyAsync(database, SyncStatus.Conflict, cancellationToken);
         }
         else
         {
@@ -86,7 +86,7 @@ public sealed partial class MainWindowViewModel
                 return;
             }
 
-            await DownloadWebDavMdbxWorkingCopyAsync(database, profile, SyncStatus.Conflict);
+            recoveryPath = await DownloadWebDavMdbxWorkingCopyAsync(database, profile, SyncStatus.Conflict, cancellationToken);
         }
         if (recoveryPath is null)
         {
@@ -110,34 +110,5 @@ public sealed partial class MainWindowViewModel
             database.LastSyncStatus == SyncStatus.Conflict
                 ? database
                 : null;
-    }
-
-    private static string BuildConflictRecoveryPath(string workingCopyPath)
-    {
-        var directory = Path.GetDirectoryName(workingCopyPath) ?? Environment.CurrentDirectory;
-        var name = Path.GetFileNameWithoutExtension(workingCopyPath);
-        var extension = Path.GetExtension(workingCopyPath);
-        return Path.Combine(
-            directory,
-            $"{name}.local-conflict-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}{extension}");
-    }
-
-    private static string GetOrCreateConflictRecoveryPath(string workingCopyPath)
-    {
-        var directory = Path.GetDirectoryName(workingCopyPath) ?? Environment.CurrentDirectory;
-        var name = Path.GetFileNameWithoutExtension(workingCopyPath);
-        var extension = Path.GetExtension(workingCopyPath);
-        var prefix = $"{name}.local-conflict-";
-        var existing = Directory.EnumerateFiles(directory, $"{prefix}*{extension}")
-            .OrderByDescending(File.GetLastWriteTimeUtc)
-            .FirstOrDefault();
-        if (existing is not null)
-        {
-            return existing;
-        }
-
-        var recoveryPath = BuildConflictRecoveryPath(workingCopyPath);
-        File.Copy(workingCopyPath, recoveryPath, overwrite: false);
-        return recoveryPath;
     }
 }

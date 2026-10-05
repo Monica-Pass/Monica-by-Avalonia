@@ -88,7 +88,7 @@ public sealed partial class AppSettingsTests
         var database = Assert.Single(viewModel.MdbxDatabases);
         var workingCopyPath = database.WorkingCopyPath!;
         var localBytes = await File.ReadAllBytesAsync(workingCopyPath);
-        oneDrive.DownloadContent = localBytes;
+        oneDrive.DownloadContent = await CreateChangedMdbxFixtureAsync(localBytes);
         var recoveryPattern = $"{Path.GetFileNameWithoutExtension(workingCopyPath)}.local-conflict-*{Path.GetExtension(workingCopyPath)}";
         var existingRecoveryFiles = Directory.GetFiles(Path.GetDirectoryName(workingCopyPath)!, recoveryPattern).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -99,6 +99,7 @@ public sealed partial class AppSettingsTests
             Directory.GetFiles(Path.GetDirectoryName(workingCopyPath)!, recoveryPattern),
             path => !existingRecoveryFiles.Contains(path));
         Assert.Equal(localBytes, await File.ReadAllBytesAsync(recoveryFile));
+        Assert.Equal(oneDrive.DownloadContent, await File.ReadAllBytesAsync(workingCopyPath));
     }
 
     private sealed class RecordingOneDriveBackupService : IOneDriveBackupService
@@ -154,6 +155,7 @@ public sealed partial class AppSettingsTests
             CancellationToken cancellationToken = default)
         {
             Assert.Equal(Account.AccountId, accountId);
+            Assert.False(content.CanWrite);
             UploadConditions.Add(condition);
             if (UploadFailure is not null)
             {

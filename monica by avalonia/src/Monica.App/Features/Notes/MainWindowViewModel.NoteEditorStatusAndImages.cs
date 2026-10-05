@@ -37,6 +37,7 @@ public sealed partial class MainWindowViewModel
     private void QueueNoteImagePreviewRefresh(string content)
     {
         CancelNoteImagePreviewRefresh();
+        if (IsMdbxRestoreInProgress) return;
         if (string.IsNullOrEmpty(content))
         {
             Interlocked.Increment(ref _noteImagePreviewVersion);
@@ -182,7 +183,7 @@ public sealed partial class MainWindowViewModel
         await dispatcher.InvokeAsync(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (version == _noteImagePreviewVersion)
+            if (!IsMdbxRestoreInProgress && version == _noteImagePreviewVersion)
             {
                 ReplaceNoteImagePreviews(previews);
             }

@@ -243,7 +243,7 @@ public sealed partial class MainWindowViewModel
     }
 
     private bool CanReadVault(CancellationToken cancellationToken) =>
-        !cancellationToken.IsCancellationRequested && _cryptoService.IsUnlocked;
+        !IsMdbxRestoreInProgress && !cancellationToken.IsCancellationRequested && _cryptoService.IsUnlocked;
 
     private bool IsCurrentSelectedPasswordDetailsRequest(int version) =>
         Volatile.Read(ref _selectedPasswordDetailsVersion) == version;

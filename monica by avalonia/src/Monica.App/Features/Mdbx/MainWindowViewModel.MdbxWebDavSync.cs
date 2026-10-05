@@ -13,6 +13,9 @@ public sealed partial class MainWindowViewModel
         RemoteWriteCondition? writeCondition = null,
         CancellationToken cancellationToken = default)
     {
+        using var transferCancellation = CreateMdbxTransferCancellation(cancellationToken);
+        cancellationToken = transferCancellation.Token;
+        cancellationToken.ThrowIfCancellationRequested();
         var workingCopyPath = GetMdbxWorkingCopyPath(database);
         if (!File.Exists(workingCopyPath))
         {
@@ -22,7 +25,7 @@ public sealed partial class MainWindowViewModel
         try
         {
             var condition = writeCondition ?? BuildWebDavWriteCondition(database);
-            await using var content = await _mdbxVaultService.OpenLocalStreamAsync(database, cancellationToken);
+            await using var content = await _mdbxVaultService.OpenSnapshotStreamAsync(database, cancellationToken);
             content.Position = 0;
             var version = await _webDavBackupService.UploadBinaryConditionallyAsync(
                 profile,
@@ -30,37 +33,53 @@ public sealed partial class MainWindowViewModel
                 content,
                 condition,
                 cancellationToken);
-            await MarkWebDavMdbxSyncedAsync(database, workingCopyPath, version);
+            await _mdbxVaultService.CommitSnapshotUploadAsync(
+                database,
+                content,
+                (current, token) => CommitMdbxUploadedMetadataAsync(database, workingCopyPath, version, current, token),
+                cancellationToken);
+            await ReloadMdbxVaultStateAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (MdbxMissingRemoteRevisionException)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await MarkWebDavMdbxSyncFailedAsync(
                 database,
                 SyncStatus.Conflict,
-                MdbxMissingRemoteRevisionFailureCode);
+                MdbxMissingRemoteRevisionFailureCode,
+                cancellationToken);
             throw;
         }
         catch (RemoteFileConflictException)
         {
-            await MarkWebDavMdbxSyncFailedAsync(database, SyncStatus.Conflict, MdbxRemoteConflictFailureCode);
+            cancellationToken.ThrowIfCancellationRequested();
+            await MarkWebDavMdbxSyncFailedAsync(database, SyncStatus.Conflict, MdbxRemoteConflictFailureCode, cancellationToken);
             throw;
         }
         catch (Exception)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var failureStatus = writeCondition is null
                 ? SyncStatus.PendingUpload
                 : SyncStatus.Conflict;
-            await MarkWebDavMdbxSyncFailedAsync(database, failureStatus, MdbxWebDavSyncFailureCode);
+            await MarkWebDavMdbxSyncFailedAsync(database, failureStatus, MdbxWebDavSyncFailureCode, cancellationToken);
             throw;
         }
     }
 
-    private async Task DownloadWebDavMdbxWorkingCopyAsync(
+    private async Task<string?> DownloadWebDavMdbxWorkingCopyAsync(
         LocalMdbxDatabase database,
         WebDavProfile profile,
         SyncStatus failureStatus = SyncStatus.Failed,
         CancellationToken cancellationToken = default)
     {
+        using var transferCancellation = CreateMdbxTransferCancellation(cancellationToken);
+        cancellationToken = transferCancellation.Token;
+        cancellationToken.ThrowIfCancellationRequested();
         var workingCopyPath = GetMdbxWorkingCopyPath(database);
         var directory = Path.GetDirectoryName(workingCopyPath) ?? Environment.CurrentDirectory;
         Directory.CreateDirectory(directory);
@@ -88,71 +107,32 @@ public sealed partial class MainWindowViewModel
                 destination.Flush(flushToDisk: true);
             }
 
-            await ValidateIncomingMdbxWorkingCopyAsync(database, incomingPath, cancellationToken);
-            File.Move(incomingPath, workingCopyPath, overwrite: true);
-            await MarkWebDavMdbxSyncedAsync(database, workingCopyPath, version);
+            var result = await RestoreIncomingMdbxSnapshotAsync(database, incomingPath, workingCopyPath, version, cancellationToken);
+            return result.RecoveryPath;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception)
         {
-            await MarkWebDavMdbxSyncFailedAsync(database, failureStatus, MdbxWebDavSyncFailureCode);
+            cancellationToken.ThrowIfCancellationRequested();
+            await MarkWebDavMdbxSyncFailedAsync(database, failureStatus, MdbxWebDavSyncFailureCode, cancellationToken);
             throw;
         }
         finally
         {
-            if (File.Exists(incomingPath))
-            {
-                File.Delete(incomingPath);
-            }
+            DeleteMdbxIncomingArtifacts(incomingPath);
         }
-    }
-
-    private async Task ValidateIncomingMdbxWorkingCopyAsync(
-        LocalMdbxDatabase database,
-        string incomingPath,
-        CancellationToken cancellationToken)
-    {
-        var validationMetadata = new LocalMdbxDatabase
-        {
-            FilePath = incomingPath,
-            WorkingCopyPath = incomingPath,
-            EncryptedPassword = database.EncryptedPassword,
-            TigaMode = database.TigaMode,
-            UnlockMethod = database.UnlockMethod
-        };
-        await using var stream = await _mdbxVaultService.OpenLocalStreamAsync(
-            validationMetadata,
-            cancellationToken);
-    }
-
-    private async Task MarkWebDavMdbxSyncedAsync(
-        LocalMdbxDatabase database,
-        string workingCopyPath,
-        RemoteFileVersion version)
-    {
-        database.WorkingCopyPath = workingCopyPath;
-        database.CacheCopyPath = workingCopyPath;
-        database.IsOfflineAvailable = true;
-        database.LastSyncedAt = DateTimeOffset.UtcNow;
-        database.LastSyncStatus = SyncStatus.Synced;
-        database.LastSyncError = null;
-        database.RemoteETag = version.ETag;
-        database.RemoteLastModifiedAt = version.LastModified;
-        await SaveMdbxSyncStateAsync(database);
     }
 
     private async Task MarkWebDavMdbxSyncFailedAsync(
         LocalMdbxDatabase database,
         SyncStatus status,
-        string failureCode)
+        string failureCode,
+        CancellationToken cancellationToken)
     {
-        database.LastSyncStatus = status;
-        database.LastSyncError = failureCode;
-        await SaveMdbxSyncStateAsync(database);
-    }
-
-    private async Task SaveMdbxSyncStateAsync(LocalMdbxDatabase database)
-    {
-        await _repository.SaveMdbxDatabaseAsync(database);
+        await CommitMdbxSyncFailureMetadataAsync(database, status, failureCode, cancellationToken);
         await ReloadMdbxVaultStateAsync();
     }
 

@@ -8,7 +8,7 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private async Task LoadBitwardenAccountsAsync()
     {
-        if (!IsUnlocked)
+        if (!IsUnlocked || IsMdbxRestoreInProgress)
         {
             return;
         }
@@ -74,7 +74,7 @@ public sealed partial class MainWindowViewModel
 
         bool IsCurrentLoad() =>
             loadVersion == _bitwardenAccountsLoadVersion && IsUnlocked &&
-            !sessionCancellationToken.IsCancellationRequested;
+            !sessionCancellationToken.IsCancellationRequested && !IsMdbxRestoreInProgress;
     }
 
     [RelayCommand]

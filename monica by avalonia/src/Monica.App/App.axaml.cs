@@ -197,7 +197,9 @@ public partial class App : Application
             provider.GetService<IVaultDataProtector>(),
             provider.GetRequiredService<IAttachmentContentStore>()));
         services.AddSingleton<IMdbxNativeBridge, MdbxUniffiNativeBridge>();
-        services.AddSingleton<IMdbxVaultStore, MdbxVaultStore>();
+        services.AddSingleton<MdbxVaultStore>();
+        services.AddSingleton<IMdbxVaultStore>(provider => provider.GetRequiredService<MdbxVaultStore>());
+        services.AddSingleton<IMdbxVaultFileReplacementCoordinator>(provider => provider.GetRequiredService<MdbxVaultStore>());
         services.AddSingleton<MdbxBackedMonicaRepository>(provider => new MdbxBackedMonicaRepository(
             provider.GetRequiredService<MonicaRepository>(),
             provider.GetRequiredService<IMdbxVaultStore>(),
@@ -262,7 +264,8 @@ public partial class App : Application
             provider.GetRequiredService<IOneDriveAccessTokenProvider>()));
         services.AddSingleton<IKeePassVaultService, KeePassVaultService>();
         services.AddSingleton<IMdbxVaultService>(provider => new MdbxVaultService(
-            nativeBridge: provider.GetRequiredService<IMdbxNativeBridge>()));
+            nativeBridge: provider.GetRequiredService<IMdbxNativeBridge>(),
+            replacementCoordinator: provider.GetRequiredService<IMdbxVaultFileReplacementCoordinator>()));
         services.AddSingleton<ICanonicalVaultPathProvider, CanonicalVaultPathProvider>();
         services.AddSingleton<ICanonicalVaultBootstrapService, CanonicalVaultBootstrapService>();
         services.AddSingleton<IClipboardAdapter>(_ => new AvaloniaClipboardAdapter(() => mainWindow));

@@ -10,6 +10,12 @@ public sealed partial class MainWindowViewModel
 
     private bool TryBeginWebDavOperation(bool isLoading)
     {
+        if (IsMdbxBusy)
+        {
+            SetStatusMessage("MdbxOperationInProgress");
+            return false;
+        }
+
         if (Interlocked.CompareExchange(ref _webDavOperationActive, 1, 0) != 0)
         {
             SetStatusMessage("WebDavOperationInProgress");

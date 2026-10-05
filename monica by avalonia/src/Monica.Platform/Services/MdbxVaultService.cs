@@ -15,12 +15,14 @@ public interface IMdbxVaultEngine
     Task<MdbxVaultInspection> InspectAsync(string path, CancellationToken cancellationToken = default);
 }
 
-public sealed class MdbxVaultService(IMdbxVaultEngine? engine = null, IMdbxNativeBridge? nativeBridge = null) : IMdbxVaultService
+public sealed partial class MdbxVaultService(IMdbxVaultEngine? engine = null, IMdbxNativeBridge? nativeBridge = null,
+    IMdbxVaultFileReplacementCoordinator? replacementCoordinator = null) : IMdbxVaultService
 {
     private const string ExpectedFormatVersion = "MDBX-2";
     private const string DeviceId = "monica-avalonia";
     private readonly IMdbxVaultEngine _engine = engine ?? new MdbxCliVaultEngine();
     private readonly IMdbxNativeBridge _nativeBridge = nativeBridge ?? new UnavailableMdbxNativeBridge();
+    private readonly IMdbxVaultFileReplacementCoordinator? _replacementCoordinator = replacementCoordinator;
 
     public async Task<LocalMdbxDatabase> CreateLocalMetadataAsync(string name, string filePath, MdbxTigaMode mode = MdbxTigaMode.Multi, CancellationToken cancellationToken = default)
     {
@@ -90,7 +92,7 @@ public sealed class MdbxVaultService(IMdbxVaultEngine? engine = null, IMdbxNativ
             EnsureExpectedFormat(inspection);
         }
 
-        Stream stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
+        Stream stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         return stream;
     }
 

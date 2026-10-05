@@ -6,6 +6,12 @@ public sealed partial class MainWindowViewModel
 
     private bool TryBeginSecurityMaintenance(Action setBusy)
     {
+        if (IsMdbxBusy)
+        {
+            SetStatusMessage("MdbxOperationInProgress");
+            return false;
+        }
+
         if (Interlocked.CompareExchange(ref _securityMaintenanceOperationActive, 1, 0) != 0)
         {
             SetStatusMessage("SecurityMaintenanceInProgress");

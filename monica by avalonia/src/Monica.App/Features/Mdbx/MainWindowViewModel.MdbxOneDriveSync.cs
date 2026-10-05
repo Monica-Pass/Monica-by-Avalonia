@@ -116,6 +116,8 @@ public sealed partial class MainWindowViewModel
         LocalMdbxDatabase database,
         CancellationToken cancellationToken = default)
     {
+        using var transferCancellation = CreateMdbxTransferCancellation(cancellationToken);
+        cancellationToken = transferCancellation.Token;
         if (string.IsNullOrWhiteSpace(database.RemoteAccountId))
         {
             throw new OneDriveAccountUnavailableException(
@@ -147,6 +149,9 @@ public sealed partial class MainWindowViewModel
         RemoteWriteCondition? writeCondition = null,
         CancellationToken cancellationToken = default)
     {
+        using var transferCancellation = CreateMdbxTransferCancellation(cancellationToken);
+        cancellationToken = transferCancellation.Token;
+        cancellationToken.ThrowIfCancellationRequested();
         var accountId = GetBoundOneDriveAccountId(database);
         var workingCopyPath = GetMdbxWorkingCopyPath(database);
         if (!File.Exists(workingCopyPath))
@@ -157,7 +162,7 @@ public sealed partial class MainWindowViewModel
         try
         {
             var condition = writeCondition ?? BuildOneDriveWriteCondition(database);
-            await using var content = await _mdbxVaultService.OpenLocalStreamAsync(database, cancellationToken);
+            await using var content = await _mdbxVaultService.OpenSnapshotStreamAsync(database, cancellationToken);
             content.Position = 0;
             var version = await _oneDriveBackupService.UploadBinaryConditionallyAsync(
                 accountId,
@@ -165,28 +170,43 @@ public sealed partial class MainWindowViewModel
                 content,
                 condition,
                 cancellationToken);
-            await MarkOneDriveMdbxSyncedAsync(database, workingCopyPath, version);
+            await _mdbxVaultService.CommitSnapshotUploadAsync(
+                database,
+                content,
+                (current, token) => CommitMdbxUploadedMetadataAsync(database, workingCopyPath, version, current, token),
+                cancellationToken);
+            await ReloadMdbxVaultStateAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (RemoteFileConflictException)
         {
-            await MarkOneDriveMdbxSyncFailedAsync(database, SyncStatus.Conflict, MdbxRemoteConflictFailureCode);
+            cancellationToken.ThrowIfCancellationRequested();
+            await MarkOneDriveMdbxSyncFailedAsync(database, SyncStatus.Conflict, MdbxRemoteConflictFailureCode, cancellationToken);
             throw;
         }
         catch (Exception)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await MarkOneDriveMdbxSyncFailedAsync(
                 database,
                 writeCondition is null ? SyncStatus.PendingUpload : SyncStatus.Conflict,
-                MdbxOneDriveSyncFailureCode);
+                MdbxOneDriveSyncFailureCode,
+                cancellationToken);
             throw;
         }
     }
 
-    private async Task DownloadOneDriveMdbxWorkingCopyAsync(
+    private async Task<string?> DownloadOneDriveMdbxWorkingCopyAsync(
         LocalMdbxDatabase database,
         SyncStatus failureStatus = SyncStatus.Failed,
         CancellationToken cancellationToken = default)
     {
+        using var transferCancellation = CreateMdbxTransferCancellation(cancellationToken);
+        cancellationToken = transferCancellation.Token;
+        cancellationToken.ThrowIfCancellationRequested();
         var accountId = GetBoundOneDriveAccountId(database);
         var workingCopyPath = GetMdbxWorkingCopyPath(database);
         var directory = Path.GetDirectoryName(workingCopyPath) ?? Environment.CurrentDirectory;
@@ -212,48 +232,33 @@ public sealed partial class MainWindowViewModel
                 destination.Flush(flushToDisk: true);
             }
 
-            await ValidateIncomingMdbxWorkingCopyAsync(database, incomingPath, cancellationToken);
-            File.Move(incomingPath, workingCopyPath, overwrite: true);
-            await MarkOneDriveMdbxSyncedAsync(database, workingCopyPath, version);
+            var result = await RestoreIncomingMdbxSnapshotAsync(database, incomingPath, workingCopyPath, version, cancellationToken);
+            return result.RecoveryPath;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception)
         {
-            await MarkOneDriveMdbxSyncFailedAsync(database, failureStatus, MdbxOneDriveSyncFailureCode);
+            cancellationToken.ThrowIfCancellationRequested();
+            await MarkOneDriveMdbxSyncFailedAsync(database, failureStatus, MdbxOneDriveSyncFailureCode, cancellationToken);
             throw;
         }
         finally
         {
-            if (File.Exists(incomingPath))
-            {
-                File.Delete(incomingPath);
-            }
+            DeleteMdbxIncomingArtifacts(incomingPath);
         }
     }
 
-    private async Task MarkOneDriveMdbxSyncedAsync(
-        LocalMdbxDatabase database,
-        string workingCopyPath,
-        RemoteFileVersion version)
-    {
-        database.WorkingCopyPath = workingCopyPath;
-        database.CacheCopyPath = workingCopyPath;
-        database.IsOfflineAvailable = true;
-        database.LastSyncedAt = DateTimeOffset.UtcNow;
-        database.LastSyncStatus = SyncStatus.Synced;
-        database.LastSyncError = null;
-        database.RemoteETag = version.ETag;
-        database.RemoteLastModifiedAt = version.LastModified;
-        await SaveMdbxSyncStateAsync(database);
-    }
-
-    private Task MarkOneDriveMdbxSyncFailedAsync(
+    private async Task MarkOneDriveMdbxSyncFailedAsync(
         LocalMdbxDatabase database,
         SyncStatus status,
-        string failureCode)
+        string failureCode,
+        CancellationToken cancellationToken)
     {
-        database.LastSyncStatus = status;
-        database.LastSyncError = failureCode;
-        return SaveMdbxSyncStateAsync(database);
+        await CommitMdbxSyncFailureMetadataAsync(database, status, failureCode, cancellationToken);
+        await ReloadMdbxVaultStateAsync();
     }
 
     private static string GetBoundOneDriveAccountId(LocalMdbxDatabase database) =>

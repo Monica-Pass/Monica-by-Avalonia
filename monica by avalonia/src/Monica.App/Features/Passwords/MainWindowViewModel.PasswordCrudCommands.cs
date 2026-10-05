@@ -11,9 +11,10 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanEditVaultDuringMdbxOperation))]
     private async Task AddPasswordAsync()
     {
+        if (!CanEditVaultDuringMdbxOperation) return;
         var initialPassword = string.IsNullOrWhiteSpace(Generator.GeneratedPassword) ? "" : Generator.GeneratedPassword;
         var editor = await _passwordEditorDialogService.ShowAsync(
             null,
@@ -59,10 +60,10 @@ public sealed partial class MainWindowViewModel
         SetStatusNotice("CreatedPasswordFormat", entries[0].Title);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanEditVaultDuringMdbxOperation))]
     private async Task EditPasswordAsync(PasswordEntry? entry)
     {
-        if (entry is null)
+        if (entry is null || !CanEditVaultDuringMdbxOperation)
         {
             return;
         }

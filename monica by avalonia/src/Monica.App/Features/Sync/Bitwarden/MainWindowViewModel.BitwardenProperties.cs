@@ -22,6 +22,7 @@ public sealed partial class MainWindowViewModel
     private int _bitwardenAccountsLoadActive;
     private int _bitwardenAccountsLoadVersion;
     private CancellationTokenSource? _bitwardenSyncOperationCancellation;
+    private TaskCompletionSource? _bitwardenOnlineOperationCompletion;
 
     public ObservableCollection<BitwardenAccountDisplayItem> BitwardenAccounts { get; } = [];
     public ObservableCollection<BitwardenLoginFactor> BitwardenLoginFactors { get; } = [];
@@ -36,7 +37,7 @@ public sealed partial class MainWindowViewModel
     public bool HasBitwardenAccounts => BitwardenAccounts.Count > 0;
     public bool HasSelectedBitwardenAccount => SelectedBitwardenAccount is not null;
     public bool HasBitwardenOperationError => !string.IsNullOrWhiteSpace(BitwardenOperationError);
-    public bool IsBitwardenOperationBusy => IsBitwardenBusy || IsBitwardenSyncActive || IsLoadingBitwardenAccounts;
+    public bool IsBitwardenOperationBusy => IsMdbxBusy || IsBitwardenBusy || IsBitwardenSyncActive || IsLoadingBitwardenAccounts;
     public bool IsBitwardenChallengeVisible => BitwardenLoginChallenge != BitwardenLoginChallengeKind.None;
     public bool IsBitwardenTwoFactorChallenge => BitwardenLoginChallenge == BitwardenLoginChallengeKind.TwoFactor;
     public bool IsBitwardenCaptchaChallenge => BitwardenLoginChallenge == BitwardenLoginChallengeKind.Captcha;

@@ -5,9 +5,10 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanEditVaultDuringMdbxOperation))]
     private async Task AddWalletItemAsync()
     {
+        if (!CanEditVaultDuringMdbxOperation) return;
         var editor = await _walletItemEditorDialogService.ShowAsync(
             null,
             VaultItemType.BankCard);
@@ -34,11 +35,11 @@ public sealed partial class MainWindowViewModel
         SetStatusNotice("SavedWalletItemFormat", item.Title);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanEditVaultDuringMdbxOperation))]
     private async Task EditWalletItemAsync(SecureItem? item)
     {
         item ??= SelectedWalletItem;
-        if (item is null)
+        if (item is null || !CanEditVaultDuringMdbxOperation)
         {
             return;
         }

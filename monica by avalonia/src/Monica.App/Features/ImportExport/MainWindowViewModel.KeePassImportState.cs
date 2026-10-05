@@ -16,6 +16,7 @@ public sealed partial class MainWindowViewModel
     private PickedBinaryFile? _keePassPendingFile;
     private KeePassVaultSession? _keePassVaultSession;
     private CancellationTokenSource? _keePassOperationCancellation;
+    private TaskCompletionSource? _keePassImportOperationCompletion;
     private int _keePassOperationActive;
     private readonly HashSet<string> _keePassOpenFolders = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<KeePassTreeRow> _keePassTreeRows = [];
@@ -83,7 +84,7 @@ public sealed partial class MainWindowViewModel
     /// </summary>
     public bool ShowKeePassOpenForm =>
         HasKeePassSelectedFile && !HasKeePassImportPreview && !ShowKeePassCreateForm;
-    public bool IsKeePassImportIdle => !IsKeePassImportBusy;
+    public bool IsKeePassImportIdle => !IsMdbxBusy && !IsKeePassImportBusy;
     public string KeePassPreviewSummaryText => _keePassVaultSession is null
         ? _localization.Get("KeePassPreviewEmpty")
         : _localization.Format(
@@ -97,6 +98,12 @@ public sealed partial class MainWindowViewModel
 
     private bool TryBeginKeePassOperation(out CancellationToken cancellationToken)
     {
+        if (IsMdbxBusy)
+        {
+            cancellationToken = CancellationToken.None;
+            return false;
+        }
+
         if (Interlocked.CompareExchange(ref _keePassOperationActive, 1, 0) != 0)
         {
             cancellationToken = CancellationToken.None;
@@ -109,6 +116,7 @@ public sealed partial class MainWindowViewModel
                 ? _vaultSessionService.SessionCancellationToken
                 : CancellationToken.None);
         cancellationToken = _keePassOperationCancellation.Token;
+        _keePassImportOperationCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         IsKeePassImportBusy = true;
         return true;
     }
@@ -119,6 +127,8 @@ public sealed partial class MainWindowViewModel
         Interlocked.Exchange(ref _keePassOperationActive, 0);
         _keePassOperationCancellation?.Dispose();
         _keePassOperationCancellation = null;
+        _keePassImportOperationCompletion?.TrySetResult();
+        _keePassImportOperationCompletion = null;
     }
 
     private void AdvanceKeePassImportProgress()

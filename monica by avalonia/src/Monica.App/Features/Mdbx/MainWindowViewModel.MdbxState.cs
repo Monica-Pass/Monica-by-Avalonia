@@ -25,6 +25,13 @@ public sealed partial class MainWindowViewModel
         {
             await action();
         }
+        catch (OperationCanceledException)
+        {
+            if (IsUnlocked)
+            {
+                SetStatusNotice("MdbxOperationCanceled");
+            }
+        }
         catch (OneDriveAccountUnavailableException ex)
         {
             AppDiagnostics.Error($"MDBX OneDrive account unavailable: {operationKey}", ex);

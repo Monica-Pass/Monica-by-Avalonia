@@ -37,9 +37,10 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private void ClearTotpSearch() => TotpSearchText = "";
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanEditVaultDuringMdbxOperation))]
     private async Task AddTotpAsync()
     {
+        if (!CanEditVaultDuringMdbxOperation) return;
         var editor = await _totpEditorDialogService.ShowAsync(null);
         if (editor is null)
         {
@@ -93,10 +94,10 @@ public sealed partial class MainWindowViewModel
         SetStatusNotice("GeneratedNextTotpFormat", item.Title);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanEditVaultDuringMdbxOperation))]
     private async Task EditTotpAsync(SecureItem? item)
     {
-        if (item is null)
+        if (item is null || !CanEditVaultDuringMdbxOperation)
         {
             return;
         }

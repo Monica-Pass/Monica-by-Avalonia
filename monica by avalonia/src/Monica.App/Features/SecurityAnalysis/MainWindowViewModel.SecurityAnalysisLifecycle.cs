@@ -12,7 +12,7 @@ public sealed partial class MainWindowViewModel
 
     private void RefreshSecurityAnalysisIfNeeded()
     {
-        if (_isUnlockedShellHibernated ||
+        if (IsMdbxRestoreInProgress || _isUnlockedShellHibernated ||
             !_isSecurityAnalysisDirty ||
             !string.Equals(SelectedSection, "SecurityAnalysis", StringComparison.Ordinal))
         {

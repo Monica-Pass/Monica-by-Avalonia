@@ -2,7 +2,7 @@
     <UserControl.Styles>
         <StyleInclude Source="/Features/Settings/SettingsStyles.axaml" />
     </UserControl.Styles>
-    <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsSettings}}" RowDefinitions="*" HorizontalAlignment="Stretch" ClipToBounds="True">
+    <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsSettings}}" IsEnabled="{Binding !IsMdbxBusy}" RowDefinitions="*" HorizontalAlignment="Stretch" ClipToBounds="True">
         <Grid x:Name="SettingsWorkspaceLayoutGrid" ColumnDefinitions="248,*" RowDefinitions="*" MinWidth="0">
             <Border x:Name="SettingsSidebarRegion" Classes="workspaceSidebar" Padding="14" ClipToBounds="True" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,1,0">
                 <ScrollViewer HorizontalScrollBarVisibility="Disabled">
