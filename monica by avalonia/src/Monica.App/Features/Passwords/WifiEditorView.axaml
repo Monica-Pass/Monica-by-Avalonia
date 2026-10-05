@@ -8,6 +8,8 @@
             <TextBlock Text="{Binding L[WifiNetwork]}" Classes="editorLabel" />
             <TextBox x:Name="WifiSsidBox" Text="{Binding WifiSsid}" Classes="editorInput"
                      PlaceholderText="{Binding L[WifiSsid]}" AutomationProperties.Name="{Binding L[WifiSsid]}" />
+            <TextBox x:Name="WifiIdentityBox" Text="{Binding Username}" IsVisible="{Binding WifiIsEnterprise}"
+                     Classes="editorInput" PlaceholderText="{Binding L.Username}" AutomationProperties.Name="{Binding L.Username}" />
             <TextBlock Text="{Binding L[WifiSecurity]}" Classes="editorLabel" />
             <ComboBox x:Name="WifiSecurityBox" ItemsSource="{Binding WifiSecurityOptions}"
                       SelectedItem="{Binding SelectedWifiSecurity}" Classes="editorInput"
@@ -18,6 +20,19 @@
             </ComboBox>
             <CheckBox x:Name="WifiHiddenNetworkBox" Content="{Binding L[WifiHiddenNetwork]}"
                       IsChecked="{Binding WifiHiddenNetwork}" />
+            <TextBlock Text="{Binding L.Category}" Classes="editorLabel" />
+            <ComboBox x:Name="WifiCategoryBox" ItemsSource="{Binding CategoryOptions}" SelectedItem="{Binding SelectedCategory}"
+                      Classes="editorInput" AutomationProperties.Name="{Binding L.Category}">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PasswordCategoryChoice">
+                        <StackPanel ToolTip.Tip="{Binding FullPath}">
+                            <TextBlock Text="{Binding FolderDisplayName}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding ParentPath}" FontSize="{StaticResource FontSizeMeta}"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
             <TextBlock Text="{Binding ValidationMessage}" IsVisible="{Binding HasWifiValidationError}"
                        TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
                        AutomationProperties.LiveSetting="Polite" />

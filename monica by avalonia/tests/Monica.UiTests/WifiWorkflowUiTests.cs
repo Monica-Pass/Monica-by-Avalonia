@@ -36,6 +36,12 @@ public sealed class WifiWorkflowUiTests
             wifi.FindControl<CheckBox>("WifiHiddenNetworkBox")!.IsChecked = true;
             Assert.Equal("Home", editor.WifiSsid);
             Assert.True(editor.WifiHiddenNetwork);
+            var identity = wifi.FindControl<TextBox>("WifiIdentityBox")!;
+            Assert.False(identity.IsVisible);
+            editor.SelectedWifiSecurity = editor.WifiSecurityOptions.Single(choice => choice.Value == "WPA2_ENTERPRISE");
+            Assert.True(identity.IsVisible);
+            identity.Text = "office-user";
+            Assert.Equal("office-user", editor.Username);
             var import = wifi.FindControl<Expander>("WifiQrImportExpander")!;
             import.IsExpanded = true;
             wifi.FindControl<TextBox>("WifiQrTextBox")!.Text = "WIFI:T:nopass;S:Guest;;";

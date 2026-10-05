@@ -140,6 +140,7 @@ public sealed partial class PasswordEditorViewModel
         OnPropertyChanged(nameof(IsBarcode));
         OnPropertyChanged(nameof(IsApiKey));
         OnPropertyChanged(nameof(IsWifi));
+        OnPropertyChanged(nameof(WifiIsEnterprise));
         OnPropertyChanged(nameof(WifiRequiresPassword));
         RaisePasswordEditorState();
         OnPropertyChanged(nameof(PasswordFieldLabel));

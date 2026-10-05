@@ -28,6 +28,7 @@ public sealed partial class PasswordEditorViewModel
     private string _wifiImportStatus = "";
 
     public bool IsWifi => SelectedLoginType?.Value == PasswordLoginType.Wifi;
+    public bool WifiIsEnterprise => IsWifi && SelectedWifiSecurity?.Value is nameof(WifiSecurity.WPA2_ENTERPRISE) or nameof(WifiSecurity.WPA3_ENTERPRISE);
     public bool WifiRequiresPassword => !IsWifi || SelectedWifiSecurity?.Value != nameof(WifiSecurity.NONE);
     public bool HasWifiValidationError => ValidationTarget is PasswordEditorValidationTarget.WifiSsid or PasswordEditorValidationTarget.WifiMetadata;
     public IReadOnlyList<WifiSecurityChoice> WifiSecurityOptions { get; private set; } = [];
@@ -74,6 +75,7 @@ public sealed partial class PasswordEditorViewModel
     {
         WifiFieldsChanged();
         OnPropertyChanged(nameof(WifiRequiresPassword));
+        OnPropertyChanged(nameof(WifiIsEnterprise));
         ClearCorrectedPasswordValidation();
     }
 
