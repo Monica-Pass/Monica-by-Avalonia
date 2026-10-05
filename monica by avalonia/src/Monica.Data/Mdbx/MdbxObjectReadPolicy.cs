@@ -7,5 +7,5 @@ public static class MdbxObjectReadPolicy
 
     public static bool Supports(string entryType, uint payloadVersion) =>
         payloadVersion == SupportedPayloadVersion &&
-        entryType is "login" or "note" or "totp" or "card" or "document-ref" or "billing-address" or "payment-account";
+        entryType is "login" or "ssh-key" or "note" or "totp" or "card" or "document-ref" or "identity" or "billing-address" or "payment-account";
 }

@@ -217,6 +217,7 @@ public sealed partial class AppSettingsTests
             webDavBackupService: webDav,
             repository: repository,
             confirmationDialogService: new ApprovingConfirmationDialogService());
+        viewModel.IsUnlocked = true;
         ConfigureWebDav(viewModel, $"/Monica/{Guid.NewGuid():N}");
         await viewModel.CreateWebDavMdbxVaultCommand.ExecuteAsync(null);
         var item = Assert.Single(viewModel.MdbxDatabaseItems);

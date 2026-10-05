@@ -552,6 +552,7 @@ public sealed partial class AppSettingsTests
     {
         var webDav = new CapturingWebDavBackupService([]);
         var viewModel = CreateViewModel(GetTempPath(), webDavBackupService: webDav);
+        viewModel.IsUnlocked = true;
         viewModel.WebDavEnabled = true;
         viewModel.WebDavServerUrl = "https://dav.example.com";
         viewModel.WebDavUsername = "user";

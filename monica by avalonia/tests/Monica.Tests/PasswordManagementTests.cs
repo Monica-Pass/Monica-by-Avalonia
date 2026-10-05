@@ -265,6 +265,7 @@ public sealed partial class PasswordManagementTests
     {
         var repositoryRecorder = FastPasswordMutationRepositoryProxy.Create(out var repository);
         var harness = CreateHarness(repositoryOverride: repository);
+        harness.ViewModel.IsUnlocked = true;
         harness.Crypto.InitializeSession("performance password", new byte[16]);
 
         for (var index = 0; index < 10_000; index++)
@@ -357,6 +358,7 @@ public sealed partial class PasswordManagementTests
     public async Task ViewModel_adds_password_from_editor_dialog()
     {
         var harness = CreateHarness();
+        harness.ViewModel.IsUnlocked = true;
         var category = new Category { Name = "Work", SortOrder = 1 };
         await harness.Repository.SaveCategoryAsync(category);
         await harness.ViewModel.LoadAsync();
@@ -434,6 +436,7 @@ public sealed partial class PasswordManagementTests
     public async Task ViewModel_saves_bound_note_and_custom_fields()
     {
         var harness = CreateHarness();
+        harness.ViewModel.IsUnlocked = true;
         var payload = NoteContentCodec.BuildSavePayload("Recovery note", "codes", "", true);
         var note = new SecureItem
         {
@@ -555,6 +558,7 @@ public sealed partial class PasswordManagementTests
     public async Task Password_editor_sensitive_state_is_cleared_after_create_command()
     {
         var harness = CreateHarness();
+        harness.ViewModel.IsUnlocked = true;
         await harness.ViewModel.LoadAsync();
         harness.Dialog.ConfigureNext(editor =>
         {
@@ -582,6 +586,7 @@ public sealed partial class PasswordManagementTests
         RunOnStaThread(() =>
         {
             var harness = CreateHarness();
+            harness.ViewModel.IsUnlocked = true;
             harness.ViewModel.LoadAsync().GetAwaiter().GetResult();
 
             harness.Dialog.ConfigureNext(editor =>
@@ -674,6 +679,7 @@ public sealed partial class PasswordManagementTests
     public async Task ViewModel_adds_grouped_passwords_from_multiple_password_lines()
     {
         var harness = CreateHarness();
+        harness.ViewModel.IsUnlocked = true;
         await harness.ViewModel.LoadAsync();
         harness.Crypto.InitializeSession("correct password", new byte[16]);
 
@@ -2244,6 +2250,7 @@ public sealed partial class PasswordManagementTests
     public async Task ViewModel_adds_edits_favorites_and_deletes_totp_items()
     {
         var harness = CreateHarness();
+        harness.ViewModel.IsUnlocked = true;
         await harness.ViewModel.LoadAsync();
         harness.TotpDialog.ConfigureNext(editor =>
         {
@@ -2403,6 +2410,7 @@ public sealed partial class PasswordManagementTests
     public async Task ViewModel_edits_and_deletes_virtual_totp_from_bound_password()
     {
         var harness = CreateHarness();
+        harness.ViewModel.IsUnlocked = true;
         var password = new PasswordEntry
         {
             Title = "GitHub",
@@ -2447,6 +2455,7 @@ public sealed partial class PasswordManagementTests
     public async Task ViewModel_adds_edits_shows_and_batch_deletes_wallet_items()
     {
         var harness = CreateHarness();
+        harness.ViewModel.IsUnlocked = true;
         await harness.ViewModel.LoadAsync();
         Assert.Empty(harness.ViewModel.FilteredWalletItems);
         harness.WalletDialog.ConfigureNext(editor =>

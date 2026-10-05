@@ -69,17 +69,17 @@ public sealed partial class MdbxVaultStore(
     private const string DefaultProjectTitle = "Monica";
     private const string DeviceId = "monica-avalonia";
     /// <summary>
-    /// Android writes credentials, including SSH templates, as "login". Other native types are
-    /// available through the generic read-only inspector instead of the password write path.
+    /// Android writes credentials, including SSH templates, as "login". Earlier desktop vaults
+    /// use the known "ssh-key" alias; retain its business codec and original native type on edits.
     /// </summary>
-    private static readonly string[] PasswordEntryTypes = [PasswordEntryType];
+    private static readonly string[] PasswordEntryTypes = [PasswordEntryType, "ssh-key"];
 
     /// <summary>
-    /// Native types with a desktop business editor. Legacy aliases are preserved by the generic inspector.
+    /// Native types with a desktop business editor, including the supported legacy identity alias.
     /// </summary>
     private static readonly string[] SecureEntryTypes =
     [
-        "note", "totp", "card", "document-ref", "billing-address", "payment-account"
+        "note", "totp", "card", "document-ref", "identity", "billing-address", "payment-account"
     ];
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -1573,12 +1573,12 @@ public sealed partial class MdbxVaultStore(
     };
 
     /// <summary>
-    /// Native types to scan for one requested item type. The legacy "identity" alias is preserved by
-    /// the generic read-only inspector instead of being rewritten through a wallet editor.
+    /// Native types to scan for one requested item type. Legacy identity records are decoded by
+    /// their payload kind and retain their original native type when a supported item is edited.
     /// </summary>
     private static IReadOnlyList<string> SecureReadEntryTypes(VaultItemType itemType) => itemType switch
     {
-        VaultItemType.BillingAddress or VaultItemType.PaymentAccount => [ToMdbxEntryType(itemType)],
+        VaultItemType.Document or VaultItemType.BillingAddress or VaultItemType.PaymentAccount => [ToMdbxEntryType(itemType), "identity"],
         _ => [ToMdbxEntryType(itemType)]
     };
 

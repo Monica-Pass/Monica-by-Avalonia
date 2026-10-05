@@ -99,7 +99,7 @@ function Write-AppLogEvidence {
 
     Write-Host "--- $Label app log ---"
     Get-Content -LiteralPath $AppLogPath |
-        Select-String -SimpleMatch 'check failed', 'budget result', 'release gate completed', 'lock cycle result' |
+        Select-String -SimpleMatch 'check failed', 'success=False', 'budget result', 'release gate completed', 'lock cycle result' |
         ForEach-Object { Write-Host ($_.Line -replace '^\[[^\]]+\]\s*', '') }
 }
 
