@@ -91,6 +91,18 @@ public sealed record MdbxNativeEntryRecord(
     string PayloadJson,
     bool Deleted);
 
+/// <summary>
+/// Metadata for a native object whose type is outside the desktop reader's known set. The descriptor keeps
+/// payload out of the returned diagnostics model; the current legacy discovery path still needs to be
+/// replaced by native summaries before this becomes a strict metadata-only disclosure boundary.
+/// </summary>
+public sealed record MdbxUnknownEntryDescriptor(
+    string EntryId,
+    string ProjectId,
+    string EntryType,
+    string Title,
+    bool Deleted);
+
 public sealed record MdbxNativeAttachmentRecord(
     string AttachmentId,
     string ProjectId,

@@ -198,10 +198,12 @@ public partial class App : Application
             provider.GetRequiredService<IAttachmentContentStore>()));
         services.AddSingleton<IMdbxNativeBridge, MdbxUniffiNativeBridge>();
         services.AddSingleton<IMdbxVaultStore, MdbxVaultStore>();
-        services.AddSingleton<IMonicaRepository>(provider => new MdbxBackedMonicaRepository(
+        services.AddSingleton<MdbxBackedMonicaRepository>(provider => new MdbxBackedMonicaRepository(
             provider.GetRequiredService<MonicaRepository>(),
             provider.GetRequiredService<IMdbxVaultStore>(),
             provider.GetRequiredService<IAttachmentContentStore>()));
+        services.AddSingleton<IMonicaRepository>(provider => provider.GetRequiredService<MdbxBackedMonicaRepository>());
+        services.AddSingleton<IMdbxUnknownEntryDiagnostics>(provider => provider.GetRequiredService<MdbxBackedMonicaRepository>());
         services.AddSingleton<IMasterPasswordMaintenanceService, MasterPasswordMaintenanceService>();
         services.AddSingleton<ICryptoService, CryptoService>();
         services.AddSingleton<IVaultSessionService, VaultSessionService>();

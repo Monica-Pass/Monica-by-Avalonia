@@ -40,6 +40,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IVaultSessionService _vaultSessionService;
     private readonly IWindowPrivacyService _windowPrivacyService;
     private readonly IExportAuthorizationService _exportAuthorizationService;
+    private readonly IMdbxUnknownEntryDiagnostics? _mdbxUnknownEntryDiagnostics;
     private int _vaultLoadVersion;
     public MainWindowViewModel(
         IMonicaRepository repository,
@@ -84,7 +85,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IBitwardenDeviceIdentityProvider? bitwardenDeviceIdentityProvider = null,
         IAutoTypeService? autoTypeService = null,
         IBitwardenPurgeQueue? bitwardenPurgeQueue = null,
-        IBitwardenStuckEraseService? bitwardenStuckEraseService = null)
+        IBitwardenStuckEraseService? bitwardenStuckEraseService = null,
+        IMdbxUnknownEntryDiagnostics? mdbxUnknownEntryDiagnostics = null)
     {
         _viewModelDispatcher = Dispatcher.CurrentDispatcher;
         _repository = repository;
@@ -109,6 +111,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _bitwardenConflictBackupStore = bitwardenConflictBackupStore;
         _bitwardenConflictRestoreService = bitwardenConflictRestoreService;
         _bitwardenStuckEraseService = bitwardenStuckEraseService;
+        _mdbxUnknownEntryDiagnostics = mdbxUnknownEntryDiagnostics;
         _bitwardenDeviceIdentityProvider = bitwardenDeviceIdentityProvider;
         _bitwardenPurgeQueue = bitwardenPurgeQueue;
         if (_bitwardenSyncCoordinator is not null)
@@ -308,6 +311,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     sessionCancellationToken);
                 return loadedSnapshot with { PreparedTotpItems = preparedTotpItems };
             }, sessionCancellationToken);
+            if (!IsCurrentLoad())
+            {
+                return;
+            }
+
+            await RefreshMdbxUnknownEntryCountAsync(sessionCancellationToken);
             if (!IsCurrentLoad())
             {
                 return;

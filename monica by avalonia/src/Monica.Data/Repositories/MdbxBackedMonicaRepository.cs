@@ -6,10 +6,18 @@ using Monica.Data.Services;
 
 namespace Monica.Data.Repositories;
 
+/// <summary>Read-only diagnostics for native MDBX objects outside the known desktop type set.</summary>
+public interface IMdbxUnknownEntryDiagnostics
+{
+    Task<IReadOnlyList<MdbxUnknownEntryDescriptor>> GetUnknownMdbxEntriesAsync(
+        bool includeDeleted = false,
+        CancellationToken cancellationToken = default);
+}
+
 public sealed partial class MdbxBackedMonicaRepository(
     IMonicaRepository inner,
     IMdbxVaultStore mdbxVaultStore,
-    IAttachmentContentStore? attachmentContentStore = null) : IMonicaRepository, ITransientVaultReadCache
+    IAttachmentContentStore? attachmentContentStore = null) : IMonicaRepository, ITransientVaultReadCache, IMdbxUnknownEntryDiagnostics
 {
     private static readonly TimeSpan ReadCacheTtl = TimeSpan.FromMinutes(2);
     public bool PersistsAttachmentContent => true;
@@ -42,6 +50,16 @@ public sealed partial class MdbxBackedMonicaRepository(
             .Where(entry => includeDeleted || !entry.IsDeleted)
             .Where(entry => includeArchived || !entry.IsArchived)
             .ToList();
+    }
+
+    public async Task<IReadOnlyList<MdbxUnknownEntryDescriptor>> GetUnknownMdbxEntriesAsync(
+        bool includeDeleted = false,
+        CancellationToken cancellationToken = default)
+    {
+        var database = await GetDefaultLocalMdbxDatabaseAsync(cancellationToken);
+        return database is null
+            ? []
+            : await mdbxVaultStore.GetUnknownEntriesAsync(database, includeDeleted, cancellationToken);
     }
 
     public async Task<long> SavePasswordAsync(PasswordEntry entry, CancellationToken cancellationToken = default)

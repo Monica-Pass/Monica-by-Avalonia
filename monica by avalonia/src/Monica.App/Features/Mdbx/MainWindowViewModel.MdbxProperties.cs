@@ -67,6 +67,7 @@ public sealed partial class MainWindowViewModel
     public int MdbxOfflineCopyCount => MdbxDatabases.Count(item => item.IsOfflineAvailable || HasMdbxWorkingCopy(item));
     public int MdbxPendingSyncCount => MdbxDatabases.Count(HasPendingMdbxSync);
     public int MdbxSyncErrorCount => MdbxDatabases.Count(HasMdbxSyncIssue);
+    public int MdbxUnknownEntryCount { get; private set; }
     public bool HasMdbxDatabases => MdbxDatabases.Count > 0;
     public bool HasMdbxSyncErrors => MdbxSyncErrorCount > 0;
     public string MdbxDefaultVaultSummaryText
@@ -109,6 +110,9 @@ public sealed partial class MainWindowViewModel
             : _localization.Get("MdbxOneDriveSourceEmpty");
     public string MdbxRuntimeSummaryText => _localization.Get("MdbxRuntimeSummary");
     public string MdbxSecuritySummaryText => _localization.Get("MdbxSecuritySummary");
+    public string MdbxUnknownEntrySummaryText => MdbxUnknownEntryCount == 0
+        ? _localization.Get("MdbxNoUnknownEntries")
+        : _localization.Format("MdbxUnknownEntriesSummaryFormat", MdbxUnknownEntryCount);
     public bool IsMdbxDetailsSelected => IsWorkspacePageSelected(SelectedMdbxWorkspacePage, "Details");
     public bool IsMdbxHealthSelected => IsWorkspacePageSelected(SelectedMdbxWorkspacePage, "Health");
     public bool IsMdbxSourcesSelected => IsWorkspacePageSelected(SelectedMdbxWorkspacePage, "Sources");

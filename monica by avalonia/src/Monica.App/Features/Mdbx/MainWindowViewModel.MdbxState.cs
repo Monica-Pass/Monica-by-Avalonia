@@ -100,6 +100,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(MdbxOneDriveSourceStatusText));
         OnPropertyChanged(nameof(MdbxRuntimeSummaryText));
         OnPropertyChanged(nameof(MdbxSecuritySummaryText));
+        OnPropertyChanged(nameof(MdbxUnknownEntrySummaryText));
         RefreshMdbxHealthItems();
         RefreshSyncHealthItems();
     }
@@ -123,7 +124,43 @@ public sealed partial class MainWindowViewModel
             _localization.Get("MdbxDiagnostics"),
             HasMdbxSyncErrors ? _localization.Get("NeedsAttention") : _localization.Get("Available"),
             MdbxSyncDiagnosticsSummaryText));
+        if (MdbxUnknownEntryCount > 0)
+        {
+            MdbxHealthItems.Add(new SyncHealthDisplayItem(
+                _localization.Get("MdbxUnknownEntries"),
+                _localization.Get("NeedsAttention"),
+                MdbxUnknownEntrySummaryText));
+        }
         OnPropertyChanged(nameof(MdbxHealthItems));
+    }
+
+    private async Task RefreshMdbxUnknownEntryCountAsync(CancellationToken cancellationToken)
+    {
+        if (_mdbxUnknownEntryDiagnostics is null)
+        {
+            MdbxUnknownEntryCount = 0;
+            return;
+        }
+
+        try
+        {
+            MdbxUnknownEntryCount = (await _mdbxUnknownEntryDiagnostics.GetUnknownMdbxEntriesAsync(
+                includeDeleted: false,
+                cancellationToken)).Count;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            MdbxUnknownEntryCount = 0;
+            AppDiagnostics.Error("MDBX unknown entry discovery failed.", ex);
+        }
+
+        OnPropertyChanged(nameof(MdbxUnknownEntryCount));
+        OnPropertyChanged(nameof(MdbxUnknownEntrySummaryText));
+        RefreshMdbxHealthItems();
     }
 
     private MdbxDatabaseDisplayItem ToMdbxDisplayItem(LocalMdbxDatabase database)

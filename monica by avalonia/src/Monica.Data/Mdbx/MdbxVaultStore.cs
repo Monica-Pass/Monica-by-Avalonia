@@ -18,6 +18,7 @@ public interface IMdbxVaultStore
     Task<PasswordEntry> SavePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, IReadOnlyList<CustomField> customFields, IReadOnlyList<PasswordHistoryEntry> passwordHistory, IReadOnlyDictionary<long, Category> categories, CancellationToken cancellationToken = default);
     Task<PasswordEntry> SavePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, IReadOnlyList<CustomField> customFields, IReadOnlyList<PasswordHistoryEntry> passwordHistory, IReadOnlyList<Attachment> attachments, IReadOnlyDictionary<long, Category> categories, CancellationToken cancellationToken = default);
     Task<MdbxPasswordReadSnapshot> GetPasswordReadSnapshotAsync(LocalMdbxDatabase database, IReadOnlyList<Category> categories, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<MdbxUnknownEntryDescriptor>> GetUnknownEntriesAsync(LocalMdbxDatabase database, bool includeDeleted = false, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PasswordEntry>> GetPasswordsAsync(LocalMdbxDatabase database, bool includeDeleted = false, bool includeArchived = false, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PasswordEntry>> GetPasswordsAsync(LocalMdbxDatabase database, IReadOnlyList<Category> categories, bool includeDeleted = false, bool includeArchived = false, CancellationToken cancellationToken = default);
     Task<PasswordEntry?> FindPasswordAsync(LocalMdbxDatabase database, IReadOnlyList<Category> categories, long entryId, bool includeDeleted = false, CancellationToken cancellationToken = default);
@@ -115,6 +116,39 @@ public sealed partial class MdbxVaultStore(
 
         return categories;
     }
+
+    public async Task<IReadOnlyList<MdbxUnknownEntryDescriptor>> GetUnknownEntriesAsync(
+        LocalMdbxDatabase database,
+        bool includeDeleted = false,
+        CancellationToken cancellationToken = default)
+    {
+        var vault = await OpenAsync(database, cancellationToken);
+        using var _ = vault;
+        var projects = await EnsureProjectsForReadAsync(vault, cancellationToken);
+        var knownTypes = PasswordEntryTypes
+            .Concat(SecureEntryTypes)
+            .ToHashSet(StringComparer.Ordinal);
+        var unknown = new List<MdbxUnknownEntryDescriptor>();
+        foreach (var project in projects)
+        {
+            var records = await vault.ListEntriesAsync(project.ProjectId, entryType: null, cancellationToken);
+            unknown.AddRange(records
+                .Where(record => !knownTypes.Contains(record.EntryType))
+                .Select(ToUnknownEntryDescriptor));
+            if (includeDeleted)
+            {
+                var deleted = await vault.ListDeletedEntriesAsync(project.ProjectId, entryType: null, cancellationToken);
+                unknown.AddRange(deleted
+                    .Where(record => !knownTypes.Contains(record.EntryType))
+                    .Select(ToUnknownEntryDescriptor));
+            }
+        }
+
+        return unknown;
+    }
+
+    private static MdbxUnknownEntryDescriptor ToUnknownEntryDescriptor(MdbxNativeEntryRecord record) =>
+        new(record.EntryId, record.ProjectId, record.EntryType, record.Title, record.Deleted);
 
     public async Task<Category> SaveCategoryAsync(LocalMdbxDatabase database, Category category, CancellationToken cancellationToken = default)
     {
