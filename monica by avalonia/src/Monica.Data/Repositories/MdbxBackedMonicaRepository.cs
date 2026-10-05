@@ -12,6 +12,10 @@ public interface IMdbxUnknownEntryDiagnostics
     Task<IReadOnlyList<MdbxUnknownEntryDescriptor>> GetUnknownMdbxEntriesAsync(
         bool includeDeleted = false,
         CancellationToken cancellationToken = default);
+    Task<MdbxUnknownEntryDetail?> ReadUnknownMdbxEntryAsync(
+        string entryId,
+        string projectId,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed partial class MdbxBackedMonicaRepository(
@@ -60,6 +64,15 @@ public sealed partial class MdbxBackedMonicaRepository(
         return database is null
             ? []
             : await mdbxVaultStore.GetUnknownEntriesAsync(database, includeDeleted, cancellationToken);
+    }
+
+    public async Task<MdbxUnknownEntryDetail?> ReadUnknownMdbxEntryAsync(
+        string entryId,
+        string projectId,
+        CancellationToken cancellationToken = default)
+    {
+        var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
+        return await mdbxVaultStore.ReadUnknownEntryAsync(database, entryId, projectId, cancellationToken);
     }
 
     public async Task<long> SavePasswordAsync(PasswordEntry entry, CancellationToken cancellationToken = default)
@@ -745,6 +758,12 @@ public sealed partial class MdbxBackedMonicaRepository(
     public async Task ClearVaultDataAsync(VaultClearScope scope, CancellationToken cancellationToken = default)
     {
         var database = await RequireDefaultMdbxDatabaseAsync(cancellationToken);
+        if (scope == VaultClearScope.All &&
+            (await mdbxVaultStore.GetUnknownEntriesAsync(database, includeDeleted: false, cancellationToken)).Count > 0)
+        {
+            throw new MdbxVaultReadOnlyException("unsupported-vault-objects", "This build cannot clear every native object in the vault.");
+        }
+
         var categories = await EnsureMdbxCategoriesAsync(database, cancellationToken);
         await MarkRemoteWorkingCopyPendingAsync(database, cancellationToken);
         switch (scope)

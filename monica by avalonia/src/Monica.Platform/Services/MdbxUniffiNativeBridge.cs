@@ -153,8 +153,11 @@ public sealed class MdbxUniffiNativeBridge : IMdbxNativeBridge
         }
     }
 
-    private sealed class MdbxUniffiNativeVault(MdbxVault vault) : IMdbxNativeVault, IDisposable
+    private sealed class MdbxUniffiNativeVault(MdbxVault vault) : IMdbxNativeVault, IMdbxNativeObjectReader, IDisposable
     {
+        private const uint ObjectSummaryPageSize = 200;
+        private const ulong MaximumObjectPayloadBytes = 4UL * 1024 * 1024;
+
         // Android labels every entry write with this operation kind and it lands in the commit rows.
         private const string EntryWriteOperationKind = "monica-upsert-entries";
 
@@ -172,6 +175,7 @@ public sealed class MdbxUniffiNativeBridge : IMdbxNativeBridge
         // The store decides whether a session is restricted and wraps the handle; a raw engine handle
         // carries no such limit.
         public bool IsReadOnly => false;
+        public bool SupportsObjectDisclosure => true;
 
         public Task<MdbxNativeProjectRecord> CreateProjectAsync(string title, CancellationToken cancellationToken = default) =>
             RunBlockingNativeAsync(() => ToProject(vault.CreateProject(title)), cancellationToken);
@@ -214,6 +218,147 @@ public sealed class MdbxUniffiNativeBridge : IMdbxNativeBridge
                     return projects;
                 },
                 cancellationToken);
+
+        public Task<IReadOnlyList<MdbxNativeObjectSummary>> ListObjectSummariesAsync(
+            string projectId,
+            bool includeDeleted = false,
+            CancellationToken cancellationToken = default) =>
+            RunBlockingNativeAsync<IReadOnlyList<MdbxNativeObjectSummary>>(
+                () =>
+                {
+                    var summaries = new List<MdbxNativeObjectSummary>();
+                    AppendObjectSummaryPages(projectId, deleted: false, summaries, cancellationToken);
+                    if (includeDeleted)
+                    {
+                        AppendObjectSummaryPages(projectId, deleted: true, summaries, cancellationToken);
+                    }
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return summaries;
+                },
+                cancellationToken);
+
+        private void AppendObjectSummaryPages(
+            string projectId,
+            bool deleted,
+            List<MdbxNativeObjectSummary> summaries,
+            CancellationToken cancellationToken)
+        {
+            var seenCursors = new HashSet<string>(StringComparer.Ordinal);
+            string? cursor = null;
+            do
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var page = deleted
+                    ? vault.ListDeletedObjectSummaries(projectId, null, ObjectSummaryPageSize, cursor)
+                    : vault.ListObjectSummaries(projectId, null, ObjectSummaryPageSize, cursor);
+                cancellationToken.ThrowIfCancellationRequested();
+                summaries.AddRange(page.Items.Select(ToObjectSummary));
+                cursor = page.NextCursor;
+                if (cursor is not null && !seenCursors.Add(cursor))
+                {
+                    throw new InvalidOperationException("The native object summary cursor did not advance.");
+                }
+            }
+            while (cursor is not null);
+        }
+
+        public Task<MdbxNativeObjectDisclosure> RevealObjectAsync(
+            string objectId,
+            ulong maximumPayloadBytes,
+            CancellationToken cancellationToken = default) =>
+            RunBlockingNativeAsync(
+                () =>
+                {
+                    if (maximumPayloadBytes == 0)
+                    {
+                        throw new ArgumentOutOfRangeException(nameof(maximumPayloadBytes), "The object payload limit must be positive.");
+                    }
+
+                    var summary = vault.GetObjectSummary(objectId);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    MdbxObjectDisclosureResult result;
+                    try
+                    {
+                        result = vault.RevealObjectWithLimits(
+                            objectId,
+                            new MdbxObjectDisclosureLimits(Math.Min(maximumPayloadBytes, MaximumObjectPayloadBytes)));
+                    }
+                    catch (MdbxFfiException.Storage ex) when (ex.message.StartsWith("resource limit exceeded for object ", StringComparison.Ordinal))
+                    {
+                        throw new MdbxObjectDisclosureException("payload-too-large");
+                    }
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var outcome = result.Authorization.Outcome;
+                    if (outcome is not (MdbxAuthorizationOutcome.Allow or MdbxAuthorizationOutcome.AllowWithConstraints))
+                    {
+                        return new MdbxNativeObjectDisclosure(
+                            summary is null ? null : ToObjectSummary(summary),
+                            PayloadJson: null,
+                            AuthorizationOutcome: outcome.ToString());
+                    }
+
+                    if (outcome == MdbxAuthorizationOutcome.AllowWithConstraints && result.Authorization.Constraints.Length > 0)
+                    {
+                        // This adapter cannot guarantee the native constraints are enforced by
+                        // every caller. Keep the payload behind the disclosure boundary.
+                        return new MdbxNativeObjectDisclosure(
+                            summary is null ? null : ToObjectSummary(summary),
+                            PayloadJson: null,
+                            AuthorizationOutcome: "constraints-unsupported");
+                    }
+
+                    var record = result.Object
+                        ?? throw new InvalidOperationException("The native engine authorized disclosure without returning an object.");
+                    var currentSummary = vault.GetObjectSummary(objectId);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (summary is null || currentSummary is null ||
+                        !string.Equals(summary.HeadCommitId, currentSummary.HeadCommitId, StringComparison.Ordinal) ||
+                        !string.Equals(record.ObjectId, currentSummary.ObjectId, StringComparison.Ordinal) ||
+                        !string.Equals(record.CollectionId, currentSummary.CollectionId, StringComparison.Ordinal) ||
+                        !string.Equals(record.ObjectTypeId, currentSummary.ObjectTypeId, StringComparison.Ordinal) ||
+                        !string.Equals(record.Title, currentSummary.Title, StringComparison.Ordinal) ||
+                        record.PayloadSchemaVersion != currentSummary.PayloadSchemaVersion ||
+                        record.Deleted != currentSummary.Deleted)
+                    {
+                        throw new InvalidOperationException("The MDBX object changed during authorized disclosure; reload its details.");
+                    }
+
+                    return new MdbxNativeObjectDisclosure(ToObjectSummary(currentSummary), record.PayloadJson, outcome.ToString());
+                },
+                cancellationToken);
+
+        public Task<MdbxNativeEntryRecord?> ReadSupportedObjectAsync(
+            MdbxNativeObjectSummary expected,
+            CancellationToken cancellationToken = default) =>
+            RunBlockingNativeAsync<MdbxNativeEntryRecord?>(() =>
+            {
+                if (!MdbxObjectReadPolicy.Supports(expected.EntryType, expected.PayloadSchemaVersion))
+                {
+                    throw new MdbxVaultReadOnlyException("object-type-or-version", "Use the native object inspector.");
+                }
+
+                var before = vault.GetObjectSummary(expected.EntryId);
+                if (before is null || ToObjectSummary(before) != expected)
+                {
+                    throw new MdbxObjectDisclosureException("changed-or-unavailable");
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                var record = vault.GetObject(expected.ProjectId, expected.EntryId);
+                var after = vault.GetObjectSummary(expected.EntryId);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (record is null || after is null || ToObjectSummary(after) != expected ||
+                    record.ObjectId != expected.EntryId || record.CollectionId != expected.ProjectId ||
+                    record.ObjectTypeId != expected.EntryType || record.Title != expected.Title ||
+                    record.PayloadSchemaVersion != expected.PayloadSchemaVersion || record.Deleted != expected.Deleted)
+                {
+                    throw new MdbxObjectDisclosureException("changed-or-unavailable");
+                }
+
+                return new MdbxNativeEntryRecord(record.ObjectId, record.CollectionId, record.ObjectTypeId,
+                    record.Title, record.PayloadJson, record.Deleted, record.PayloadSchemaVersion);
+            }, cancellationToken);
 
         public Task<MdbxNativeEntryRecord> CreateEntryAsync(
             string projectId,
@@ -258,6 +403,7 @@ public sealed class MdbxUniffiNativeBridge : IMdbxNativeBridge
             RunBlockingNativeAsync(
                 () =>
                 {
+                    RequireEditableObject(entryId, entryType);
                     Execute(new MdbxWriteCommand.UpdateEntry(entryId, projectId, entryType, title, payloadJson));
                     return new MdbxNativeEntryRecord(entryId, projectId, entryType, title, payloadJson, Deleted: false);
                 },
@@ -273,27 +419,49 @@ public sealed class MdbxUniffiNativeBridge : IMdbxNativeBridge
         private void Execute(MdbxWriteCommand command) =>
             vault.ExecuteWriteOperation(Guid.NewGuid().ToString(), EntryWriteOperationKind, [command]);
 
+        private void RequireEditableObject(string entryId, string? expectedType = null)
+        {
+            var summary = vault.GetObjectSummary(entryId);
+            if (summary is null || !MdbxObjectReadPolicy.Supports(summary.ObjectTypeId, summary.PayloadSchemaVersion) ||
+                expectedType is not null && summary.ObjectTypeId != expectedType)
+            {
+                throw new MdbxVaultReadOnlyException("object-type-or-version", "Use the native object inspector.");
+            }
+        }
+
         public Task<MdbxNativeEntryRecord> MoveEntryAsync(
             string projectId,
             string entryId,
             string targetProjectId,
             CancellationToken cancellationToken = default) =>
             RunBlockingNativeAsync(
-                () => ToEntry(vault.MoveEntry(projectId, entryId, targetProjectId)),
+                () =>
+                {
+                    RequireEditableObject(entryId);
+                    return ToEntry(vault.MoveEntry(projectId, entryId, targetProjectId));
+                },
                 cancellationToken);
 
         public Task DeleteEntryAsync(
             string projectId,
             string entryId,
             CancellationToken cancellationToken = default) =>
-            RunBlockingNativeAsync(() => vault.DeleteEntry(projectId, entryId), cancellationToken);
+            RunBlockingNativeAsync(() =>
+            {
+                RequireEditableObject(entryId);
+                vault.DeleteEntry(projectId, entryId);
+            }, cancellationToken);
 
         public Task<MdbxNativeEntryRecord> RestoreEntryAsync(
             string projectId,
             string entryId,
             CancellationToken cancellationToken = default) =>
             RunBlockingNativeAsync(
-                () => ToEntry(vault.RestoreEntry(projectId, entryId)),
+                () =>
+                {
+                    RequireEditableObject(entryId);
+                    return ToEntry(vault.RestoreEntry(projectId, entryId));
+                },
                 cancellationToken);
 
         public Task<MdbxNativeAttachmentRecord> CreateAttachmentAsync(
@@ -341,6 +509,17 @@ public sealed class MdbxUniffiNativeBridge : IMdbxNativeBridge
 
         private static MdbxNativeProjectRecord ToProject(MdbxCollectionSummary summary) =>
             new(summary.CollectionId, summary.Title);
+
+        private static MdbxNativeObjectSummary ToObjectSummary(MdbxObjectSummary summary) =>
+            new(
+                summary.ObjectId,
+                summary.CollectionId,
+                summary.ObjectTypeId,
+                summary.Title,
+                summary.PayloadSchemaVersion,
+                summary.HeadCommitId,
+                summary.Deleted,
+                summary.UpdatedAt);
 
         private static MdbxNativeEntryRecord ToEntry(EntryRecord entry) =>
             new(entry.EntryId, entry.ProjectId, entry.EntryType, entry.Title, entry.PayloadJson, entry.Deleted);

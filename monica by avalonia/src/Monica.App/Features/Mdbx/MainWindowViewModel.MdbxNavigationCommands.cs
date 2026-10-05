@@ -36,6 +36,7 @@ public sealed partial class MainWindowViewModel
     {
         if (item is null) return;
 
+        ClearMdbxUnknownEntries();
         foreach (var database in MdbxDatabases)
         {
             database.IsDefault = database.Id == item.Database.Id;
@@ -44,6 +45,7 @@ public sealed partial class MainWindowViewModel
 
         RefreshMdbxVaultState();
         RefreshVaultSources();
+        await RefreshMdbxUnknownEntryCountAsync(_vaultSessionService.SessionCancellationToken);
         SetStatusMessage("SelectedMdbxDefaultFormat", item.Name);
     }
 

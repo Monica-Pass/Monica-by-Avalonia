@@ -81,6 +81,12 @@ public sealed partial class MainWindowViewModel
                 includeImages: true,
                 includeCategories: true);
         }
+        catch (Monica.Data.Mdbx.MdbxVaultReadOnlyException ex) when (ex.ReasonCode == "unsupported-vault-objects")
+        {
+            ExportPreview = "";
+            SetStatusFailure("MdbxUnsupportedObjectsProtected");
+            return false;
+        }
         catch (PasswordSecretUnavailableException ex)
         {
             ExportPreview = "";

@@ -138,6 +138,7 @@ public sealed partial class MainWindowViewModel
 
     private void ReleaseTransientBackgroundSecrets()
     {
+        ClearMdbxUnknownEntryDetails();
         ClearTransientSettingsSecurityInputs();
         ClearTransferBuffers();
         Generator.ClearSensitiveState();

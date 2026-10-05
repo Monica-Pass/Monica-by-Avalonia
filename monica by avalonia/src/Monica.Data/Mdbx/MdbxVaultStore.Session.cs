@@ -216,7 +216,7 @@ public sealed partial class MdbxVaultStore
         return CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, sessionToken);
     }
 
-    private sealed class MdbxVaultLease : IMdbxNativeVault
+    private sealed class MdbxVaultLease : IMdbxNativeVault, IMdbxNativeObjectReader
     {
         private readonly IMdbxNativeVault _vault;
         private MdbxVaultStore? _owner;
@@ -230,6 +230,7 @@ public sealed partial class MdbxVaultStore
 
         // The lease wraps whatever the format gate handed back, so the restriction travels with it.
         public bool IsReadOnly => _vault.IsReadOnly;
+        public bool SupportsObjectDisclosure => (_vault as IMdbxNativeObjectReader)?.SupportsObjectDisclosure ?? false;
 
         public Task<MdbxNativeVaultInfo> GetInfoAsync(CancellationToken cancellationToken = default) =>
             _vault.GetInfoAsync(cancellationToken);
@@ -246,6 +247,28 @@ public sealed partial class MdbxVaultStore
 
         public Task<IReadOnlyList<MdbxNativeProjectRecord>> ListProjectsAsync(CancellationToken cancellationToken = default) =>
             _vault.ListProjectsAsync(cancellationToken);
+
+        public Task<IReadOnlyList<MdbxNativeObjectSummary>> ListObjectSummariesAsync(
+            string projectId,
+            bool includeDeleted = false,
+            CancellationToken cancellationToken = default) =>
+            RequireObjectReader().ListObjectSummariesAsync(projectId, includeDeleted, cancellationToken);
+
+        public Task<MdbxNativeObjectDisclosure> RevealObjectAsync(
+            string objectId,
+            ulong maximumPayloadBytes,
+            CancellationToken cancellationToken = default) =>
+            RequireObjectReader().RevealObjectAsync(objectId, maximumPayloadBytes, cancellationToken);
+
+        private IMdbxNativeObjectReader RequireObjectReader() =>
+            _vault is IMdbxNativeObjectReader { SupportsObjectDisclosure: true } reader
+                ? reader
+                : throw new NotSupportedException("The native vault does not support metadata summaries and authorized object disclosure.");
+
+        public Task<MdbxNativeEntryRecord?> ReadSupportedObjectAsync(
+            MdbxNativeObjectSummary expected,
+            CancellationToken cancellationToken = default) =>
+            RequireObjectReader().ReadSupportedObjectAsync(expected, cancellationToken);
 
         public Task<MdbxNativeEntryRecord> CreateEntryAsync(
             string projectId,

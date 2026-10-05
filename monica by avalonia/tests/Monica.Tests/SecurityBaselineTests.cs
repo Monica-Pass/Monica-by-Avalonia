@@ -85,6 +85,49 @@ public sealed class SecurityBaselineTests
     }
 
     [Fact]
+    public async Task Security_baseline_sensitive_copy_without_expiry_remains_owned_for_lock_cleanup()
+    {
+        var adapter = new MemoryClipboardAdapter();
+        var scheduler = new ManualClipboardExpiryScheduler();
+        using var clipboard = new SecureClipboardService(adapter, scheduler);
+        clipboard.ConfigureSensitiveClear(null);
+
+        await clipboard.SetSensitiveTextAsync("owned-secret");
+        Assert.Empty(scheduler.Delays);
+        await clipboard.ClearOwnedContentAsync();
+
+        Assert.Null(adapter.Text);
+    }
+
+    [Fact]
+    public async Task Security_baseline_cleanup_without_expiry_preserves_another_application_copy()
+    {
+        var adapter = new MemoryClipboardAdapter();
+        using var clipboard = new SecureClipboardService(adapter);
+        clipboard.ConfigureSensitiveClear(null);
+
+        await clipboard.SetSensitiveTextAsync("owned-secret");
+        adapter.Text = "external-content";
+        await clipboard.ClearOwnedContentAsync();
+
+        Assert.Equal("external-content", adapter.Text);
+    }
+
+    [Fact]
+    public async Task Security_baseline_cleanup_does_not_clear_content_when_ownership_cannot_be_verified()
+    {
+        var adapter = new MemoryClipboardAdapter { GetTextFailure = new InvalidOperationException("Clipboard unavailable") };
+        using var clipboard = new SecureClipboardService(adapter);
+        clipboard.ConfigureSensitiveClear(null);
+
+        await clipboard.SetSensitiveTextAsync("owned-secret");
+        adapter.Text = "external-content";
+        await clipboard.ClearOwnedContentAsync();
+
+        Assert.Equal("external-content", adapter.Text);
+    }
+
+    [Fact]
     public async Task Security_baseline_inflight_cleanup_survives_concurrent_disposal()
     {
         var adapter = new BlockingClipboardAdapter();
@@ -153,11 +196,17 @@ public sealed class SecurityBaselineTests
     private sealed class MemoryClipboardAdapter : IClipboardAdapter
     {
         public string? Text { get; set; }
+        public Exception? GetTextFailure { get; set; }
         public int GetTextCallCount { get; private set; }
 
         public Task<string?> GetTextAsync(CancellationToken cancellationToken = default)
         {
             GetTextCallCount++;
+            if (GetTextFailure is not null)
+            {
+                return Task.FromException<string?>(GetTextFailure);
+            }
+
             return Task.FromResult(Text);
         }
 

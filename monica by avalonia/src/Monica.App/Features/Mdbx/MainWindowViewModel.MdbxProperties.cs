@@ -110,14 +110,30 @@ public sealed partial class MainWindowViewModel
             : _localization.Get("MdbxOneDriveSourceEmpty");
     public string MdbxRuntimeSummaryText => _localization.Get("MdbxRuntimeSummary");
     public string MdbxSecuritySummaryText => _localization.Get("MdbxSecuritySummary");
-    public string MdbxUnknownEntrySummaryText => MdbxUnknownEntryCount == 0
-        ? _localization.Get("MdbxNoUnknownEntries")
-        : _localization.Format("MdbxUnknownEntriesSummaryFormat", MdbxUnknownEntryCount);
+    public string MdbxUnknownEntrySummaryText => IsLoadingMdbxUnknownEntries
+        ? _localization.Get("MdbxUnknownEntriesLoading")
+        : IsMdbxUnknownEntryDiscoveryFailed
+            ? _localization.Get("MdbxUnknownEntriesDiscoveryFailed")
+            : _mdbxUnknownEntryDiagnostics is null
+                ? _localization.Get("MdbxUnknownEntriesUnavailable")
+                : !HasLoadedMdbxUnknownEntries
+                    ? _localization.Get("MdbxUnknownEntriesNotLoaded")
+                    : MdbxUnknownEntryCount == 0
+                        ? _localization.Get("MdbxNoUnknownEntries")
+                        : _localization.Format("MdbxUnknownEntriesSummaryFormat", MdbxUnknownEntryCount);
     public bool IsMdbxDetailsSelected => IsWorkspacePageSelected(SelectedMdbxWorkspacePage, "Details");
     public bool IsMdbxHealthSelected => IsWorkspacePageSelected(SelectedMdbxWorkspacePage, "Health");
     public bool IsMdbxSourcesSelected => IsWorkspacePageSelected(SelectedMdbxWorkspacePage, "Sources");
     public bool IsMdbxRuntimeSelected => IsWorkspacePageSelected(SelectedMdbxWorkspacePage, "Runtime");
     public bool HasSelectedMdbxDatabaseItem => SelectedMdbxDatabaseItem is not null;
+
+    partial void OnSelectedMdbxWorkspacePageChanged(string value)
+    {
+        if (!IsWorkspacePageSelected(value, "Health"))
+        {
+            ClearMdbxUnknownEntryDetails();
+        }
+    }
 
     partial void OnMdbxLocalCacheEnabledChanged(bool value)
     {

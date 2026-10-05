@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Mdbx.MdbxWorkbenchView" x:DataType="vm:MainWindowViewModel">
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" xmlns:mdbx="using:Monica.App.Features.Mdbx" x:Class="Monica.App.Features.Mdbx.MdbxWorkbenchView" x:DataType="vm:MainWindowViewModel">
     <StackPanel Spacing="14">
         <Border Classes="mdbxWorkbench" Padding="20" IsVisible="{Binding IsMdbxDetailsSelected}">
             <Grid>
@@ -91,6 +91,7 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                <mdbx:MdbxUnknownEntriesView />
             </StackPanel>
         </Border>
         <Border Classes="mdbxWorkbench" Padding="20" IsVisible="{Binding IsMdbxSourcesSelected}">

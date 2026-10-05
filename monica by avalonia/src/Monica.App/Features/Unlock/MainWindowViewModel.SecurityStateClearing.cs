@@ -29,6 +29,7 @@ public sealed partial class MainWindowViewModel
 
     private void ClearVaultCollections()
     {
+        ClearMdbxUnknownEntries();
         ClearItems(Passwords);
         ClearItems(ArchivedPasswords);
         ClearItems(DeletedPasswords);

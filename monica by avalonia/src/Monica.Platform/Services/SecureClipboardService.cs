@@ -95,9 +95,31 @@ public sealed class SecureClipboardService(
             Interlocked.Exchange(ref _ownedText, null);
             var version = Interlocked.Increment(ref _ownershipVersion);
             await _adapter.SetTextAsync(text, cancellationToken);
-            if (isSensitive && _sensitiveLifetime is { } lifetime)
+            if (IsDisposed)
             {
-                ScheduleExpiry(text, version, lifetime);
+                if (isSensitive)
+                {
+                    await ClearAdapterIfMatchingAsync(text, CancellationToken.None);
+                }
+
+                ThrowIfDisposed();
+            }
+
+            if (isSensitive)
+            {
+                // Disabling timer expiry does not disable ownership cleanup when the vault locks.
+                Interlocked.Exchange(ref _ownedText, text);
+                if (IsDisposed)
+                {
+                    Interlocked.Exchange(ref _ownedText, null);
+                    await ClearAdapterIfMatchingAsync(text, CancellationToken.None);
+                    ThrowIfDisposed();
+                }
+
+                if (_sensitiveLifetime is { } lifetime)
+                {
+                    ScheduleExpiry(text, version, lifetime);
+                }
             }
         }
         finally
@@ -115,7 +137,6 @@ public sealed class SecureClipboardService(
 
         var expiryCancellation = new CancellationTokenSource();
         var cancellationToken = expiryCancellation.Token;
-        Interlocked.Exchange(ref _ownedText, text);
         CancelAndDispose(Interlocked.Exchange(ref _expiryCancellation, expiryCancellation));
 
         if (IsDisposed)
@@ -192,7 +213,7 @@ public sealed class SecureClipboardService(
         }
         catch
         {
-            await _adapter.ClearAsync(cancellationToken);
+            // Without a readback we cannot prove Monica still owns the clipboard.
             return;
         }
 

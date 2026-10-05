@@ -1,0 +1,68 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Monica.App.ViewModels"
+             xmlns:data="using:Monica.Data.Mdbx"
+             x:Class="Monica.App.Features.Mdbx.MdbxUnknownEntriesView"
+             x:Name="Root"
+             x:DataType="vm:MainWindowViewModel">
+    <StackPanel Spacing="12">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <StackPanel Spacing="4">
+                <TextBlock Text="{Binding L[MdbxUnknownEntries]}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding MdbxUnknownEntrySummaryText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="workspaceCommand" Command="{Binding RefreshMdbxUnknownEntriesCommand}" IsEnabled="{Binding !IsLoadingMdbxUnknownEntries}" VerticalAlignment="Top" ToolTip.Tip="{Binding L.Refresh}" AutomationProperties.Name="{Binding L.Refresh}">
+                <ic:FluentIcon Icon="ArrowClockwise" FontSize="18" />
+            </Button>
+        </Grid>
+        <TextBlock Text="{Binding L[MdbxUnknownEntriesReadOnlyHint]}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        <ListBox ItemsSource="{Binding MdbxUnknownEntries}" IsVisible="{Binding HasMdbxUnknownEntries}" IsEnabled="{Binding !IsLoadingMdbxUnknownEntries}" MaxHeight="360" AutomationProperties.Name="{Binding L[MdbxUnknownEntries]}">
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="data:MdbxUnknownEntryDescriptor">
+                    <Border Classes="mdbxDiagnosticTile" Padding="12" Margin="0,0,0,8">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding EntryType}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <Button Classes="workspaceCommand" Command="{Binding #Root.DataContext.ShowMdbxUnknownEntryDetailsCommand}" CommandParameter="{Binding}" HorizontalAlignment="Left">
+                                <TextBlock Text="{Binding #Root.DataContext.L[MdbxUnknownEntryInspect]}" TextWrapping="Wrap" />
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        <Border Classes="mdbxDiagnosticTile" Padding="12" IsVisible="{Binding HasMdbxUnknownEntryDetails}">
+            <StackPanel Spacing="12">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <TextBlock Text="{Binding L[MdbxUnknownEntryRawFields]}" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    <Button Grid.Column="1" Classes="workspaceCommand" Command="{Binding CloseMdbxUnknownEntryDetailsCommand}" ToolTip.Tip="{Binding L.Close}" AutomationProperties.Name="{Binding L.Close}">
+                        <ic:FluentIcon Icon="Dismiss" FontSize="18" />
+                    </Button>
+                </Grid>
+                <TextBlock Text="{Binding L[MdbxUnknownEntryDetailsLoading]}" IsVisible="{Binding IsLoadingMdbxUnknownEntryDetails}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <TextBlock Text="{Binding MdbxUnknownEntryDetailsError}" IsVisible="{Binding HasMdbxUnknownEntryDetailsError}" TextWrapping="Wrap" />
+                <ItemsControl ItemsSource="{Binding MdbxUnknownEntryFields}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PasswordDetailField">
+                            <Border Classes="mdbxWorkbench" Padding="0,8">
+                                <StackPanel Spacing="8">
+                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                        <TextBlock Text="{Binding Label}" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        <Button Grid.Column="1" Classes="workspaceCommand" Command="{Binding #Root.DataContext.ToggleMdbxUnknownEntryFieldVisibilityCommand}" CommandParameter="{Binding}" IsEnabled="{Binding CanToggleVisibility}" ToolTip.Tip="{Binding VisibilityActionLabel}" AutomationProperties.Name="{Binding VisibilityActionLabel}">
+                                            <ic:FluentIcon Icon="Eye" FontSize="18" />
+                                        </Button>
+                                        <Button Grid.Column="2" Classes="workspaceCommand" Command="{Binding #Root.DataContext.CopyMdbxUnknownEntryFieldCommand}" CommandParameter="{Binding}" IsEnabled="{Binding CanCopy}" ToolTip.Tip="{Binding #Root.DataContext.L.Copy}" AutomationProperties.Name="{Binding #Root.DataContext.L.Copy}">
+                                            <ic:FluentIcon Icon="Copy" FontSize="18" />
+                                        </Button>
+                                    </Grid>
+                                    <TextBlock Text="{Binding DisplayText}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

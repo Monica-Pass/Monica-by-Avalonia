@@ -8,6 +8,8 @@ public sealed partial class MainWindowViewModel
         Exception exception)
     {
         AppDiagnostics.Error(diagnosticMessage, exception);
-        SetStatusFailure(userMessageKey);
+        SetStatusFailure(exception is Monica.Data.Mdbx.MdbxVaultReadOnlyException { ReasonCode: "unsupported-vault-objects" }
+            ? "MdbxUnsupportedObjectsProtected"
+            : userMessageKey);
     }
 }

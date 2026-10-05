@@ -214,6 +214,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     partial void OnSelectedSectionChanged(string value)
     {
+        ClearMdbxUnknownEntryDetails();
         RetireNoticeOnNavigation();
         RefreshVaultPreset();
         RestoreActiveWorkspaceState();

@@ -77,6 +77,53 @@ public interface IMdbxNativeVault : IDisposable
     Task DeleteAttachmentAsync(string attachmentId, CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// Metadata browsing and policy-authorized payload reads. This capability is separate from the legacy
+/// vault interface so callers can refuse an unsupported reader without falling back to plaintext lists.
+/// </summary>
+public interface IMdbxNativeObjectReader
+{
+    bool SupportsObjectDisclosure { get; }
+
+    Task<IReadOnlyList<MdbxNativeObjectSummary>> ListObjectSummariesAsync(
+        string projectId,
+        bool includeDeleted = false,
+        CancellationToken cancellationToken = default);
+
+    Task<MdbxNativeObjectDisclosure> RevealObjectAsync(
+        string objectId,
+        ulong maximumPayloadBytes,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Compatibility read for an exact supported type/version pair, including recycle-bin records.
+    /// It does not replace policy-authorized disclosure for unknown objects; unsupported pairs are refused
+    /// before loading payload. The engine's disclosure API currently refuses deleted objects.
+    /// </summary>
+    Task<MdbxNativeEntryRecord?> ReadSupportedObjectAsync(
+        MdbxNativeObjectSummary expected,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed record MdbxNativeObjectSummary(
+    string EntryId,
+    string ProjectId,
+    string EntryType,
+    string Title,
+    uint PayloadSchemaVersion,
+    string HeadCommitId,
+    bool Deleted,
+    string UpdatedAt);
+
+/// <summary>Payload is absent unless the native policy authorizes its disclosure.</summary>
+public sealed record MdbxNativeObjectDisclosure(
+    MdbxNativeObjectSummary? Summary,
+    string? PayloadJson,
+    string AuthorizationOutcome)
+{
+    public override string ToString() => $"MdbxNativeObjectDisclosure({AuthorizationOutcome}, redacted)";
+}
+
 public sealed record MdbxNativeVaultInfo(string VaultId, string DeviceId);
 
 public sealed record MdbxNativeProjectRecord(
@@ -89,19 +136,22 @@ public sealed record MdbxNativeEntryRecord(
     string EntryType,
     string Title,
     string PayloadJson,
-    bool Deleted);
+    bool Deleted,
+    uint PayloadSchemaVersion = 1);
 
 /// <summary>
-/// Metadata for a native object whose type is outside the desktop reader's known set. The descriptor keeps
-/// payload out of the returned diagnostics model; the current legacy discovery path still needs to be
-/// replaced by native summaries before this becomes a strict metadata-only disclosure boundary.
+/// Metadata for a native object whose type or payload version is outside the desktop reader's known set.
+/// The descriptor comes from native summaries without reading payload; details require authorized disclosure.
 /// </summary>
 public sealed record MdbxUnknownEntryDescriptor(
     string EntryId,
     string ProjectId,
     string EntryType,
     string Title,
-    bool Deleted);
+    bool Deleted,
+    uint PayloadSchemaVersion = 1,
+    string HeadCommitId = "",
+    string UpdatedAt = "");
 
 public sealed record MdbxNativeAttachmentRecord(
     string AttachmentId,

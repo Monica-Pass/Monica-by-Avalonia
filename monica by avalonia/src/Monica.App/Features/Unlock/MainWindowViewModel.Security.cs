@@ -64,6 +64,7 @@ public sealed partial class MainWindowViewModel
     public void HandleWindowDeactivated()
     {
         _isWindowActive = false;
+        ClearMdbxUnknownEntryDetails();
         IsPrivacyScreenVisible = IsUnlocked;
     }
 

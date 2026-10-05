@@ -55,6 +55,10 @@ macOS 与 Linux 的跨平台构建目标。它不是把 Android 界面直接搬�
 | 浏览器配对 | Chrome/Edge Manifest V3 扩展、仅回环地址的会话令牌桥接和当前站点凭据查询 |
 | MDBX 工具 | Vault 创建、检查、快照、历史、冲突、恢复和数据库管理工作台 |
 
+MDBX 健康页提供默认保险库的[未知类型与高版本条目只读查看](docs/mdbx-readonly-inspector.md)：
+列表只读取摘要，查看正文时走原生授权与大小限制，字段默认隐藏。当前版本无法完整承载这些
+对象时，会拒绝生成 Monica JSON 备份或清空全部数据。
+
 Bitwarden 在线同步包括账户认证、支持的双因素挑战、待上传变更、远端下载与合并、
 嵌套文件夹元数据和冲突备份。协议兼容与安全限制记录在
 [Bitwarden 在线同步边界](docs/bitwarden-online-sync-boundary.md)。

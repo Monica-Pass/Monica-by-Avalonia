@@ -63,6 +63,7 @@ public sealed partial class MainWindowViewModel
 
     private async Task ReloadMdbxVaultStateAsync()
     {
+        ClearMdbxUnknownEntryDetails();
         var databases = await _repository.GetMdbxDatabasesAsync();
         MdbxDatabases.Clear();
         foreach (var database in databases)
@@ -72,6 +73,7 @@ public sealed partial class MainWindowViewModel
 
         RefreshMdbxVaultState();
         RefreshVaultSources();
+        await RefreshMdbxUnknownEntryCountAsync(_vaultSessionService.SessionCancellationToken);
     }
 
     private void RaiseMdbxVaultState()
@@ -124,7 +126,7 @@ public sealed partial class MainWindowViewModel
             _localization.Get("MdbxDiagnostics"),
             HasMdbxSyncErrors ? _localization.Get("NeedsAttention") : _localization.Get("Available"),
             MdbxSyncDiagnosticsSummaryText));
-        if (MdbxUnknownEntryCount > 0)
+        if (MdbxUnknownEntryCount > 0 || IsMdbxUnknownEntryDiscoveryFailed)
         {
             MdbxHealthItems.Add(new SyncHealthDisplayItem(
                 _localization.Get("MdbxUnknownEntries"),
@@ -132,35 +134,6 @@ public sealed partial class MainWindowViewModel
                 MdbxUnknownEntrySummaryText));
         }
         OnPropertyChanged(nameof(MdbxHealthItems));
-    }
-
-    private async Task RefreshMdbxUnknownEntryCountAsync(CancellationToken cancellationToken)
-    {
-        if (_mdbxUnknownEntryDiagnostics is null)
-        {
-            MdbxUnknownEntryCount = 0;
-            return;
-        }
-
-        try
-        {
-            MdbxUnknownEntryCount = (await _mdbxUnknownEntryDiagnostics.GetUnknownMdbxEntriesAsync(
-                includeDeleted: false,
-                cancellationToken)).Count;
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            MdbxUnknownEntryCount = 0;
-            AppDiagnostics.Error("MDBX unknown entry discovery failed.", ex);
-        }
-
-        OnPropertyChanged(nameof(MdbxUnknownEntryCount));
-        OnPropertyChanged(nameof(MdbxUnknownEntrySummaryText));
-        RefreshMdbxHealthItems();
     }
 
     private MdbxDatabaseDisplayItem ToMdbxDisplayItem(LocalMdbxDatabase database)

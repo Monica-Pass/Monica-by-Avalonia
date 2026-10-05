@@ -18,7 +18,10 @@ public interface IMdbxVaultStore
     Task<PasswordEntry> SavePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, IReadOnlyList<CustomField> customFields, IReadOnlyList<PasswordHistoryEntry> passwordHistory, IReadOnlyDictionary<long, Category> categories, CancellationToken cancellationToken = default);
     Task<PasswordEntry> SavePasswordAsync(LocalMdbxDatabase database, PasswordEntry entry, IReadOnlyList<CustomField> customFields, IReadOnlyList<PasswordHistoryEntry> passwordHistory, IReadOnlyList<Attachment> attachments, IReadOnlyDictionary<long, Category> categories, CancellationToken cancellationToken = default);
     Task<MdbxPasswordReadSnapshot> GetPasswordReadSnapshotAsync(LocalMdbxDatabase database, IReadOnlyList<Category> categories, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<MdbxUnknownEntryDescriptor>> GetUnknownEntriesAsync(LocalMdbxDatabase database, bool includeDeleted = false, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<MdbxUnknownEntryDescriptor>> GetUnknownEntriesAsync(LocalMdbxDatabase database, bool includeDeleted = false, CancellationToken cancellationToken = default) =>
+        Task.FromException<IReadOnlyList<MdbxUnknownEntryDescriptor>>(new NotSupportedException("Native object summaries are unavailable."));
+    Task<MdbxUnknownEntryDetail?> ReadUnknownEntryAsync(LocalMdbxDatabase database, string entryId, string projectId, CancellationToken cancellationToken = default) =>
+        Task.FromException<MdbxUnknownEntryDetail?>(new NotSupportedException("Authorized native object disclosure is unavailable."));
     Task<IReadOnlyList<PasswordEntry>> GetPasswordsAsync(LocalMdbxDatabase database, bool includeDeleted = false, bool includeArchived = false, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PasswordEntry>> GetPasswordsAsync(LocalMdbxDatabase database, IReadOnlyList<Category> categories, bool includeDeleted = false, bool includeArchived = false, CancellationToken cancellationToken = default);
     Task<PasswordEntry?> FindPasswordAsync(LocalMdbxDatabase database, IReadOnlyList<Category> categories, long entryId, bool includeDeleted = false, CancellationToken cancellationToken = default);
@@ -66,19 +69,17 @@ public sealed partial class MdbxVaultStore(
     private const string DefaultProjectTitle = "Monica";
     private const string DeviceId = "monica-avalonia";
     /// <summary>
-    /// Types to look for when reading a password record. "login" is what Android writes for every
-    /// password — including SSH keys, which live in the payload's login_type — while "ssh-key" is
-    /// only kept so vaults written by earlier desktop builds stay readable.
+    /// Android writes credentials, including SSH templates, as "login". Other native types are
+    /// available through the generic read-only inspector instead of the password write path.
     /// </summary>
-    private static readonly string[] PasswordEntryTypes = [PasswordEntryType, "ssh-key"];
+    private static readonly string[] PasswordEntryTypes = [PasswordEntryType];
 
     /// <summary>
-    /// Types to look for when reading a secure item. The names Android writes come first;
-    /// "identity" is retained purely to read vaults an earlier desktop build authored.
+    /// Native types with a desktop business editor. Legacy aliases are preserved by the generic inspector.
     /// </summary>
     private static readonly string[] SecureEntryTypes =
     [
-        "note", "totp", "card", "document-ref", "billing-address", "payment-account", "identity"
+        "note", "totp", "card", "document-ref", "billing-address", "payment-account"
     ];
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -116,39 +117,6 @@ public sealed partial class MdbxVaultStore(
 
         return categories;
     }
-
-    public async Task<IReadOnlyList<MdbxUnknownEntryDescriptor>> GetUnknownEntriesAsync(
-        LocalMdbxDatabase database,
-        bool includeDeleted = false,
-        CancellationToken cancellationToken = default)
-    {
-        var vault = await OpenAsync(database, cancellationToken);
-        using var _ = vault;
-        var projects = await EnsureProjectsForReadAsync(vault, cancellationToken);
-        var knownTypes = PasswordEntryTypes
-            .Concat(SecureEntryTypes)
-            .ToHashSet(StringComparer.Ordinal);
-        var unknown = new List<MdbxUnknownEntryDescriptor>();
-        foreach (var project in projects)
-        {
-            var records = await vault.ListEntriesAsync(project.ProjectId, entryType: null, cancellationToken);
-            unknown.AddRange(records
-                .Where(record => !knownTypes.Contains(record.EntryType))
-                .Select(ToUnknownEntryDescriptor));
-            if (includeDeleted)
-            {
-                var deleted = await vault.ListDeletedEntriesAsync(project.ProjectId, entryType: null, cancellationToken);
-                unknown.AddRange(deleted
-                    .Where(record => !knownTypes.Contains(record.EntryType))
-                    .Select(ToUnknownEntryDescriptor));
-            }
-        }
-
-        return unknown;
-    }
-
-    private static MdbxUnknownEntryDescriptor ToUnknownEntryDescriptor(MdbxNativeEntryRecord record) =>
-        new(record.EntryId, record.ProjectId, record.EntryType, record.Title, record.Deleted);
 
     public async Task<Category> SaveCategoryAsync(LocalMdbxDatabase database, Category category, CancellationToken cancellationToken = default)
     {
@@ -196,6 +164,11 @@ public sealed partial class MdbxVaultStore(
     {
         var vault = await OpenAsync(database, cancellationToken);
         using var _ = vault;
+        if (!string.IsNullOrWhiteSpace(entry.MdbxFolderId))
+        {
+            await FindEntryAsync(vault, entry.MdbxFolderId, PasswordEntryTypes, includeDeleted: true, cancellationToken);
+        }
+
         var project = await ResolveProjectAsync(vault, entry.CategoryId, categories, cancellationToken);
         var entryType = PasswordEntryType;
         var portableEntry = ClonePasswordEntryForPayload(entry);
@@ -598,6 +571,11 @@ public sealed partial class MdbxVaultStore(
     {
         var vault = await OpenAsync(database, cancellationToken);
         using var _ = vault;
+        if (!string.IsNullOrWhiteSpace(item.MdbxFolderId))
+        {
+            await FindEntryAsync(vault, item.MdbxFolderId, SecureEntryTypes, includeDeleted: true, cancellationToken);
+        }
+
         var project = await ResolveProjectAsync(vault, item.CategoryId, categories, cancellationToken);
         var entryType = ToMdbxEntryType(item.ItemType);
         var portableItem = CloneSecureItemForPayload(item);
@@ -931,9 +909,7 @@ public sealed partial class MdbxVaultStore(
         var projects = await vault.ListProjectsAsync(cancellationToken);
         foreach (var project in projects)
         {
-            var records = (await vault.ListEntriesAsync(project.ProjectId, entryType: null, cancellationToken))
-                .Where(record => entryTypes.Contains(record.EntryType, StringComparer.OrdinalIgnoreCase))
-                .ToList();
+            var records = await ListRecordsAsync(vault, [project], entryTypes, includeDeleted: false, cancellationToken);
             foreach (var record in records)
             {
                 if (deleteAttachments)
@@ -1035,6 +1011,11 @@ public sealed partial class MdbxVaultStore(
 
     private static async Task<bool> HasBusinessEntriesAsync(IMdbxNativeVault vault, string projectId, CancellationToken cancellationToken)
     {
+        if (vault is IMdbxNativeObjectReader { SupportsObjectDisclosure: true } reader)
+        {
+            return (await reader.ListObjectSummariesAsync(projectId, true, cancellationToken)).Count > 0;
+        }
+
         var recognisedTypes = PasswordEntryTypes.Concat(SecureEntryTypes).ToList();
         return (await vault.ListEntriesAsync(projectId, entryType: null, cancellationToken))
                 .Any(entry => recognisedTypes.Contains(entry.EntryType, StringComparer.OrdinalIgnoreCase)) ||
@@ -1106,14 +1087,17 @@ public sealed partial class MdbxVaultStore(
         string title,
         string payloadJson,
         AndroidMdbxPayloadFamily payloadFamily,
-        CancellationToken cancellationToken) =>
-        vault.UpdateEntryAsync(
+        CancellationToken cancellationToken)
+    {
+        RequireSupportedRecord(existing);
+        return vault.UpdateEntryAsync(
             targetProjectId,
             existing.EntryId,
             existing.EntryType,
             title,
             AndroidMdbxPayloadMerge.PreserveForeignFields(existing.PayloadJson, payloadJson, payloadFamily),
             cancellationToken);
+    }
 
     private static async Task<MdbxNativeEntryRecord?> FindEntryAsync(
         IMdbxNativeVault vault,
@@ -1127,15 +1111,32 @@ public sealed partial class MdbxVaultStore(
             return null;
         }
 
-        var projects = await EnsureProjectsForReadAsync(vault, cancellationToken);
+        var projects = await vault.ListProjectsAsync(cancellationToken);
         foreach (var project in projects)
         {
+            if (vault is IMdbxNativeObjectReader { SupportsObjectDisclosure: true } reader)
+            {
+                var summary = (await reader.ListObjectSummariesAsync(project.ProjectId, includeDeleted, cancellationToken))
+                    .FirstOrDefault(entry => string.Equals(entry.EntryId, entryId, StringComparison.Ordinal));
+                if (summary is null)
+                {
+                    continue;
+                }
+
+                if (!HasSupportedPayload(summary) || !entryTypes.Contains(summary.EntryType, StringComparer.Ordinal))
+                {
+                    throw new MdbxVaultReadOnlyException("object-type-or-version", "Use the read-only native object inspector.");
+                }
+
+                return await ReadSupportedRecordAsync(reader, summary, cancellationToken);
+            }
+
             var active = await vault.ListEntriesAsync(project.ProjectId, entryType: null, cancellationToken);
             var match = active.FirstOrDefault(entry =>
-                entryTypes.Contains(entry.EntryType, StringComparer.OrdinalIgnoreCase) &&
                 string.Equals(entry.EntryId, entryId, StringComparison.OrdinalIgnoreCase));
             if (match is not null)
             {
+                RequireSupportedRecord(match, entryTypes);
                 return match;
             }
 
@@ -1143,10 +1144,10 @@ public sealed partial class MdbxVaultStore(
             {
                 var deleted = await vault.ListDeletedEntriesAsync(project.ProjectId, entryType: null, cancellationToken);
                 match = deleted.FirstOrDefault(entry =>
-                    entryTypes.Contains(entry.EntryType, StringComparer.OrdinalIgnoreCase) &&
                     string.Equals(entry.EntryId, entryId, StringComparison.OrdinalIgnoreCase));
                 if (match is not null)
                 {
+                    RequireSupportedRecord(match, entryTypes);
                     return match;
                 }
             }
@@ -1197,9 +1198,9 @@ public sealed partial class MdbxVaultStore(
     }
 
     /// <summary>
-    /// Lists every entry of a project once and narrows by type in memory. The native list_entries
-    /// call rejects a type name outside the legacy set, so scanning "billing-address" directly would
-    /// fail the whole read — and Android's vaults are full of those entries.
+    /// Discovers records through payload-free summaries, then reads only supported type/version pairs
+    /// through the business compatibility path, which also handles recycle-bin records. Unknown objects
+    /// use the separate authorized disclosure path. Legacy bridges remain available for existing tests.
     /// </summary>
     private static async Task<IReadOnlyList<MdbxNativeEntryRecord>> ListRecordsAsync(
         IMdbxNativeVault vault,
@@ -1211,12 +1212,26 @@ public sealed partial class MdbxVaultStore(
         var records = new List<MdbxNativeEntryRecord>();
         foreach (var project in projects)
         {
+            if (vault is IMdbxNativeObjectReader { SupportsObjectDisclosure: true } reader)
+            {
+                var summaries = await reader.ListObjectSummariesAsync(project.ProjectId, includeDeleted, cancellationToken);
+                foreach (var summary in summaries.Where(summary => HasSupportedPayload(summary) &&
+                             entryTypes.Contains(summary.EntryType, StringComparer.Ordinal)))
+                {
+                    records.Add(await ReadSupportedRecordAsync(reader, summary, cancellationToken));
+                }
+
+                continue;
+            }
+
             records.AddRange((await vault.ListEntriesAsync(project.ProjectId, entryType: null, cancellationToken))
-                .Where(entry => entryTypes.Contains(entry.EntryType, StringComparer.OrdinalIgnoreCase)));
+                .Where(entry => entry.PayloadSchemaVersion == SupportedObjectPayloadVersion &&
+                                entryTypes.Contains(entry.EntryType, StringComparer.Ordinal)));
             if (includeDeleted)
             {
                 records.AddRange((await vault.ListDeletedEntriesAsync(project.ProjectId, entryType: null, cancellationToken))
-                    .Where(entry => entryTypes.Contains(entry.EntryType, StringComparer.OrdinalIgnoreCase)));
+                    .Where(entry => entry.PayloadSchemaVersion == SupportedObjectPayloadVersion &&
+                                    entryTypes.Contains(entry.EntryType, StringComparer.Ordinal)));
             }
         }
 
@@ -1558,13 +1573,12 @@ public sealed partial class MdbxVaultStore(
     };
 
     /// <summary>
-    /// Native types to scan for one requested item type. Earlier desktop builds filed both wallet
-    /// kinds under "identity", so that legacy name stays in the scan set and the payload's own kind
-    /// decides which of the two a record really is.
+    /// Native types to scan for one requested item type. The legacy "identity" alias is preserved by
+    /// the generic read-only inspector instead of being rewritten through a wallet editor.
     /// </summary>
     private static IReadOnlyList<string> SecureReadEntryTypes(VaultItemType itemType) => itemType switch
     {
-        VaultItemType.BillingAddress or VaultItemType.PaymentAccount => [ToMdbxEntryType(itemType), "identity"],
+        VaultItemType.BillingAddress or VaultItemType.PaymentAccount => [ToMdbxEntryType(itemType)],
         _ => [ToMdbxEntryType(itemType)]
     };
 

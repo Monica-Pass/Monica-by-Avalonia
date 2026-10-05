@@ -9,15 +9,35 @@ namespace Monica.Data.Mdbx;
 /// Deliberately not a partial-enforcement helper: reads forward untouched, including the attachment
 /// content reads, so a restricted vault is still fully usable for viewing, copying and search.
 /// </remarks>
-public sealed class MdbxReadOnlyNativeVault(IMdbxNativeVault inner, MdbxNativeAccessDecision decision) : IMdbxNativeVault
+public sealed class MdbxReadOnlyNativeVault(IMdbxNativeVault inner, MdbxNativeAccessDecision decision) : IMdbxNativeVault, IMdbxNativeObjectReader
 {
     public bool IsReadOnly => true;
+    public bool SupportsObjectDisclosure => (inner as IMdbxNativeObjectReader)?.SupportsObjectDisclosure ?? false;
 
     public Task<MdbxNativeVaultInfo> GetInfoAsync(CancellationToken cancellationToken = default) =>
         inner.GetInfoAsync(cancellationToken);
 
     public Task<IReadOnlyList<MdbxNativeProjectRecord>> ListProjectsAsync(CancellationToken cancellationToken = default) =>
         inner.ListProjectsAsync(cancellationToken);
+
+    public Task<IReadOnlyList<MdbxNativeObjectSummary>> ListObjectSummariesAsync(
+        string projectId,
+        bool includeDeleted = false,
+        CancellationToken cancellationToken = default) =>
+        RequireObjectReader().ListObjectSummariesAsync(projectId, includeDeleted, cancellationToken);
+
+    // Native disclosure records an audit event. A format-restricted handle must not perform
+    // that write; metadata summaries remain available without disclosing the payload.
+    public Task<MdbxNativeObjectDisclosure> RevealObjectAsync(
+        string objectId,
+        ulong maximumPayloadBytes,
+        CancellationToken cancellationToken = default) =>
+        Task.FromException<MdbxNativeObjectDisclosure>(new MdbxObjectDisclosureException("read-only-session"));
+
+    public Task<MdbxNativeEntryRecord?> ReadSupportedObjectAsync(
+        MdbxNativeObjectSummary expected,
+        CancellationToken cancellationToken = default) =>
+        RequireObjectReader().ReadSupportedObjectAsync(expected, cancellationToken);
 
     public Task<IReadOnlyList<MdbxNativeEntryRecord>> ListEntriesAsync(
         string projectId,
@@ -96,6 +116,11 @@ public sealed class MdbxReadOnlyNativeVault(IMdbxNativeVault inner, MdbxNativeAc
         Blocked();
 
     public void Dispose() => inner.Dispose();
+
+    private IMdbxNativeObjectReader RequireObjectReader() =>
+        inner is IMdbxNativeObjectReader { SupportsObjectDisclosure: true } reader
+            ? reader
+            : throw new NotSupportedException("The native vault does not support metadata summaries and authorized object disclosure.");
 
     private Task Blocked() => Task.FromException(Reject());
 

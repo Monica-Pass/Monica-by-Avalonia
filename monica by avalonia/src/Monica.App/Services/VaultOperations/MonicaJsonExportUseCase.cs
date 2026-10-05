@@ -25,6 +25,15 @@ public sealed class MonicaJsonExportUseCase
         IReadOnlyDictionary<long, IReadOnlyList<PasswordHistoryEntry>>? precomputedPasswordHistory = null,
         CancellationToken cancellationToken = default)
     {
+        if (_repository is IMdbxUnknownEntryDiagnostics diagnostics &&
+            (await diagnostics.GetUnknownMdbxEntriesAsync(includeDeleted: true, cancellationToken)).Count > 0)
+        {
+            // This format has no carrier for generic native objects. Refuse an incomplete vault
+            // backup rather than silently dropping records from a newer or different client.
+            throw new Monica.Data.Mdbx.MdbxVaultReadOnlyException(
+                "unsupported-vault-objects", "Monica JSON cannot represent every native object in this vault.");
+        }
+
         var passwordIds = exportPasswords.Select(item => item.Id).ToArray();
 
         var customFieldsByPasswordId = precomputedCustomFields
