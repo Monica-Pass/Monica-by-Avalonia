@@ -1,0 +1,27 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Passwords.WifiDetailView"
+             x:DataType="vm:PasswordDetailViewModel">
+    <Border Classes="workspaceSection" Padding="{StaticResource PaddingSection}">
+        <StackPanel Spacing="{StaticResource SpacingMedium}">
+            <TextBlock Text="{Binding L[WifiNetwork]}" FontSize="{StaticResource FontSizePageTitle}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding L[WifiSsid]}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <SelectableTextBlock Text="{Binding WifiSsid}" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding WifiSecurityLabel}" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding L[WifiHiddenNetwork]}" IsVisible="{Binding WifiHiddenNetwork}" />
+            <WrapPanel>
+                <Button x:Name="WifiShowQrButton" Content="{Binding WifiQrActionLabel}" Command="{Binding ToggleWifiQrCommand}" IsEnabled="{Binding CanShowWifiQr}" />
+                <Button x:Name="WifiCopyQrButton" Content="{Binding L[WifiCopyQr]}" Command="{Binding CopyWifiQrCommand}" IsEnabled="{Binding CanShowWifiQr}" />
+            </WrapPanel>
+            <TextBlock Text="{Binding WifiQrUnavailableReason}" IsVisible="{Binding !CanShowWifiQr}"
+                       TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Border x:Name="WifiQrPreview" IsVisible="{Binding IsWifiQrVisible}"
+                    Background="{DynamicResource MonicaBarcodeSurfaceBrush}" Padding="{StaticResource PaddingSection}"
+                    CornerRadius="{StaticResource RadiusControl}" HorizontalAlignment="Center">
+                <Image Source="{Binding WifiQrImage}" Stretch="Uniform" MaxWidth="{StaticResource ConnectionQrSize}"
+                       MaxHeight="{StaticResource ConnectionQrSize}" AutomationProperties.Name="{Binding L[WifiNetwork]}" />
+            </Border>
+        </StackPanel>
+    </Border>
+</UserControl>

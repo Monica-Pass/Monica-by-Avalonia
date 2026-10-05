@@ -1,0 +1,40 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Passwords.WifiEditorView"
+             x:DataType="vm:PasswordEditorViewModel">
+    <Border Classes="editorSection">
+        <StackPanel Spacing="{StaticResource SpacingMedium}">
+            <TextBlock Text="{Binding L[WifiNetwork]}" Classes="editorLabel" />
+            <TextBox x:Name="WifiSsidBox" Text="{Binding WifiSsid}" Classes="editorInput"
+                     PlaceholderText="{Binding L[WifiSsid]}" AutomationProperties.Name="{Binding L[WifiSsid]}" />
+            <TextBlock Text="{Binding L[WifiSecurity]}" Classes="editorLabel" />
+            <ComboBox x:Name="WifiSecurityBox" ItemsSource="{Binding WifiSecurityOptions}"
+                      SelectedItem="{Binding SelectedWifiSecurity}" Classes="editorInput"
+                      AutomationProperties.Name="{Binding L[WifiSecurity]}">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:WifiSecurityChoice"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+            <CheckBox x:Name="WifiHiddenNetworkBox" Content="{Binding L[WifiHiddenNetwork]}"
+                      IsChecked="{Binding WifiHiddenNetwork}" />
+            <TextBlock Text="{Binding ValidationMessage}" IsVisible="{Binding HasWifiValidationError}"
+                       TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                       AutomationProperties.LiveSetting="Polite" />
+            <Expander x:Name="WifiQrImportExpander" Header="{Binding L[WifiImportQr]}" Classes="editorExpander">
+                <StackPanel Spacing="{StaticResource SpacingSmall}">
+                    <TextBox x:Name="WifiQrTextBox" Text="{Binding WifiQrText}" PasswordChar="*"
+                             PlaceholderText="{Binding L[WifiQrText]}" AutomationProperties.Name="{Binding L[WifiQrText]}" />
+                    <WrapPanel>
+                        <Button x:Name="WifiImportTextButton" Content="{Binding L[WifiImportQrText]}"
+                                Command="{Binding ImportWifiQrTextCommand}" />
+                        <Button x:Name="WifiImportImageButton" Content="{Binding L[WifiImportQrImage]}"
+                                Command="{Binding ImportWifiQrImageCommand}" />
+                    </WrapPanel>
+                    <TextBlock Text="{Binding WifiImportStatus}" TextWrapping="Wrap" Classes="editorHint"
+                               AutomationProperties.LiveSetting="Polite" />
+                </StackPanel>
+            </Expander>
+        </StackPanel>
+    </Border>
+</UserControl>

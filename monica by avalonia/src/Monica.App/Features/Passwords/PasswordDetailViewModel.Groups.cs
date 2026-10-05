@@ -83,7 +83,7 @@ public sealed partial class PasswordDetailViewModel
             Field(localization.Get("LoginType"), LocalizeLoginType(localization, entry.LoginType)),
             Field(localization.Get("SsoProvider"), entry.SsoProvider),
             Field(localization.Get("PasskeyBindings"), entry.PasskeyBindings),
-            Field(localization.Get("WifiMetadata"), entry.WifiMetadata),
+            Field(localization.Get("WifiMetadata"), entry.WifiMetadata, isSensitive: true),
             Field(localization.Get("SshKeyData"), entry.SshKeyData));
 
         AddGroup(groups, localization.Get("CustomIcon"), false,

@@ -10,7 +10,7 @@ public static class FeatureCatalog
         new("cards", "Wallet", "Bank cards, identity documents and images stored as secure items.", PlatformFeatureStatus.Available),
         new("passkeys", "Passkeys", "WebAuthn/FIDO2 metadata and platform capability reporting; system credential-provider flows remain platform-limited.", PlatformFeatureStatus.PlatformLimited),
         new("api-key", "API Keys", "Android-compatible API key entries with encrypted secrets, provider websites and optional request URLs.", PlatformFeatureStatus.Available),
-        new("wifi", "Wi-Fi", "Wi-Fi secrets stored as typed credential entries.", PlatformFeatureStatus.Available),
+        new("wifi", "Wi-Fi", "Network settings, connection QR import and sharing, with preserved Android advanced metadata.", PlatformFeatureStatus.Available),
         new("ssh", "SSH Keys", "Structured SSH key records stored alongside password entries.", PlatformFeatureStatus.Available),
         new("security-analysis", "Security Analysis", "Weak, duplicate and stale password checks.", PlatformFeatureStatus.Available),
         new("generator", "Generator", "Password and passphrase generation.", PlatformFeatureStatus.Available),

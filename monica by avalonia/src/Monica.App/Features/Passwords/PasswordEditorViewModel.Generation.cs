@@ -57,6 +57,12 @@ public sealed partial class PasswordEditorViewModel
     [RelayCommand]
     private void AddGeneratedPasswordRow()
     {
+        if (IsWifi)
+        {
+            PasswordLines = GenerateEditorPassword();
+            return;
+        }
+
         var rows = GetPasswordRows().ToList();
         rows.Add(GenerateEditorPassword());
         PasswordLines = string.Join(Environment.NewLine, rows);

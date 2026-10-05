@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Monica.App.Services;
 using Monica.Core.Models;
 using Monica.Core.Services;
+using Monica.Platform.Services;
 
 namespace Monica.App.ViewModels;
 
@@ -22,10 +23,12 @@ public sealed partial class PasswordEditorViewModel : ObservableObject, IDisposa
         string plainPassword,
         IEnumerable<string>? siblingPasswords = null,
         IEnumerable<SecureItem>? notes = null,
-        IEnumerable<CustomField>? customFields = null)
+        IEnumerable<CustomField>? customFields = null,
+        IFileSystemPickerService? fileSystemPickerService = null)
     {
         L = localization;
         _passwordGenerator = passwordGenerator;
+        _wifiFilePicker = fileSystemPickerService;
         Source = source;
         IsNew = source is null;
 
@@ -87,6 +90,11 @@ public sealed partial class PasswordEditorViewModel : ObservableObject, IDisposa
         CustomIconValue = source?.CustomIconValue ?? "";
         SelectedCustomIconType = CustomIconTypeOptions.FirstOrDefault(item => item.Value == iconType) ?? CustomIconTypeOptions[0];
         CustomFieldsText = EncodeCustomFields(sourceCustomFields.Where(field => !ApiKeyEntryFields.Owns(field.Title)));
+        InitializeWifiFields();
+        if (source?.LoginType == PasswordLoginType.Wifi)
+        {
+            PasswordLines = plainPassword;
+        }
     }
 
     public ILocalizationService L { get; }

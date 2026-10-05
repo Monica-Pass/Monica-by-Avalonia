@@ -36,6 +36,10 @@ macOS 与 Linux 的跨平台构建目标。它不是把 Android 界面直接搬�
 - **Vault 业务数据以 canonical MDBX 为准。** SQLite 保留应用元数据、迁移状态和集成
   记账，不再作为解锁后 vault 业务数据的双重真源。
 
+当前通用功能范围、剩余差距与平台取舍见[Android 与桌面功能对齐](docs/android-desktop-parity.md)。
+Wi-Fi 条目支持网络名称、加密类型、隐藏网络、连接二维码文本/图片导入及按需显示与安全复制；
+Android 企业认证、代理和静态 IP 等扩展设置在编辑常用字段时保留。
+
 本仓库不会生成 Android 或 iOS 包。Monica Android 仍由
 [Monica 主仓库](https://github.com/Monica-Pass/Monica)独立维护和发布。
 

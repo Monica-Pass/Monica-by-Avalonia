@@ -50,6 +50,7 @@ public sealed partial class PasswordDetailViewModel : ObservableObject, IDisposa
         PasswordHistoryDescription = localization.Get("PasswordHistoryDescription");
 
         InitializeBarcodePreview(cryptoService, entry);
+        InitializeWifiDetails(cryptoService, secretsAlreadyPlaintext);
 
         foreach (var group in BuildGroups(
             localization,
@@ -172,6 +173,7 @@ public sealed partial class PasswordDetailViewModel : ObservableObject, IDisposa
         _deletePasswordHistory = null;
         _clearPasswordHistory = null;
         IsSensitiveStateCleared = true;
+        ClearWifiDetails();
         OnPropertyChanged(nameof(Entry));
         OnPropertyChanged(nameof(Title));
         OnPropertyChanged(nameof(Subtitle));

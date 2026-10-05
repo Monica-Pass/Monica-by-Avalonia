@@ -16,5 +16,9 @@
 
     <Thickness x:Key="PaddingListRow">8,6</Thickness>
     <Thickness x:Key="PaddingPane">12,8</Thickness>
+    <x:Double x:Key="SpacingSmall">8</x:Double>
+    <x:Double x:Key="SpacingMedium">12</x:Double>
+    <Thickness x:Key="PaddingSection">12</Thickness>
+    <x:Double x:Key="ConnectionQrSize">280</x:Double>
 
 </ResourceDictionary>

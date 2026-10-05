@@ -8,7 +8,9 @@ public enum PasswordEditorValidationTarget
     None,
     Title,
     Password,
-    ApiKeyUrl
+    ApiKeyUrl,
+    WifiSsid,
+    WifiMetadata
 }
 
 public sealed partial class PasswordEditorViewModel
@@ -33,7 +35,19 @@ public sealed partial class PasswordEditorViewModel
             return false;
         }
 
-        if (GetPasswordRows().Count == 0 && SelectedLoginType?.Value != PasswordLoginType.Sso)
+        if (IsWifi && string.IsNullOrWhiteSpace(WifiSsid))
+        {
+            SetValidation(PasswordEditorValidationTarget.WifiSsid, L.Get("WifiSsidRequired"));
+            return false;
+        }
+
+        if (IsWifi && !WifiNetworkData.TryRead(WifiMetadata, Title, out _))
+        {
+            SetValidation(PasswordEditorValidationTarget.WifiMetadata, L.Get("WifiMetadataInvalid"));
+            return false;
+        }
+
+        if (GetPasswordRows().Count == 0 && SelectedLoginType?.Value != PasswordLoginType.Sso && WifiRequiresPassword)
         {
             SetValidation(PasswordEditorValidationTarget.Password, L.Get("PasswordValueRequired"));
             return false;
@@ -88,12 +102,14 @@ public sealed partial class PasswordEditorViewModel
         SelectedLoginType = null;
         SelectedBoundNote = null;
         SelectedCustomIconType = null;
+        ClearWifiState();
         CategoryOptions.Clear();
         LoginTypeOptions.Clear();
         BoundNoteOptions.Clear();
         CustomIconTypeOptions.Clear();
         ClearValidation();
         IsSensitiveStateCleared = true;
+        ImportWifiQrImageCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(IsSensitiveStateCleared));
     }
 
@@ -123,13 +139,16 @@ public sealed partial class PasswordEditorViewModel
         ClearCorrectedPasswordValidation();
         OnPropertyChanged(nameof(IsBarcode));
         OnPropertyChanged(nameof(IsApiKey));
+        OnPropertyChanged(nameof(IsWifi));
+        OnPropertyChanged(nameof(WifiRequiresPassword));
+        RaisePasswordEditorState();
         OnPropertyChanged(nameof(PasswordFieldLabel));
     }
 
     private void ClearCorrectedPasswordValidation()
     {
         if (HasPasswordValidationError &&
-            (GetPasswordRows().Count > 0 || SelectedLoginType?.Value == PasswordLoginType.Sso))
+            (GetPasswordRows().Count > 0 || SelectedLoginType?.Value == PasswordLoginType.Sso || !WifiRequiresPassword))
         {
             ClearValidation();
         }
@@ -150,6 +169,7 @@ public sealed partial class PasswordEditorViewModel
         OnPropertyChanged(nameof(HasTitleValidationError));
         OnPropertyChanged(nameof(HasPasswordValidationError));
         OnPropertyChanged(nameof(HasApiKeyUrlValidationError));
+        OnPropertyChanged(nameof(HasWifiValidationError));
         OnPropertyChanged(nameof(TitleValidationMessage));
         OnPropertyChanged(nameof(PasswordValidationMessage));
         OnPropertyChanged(nameof(ApiKeyUrlValidationMessage));

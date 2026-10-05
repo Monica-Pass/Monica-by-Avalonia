@@ -6,6 +6,7 @@ using Monica.App.Features;
 using Monica.App.ViewModels;
 using Monica.Core.Models;
 using Monica.Core.Services;
+using Monica.Platform.Services;
 
 namespace Monica.App.Services;
 
@@ -24,7 +25,8 @@ public interface IPasswordEditorDialogService
 public sealed class PasswordEditorDialogService(
     Func<Window> ownerProvider,
     ILocalizationService localization,
-    IPasswordGeneratorService passwordGenerator) : IPasswordEditorDialogService
+    IPasswordGeneratorService passwordGenerator,
+    IFileSystemPickerService? fileSystemPickerService = null) : IPasswordEditorDialogService
 {
     public async Task<PasswordEditorViewModel?> ShowAsync(
         PasswordEntry? entry,
@@ -37,7 +39,7 @@ public sealed class PasswordEditorDialogService(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var editor = new PasswordEditorViewModel(localization, passwordGenerator, entry, categories, plainPassword, siblingPasswords, notes, customFields);
+        var editor = new PasswordEditorViewModel(localization, passwordGenerator, entry, categories, plainPassword, siblingPasswords, notes, customFields, fileSystemPickerService);
         var editorView = VaultEditorDialogWarmup.TakePasswordEditorView();
         editorView.DataContext = editor;
         var dialog = new FAContentDialog

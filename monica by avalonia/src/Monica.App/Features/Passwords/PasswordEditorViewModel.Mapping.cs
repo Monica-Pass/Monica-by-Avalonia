@@ -31,7 +31,7 @@ public sealed partial class PasswordEditorViewModel
         entry.PasskeyBindings = PasskeyBindings.Trim();
         entry.SshKeyData = SshKeyData.Trim();
         entry.SsoProvider = SsoProvider.Trim();
-        entry.WifiMetadata = WifiMetadata.Trim();
+        entry.WifiMetadata = BuildWifiMetadata();
         entry.LoginType = SelectedLoginType?.Value ?? PasswordLoginType.Password;
         if (entry.LoginType == PasswordLoginType.Barcode)
         {
