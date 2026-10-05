@@ -62,6 +62,7 @@
                             <TextBlock Text="{Binding L.SetDefault}" />
                         </Button>
                     </WrapPanel>
+                    <mdbx:MdbxLocalSnapshotView />
                 </StackPanel>
                 <StackPanel IsVisible="{Binding !HasSelectedMdbxDatabaseItem}" Spacing="10" Margin="24" Width="260" HorizontalAlignment="Left">
                     <ic:FluentIcon Icon="Database" FontSize="34" HorizontalAlignment="Center" />

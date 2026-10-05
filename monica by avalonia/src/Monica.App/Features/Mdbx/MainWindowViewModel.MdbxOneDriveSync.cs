@@ -239,7 +239,7 @@ public sealed partial class MainWindowViewModel
         {
             throw;
         }
-        catch (Exception)
+        catch (Exception) when (!_mdbxOperationCommitted)
         {
             cancellationToken.ThrowIfCancellationRequested();
             await MarkOneDriveMdbxSyncFailedAsync(database, failureStatus, MdbxOneDriveSyncFailureCode, cancellationToken);

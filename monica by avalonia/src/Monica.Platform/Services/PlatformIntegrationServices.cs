@@ -49,6 +49,9 @@ public sealed record PickedBinaryFile(string FileName, byte[] Content, string? F
 /// </param>
 public sealed record PickedSaveTarget(string FileName, string? FullPath = null);
 
+/// <summary>A selected existing local file whose contents have not been read into memory.</summary>
+public sealed record PickedOpenTarget(string FileName, string? FullPath = null);
+
 public interface ISecretProtector
 {
     PlatformIntegrationCapability Capability { get; }
@@ -71,6 +74,10 @@ public interface IFileSystemPickerService
     /// destination rather than a hand-off.
     /// </summary>
     Task<PickedSaveTarget?> PickSaveFileTargetAsync(string title, string suggestedFileName, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default);
+
+    /// <summary>Selects a source path without opening or buffering the selected file.</summary>
+    Task<PickedOpenTarget?> PickOpenFileTargetAsync(string title, IReadOnlyList<PlatformFilePickerFileType> fileTypes, CancellationToken cancellationToken = default) =>
+        Task.FromException<PickedOpenTarget?>(new NotSupportedException("Path-only file selection is unavailable."));
 }
 
 public interface IBrowserBridgeService : IDisposable

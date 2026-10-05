@@ -540,6 +540,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(WebDavBackupOptionsSummaryText));
         RaiseSyncPageState();
         RefreshVaultSources();
+        RefreshMdbxVaultState();
         RaiseWebDavBackupHistoryState();
         RaiseBitwardenState();
         RaisePasswordQuickAccessState();

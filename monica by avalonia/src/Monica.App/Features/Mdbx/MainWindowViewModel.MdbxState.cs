@@ -11,6 +11,7 @@ public sealed partial class MainWindowViewModel
     private const string MdbxOneDriveSyncFailureCode = "onedrive-sync-failed";
     private const string MdbxWebDavSyncFailureCode = "webdav-sync-failed";
     private int _mdbxOperationActive;
+    private bool _mdbxOperationCommitted;
 
     private async Task RunMdbxOperationAsync(string operationKey, Func<Task> action)
     {
@@ -20,6 +21,7 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        _mdbxOperationCommitted = false;
         IsMdbxBusy = true;
         try
         {
@@ -27,7 +29,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (OperationCanceledException)
         {
-            if (IsUnlocked)
+            if (IsUnlocked && !_mdbxOperationCommitted)
             {
                 SetStatusNotice("MdbxOperationCanceled");
             }
@@ -39,7 +41,15 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            ReportRemoteSyncFailure($"MDBX operation failed: {operationKey}", "MdbxOperationFailed", ex);
+            if (_mdbxOperationCommitted)
+            {
+                AppDiagnostics.Error($"Refreshing after committed MDBX operation failed: {operationKey}", ex);
+                SetStatusFailure("MdbxSnapshotRefreshAfterCommitFailed");
+            }
+            else
+            {
+                ReportRemoteSyncFailure($"MDBX operation failed: {operationKey}", "MdbxOperationFailed", ex);
+            }
         }
         finally
         {
@@ -85,6 +95,7 @@ public sealed partial class MainWindowViewModel
 
     private void RaiseMdbxVaultState()
     {
+        RaiseMdbxSnapshotState();
         OnPropertyChanged(nameof(MdbxDatabaseCountText));
         OnPropertyChanged(nameof(MdbxLocalCountText));
         OnPropertyChanged(nameof(MdbxWebDavCountText));

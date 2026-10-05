@@ -1,0 +1,43 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Mdbx.MdbxLocalSnapshotView"
+             x:DataType="vm:MainWindowViewModel">
+    <Border Classes="mdbxDiagnosticTile" Padding="{DynamicResource PaddingPane}"
+            AutomationProperties.Name="{Binding L[MdbxLocalSnapshotSection]}">
+        <StackPanel>
+            <TextBlock Text="{Binding L[MdbxLocalSnapshotSection]}" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding L[MdbxLocalSnapshotDescription]}" TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <WrapPanel IsEnabled="{Binding !IsMdbxBusy}">
+                <Button x:Name="ExportMdbxSnapshotButton" Classes="workspaceCommand"
+                        Command="{Binding ExportMdbxSnapshotCommand}"
+                        CommandParameter="{Binding SelectedMdbxDatabaseItem}"
+                        IsEnabled="{Binding CanUseMdbxSnapshotActions}"
+                        Margin="{DynamicResource PaddingListRow}"
+                        AutomationProperties.Name="{Binding L[MdbxExportSnapshot]}">
+                    <TextBlock Text="{Binding L[MdbxExportSnapshot]}" TextWrapping="Wrap" />
+                </Button>
+                <Button x:Name="RestoreMdbxSnapshotButton" Classes="workspaceCommand"
+                        Command="{Binding RestoreMdbxSnapshotCommand}"
+                        CommandParameter="{Binding SelectedMdbxDatabaseItem}"
+                        IsEnabled="{Binding CanUseMdbxSnapshotActions}"
+                        Margin="{DynamicResource PaddingListRow}"
+                        AutomationProperties.Name="{Binding L[MdbxRestoreSnapshot]}">
+                    <TextBlock Text="{Binding L[MdbxRestoreSnapshot]}" TextWrapping="Wrap" />
+                </Button>
+            </WrapPanel>
+            <TextBlock Text="{Binding MdbxSnapshotAvailabilityText}" TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Border IsVisible="{Binding HasMdbxSnapshotRecovery}" Padding="{DynamicResource PaddingPane}">
+                <StackPanel>
+                    <TextBlock Text="{Binding L[MdbxSnapshotRecoveryLabel]}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding MdbxSnapshotRecoveryFileName}" TextWrapping="Wrap" />
+                    <TextBox Text="{Binding MdbxSnapshotRecoveryPath, Mode=OneWay}" IsReadOnly="True"
+                             TextWrapping="Wrap"
+                             AutomationProperties.Name="{Binding L[MdbxSnapshotRecoveryPathLabel]}" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Border>
+</UserControl>

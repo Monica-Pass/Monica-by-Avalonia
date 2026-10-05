@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Monica.Core.Models;
+using Monica.Data.Mdbx;
 using Monica.Platform.Services;
 
 namespace Monica.Tests;
@@ -12,6 +13,10 @@ public sealed partial class AppSettingsTests
     {
         private readonly MdbxTestVaultEngine _engine = new();
         private readonly MdbxVaultService _local;
+
+        public bool SupportsSnapshots => true;
+        public int CreateSnapshotCalls { get; private set; }
+        public int RestoreSnapshotCalls { get; private set; }
 
         public MdbxSnapshotTestVaultService() => _local = new MdbxVaultService(_engine);
 
@@ -29,6 +34,12 @@ public sealed partial class AppSettingsTests
         public async Task CreateSnapshotAsync(LocalMdbxDatabase database, string destination,
             CancellationToken cancellationToken = default)
         {
+            CreateSnapshotCalls++;
+            if (File.Exists(destination))
+            {
+                throw new MdbxSnapshotException("destination-exists");
+            }
+
             await using var snapshot = await OpenSnapshotStreamAsync(database, cancellationToken);
             await using var output = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None);
             await snapshot.CopyToAsync(output, cancellationToken);
@@ -46,6 +57,7 @@ public sealed partial class AppSettingsTests
             string incomingPath, Func<CancellationToken, Task> commitMetadata,
             CancellationToken cancellationToken = default)
         {
+            RestoreSnapshotCalls++;
             // Inspect before publication so the existing invalid-download tests keep their contract.
             var inspection = await _engine.InspectAsync(incomingPath, cancellationToken);
             if (inspection.FormatVersion != "MDBX-2")

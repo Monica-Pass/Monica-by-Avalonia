@@ -205,6 +205,7 @@ public interface IKeePassVaultService
 
 public interface IMdbxVaultService
 {
+    bool SupportsSnapshots => false;
     Task<LocalMdbxDatabase> CreateLocalMetadataAsync(string name, string filePath, MdbxTigaMode mode = MdbxTigaMode.Multi, CancellationToken cancellationToken = default);
     Task<Stream> OpenLocalStreamAsync(LocalMdbxDatabase database, CancellationToken cancellationToken = default);
     Task<Stream> OpenSnapshotStreamAsync(LocalMdbxDatabase database, CancellationToken cancellationToken = default) =>

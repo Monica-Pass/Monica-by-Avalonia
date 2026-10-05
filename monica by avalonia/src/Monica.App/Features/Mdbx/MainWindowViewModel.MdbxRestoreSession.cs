@@ -15,11 +15,19 @@ public sealed partial class MainWindowViewModel
 
     private bool CanEditVaultDuringMdbxOperation => IsUnlocked && !IsMdbxBusy && !IsMdbxRestoreInProgress;
 
-    private async Task<MdbxSnapshotRestoreResult> RestoreIncomingMdbxSnapshotAsync(
+    private Task<MdbxSnapshotRestoreResult> RestoreIncomingMdbxSnapshotAsync(
         LocalMdbxDatabase database,
         string incomingPath,
         string workingCopyPath,
         RemoteFileVersion version,
+        CancellationToken cancellationToken) =>
+        RestoreMdbxSnapshotInSessionAsync(database, incomingPath,
+            token => CommitMdbxSyncedMetadataAsync(database, workingCopyPath, version, token), cancellationToken);
+
+    private async Task<MdbxSnapshotRestoreResult> RestoreMdbxSnapshotInSessionAsync(
+        LocalMdbxDatabase database,
+        string incomingPath,
+        Func<CancellationToken, Task> commitMetadata,
         CancellationToken cancellationToken)
     {
         if (database.IsDefault && OpenNoteTabs.Any(tab => tab.IsDirty))
@@ -34,7 +42,7 @@ public sealed partial class MainWindowViewModel
             result = await _mdbxVaultService.RestoreSnapshotAsync(
                 database,
                 incomingPath,
-                token => CommitMdbxSyncedMetadataAsync(database, workingCopyPath, version, token),
+                commitMetadata,
                 cancellationToken);
         }
         catch (MdbxSnapshotException exception) when (exception.ReasonCode == "rollback-failed")
@@ -43,22 +51,33 @@ public sealed partial class MainWindowViewModel
             throw;
         }
 
-        // The service has released its native gate. Remove all objects tied to the previous database
-        // before loading the restored default vault, so an old editor cannot write them back afterward.
-        if (database.IsDefault)
+        // The native transaction is committed. A canceled reload must not report the restore as
+        // canceled or forget its recovery receipt; locking still clears the presentation state.
+        _mdbxOperationCommitted = true;
+        RememberMdbxSnapshotRecovery(database.Id, result.RecoveryPath, cancellationToken);
+        try
         {
-            ClearVaultCollections();
-            ClearEditorAndTransferBuffers();
-            ClearSensitiveCaches();
-            await LoadAsync();
-        }
-        else
-        {
-            await ReloadMdbxVaultStateAsync();
-        }
+            cancellationToken.ThrowIfCancellationRequested();
+            // The service has released its gate. Clear old objects before reloading the workspace.
+            if (database.IsDefault)
+            {
+                ClearVaultCollections();
+                ClearEditorAndTransferBuffers();
+                ClearSensitiveCaches();
+                await LoadAsync();
+            }
+            else
+            {
+                await ReloadMdbxVaultStateAsync();
+            }
 
-        cancellationToken.ThrowIfCancellationRequested();
-        return result;
+            cancellationToken.ThrowIfCancellationRequested();
+            return result;
+        }
+        finally
+        {
+            RememberMdbxSnapshotRecovery(database.Id, result.RecoveryPath, cancellationToken);
+        }
     }
 
     private async Task<IDisposable> BeginMdbxRestoreQuiescenceAsync(CancellationToken cancellationToken)
@@ -155,6 +174,7 @@ public sealed partial class MainWindowViewModel
 
     partial void OnIsMdbxBusyChanged(bool value)
     {
+        RaiseMdbxSnapshotState();
         RaiseBitwardenState();
         OnPropertyChanged(nameof(IsImportExportIdle));
         OnPropertyChanged(nameof(IsImportWorkspaceIdle));

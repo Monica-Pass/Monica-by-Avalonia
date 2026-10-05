@@ -99,6 +99,7 @@ public sealed partial class MainWindowViewModel
         {
             SetShellHibernatedByLock(false);
             _vaultSessionService.MarkUnlocked();
+            RaiseMdbxSnapshotState();
             IsPrivacyScreenVisible = false;
             NotifyAutoLockScheduleChanged();
             // A database handed to the window while it sat at the lock screen is asked for here, once
@@ -111,6 +112,7 @@ public sealed partial class MainWindowViewModel
         CancelBitwardenOperationAndClearSecrets();
         SetShellHibernatedByLock(true);
         _vaultSessionService.MarkLocked();
+        RaiseMdbxSnapshotState();
         NotifyAutoLockScheduleChanged();
     }
 

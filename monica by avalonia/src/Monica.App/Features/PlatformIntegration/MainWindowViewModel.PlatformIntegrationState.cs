@@ -96,6 +96,7 @@ public sealed partial class MainWindowViewModel
 
     private void RaisePlatformIntegrationState()
     {
+        RaiseMdbxSnapshotState();
         OnPropertyChanged(nameof(PlatformIntegrationSummaryText));
         OnPropertyChanged(nameof(CanUseTrayIntegration));
         OnPropertyChanged(nameof(CanUseGlobalHotkeyIntegration));

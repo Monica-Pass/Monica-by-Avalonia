@@ -164,6 +164,26 @@ public sealed class AvaloniaFileSystemPickerService(
         return new PickedSaveTarget(file.Name, file.TryGetLocalPath());
     }
 
+    public async Task<PickedOpenTarget?> PickOpenFileTargetAsync(
+        string title,
+        IReadOnlyList<PlatformFilePickerFileType> fileTypes,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        EnsureUsable();
+        var files = await ownerProvider().StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = title,
+            AllowMultiple = false,
+            FileTypeFilter = ToAvaloniaFileTypes(fileTypes)
+        });
+        cancellationToken.ThrowIfCancellationRequested();
+        var file = files.FirstOrDefault();
+        // Large encrypted databases and their sidecars belong to the snapshot service. Selecting
+        // the path must not load bytes or copy away the original WAL/.blobs association.
+        return file is null ? null : new PickedOpenTarget(file.Name, file.TryGetLocalPath());
+    }
+
     private void EnsureUsable()
     {
         if (!Capability.IsUsable)

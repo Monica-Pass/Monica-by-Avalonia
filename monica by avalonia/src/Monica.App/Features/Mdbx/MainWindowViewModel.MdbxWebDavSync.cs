@@ -114,7 +114,7 @@ public sealed partial class MainWindowViewModel
         {
             throw;
         }
-        catch (Exception)
+        catch (Exception) when (!_mdbxOperationCommitted)
         {
             cancellationToken.ThrowIfCancellationRequested();
             await MarkWebDavMdbxSyncFailedAsync(database, failureStatus, MdbxWebDavSyncFailureCode, cancellationToken);

@@ -50,7 +50,7 @@ Windows 的部分替换失败也可能已把原文件移入回滚位置，失败
 云端恢复前取消并等待 Bitwarden、导入及敏感后台任务；已有编辑对话框或不可取消
 操作时拒绝替换；默认库存在未保存笔记时也拒绝，先由用户保存或关闭。默认库恢复
 成功后清理旧业务集合、编辑状态和缓存，重新加载工作区。
-该屏障覆盖现有云端入口，后续本地恢复入口也必须复用它。
+该屏障由云端和本地恢复入口共同使用。
 
 ## 上传期间的本地变更
 
@@ -69,9 +69,30 @@ Windows 的部分替换失败也可能已把原文件移入回滚位置，失败
 原因码，不保留包含凭据或载荷的底层 message/inner exception；界面显示对应的本地化
 错误，诊断不读取或记录密码、JSON 正文和附件内容。
 
-这项工作提供整库快照服务和现有云传输接入，不代表 Android `.sync` 分段、增量合并、
-外部 blob 传输协议已经完整对齐。手动本地备份/恢复界面尚未接入；文件导出 API 的存在
-不代表用户已有对应操作入口。
+这项工作提供整库快照服务、云传输及本地备份/恢复入口，不代表 Android `.sync`
+分段、增量合并、外部 blob 传输协议已经完整对齐。
+
+## 本地备份与恢复
+
+MDBX 工作区选中保险库后，在“详情 → 本地加密备份”使用“导出备份”或“从备份恢复”。
+需要解锁、可用的原生快照功能、文件选择能力及现存本地副本。备份沿用当前库的密码；
+恢复要求相同 vault 身份和有效凭据。含外部存储附件的库会拒绝，不能把不完整的单文件
+当作完整备份；之前已绑定但本地副本丢失的库仍会保守拒绝。
+
+- 导出沿用现有导出授权策略。保存对话框只选择路径，不先打开或截断文件；目标及
+  sidecar 在验证前和发布前各检查一次，已有备份不会覆盖。
+- 恢复选择器只返回原始本地路径，不把整个数据库载入内存，也不复制走原文件的 WAL
+  或 `.blobs` 关联。选中的备份始终由用户保留；服务只清理自身创建的暂存文件。
+- 确认替换目标后使用同一恢复屏障、同身份验证、recovery 与回滚流程。未保存笔记、
+  活动编辑、取消或验证失败会保留当前内容。
+- 本地/外部库恢复后为 `LocalOnly`，WebDAV/OneDrive 工作副本恢复后为 `PendingUpload`。
+  当前远端 ETag、修改时间及 LastSyncedAt 保留，恢复不执行网络上传。
+- 最近的恢复副本与库 ID 绑定，详情区显示文件名和可选择复制的路径；换库不显示其他
+  库的回执，锁定清理回执展示。默认库恢复后清理并重新加载业务工作区。
+- 文件已提交后的取消不显示“操作已取消”；刷新异常单独提示操作已完成而界面刷新失败，
+  保留已提交的数据与远端版本，不把它改记为下载失败。
+
+切换语言会重建 MDBX 列表的本地化显示项，同时保留选中的库 ID。
 
 主要实现：
 
@@ -80,6 +101,8 @@ Windows 的部分替换失败也可能已把原文件移入回滚位置，失败
 - [原生适配器](../monica%20by%20avalonia/src/Monica.Platform/Services/MdbxUniffiNativeBridge.Snapshots.cs)
 - [文件替换协调](../monica%20by%20avalonia/src/Monica.Data/Mdbx/MdbxVaultStore.FileReplacement.cs)
 - [传输元数据提交](../monica%20by%20avalonia/src/Monica.App/Features/Mdbx/MainWindowViewModel.MdbxSnapshotTransfers.cs)
+- [本地命令](../monica%20by%20avalonia/src/Monica.App/Features/Mdbx/MainWindowViewModel.MdbxLocalSnapshotCommands.cs)
+- [本地界面](../monica%20by%20avalonia/src/Monica.App/Features/Mdbx/MdbxLocalSnapshotView.axaml)
 
 ## 验证记录
 
@@ -98,3 +121,18 @@ Windows 的部分替换失败也可能已把原文件移入回滚位置，失败
 
 测试源已按新接口更新，但本轮未生成、恢复或运行此前报毒的 `Monica.Tests.dll`。
 单元/界面测试套件未执行；原生脚本不替代真实云服务器或界面交互验证。
+
+本地入口这一轮的实际验证：
+
+- 应用 Release 构建再次通过，0 warning / 0 error；全解决方案格式检查退出码 0。
+- `eng/mdbx/verify-local-snapshots.ps1`：31 项通过。在内存编译验证器，使用产品程序集、
+  真实原生运行时及 Avalonia 的第三方 headless 后端，不加载测试程序集。通过生产 DI
+  装配业务服务，仅替换 picker、确认、导出授权和剪贴板交互，并对刷新失败单独注入故障。
+  覆盖编译 XAML 命令/参数绑定、中英文自动化名称、焦点、无整库缓冲导出、目标不覆盖、
+  取消/拒绝、四类源的恢复状态与 validators、用户备份原样保留、恢复回执、已提交后
+  刷新失败、未保存笔记、默认库业务列表重载及锁定禁用/清理。
+- 原生快照脚本 49 项回归通过；重点功能 300 行门与 `git diff --check` 通过。
+- 用虚构数据生成并检查实际 UI 位图：`artifacts/mdbx-local-snapshots/local-snapshots-en.png`。
+  验证器需已安装的 `Avalonia.Headless.dll`，可由 `-HeadlessAssembly` 指定；截图仅为本地 QA
+  产物，没有用户密码或真实库内容。原生文件对话框、Narrator 和高对比度手动走查未执行。
+- 新增 10 个本地命令单元测试案例的源码；本轮仍未生成、恢复或执行 `Monica.Tests.dll`。

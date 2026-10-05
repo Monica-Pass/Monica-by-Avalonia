@@ -6,6 +6,8 @@ namespace Monica.Platform.Services;
 
 public sealed partial class MdbxVaultService
 {
+    public bool SupportsSnapshots => _nativeBridge.IsAvailable && _nativeBridge is IMdbxNativeSnapshotBridge;
+
     public async Task<Stream> OpenSnapshotStreamAsync(LocalMdbxDatabase database, CancellationToken cancellationToken = default)
     {
         var source = SnapshotSourcePath(database);
@@ -34,6 +36,7 @@ public sealed partial class MdbxVaultService
             var path = Path.Combine(scratch, "snapshot.mdbx");
             await PrepareSnapshotAsync(database, SnapshotSourcePath(database), path, scratch, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
+            RequireSnapshotDestinationAbsent(target);
             File.Move(path, target, overwrite: false);
         }
         finally
