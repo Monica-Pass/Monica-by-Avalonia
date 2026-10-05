@@ -62,6 +62,8 @@ public sealed class KeePassOpenFromOutsideUiTests
             viewModel.IsUnlocked = true;
             Dispatcher.UIThread.RunJobs();
 
+            await WaitForSelectedFileAsync(viewModel, fixturePath);
+
             Assert.Equal("Import", viewModel.SelectedSyncPage);
             Assert.True(keepassTab.IsSelected, "the file arrived but not on the tab that opens one");
             Assert.True(viewModel.KeePassImportTabSelected);
@@ -115,6 +117,7 @@ public sealed class KeePassOpenFromOutsideUiTests
 
             viewModel.RequestKeePassFileOpen(firstPath);
             Dispatcher.UIThread.RunJobs();
+            await WaitForSelectedFileAsync(viewModel, firstPath);
 
             Assert.True(keepassTab.IsSelected);
             Assert.Equal(Path.GetFileName(firstPath), viewModel.KeePassSelectedFileName);
@@ -129,6 +132,7 @@ public sealed class KeePassOpenFromOutsideUiTests
 
             viewModel.RequestKeePassFileOpen(secondPath);
             Dispatcher.UIThread.RunJobs();
+            await WaitForSelectedFileAsync(viewModel, secondPath);
 
             Assert.True(
                 keepassTab.IsSelected,
@@ -303,6 +307,25 @@ public sealed class KeePassOpenFromOutsideUiTests
         catch (IOException)
         {
         }
+    }
+
+    private static async Task WaitForSelectedFileAsync(MainWindowViewModel viewModel, string path)
+    {
+        var expectedName = Path.GetFileName(path);
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (DateTime.UtcNow < deadline)
+        {
+            Dispatcher.UIThread.RunJobs();
+            if (viewModel.KeePassSelectedFileName == expectedName && viewModel.IsKeePassImportIdle)
+            {
+                return;
+            }
+
+            await Task.Delay(10);
+        }
+
+        Assert.Equal(expectedName, viewModel.KeePassSelectedFileName);
+        Assert.True(viewModel.IsKeePassImportIdle);
     }
 
     private sealed record OpenedHost(

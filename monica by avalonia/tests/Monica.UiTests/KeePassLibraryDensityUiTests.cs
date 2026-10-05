@@ -26,8 +26,10 @@ public sealed class KeePassLibraryDensityUiTests
     /// </summary>
     private const int MinimumRowsInView = 8;
 
-    [Fact]
-    public async Task Opened_vault_leaves_the_library_in_rows_a_person_can_count()
+    [Theory]
+    [InlineData("zh-CN")]
+    [InlineData("en-US")]
+    public async Task Opened_vault_leaves_the_library_in_rows_a_person_can_count(string language)
     {
         var fixturePath = Path.Combine(
             Path.GetTempPath(),
@@ -51,7 +53,7 @@ public sealed class KeePassLibraryDensityUiTests
             window.Show();
             window.DataContext = viewModel;
             viewModel.IsUnlocked = true;
-            viewModel.L.SetLanguage("zh-CN");
+            viewModel.L.SetLanguage(language);
             Drain();
 
             viewModel.SelectSectionCommand.Execute("Sync");

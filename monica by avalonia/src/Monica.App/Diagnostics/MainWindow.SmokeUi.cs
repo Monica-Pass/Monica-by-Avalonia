@@ -807,6 +807,7 @@ public partial class MainWindow
                 $"saveCopyOnScreen={saveCopyOnScreen}, " +
                 $"browseRowsInView={browseRowsInView}, browseRowHeight={treeRowHeight:F1}, " +
                 $"browseViewport={treeScroller?.Viewport.Height ?? 0:F1}, " +
+                $"windowWidth={Bounds.Width:F1}, windowHeight={Bounds.Height:F1}, " +
                 $"treeRows={state.TreeRows}, entryRows={state.EntryRows}, vaultBytes={state.FileBytes}, " +
                 $"tabSelected={keepassTab.IsSelected}, frameBytes={historyShot.Bytes}, " +
                 $"policyFrameBytes={policyShot.Bytes}, " +

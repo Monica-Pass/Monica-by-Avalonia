@@ -164,20 +164,24 @@
                                 <Button x:Name="NewKeePassEntryButton" Classes="workspaceCommand" Command="{Binding NewKeePassEntryCommand}" Margin="0,0,8,8">
                                     <TextBlock Text="{Binding L.KeePassNewEntry}" />
                                 </Button>
-                                <Button x:Name="EditKeePassEntryButton" Classes="workspaceCommand" Command="{Binding EditKeePassEntryCommand}" IsVisible="{Binding CanEditKeePassEntry}" Margin="0,0,8,8">
-                                    <TextBlock Text="{Binding L.KeePassEditEntry}" />
+                                <Button x:Name="EditKeePassEntryButton" Classes="workspaceCommand" Command="{Binding EditKeePassEntryCommand}" IsVisible="{Binding CanEditKeePassEntry}" Margin="0,0,8,8"
+                                        ToolTip.Tip="{Binding L.KeePassEditEntry}" AutomationProperties.Name="{Binding L.KeePassEditEntry}">
+                                    <ic:FluentIcon Icon="Edit" FontSize="{StaticResource FontSizePageTitle}" />
                                 </Button>
-                                <Button x:Name="SaveKeePassVaultButton" Classes="workspaceCommand" Command="{Binding SaveKeePassVaultCommand}" Margin="0,0,8,8">
-                                    <TextBlock Text="{Binding L.KeePassSaveToFile}" />
+                                <Button x:Name="SaveKeePassVaultButton" Classes="workspaceCommand" Command="{Binding SaveKeePassVaultCommand}" Margin="0,0,8,8"
+                                        ToolTip.Tip="{Binding L.KeePassSaveToFile}" AutomationProperties.Name="{Binding L.KeePassSaveToFile}">
+                                    <ic:FluentIcon Icon="Save" FontSize="{StaticResource FontSizePageTitle}" />
                                 </Button>
-                                <Button x:Name="SaveKeePassVaultCopyButton" Classes="workspaceCommand" Command="{Binding SaveKeePassVaultCopyCommand}" Margin="0,0,8,8">
+                                <Button x:Name="SaveKeePassVaultCopyButton" Classes="workspaceCommand" Command="{Binding SaveKeePassVaultCopyCommand}" Margin="0,0,8,8"
+                                        ToolTip.Tip="{Binding L.KeePassSaveACopy}" AutomationProperties.Name="{Binding L.KeePassSaveACopy}">
                                     <TextBlock Text="{Binding L.KeePassSaveACopy}" />
                                 </Button>
                                 <Button x:Name="ImportKeePassVaultButton" Classes="workspacePrimaryCommand" Command="{Binding ImportKeePassVaultCommand}" Margin="0,0,8,8">
                                     <TextBlock Text="{Binding L.KeePassImportNow}" />
                                 </Button>
-                                <Button Classes="workspaceCommand" Command="{Binding ResetKeePassImportCommand}" Margin="0,0,0,8">
-                                    <TextBlock Text="{Binding L.KeePassCloseFile}" />
+                                <Button Classes="workspaceCommand" Command="{Binding ResetKeePassImportCommand}" Margin="0,0,0,8"
+                                        ToolTip.Tip="{Binding L.KeePassCloseFile}" AutomationProperties.Name="{Binding L.KeePassCloseFile}">
+                                    <ic:FluentIcon Icon="Dismiss" FontSize="{StaticResource FontSizePageTitle}" />
                                 </Button>
                             </WrapPanel>
                             <sync:KeePassBrowsePane Grid.Row="2" />
