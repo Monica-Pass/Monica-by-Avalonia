@@ -25,6 +25,12 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+if ($RuntimeIdentifier -like 'win-*' -and $env:GITHUB_ACTIONS -eq 'true') {
+    # The hosted desktop otherwise clamps the requested 1280x800 smoke window to
+    # roughly 1024x768, changing the layout the artifact is supposed to validate.
+    & (Join-Path $PSScriptRoot 'set-ci-display.ps1')
+}
+
 # The password the artifact writes its own databases with. It is a fixture, but it is the only thing
 # that unlocks every file this run creates, so it is treated as a secret everywhere it can be seen.
 $keepassFixturePassword = 'keepass-smoke-fixture-not-a-secret'
