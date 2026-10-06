@@ -9,6 +9,7 @@ using Monica.App.ViewModels;
 using Monica.Core.Bitwarden;
 using Monica.Core.ImportExport;
 using Monica.Core.Models;
+using Monica.Core.Passkeys;
 using Monica.Core.Services;
 using Monica.Data;
 using Monica.Data.Bitwarden;
@@ -244,6 +245,8 @@ public partial class App : Application
         services.AddSingleton<INativePasskeyService>(provider => OperatingSystem.IsWindows()
             ? new WindowsNativePasskeyService(provider.GetRequiredService<IPlatformIntegrationService>())
             : new CapabilityOnlyNativePasskeyService(provider.GetRequiredService<IPlatformIntegrationService>()));
+        services.AddSingleton<INativePasskeyAuthenticator>(provider =>
+            provider.GetRequiredService<INativePasskeyService>());
         services.AddSingleton<ITrayService>(provider => OperatingSystem.IsWindows()
             ? new AvaloniaTrayService(
                 provider.GetRequiredService<IPlatformIntegrationService>(),

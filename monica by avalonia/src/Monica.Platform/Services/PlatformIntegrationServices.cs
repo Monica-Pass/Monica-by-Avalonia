@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Monica.Core.Models;
+using Monica.Core.Passkeys;
 
 namespace Monica.Platform.Services;
 
@@ -93,7 +94,7 @@ public interface IBrowserBridgeService : IDisposable
 
 public sealed record BrowserBridgeCredential(long Id, string Title, string Username, string Password, string Website);
 
-public interface INativePasskeyService
+public interface INativePasskeyService : INativePasskeyAuthenticator
 {
     PlatformIntegrationCapability Capability { get; }
     NativePasskeySupport Support { get; }
@@ -356,6 +357,20 @@ public sealed class CapabilityOnlyNativePasskeyService(IPlatformIntegrationServi
 {
     public PlatformIntegrationCapability Capability => platformIntegrationService.GetCapability(PlatformFeatureKeys.NativePasskey);
     public NativePasskeySupport Support => NativePasskeySupport.Unavailable(Capability.UnsupportedReason ?? "Native passkey integration is unavailable on this platform.");
+    public bool IsAvailable => false;
+    public bool IsUserVerifyingPlatformAuthenticatorAvailable => false;
+
+    public Task<NativePasskeyRegistration> CreateAsync(
+        NativePasskeyCreateRequest request,
+        CancellationToken cancellationToken = default) =>
+        Task.FromException<NativePasskeyRegistration>(new PlatformNotSupportedException(
+            Capability.UnsupportedReason ?? "A native passkey authenticator is unavailable on this platform."));
+
+    public Task<NativePasskeyAssertion> GetAssertionAsync(
+        NativePasskeyAssertionRequest request,
+        CancellationToken cancellationToken = default) =>
+        Task.FromException<NativePasskeyAssertion>(new PlatformNotSupportedException(
+            Capability.UnsupportedReason ?? "A native passkey authenticator is unavailable on this platform."));
 }
 
 public sealed class CapabilityOnlyTrayService(IPlatformIntegrationService platformIntegrationService) : ITrayService
