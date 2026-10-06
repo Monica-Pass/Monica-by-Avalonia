@@ -99,13 +99,21 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
 
     public Task<NativePasskeyRegistration> CreateAsync(
         NativePasskeyCreateRequest request,
-        CancellationToken cancellationToken = default) =>
-        RunAsync(() => CreateCore(request), cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        NativePasskeyValidation.ValidateCreate(request);
+        var snapshot = request with { UserId = request.UserId.ToArray(), Challenge = request.Challenge.ToArray() };
+        return RunAsync(cancel => CreateCore(snapshot, cancel), cancellationToken);
+    }
 
     public Task<NativePasskeyAssertion> GetAssertionAsync(
         NativePasskeyAssertionRequest request,
-        CancellationToken cancellationToken = default) =>
-        RunAsync(() => GetAssertionCore(request), cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        NativePasskeyValidation.ValidateAssertion(request);
+        var snapshot = request with { CredentialId = request.CredentialId?.ToArray(), Challenge = request.Challenge.ToArray() };
+        return RunAsync(cancel => GetAssertionCore(snapshot, cancel), cancellationToken);
+    }
 
     public static PlatformIntegrationCapability CreateCapability()
     {
@@ -114,13 +122,31 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
             "Windows WebAuthn client API availability is probed on demand; Monica is not a packaged system credential provider.");
     }
 
-    private static Task<T> RunAsync<T>(Func<T> operation, CancellationToken cancellationToken)
+    private static Task<T> RunAsync<T>(Func<nint, T> operation, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.Run(operation, cancellationToken);
+        return Task.Run(() =>
+        {
+            EnsureAvailable();
+            ThrowIfFailed(WebAuthNGetCancellationId(out var operationId), "WebAuthn cancellation initialization");
+            var pointer = Marshal.AllocHGlobal(Marshal.SizeOf<Guid>());
+            try
+            {
+                Marshal.StructureToPtr(operationId, pointer, false);
+                using var registration = cancellationToken.Register(() => WebAuthNCancelCurrentOperation(ref operationId));
+                cancellationToken.ThrowIfCancellationRequested();
+                var response = operation(pointer);
+                cancellationToken.ThrowIfCancellationRequested();
+                return response;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(pointer);
+            }
+        }, cancellationToken);
     }
 
-    private static NativePasskeyRegistration CreateCore(NativePasskeyCreateRequest request)
+    private static NativePasskeyRegistration CreateCore(NativePasskeyCreateRequest request, nint cancellation)
     {
         EnsureAvailable();
         var clientData = PasskeyClientData.Build(
@@ -145,9 +171,9 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
         {
             Marshal.StructureToPtr(parameter, parameterMemory, false);
             var options = new NativeMakeCredentialOptions(
-                1, 120_000, default, default,
+                3, 120_000, default, default,
                 1, request.Discoverable ? 1 : 0,
-                request.RequireUserVerification ? 1u : 2u, 1, 0);
+                request.RequireUserVerification ? 1u : 2u, 1, 0, cancellation);
             var client = new NativeClientData(1, (uint)clientData.Json.Length, clientJson.Pointer, hashAlgorithm.Pointer);
             var hr = WebAuthNAuthenticatorMakeCredential(
                 request.ParentWindowHandle,
@@ -157,22 +183,24 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
                 ref client,
                 ref options,
                 out var result);
-            ThrowIfFailed(hr, "Windows Hello passkey registration");
             try
             {
+                ThrowIfFailed(hr, "Windows Hello passkey registration");
+                if (result == nint.Zero) throw new InvalidOperationException("Windows returned no passkey registration.");
                 var attestation = Marshal.PtrToStructure<NativeCredentialAttestationPrefix>(result);
+                var authData = CopyBytes(attestation.pbAuthenticatorData, attestation.cbAuthenticatorData);
                 return new NativePasskeyRegistration(
                     CopyBytes(attestation.pbCredentialId, attestation.cbCredentialId),
-                    CopyBytes(attestation.pbAuthenticatorData, attestation.cbAuthenticatorData),
+                    authData,
                     CopyBytes(attestation.pbAttestationObject, attestation.cbAttestationObject),
                     clientData.Json,
                     "internal",
                     request.Discoverable,
-                    request.RequireUserVerification);
+                    HasUserVerification(authData));
             }
             finally
             {
-                WebAuthNFreeCredentialAttestation(result);
+                if (result != nint.Zero) WebAuthNFreeCredentialAttestation(result);
             }
         }
         finally
@@ -181,7 +209,7 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
         }
     }
 
-    private static NativePasskeyAssertion GetAssertionCore(NativePasskeyAssertionRequest request)
+    private static NativePasskeyAssertion GetAssertionCore(NativePasskeyAssertionRequest request, nint cancellation)
     {
         EnsureAvailable();
         var clientData = PasskeyClientData.Build(
@@ -209,8 +237,8 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
             }
 
             var options = new NativeGetAssertionOptions(
-                1, 120_000, credentials, default, 1,
-                request.RequireUserVerification ? 1u : 2u, 0);
+                3, 120_000, credentials, default, 1,
+                request.RequireUserVerification ? 1u : 2u, 0, cancellation);
             var client = new NativeClientData(1, (uint)clientData.Json.Length, clientJson.Pointer, hashAlgorithm.Pointer);
             var hr = WebAuthNAuthenticatorGetAssertion(
                 request.ParentWindowHandle,
@@ -218,22 +246,24 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
                 ref client,
                 ref options,
                 out var result);
-            ThrowIfFailed(hr, "Windows Hello passkey assertion");
             try
             {
+                ThrowIfFailed(hr, "Windows Hello passkey assertion");
+                if (result == nint.Zero) throw new InvalidOperationException("Windows returned no passkey assertion.");
                 var assertion = Marshal.PtrToStructure<NativeAssertionPrefix>(result);
+                var authData = CopyBytes(assertion.pbAuthenticatorData, assertion.cbAuthenticatorData);
                 return new NativePasskeyAssertion(
                     CopyBytes(assertion.Credential.pbId, assertion.Credential.cbId),
-                    CopyBytes(assertion.pbAuthenticatorData, assertion.cbAuthenticatorData),
+                    authData,
                     CopyBytes(assertion.pbSignature, assertion.cbSignature),
                     CopyBytes(assertion.pbUserId, assertion.cbUserId),
                     clientData.Json,
                     "internal",
-                    request.RequireUserVerification);
+                    HasUserVerification(authData));
             }
             finally
             {
-                WebAuthNFreeAssertion(result);
+                if (result != nint.Zero) WebAuthNFreeAssertion(result);
             }
         }
         finally
@@ -247,15 +277,16 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
 
     private static void EnsureAvailable()
     {
-        if (!OperatingSystem.IsWindows() || NativePasskeyProbe.TryGetWebAuthnApiVersion() == 0)
+        if (!OperatingSystem.IsWindows() || NativePasskeyProbe.TryGetWebAuthnApiVersion() == 0 ||
+            !NativePasskeyProbe.TryIsUserVerifyingPlatformAuthenticatorAvailable())
         {
-            throw new PlatformNotSupportedException("Windows WebAuthn is unavailable on this device.");
+            throw new PlatformNotSupportedException("A Windows Hello platform authenticator is unavailable on this device.");
         }
     }
 
     private static void ThrowIfFailed(int result, string operation)
     {
-        if (result < 0)
+        if (result != 0)
         {
             throw new InvalidOperationException($"{operation} failed with HRESULT 0x{result:X8}.");
         }
@@ -263,15 +294,27 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
 
     private static byte[] CopyBytes(nint pointer, uint length)
     {
-        if (pointer == nint.Zero || length == 0)
+        if (length == 0)
         {
             return [];
         }
+
+        if (pointer == nint.Zero || length > NativePasskeyValidation.MaximumResponseBytes)
+            throw new InvalidOperationException("The native WebAuthn response has invalid bounds.");
 
         var bytes = new byte[length];
         Marshal.Copy(pointer, bytes, 0, checked((int)length));
         return bytes;
     }
+
+    private static bool HasUserVerification(byte[] authenticatorData) =>
+        authenticatorData.Length >= 37 && (authenticatorData[32] & (byte)PasskeyAuthenticatorFlags.UserVerified) != 0;
+
+    [DllImport("webauthn.dll", EntryPoint = "WebAuthNGetCancellationId", ExactSpelling = true)]
+    private static extern int WebAuthNGetCancellationId(out Guid id);
+
+    [DllImport("webauthn.dll", EntryPoint = "WebAuthNCancelCurrentOperation", ExactSpelling = true)]
+    private static extern int WebAuthNCancelCurrentOperation(ref Guid id);
 
     [DllImport("webauthn.dll", EntryPoint = "WebAuthNAuthenticatorMakeCredential", ExactSpelling = true)]
     private static extern int WebAuthNAuthenticatorMakeCredential(
@@ -308,8 +351,8 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
             pExtensions = nint.Zero;
         }
     }
-    [StructLayout(LayoutKind.Sequential)] private readonly struct NativeMakeCredentialOptions(uint version, uint timeout, NativeCredentials credentials, NativeExtensions extensions, uint attachment, int resident, uint verification, uint attestation, uint flags) { public readonly uint dwVersion = version, dwTimeoutMilliseconds = timeout; public readonly NativeCredentials CredentialList = credentials; public readonly NativeExtensions Extensions = extensions; public readonly uint dwAuthenticatorAttachment = attachment; public readonly int bRequireResidentKey = resident; public readonly uint dwUserVerificationRequirement = verification, dwAttestationConveyancePreference = attestation, dwFlags = flags; }
-    [StructLayout(LayoutKind.Sequential)] private readonly struct NativeGetAssertionOptions(uint version, uint timeout, NativeCredentials credentials, NativeExtensions extensions, uint attachment, uint verification, uint flags) { public readonly uint dwVersion = version, dwTimeoutMilliseconds = timeout; public readonly NativeCredentials CredentialList = credentials; public readonly NativeExtensions Extensions = extensions; public readonly uint dwAuthenticatorAttachment = attachment, dwUserVerificationRequirement = verification, dwFlags = flags; }
+    [StructLayout(LayoutKind.Sequential)] private readonly struct NativeMakeCredentialOptions(uint version, uint timeout, NativeCredentials credentials, NativeExtensions extensions, uint attachment, int resident, uint verification, uint attestation, uint flags, nint cancellation) { public readonly uint dwVersion = version, dwTimeoutMilliseconds = timeout; public readonly NativeCredentials CredentialList = credentials; public readonly NativeExtensions Extensions = extensions; public readonly uint dwAuthenticatorAttachment = attachment; public readonly int bRequireResidentKey = resident; public readonly uint dwUserVerificationRequirement = verification, dwAttestationConveyancePreference = attestation, dwFlags = flags; public readonly nint pCancellationId = cancellation; public readonly nint pExcludeCredentialList = nint.Zero; }
+    [StructLayout(LayoutKind.Sequential)] private readonly struct NativeGetAssertionOptions(uint version, uint timeout, NativeCredentials credentials, NativeExtensions extensions, uint attachment, uint verification, uint flags, nint cancellation) { public readonly uint dwVersion = version, dwTimeoutMilliseconds = timeout; public readonly NativeCredentials CredentialList = credentials; public readonly NativeExtensions Extensions = extensions; public readonly uint dwAuthenticatorAttachment = attachment, dwUserVerificationRequirement = verification, dwFlags = flags; public readonly nint pwszU2fAppId = nint.Zero, pbU2fAppId = nint.Zero, pCancellationId = cancellation; }
     [StructLayout(LayoutKind.Sequential)] private readonly struct NativeCredentialAttestationPrefix { public readonly uint dwVersion; public readonly nint pwszFormatType; public readonly uint cbAuthenticatorData; public readonly nint pbAuthenticatorData; public readonly uint cbAttestation; public readonly nint pbAttestation; public readonly uint dwAttestationDecodeType; public readonly nint pvAttestationDecode; public readonly uint cbAttestationObject; public readonly nint pbAttestationObject; public readonly uint cbCredentialId; public readonly nint pbCredentialId; }
     [StructLayout(LayoutKind.Sequential)] private readonly struct NativeAssertionPrefix { public readonly uint dwVersion; public readonly uint cbAuthenticatorData; public readonly nint pbAuthenticatorData; public readonly uint cbSignature; public readonly nint pbSignature; public readonly NativeCredential Credential; public readonly uint cbUserId; public readonly nint pbUserId; }
 

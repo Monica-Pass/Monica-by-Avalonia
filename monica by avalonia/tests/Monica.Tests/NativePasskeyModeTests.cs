@@ -47,15 +47,9 @@ public sealed class NativePasskeyModeTests
         Assert.NotNull(assertion);
         Assert.Equal(1, platform.AssertionCount);
         Assert.Equal(1, store.MarkUsedCount);
-        Assert.True(PasskeyVerifier.TryVerifyAssertion(
-            assertion!,
-            entry.PublicKeyAlgorithm,
-            entry.PublicKey,
-            platform.LastChallenge!,
-            "example.com",
-            out var failure,
-            "https://example.com"));
-        Assert.Null(failure);
+        Assert.True(NativePasskeyValidation.VerifySignature(
+            entry.PublicKeyAlgorithm, entry.PublicKey,
+            [.. assertion!.AuthenticatorData, .. assertion.ClientData.ClientDataHash], assertion.Signature));
     }
 
     private sealed class FakePlatformAuthenticator(PasskeyRegistration registration) : INativePasskeyAuthenticator
@@ -87,11 +81,15 @@ public sealed class NativePasskeyModeTests
                 request.Challenge,
                 request.RpId,
                 request.Origin);
+            using var key = ECDsa.Create();
+            key.ImportPkcs8PrivateKey(Convert.FromBase64String(_registration.KeyMaterial.PrivateKeyPkcs8Base64), out _);
+            var signature = key.SignData([.. assertion.AuthenticatorData, .. assertion.ClientData.ClientDataHash],
+                HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence);
             AssertionCount++;
             return Task.FromResult(new NativePasskeyAssertion(
                 PasskeyBase64Url.TryDecode(entry.CredentialId, out var id) ? id! : [],
                 assertion.AuthenticatorData,
-                assertion.Signature,
+                signature,
                 PasskeyBase64Url.TryDecode(entry.UserId, out var userId) ? userId! : [],
                 assertion.ClientData.Json,
                 "internal",

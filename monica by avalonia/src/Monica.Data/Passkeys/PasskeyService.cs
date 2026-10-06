@@ -1,5 +1,6 @@
 using Monica.Core.Models;
 using Monica.Core.Passkeys;
+using System.Security.Cryptography;
 
 namespace Monica.Data.Passkeys;
 
@@ -21,6 +22,10 @@ public interface IPasskeyService
 {
     Task<PasskeyEntry> CreateAsync(PasskeyCreateRequest request, CancellationToken cancellationToken = default);
 
+    Task<PlatformPasskeyCreationResult> CreatePlatformRegistrationAsync(
+        PasskeyCreateRequest request, string platformMode,
+        nint parentWindowHandle = 0, CancellationToken cancellationToken = default);
+
     Task<PasskeyAssertion?> AssertAsync(
         string credentialId,
         byte[] challenge,
@@ -35,6 +40,8 @@ public interface IPasskeyService
 /// rejected by a standards-compliant server never leaves Monica. Private key material is resolved for
 /// the single signature call and never travels back out through the entry.
 /// </summary>
+public sealed record PlatformPasskeyCreationResult(PasskeyEntry Entry, NativePasskeyRegistration Registration);
+
 public sealed class PasskeyService(
     IPasskeyStore store,
     INativePasskeyAuthenticator? nativeAuthenticator = null) : IPasskeyService
@@ -123,13 +130,15 @@ public sealed class PasskeyService(
                 new NativePasskeyAssertionRequest(
                     requestedRpId,
                     challenge,
-                    PasskeyBase64Url.TryDecode(PasskeyCredentialId.ToWebAuthnId(entry.CredentialId) ?? entry.CredentialId, out var rawId)
-                        ? rawId
-                        : null,
+                    DecodeNativeCredentialId(entry.CredentialId),
                     origin,
                     entry.IsUserVerificationRequired),
                 cancellationToken);
-            if (!PasskeyClientData.TryParse(nativeAssertion.ClientDataJson, out var nativeClientData) || nativeClientData is null)
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!NativePasskeyValidation.VerifyClientData(nativeAssertion.ClientDataJson,
+                    PasskeyClientData.AssertionType, challenge, origin ?? $"https://{requestedRpId}") ||
+                !PasskeyClientData.TryParse(nativeAssertion.ClientDataJson, out var nativeClientData) || nativeClientData is null ||
+                !CryptographicOperations.FixedTimeEquals(nativeAssertion.CredentialId, DecodeNativeCredentialId(entry.CredentialId)))
             {
                 throw new InvalidOperationException("Windows Hello returned invalid client data.");
             }
@@ -140,16 +149,13 @@ public sealed class PasskeyService(
                 nativeAssertion.Signature,
                 PasskeyCredentialId.Normalize(entry.CredentialId) ?? entry.CredentialId,
                 PasskeyBase64Url.Encode(nativeAssertion.UserHandle));
-            if (!PasskeyVerifier.TryVerifyAssertion(
-                    nativePasskeyAssertion,
-                    entry.PublicKeyAlgorithm,
-                    entry.PublicKey,
-                    challenge,
-                    requestedRpId,
-                    out var nativeFailure,
-                    origin))
+            if (!PasskeyAuthenticatorDataCodec.TryParse(nativeAssertion.AuthenticatorData, out var authData) || authData is null ||
+                !authData.UserPresent || (entry.IsUserVerificationRequired && !authData.UserVerified) ||
+                !CryptographicOperations.FixedTimeEquals(authData.RpIdHash, PasskeyRpId.Hash(requestedRpId)) ||
+                !NativePasskeyValidation.VerifySignature(entry.PublicKeyAlgorithm, entry.PublicKey,
+                    [.. nativeAssertion.AuthenticatorData, .. nativeClientData.ClientDataHash], nativeAssertion.Signature))
             {
-                throw new InvalidOperationException($"Refused to release a Windows Hello assertion: {nativeFailure}.");
+                throw new InvalidOperationException("Refused to release an invalid Windows Hello assertion.");
             }
 
             await store.MarkUsedAsync(entry.Id, cancellationToken);
@@ -183,17 +189,26 @@ public sealed class PasskeyService(
     public async Task<PasskeyEntry> CreateWithPlatformAuthenticatorAsync(
         PasskeyCreateRequest request,
         string platformMode,
+        CancellationToken cancellationToken = default) =>
+        (await CreatePlatformRegistrationAsync(request, platformMode, cancellationToken: cancellationToken)).Entry;
+
+    public async Task<PlatformPasskeyCreationResult> CreatePlatformRegistrationAsync(
+        PasskeyCreateRequest request,
+        string platformMode,
+        nint parentWindowHandle = 0,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (platformMode != PasskeyModes.WindowsHello)
+            throw new NotSupportedException("Only the implemented Windows platform mode can be registered here.");
         if (nativeAuthenticator is null || !nativeAuthenticator.IsAvailable)
         {
             throw new PlatformNotSupportedException("The selected platform passkey authenticator is unavailable.");
         }
 
-        var rpId = PasskeyRpId.Normalize(request.RpId)
-            ?? throw new ArgumentException("A passkey needs a relying-party id.", nameof(request));
-        var native = await nativeAuthenticator.CreateAsync(
-            new NativePasskeyCreateRequest(
+        var rpId = NativePasskeyValidation.ValidateRpAndOrigin(request.RpId, request.Origin, request.Challenge);
+        var nativeRequest = new NativePasskeyCreateRequest(
                 rpId,
                 request.RpName?.Trim() ?? rpId,
                 request.UserHandle,
@@ -203,18 +218,23 @@ public sealed class PasskeyService(
                 request.Algorithm,
                 request.IsDiscoverable,
                 request.IsUserVerificationRequired,
-                request.Origin),
-            cancellationToken);
+                request.Origin,
+                parentWindowHandle);
+        NativePasskeyValidation.ValidateCreate(nativeRequest);
+        var native = await nativeAuthenticator.CreateAsync(nativeRequest, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (!PasskeyAuthenticatorDataCodec.TryParse(native.AuthenticatorData, out var authData) ||
             authData?.CredentialId is not { Length: > 0 } credentialId ||
             authData.PublicKey is null ||
-            !credentialId.AsSpan().SequenceEqual(native.CredentialId))
+            !credentialId.AsSpan().SequenceEqual(native.CredentialId) || authData.PublicKey.Algorithm != request.Algorithm)
         {
             throw new InvalidOperationException("The platform authenticator returned malformed credential data.");
         }
 
-        if (!PasskeyClientData.TryParse(native.ClientDataJson, out var clientData) || clientData is null)
+        if (!NativePasskeyValidation.VerifyClientData(native.ClientDataJson, PasskeyClientData.CreateType,
+                request.Challenge, request.Origin ?? $"https://{rpId}") ||
+            !PasskeyClientData.TryParse(native.ClientDataJson, out var clientData) || clientData is null)
         {
             throw new InvalidOperationException("The platform authenticator returned invalid client data.");
         }
@@ -246,14 +266,14 @@ public sealed class PasskeyService(
         if (!string.Equals(clientData.Type, PasskeyClientData.CreateType, StringComparison.Ordinal) ||
             !PasskeyBase64Url.TryDecode(clientData.Challenge, out var returnedChallenge) ||
             returnedChallenge is null || !returnedChallenge.AsSpan().SequenceEqual(request.Challenge) ||
-            !authData.UserPresent || !authData.UserVerified ||
+            !authData.UserPresent || (request.IsUserVerificationRequired && !authData.UserVerified) ||
             !authData.RpIdHash.AsSpan().SequenceEqual(PasskeyRpId.Hash(rpId)))
         {
             throw new InvalidOperationException("The platform authenticator returned data that failed WebAuthn checks.");
         }
 
         entry.Id = await store.SaveAsync(entry, privateKeyPkcs8Base64: null, cancellationToken);
-        return entry;
+        return new PlatformPasskeyCreationResult(entry, native);
     }
 
     private static string ExtractAaguid(byte[] authenticatorData)
@@ -265,6 +285,11 @@ public sealed class PasskeyService(
         }
 
         var bytes = authenticatorData.AsSpan(37, PasskeyAuthenticatorDataCodec.AaguidLength).ToArray();
-        return new Guid(bytes).ToString("D");
+        return PasskeyCredentialId.ToUuidText(bytes);
     }
+
+    private static byte[] DecodeNativeCredentialId(string credentialId) =>
+        PasskeyBase64Url.TryDecode(PasskeyCredentialId.ToWebAuthnId(credentialId), out var id) && id.Length > 0
+            ? id
+            : throw new InvalidOperationException("The native credential id is invalid.");
 }
