@@ -23,6 +23,9 @@ public interface IPasskeyStore
         string rpId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<PasskeyEntry>> ListAllAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<PasskeyEntry>>([]);
+
     Task<string?> ResolvePrivateKeyAsync(
         PasskeyEntry entry,
         CancellationToken cancellationToken = default);
@@ -86,39 +89,83 @@ public sealed class PasskeyStore(
 
     private const string SelectByRpId = SelectColumns + " WHERE rp_id = @RpId ORDER BY user_name, id";
 
+    private const string SelectAll = SelectColumns + " ORDER BY rp_id, user_name, id";
+
+    private const string SelectDuplicate = SelectColumns +
+        " WHERE (credential_id = @CredentialId OR credential_id = @WebAuthnId)" +
+        " AND rp_id = @RpId AND id <> @Id LIMIT 1";
+
     public async Task<long> SaveAsync(
         PasskeyEntry entry,
         string? privateKeyPkcs8Base64 = null,
         CancellationToken cancellationToken = default)
     {
         Validate(entry);
-        entry.PrivateKeyAlias = await privateKeyStore.ProtectAsync(
-            entry.CredentialId,
-            entry.RpId,
-            entry.UserId,
-            privateKeyPkcs8Base64 ?? entry.PrivateKeyAlias,
-            cancellationToken);
-
         await migrator.MigrateAsync(cancellationToken);
         await using var connection = connectionFactory.CreateConnection();
         await connection.OpenAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction();
+
+        var existing = entry.Id > 0
+            ? await connection.QueryFirstOrDefaultAsync<PasskeyRow>(new CommandDefinition(
+                SelectById, new { entry.Id }, transaction, cancellationToken: cancellationToken))
+            : null;
+        if (entry.Id > 0 && existing is null)
+        {
+            throw new InvalidOperationException("The passkey being updated no longer exists.");
+        }
+
+        var duplicate = await connection.QueryFirstOrDefaultAsync<PasskeyRow>(new CommandDefinition(
+            SelectDuplicate,
+            new
+            {
+                entry.Id,
+                entry.RpId,
+                CredentialId = PasskeyCredentialId.Normalize(entry.CredentialId),
+                WebAuthnId = PasskeyCredentialId.ToWebAuthnId(entry.CredentialId)
+            },
+            transaction,
+            cancellationToken: cancellationToken));
+        if (duplicate is not null)
+        {
+            throw new InvalidOperationException("This relying party already has a passkey with that credential id.");
+        }
+
+        var protectedReference = await privateKeyStore.ProtectInTransactionAsync(
+            connection, transaction, entry.CredentialId, entry.RpId, entry.UserId,
+            privateKeyPkcs8Base64 ?? entry.PrivateKeyAlias, cancellationToken);
+        var savedId = entry.Id;
         if (entry.Id > 0)
         {
             await connection.ExecuteAsync(new CommandDefinition(
                 UpdateSql,
-                ToParameters(entry),
+                ToParameters(entry, protectedReference),
+                transaction,
                 cancellationToken: cancellationToken));
-            return entry.Id;
+        }
+        else
+        {
+            await connection.ExecuteAsync(new CommandDefinition(
+                InsertSql,
+                ToParameters(entry, protectedReference),
+                transaction,
+                cancellationToken: cancellationToken));
+            savedId = await connection.ExecuteScalarAsync<long>(new CommandDefinition(
+                LastInsertRowIdSql,
+                transaction: transaction,
+                cancellationToken: cancellationToken));
         }
 
-        await connection.ExecuteAsync(new CommandDefinition(
-            InsertSql,
-            ToParameters(entry),
-            cancellationToken: cancellationToken));
-        entry.Id = await connection.ExecuteScalarAsync<long>(new CommandDefinition(
-            LastInsertRowIdSql,
-            cancellationToken: cancellationToken));
-        return entry.Id;
+        if (existing is not null && existing.PrivateKeyAlias != protectedReference)
+        {
+            await privateKeyStore.RemoveInTransactionAsync(
+                connection, transaction, existing.PrivateKeyAlias, cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        entry.Id = savedId;
+        entry.PrivateKeyAlias = protectedReference;
+        return savedId;
     }
 
     public async Task<PasskeyEntry?> GetAsync(long id, CancellationToken cancellationToken = default)
@@ -144,6 +191,12 @@ public sealed class PasskeyStore(
             return null;
         }
 
+        var normalizedRpId = rpId is null ? null : PasskeyRpId.Normalize(rpId);
+        if (rpId is not null && normalizedRpId is null)
+        {
+            return null;
+        }
+
         await migrator.MigrateAsync(cancellationToken);
         await using var connection = connectionFactory.CreateConnection();
         await connection.OpenAsync(cancellationToken);
@@ -153,7 +206,7 @@ public sealed class PasskeyStore(
             {
                 CredentialId = normalized,
                 WebAuthnId = PasskeyCredentialId.ToWebAuthnId(normalized),
-                RpId = string.IsNullOrWhiteSpace(rpId) ? null : rpId.Trim()
+                RpId = normalizedRpId
             },
             cancellationToken: cancellationToken));
         return row?.ToEntry();
@@ -175,6 +228,17 @@ public sealed class PasskeyStore(
         var rows = await connection.QueryAsync<PasskeyRow>(new CommandDefinition(
             SelectByRpId,
             new { RpId = normalized },
+            cancellationToken: cancellationToken));
+        return rows.Select(static row => row.ToEntry()).ToList();
+    }
+
+    public async Task<IReadOnlyList<PasskeyEntry>> ListAllAsync(CancellationToken cancellationToken = default)
+    {
+        await migrator.MigrateAsync(cancellationToken);
+        await using var connection = connectionFactory.CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+        var rows = await connection.QueryAsync<PasskeyRow>(new CommandDefinition(
+            SelectAll,
             cancellationToken: cancellationToken));
         return rows.Select(static row => row.ToEntry()).ToList();
     }
@@ -206,19 +270,26 @@ public sealed class PasskeyStore(
 
     public async Task<bool> DeleteAsync(long id, CancellationToken cancellationToken = default)
     {
-        var entry = await GetAsync(id, cancellationToken);
+        await migrator.MigrateAsync(cancellationToken);
+        await using var connection = connectionFactory.CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction();
+        var entry = await connection.QueryFirstOrDefaultAsync<PasskeyRow>(new CommandDefinition(
+            SelectById, new { Id = id }, transaction, cancellationToken: cancellationToken));
         if (entry is null)
         {
             return false;
         }
 
-        await privateKeyStore.RemoveAsync(entry.PrivateKeyAlias, cancellationToken);
-        await using var connection = connectionFactory.CreateConnection();
-        await connection.OpenAsync(cancellationToken);
-        return await connection.ExecuteAsync(new CommandDefinition(
+        var deleted = await connection.ExecuteAsync(new CommandDefinition(
             "DELETE FROM passkeys WHERE id = @Id",
             new { Id = id },
+            transaction,
             cancellationToken: cancellationToken)) == 1;
+        await privateKeyStore.RemoveInTransactionAsync(
+            connection, transaction, entry.PrivateKeyAlias, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return deleted;
     }
 
     private const string InsertSql =
@@ -247,8 +318,8 @@ public sealed class PasskeyStore(
             credential_id = @CredentialId, rp_id = @RpId, rp_name = @RpName,
             user_id = @UserId, user_name = @UserName, user_display_name = @UserDisplayName,
             public_key_algorithm = @PublicKeyAlgorithm, public_key = @PublicKey,
-            private_key_alias = @PrivateKeyAlias, created_at = @CreatedAt, last_used_at = @LastUsedAt,
-            use_count = @UseCount, icon_url = @IconUrl, is_discoverable = @IsDiscoverable,
+            private_key_alias = @PrivateKeyAlias, created_at = @CreatedAt, last_used_at = MAX(last_used_at, @LastUsedAt),
+            use_count = MAX(use_count, @UseCount), icon_url = @IconUrl, is_discoverable = @IsDiscoverable,
             is_user_verification_required = @IsUserVerificationRequired, transports = @Transports,
             aaguid = @Aaguid, sign_count = @SignCount, is_backed_up = @IsBackedUp, notes = @Notes,
             bound_password_id = @BoundPasswordId, category_id = @CategoryId,
@@ -260,7 +331,7 @@ public sealed class PasskeyStore(
         WHERE id = @Id
         """;
 
-    private static object ToParameters(PasskeyEntry entry) => new
+    private static object ToParameters(PasskeyEntry entry, string privateKeyAlias) => new
     {
         entry.Id,
         entry.CredentialId,
@@ -271,7 +342,7 @@ public sealed class PasskeyStore(
         entry.UserDisplayName,
         entry.PublicKeyAlgorithm,
         entry.PublicKey,
-        entry.PrivateKeyAlias,
+        PrivateKeyAlias = privateKeyAlias,
         CreatedAt = entry.CreatedAt.ToUnixTimeMilliseconds(),
         LastUsedAt = entry.LastUsedAt.ToUnixTimeMilliseconds(),
         entry.UseCount,
@@ -315,7 +386,7 @@ public sealed class PasskeyStore(
                 $"A passkey needs a public key and a verifiable algorithm ({entry.PublicKeyAlgorithm}).");
         }
 
-        entry.CredentialId = entry.CredentialId.Trim();
+        entry.CredentialId = PasskeyCredentialId.ToWebAuthnId(entry.CredentialId)!;
         entry.RpId = rpId;
     }
 

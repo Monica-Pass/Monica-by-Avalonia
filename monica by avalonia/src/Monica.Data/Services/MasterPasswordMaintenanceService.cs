@@ -43,6 +43,8 @@ public sealed record MasterPasswordMaintenanceResult(
     int BitwardenSecretsReencrypted = 0,
     MasterPasswordMaintenanceFailureReason FailureReason = MasterPasswordMaintenanceFailureReason.None)
 {
+    public int PasskeySecretsReencrypted { get; init; }
+
     public int TotalSecretsReencrypted =>
         PasswordsReencrypted +
         PasswordHistoryEntriesReencrypted +
@@ -51,7 +53,8 @@ public sealed record MasterPasswordMaintenanceResult(
         SecureItemsReencrypted +
         OperationLogsReencrypted +
         RemoteSourceSecretsReencrypted +
-        BitwardenSecretsReencrypted;
+        BitwardenSecretsReencrypted +
+        PasskeySecretsReencrypted;
 
     public static MasterPasswordMaintenanceResult Failure(
         string message,
@@ -93,6 +96,9 @@ public sealed class MasterPasswordMaintenanceService(
         new("password_entries", "id", "wifi_metadata", SecretBucket.Passwords, true),
         new("password_entries", "id", "custom_icon_value", SecretBucket.Passwords, true),
         new("password_history_entries", "id", "password", SecretBucket.PasswordHistory, false),
+        // The private-key table has a text primary key. Its SQLite rowid gives this maintenance
+        // transaction a stable numeric locator without changing credential/key references.
+        new("passkey_private_keys", "rowid", "encrypted_pkcs8", SecretBucket.Passkeys, false, AddProtectedPrefix: false),
         new("custom_fields", "id", "title", SecretBucket.CustomFields, true),
         new("custom_fields", "id", "value", SecretBucket.CustomFields, true),
         new("secure_items", "id", "title", SecretBucket.SecureItems, true),
@@ -225,7 +231,7 @@ public sealed class MasterPasswordMaintenanceService(
                 .Select(cell => new EncryptedSecretCell(
                     cell.Spec,
                     cell.Id,
-                    ProtectedPrefix + newSession.EncryptString(cell.PlainText)))
+                    (cell.Spec.AddProtectedPrefix ? ProtectedPrefix : string.Empty) + newSession.EncryptString(cell.PlainText)))
                 .ToList();
         }
         catch (Exception ex)
@@ -265,7 +271,10 @@ public sealed class MasterPasswordMaintenanceService(
             Count(encryptedSecrets, SecretBucket.SecureItems),
             Count(encryptedSecrets, SecretBucket.OperationLogs),
             Count(encryptedSecrets, SecretBucket.RemoteSources),
-            Count(encryptedSecrets, SecretBucket.Bitwarden));
+            Count(encryptedSecrets, SecretBucket.Bitwarden))
+        {
+            PasskeySecretsReencrypted = Count(encryptedSecrets, SecretBucket.Passkeys)
+        };
     }
 
     private async Task<IReadOnlyList<PlainSecretCell>> CapturePlainSecretsAsync(
@@ -401,6 +410,7 @@ public sealed class MasterPasswordMaintenanceService(
     {
         Passwords,
         PasswordHistory,
+        Passkeys,
         Mdbx,
         CustomFields,
         SecureItems,
@@ -409,7 +419,8 @@ public sealed class MasterPasswordMaintenanceService(
         Bitwarden
     }
 
-    private sealed record SecretColumnSpec(string TableName, string IdColumn, string ValueColumn, SecretBucket Bucket, bool AllowPlaintextFallback);
+    private sealed record SecretColumnSpec(string TableName, string IdColumn, string ValueColumn,
+        SecretBucket Bucket, bool AllowPlaintextFallback, bool AddProtectedPrefix = true);
     private sealed record PlainSecretCell(SecretColumnSpec Spec, long Id, string PlainText);
     private sealed record EncryptedSecretCell(SecretColumnSpec Spec, long Id, string Value);
 

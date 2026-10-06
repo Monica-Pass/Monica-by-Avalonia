@@ -78,9 +78,14 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
     private readonly PlatformIntegrationCapability _capability;
 
     public WindowsNativePasskeyService(IPlatformIntegrationService platformIntegrationService)
+        : this(platformIntegrationService, NativePasskeyProbe.TryGetWebAuthnApiVersion(),
+            NativePasskeyProbe.TryIsUserVerifyingPlatformAuthenticatorAvailable())
     {
-        var version = NativePasskeyProbe.TryGetWebAuthnApiVersion();
-        var uvAvailable = NativePasskeyProbe.TryIsUserVerifyingPlatformAuthenticatorAvailable();
+    }
+
+    internal WindowsNativePasskeyService(
+        IPlatformIntegrationService platformIntegrationService, uint version, bool uvAvailable)
+    {
         _capability = platformIntegrationService.GetCapability(PlatformFeatureKeys.NativePasskey);
         Support = new NativePasskeySupport(
             version > 0,
@@ -94,7 +99,10 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
 
     public PlatformIntegrationCapability Capability => _capability;
     public NativePasskeySupport Support { get; }
-    public bool IsAvailable => Support.IsWebAuthnClientApiAvailable;
+    // This adapter always requests a platform authenticator. The DLL alone is insufficient:
+    // without Windows Hello the same operation would fail in EnsureAvailable.
+    public bool IsAvailable => Support.IsWebAuthnClientApiAvailable &&
+        Support.IsUserVerifyingPlatformAuthenticatorAvailable;
     public bool IsUserVerifyingPlatformAuthenticatorAvailable => Support.IsUserVerifyingPlatformAuthenticatorAvailable;
 
     public Task<NativePasskeyRegistration> CreateAsync(
@@ -135,7 +143,15 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
                 Marshal.StructureToPtr(operationId, pointer, false);
                 using var registration = cancellationToken.Register(() => WebAuthNCancelCurrentOperation(ref operationId));
                 cancellationToken.ThrowIfCancellationRequested();
-                var response = operation(pointer);
+                T response;
+                try
+                {
+                    response = operation(pointer);
+                }
+                catch (Exception error) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw new OperationCanceledException("The WebAuthn operation was cancelled.", error, cancellationToken);
+                }
                 cancellationToken.ThrowIfCancellationRequested();
                 return response;
             }
@@ -190,13 +206,14 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
                 var attestation = Marshal.PtrToStructure<NativeCredentialAttestationPrefix>(result);
                 var authData = CopyBytes(attestation.pbAuthenticatorData, attestation.cbAuthenticatorData);
                 var returnedClientData = CopyCredentialAttestationClientData(result, attestation.dwVersion, clientData.Json);
+                var metadata = ReadCredentialAttestationMetadata(result, attestation.dwVersion, request.Discoverable);
                 return new NativePasskeyRegistration(
                     CopyBytes(attestation.pbCredentialId, attestation.cbCredentialId),
                     authData,
                     CopyBytes(attestation.pbAttestationObject, attestation.cbAttestationObject),
                     returnedClientData,
-                    "internal",
-                    request.Discoverable,
+                    metadata.Transport,
+                    metadata.IsDiscoverable,
                     HasUserVerification(authData));
             }
             finally
@@ -260,7 +277,7 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
                     CopyBytes(assertion.pbSignature, assertion.cbSignature),
                     CopyBytes(assertion.pbUserId, assertion.cbUserId),
                     returnedClientData,
-                    "internal",
+                    ReadAssertionTransport(result, assertion.dwVersion),
                     HasUserVerification(authData));
             }
             finally
@@ -286,9 +303,17 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
         }
     }
 
-    private static void ThrowIfFailed(int result, string operation)
+    internal static void ThrowIfFailed(int result, string operation)
     {
-        if (result != 0)
+        // These are the two cancellation statuses documented by WebAuthNGetErrorName in
+        // Microsoft's webauthn.h. NotAllowedError also includes missing credentials and
+        // timeouts, so it must not be treated as cancellation as a whole.
+        if (result is unchecked((int)0x800704C7) or unchecked((int)0x80090036))
+        {
+            throw new OperationCanceledException($"{operation} was cancelled.");
+        }
+
+        if (result < 0)
         {
             throw new InvalidOperationException($"{operation} failed with HRESULT 0x{result:X8}.");
         }
@@ -324,7 +349,7 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
         }
 
         var attestation = Marshal.PtrToStructure<NativeCredentialAttestation>(result);
-        return CopyBytes(attestation.pbClientDataJSON, attestation.cbClientDataJSON);
+        return CopyReturnedClientData(attestation.pbClientDataJSON, attestation.cbClientDataJSON, requestedClientData);
     }
 
     internal static byte[] CopyAssertionClientData(
@@ -339,7 +364,75 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
         }
 
         var assertion = Marshal.PtrToStructure<NativeAssertion>(result);
-        return CopyBytes(assertion.pbClientDataJSON, assertion.cbClientDataJSON);
+        return CopyReturnedClientData(assertion.pbClientDataJSON, assertion.cbClientDataJSON, requestedClientData);
+    }
+
+    private static byte[] CopyReturnedClientData(nint pointer, uint length, byte[] requestedClientData)
+    {
+        // Legacy options supply WEBAUTHN_CLIENT_DATA directly and cannot ask Windows to
+        // construct remote client data. New result versions may therefore leave this optional
+        // output absent. In that case the exact input bytes were hashed by the authenticator.
+        // A partially populated or oversized output is malformed and must never fall back.
+        if (pointer == nint.Zero && length == 0)
+        {
+            return requestedClientData;
+        }
+
+        if (length == 0)
+        {
+            throw new InvalidOperationException("The native WebAuthn client data has invalid bounds.");
+        }
+
+        return CopyBytes(pointer, length);
+    }
+
+    internal static (string Transport, bool IsDiscoverable) ReadCredentialAttestationMetadata(
+        nint result, uint structureVersion, bool requiredResidentKey)
+    {
+        // Read only fields belonging to the returned version. Marshaling the current full
+        // structure here would overread older native allocations.
+        var usedTransport = structureVersion >= 3
+            ? ReadUInt32<NativeCredentialAttestation>(result, nameof(NativeCredentialAttestation.dwUsedTransport))
+            : 0;
+        var transport = structureVersion >= 8
+            ? MapTransports(ReadUInt32<NativeCredentialAttestation>(result, nameof(NativeCredentialAttestation.dwTransports)))
+            : MapUsedTransport(usedTransport);
+        var isDiscoverable = structureVersion >= 4
+            ? ReadUInt32<NativeCredentialAttestation>(result, nameof(NativeCredentialAttestation.bResidentKey)) != 0
+            // Before v4, successful bRequireResidentKey is the only available guarantee.
+            // A request that did not require it cannot tell us whether the result is resident.
+            : requiredResidentKey;
+        return (transport, isDiscoverable);
+    }
+
+    internal static string ReadAssertionTransport(nint result, uint structureVersion) =>
+        structureVersion >= 4
+            ? MapUsedTransport(ReadUInt32<NativeAssertion>(result, nameof(NativeAssertion.dwUsedTransport)))
+            : string.Empty;
+
+    private static uint ReadUInt32<T>(nint result, string field) where T : struct =>
+        unchecked((uint)Marshal.ReadInt32(result, checked((int)Marshal.OffsetOf<T>(field))));
+
+    private static string MapUsedTransport(uint transport) => transport switch
+    {
+        0x01 => "usb",
+        0x02 => "nfc",
+        0x04 => "ble",
+        0x10 => "internal",
+        0x20 => "hybrid",
+        0x40 => "smart-card",
+        _ => string.Empty
+    };
+
+    private static string MapTransports(uint transports)
+    {
+        List<string> known = [];
+        foreach (var flag in new uint[] { 0x01, 0x02, 0x04, 0x10, 0x20, 0x40 })
+        {
+            if ((transports & flag) != 0) known.Add(MapUsedTransport(flag));
+        }
+
+        return string.Join(",", known);
     }
 
     private static bool HasUserVerification(byte[] authenticatorData) =>

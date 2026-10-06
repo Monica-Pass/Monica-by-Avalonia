@@ -1,5 +1,6 @@
 using Monica.Core.Models;
 using Monica.Core.Passkeys;
+using Monica.Core.Services;
 using System.Security.Cryptography;
 
 namespace Monica.Data.Passkeys;
@@ -44,15 +45,23 @@ public sealed record PlatformPasskeyCreationResult(PasskeyEntry Entry, NativePas
 
 public sealed class PasskeyService(
     IPasskeyStore store,
-    INativePasskeyAuthenticator? nativeAuthenticator = null) : IPasskeyService
+    INativePasskeyAuthenticator? nativeAuthenticator = null,
+    IVaultSessionService? vaultSession = null) : IPasskeyService
 {
     public async Task<PasskeyEntry> CreateAsync(
         PasskeyCreateRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var rpId = PasskeyRpId.Normalize(request.RpId)
-            ?? throw new ArgumentException("A passkey needs a relying-party id.", nameof(request));
+        using var operationCancellation = BeginVaultOperation(cancellationToken);
+        cancellationToken = operationCancellation?.Token ?? cancellationToken;
+        cancellationToken.ThrowIfCancellationRequested();
+        var rpId = NativePasskeyValidation.ValidateRpAndOrigin(request.RpId, request.Origin, request.Challenge);
+        NativePasskeyValidation.ValidateCreate(new NativePasskeyCreateRequest(
+            rpId, request.RpName?.Trim() ?? rpId, request.UserHandle,
+            request.UserName, request.UserDisplayName ?? request.UserName,
+            request.Challenge, request.Algorithm, request.IsDiscoverable,
+            request.IsUserVerificationRequired, request.Origin));
 
         var registration = PasskeyAuthenticator.Register(
             rpId,
@@ -98,6 +107,8 @@ public sealed class PasskeyService(
             entry,
             registration.KeyMaterial.PrivateKeyPkcs8Base64,
             cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        vaultSession?.RecordActivity();
         return entry;
     }
 
@@ -108,8 +119,26 @@ public sealed class PasskeyService(
         string? origin = null,
         CancellationToken cancellationToken = default)
     {
-        var entry = await store.FindAsync(credentialId, cancellationToken: cancellationToken)
-            ?? throw new InvalidOperationException("No passkey matches that credential id.");
+        using var operationCancellation = BeginVaultOperation(cancellationToken);
+        cancellationToken = operationCancellation?.Token ?? cancellationToken;
+        cancellationToken.ThrowIfCancellationRequested();
+        var lookupRpId = rpId is null ? null : PasskeyRpId.Normalize(rpId)
+            ?? throw new ArgumentException("A passkey assertion needs a relying-party id.", nameof(rpId));
+        var entry = await store.FindAsync(credentialId, lookupRpId, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (entry is null)
+        {
+            var otherRpEntry = lookupRpId is null ? null :
+                await store.FindAsync(credentialId, cancellationToken: cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (otherRpEntry is not null)
+            {
+                throw new InvalidOperationException(
+                    $"This passkey belongs to '{otherRpEntry.RpId}' and cannot sign for '{lookupRpId}'.");
+            }
+
+            throw new InvalidOperationException("No passkey matches that credential id.");
+        }
 
         var requestedRpId = PasskeyRpId.Normalize(rpId ?? entry.RpId)
             ?? throw new ArgumentException("A passkey assertion needs a relying-party id.", nameof(rpId));
@@ -118,6 +147,10 @@ public sealed class PasskeyService(
             throw new InvalidOperationException(
                 $"This passkey belongs to '{entry.RpId}' and cannot sign for '{requestedRpId}'.");
         }
+
+        NativePasskeyValidation.ValidateAssertion(new NativePasskeyAssertionRequest(
+            requestedRpId, challenge, DecodeNativeCredentialId(entry.CredentialId), origin,
+            entry.IsUserVerificationRequired));
 
         if (entry.PasskeyMode == PasskeyModes.WindowsHello)
         {
@@ -143,6 +176,13 @@ public sealed class PasskeyService(
                 throw new InvalidOperationException("Windows Hello returned invalid client data.");
             }
 
+            if (nativeAssertion.UserHandle.Length > 0 &&
+                (!PasskeyBase64Url.TryDecode(entry.UserId, out var expectedUserHandle) ||
+                 !CryptographicOperations.FixedTimeEquals(nativeAssertion.UserHandle, expectedUserHandle)))
+            {
+                throw new InvalidOperationException("Windows Hello returned a user handle for a different account.");
+            }
+
             var nativePasskeyAssertion = new PasskeyAssertion(
                 nativeAssertion.AuthenticatorData,
                 nativeClientData,
@@ -150,6 +190,7 @@ public sealed class PasskeyService(
                 PasskeyCredentialId.Normalize(entry.CredentialId) ?? entry.CredentialId,
                 PasskeyBase64Url.Encode(nativeAssertion.UserHandle));
             if (!PasskeyAuthenticatorDataCodec.TryParse(nativeAssertion.AuthenticatorData, out var authData) || authData is null ||
+                authData.Flags.HasFlag(PasskeyAuthenticatorFlags.AttestedCredentialData) ||
                 !authData.UserPresent || (entry.IsUserVerificationRequired && !authData.UserVerified) ||
                 !CryptographicOperations.FixedTimeEquals(authData.RpIdHash, PasskeyRpId.Hash(requestedRpId)) ||
                 !NativePasskeyValidation.VerifySignature(entry.PublicKeyAlgorithm, entry.PublicKey,
@@ -159,11 +200,17 @@ public sealed class PasskeyService(
             }
 
             await store.MarkUsedAsync(entry.Id, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            vaultSession?.RecordActivity();
             return nativePasskeyAssertion;
         }
 
-        var privateKey = await store.ResolvePrivateKeyAsync(entry, cancellationToken)
-            ?? throw new InvalidOperationException("This passkey's private key is not available.");
+        var privateKey = await store.ResolvePrivateKeyAsync(entry, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (privateKey is null)
+        {
+            throw new InvalidOperationException("This passkey's private key is not available.");
+        }
 
         var assertion = PasskeyAuthenticator.Assert(entry, privateKey, challenge, requestedRpId, origin);
         if (!PasskeyVerifier.TryVerifyAssertion(
@@ -179,6 +226,8 @@ public sealed class PasskeyService(
         }
 
         await store.MarkUsedAsync(entry.Id, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        vaultSession?.RecordActivity();
         return assertion;
     }
 
@@ -199,6 +248,8 @@ public sealed class PasskeyService(
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        using var operationCancellation = BeginVaultOperation(cancellationToken);
+        cancellationToken = operationCancellation?.Token ?? cancellationToken;
         cancellationToken.ThrowIfCancellationRequested();
         if (platformMode != PasskeyModes.WindowsHello)
             throw new NotSupportedException("Only the implemented Windows platform mode can be registered here.");
@@ -223,6 +274,18 @@ public sealed class PasskeyService(
         NativePasskeyValidation.ValidateCreate(nativeRequest);
         var native = await nativeAuthenticator.CreateAsync(nativeRequest, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
+        if (request.IsDiscoverable && !native.IsDiscoverable)
+        {
+            throw new InvalidOperationException("The platform authenticator did not create the required discoverable passkey.");
+        }
+
+        // The Windows adapter requests none attestation. Bind its embedded authenticator data to
+        // the credential/public key we persist, rather than trusting two independent response blobs.
+        if (!PasskeyVerifier.TryReadNoneAttestationObject(native.AttestationObject, out var attestedAuthenticatorData) ||
+            !attestedAuthenticatorData.AsSpan().SequenceEqual(native.AuthenticatorData))
+        {
+            throw new InvalidOperationException("The platform authenticator returned invalid attestation data.");
+        }
 
         if (!PasskeyAuthenticatorDataCodec.TryParse(native.AuthenticatorData, out var authData) ||
             authData?.CredentialId is not { Length: > 0 } credentialId ||
@@ -253,7 +316,7 @@ public sealed class PasskeyService(
             CreatedAt = DateTimeOffset.UtcNow,
             LastUsedAt = DateTimeOffset.UtcNow,
             Aaguid = ExtractAaguid(native.AuthenticatorData),
-            IsDiscoverable = request.IsDiscoverable,
+            IsDiscoverable = native.IsDiscoverable,
             IsUserVerificationRequired = request.IsUserVerificationRequired,
             Transports = native.Transport,
             BoundPasswordId = request.BoundPasswordId,
@@ -273,7 +336,28 @@ public sealed class PasskeyService(
         }
 
         entry.Id = await store.SaveAsync(entry, privateKeyPkcs8Base64: null, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        vaultSession?.RecordActivity();
         return new PlatformPasskeyCreationResult(entry, native);
+    }
+
+    private CancellationTokenSource? BeginVaultOperation(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (vaultSession is null)
+        {
+            return null;
+        }
+
+        // Capture before checking IsUnlocked so a lock/re-unlock cannot substitute a fresh token
+        // for an operation started in the previous session.
+        var sessionToken = vaultSession.SessionCancellationToken;
+        if (!vaultSession.IsUnlocked)
+        {
+            throw new InvalidOperationException("Unlock the vault before creating or using a passkey.");
+        }
+
+        return CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, sessionToken);
     }
 
     private static string ExtractAaguid(byte[] authenticatorData)

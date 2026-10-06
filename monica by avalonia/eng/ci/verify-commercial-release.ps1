@@ -71,6 +71,7 @@ function Assert-FocusedFeatureFileSizes {
         'src/Monica.App/Features/Passwords',
         'src/Monica.App/Features/Notes',
         'src/Monica.App/Features/Authenticator',
+        'src/Monica.App/Features/Passkeys',
         'src/Monica.App/Features/Wallet',
         'src/Monica.App/Features/Generator',
         'src/Monica.App/Features/SecurityAnalysis',

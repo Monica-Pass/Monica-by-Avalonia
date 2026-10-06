@@ -26,6 +26,7 @@ public sealed partial class MainWindowViewModel
             new("Passwords", _localization.Passwords),
             new("Notes", _localization.SecureNotes),
             new("Totp", _localization.Totp),
+            new("Passkeys", _localization.Passkeys),
             new("Cards", _localization.Cards),
             new("Generator", _localization.Generator),
             new("Archive", _localization.Archive),
@@ -64,6 +65,7 @@ public sealed partial class MainWindowViewModel
             new("favorites-first", _localization.Get("SortFavorites")));
 
         Generator.RefreshLocalization();
+        Passkeys.RefreshLocalization();
 
         ReplaceOptions(
             SecurityQuestionOptions,

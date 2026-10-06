@@ -5,8 +5,8 @@ using Monica.Core.Passkeys;
 namespace Monica.Tests;
 
 /// <summary>
-/// Protocol-level evidence for Monica's own passkey authenticator: every case is a create/assert round
-/// trip checked with the relying-party verifier, so nothing here depends on a platform passkey provider.
+/// Protocol evidence for Monica's software authenticator, using independent .NET signature checks,
+/// published W3C vectors and relying-party validation without a platform passkey provider.
 /// </summary>
 public sealed class PasskeyEngineTests
 {
@@ -58,23 +58,158 @@ public sealed class PasskeyEngineTests
     }
 
     [Fact]
-    public void Es256SignatureIsSixtyFourByteJitterFreeCoseFormat()
+    public void Es256AssertionsVerifyWithAnIndependentWebAuthnDerVerifier()
     {
-        var registration = PasskeyAuthenticator.Register(RpId, RandomNumberGenerator.GetBytes(32), PasskeyAlgorithm.Es256);
-        var entry = new Monica.Core.Models.PasskeyEntry
+        var (registration, assertion, _) = CreateAssertion(PasskeyAlgorithm.Es256);
+        // Compute the relying-party payload from the response bytes, then verify with .NET
+        // directly. Monica's signer and verifier must not validate a shared format mistake.
+        var signedPayload = assertion.AuthenticatorData.Concat(SHA256.HashData(assertion.ClientData.Json)).ToArray();
+        using var relyingPartyKey = ECDsa.Create();
+        relyingPartyKey.ImportSubjectPublicKeyInfo(Convert.FromBase64String(registration.KeyMaterial.PublicKeySpkiBase64), out _);
+
+        Assert.True(relyingPartyKey.VerifyData(signedPayload, assertion.Signature,
+            HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence));
+        Assert.False(relyingPartyKey.VerifyData(signedPayload, assertion.Signature,
+            HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation));
+        signedPayload[0] ^= 1;
+        Assert.False(relyingPartyKey.VerifyData(signedPayload, assertion.Signature,
+            HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence));
+    }
+
+    [Fact]
+    public void AValidRawEs256SignatureIsRejectedByTheWebAuthnVerifier()
+    {
+        var (registration, assertion, _) = CreateAssertion(PasskeyAlgorithm.Es256);
+        var signedPayload = assertion.AuthenticatorData.Concat(SHA256.HashData(assertion.ClientData.Json)).ToArray();
+        using var independentSigner = ECDsa.Create();
+        independentSigner.ImportPkcs8PrivateKey(Convert.FromBase64String(registration.KeyMaterial.PrivateKeyPkcs8Base64), out _);
+        var rawSignature = independentSigner.SignData(signedPayload, HashAlgorithmName.SHA256,
+            DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+
+        Assert.True(independentSigner.VerifyData(signedPayload, rawSignature,
+            HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation));
+        Assert.False(PasskeyVerifier.TryVerifyAssertion(assertion with { Signature = rawSignature },
+            PasskeyAlgorithm.Es256, registration.KeyMaterial.PublicKeySpkiBase64, ChallengeOf(assertion),
+            RpId, out var failure, Origin));
+        Assert.Equal("signature", failure);
+    }
+
+    [Fact]
+    public void IndependentDerSignaturesAreAcceptedButTamperedOrMalformedResponsesAreRefused()
+    {
+        using var independentSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var publicKey = Convert.ToBase64String(independentSigner.ExportSubjectPublicKeyInfo());
+        var payload = Encoding.UTF8.GetBytes("independent WebAuthn assertion payload");
+        var signature = independentSigner.SignData(payload, HashAlgorithmName.SHA256,
+            DSASignatureFormat.Rfc3279DerSequence);
+
+        Assert.True(PasskeyKeyMaterialGenerator.Verify(PasskeyAlgorithm.Es256, publicKey, payload, signature));
+        Assert.False(PasskeyKeyMaterialGenerator.Verify(PasskeyAlgorithm.Es256, publicKey, payload, signature[..^1]));
+        Assert.False(PasskeyKeyMaterialGenerator.Verify(PasskeyAlgorithm.Es256, publicKey, payload, [.. signature, 0]));
+        var tamperedSignature = signature.ToArray();
+        tamperedSignature[^1] ^= 1;
+        Assert.False(PasskeyKeyMaterialGenerator.Verify(PasskeyAlgorithm.Es256, publicKey, payload, tamperedSignature));
+        payload[0] ^= 1;
+        Assert.False(PasskeyKeyMaterialGenerator.Verify(PasskeyAlgorithm.Es256, publicKey, payload, signature));
+    }
+
+    [Fact]
+    public void W3cPublishedEs256AssertionVectorVerifiesWithoutReserializingClientData()
+    {
+        // Frozen W3C WebAuthn Level 3 §16.2, "ES256 Credential with No Attestation".
+        // Public coordinates are taken from the registration's COSE key; the assertion uses
+        // the exact published clientDataJSON/authenticatorData/signature, not Monica output.
+        // https://www.w3.org/TR/2026/REC-webauthn-3-20260825/ (section 16.2)
+        using var publicKey = ECDsa.Create(new ECParameters
         {
-            CredentialId = registration.CredentialIdBase64Url,
-            RpId = RpId,
-            PublicKeyAlgorithm = PasskeyAlgorithm.Es256,
-            PublicKey = registration.KeyMaterial.PublicKeySpkiBase64
-        };
+            Curve = ECCurve.NamedCurves.nistP256,
+            Q = new ECPoint
+            {
+                X = Convert.FromHexString("afefa16f97ca9b2d23eb86ccb64098d20db90856062eb249c33a9b672f26df61"),
+                Y = Convert.FromHexString("930a56b87a2fca66334b03458abf879717c12cc68ed73290af2e2664796b9220")
+            }
+        });
+        var authenticatorData = Convert.FromHexString("bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b51900000000");
+        var clientDataJson = Convert.FromHexString("7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a224f63446e55685158756c5455506f334a5558543049393770767a7a59425039745a63685879617630314167222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d");
+        var signature = Convert.FromHexString("3046022100f50a4e2e4409249c4a853ba361282f09841df4dd4547a13a87780218deffcd380221008480ac0f0b93538174f575bf11a1dd5d78c6e486013f937295ea13653e331e87");
+        var signedPayload = authenticatorData.Concat(SHA256.HashData(clientDataJson)).ToArray();
 
-        var assertion = PasskeyAuthenticator.Assert(
-            entry,
-            registration.KeyMaterial.PrivateKeyPkcs8Base64,
-            RandomNumberGenerator.GetBytes(32));
+        Assert.True(publicKey.VerifyData(signedPayload, signature, HashAlgorithmName.SHA256,
+            DSASignatureFormat.Rfc3279DerSequence));
+        var spki = Convert.ToBase64String(publicKey.ExportSubjectPublicKeyInfo());
+        Assert.True(PasskeyKeyMaterialGenerator.Verify(PasskeyAlgorithm.Es256, spki, signedPayload, signature));
+        signedPayload[0] ^= 1;
+        Assert.False(PasskeyKeyMaterialGenerator.Verify(PasskeyAlgorithm.Es256, spki, signedPayload, signature));
+    }
 
-        Assert.Equal(64, assertion.Signature.Length);
+    [Theory]
+    [InlineData(PasskeyAlgorithm.Es256, null)]
+    [InlineData(PasskeyAlgorithm.Es256, "not base64")]
+    [InlineData(PasskeyAlgorithm.Es256, "AQID")]
+    [InlineData(PasskeyAlgorithm.Rs256, null)]
+    [InlineData(PasskeyAlgorithm.Rs256, "not base64")]
+    [InlineData(PasskeyAlgorithm.Rs256, "AQID")]
+    [InlineData(PasskeyAlgorithm.Ps256, null)]
+    [InlineData(PasskeyAlgorithm.Ps256, "not base64")]
+    [InlineData(PasskeyAlgorithm.Ps256, "AQID")]
+    public void InvalidPublicKeysAreRefusedWithoutThrowingFromTheBoolVerifier(int algorithm, string? publicKey)
+    {
+        Assert.False(PasskeyKeyMaterialGenerator.Verify(algorithm, publicKey!, [1, 2, 3], [1, 2, 3]));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("3046022100")]
+    [InlineData("3006020101020101")]
+    [InlineData("3006020180020101")]
+    [InlineData("300702020001020101")]
+    [InlineData("308106020101020101")]
+    public void MalformedDerOrInvalidEcdsaValuesAreRefusedWithoutThrowing(string signatureHex)
+    {
+        using var publicKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        Assert.False(PasskeyKeyMaterialGenerator.Verify(PasskeyAlgorithm.Es256,
+            Convert.ToBase64String(publicKey.ExportSubjectPublicKeyInfo()),
+            [1, 2, 3], Convert.FromHexString(signatureHex)));
+    }
+
+    [Fact]
+    public void TrailingBytesInAnImportedPublicKeyAreRefused()
+    {
+        using var independentSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        byte[] payload = [1, 2, 3];
+        var signature = independentSigner.SignData(payload, HashAlgorithmName.SHA256,
+            DSASignatureFormat.Rfc3279DerSequence);
+        var spki = independentSigner.ExportSubjectPublicKeyInfo();
+
+        Assert.True(PasskeyKeyMaterialGenerator.Verify(PasskeyAlgorithm.Es256,
+            Convert.ToBase64String(spki), payload, signature));
+        byte[] invalidSpki = [.. spki, 0];
+        Assert.False(PasskeyKeyMaterialGenerator.Verify(PasskeyAlgorithm.Es256,
+            Convert.ToBase64String(invalidSpki), payload, signature));
+    }
+
+    [Theory]
+    [InlineData(PasskeyAlgorithm.Rs256)]
+    [InlineData(PasskeyAlgorithm.Ps256)]
+    public void RsaAlgorithmsStillAcceptIndependentPkcs1AndPssSignatures(int algorithm)
+    {
+        using var independentSigner = RSA.Create(2048);
+        var publicKey = Convert.ToBase64String(independentSigner.ExportSubjectPublicKeyInfo());
+        byte[] payload = [1, 2, 3];
+        var padding = algorithm == PasskeyAlgorithm.Rs256 ? RSASignaturePadding.Pkcs1 : RSASignaturePadding.Pss;
+        var signature = independentSigner.SignData(payload, HashAlgorithmName.SHA256, padding);
+
+        Assert.True(PasskeyKeyMaterialGenerator.Verify(algorithm, publicKey, payload, signature));
+        if (algorithm == PasskeyAlgorithm.Rs256)
+        {
+            var monicaSignature = PasskeyKeyMaterialGenerator.Sign(algorithm,
+                Convert.ToBase64String(independentSigner.ExportPkcs8PrivateKey()), payload);
+            Assert.True(independentSigner.VerifyData(payload, monicaSignature, HashAlgorithmName.SHA256,
+                RSASignaturePadding.Pkcs1));
+        }
+
+        payload[0] ^= 1;
+        Assert.False(PasskeyKeyMaterialGenerator.Verify(algorithm, publicKey, payload, signature));
     }
 
     [Fact]

@@ -20,6 +20,7 @@ public interface ILocalizationService : INotifyPropertyChanged
     string StorageNavigationGroup { get; }
     string SecureNotes { get; }
     string Totp { get; }
+    string Passkeys { get; }
     string Cards { get; }
     string Library { get; }
     string LibraryAll { get; }
@@ -568,6 +569,7 @@ public sealed class LocalizationService : ILocalizationService
     public string StorageNavigationGroup => Text();
     public string SecureNotes => Text();
     public string Totp => Text();
+    public string Passkeys => Text();
     public string Cards => Text();
     public string Library => Text();
     public string LibraryAll => Text();
@@ -1095,6 +1097,31 @@ public sealed class LocalizationService : ILocalizationService
     internal static readonly Dictionary<string, string> English = new()
     {
         ["Passwords"] = "Passwords",
+        ["Passkeys"] = "Passkeys",
+        ["PasskeyManagementHint"] = "Manage passkey records on this device. Monica passkeys are not yet included in vault sync or backups.",
+        ["PasskeyRegistrationHint"] = "Create a passkey from the website's registration flow. Browser and system provider integration is still being developed.",
+        ["PasskeySearchHint"] = "Search by website or account",
+        ["PasskeyCountFormat"] = "{0} of {1} passkeys",
+        ["PasskeyEmpty"] = "There are no passkey records on this device.",
+        ["PasskeyNoMatches"] = "No passkeys match your search.",
+        ["PasskeySelectHint"] = "Select a passkey to review its website, account and storage.",
+        ["PasskeyOwnerMonica"] = "Stored by Monica",
+        ["PasskeyOwnerOther"] = "Platform or other storage",
+        ["PasskeyNotUsed"] = "Not used in Monica",
+        ["PasskeyDiscoverable"] = "Available for account selection",
+        ["PasskeyNotDiscoverable"] = "Requires the website to identify the account",
+        ["PasskeyRemoveRecord"] = "Remove local record",
+        ["PasskeyRemovePlatformConfirm"] = "Remove Monica's local record for {1} at {0}? The system passkey and website registration remain. Manage the key itself in its provider's settings.",
+        ["PasskeyDeleteConfirm"] = "Delete the passkey for {1} at {0} and its private key from this device? Make sure you have another way to sign in. The website registration remains.",
+        ["PasskeyLoadFailed"] = "Passkeys could not be loaded. Unlock the vault and try refreshing.",
+        ["PasskeyDeleteFailed"] = "The passkey could not be removed. Refresh the list and try again.",
+        ["PasskeyBackToList"] = "Back to passkeys",
+        ["PasskeyWebsite"] = "Website",
+        ["PasskeyAccount"] = "Account",
+        ["PasskeyStorage"] = "Storage",
+        ["PasskeyCreated"] = "Created",
+        ["PasskeyLastUsed"] = "Last used in Monica",
+        ["PasskeyCredentialId"] = "Credential ID",
         ["VaultNavigationGroup"] = "Vault",
         ["ToolsNavigationGroup"] = "Tools",
         ["StorageNavigationGroup"] = "Storage",
@@ -2326,7 +2353,7 @@ public sealed class LocalizationService : ILocalizationService
         ["Capability.cards.Title"] = "Wallet",
         ["Capability.cards.Description"] = "Bank cards, identity documents and images stored as secure items.",
         ["Capability.passkeys.Title"] = "Passkeys",
-        ["Capability.passkeys.Description"] = "WebAuthn/FIDO2 metadata with Bitwarden and KeePass-compatible modes.",
+        ["Capability.passkeys.Description"] = "Local passkey management and encrypted software keys. System providers and passkey sync remain in development.",
         ["Capability.wifi.Title"] = "Wi-Fi",
         ["Capability.wifi.Description"] = "Network settings, connection QR import and sharing, with preserved Android advanced metadata.",
         ["Capability.ssh.Title"] = "SSH Keys",
@@ -2756,6 +2783,31 @@ public sealed class LocalizationService : ILocalizationService
     internal static readonly Dictionary<string, string> Chinese = new()
     {
         ["Passwords"] = "密码",
+        ["Passkeys"] = "通行密钥",
+        ["PasskeyManagementHint"] = "管理此设备中的通行密钥记录。Monica 通行密钥暂未包含在保险库同步和备份中。",
+        ["PasskeyRegistrationHint"] = "请从网站的注册流程创建通行密钥。浏览器与系统供应器接入仍在开发中。",
+        ["PasskeySearchHint"] = "按网站或账户搜索",
+        ["PasskeyCountFormat"] = "显示 {0} / {1} 个通行密钥",
+        ["PasskeyEmpty"] = "此设备中尚无通行密钥记录。",
+        ["PasskeyNoMatches"] = "没有匹配搜索条件的通行密钥。",
+        ["PasskeySelectHint"] = "选择通行密钥，查看网站、账户和存储位置。",
+        ["PasskeyOwnerMonica"] = "由 Monica 保存",
+        ["PasskeyOwnerOther"] = "平台或其他存储",
+        ["PasskeyNotUsed"] = "尚未在 Monica 中使用",
+        ["PasskeyDiscoverable"] = "可供选择账户",
+        ["PasskeyNotDiscoverable"] = "需要网站指定账户",
+        ["PasskeyRemoveRecord"] = "移除本地记录",
+        ["PasskeyRemovePlatformConfirm"] = "移除 {0} 上账户 {1} 在 Monica 中的本地记录？系统通行密钥和网站注册信息仍会保留。如需管理密钥本身，请前往其供应器设置。",
+        ["PasskeyDeleteConfirm"] = "删除此设备中 {0} 上账户 {1} 的通行密钥和私钥？请先确认还有其他登录方式。网站注册信息仍会保留。",
+        ["PasskeyLoadFailed"] = "无法加载通行密钥。请解锁保险库后尝试刷新。",
+        ["PasskeyDeleteFailed"] = "无法移除通行密钥。请刷新列表后重试。",
+        ["PasskeyBackToList"] = "返回通行密钥列表",
+        ["PasskeyWebsite"] = "网站",
+        ["PasskeyAccount"] = "账户",
+        ["PasskeyStorage"] = "存储位置",
+        ["PasskeyCreated"] = "创建时间",
+        ["PasskeyLastUsed"] = "最近在 Monica 中使用",
+        ["PasskeyCredentialId"] = "凭据 ID",
         ["VaultNavigationGroup"] = "保险库",
         ["ToolsNavigationGroup"] = "工具",
         ["StorageNavigationGroup"] = "存储",
@@ -3964,7 +4016,7 @@ public sealed class LocalizationService : ILocalizationService
         ["Capability.cards.Title"] = "卡包",
         ["Capability.cards.Description"] = "银行卡、身份证件和图片以安全项目形式保存。",
         ["Capability.passkeys.Title"] = "Passkey",
-        ["Capability.passkeys.Description"] = "WebAuthn/FIDO2 元数据，兼容 Bitwarden 和 KeePass 模式。",
+        ["Capability.passkeys.Description"] = "本机通行密钥管理与加密软件私钥。系统供应器和通行密钥同步仍在开发中。",
         ["Capability.wifi.Title"] = "Wi-Fi",
         ["Capability.wifi.Description"] = "网络设置、连接二维码导入与分享，并保留 Android 的高级元数据。",
         ["Capability.ssh.Title"] = "SSH 密钥",

@@ -20,6 +20,7 @@ public partial class UnlockedShellView : UserControl
         new("L.Passwords", "Passwords", Symbol.Key),
         new("L.SecureNotes", "Notes", Symbol.Note),
         new("L.Totp", "Totp", Symbol.Fingerprint),
+        new("L.Passkeys", "Passkeys", Symbol.PersonPasskey),
         new("L.Cards", "Cards", Symbol.WalletCreditCard)
     ];
 

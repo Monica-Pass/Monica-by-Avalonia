@@ -142,6 +142,7 @@ public sealed partial class MainWindowViewModel
         ClearTransientSettingsSecurityInputs();
         ClearTransferBuffers();
         Generator.ClearSensitiveState();
+        Passkeys.ClearSensitiveState();
     }
 
     private void RestoreActiveWorkspaceState()

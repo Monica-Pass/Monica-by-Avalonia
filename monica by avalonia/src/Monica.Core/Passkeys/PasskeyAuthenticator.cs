@@ -23,9 +23,9 @@ public sealed record PasskeyAssertion(
 }
 
 /// <summary>
-/// Monica's own WebAuthn authenticator. It is a roaming software authenticator: the private key lives
-/// in the vault next to the credential, so registrations work on every machine the vault is opened on
-/// without any platform passkey provider being involved.
+/// Monica's low-level WebAuthn software authenticator. The caller is responsible for a trusted
+/// relying-party request, operation-level consent and user verification. This engine does not provide
+/// an OS/browser provider or implement cross-device storage and recovery by itself.
 /// </summary>
 public static class PasskeyAuthenticator
 {
@@ -66,12 +66,10 @@ public static class PasskeyAuthenticator
     }
 
     /// <summary>
-    /// UP and UV are both asserted because a signature is only reachable behind the vault unlock, and
-    /// BE/BS are set since the key material is exported and re-imported with the vault rather than being
-    /// hardware-bound. The counter is pinned at 0 on purpose: WebAuthn allows an authenticator to omit
-    /// it, and Monica restores keys from whole-vault backups without a live two-way sync, so a monotonic
-    /// counter diverges across machines and the relying party rejects the credential once it goes
-    /// backwards. That divergence is the "passkey worked for a while and then stopped" failure.
+    /// This low-level engine sets software-authenticator flags. Its caller must establish consent and
+    /// user verification before reaching it; vault unlock alone is not an operation-level UV proof.
+    /// The counter remains zero, which WebAuthn permits for authenticators without a monotonic counter.
+    /// Software key portability and the flags do not imply that vault backup/sync is implemented.
     /// </summary>
     public static PasskeyAssertion Assert(
         PasskeyEntry credential,
@@ -115,12 +113,8 @@ public static class PasskeyAuthenticator
             .Build();
 
     /// <summary>
-    /// UP and UV are both asserted because a signature is only reachable behind the vault unlock, and
-    /// BE/BS are set since the key material is exported and re-imported with the vault rather than being
-    /// hardware-bound. The counter is pinned at 0 on purpose: WebAuthn allows an authenticator to omit
-    /// it, and Monica restores keys from whole-vault backups without a live two-way sync, so a monotonic
-    /// counter diverges across machines and the relying party rejects the credential once it goes
-    /// backwards. That divergence is the "passkey worked for a while and then stopped" failure.
+    /// Uses the relying party's supplied origin, or the conventional HTTPS origin for an app-local
+    /// ceremony. Production callers must validate origin provenance before invoking this engine.
     /// </summary>
     private static string ResolveOrigin(string rpId, string? origin) =>
         string.IsNullOrWhiteSpace(origin) ? $"https://{rpId}" : origin.Trim();

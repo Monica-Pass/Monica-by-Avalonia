@@ -1,0 +1,96 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Monica.App.ViewModels"
+             x:Class="Monica.App.Features.Passkeys.PasskeyWorkspaceView"
+             x:Name="PasskeyWorkspaceRoot"
+             x:DataType="vm:PasskeyWorkspaceViewModel">
+    <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="{DynamicResource SpacingSmall}">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource SpacingMedium}">
+            <StackPanel>
+                <TextBlock Classes="workspacePageTitle" Text="{Binding L[Passkeys]}" />
+                <TextBlock Text="{Binding CountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           AutomationProperties.LiveSetting="Polite" />
+            </StackPanel>
+            <Button Grid.Column="1" x:Name="PasskeyRefreshButton" Classes="workspaceCommand"
+                    Command="{Binding RefreshCommand}" Content="{Binding L.Refresh}"
+                    AutomationProperties.Name="{Binding L.Refresh}" />
+        </Grid>
+        <TextBlock Grid.Row="1" Text="{Binding L[PasskeyManagementHint]}" TextWrapping="Wrap"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        <StackPanel Grid.Row="2" Spacing="{DynamicResource SpacingSmall}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource SpacingSmall}">
+                <TextBox x:Name="PasskeySearchBox" Text="{Binding SearchText}"
+                         PlaceholderText="{Binding L[PasskeySearchHint]}" AutomationProperties.Name="{Binding L[PasskeySearchHint]}" />
+                <Button Grid.Column="1" Classes="workspaceCommand" Command="{Binding ClearSearchCommand}"
+                        Content="{Binding L.ClearSearch}" AutomationProperties.Name="{Binding L.ClearSearch}" />
+            </Grid>
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
+            <TextBlock x:Name="PasskeyErrorText" Text="{Binding ErrorText}" IsVisible="{Binding HasError}"
+                       TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                       AutomationProperties.LiveSetting="Polite" />
+        </StackPanel>
+        <Grid x:Name="PasskeyMasterDetailGrid" Grid.Row="3" ColumnDefinitions="*,*" MinWidth="0">
+            <Border x:Name="PasskeyListRegion" Padding="{DynamicResource PaddingPane}" ClipToBounds="True">
+                <Grid>
+                    <ListBox x:Name="PasskeyList" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}"
+                             HorizontalAlignment="Stretch" AutomationProperties.Name="{Binding L[Passkeys]}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PasskeyListItem">
+                                <StackPanel Margin="{DynamicResource PaddingListRow}">
+                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding UserName}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding OwnerText}" FontSize="{DynamicResource FontSizeMeta}"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBlock Text="{Binding EmptyText}" IsVisible="{Binding IsEmpty}" TextWrapping="Wrap"
+                               Margin="{DynamicResource PaddingSection}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </Grid>
+            </Border>
+            <Border x:Name="PasskeyDetailRegion" Grid.Column="1" Classes="workspaceDetail" MinWidth="0">
+                <ScrollViewer>
+                    <Grid>
+                        <StackPanel IsVisible="{Binding HasSelection}" Spacing="{DynamicResource SpacingMedium}">
+                            <Button x:Name="PasskeyBackButton" Classes="workspaceCommand" Content="{Binding L[PasskeyBackToList]}"
+                                    Command="{Binding BackToListCommand}" HorizontalAlignment="Left" />
+                            <TextBlock x:Name="PasskeyDetailTitle" Classes="workspacePageTitle" Text="{Binding SelectedItem.Title}" TextWrapping="Wrap" />
+                            <StackPanel>
+                                <TextBlock Classes="workspaceDetailLabel" Text="{Binding L[PasskeyWebsite]}" />
+                                <SelectableTextBlock Text="{Binding SelectedItem.RpId}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Classes="workspaceDetailLabel" Text="{Binding L[PasskeyAccount]}" />
+                                <SelectableTextBlock x:Name="PasskeyAccountText" Text="{Binding SelectedItem.UserName}" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding SelectedItem.UserDisplayName}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Classes="workspaceDetailLabel" Text="{Binding L[PasskeyStorage]}" />
+                                <TextBlock Text="{Binding SelectedItem.OwnerText}" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding SelectedItem.DiscoverableText}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Classes="workspaceDetailLabel" Text="{Binding L[PasskeyCreated]}" />
+                                <TextBlock Text="{Binding SelectedItem.CreatedText}" />
+                                <TextBlock Classes="workspaceDetailLabel" Text="{Binding L[PasskeyLastUsed]}" />
+                                <TextBlock Text="{Binding SelectedItem.LastUsedText}" />
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Classes="workspaceDetailLabel" Text="{Binding L[PasskeyCredentialId]}" />
+                                <SelectableTextBlock Text="{Binding SelectedItem.CredentialId}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding L[PasskeyRegistrationHint]}" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <Button x:Name="PasskeyDeleteButton" Classes="workspaceCommand" Command="{Binding DeleteSelectedCommand}"
+                                    Content="{Binding DeleteText}" AutomationProperties.Name="{Binding DeleteText}" HorizontalAlignment="Left" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding L[PasskeySelectHint]}" IsVisible="{Binding !HasSelection}" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </Grid>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -7,6 +7,7 @@ using Monica.App.Features.Archive;
 using Monica.App.Features.DatabaseManagement;
 using Monica.App.Features.Generator;
 using Monica.App.Features.Mdbx;
+using Monica.App.Features.Passkeys;
 using Monica.App.Features.RecycleBin;
 using Monica.App.Features.SecurityAnalysis;
 using Monica.App.Features.Settings;
@@ -25,6 +26,10 @@ public sealed class WorkspaceHostView : ContentControl
             ["Generator"] = static () => new GeneratorWorkspaceView
             {
                 [!DataContextProperty] = new Binding("Generator")
+            },
+            ["Passkeys"] = static () => new PasskeyWorkspaceView
+            {
+                [!DataContextProperty] = new Binding("Passkeys")
             },
             ["Archive"] = static () => new ArchiveWorkspaceView(),
             ["RecycleBin"] = static () => new RecycleBinWorkspaceView(),

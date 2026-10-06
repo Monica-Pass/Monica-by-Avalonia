@@ -1,6 +1,6 @@
 # Monica Avalonia 发布就绪与证据矩阵
 
-最近本地验证：2026-09-29；历史远端配置审计：2026-07-26（本轮未重新查询远端）
+最近本地验证：2026-10-06；历史远端配置审计：2026-07-26（本轮未重新查询远端安全配置）
 
 本文件区分四种状态，避免把“代码已存在”“自动化测试通过”和“可以公开分发”
 混为一谈：
@@ -20,7 +20,7 @@
 | 浏览器本地配对与站点凭据查询 | 已验证 | `WindowsBrowserBridgeService`、Manifest V3 扩展 | `BrowserBridgeServiceTests.cs`、`DesktopIntegrationUiTests.cs`、协议文档 |
 | Windows 托盘与全局快速搜索 | 已验证 | `AvaloniaTrayService`、`WindowsGlobalHotkeyService` | `DesktopIntegrationUiTests.cs`；非 Windows 平台按 capability 明示限制 |
 | Android 钱包类型的桌面等价实现 | 已验证 | `ExtendedWalletItemData.cs`、钱包编辑器和详情投影 | `WalletParityTests.cs`、`WalletWorkflowUiTests.cs` |
-| Windows 原生 passkey 状态 | 平台受限 | `NativePasskeyService.cs` 仅探测 WebAuthn client API | `PlatformServiceTests.cs`、`native-passkey-boundary.md`；Monica 不是系统 Credential Provider |
+| 通行密钥管理与 Windows 客户端 | 已验证（边界内） | 独立本机管理页、事务密钥存储、主密码重加密、Windows WebAuthn client | passkey engine/store/session/UI 回归；Monica 系统供应器和真实网站验收仍待完成 |
 | 截图保护 | 已验证 | Windows capture-affinity adapter 与设置开关 | `AppSettingsTests.WindowCapture.cs`；能力由用户选择，不强制启用 |
 
 ## 数据与安全边界
@@ -46,7 +46,13 @@
 | 冷启动与首次导航 | 已验证（当前预算） | `ColdStartupPerformanceTests.cs`、延迟工作区物化和编辑器预热 | 必须在发布硬件上继续记录真实启动、解锁和大 vault 指标 |
 | MDBX UI 响应性 | 已验证 | blocking UniFFI 工作移出 Avalonia dispatcher | `MdbxUiResponsivenessTests.cs` |
 | 后台内存 | 已验证（行为） | 最小化释放可重建视觉树、投影和图片缓存 | 自动化验证对象可回收，不替代多小时进程 RSS/working-set soak test |
-| 功能拆分 | 渐进进行 | 生成器已独立为 `GeneratorWorkspaceViewModel`；保留 300 行文件门与独立实例、绑定、锁定清理测试 | 其他工作区仍有大量共享 partial 状态；文件门不代表职责已经隔离 |
+| 功能拆分 | 渐进进行 | 生成器和通行密钥已有独立 ViewModel；保留 300 行文件门与独立实例、绑定、锁定清理测试 | 其他工作区仍有大量共享 partial 状态；文件门不代表职责已经隔离 |
+
+2026-10-06 本轮本地验证：Release 零警告构建；172 项通行密钥、主密码维护和本地化定向
+测试，288 项 UI 功能回归、17 项 UI 性能检查通过。笔记默认编辑模式延迟创建 Markdown
+预览；这次冷编辑器构造测得 56.168 ms，属于本机单次证据，不是跨硬件承诺。更换上下文、
+锁定和 detach 时显式清除已渲染文本、图片与绑定，确认弹窗取消也会清除保留的账号文本。
+本机完整核心测试程序集仍被安全软件移除，完整核心质量门以远端 CI 为准。
 
 真实 AppHost 截图烟雾测试使用临时 canonical MDBX vault，验证了 26 个密码、
 14 个笔记、1 个 TOTP、2 个钱包项目和 12 个页面截图。一次审计中的 vault 加载为

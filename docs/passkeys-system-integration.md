@@ -23,7 +23,7 @@ Avalonia 进程调用平台 API，后者必须交付该平台认可的原生供�
 
 | 平台 | 系统入口 | 本地用户验证 | 仓库现状与限制 |
 | --- | --- | --- | --- |
-| Windows | 应用内：Win32 WebAuthn API + Windows Hello；系统级：Windows 11 WebAuthn Plugin API、`IPluginAuthenticator` | Windows Hello 指纹/面容/PIN | 应用内客户端边界已编译和模拟验证；系统插件、管理页和真实网站验收尚未交付 |
+| Windows | 应用内：Win32 WebAuthn API + Windows Hello；系统级：Windows 11 WebAuthn Plugin API、`IPluginAuthenticator` | Windows Hello 指纹/面容/PIN | 应用内客户端及本机管理页已实现并测试；系统插件与真实网站验收尚未交付 |
 | macOS | 应用内/浏览器：AuthenticationServices；系统级：Credential Provider Extension | Touch ID、设备认证 | 需要原生扩展、App Group/Keychain 共享存储、entitlement 和签名；Avalonia UI 本身不是供应器 |
 | Linux | 应用内：Monica 软件密钥；浏览器/硬件：WebAuthn、FIDO2；实验系统路线：credentialsd / CredentialsX portal | 桌面密钥环、FIDO2 设备或 Monica 主密码 | Credentials portal 仍是实验提案，需探测实际服务和浏览器支持；不能承诺所有浏览器/应用自动发现 Monica |
 
@@ -46,6 +46,11 @@ Android 的 Credential Provider Service 继续作为移动端对齐实现，但�
 目前桌面软件密钥仍存在独立 SQLite 表中。只加 `MdbxDatabaseId` 字段不会把密钥放入 MDBX；
 原生 `passkey` 的只读查看也不代表已能管理、备份或使用它。交付跨端功能前必须补齐真正的
 共享存储、主密码变更、导出导入及锁定生命周期。
+
+当前本机管理页只展示公开字段，不持有私钥或其存储引用；锁库、后台释放和确认取消会
+清除界面内容。SQLite 私钥写入、删除、轮换与凭证记录已在同一事务内处理，主密码变更/
+重置会重加密软件私钥。它们尚未接入 canonical MDBX、保险库同步、备份恢复或浏览器挑战。
+密码条目的 `PasskeyBindings` 保留链路与独立 `PasskeyStore` 也尚未建立双向映射。
 
 ## 实施与验收顺序
 

@@ -99,6 +99,9 @@ public sealed partial class MainWindowViewModel
         {
             SetShellHibernatedByLock(false);
             _vaultSessionService.MarkUnlocked();
+            Passkeys.NotifyAccessChanged();
+            if (string.Equals(SelectedSection, "Passkeys", StringComparison.OrdinalIgnoreCase))
+                _ = Passkeys.EnsureLoadedAsync();
             RaiseMdbxSnapshotState();
             IsPrivacyScreenVisible = false;
             NotifyAutoLockScheduleChanged();

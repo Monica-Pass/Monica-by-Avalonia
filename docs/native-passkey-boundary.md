@@ -9,10 +9,23 @@ authenticator data, uses the WebAuthn DER signature format for native ES256 asse
 client data returned by the native response structure. Registration responses include the public
 attestation/client data needed by a relying party.
 
+Software ES256 assertions now use the same ASN.1 DER wire format. Regression tests verify Monica
+output with independent .NET cryptography, reject otherwise valid raw P1363 signatures and verify the
+published W3C assertion vector. RSA key and signature formats are unchanged.
+
 Compilation and simulated authenticator tests are evidence for this boundary. They do not prove a
-physical Windows Hello registration or website sign-in. The desktop currently has no complete passkey
-management workspace or browser/system-provider entry point. Platform registration metadata is
-stored in SQLite; the passkey material is not yet a complete canonical MDBX cross-device feature.
+physical Windows Hello registration or website sign-in. The desktop management workspace now lists
+and searches local records, shows public account/storage metadata and confirms deletion. Platform-owned
+records can be removed from Monica without claiming to delete the OS credential. The page does not
+offer a standalone fake website registration or an unverified signing operation. Metadata and software
+private keys are stored in SQLite; they are not included in canonical MDBX snapshots or vault sync.
+
+Credential and private-key writes/deletes share a SQLite transaction. Key rotation removes unreferenced
+keys, duplicate equivalent credential IDs are rejected within an RP, and master-password maintenance
+rewraps encrypted passkey material without changing its reference or PKCS#8 format. App-injected
+passkey operations require an unlocked vault session and capture its cancellation token, so locking
+then immediately unlocking again cannot revive an old operation. The workspace drops held account
+projections and pending confirmations when locked or released to the background.
 
 ## Two different ownership models
 
@@ -51,7 +64,12 @@ property and must not be interpreted as plugin registration or as Windows accoun
 - Validate RP/origin, challenge sizes, algorithm and user handle before invoking native UI.
 - Native results must match the challenge, origin, credential id, RP hash and required UV.
 - Preserve returned authenticator data and its signature; do not synthesize verification flags.
-- Cancellation must cancel the Windows ceremony and prevent late persistence or output.
+- Cancellation must cancel the Windows ceremony and prevent late Monica persistence or output. If
+  Windows has already created a credential, this boundary does not automatically delete that OS key.
+- Input RP/origin checks are not a replacement for trusted browser-origin validation or public-suffix
+  checks. A system/browser provider must validate the requesting client before it reaches this engine.
+- The low-level software engine's UP/UV flags require an operation-level consent and verification
+  boundary in the future provider; merely exposing a create/sign button would not establish that proof.
 - Windows controls the available fingerprint, face and PIN methods. Monica does not read biometric
   templates and cannot force a fingerprint method that the device has not configured.
 - Full acceptance requires real OS-provider registration, a trusted WebAuthn test relying party,

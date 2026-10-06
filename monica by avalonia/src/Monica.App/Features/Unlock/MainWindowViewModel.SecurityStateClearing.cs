@@ -42,6 +42,7 @@ public sealed partial class MainWindowViewModel
         ClearItems(OpenNoteTabs);
         ReplaceNoteImagePreviews([]);
         Generator.ClearSensitiveState();
+        Passkeys.ClearSensitiveState();
         ClearItems(TimelineEntries);
         ClearItems(SecuritySummaryItems);
         ClearItems(SecurityIssueItems);

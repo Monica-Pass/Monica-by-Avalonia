@@ -106,7 +106,7 @@ public sealed class UiArchitectureTests
                 .ToArray();
             Assert.Equal(
                 [
-                    "Vault", "Passwords", "Notes", "Totp", "Cards", "Generator", "SecurityAnalysis",
+                    "Vault", "Passwords", "Notes", "Totp", "Passkeys", "Cards", "Generator", "SecurityAnalysis",
                     "Timeline", "Archive", "RecycleBin", "Mdbx",
                     "DatabaseManagement", "Sync", "Settings", "Lock"
                 ],

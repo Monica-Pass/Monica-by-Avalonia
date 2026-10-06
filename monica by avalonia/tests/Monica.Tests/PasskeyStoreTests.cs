@@ -175,6 +175,226 @@ public sealed class PasskeyStoreTests
     }
 
     [Fact]
+    public async Task AllCredentialsAreListedInStableAccountOrderWhileTheVaultIsLocked()
+    {
+        var fixture = new PasskeyFixture();
+        var last = await fixture.Service.CreateAsync(CreateRequest("z.example", "zoe"));
+        var bob = await fixture.Service.CreateAsync(CreateRequest(RpId, "bob"));
+        var alice = await fixture.Service.CreateAsync(CreateRequest(RpId, "alice"));
+        var secondAlice = await fixture.Service.CreateAsync(CreateRequest(RpId, "alice"));
+        fixture.Crypto.Lock();
+
+        var all = await fixture.Store.ListAllAsync();
+
+        Assert.Equal(new[] { alice.Id, secondAlice.Id, bob.Id, last.Id }, all.Select(entry => entry.Id));
+        Assert.All(all, entry => Assert.StartsWith(PasskeyPrivateKeyRef.ReferencePrefix, entry.PrivateKeyAlias));
+    }
+
+    [Fact]
+    public async Task CredentialLookupNormalizesTheRpAndRefusesAnInvalidRpFilter()
+    {
+        var fixture = new PasskeyFixture();
+        var entry = await fixture.CreatePasskeyAsync(PasskeyAlgorithm.Es256);
+
+        Assert.Equal(entry.Id, (await fixture.Store.FindAsync(entry.CredentialId, " Example.COM. "))?.Id);
+        Assert.Null(await fixture.Store.FindAsync(entry.CredentialId, ".."));
+        Assert.Null(await fixture.Store.FindAsync(entry.CredentialId, " "));
+    }
+
+    [Fact]
+    public async Task AFailedCredentialInsertRollsBackTheProtectedKeyAndLeavesTheEntryUnchanged()
+    {
+        var fixture = new PasskeyFixture();
+        await fixture.Migrator.MigrateAsync();
+        await fixture.ExecuteAsync("""
+            CREATE TRIGGER reject_passkey_insert BEFORE INSERT ON passkeys
+            BEGIN SELECT RAISE(ABORT, 'simulated credential insert failure'); END;
+            """);
+        var material = PasskeyKeyMaterialGenerator.Generate(PasskeyAlgorithm.Es256);
+        var entry = EntryFrom(material);
+
+        await Assert.ThrowsAsync<SqliteException>(() => fixture.Store.SaveAsync(entry, material.PrivateKeyPkcs8Base64));
+
+        Assert.Equal(0, entry.Id);
+        Assert.Empty(entry.PrivateKeyAlias);
+        Assert.Equal(0, await fixture.CountPrivateKeysAsync());
+        Assert.Equal(0, await fixture.CountPasskeysAsync());
+    }
+
+    [Fact]
+    public async Task AFailedCredentialDeleteLeavesItsPrivateKeyUsable()
+    {
+        var fixture = new PasskeyFixture();
+        var entry = await fixture.CreatePasskeyAsync(PasskeyAlgorithm.Es256);
+        var privateKey = await fixture.Store.ResolvePrivateKeyAsync(entry);
+        await fixture.ExecuteAsync("""
+            CREATE TRIGGER reject_passkey_delete BEFORE DELETE ON passkeys
+            BEGIN SELECT RAISE(ABORT, 'simulated credential delete failure'); END;
+            """);
+
+        await Assert.ThrowsAsync<SqliteException>(() => fixture.Store.DeleteAsync(entry.Id));
+
+        Assert.NotNull(await fixture.Store.GetAsync(entry.Id));
+        Assert.Equal(privateKey, await fixture.Store.ResolvePrivateKeyAsync(entry));
+        Assert.Equal(1, await fixture.CountPrivateKeysAsync());
+    }
+
+    [Fact]
+    public async Task AFailedPrivateKeyDeleteRollsBackTheCredentialDelete()
+    {
+        var fixture = new PasskeyFixture();
+        var entry = await fixture.CreatePasskeyAsync(PasskeyAlgorithm.Es256);
+        await fixture.ExecuteAsync("""
+            CREATE TRIGGER reject_private_key_delete BEFORE DELETE ON passkey_private_keys
+            BEGIN SELECT RAISE(ABORT, 'simulated private key delete failure'); END;
+            """);
+
+        await Assert.ThrowsAsync<SqliteException>(() => fixture.Store.DeleteAsync(entry.Id));
+
+        Assert.NotNull(await fixture.Store.GetAsync(entry.Id));
+        Assert.NotNull(await fixture.Store.ResolvePrivateKeyAsync(entry));
+    }
+
+    [Fact]
+    public async Task RotatingAKeyRemovesItsPreviousProtectedBlob()
+    {
+        var fixture = new PasskeyFixture();
+        var entry = await fixture.CreatePasskeyAsync(PasskeyAlgorithm.Es256);
+        var previousReference = entry.PrivateKeyAlias;
+        var material = PasskeyKeyMaterialGenerator.Generate(PasskeyAlgorithm.Es256);
+        entry.PublicKey = material.PublicKeySpkiBase64;
+
+        await fixture.Store.SaveAsync(entry, material.PrivateKeyPkcs8Base64);
+
+        Assert.NotEqual(previousReference, entry.PrivateKeyAlias);
+        Assert.Null(await fixture.PrivateKeyStore.ResolveAsync(previousReference));
+        Assert.Equal(material.PrivateKeyPkcs8Base64, await fixture.Store.ResolvePrivateKeyAsync(entry));
+        Assert.Equal(1, await fixture.CountPrivateKeysAsync());
+    }
+
+    [Fact]
+    public async Task AFailedRotationPreservesThePreviousCredentialAndProtectedKey()
+    {
+        var fixture = new PasskeyFixture();
+        var entry = await fixture.CreatePasskeyAsync(PasskeyAlgorithm.Es256);
+        var previousReference = entry.PrivateKeyAlias;
+        var previousPublicKey = entry.PublicKey;
+        var material = PasskeyKeyMaterialGenerator.Generate(PasskeyAlgorithm.Es256);
+        entry.PublicKey = material.PublicKeySpkiBase64;
+        await fixture.ExecuteAsync("""
+            CREATE TRIGGER reject_passkey_update BEFORE UPDATE ON passkeys
+            BEGIN SELECT RAISE(ABORT, 'simulated credential update failure'); END;
+            """);
+
+        await Assert.ThrowsAsync<SqliteException>(() => fixture.Store.SaveAsync(entry, material.PrivateKeyPkcs8Base64));
+
+        Assert.Equal(previousReference, entry.PrivateKeyAlias);
+        Assert.Equal(previousPublicKey, (await fixture.Store.GetAsync(entry.Id))!.PublicKey);
+        Assert.NotNull(await fixture.PrivateKeyStore.ResolveAsync(previousReference));
+        Assert.Equal(1, await fixture.CountPrivateKeysAsync());
+    }
+
+    [Fact]
+    public async Task AnUpdateToAMissingCredentialDoesNotCreateAnOrphanKey()
+    {
+        var fixture = new PasskeyFixture();
+        var material = PasskeyKeyMaterialGenerator.Generate(PasskeyAlgorithm.Es256);
+        var entry = EntryFrom(material);
+        entry.Id = 999;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Store.SaveAsync(entry, material.PrivateKeyPkcs8Base64));
+
+        Assert.Equal(0, await fixture.CountPrivateKeysAsync());
+        Assert.Equal(0, await fixture.CountPasskeysAsync());
+        Assert.Empty(entry.PrivateKeyAlias);
+    }
+
+    [Fact]
+    public async Task DuplicateCredentialSpellingsAreRefusedWithoutCreatingAnotherKey()
+    {
+        var fixture = new PasskeyFixture();
+        var first = await fixture.CreatePasskeyAsync(PasskeyAlgorithm.Es256);
+        var material = PasskeyKeyMaterialGenerator.Generate(PasskeyAlgorithm.Es256);
+        var duplicate = EntryFrom(material);
+        Assert.True(PasskeyBase64Url.TryDecode(first.CredentialId, out var credentialId));
+        duplicate.CredentialId = PasskeyCredentialId.ToUuidText(credentialId);
+        duplicate.UserName = "another account";
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Store.SaveAsync(duplicate, material.PrivateKeyPkcs8Base64));
+
+        Assert.Equal(1, await fixture.CountPasskeysAsync());
+        Assert.Equal(1, await fixture.CountPrivateKeysAsync());
+    }
+
+    [Fact]
+    public async Task ASharedProtectedReferenceSurvivesUntilItsLastCredentialIsDeleted()
+    {
+        var fixture = new PasskeyFixture();
+        var first = await fixture.CreatePasskeyAsync(PasskeyAlgorithm.Es256);
+        var second = EntryFrom(PasskeyKeyMaterialGenerator.Generate(PasskeyAlgorithm.Es256));
+        second.PublicKey = first.PublicKey;
+        second.PrivateKeyAlias = first.PrivateKeyAlias;
+        await fixture.Store.SaveAsync(second);
+
+        Assert.True(await fixture.Store.DeleteAsync(first.Id));
+        Assert.NotNull(await fixture.Store.ResolvePrivateKeyAsync(second));
+        Assert.Equal(1, await fixture.CountPrivateKeysAsync());
+        Assert.True(await fixture.Store.DeleteAsync(second.Id));
+        Assert.Equal(0, await fixture.CountPrivateKeysAsync());
+    }
+
+    [Fact]
+    public async Task AProtectedReferenceMustExistBeforeItCanBeStored()
+    {
+        var fixture = new PasskeyFixture();
+        var entry = EntryFrom(PasskeyKeyMaterialGenerator.Generate(PasskeyAlgorithm.Es256));
+        entry.PrivateKeyAlias = PasskeyPrivateKeyRef.ToReference("missing-key");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Store.SaveAsync(entry));
+
+        Assert.Equal(0, await fixture.CountPasskeysAsync());
+    }
+
+    [Fact]
+    public async Task SavingStaleMetadataDoesNotResetConcurrentUsageStatistics()
+    {
+        var fixture = new PasskeyFixture();
+        var entry = await fixture.CreatePasskeyAsync(PasskeyAlgorithm.Es256);
+        entry.LastUsedAt = DateTimeOffset.UnixEpoch;
+        await fixture.Store.MarkUsedAsync(entry.Id);
+        var used = await fixture.Store.GetAsync(entry.Id);
+        entry.Notes = "metadata edit";
+
+        await fixture.Store.SaveAsync(entry);
+
+        var reloaded = await fixture.Store.GetAsync(entry.Id);
+        Assert.Equal(1, reloaded!.UseCount);
+        Assert.Equal(used!.LastUsedAt, reloaded.LastUsedAt);
+        Assert.Equal("metadata edit", reloaded.Notes);
+    }
+
+    [Fact]
+    public async Task TheSameCredentialIdCanSignForItsCorrectRpAcrossMultipleRelyingParties()
+    {
+        var fixture = new PasskeyFixture();
+        var first = await fixture.CreatePasskeyAsync(PasskeyAlgorithm.Es256);
+        var material = PasskeyKeyMaterialGenerator.Generate(PasskeyAlgorithm.Es256);
+        var second = EntryFrom(material);
+        second.CredentialId = first.CredentialId;
+        second.RpId = "second.example";
+        await fixture.Store.SaveAsync(second, material.PrivateKeyPkcs8Base64);
+        var challenge = RandomNumberGenerator.GetBytes(32);
+
+        var assertion = await fixture.Service.AssertAsync(second.CredentialId, challenge, second.RpId);
+
+        Assert.NotNull(assertion);
+        Assert.True(PasskeyVerifier.TryVerifyAssertion(assertion!, second.PublicKeyAlgorithm,
+            second.PublicKey, challenge, second.RpId, out _, OriginOf(second.RpId)));
+        Assert.Equal(0, (await fixture.Store.GetAsync(first.Id))!.UseCount);
+        Assert.Equal(1, (await fixture.Store.GetAsync(second.Id))!.UseCount);
+    }
+
+    [Fact]
     public async Task TheStoreRefusesCredentialsItCouldNeverVerify()
     {
         var fixture = new PasskeyFixture();
@@ -226,6 +446,24 @@ public sealed class PasskeyStoreTests
     }
 
     private static string OriginOf(string rpId) => $"https://{rpId}";
+
+    private static PasskeyCreateRequest CreateRequest(string rpId, string userName) =>
+        new(rpId, RandomNumberGenerator.GetBytes(32), Encoding.UTF8.GetBytes(userName), userName);
+
+    private static PasskeyEntry EntryFrom(PasskeyKeyMaterial material) => new()
+    {
+        CredentialId = PasskeyBase64Url.Encode(PasskeyCredentialId.NewRandom()),
+        RpId = RpId,
+        RpName = "Example",
+        UserId = PasskeyBase64Url.Encode(Encoding.UTF8.GetBytes("user")),
+        UserName = "alice",
+        UserDisplayName = "Alice",
+        PublicKeyAlgorithm = material.Algorithm,
+        PublicKey = material.PublicKeySpkiBase64,
+        PasskeyMode = PasskeyModes.BitwardenCompatible,
+        CreatedAt = DateTimeOffset.UtcNow,
+        LastUsedAt = DateTimeOffset.UtcNow
+    };
 
     private static CryptoService CreateUnlockedCrypto(string password = "local vault password")
     {
@@ -284,6 +522,15 @@ public sealed class PasskeyStoreTests
         public Task<int> CountPrivateKeysAsync() => CountAsync("SELECT COUNT(*) FROM passkey_private_keys");
 
         public Task<int> CountPasskeysAsync() => CountAsync("SELECT COUNT(*) FROM passkeys");
+
+        public async Task ExecuteAsync(string sql)
+        {
+            await using var connection = Factory.CreateConnection();
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            await command.ExecuteNonQueryAsync();
+        }
 
         private async Task<List<RawRow>> ReadAsync(string sql, string parameterName, object value)
         {

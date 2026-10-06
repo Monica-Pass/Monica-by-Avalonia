@@ -23,6 +23,7 @@ using Monica.Core.ImportExport;
 using Monica.Core.Models;
 using Monica.Core.Services;
 using Monica.Data;
+using Monica.Data.Passkeys;
 using Monica.Data.Bitwarden;
 using Monica.Data.Repositories;
 using Monica.Data.Services;
@@ -86,7 +87,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IAutoTypeService? autoTypeService = null,
         IBitwardenPurgeQueue? bitwardenPurgeQueue = null,
         IBitwardenStuckEraseService? bitwardenStuckEraseService = null,
-        IMdbxUnknownEntryDiagnostics? mdbxUnknownEntryDiagnostics = null)
+        IMdbxUnknownEntryDiagnostics? mdbxUnknownEntryDiagnostics = null,
+        IPasskeyStore? passkeyStore = null)
     {
         _viewModelDispatcher = Dispatcher.CurrentDispatcher;
         _repository = repository;
@@ -136,6 +138,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         Generator = new GeneratorWorkspaceViewModel(
             _passwordGenerator, _clipboardService, _localization,
             key => SetStatusNotice(key), AddPasswordCommand);
+        Passkeys = new PasskeyWorkspaceViewModel(passkeyStore, _confirmationDialogService, _localization,
+            () => IsUnlocked, () => _vaultSessionService.IsUnlocked
+                ? _vaultSessionService.SessionCancellationToken : CancellationToken.None);
         _localization.PropertyChanged += (_, _) => RefreshLocalizedProperties();
         SetStatusMessage("Locked");
         _sourceCapabilities = platformCapabilityService.GetCapabilities();
@@ -155,6 +160,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ILocalizationService L => _localization;
 
     public GeneratorWorkspaceViewModel Generator { get; }
+    public PasskeyWorkspaceViewModel Passkeys { get; }
 
     // The library is the whole vault in one tree, so it is what an unlocked vault should show;
     // every single type is a filter on it rather than a destination of its own.
@@ -233,6 +239,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (string.Equals(value, "Generator", StringComparison.OrdinalIgnoreCase))
         {
             Generator.EnsureGeneratedPassword();
+        }
+
+        if (string.Equals(value, "Passkeys", StringComparison.OrdinalIgnoreCase))
+        {
+            _ = Passkeys.EnsureLoadedAsync();
         }
 
         if (string.Equals(value, "RecycleBin", StringComparison.OrdinalIgnoreCase))

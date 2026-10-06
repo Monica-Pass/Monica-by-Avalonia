@@ -137,7 +137,9 @@ public static class PasskeyKeyMaterialGenerator
         {
             using var ec = ECDsa.Create();
             ec.ImportPkcs8PrivateKey(pkcs8, out _);
-            return ec.SignData(payload, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+            // WebAuthn §6.5.5 requires ASN.1 DER for ES256 assertion signatures. COSE's
+            // fixed-width r || s representation describes a different wire format.
+            return ec.SignData(payload, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence);
         }
 
         using var rsa = RSA.Create();
@@ -156,30 +158,43 @@ public static class PasskeyKeyMaterialGenerator
             return false;
         }
 
-        var subjectPublicKeyInfo = Convert.FromBase64String(publicKeySpkiBase64);
-        if (algorithm == PasskeyAlgorithm.Es256)
+        try
         {
-            if (signature.Length != 64)
+            var subjectPublicKeyInfo = Convert.FromBase64String(publicKeySpkiBase64);
+            if (algorithm == PasskeyAlgorithm.Es256)
+            {
+                using var ec = ECDsa.Create();
+                ec.ImportSubjectPublicKeyInfo(subjectPublicKeyInfo, out var bytesRead);
+                if (bytesRead != subjectPublicKeyInfo.Length)
+                {
+                    return false;
+                }
+
+                return ec.VerifyData(
+                    payload,
+                    signature.ToArray(),
+                    HashAlgorithmName.SHA256,
+                    DSASignatureFormat.Rfc3279DerSequence);
+            }
+
+            using var rsa = RSA.Create();
+            rsa.ImportSubjectPublicKeyInfo(subjectPublicKeyInfo, out var rsaBytesRead);
+            if (rsaBytesRead != subjectPublicKeyInfo.Length)
             {
                 return false;
             }
 
-            using var ec = ECDsa.Create();
-            ec.ImportSubjectPublicKeyInfo(subjectPublicKeyInfo, out _);
-            return ec.VerifyData(
+            return rsa.VerifyData(
                 payload,
                 signature.ToArray(),
                 HashAlgorithmName.SHA256,
-                DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+                algorithm == PasskeyAlgorithm.Ps256 ? RSASignaturePadding.Pss : RSASignaturePadding.Pkcs1);
         }
-
-        using var rsa = RSA.Create();
-        rsa.ImportSubjectPublicKeyInfo(subjectPublicKeyInfo, out _);
-        return rsa.VerifyData(
-            payload,
-            signature.ToArray(),
-            HashAlgorithmName.SHA256,
-            algorithm == PasskeyAlgorithm.Ps256 ? RSASignaturePadding.Pss : RSASignaturePadding.Pkcs1);
+        catch (Exception error) when (error is CryptographicException or FormatException or ArgumentException)
+        {
+            // Invalid imported keys and malformed signatures fail the bool verification boundary.
+            return false;
+        }
     }
 
     public static byte[] BuildCosePublicKey(int algorithm, string publicKeySpkiBase64)
