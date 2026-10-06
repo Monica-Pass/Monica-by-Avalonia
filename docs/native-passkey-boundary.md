@@ -5,8 +5,9 @@
 Monica has a software authenticator engine, an encrypted SQLite private-key store and a Windows
 WebAuthn client adapter. The adapter calls `WebAuthNAuthenticatorMakeCredential` and
 `WebAuthNAuthenticatorGetAssertion`, supports native cancellation, reads UP/UV from returned
-authenticator data, and uses the WebAuthn DER signature format for native ES256 assertions.
-Registration responses include the public attestation/client data needed by a relying party.
+authenticator data, uses the WebAuthn DER signature format for native ES256 assertions and reads the
+client data returned by the native response structure. Registration responses include the public
+attestation/client data needed by a relying party.
 
 Compilation and simulated authenticator tests are evidence for this boundary. They do not prove a
 physical Windows Hello registration or website sign-in. The desktop currently has no complete passkey
@@ -22,11 +23,18 @@ stored in SQLite; the passkey material is not yet a complete canonical MDBX cros
   responses, with no Windows private-key export API. This adapter is for native client ceremonies;
   it does not register Monica as a system passkey manager.
 
-Other mode names in `PasskeyModes` are reserved identifiers, not implemented native adapters.
-Apple and Android platform services may themselves sync passkeys. Their provider implementations
-must not be described as universally device-bound or as exporting keys into Monica.
+Other mode names in `PasskeyModes` are storage/provider identifiers, not implemented native adapters
+in this Avalonia process. The three desktop targets are Windows, macOS and Linux: macOS needs a
+separate AuthenticationServices Credential Provider Extension, while Linux needs a browser/FIDO2
+route selected by the active desktop environment. Apple and Android platform services may themselves
+sync passkeys. Their provider implementations must not be described as universally device-bound or as
+exporting keys into Monica.
 
 ## System passkey manager is the target
+
+The code exposes these as separate platform capabilities: `native-passkey` means Monica can start a
+platform ceremony from its own process; `system-passkey-provider` means the operating system/browser
+can dispatch WebAuthn requests to Monica. A platform can have the first capability without the second.
 
 Microsoft's Windows WebAuthn Plugin API provides `IPluginAuthenticator`, plugin registration,
 credential metadata caching, cancellation and Windows Hello user verification. This is distinct from

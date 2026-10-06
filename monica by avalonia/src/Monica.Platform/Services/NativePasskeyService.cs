@@ -189,11 +189,12 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
                 if (result == nint.Zero) throw new InvalidOperationException("Windows returned no passkey registration.");
                 var attestation = Marshal.PtrToStructure<NativeCredentialAttestationPrefix>(result);
                 var authData = CopyBytes(attestation.pbAuthenticatorData, attestation.cbAuthenticatorData);
+                var returnedClientData = CopyCredentialAttestationClientData(result, attestation.dwVersion, clientData.Json);
                 return new NativePasskeyRegistration(
                     CopyBytes(attestation.pbCredentialId, attestation.cbCredentialId),
                     authData,
                     CopyBytes(attestation.pbAttestationObject, attestation.cbAttestationObject),
-                    clientData.Json,
+                    returnedClientData,
                     "internal",
                     request.Discoverable,
                     HasUserVerification(authData));
@@ -252,12 +253,13 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
                 if (result == nint.Zero) throw new InvalidOperationException("Windows returned no passkey assertion.");
                 var assertion = Marshal.PtrToStructure<NativeAssertionPrefix>(result);
                 var authData = CopyBytes(assertion.pbAuthenticatorData, assertion.cbAuthenticatorData);
+                var returnedClientData = CopyAssertionClientData(result, assertion.dwVersion, clientData.Json);
                 return new NativePasskeyAssertion(
                     CopyBytes(assertion.Credential.pbId, assertion.Credential.cbId),
                     authData,
                     CopyBytes(assertion.pbSignature, assertion.cbSignature),
                     CopyBytes(assertion.pbUserId, assertion.cbUserId),
-                    clientData.Json,
+                    returnedClientData,
                     "internal",
                     HasUserVerification(authData));
             }
@@ -307,6 +309,39 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
         return bytes;
     }
 
+    private static byte[] CopyCredentialAttestationClientData(
+        nint result,
+        uint structureVersion,
+        byte[] requestedClientData)
+    {
+        // pbClientDataJSON was added in WEBAUTHN_CREDENTIAL_ATTESTATION_VERSION_8.
+        // Older Windows builds do not expose it, so the input WEBAUTHN_CLIENT_DATA is the
+        // only client data available on those builds. Never read beyond the returned struct
+        // for an older version.
+        if (structureVersion < 8)
+        {
+            return requestedClientData;
+        }
+
+        var attestation = Marshal.PtrToStructure<NativeCredentialAttestation>(result);
+        return CopyBytes(attestation.pbClientDataJSON, attestation.cbClientDataJSON);
+    }
+
+    private static byte[] CopyAssertionClientData(
+        nint result,
+        uint structureVersion,
+        byte[] requestedClientData)
+    {
+        // pbClientDataJSON was added in WEBAUTHN_ASSERTION_VERSION_6.
+        if (structureVersion < 6)
+        {
+            return requestedClientData;
+        }
+
+        var assertion = Marshal.PtrToStructure<NativeAssertion>(result);
+        return CopyBytes(assertion.pbClientDataJSON, assertion.cbClientDataJSON);
+    }
+
     private static bool HasUserVerification(byte[] authenticatorData) =>
         authenticatorData.Length >= 37 && (authenticatorData[32] & (byte)PasskeyAuthenticatorFlags.UserVerified) != 0;
 
@@ -352,9 +387,11 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
         }
     }
     [StructLayout(LayoutKind.Sequential)] private readonly struct NativeMakeCredentialOptions(uint version, uint timeout, NativeCredentials credentials, NativeExtensions extensions, uint attachment, int resident, uint verification, uint attestation, uint flags, nint cancellation) { public readonly uint dwVersion = version, dwTimeoutMilliseconds = timeout; public readonly NativeCredentials CredentialList = credentials; public readonly NativeExtensions Extensions = extensions; public readonly uint dwAuthenticatorAttachment = attachment; public readonly int bRequireResidentKey = resident; public readonly uint dwUserVerificationRequirement = verification, dwAttestationConveyancePreference = attestation, dwFlags = flags; public readonly nint pCancellationId = cancellation; public readonly nint pExcludeCredentialList = nint.Zero; }
-    [StructLayout(LayoutKind.Sequential)] private readonly struct NativeGetAssertionOptions(uint version, uint timeout, NativeCredentials credentials, NativeExtensions extensions, uint attachment, uint verification, uint flags, nint cancellation) { public readonly uint dwVersion = version, dwTimeoutMilliseconds = timeout; public readonly NativeCredentials CredentialList = credentials; public readonly NativeExtensions Extensions = extensions; public readonly uint dwAuthenticatorAttachment = attachment, dwUserVerificationRequirement = verification, dwFlags = flags; public readonly nint pwszU2fAppId = nint.Zero, pbU2fAppId = nint.Zero, pCancellationId = cancellation; }
+    [StructLayout(LayoutKind.Sequential)] private readonly struct NativeGetAssertionOptions(uint version, uint timeout, NativeCredentials credentials, NativeExtensions extensions, uint attachment, uint verification, uint flags, nint cancellation) { public readonly uint dwVersion = version, dwTimeoutMilliseconds = timeout; public readonly NativeCredentials CredentialList = credentials; public readonly NativeExtensions Extensions = extensions; public readonly uint dwAuthenticatorAttachment = attachment, dwUserVerificationRequirement = verification, dwFlags = flags; public readonly nint pwszU2fAppId = nint.Zero, pbU2fAppId = nint.Zero, pCancellationId = cancellation, pAllowCredentialList = nint.Zero; }
     [StructLayout(LayoutKind.Sequential)] private readonly struct NativeCredentialAttestationPrefix { public readonly uint dwVersion; public readonly nint pwszFormatType; public readonly uint cbAuthenticatorData; public readonly nint pbAuthenticatorData; public readonly uint cbAttestation; public readonly nint pbAttestation; public readonly uint dwAttestationDecodeType; public readonly nint pvAttestationDecode; public readonly uint cbAttestationObject; public readonly nint pbAttestationObject; public readonly uint cbCredentialId; public readonly nint pbCredentialId; }
+    [StructLayout(LayoutKind.Sequential)] private readonly struct NativeCredentialAttestation { public readonly uint dwVersion; public readonly nint pwszFormatType; public readonly uint cbAuthenticatorData; public readonly nint pbAuthenticatorData; public readonly uint cbAttestation; public readonly nint pbAttestation; public readonly uint dwAttestationDecodeType; public readonly nint pvAttestationDecode; public readonly uint cbAttestationObject; public readonly nint pbAttestationObject; public readonly uint cbCredentialId; public readonly nint pbCredentialId; public readonly NativeExtensions Extensions; public readonly uint dwUsedTransport; public readonly int bEpAtt, bLargeBlobSupported, bResidentKey, bPrfEnabled; public readonly uint cbUnsignedExtensionOutputs; public readonly nint pbUnsignedExtensionOutputs; public readonly nint pHmacSecret; public readonly int bThirdPartyPayment; public readonly uint dwTransports; public readonly uint cbClientDataJSON; public readonly nint pbClientDataJSON; public readonly uint cbRegistrationResponseJSON; public readonly nint pbRegistrationResponseJSON; }
     [StructLayout(LayoutKind.Sequential)] private readonly struct NativeAssertionPrefix { public readonly uint dwVersion; public readonly uint cbAuthenticatorData; public readonly nint pbAuthenticatorData; public readonly uint cbSignature; public readonly nint pbSignature; public readonly NativeCredential Credential; public readonly uint cbUserId; public readonly nint pbUserId; }
+    [StructLayout(LayoutKind.Sequential)] private readonly struct NativeAssertion { public readonly uint dwVersion; public readonly uint cbAuthenticatorData; public readonly nint pbAuthenticatorData; public readonly uint cbSignature; public readonly nint pbSignature; public readonly NativeCredential Credential; public readonly uint cbUserId; public readonly nint pbUserId; public readonly NativeExtensions Extensions; public readonly uint cbCredLargeBlob; public readonly nint pbCredLargeBlob; public readonly uint dwCredLargeBlobStatus; public readonly nint pHmacSecret; public readonly uint dwUsedTransport; public readonly uint cbUnsignedExtensionOutputs; public readonly nint pbUnsignedExtensionOutputs; public readonly uint cbClientDataJSON; public readonly nint pbClientDataJSON; public readonly uint cbAuthenticationResponseJSON; public readonly nint pbAuthenticationResponseJSON; }
 
     private sealed class HGlobalString(string value) : IDisposable
     {

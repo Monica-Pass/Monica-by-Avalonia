@@ -131,8 +131,9 @@ manifest，是否可写还取决于文件实际声明、schema 和 critical exte
 - Bitwarden endpoint、KDF 参数、CipherString 长度和认证类型均受显式策略限制；账户秘密、
   待同步载荷、错误和冲突备份使用 Monica vault AEAD envelope 持久化。
 - Windows 截图保护是用户可配置开关，不会强制阻止截图。
-- Windows WebAuthn 只做客户端 API 可用性探测。Monica 当前不是系统 Credential Provider，
-  因而不会把桌面 passkey 状态误报为 Android Credential Provider 等价能力。
+- Windows WebAuthn 客户端边界会调用 Windows Hello，并校验原生返回的 clientData、RP、
+  challenge、公钥和签名。Monica 当前仍不是系统 Credential Provider；系统级供应器、macOS
+  Credential Provider Extension 和 Linux 浏览器/FIDO2 入口分别按平台建设，不能互相冒充。
 
 详细边界：
 
@@ -147,7 +148,8 @@ manifest，是否可写还取决于文件实际声明、schema 和 critical exte
 ### 环境要求
 
 - .NET SDK 10.0 或更高版本
-- 受验证的运行环境为 Windows x64；macOS/Linux 目前仅保留构建目标，见下方支持矩阵
+- Windows、macOS、Linux 都是桌面目标；Windows x64 是当前本机硬件验证目标，macOS/Linux
+  还需要各自的原生库、签名和人工验收
 - PowerShell 7，用于统一验证与发布脚本
 - 运行产物发布脚本、重建 `monica-crypto` 或开发 MDBX CLI 回退时需要 Rust toolchain
 
@@ -233,7 +235,7 @@ dotnet publish "src\Monica.App\Monica.App.csproj" `
 | 目标 | 当前边界 |
 | --- | --- |
 | Windows x64 JIT | 默认验证目标，仓库含 `mdbx_ffi.dll` 与 `monica_crypto.dll`；签名和正式分发另行验收 |
-| Linux x64、macOS x64/arm64 | CI 构建目标，不是可交付的 vault 客户端；缺对应 MDBX 与加密原生库，必须补齐并通过产物门 |
+| Linux x64、macOS x64/arm64 | CI 构建目标；工作流会固定 checkout MDBX 源码并按 RID 构建原生库，仍需通过产物门、签名和人工验收 |
 | Linux arm64 | 仅声明 RID，未纳入当前 Build 矩阵，原生库与运行验收均待完成 |
 | NativeAOT | 实验性，不替代 JIT；失败的冒烟不能作为发布证据 |
 

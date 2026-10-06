@@ -58,7 +58,7 @@
 | --- | --- | --- |
 | 统一商业质量门 | 已验证 | `eng/ci/verify-commercial-release.ps1` 执行卫生、文件体积、格式、漏洞、零警告构建、核心和 Headless UI 测试 |
 | Windows JIT 包 | 已验证（默认） | Build/Release 工作流覆盖 `win-x64`；产物门真跑 canonical vault 与带窗口冒烟 |
-| Linux / macOS JIT 包 | 受阻 | 缺自研原生引擎：产物里没有 `libmdbx_ffi.so` / `libmdbx_ffi.dylib`，还缺对应 `monica_crypto` 平台库，不能作为可用 vault 客户端交付。MDBX 引擎需由 Rust 源仓库 `crates/mdbx-ffi` 交叉编译后放入 `src/Monica.Platform/Mdbx/runtimes/<rid>/`；产物门现在会因缺引擎直接失败，不再警告后跳过 |
+| Linux / macOS JIT 包 | 已补齐构建路径，待 CI 复验 | Build/Release 工作流固定 checkout `Monica-Pass/Mdbx`，发布脚本按 RID 构建 `crates/mdbx-ffi` 并写入 `src/Monica.Platform/Mdbx/runtimes/<rid>/`；产物门仍会在缺少 `libmdbx_ffi.so` / `libmdbx_ffi.dylib` 时直接失败。真实安装、签名和跨硬件验收仍待完成 |
 | NativeAOT 包 | 实验性 | 保留构建/冒烟信号，但 Build 打包与上传必须检查 smoke 的原始 outcome；`continue-on-error` 不再放行失败产物 |
 | Action 供应链固定 | 已验证 | 所有第三方 Action 固定完整 commit SHA，checkout 不保留凭据 |
 | 依赖更新 | 已验证（配置） | `.github/dependabot.yml` 每周检查 GitHub Actions 与 NuGet |
@@ -119,7 +119,8 @@ cd ".\monica by avalonia"
   publish 返回 23”，确认不会导出产物路径；返回 0 才报告路径。
 - **支持范围**：当前库创建格式为 MDBX-2 / schema 17，可读清单来自运行时 manifest，
   文件自己的格式、schema、critical extensions 决定实际访问权限。Windows x64 是当前
-  原生库齐全的验证目标，Linux/macOS 仍受原生库阻塞；Linux arm64 尚不在当前 Build 矩阵。
+  本机原生库验证目标；Linux/macOS 的 CI 发布脚本已加入固定 MDBX 源码构建，但远端产物门、
+  签名和人工验收仍需复验；Linux arm64 尚不在当前 Build 矩阵。
 
 修改前基线：2026-09-28，`ade0e18cee5eca4aca2b806187c7dbbbc38dd99a`，
 核心功能 1,166、核心性能 11、UI 功能 266、UI 性能 17，全部通过。

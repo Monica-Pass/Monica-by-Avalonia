@@ -13,6 +13,8 @@ public static class PlatformFeatureKeys
     public const string AutoType = "auto-type";
     public const string BrowserBridge = "browser-bridge";
     public const string NativePasskey = "native-passkey";
+    /// <summary>Browser/OS-discoverable passkey manager registration, separate from app-local ceremonies.</summary>
+    public const string SystemPasskeyProvider = "system-passkey-provider";
     public const string NativeNotification = "native-notification";
     public const string WindowSecurity = "window-security";
     public const string ExternalLinks = "external-links";
@@ -236,6 +238,7 @@ public sealed class PlatformIntegrationService : IPlatformIntegrationService
                 Available(PlatformFeatureKeys.BrowserBridge, "An authenticated loopback browser bridge is available for Windows desktop builds."),
                 Available(PlatformFeatureKeys.ExternalLinks, "External links can be opened through the Windows shell."),
                 WindowsNativePasskeyService.CreateCapability(),
+                PlatformLimited(PlatformFeatureKeys.SystemPasskeyProvider, "Windows 11 WebAuthn Plugin API registration is not packaged yet; Monica is not visible in the system passkey picker."),
                 DesktopEquivalent(PlatformFeatureKeys.NativeNotification, "Desktop notifications can replace Android notification features."),
                 Available(PlatformFeatureKeys.WindowSecurity, "Window-level security features can be mapped to Windows shell behavior.")
             ];
@@ -252,7 +255,8 @@ public sealed class PlatformIntegrationService : IPlatformIntegrationService
                 PlatformLimited(PlatformFeatureKeys.AutoType, "Auto-typing requires a macOS input adapter."),
                 PlatformLimited(PlatformFeatureKeys.BrowserBridge, "The authenticated local browser bridge adapter is not implemented yet."),
                 Available(PlatformFeatureKeys.ExternalLinks, "External links can be opened through the macOS desktop shell."),
-                Unsupported(PlatformFeatureKeys.NativePasskey, "Android Credential Provider behavior is not available on macOS."),
+                PlatformLimited(PlatformFeatureKeys.NativePasskey, "macOS AuthenticationServices requires a native Credential Provider Extension; the Avalonia process cannot provide the system extension by itself."),
+                PlatformLimited(PlatformFeatureKeys.SystemPasskeyProvider, "A macOS AuthenticationServices Credential Provider Extension, entitlements and shared Keychain group are not packaged yet."),
                 DesktopEquivalent(PlatformFeatureKeys.NativeNotification, "Desktop notifications can replace Android notification features."),
                 PlatformLimited(PlatformFeatureKeys.WindowSecurity, "macOS window privacy behavior needs a native adapter.")
             ];
@@ -269,7 +273,8 @@ public sealed class PlatformIntegrationService : IPlatformIntegrationService
                 PlatformLimited(PlatformFeatureKeys.AutoType, "Auto-typing depends on the compositor input APIs."),
                 PlatformLimited(PlatformFeatureKeys.BrowserBridge, "The authenticated local browser bridge adapter is not implemented yet."),
                 Available(PlatformFeatureKeys.ExternalLinks, "External links can be opened through the Linux desktop shell."),
-                Unsupported(PlatformFeatureKeys.NativePasskey, "Android Credential Provider behavior is not available on Linux."),
+                PlatformLimited(PlatformFeatureKeys.NativePasskey, "Linux has no single desktop WebAuthn API; Monica can use its vault-managed software passkeys and FIDO2/browser routes while desktop-specific adapters are added."),
+                PlatformLimited(PlatformFeatureKeys.SystemPasskeyProvider, "Linux has no unified system passkey-provider contract; browser/WebAuthn and FIDO2 integration depends on the active desktop and browser."),
                 DesktopEquivalent(PlatformFeatureKeys.NativeNotification, "Desktop notifications can replace Android notification features."),
                 PlatformLimited(PlatformFeatureKeys.WindowSecurity, "Linux screenshot/window privacy support depends on the compositor.")
             ];
@@ -285,6 +290,7 @@ public sealed class PlatformIntegrationService : IPlatformIntegrationService
             PlatformLimited(PlatformFeatureKeys.BrowserBridge, "The authenticated local browser bridge adapter is not implemented yet."),
             PlatformLimited(PlatformFeatureKeys.ExternalLinks, "External link launching depends on the current desktop shell."),
             Unsupported(PlatformFeatureKeys.NativePasskey, "Native passkey integration is not available for this platform."),
+            Unsupported(PlatformFeatureKeys.SystemPasskeyProvider, "System passkey-provider integration is not available for this platform."),
             Unsupported(PlatformFeatureKeys.NativeNotification, "No notification adapter is available for this platform."),
             Unsupported(PlatformFeatureKeys.WindowSecurity, "No window security adapter is available for this platform.")
         ];

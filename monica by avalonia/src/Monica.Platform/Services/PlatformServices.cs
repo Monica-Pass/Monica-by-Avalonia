@@ -57,7 +57,7 @@ public sealed class PlatformCapabilityService(IPlatformIntegrationService? platf
         return capability.Key switch
         {
             "autofill" => ApplyAutofillStatus(capability),
-            "credential-provider" => ApplyNativePasskeyStatus(capability),
+            "credential-provider" => ApplySystemPasskeyProviderStatus(capability),
             _ => capability
         };
     }
@@ -86,13 +86,18 @@ public sealed class PlatformCapabilityService(IPlatformIntegrationService? platf
         };
     }
 
-    private PlatformCapability ApplyNativePasskeyStatus(PlatformCapability capability)
+    private PlatformCapability ApplySystemPasskeyProviderStatus(PlatformCapability capability)
     {
-        var nativePasskey = _platformIntegrationService.GetCapability(PlatformFeatureKeys.NativePasskey);
+        // Keep older/custom adapters compatible: before the provider boundary was split out,
+        // integrations declared only native-passkey. Prefer the explicit system-provider result
+        // when it exists and fall back to the old declaration for those adapters.
+        var provider = _platformIntegrationService.GetCapabilities()
+            .FirstOrDefault(item => string.Equals(item.Key, PlatformFeatureKeys.SystemPasskeyProvider, StringComparison.OrdinalIgnoreCase))
+            ?? _platformIntegrationService.GetCapability(PlatformFeatureKeys.NativePasskey);
         return capability with
         {
-            Status = nativePasskey.Status,
-            UnsupportedReason = nativePasskey.UnsupportedReason
+            Status = provider.Status,
+            UnsupportedReason = provider.UnsupportedReason
         };
     }
 }

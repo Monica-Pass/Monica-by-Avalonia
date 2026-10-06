@@ -11,18 +11,24 @@
 通行密钥必须使用网站发出的注册/登录挑战，并把公钥注册到网站。手工填写网站和用户名后
 生成一把密钥，只能生成本地对象，不能代替网站注册。
 
+## 三端范围
+
+本项目的“三端”固定指 **Windows、macOS、Linux**。Android 是移动端功能对齐和数据格式的
+参考实现，但不计入这三个桌面端目标；iOS 也不在本阶段的交付范围内。
+
+“应用内能用平台认证器”和“浏览器/系统能发现 Monica”是两个独立的能力。前者可以由
+Avalonia 进程调用平台 API，后者必须交付该平台认可的原生供应器扩展或插件。
+
 ## 按平台接入
 
 | 平台 | 系统入口 | 本地用户验证 | 仓库现状与限制 |
 | --- | --- | --- | --- |
-| Windows | WebAuthn Plugin API、`IPluginAuthenticator`、系统通行密钥缓存 | Windows Hello 指纹/面容/PIN | 客户端接口基础已编译和模拟验证；插件、管理页和真实网站验收尚未交付 |
-| Android | Credential Provider Service、Credential Manager | Android BiometricPrompt 与设备凭据 | 主仓库已有创建/使用 Activity 和供应器；需要与桌面共同做格式、备份和跨设备验收 |
-| macOS | AuthenticationServices Credential Provider Extension | Touch ID、系统认证 | 需要独立原生扩展、共享安全存储和签名/entitlement；Avalonia UI 本身不是供应器 |
-| iOS（如纳入） | AuthenticationServices Credential Provider Extension | Face ID/Touch ID/设备认证 | 需要独立 Apple 应用与扩展；当前仓库未交付 iOS 客户端 |
-| Linux | 浏览器适配或 FIDO2/跨设备认证；按桌面环境确定入口 | 系统密钥环、可用的用户验证设施或主密码 | 没有可直接等同 Windows 插件的统一桌面供应器入口，不能承诺所有浏览器/应用完全同样 |
+| Windows | 应用内：Win32 WebAuthn API + Windows Hello；系统级：Windows 11 WebAuthn Plugin API、`IPluginAuthenticator` | Windows Hello 指纹/面容/PIN | 应用内客户端边界已编译和模拟验证；系统插件、管理页和真实网站验收尚未交付 |
+| macOS | 应用内/浏览器：AuthenticationServices；系统级：Credential Provider Extension | Touch ID、设备认证 | 需要原生扩展、App Group/Keychain 共享存储、entitlement 和签名；Avalonia UI 本身不是供应器 |
+| Linux | 应用内：Monica 软件密钥；浏览器/硬件：WebAuthn、FIDO2、USB/NFC/BLE 按浏览器和桌面环境接入 | 桌面密钥环、FIDO2 设备或 Monica 主密码 | 没有可直接等同 Windows Plugin API 的统一桌面供应器入口；不能承诺所有浏览器/应用自动发现 Monica |
 
-“三端”具体范围待用户明确。当前对 Windows/macOS/Linux 桌面能力及现有 Android 主应用
-同时核对；这不等于已经决定开发新的 iOS 客户端。
+Android 的 Credential Provider Service 继续作为移动端对齐实现，但它不改变本项目“三端”
+的定义。
 
 ## 凭据归属与同步
 
@@ -39,9 +45,13 @@
 
 - 校准 WebAuthn 字节格式、原始 client data、DER 签名、RP/origin 与操作级用户验证。
 - 建立统一 passkey 存储与迁移，验证多账户、删除、密钥恢复、主密码变更和丢失设备。
-- Windows 增加打包 COM 插件及注册/启用页，验证 OS 签名的请求、Hello 验证、取消与锁定，
+- Windows 增加打包 COM 插件及注册/启用页，验证系统签名请求、Hello 验证、取消与锁定，
   再将创建/获取结果接入现有保险库。使用微软样例的 SDK 和 OS 版本门槛。
-- 补齐 Android 共用格式；开发范围内的 Apple 原生扩展或 Linux 浏览器入口。
+- macOS 增加独立 AuthenticationServices Credential Provider Extension，并以 App Group/Keychain
+  共享安全存储连接主应用。
+- Linux 先交付浏览器 WebAuthn/FIDO2 路径和软件密钥的保存、读取、使用；系统级供应器按桌面
+  环境单独适配，不能伪装成统一能力。
+- 补齐 Android 共用格式，保证移动端与三端共享格式、备份和恢复策略。
 - 在真实网站和自有 WebAuthn 测试服务验收：保存、列出、选账户、登录、删凭据、注销供应器，
   并验证跨设备和无网络场景。编译与模拟认证器测试不能代替这些结果。
 

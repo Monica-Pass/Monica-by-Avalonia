@@ -426,6 +426,23 @@ public sealed partial class PlatformServiceTests
     }
 
     [Fact]
+    public void Platform_capability_service_prefers_the_explicit_system_provider_boundary()
+    {
+        var integration = new PlatformIntegrationService(
+            "Windows",
+            [
+                PlatformIntegrationService.Available(PlatformFeatureKeys.NativePasskey, "The app can start a native ceremony."),
+                PlatformIntegrationService.PlatformLimited(PlatformFeatureKeys.SystemPasskeyProvider, "The packaged system provider is not installed.")
+            ]);
+        var service = new PlatformCapabilityService(integration);
+
+        var credentialProvider = service.GetCapability("credential-provider");
+
+        Assert.Equal(PlatformFeatureStatus.PlatformLimited, credentialProvider.Status);
+        Assert.Equal("The packaged system provider is not installed.", credentialProvider.UnsupportedReason);
+    }
+
+    [Fact]
     public void Platform_capability_service_keeps_autofill_limited_without_auto_typing()
     {
         var integration = new PlatformIntegrationService(
