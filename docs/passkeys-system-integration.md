@@ -25,10 +25,16 @@ Avalonia 进程调用平台 API，后者必须交付该平台认可的原生供�
 | --- | --- | --- | --- |
 | Windows | 应用内：Win32 WebAuthn API + Windows Hello；系统级：Windows 11 WebAuthn Plugin API、`IPluginAuthenticator` | Windows Hello 指纹/面容/PIN | 应用内客户端边界已编译和模拟验证；系统插件、管理页和真实网站验收尚未交付 |
 | macOS | 应用内/浏览器：AuthenticationServices；系统级：Credential Provider Extension | Touch ID、设备认证 | 需要原生扩展、App Group/Keychain 共享存储、entitlement 和签名；Avalonia UI 本身不是供应器 |
-| Linux | 应用内：Monica 软件密钥；浏览器/硬件：WebAuthn、FIDO2、USB/NFC/BLE 按浏览器和桌面环境接入 | 桌面密钥环、FIDO2 设备或 Monica 主密码 | 没有可直接等同 Windows Plugin API 的统一桌面供应器入口；不能承诺所有浏览器/应用自动发现 Monica |
+| Linux | 应用内：Monica 软件密钥；浏览器/硬件：WebAuthn、FIDO2；实验系统路线：credentialsd / CredentialsX portal | 桌面密钥环、FIDO2 设备或 Monica 主密码 | Credentials portal 仍是实验提案，需探测实际服务和浏览器支持；不能承诺所有浏览器/应用自动发现 Monica |
 
 Android 的 Credential Provider Service 继续作为移动端对齐实现，但它不改变本项目“三端”
 的定义。
+
+2026-10-06 核对：Linux 并非没有系统集成方向。`linux-credentials/credentialsd` 提供 D-Bus
+参考实现和实验浏览器入口，XDG 的 `CredentialsX` portal 提案仍处于 Open 状态。项目自身
+将扩展和改版 Firefox 标为实验功能，其测试扩展目前仅覆盖列出的测试网站。Monica 的判断是
+先把保险库存取、WebAuthn 响应和浏览器流程做完整，再对可用的 credentialsd 服务做原型接入；
+不能把这个提案描述成已在全部 Linux 发行版和浏览器中部署的稳定系统供应器。
 
 ## 凭据归属与同步
 
@@ -49,8 +55,8 @@ Android 的 Credential Provider Service 继续作为移动端对齐实现，但�
   再将创建/获取结果接入现有保险库。使用微软样例的 SDK 和 OS 版本门槛。
 - macOS 增加独立 AuthenticationServices Credential Provider Extension，并以 App Group/Keychain
   共享安全存储连接主应用。
-- Linux 先交付浏览器 WebAuthn/FIDO2 路径和软件密钥的保存、读取、使用；系统级供应器按桌面
-  环境单独适配，不能伪装成统一能力。
+- Linux 先交付浏览器 WebAuthn/FIDO2 路径和软件密钥的保存、读取、使用，再探测并适配
+  credentialsd / CredentialsX 实验服务；系统级供应器按实际桌面、服务和浏览器能力验收。
 - 补齐 Android 共用格式，保证移动端与三端共享格式、备份和恢复策略。
 - 在真实网站和自有 WebAuthn 测试服务验收：保存、列出、选账户、登录、删凭据、注销供应器，
   并验证跨设备和无网络场景。编译与模拟认证器测试不能代替这些结果。
@@ -61,4 +67,6 @@ Android 的 Credential Provider Service 继续作为移动端对齐实现，但�
 - [Microsoft Passkey Manager sample](https://learn.microsoft.com/en-us/samples/microsoft/windows-classic-samples/passkeymanager/)
 - [Android credential provider](https://developer.android.com/identity/sign-in/credential-provider)
 - [Apple credential provider controller](https://developer.apple.com/documentation/authenticationservices/ascredentialproviderviewcontroller)
+- [Linux credentialsd reference implementation and experimental browser entry points](https://github.com/linux-credentials/credentialsd)
+- [XDG Credentials portal experimental proposal #1889](https://github.com/flatpak/xdg-desktop-portal/pull/1889)
 - [WebAuthn Level 3](https://www.w3.org/TR/webauthn-3/)
