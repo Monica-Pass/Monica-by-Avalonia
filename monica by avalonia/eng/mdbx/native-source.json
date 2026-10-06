@@ -1,0 +1,46 @@
+{
+  "schema": "monica-desktop-mdbx-source-v1",
+  "repository": "https://github.com/Monica-Pass/Mdbx",
+  "commit": "90005c8c608c952093a4522ffa507a562e2e39a4",
+  "patches": [
+    {
+      "path": "patches/90005c8-read-session-lifetime.patch",
+      "sha256": "1790361321be909a7f176ae705e25511ee6f001a163d2a5c91f918aaccb44882",
+      "purpose": "Policy-bounded disclosure read-session reuse; no storage or payload format changes"
+    },
+    {
+      "path": "patches/90005c8-sync-delta-limits.patch",
+      "sha256": "d47d75cf49ed6d19870e8c61984ff642e906c7cc956fd03a1bfa8fb52d02e7bf",
+      "purpose": "Check encoded sync-delta limits before commit using a bounded counting writer; buffer incremental file exports in 64 KiB and flush before fsync/publish; preserve rollback, storage format and FFI contracts"
+    },
+    {
+      "path": "patches/90005c8-json-precision.patch",
+      "sha256": "e0fb20c6c44a8a9237fb5e9cd6a011673303188073ef115f8ffadd1d94233d37",
+      "purpose": "Enable serde_json arbitrary_precision so FFI reads and writes preserve JSON integer and decimal lexemes. No FFI or storage schema change."
+    },
+    {
+      "path": "patches/90005c8-json-literal-keys.patch",
+      "sha256": "8ce59d57462f33d6b5d5cd914b54b03aeb14baab9f2834d4ee30607b31df83b3",
+      "purpose": "Shared lossless JSON parser preserves literal internal-marker keys and precise numbers in FFI, writes, merges, exports and sync extensions. No FFI or database schema change."
+    },
+    {
+      "path": "patches/90005c8-composite-commit-kind.patch",
+      "sha256": "7647cd15f565e932f4f0010b350409042cf3d81561ac08521556a5e85d95a945",
+      "purpose": "Derive composite commit kind from the prepared generic commands plus attachment change commands; move/restore mixtures use multi and remain one transaction/commit. Regression checks true bytes, native object identity, TIGA override, retry idempotence and late failure rollback. No FFI or storage schema changes."
+    }
+  ],
+  "finalOverlayFiles": {
+    "Cargo.toml": "8e4cfc3d0da2b1b182a62d33611dead8da92db5f3c678cf1a021cebe9f3ef931",
+    "crates/mdbx-core/src/lib.rs": "87f151875952e1ad8fff19111208f8da90fd08b7fe31267c4d4dfd89c9bcf6d2",
+    "crates/mdbx-core/src/json.rs": "0c87f40be5b85a69528e1c9f6f5e60f4a4af531fa2259e722b5a8f90258e90ec",
+    "crates/mdbx-ffi/src/object_facade.rs": "8ddb80eb7e7499884161bef1909c3203391a5f3b64a0e19266bf3b110f3436a7",
+    "crates/mdbx-storage/src/import/kdbx_export.rs": "e27f426b61b79bd4568facc3776a1750bededa121131a58a7429ce7afaab8a92",
+    "crates/mdbx-storage/src/repo/operation_coordinator.rs": "15718ee932ec2dfba5dfc6902cae9f08f7add0dcb28664e6e538946217605136",
+    "crates/mdbx-storage/src/sync_apply/entry.rs": "9ea4e7db177add6da77be6db60d63ba9c2a3fd53b5556767a2b75a1465d686c7",
+    "crates/mdbx-storage/src/sync_state.rs": "667b29478f4faf5e6fb92a3d724fecc06fd6b6ee9385c7b94309608c456502f9",
+    "crates/mdbx-ffi/src/write_facade.rs": "5f0966f978332b186d8de4be6c432bf644b8a73a2def26c6018919b2cb21ebe6",
+    "crates/mdbx-ffi/src/tests.rs": "a5f06ec5a98b110aab3613cdf1577318264fb02c4de98eef226c3c153ce492ca"
+  },
+  "upstreamProvenance": "Monica/Monica for Android/mdbx-engine/MDBX3_RUNTIME_PROVENANCE.json",
+  "license": "MIT"
+}

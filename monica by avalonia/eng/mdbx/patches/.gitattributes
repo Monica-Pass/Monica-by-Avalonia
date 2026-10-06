@@ -1,0 +1,2 @@
+# Unified diff context includes space-only lines; retain the verified upstream bytes.
+*.patch -text -whitespace

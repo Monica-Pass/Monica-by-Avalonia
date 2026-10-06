@@ -309,7 +309,7 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
         return bytes;
     }
 
-    private static byte[] CopyCredentialAttestationClientData(
+    internal static byte[] CopyCredentialAttestationClientData(
         nint result,
         uint structureVersion,
         byte[] requestedClientData)
@@ -327,7 +327,7 @@ public sealed class WindowsNativePasskeyService : INativePasskeyService
         return CopyBytes(attestation.pbClientDataJSON, attestation.cbClientDataJSON);
     }
 
-    private static byte[] CopyAssertionClientData(
+    internal static byte[] CopyAssertionClientData(
         nint result,
         uint structureVersion,
         byte[] requestedClientData)

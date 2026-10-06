@@ -255,7 +255,7 @@ public sealed class PlatformIntegrationService : IPlatformIntegrationService
                 PlatformLimited(PlatformFeatureKeys.AutoType, "Auto-typing requires a macOS input adapter."),
                 PlatformLimited(PlatformFeatureKeys.BrowserBridge, "The authenticated local browser bridge adapter is not implemented yet."),
                 Available(PlatformFeatureKeys.ExternalLinks, "External links can be opened through the macOS desktop shell."),
-                PlatformLimited(PlatformFeatureKeys.NativePasskey, "macOS AuthenticationServices requires a native Credential Provider Extension; the Avalonia process cannot provide the system extension by itself."),
+                PlatformLimited(PlatformFeatureKeys.NativePasskey, "The macOS AuthenticationServices client adapter is not implemented yet; system-provider registration requires a separate native Credential Provider Extension."),
                 PlatformLimited(PlatformFeatureKeys.SystemPasskeyProvider, "A macOS AuthenticationServices Credential Provider Extension, entitlements and shared Keychain group are not packaged yet."),
                 DesktopEquivalent(PlatformFeatureKeys.NativeNotification, "Desktop notifications can replace Android notification features."),
                 PlatformLimited(PlatformFeatureKeys.WindowSecurity, "macOS window privacy behavior needs a native adapter.")
@@ -273,7 +273,7 @@ public sealed class PlatformIntegrationService : IPlatformIntegrationService
                 PlatformLimited(PlatformFeatureKeys.AutoType, "Auto-typing depends on the compositor input APIs."),
                 PlatformLimited(PlatformFeatureKeys.BrowserBridge, "The authenticated local browser bridge adapter is not implemented yet."),
                 Available(PlatformFeatureKeys.ExternalLinks, "External links can be opened through the Linux desktop shell."),
-                PlatformLimited(PlatformFeatureKeys.NativePasskey, "Linux has no single desktop WebAuthn API; Monica can use its vault-managed software passkeys and FIDO2/browser routes while desktop-specific adapters are added."),
+                PlatformLimited(PlatformFeatureKeys.NativePasskey, "The Linux native authenticator adapter is not implemented yet; browser/FIDO2 routes require separate integration alongside the existing software engine."),
                 PlatformLimited(PlatformFeatureKeys.SystemPasskeyProvider, "Linux has no unified system passkey-provider contract; browser/WebAuthn and FIDO2 integration depends on the active desktop and browser."),
                 DesktopEquivalent(PlatformFeatureKeys.NativeNotification, "Desktop notifications can replace Android notification features."),
                 PlatformLimited(PlatformFeatureKeys.WindowSecurity, "Linux screenshot/window privacy support depends on the compositor.")

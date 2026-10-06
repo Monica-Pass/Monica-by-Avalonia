@@ -58,7 +58,7 @@
 | --- | --- | --- |
 | 统一商业质量门 | 已验证 | `eng/ci/verify-commercial-release.ps1` 执行卫生、文件体积、格式、漏洞、零警告构建、核心和 Headless UI 测试 |
 | Windows JIT 包 | 已验证（默认） | Build/Release 工作流覆盖 `win-x64`；产物门真跑 canonical vault 与带窗口冒烟 |
-| Linux / macOS JIT 包 | 已补齐构建路径，待 CI 复验 | Build/Release 工作流固定 checkout `Monica-Pass/Mdbx`，发布脚本按 RID 构建 `crates/mdbx-ffi` 并写入 `src/Monica.Platform/Mdbx/runtimes/<rid>/`；产物门仍会在缺少 `libmdbx_ffi.so` / `libmdbx_ffi.dylib` 时直接失败。真实安装、签名和跨硬件验收仍待完成 |
+| Linux / macOS JIT 包 | 构建和保险库冒烟已恢复，补丁对齐待复验 | `81d2824` 的 JIT 产物门已通过；后续原生构建使用 `eng/mdbx/native-source.json` 固定的 Android 基线与五个校验补丁，在隔离源码副本中按 Rust target 构建。真实安装、签名和跨硬件验收仍待完成 |
 | NativeAOT 包 | 实验性 | 保留构建/冒烟信号，但 Build 打包与上传必须检查 smoke 的原始 outcome；`continue-on-error` 不再放行失败产物 |
 | Action 供应链固定 | 已验证 | 所有第三方 Action 固定完整 commit SHA，checkout 不保留凭据 |
 | 依赖更新 | 已验证（配置） | `.github/dependabot.yml` 每周检查 GitHub Actions 与 NuGet |

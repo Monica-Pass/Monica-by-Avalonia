@@ -140,7 +140,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Monica-Pass/Mdbx
-          ref: d1d3cc4fdff4e33fcb70099b3e7df36eeae43ba4
+          ref: 90005c8c608c952093a4522ffa507a562e2e39a4
           path: mdbx
           fetch-depth: 1
           persist-credentials: false
@@ -222,7 +222,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Monica-Pass/Mdbx
-          ref: d1d3cc4fdff4e33fcb70099b3e7df36eeae43ba4
+          ref: 90005c8c608c952093a4522ffa507a562e2e39a4
           path: mdbx
           fetch-depth: 1
           persist-credentials: false
@@ -299,7 +299,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Monica-Pass/Mdbx
-          ref: d1d3cc4fdff4e33fcb70099b3e7df36eeae43ba4
+          ref: 90005c8c608c952093a4522ffa507a562e2e39a4
           path: mdbx
           fetch-depth: 1
           persist-credentials: false

@@ -1,0 +1,220 @@
+diff --git a/crates/mdbx-ffi/src/sync_facade.rs b/crates/mdbx-ffi/src/sync_facade.rs
+index 177f9ed..f79cee4 100644
+--- a/crates/mdbx-ffi/src/sync_facade.rs
++++ b/crates/mdbx-ffi/src/sync_facade.rs
+@@ -1,5 +1,5 @@
+ use std::fs::File;
+-use std::io::{BufReader, Read};
++use std::io::{BufReader, BufWriter, Read, Write};
+ use std::path::Path;
+ use std::sync::{Arc, Mutex};
+ use std::time::Instant;
+@@ -1294,7 +1294,13 @@ impl MdbxVault {
+         )?;
+         let integrity_key = sync_integrity_key(&conn)?;
+         let mut temporary = NamedTempFile::new_in(parent).map_err(StorageError::from)?;
+-        write_incremental_bundle_authenticated(&bundle, &mut temporary, integrity_key.as_slice())?;
++        {
++            // Bincode emits many small writes for byte arrays. Bound memory while
++            // coalescing them, and surface flush errors before publishing the file.
++            let mut writer = BufWriter::with_capacity(64 * 1024, &mut temporary);
++            write_incremental_bundle_authenticated(&bundle, &mut writer, integrity_key.as_slice())?;
++            writer.flush().map_err(StorageError::from)?;
++        }
+         temporary
+             .as_file_mut()
+             .sync_all()
+diff --git a/crates/mdbx-storage/src/repo/operation_coordinator.rs b/crates/mdbx-storage/src/repo/operation_coordinator.rs
+index a814ef7..114d7f4 100644
+--- a/crates/mdbx-storage/src/repo/operation_coordinator.rs
++++ b/crates/mdbx-storage/src/repo/operation_coordinator.rs
+@@ -2044,6 +2044,69 @@ mod tests {
+             .is_none());
+     }
+ 
++    #[test]
++    fn oversized_sync_envelope_rolls_back_and_split_operations_remain_exportable() {
++        use crate::sync_delta::{load_sync_delta_envelope, SyncDeltaLimits};
++
++        let (conn, ctx, _) = setup();
++        let project = ProjectRepo::create(&conn, &ctx, "Large import", None, None).unwrap();
++        let commits_before = count(&conn, "commits");
++        let operations_before = count(&conn, "commit_operations");
++        let deltas_before = count(&conn, "sync_delta_batches");
++        let payload_json = serde_json::json!({ "notes": "x".repeat(700_000) }).to_string();
++        let commands = (1..=3)
++            .map(|index| WriteCommand::CreateEntry {
++                entry_id: format!("00000000-0000-4000-8000-{index:012}"),
++                project_id: project.project_id.clone(),
++                entry_type: "login".to_string(),
++                title: format!("Large {index}"),
++                payload_json: payload_json.clone(),
++            })
++            .collect::<Vec<_>>();
++        let error = OperationCoordinator::execute(
++            &conn,
++            &ctx,
++            WriteOperationRequest::new("large-import", "import", commands.clone()),
++        )
++        .unwrap_err();
++        assert!(error.to_string().contains("sync delta payload bytes"));
++        assert!(conn.inner().is_autocommit());
++        assert_eq!(count(&conn, "entries"), 0);
++        assert_eq!(count(&conn, "commits"), commits_before);
++        assert_eq!(count(&conn, "commit_operations"), operations_before);
++        assert_eq!(count(&conn, "sync_delta_batches"), deltas_before);
++        assert_eq!(count(&conn, "sync_delta_mutations"), 0);
++
++        for (index, command) in commands.into_iter().enumerate() {
++            let request = WriteOperationRequest::new(
++                format!("large-import-{index}"),
++                "import",
++                vec![command],
++            );
++            let prepared = OperationCoordinator::prepare(request).unwrap();
++            let first = OperationCoordinator::execute_prepared(&conn, &ctx, &prepared).unwrap();
++            let retry = OperationCoordinator::execute_prepared(&conn, &ctx, &prepared).unwrap();
++            assert!(!first.already_committed);
++            assert!(retry.already_committed);
++            assert_eq!(first.commit_id, retry.commit_id);
++            let batch_id: String = conn
++                .inner()
++                .query_row(
++                    "SELECT batch_id FROM sync_delta_batches ORDER BY batch_seq DESC LIMIT 1",
++                    [],
++                    |row| row.get(0),
++                )
++                .unwrap();
++            let envelope = load_sync_delta_envelope(&conn, &batch_id, SyncDeltaLimits::default())
++                .unwrap()
++                .unwrap();
++            envelope.encode(SyncDeltaLimits::default()).unwrap();
++        }
++        assert_eq!(count(&conn, "entries"), 3);
++        assert_eq!(count(&conn, "commits"), commits_before + 3);
++        assert_eq!(count(&conn, "sync_delta_batches"), deltas_before + 3);
++    }
++
+     #[test]
+     fn native_operation_rolls_back_every_command_on_failure() {
+         let (conn, ctx, _) = setup();
+diff --git a/crates/mdbx-storage/src/sync_delta.rs b/crates/mdbx-storage/src/sync_delta.rs
+index e7b08d2..1433228 100644
+--- a/crates/mdbx-storage/src/sync_delta.rs
++++ b/crates/mdbx-storage/src/sync_delta.rs
+@@ -193,13 +193,24 @@ impl SyncDeltaEnvelope {
+ 
+     pub fn encode(&self, limits: SyncDeltaLimits) -> StorageResult<Vec<u8>> {
+         self.validate_structure(limits)?;
+-        let mut writer = LimitedVecWriter::new(limits.max_payload_bytes);
++        let mut writer = LimitedWriter::new(Vec::new(), limits.max_payload_bytes);
+         serde_json::to_writer(&mut writer, self).map_err(|error| {
+             writer
+                 .limit_error()
+                 .unwrap_or_else(|| StorageError::SchemaCreation(error.to_string()))
+         })?;
+-        Ok(writer.bytes)
++        Ok(writer.inner)
++    }
++
++    // The wire envelope serializes payload bytes again as a JSON integer array.
++    // Validate it before commit, without allocating another encoded copy.
++    fn validate_encoded_size(&self, limits: SyncDeltaLimits) -> StorageResult<()> {
++        let mut writer = LimitedWriter::new(io::sink(), limits.max_payload_bytes);
++        serde_json::to_writer(&mut writer, self).map_err(|error| {
++            writer
++                .limit_error()
++                .unwrap_or_else(|| StorageError::SchemaCreation(error.to_string()))
++        })
+     }
+ 
+     pub fn decode(bytes: &[u8], limits: SyncDeltaLimits) -> StorageResult<Self> {
+@@ -342,6 +353,7 @@ pub(crate) fn materialize_pending_sync_delta(
+         },
+         limits,
+     )?;
++    envelope.validate_encoded_size(limits)?;
+     persist_envelope(conn, &envelope)?;
+     crate::integrity_root::apply_sync_delta(conn, &envelope, &body, &latest)?;
+     conn.inner().execute(
+@@ -772,13 +784,13 @@ fn load_device_heads(
+ }
+ 
+ fn serialize_body_bounded(body: &SyncDeltaBody, limit: usize) -> StorageResult<Vec<u8>> {
+-    let mut writer = LimitedVecWriter::new(limit);
++    let mut writer = LimitedWriter::new(Vec::new(), limit);
+     serde_json::to_writer(&mut writer, body).map_err(|error| {
+         writer
+             .limit_error()
+             .unwrap_or_else(|| StorageError::SchemaCreation(error.to_string()))
+     })?;
+-    Ok(writer.bytes)
++    Ok(writer.inner)
+ }
+ 
+ pub(crate) fn persist_envelope(
+@@ -852,16 +864,18 @@ fn validate_actual_limit(name: &str, actual: usize, limit: usize) -> StorageResu
+     Ok(())
+ }
+ 
+-struct LimitedVecWriter {
+-    bytes: Vec<u8>,
++struct LimitedWriter<W> {
++    inner: W,
++    written: usize,
+     limit: usize,
+     exceeded_at: Option<usize>,
+ }
+ 
+-impl LimitedVecWriter {
+-    fn new(limit: usize) -> Self {
++impl<W> LimitedWriter<W> {
++    fn new(inner: W, limit: usize) -> Self {
+         Self {
+-            bytes: Vec::new(),
++            inner,
++            written: 0,
+             limit,
+             exceeded_at: None,
+         }
+@@ -876,23 +890,20 @@ impl LimitedVecWriter {
+     }
+ }
+ 
+-impl Write for LimitedVecWriter {
++impl<W: Write> Write for LimitedWriter<W> {
+     fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+-        let actual = self
+-            .bytes
+-            .len()
+-            .checked_add(buffer.len())
+-            .unwrap_or(usize::MAX);
++        let actual = self.written.checked_add(buffer.len()).unwrap_or(usize::MAX);
+         if actual > self.limit {
+             self.exceeded_at = Some(actual);
+             return Err(io::Error::other("sync delta payload limit exceeded"));
+         }
+-        self.bytes.extend_from_slice(buffer);
+-        Ok(buffer.len())
++        let written = self.inner.write(buffer)?;
++        self.written += written;
++        Ok(written)
+     }
+ 
+     fn flush(&mut self) -> io::Result<()> {
+-        Ok(())
++        self.inner.flush()
+     }
+ }
+ 
+@@ -940,6 +951,10 @@ mod tests {
+         )
+         .unwrap();
+         let encoded = envelope.encode(limits).unwrap();
++        let exact = SyncDeltaLimits::new(encoded.len(), 50_000, 512).unwrap();
++        let short = SyncDeltaLimits::new(encoded.len() - 1, 50_000, 512).unwrap();
++        envelope.validate_encoded_size(exact).unwrap();
++        assert!(envelope.validate_encoded_size(short).is_err());
+         let decoded = SyncDeltaEnvelope::decode(&encoded, limits).unwrap();
+         decoded.verify(&conn, limits).unwrap();
+ 

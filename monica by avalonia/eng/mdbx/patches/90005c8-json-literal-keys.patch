@@ -1,0 +1,339 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -18,7 +18,7 @@
+ 
+ [workspace.dependencies]
+ serde = { version = "1", features = ["derive"] }
+-serde_json = { version = "1", features = ["arbitrary_precision"] }
++serde_json = { version = "1", features = ["arbitrary_precision", "raw_value"] }
+ thiserror = "2"
+ chrono = { version = "0.4", features = ["serde"] }
+ uuid = { version = "1", features = ["v4", "serde"] }
+--- a/crates/mdbx-core/src/lib.rs
++++ b/crates/mdbx-core/src/lib.rs
+@@ -1,3 +1,4 @@
++pub mod json;
+ pub mod model;
+ pub mod tiga;
+ pub mod types;
+--- /dev/null
++++ b/crates/mdbx-core/src/json.rs
+@@ -0,0 +1,78 @@
++//! JSON at the storage boundary: exact numbers and literal object keys.
++//!
++//! `serde_json::Value` treats some real object keys as internal Number/RawValue
++//! markers when those features are enabled. Decode containers as raw members
++//! first, so only a JSON number token can become a Number.
++use std::collections::BTreeMap;
++
++use serde::de::Error as _;
++use serde_json::{value::RawValue, Value};
++
++const MAX_DEPTH: usize = 128;
++
++pub fn from_str(input: &str) -> serde_json::Result<Value> {
++    let raw: &RawValue = serde_json::from_str(input)?;
++    from_raw(raw, 0)
++}
++
++pub fn from_slice(input: &[u8]) -> serde_json::Result<Value> {
++    let raw: &RawValue = serde_json::from_slice(input)?;
++    from_raw(raw, 0)
++}
++
++fn from_raw(raw: &RawValue, depth: usize) -> serde_json::Result<Value> {
++    if depth >= MAX_DEPTH {
++        return Err(serde_json::Error::custom("JSON nesting limit exceeded"));
++    }
++    match raw.get().as_bytes()[0] {
++        b'{' => {
++            let fields: BTreeMap<String, &RawValue> = serde_json::from_str(raw.get())?;
++            fields
++                .into_iter()
++                .map(|(key, value)| Ok((key, from_raw(value, depth + 1)?)))
++                .collect::<serde_json::Result<_>>()
++                .map(Value::Object)
++        }
++        b'[' => {
++            let elements: Vec<&RawValue> = serde_json::from_str(raw.get())?;
++            elements
++                .into_iter()
++                .map(|value| from_raw(value, depth + 1))
++                .collect::<serde_json::Result<_>>()
++                .map(Value::Array)
++        }
++        _ => serde_json::from_str(raw.get()),
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn precise_numbers_and_literal_internal_keys_survive_roundtrip() {
++        let input = r#"{"n":123456789012345678901234567890,"f":1.2345678901234567890123456789,"number":{"$serde_json::private::Number":"123"},"raw":{"$serde_json::private::RawValue":"{\"lost\":true}"},"nested":[{"$serde_json::private::Number":null,"other":false}],"escaped":{"\u0024serde_json::private::Number":"not a number"}}"#;
++        let value = from_str(input).unwrap();
++        assert_eq!(value["n"].to_string(), "123456789012345678901234567890");
++        assert_eq!(value["f"].to_string(), "1.2345678901234567890123456789");
++        assert_eq!(value["number"]["$serde_json::private::Number"], "123");
++        assert_eq!(value["raw"]["$serde_json::private::RawValue"], "{\"lost\":true}");
++        assert!(value["nested"][0]["$serde_json::private::Number"].is_null());
++        assert_eq!(value["nested"][0]["other"], false);
++        assert_eq!(value["escaped"]["$serde_json::private::Number"], "not a number");
++        assert_eq!(from_slice(&serde_json::to_vec(&value).unwrap()).unwrap(), value);
++    }
++
++    #[test]
++    fn accepts_all_json_shapes_and_rejects_invalid_or_deep_input() {
++        for input in ["null", "true", "false", "[]", "{}", "\"text\"", "-42", "1e400", "1.00"] {
++            let value = from_str(input).unwrap();
++            assert_eq!(from_slice(&serde_json::to_vec(&value).unwrap()).unwrap(), value);
++        }
++        for input in ["", "{} trailing", "[1,]", "{\"x\":}", "NaN", "01"] {
++            assert!(from_str(input).is_err(), "accepted invalid JSON");
++        }
++        assert!(from_slice(&[0xff]).is_err());
++        assert!(from_str(&format!("{}0{}", "[".repeat(128), "]".repeat(128))).is_err());
++    }
++}
+--- a/crates/mdbx-ffi/src/object_facade.rs
++++ b/crates/mdbx-ffi/src/object_facade.rs
+@@ -381,11 +381,11 @@
+ }
+ 
+ pub(crate) fn parse_payload_json(payload_json: &str) -> Result<serde_json::Value, MdbxFfiError> {
+-    serde_json::from_str(payload_json).map_err(MdbxFfiError::from)
++    mdbx_core::json::from_str(payload_json).map_err(MdbxFfiError::from)
+ }
+ 
+ fn entry_record_from_entry(entry: &mdbx_core::model::Entry) -> Result<EntryRecord, MdbxFfiError> {
+-    let payload: serde_json::Value = serde_json::from_slice(&entry.payload_ct)?;
++    let payload: serde_json::Value = mdbx_core::json::from_slice(&entry.payload_ct)?;
+     Ok(EntryRecord {
+         entry_id: entry.entry_id.clone(),
+         project_id: entry.project_id.clone(),
+@@ -404,7 +404,7 @@
+ fn object_record_from_entry(
+     entry: &mdbx_core::model::Entry,
+ ) -> Result<MdbxObjectRecord, MdbxFfiError> {
+-    let payload: serde_json::Value = serde_json::from_slice(&entry.payload_ct)?;
++    let payload: serde_json::Value = mdbx_core::json::from_slice(&entry.payload_ct)?;
+     Ok(MdbxObjectRecord {
+         object_id: entry.entry_id.clone(),
+         collection_id: entry.project_id.clone(),
+@@ -470,7 +470,7 @@
+ fn object_relation_record(
+     relation: &mdbx_core::model::ObjectRelation,
+ ) -> Result<MdbxObjectRelationRecord, MdbxFfiError> {
+-    let payload: serde_json::Value = serde_json::from_slice(&relation.payload_ct)?;
++    let payload: serde_json::Value = mdbx_core::json::from_slice(&relation.payload_ct)?;
+     Ok(MdbxObjectRelationRecord {
+         relation_id: relation.relation_id.clone(),
+         source_object_id: relation.source_object_id.clone(),
+@@ -516,7 +516,7 @@
+         String::from_utf8(label.name_ct.clone()).map_err(|error| MdbxFfiError::Serialization {
+             message: error.to_string(),
+         })?;
+-    let payload: serde_json::Value = serde_json::from_slice(&label.payload_ct)?;
++    let payload: serde_json::Value = mdbx_core::json::from_slice(&label.payload_ct)?;
+     Ok(MdbxObjectLabelRecord {
+         label_id: label.label_id.clone(),
+         collection_id: label.collection_id.clone(),
+--- a/crates/mdbx-storage/src/import/kdbx_export.rs
++++ b/crates/mdbx-storage/src/import/kdbx_export.rs
+@@ -199,7 +199,7 @@
+         Option<String>,
+         Vec<(String, String)>,
+     ) {
+-        let payload: serde_json::Value = match serde_json::from_slice(&entry.payload_ct) {
++        let payload: serde_json::Value = match mdbx_core::json::from_slice(&entry.payload_ct) {
+             Ok(v) => v,
+             Err(e) => {
+                 warnings.push(format!("failed to parse login payload: {}", e));
+@@ -242,7 +242,7 @@
+ 
+     /// 从 Note entry 的 payload 中提取文本内容。
+     fn extract_note_text(entry: &mdbx_core::model::Entry, warnings: &mut Vec<String>) -> String {
+-        let payload: serde_json::Value = match serde_json::from_slice(&entry.payload_ct) {
++        let payload: serde_json::Value = match mdbx_core::json::from_slice(&entry.payload_ct) {
+             Ok(v) => v,
+             Err(e) => {
+                 warnings.push(format!("failed to parse note payload: {}", e));
+--- a/crates/mdbx-storage/src/repo/operation_coordinator.rs
++++ b/crates/mdbx-storage/src/repo/operation_coordinator.rs
+@@ -873,7 +873,7 @@
+                     project_id: project_id.clone(),
+                     entry_type: parse_object_type_id(entry_type)?,
+                     title: title.clone(),
+-                    payload: serde_json::from_str(payload_json)?,
++                    payload: mdbx_core::json::from_str(payload_json)?,
+                 })
+             }
+             WriteCommand::UpdateEntry {
+@@ -890,7 +890,7 @@
+                     project_id: project_id.clone(),
+                     entry_type: parse_object_type_id(entry_type)?,
+                     title: title.clone(),
+-                    payload: serde_json::from_str(payload_json)?,
++                    payload: mdbx_core::json::from_str(payload_json)?,
+                 })
+             }
+             WriteCommand::DeleteEntry {
+@@ -954,7 +954,7 @@
+                     source_object_id: source_object_id.clone(),
+                     target_object_id: target_object_id.clone(),
+                     relation_kind,
+-                    payload: serde_json::from_str(payload_json)?,
++                    payload: mdbx_core::json::from_str(payload_json)?,
+                     payload_schema_version: *payload_schema_version,
+                 })
+             }
+@@ -970,7 +970,7 @@
+                 Ok(Self::UpdateObjectRelation {
+                     relation_id: relation_id.clone(),
+                     relation_kind,
+-                    payload: serde_json::from_str(payload_json)?,
++                    payload: mdbx_core::json::from_str(payload_json)?,
+                     payload_schema_version: *payload_schema_version,
+                 })
+             }
+@@ -995,7 +995,7 @@
+                     label_id: label_id.clone(),
+                     collection_id: collection_id.clone(),
+                     name: name.clone(),
+-                    payload: serde_json::from_str(payload_json)?,
++                    payload: mdbx_core::json::from_str(payload_json)?,
+                     payload_schema_version: *payload_schema_version,
+                 })
+             }
+@@ -1011,7 +1011,7 @@
+                 Ok(Self::UpdateObjectLabel {
+                     label_id: label_id.clone(),
+                     name: name.clone(),
+-                    payload: serde_json::from_str(payload_json)?,
++                    payload: mdbx_core::json::from_str(payload_json)?,
+                     payload_schema_version: *payload_schema_version,
+                 })
+             }
+--- a/crates/mdbx-storage/src/sync_apply/entry.rs
++++ b/crates/mdbx-storage/src/sync_apply/entry.rs
+@@ -297,7 +297,7 @@
+     payload_ct: &[u8],
+ ) -> StorageResult<serde_json::Value> {
+     let plaintext = EntryRepo::decrypt_payload_blob(conn, entry_id, payload_ct)?;
+-    serde_json::from_slice(&plaintext).map_err(|e| {
++    mdbx_core::json::from_slice(&plaintext).map_err(|e| {
+         StorageError::Validation(format!(
+             "entry {} payload is not valid JSON: {}",
+             entry_id, e
+--- a/crates/mdbx-storage/src/sync_state.rs
++++ b/crates/mdbx-storage/src/sync_state.rs
+@@ -74,7 +74,7 @@
+     }
+ }
+ 
+-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
++#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+ pub struct SyncStatePayload {
+     pub format: String,
+     #[serde(default, skip_serializing_if = "Option::is_none")]
+@@ -114,6 +114,67 @@
+     #[serde(flatten, default, skip_serializing_if = "BTreeMap::is_empty")]
+     pub extensions: BTreeMap<String, serde_json::Value>,
+ }
++
++// Avoid serde's flattened Value buffering: extension keys are literal JSON,
++// including keys that serde uses internally for Number and RawValue.
++impl<'de> Deserialize<'de> for SyncStatePayload {
++    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
++        use serde::de::{Error, MapAccess, Visitor};
++        use serde_json::value::RawValue;
++        struct RawFields;
++        impl<'de> Visitor<'de> for RawFields {
++            type Value = BTreeMap<String, Box<RawValue>>;
++            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
++                f.write_str("a sync state object")
++            }
++            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
++                let mut fields = BTreeMap::new();
++                while let Some((key, value)) = map.next_entry::<String, Box<RawValue>>()? {
++                    if fields.insert(key, value).is_some() {
++                        return Err(A::Error::custom("duplicate sync state field"));
++                    }
++                }
++                Ok(fields)
++            }
++        }
++        fn take<T: serde::de::DeserializeOwned, E: serde::de::Error>(
++            fields: &mut BTreeMap<String, Box<RawValue>>,
++            key: &'static str,
++            required: bool,
++        ) -> Result<T, E> {
++            match fields.remove(key) {
++                Some(raw) => serde_json::from_str(raw.get()).map_err(E::custom),
++                None if required => Err(E::missing_field(key)),
++                None => serde_json::from_str("null").map_err(E::custom),
++            }
++        }
++        let mut fields = deserializer.deserialize_map(RawFields)?;
++        Ok(Self {
++            format: take(&mut fields, "format", true)?,
++            key_epoch_state: take(&mut fields, "key_epoch_state", false)?,
++            tiga_vault_state: take(&mut fields, "tiga_vault_state", false)?,
++            tiga_policy_overrides: take(&mut fields, "tiga_policy_overrides", false)?,
++            tiga_policy_exceptions: take(&mut fields, "tiga_policy_exceptions", false)?,
++            security_audit_events: take(&mut fields, "security_audit_events", false)?,
++            projects: take(&mut fields, "projects", true)?,
++            entries: take(&mut fields, "entries", true)?,
++            object_relations: take(&mut fields, "object_relations", false)?,
++            object_labels: take(&mut fields, "object_labels", false)?,
++            object_label_assignments: take(&mut fields, "object_label_assignments", false)?,
++            attachments: take(&mut fields, "attachments", true)?,
++            attachment_chunks: take(&mut fields, "attachment_chunks", true)?,
++            project_tags: take(&mut fields, "project_tags", false)?,
++            tombstones: take(&mut fields, "tombstones", false)?,
++            tombstone_acknowledgements: take(&mut fields, "tombstone_acknowledgements", false)?,
++            purge_receipts: take(&mut fields, "purge_receipts", false)?,
++            branches: take(&mut fields, "branches", true)?,
++            extensions: fields.into_iter().map(|(key, raw)| {
++                mdbx_core::json::from_str(raw.get()).map(|value| (key, value)).map_err(D::Error::custom)
++            }).collect::<Result<_, _>>()?,
++        })
++    }
++}
++
+ 
+ #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+ pub struct KeyEpochState {
+@@ -473,7 +534,7 @@
+     let mut extensions = BTreeMap::new();
+     for row in rows {
+         let (key, value_json) = row?;
+-        let value = serde_json::from_slice(&value_json).map_err(|error| {
++        let value = mdbx_core::json::from_slice(&value_json).map_err(|error| {
+             rusqlite::Error::FromSqlConversionFailure(
+                 1,
+                 rusqlite::types::Type::Blob,
+@@ -1469,6 +1530,21 @@
+     }
+ 
+     #[test]
++    fn literal_extension_keys_and_precise_numbers_survive_state_roundtrip() {
++        let (conn, _) = setup();
++        let mut state = collect_sync_state(&conn).unwrap();
++        let literal = mdbx_core::json::from_str(r#"{"$serde_json::private::Number":"123","nested":{"$serde_json::private::RawValue":"null"},"n":123456789012345678901234567890,"f":1.2345678901234567890123456789}"#).unwrap();
++        state.extensions.insert("com.example.future".into(), literal.clone());
++        let encoded = serialize_state_bounded(&state, SyncStateLimits::default()).unwrap();
++        let decoded: SyncStatePayload = serde_json::from_slice(&encoded).unwrap();
++        assert_eq!(decoded.extensions["com.example.future"], literal);
++        let reencoded = serialize_state_bounded(&decoded, SyncStateLimits::default()).unwrap();
++        assert_eq!(encoded, reencoded);
++        let duplicate = String::from_utf8(encoded.clone()).unwrap().replacen("{", "{\"format\":\"duplicate\",", 1);
++        assert!(serde_json::from_str::<SyncStatePayload>(&duplicate).is_err());
++    }
++
++    #[test]
+     fn unknown_top_level_fields_survive_sync_state_reencoding() {
+         let (conn, _) = setup();
+         let mut payload = collect_sync_state_payload(&conn).unwrap();
