@@ -45,27 +45,20 @@ public static partial class WalletItemDataCodec
 {
     public static BillingAddressWalletData DecodeBillingAddress(SecureItem item)
     {
-        var data = Deserialize<BillingAddressWalletData>(item.ItemData) ?? new BillingAddressWalletData();
+        var data = JsonSerializer.Deserialize(item.ItemData, WalletNoteJsonContext.Default.BillingAddressWalletData) ?? new BillingAddressWalletData();
         MergeExtendedImagePaths(data.ImagePaths, item.ImagePaths);
         return data;
     }
 
     public static PaymentAccountWalletData DecodePaymentAccount(SecureItem item)
     {
-        var data = Deserialize<PaymentAccountWalletData>(item.ItemData) ?? new PaymentAccountWalletData();
+        var data = JsonSerializer.Deserialize(item.ItemData, WalletNoteJsonContext.Default.PaymentAccountWalletData) ?? new PaymentAccountWalletData();
         MergeExtendedImagePaths(data.ImagePaths, item.ImagePaths);
         return data;
     }
 
-    public static string EncodeBillingAddress(BillingAddressWalletData data) => JsonSerializer.Serialize(data, JsonOptions);
-    public static string EncodePaymentAccount(PaymentAccountWalletData data) => JsonSerializer.Serialize(data, JsonOptions);
-
-    private static T? Deserialize<T>(string itemData)
-    {
-        if (string.IsNullOrWhiteSpace(itemData)) return default;
-        try { return JsonSerializer.Deserialize<T>(itemData, JsonOptions); }
-        catch (JsonException) { return default; }
-    }
+    public static string EncodeBillingAddress(BillingAddressWalletData data) => JsonSerializer.Serialize<BillingAddressWalletData>(data, WalletNoteJsonContext.Default.BillingAddressWalletData);
+    public static string EncodePaymentAccount(PaymentAccountWalletData data) => JsonSerializer.Serialize<PaymentAccountWalletData>(data, WalletNoteJsonContext.Default.PaymentAccountWalletData);
 
     private static void MergeExtendedImagePaths(List<string> target, string fallback)
     {

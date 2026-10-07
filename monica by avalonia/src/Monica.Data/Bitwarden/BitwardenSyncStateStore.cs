@@ -150,7 +150,7 @@ public sealed class BitwardenSyncStateStore(
         }
     }
 
-    private sealed class SyncStateRow
+    internal sealed class SyncStateRow
     {
         public string CipherId { get; init; } = "";
         public string PayloadHash { get; init; } = "";

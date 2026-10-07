@@ -78,26 +78,26 @@ public static partial class WalletItemDataCodec
 
     public static DocumentWalletData DecodeDocument(SecureItem item)
     {
-        var data = Decode<DocumentWalletData>(item.ItemData) ?? new DocumentWalletData();
+        var data = JsonSerializer.Deserialize(item.ItemData, WalletNoteJsonContext.Default.DocumentWalletData) ?? new DocumentWalletData();
         MergeImagePaths(data.ImagePaths, item.ImagePaths);
         return data;
     }
 
     public static BankCardWalletData DecodeBankCard(SecureItem item)
     {
-        var data = Decode<BankCardWalletData>(item.ItemData) ?? new BankCardWalletData();
+        var data = JsonSerializer.Deserialize(item.ItemData, WalletNoteJsonContext.Default.BankCardWalletData) ?? new BankCardWalletData();
         MergeImagePaths(data.ImagePaths, item.ImagePaths);
         return data;
     }
 
     public static string EncodeDocument(DocumentWalletData data) =>
-        JsonSerializer.Serialize(data, JsonOptions);
+        JsonSerializer.Serialize<DocumentWalletData>(data, WalletNoteJsonContext.Default.DocumentWalletData);
 
     public static string EncodeBankCard(BankCardWalletData data) =>
-        JsonSerializer.Serialize(data, JsonOptions);
+        JsonSerializer.Serialize<BankCardWalletData>(data, WalletNoteJsonContext.Default.BankCardWalletData);
 
     public static string EncodeImagePaths(IEnumerable<string> imagePaths) =>
-        JsonSerializer.Serialize(NormalizeImagePaths(imagePaths), JsonOptions);
+        JsonSerializer.Serialize(NormalizeImagePaths(imagePaths), WalletNoteJsonContext.Default.ListString);
 
     public static IReadOnlyList<string> DecodeImagePaths(string imagePaths)
     {
@@ -108,7 +108,7 @@ public static partial class WalletItemDataCodec
 
         try
         {
-            return NormalizeImagePaths(JsonSerializer.Deserialize<string[]>(imagePaths, JsonOptions) ?? []);
+            return NormalizeImagePaths(JsonSerializer.Deserialize(imagePaths, WalletNoteJsonContext.Default.StringArray) ?? []);
         }
         catch (JsonException)
         {
@@ -116,22 +116,6 @@ public static partial class WalletItemDataCodec
         }
     }
 
-    private static T? Decode<T>(string itemData)
-    {
-        if (string.IsNullOrWhiteSpace(itemData))
-        {
-            return default;
-        }
-
-        try
-        {
-            return JsonSerializer.Deserialize<T>(itemData, JsonOptions);
-        }
-        catch (JsonException)
-        {
-            return default;
-        }
-    }
 
     private static void MergeImagePaths(List<string> target, string fallbackImagePaths)
     {

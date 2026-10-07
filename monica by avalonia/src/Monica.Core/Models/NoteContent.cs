@@ -25,7 +25,7 @@ public static partial class NoteContentCodec
         {
             try
             {
-                var data = JsonSerializer.Deserialize<NoteData>(raw, JsonOptions);
+                var data = JsonSerializer.Deserialize(raw, WalletNoteJsonContext.Default.NoteData);
                 if (data is not null)
                 {
                     return new DecodedNoteContent(
@@ -56,7 +56,7 @@ public static partial class NoteContentCodec
         var inlineImages = ExtractInlineImageIds(normalizedContent);
         var mergedImages = NormalizeTags((imagePaths ?? []).Concat(inlineImages));
         var resolvedTitle = ResolveTitle(title, normalizedContent);
-        var itemData = JsonSerializer.Serialize(new NoteData(normalizedContent, tags, isMarkdown), JsonOptions);
+        var itemData = JsonSerializer.Serialize<NoteData>(new NoteData(normalizedContent, tags, isMarkdown), WalletNoteJsonContext.Default.NoteData);
 
         return new NoteSavePayload(
             resolvedTitle,
@@ -96,7 +96,7 @@ public static partial class NoteContentCodec
 
         try
         {
-            return NormalizeTags(JsonSerializer.Deserialize<string[]>(imagePaths, JsonOptions) ?? []);
+            return NormalizeTags(JsonSerializer.Deserialize(imagePaths, WalletNoteJsonContext.Default.StringArray) ?? []);
         }
         catch (JsonException)
         {
@@ -104,7 +104,7 @@ public static partial class NoteContentCodec
         }
     }
 
-    public static string EncodeStringArray(IEnumerable<string> values) => JsonSerializer.Serialize(NormalizeTags(values), JsonOptions);
+    public static string EncodeStringArray(IEnumerable<string> values) => JsonSerializer.Serialize<IReadOnlyList<string>>(NormalizeTags(values), WalletNoteJsonContext.Default.IReadOnlyListString);
 
     public static string BuildInlineImageMarkdown(string imageId)
     {
@@ -154,7 +154,7 @@ public static partial class NoteContentCodec
     [GeneratedRegex("```[\\s\\S]*?```")]
     private static partial Regex FencedCodeRegex();
 
-    private sealed record NoteData(
+    public sealed record NoteData(
         [property: JsonPropertyName("content")] string Content,
         [property: JsonPropertyName("tags")] IReadOnlyList<string> Tags,
         [property: JsonPropertyName("isMarkdown")] bool IsMarkdown);

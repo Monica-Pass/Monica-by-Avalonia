@@ -1352,7 +1352,9 @@ public sealed partial class MdbxVaultStore(
 
     private static PasswordEntry ClonePasswordEntryForPayload(PasswordEntry entry)
     {
-        var clone = JsonSerializer.Deserialize<PasswordEntry>(JsonSerializer.Serialize(entry, JsonOptions), JsonOptions) ?? new PasswordEntry();
+        var clone = JsonSerializer.Deserialize(
+            JsonSerializer.Serialize(entry, MdbxJsonContext.Default.PasswordEntry),
+            MdbxJsonContext.Default.PasswordEntry) ?? new PasswordEntry();
         clone.MdbxDatabaseId = null;
         // MdbxFolderId carries this client's native record id; the payload's folder key is
         // supplied separately so the two namespaces can never be confused again.
@@ -1362,23 +1364,19 @@ public sealed partial class MdbxVaultStore(
 
     private static SecureItem CloneSecureItemForPayload(SecureItem item)
     {
-        var clone = JsonSerializer.Deserialize<SecureItem>(JsonSerializer.Serialize(item, JsonOptions), JsonOptions) ?? new SecureItem();
+        var clone = JsonSerializer.Deserialize(
+            JsonSerializer.Serialize(item, MdbxJsonContext.Default.SecureItem),
+            MdbxJsonContext.Default.SecureItem) ?? new SecureItem();
         clone.MdbxDatabaseId = null;
         clone.MdbxFolderId = null;
         return clone;
-    }
-
-    private static T? DeserializePayload<T>(string payloadJson)
-    {
-        var payload = JsonSerializer.Deserialize<MdbxPayload<T>>(payloadJson, JsonOptions);
-        return payload is null ? default : payload.Data;
     }
 
     private static PasswordPayloadSnapshot? DeserializePasswordPayload(string payloadJson, string recordTitle = "")
     {
         try
         {
-            var payload = JsonSerializer.Deserialize<MdbxPayload<MdbxPasswordPayload>>(payloadJson, JsonOptions);
+            var payload = JsonSerializer.Deserialize(payloadJson, MdbxJsonContext.Default.MdbxPayloadMdbxPasswordPayload);
             if (payload?.Data?.Entry is not null)
             {
                 return new PasswordPayloadSnapshot(payload.Data.Entry, payload.Data.CustomFields, payload.Data.PasswordHistory, payload.Data.Attachments, BoundNoteEntryId: null);
@@ -1390,8 +1388,8 @@ public sealed partial class MdbxVaultStore(
 
         try
         {
-            var entry = DeserializePayload<PasswordEntry>(payloadJson);
-            if (entry is not null)
+            var payload = JsonSerializer.Deserialize(payloadJson, MdbxJsonContext.Default.MdbxPayloadPasswordEntry);
+            if (payload?.Data is { Id: > 0 } entry)
             {
                 return new PasswordPayloadSnapshot(entry, CustomFields: null, PasswordHistory: null, Attachments: null, BoundNoteEntryId: null);
             }
@@ -1418,7 +1416,7 @@ public sealed partial class MdbxVaultStore(
     {
         try
         {
-            var payload = JsonSerializer.Deserialize<MdbxPayload<MdbxSecureItemPayload>>(payloadJson, JsonOptions);
+            var payload = JsonSerializer.Deserialize(payloadJson, MdbxJsonContext.Default.MdbxPayloadMdbxSecureItemPayload);
             if (payload?.Data?.Item is not null)
             {
                 return new SecureItemPayloadSnapshot(payload.Data.Item, payload.Data.Attachments, BoundPasswordEntryId: null);
@@ -1430,8 +1428,8 @@ public sealed partial class MdbxVaultStore(
 
         try
         {
-            var item = DeserializePayload<SecureItem>(payloadJson);
-            if (item is not null)
+            var payload = JsonSerializer.Deserialize(payloadJson, MdbxJsonContext.Default.MdbxPayloadSecureItem);
+            if (payload?.Data is { Id: > 0 } item)
             {
                 return new SecureItemPayloadSnapshot(item, Attachments: null, BoundPasswordEntryId: null);
             }
@@ -1605,9 +1603,17 @@ public sealed partial class MdbxVaultStore(
         return null;
     }
 
-    private sealed record MdbxPayload<T>(string Kind, int SchemaVersion, T Data);
+    // NativeAOT's reflection-free JSON path still needs a public parameterless shape when
+    // this legacy payload is deserialized. The previous private primary-constructor record
+    // worked under JIT reflection but failed in the shipped AOT smoke at first vault seed.
+    public sealed class MdbxPayload<T>
+    {
+        public string Kind { get; set; } = "";
+        public int SchemaVersion { get; set; }
+        public T? Data { get; set; }
+    }
 
-    private sealed class MdbxPasswordPayload
+    public sealed class MdbxPasswordPayload
     {
         public PasswordEntry? Entry { get; init; }
         public List<CustomField>? CustomFields { get; init; }
@@ -1615,7 +1621,7 @@ public sealed partial class MdbxVaultStore(
         public List<Attachment>? Attachments { get; init; }
     }
 
-    private sealed class MdbxSecureItemPayload
+    public sealed class MdbxSecureItemPayload
     {
         public SecureItem? Item { get; init; }
         public List<Attachment>? Attachments { get; init; }

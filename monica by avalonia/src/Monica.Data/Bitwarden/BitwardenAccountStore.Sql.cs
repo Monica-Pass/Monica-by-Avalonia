@@ -117,13 +117,13 @@ public sealed partial class BitwardenAccountStore
         string? CustomCaCertificatePath,
         string? ClientCertificatePath);
 
-    private sealed class SavedAccountRow
+    internal sealed class SavedAccountRow
     {
         public long Id { get; init; }
         public long CreatedAt { get; init; }
     }
 
-    private sealed class BitwardenSecretRow
+    internal sealed class BitwardenSecretRow
     {
         public string? EncryptedAccessToken { get; init; }
         public string? EncryptedRefreshToken { get; init; }
@@ -133,7 +133,7 @@ public sealed partial class BitwardenAccountStore
         public string? EncryptedClientCertificatePassword { get; init; }
     }
 
-    private sealed class BitwardenAccountRow
+    internal sealed class BitwardenAccountRow
     {
         public long Id { get; init; }
         public string Email { get; init; } = "";

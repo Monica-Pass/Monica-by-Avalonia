@@ -173,13 +173,19 @@ public sealed partial class BitwardenPendingOperationStore(
             }
         }
 
-        var rows = claimedIds.Count == 0
-            ? []
-            : (await connection.QueryAsync<PendingOperationRow>(new CommandDefinition(
-                SelectSql + " WHERE id IN @Ids ORDER BY CASE operation_type WHEN 'delete' THEN 0 WHEN 'create' THEN 1 WHEN 'update' THEN 2 ELSE 3 END, next_attempt_at ASC, id ASC",
-                new { Ids = claimedIds },
-                transaction,
-                cancellationToken: cancellationToken))).ToList();
+        var rows = new List<PendingOperationRow>();
+        foreach (var id in claimedIds)
+        {
+            var row = await connection.QueryFirstOrDefaultAsync<PendingOperationRow>(new CommandDefinition(
+                SelectSql + " WHERE id = @Id",
+                new { Id = id }, transaction, cancellationToken: cancellationToken));
+            if (row is not null) rows.Add(row);
+        }
+        rows = rows
+            .OrderBy(row => row.OperationType == "delete" ? 0 : row.OperationType == "create" ? 1 : row.OperationType == "update" ? 2 : 3)
+            .ThenBy(row => row.NextAttemptAt)
+            .ThenBy(row => row.Id)
+            .ToList();
         await transaction.CommitAsync(cancellationToken);
         return rows.Select(Map).ToList();
     }

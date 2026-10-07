@@ -56,9 +56,6 @@ public partial class UnlockedShellView : UserControl
     public UnlockedShellView()
     {
         _workspaceHost = new WorkspaceHostView();
-        _workspaceHost.Bind(
-            WorkspaceHostView.SectionProperty,
-            new Binding(nameof(MainWindowViewModel.SelectedSection)));
         _workspaceHost.SizeChanged += WorkspaceHost_OnSizeChanged;
         Content = CreateLoadingPlaceholder();
         Dispatcher.UIThread.Post(InitializeWorkspaceScaffold, DispatcherPriority.Background);
@@ -90,6 +87,7 @@ public partial class UnlockedShellView : UserControl
         _workspaceScaffold = null;
         InitializeComponent();
         WorkspaceHostSlot.Content = _workspaceHost;
+        SyncWorkspaceActivation();
         Dispatcher.UIThread.Post(InitializeDeferredNavigation, DispatcherPriority.SystemIdle);
     }
 
@@ -126,6 +124,8 @@ public partial class UnlockedShellView : UserControl
             {
                 ObserveViewModel(viewModel);
             }
+
+            SyncWorkspaceActivation();
         };
         if (DataContext is MainWindowViewModel dataContext)
         {
@@ -180,6 +180,7 @@ public partial class UnlockedShellView : UserControl
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
+        SyncWorkspaceActivation();
         if (DataContext is MainWindowViewModel viewModel)
         {
             ObserveViewModel(viewModel);
@@ -196,6 +197,10 @@ public partial class UnlockedShellView : UserControl
     // navigation), and FANavigationView only highlights what it selected itself.
     private void SyncNavigationSelection(string section)
     {
+        // Keep the deferred host on the same section without a reflection binding. This
+        // callback is also used before the navigation rail is materialized, so the workspace
+        // can start loading even when AOT trimming removes reflection binding metadata.
+        _workspaceHost.Section = section;
         if (!_deferredNavigationInitialized ||
             !_navigationItemsByTag.TryGetValue(section, out var item) ||
             ReferenceEquals(VaultNavigationView.SelectedItem, item))
@@ -281,6 +286,19 @@ public partial class UnlockedShellView : UserControl
         {
             viewModel.OtherWorkspaceViewportWidth = e.NewSize.Width;
             viewModel.OtherWorkspaceViewportHeight = e.NewSize.Height;
+        }
+    }
+
+    // The shell and its workspace host are intentionally materialized at idle priority to keep
+    // unlock responsive. On native AOT the main window can finish its unlock callback before that
+    // deferred tree exists, so MainWindow's one-shot activation callback may have no host to find.
+    // Reapply the current unlocked state whenever the deferred shell becomes available.
+    private void SyncWorkspaceActivation()
+    {
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            _workspaceHost.Section = viewModel.SelectedSection;
+            _workspaceHost.IsActive = viewModel.IsUnlocked;
         }
     }
 

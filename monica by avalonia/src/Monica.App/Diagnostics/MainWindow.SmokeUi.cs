@@ -61,7 +61,10 @@ public partial class MainWindow
 
             var library = VaultWorkspaceView;
             viewModel.SelectSectionCommand.Execute("Passwords");
-            await Task.Delay(50);
+            await WaitForSmokeWindowConditionAsync(
+                () => this.GetVisualDescendants().OfType<VaultWorkspaceView>().Any(view => view.IsVisible) &&
+                      viewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Any(),
+                TimeSpan.FromSeconds(3));
             library.FocusSearch();
             Check("library-search-focus", library.IsSearchFocused, $"section={viewModel.SelectedSection}");
 
@@ -310,7 +313,11 @@ public partial class MainWindow
             foreach (var preset in libraryPresets)
             {
                 viewModel.SelectSectionCommand.Execute(preset.Section);
-                await Task.Delay(80);
+                await WaitForSmokeWindowConditionAsync(
+                    () => this.GetVisualDescendants().OfType<VaultWorkspaceView>().Any(view => view.IsVisible) &&
+                          viewModel.VaultGroup == preset.Group &&
+                          viewModel.VaultTreeRows.OfType<VaultTreeEntryRow>().Any(),
+                    TimeSpan.FromSeconds(3));
                 var libraries = this.GetVisualDescendants().OfType<VaultWorkspaceView>().ToList();
                 Check(
                     $"library-{preset.Section}-one-instance",

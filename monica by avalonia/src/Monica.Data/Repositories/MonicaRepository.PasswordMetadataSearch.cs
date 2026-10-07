@@ -15,21 +15,26 @@ public sealed partial class MonicaRepository
 
         await migrator.MigrateAsync(cancellationToken);
         await using var connection = connectionFactory.CreateConnection();
-        var command = new CommandDefinition(
+        // QueryMultipleAsync cannot be intercepted by Dapper.AOT and falls back to
+        // Reflection.Emit at runtime. Keep the two reads separate so each call gets
+        // a generated row factory in native AOT builds.
+        cancellationToken.ThrowIfCancellationRequested();
+        var customFieldRows = (await connection.QueryAsync<CustomFieldRow>(
             """
             SELECT id, entry_id, title, value, is_protected, sort_order
             FROM custom_fields
-            ORDER BY entry_id ASC;
-
+            ORDER BY entry_id ASC
+            """))
+            .ToArray();
+        cancellationToken.ThrowIfCancellationRequested();
+        var attachmentRows = (await connection.QueryAsync<AttachmentRow>(
+            """
             SELECT id, owner_type, owner_id, file_name, content_type, storage_path, size_bytes, created_at, bitwarden_vault_id, keepass_binary_ref
             FROM attachments
             WHERE owner_type = 'PASSWORD'
-            ORDER BY owner_id ASC;
-            """,
-            cancellationToken: cancellationToken);
-        using var results = await connection.QueryMultipleAsync(command);
-        var customFieldRows = (await results.ReadAsync<CustomFieldRow>()).ToArray();
-        var attachmentRows = (await results.ReadAsync<AttachmentRow>()).ToArray();
+            ORDER BY owner_id ASC
+            """))
+            .ToArray();
         var term = query.Trim();
 
         return new PasswordMetadataSearchResult(

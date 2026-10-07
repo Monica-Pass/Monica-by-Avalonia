@@ -390,7 +390,7 @@ public sealed class PasskeyStore(
         entry.RpId = rpId;
     }
 
-    private sealed class PasskeyRow
+    internal sealed class PasskeyRow
     {
         public long Id { get; init; }
         public string CredentialId { get; init; } = "";

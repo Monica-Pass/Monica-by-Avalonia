@@ -1,3 +1,3 @@
 using Dapper;
 
-[assembly: DapperAot]
+[module: DapperAot]

@@ -258,21 +258,14 @@ public sealed partial class MonicaRepository(
             return new Dictionary<long, IReadOnlyList<CustomField>>();
         }
 
-        await using var connection = connectionFactory.CreateConnection();
-        var rows = await connection.QueryAsync<CustomFieldRow>(
-            """
-            SELECT id, entry_id, title, value, is_protected, sort_order
-            FROM custom_fields
-            WHERE entry_id IN @EntryIds
-            ORDER BY entry_id ASC, sort_order ASC, id ASC
-            """,
-            new { EntryIds = ids });
+        var result = new Dictionary<long, IReadOnlyList<CustomField>>();
+        foreach (var id in ids)
+        {
+            var fields = await GetCustomFieldsAsync(id, cancellationToken);
+            if (fields.Count > 0) result[id] = fields;
+        }
 
-        return rows
-            .Select(ToModel)
-            .Select(field => _vaultDataProtector.Unprotect(field))
-            .GroupBy(field => field.EntryId)
-            .ToDictionary(group => group.Key, group => (IReadOnlyList<CustomField>)group.ToList());
+        return result;
     }
 
     public async Task ReplaceCustomFieldsAsync(long entryId, IReadOnlyList<CustomField> fields, CancellationToken cancellationToken = default)
@@ -375,20 +368,14 @@ public sealed partial class MonicaRepository(
             return new Dictionary<long, IReadOnlyList<Attachment>>();
         }
 
-        await using var connection = connectionFactory.CreateConnection();
-        var rows = await connection.QueryAsync<AttachmentRow>(
-            """
-            SELECT id, owner_type, owner_id, file_name, content_type, storage_path, size_bytes, created_at, bitwarden_vault_id, keepass_binary_ref
-            FROM attachments
-            WHERE owner_type = @OwnerType AND owner_id IN @OwnerIds
-            ORDER BY owner_id ASC, created_at DESC, id DESC
-            """,
-            new { OwnerType = NormalizeOwnerType(ownerType), OwnerIds = ids });
+        var result = new Dictionary<long, IReadOnlyList<Attachment>>();
+        foreach (var id in ids)
+        {
+            var attachments = await GetAttachmentsAsync(ownerType, id, cancellationToken);
+            if (attachments.Count > 0) result[id] = attachments;
+        }
 
-        return rows
-            .Select(ToModel)
-            .GroupBy(attachment => attachment.OwnerId)
-            .ToDictionary(group => group.Key, group => (IReadOnlyList<Attachment>)group.ToList());
+        return result;
     }
 
     public Task<byte[]?> TryReadAttachmentContentAsync(Attachment attachment, CancellationToken cancellationToken = default) =>
@@ -475,24 +462,14 @@ public sealed partial class MonicaRepository(
         }
 
         await migrator.MigrateAsync(cancellationToken);
-        await using var connection = connectionFactory.CreateConnection();
-        var rows = await connection.QueryAsync<PasswordHistoryEntryRow>(
-            new CommandDefinition(
-                """
-                SELECT id, entry_id, password, last_used_at
-                FROM password_history_entries
-                WHERE entry_id IN @EntryIds
-                ORDER BY entry_id ASC, last_used_at DESC, id DESC
-                """,
-                new { EntryIds = distinctIds },
-                cancellationToken: cancellationToken));
-        return rows
-            .Select(ToModel)
-            .Select(entry => _vaultDataProtector.Unprotect(entry))
-            .GroupBy(entry => entry.EntryId)
-            .ToDictionary(
-                group => group.Key,
-                group => (IReadOnlyList<PasswordHistoryEntry>)group.ToList());
+        var result = new Dictionary<long, IReadOnlyList<PasswordHistoryEntry>>();
+        foreach (var id in distinctIds)
+        {
+            var history = await GetPasswordHistoryAsync(id, cancellationToken);
+            if (history.Count > 0) result[id] = history;
+        }
+
+        return result;
     }
 
     public async Task<long> SavePasswordHistoryAsync(PasswordHistoryEntry entry, CancellationToken cancellationToken = default)
@@ -583,7 +560,14 @@ public sealed partial class MonicaRepository(
         {
             foreach (var sql in GetClearVaultStatements(scope))
             {
-                await connection.ExecuteAsync(sql, transaction: transaction);
+                // The statements are selected from a small, fixed set based on the
+                // requested scope. Passing that local string through Dapper cannot be
+                // intercepted by Dapper.AOT, so execute the already validated SQL with
+                // the provider command directly.
+                await using var command = connection.CreateCommand();
+                command.CommandText = sql;
+                command.Transaction = (Microsoft.Data.Sqlite.SqliteTransaction)transaction;
+                await command.ExecuteNonQueryAsync(cancellationToken);
             }
 
             await transaction.CommitAsync(cancellationToken);
@@ -1104,7 +1088,7 @@ public sealed partial class MonicaRepository(
         BitwardenLocalModified = entry.BitwardenLocalModified ? 1 : 0
     };
 
-    private sealed class PasswordEntryParameters
+    internal sealed class PasswordEntryParameters
     {
         public long Id { get; init; }
         public string Title { get; init; } = "";
@@ -1222,7 +1206,7 @@ public sealed partial class MonicaRepository(
         LastUsedAt = ToUnixMilliseconds(entry.LastUsedAt)
     };
 
-    private sealed class AttachmentParameters
+    internal sealed class AttachmentParameters
     {
         public long Id { get; init; }
         public string OwnerType { get; init; } = "";
@@ -1236,7 +1220,7 @@ public sealed partial class MonicaRepository(
         public string? KeepassBinaryRef { get; init; }
     }
 
-    private sealed class PasswordHistoryEntryParameters
+    internal sealed class PasswordHistoryEntryParameters
     {
         public long Id { get; init; }
         public long EntryId { get; init; }
@@ -1306,7 +1290,7 @@ public sealed partial class MonicaRepository(
         SyncStatus = item.SyncStatus.ToString().ToUpperInvariant()
     };
 
-    private sealed class SecureItemParameters
+    internal sealed class SecureItemParameters
     {
         public long Id { get; init; }
         public string ItemType { get; init; } = "";
@@ -1413,7 +1397,7 @@ public sealed partial class MonicaRepository(
         RemoteAccountId = database.RemoteAccountId
     };
 
-    private sealed class MdbxDatabaseParameters
+    internal sealed class MdbxDatabaseParameters
     {
         public long Id { get; init; }
         public string Name { get; init; } = "";
@@ -1502,7 +1486,7 @@ public sealed partial class MonicaRepository(
     private static DateTimeOffset FromUnixMilliseconds(long value) => DateTimeOffset.FromUnixTimeMilliseconds(value);
     private static DateTimeOffset? FromNullableUnixMilliseconds(long? value) => value is null ? null : DateTimeOffset.FromUnixTimeMilliseconds(value.Value);
 
-    private sealed class PasswordEntryRow
+    internal sealed class PasswordEntryRow
     {
         public long Id { get; init; }
         public string Title { get; init; } = "";
@@ -1559,7 +1543,7 @@ public sealed partial class MonicaRepository(
         public bool BitwardenLocalModified { get; init; }
     }
 
-    private sealed class CustomFieldRow
+    internal sealed class CustomFieldRow
     {
         public long Id { get; init; }
         public long EntryId { get; init; }
@@ -1569,7 +1553,7 @@ public sealed partial class MonicaRepository(
         public int SortOrder { get; init; }
     }
 
-    private sealed class AttachmentRow
+    internal sealed class AttachmentRow
     {
         public long Id { get; init; }
         public string OwnerType { get; init; } = "";
@@ -1583,7 +1567,7 @@ public sealed partial class MonicaRepository(
         public string? KeepassBinaryRef { get; init; }
     }
 
-    private sealed class PasswordHistoryEntryRow
+    internal sealed class PasswordHistoryEntryRow
     {
         public long Id { get; init; }
         public long EntryId { get; init; }
@@ -1591,14 +1575,14 @@ public sealed partial class MonicaRepository(
         public long LastUsedAt { get; init; }
     }
 
-    private sealed class PasswordQuickAccessRecordRow
+    internal sealed class PasswordQuickAccessRecordRow
     {
         public long PasswordId { get; init; }
         public int OpenCount { get; init; }
         public long LastOpenedAt { get; init; }
     }
 
-    private sealed class SecureItemRow
+    internal sealed class SecureItemRow
     {
         public long Id { get; init; }
         public string ItemType { get; init; } = "";
@@ -1629,7 +1613,7 @@ public sealed partial class MonicaRepository(
         public string SyncStatus { get; init; } = "NONE";
     }
 
-    private sealed class CategoryRow
+    internal sealed class CategoryRow
     {
         public long Id { get; init; }
         public string Name { get; init; } = "";
@@ -1643,7 +1627,7 @@ public sealed partial class MonicaRepository(
         public bool BitwardenLocalModified { get; init; }
     }
 
-    private sealed class MdbxDatabaseRow
+    internal sealed class MdbxDatabaseRow
     {
         public long Id { get; init; }
         public string Name { get; init; } = "";
@@ -1675,7 +1659,7 @@ public sealed partial class MonicaRepository(
         public string? RemoteAccountId { get; init; }
     }
 
-    private sealed class OperationLogRow
+    internal sealed class OperationLogRow
     {
         public long Id { get; init; }
         public string ItemType { get; init; } = "";
