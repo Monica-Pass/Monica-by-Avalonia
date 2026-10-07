@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Dapper;
 using Monica.Core.Models;
 using Monica.Data.Services;
@@ -258,6 +259,29 @@ public sealed partial class MonicaRepository(
             return new Dictionary<long, IReadOnlyList<CustomField>>();
         }
 
+        // Dapper's list expansion is not available in native AOT. Keep its single-query
+        // path for JIT builds, where this scan is performance-sensitive, and use the
+        // generated single-id query path when dynamic code is unavailable.
+        if (RuntimeFeature.IsDynamicCodeSupported && ids.Length > 1)
+        {
+            await using var connection = connectionFactory.CreateConnection();
+            var rows = await connection.QueryAsync<CustomFieldRow>(new CommandDefinition(
+                """
+                SELECT id, entry_id, title, value, is_protected, sort_order
+                FROM custom_fields
+                WHERE entry_id IN @EntryIds
+                ORDER BY entry_id ASC, sort_order ASC, id ASC
+                """,
+                new { EntryIds = ids },
+                cancellationToken: cancellationToken));
+
+            return rows
+                .Select(ToModel)
+                .Select(field => _vaultDataProtector.Unprotect(field))
+                .GroupBy(field => field.EntryId)
+                .ToDictionary(group => group.Key, group => (IReadOnlyList<CustomField>)group.ToList());
+        }
+
         var result = new Dictionary<long, IReadOnlyList<CustomField>>();
         foreach (var id in ids)
         {
@@ -368,6 +392,25 @@ public sealed partial class MonicaRepository(
             return new Dictionary<long, IReadOnlyList<Attachment>>();
         }
 
+        if (RuntimeFeature.IsDynamicCodeSupported && ids.Length > 1)
+        {
+            await using var connection = connectionFactory.CreateConnection();
+            var rows = await connection.QueryAsync<AttachmentRow>(new CommandDefinition(
+                """
+                SELECT id, owner_type, owner_id, file_name, content_type, storage_path, size_bytes, created_at, bitwarden_vault_id, keepass_binary_ref
+                FROM attachments
+                WHERE owner_type = @OwnerType AND owner_id IN @OwnerIds
+                ORDER BY owner_id ASC, created_at DESC, id DESC
+                """,
+                new { OwnerType = NormalizeOwnerType(ownerType), OwnerIds = ids },
+                cancellationToken: cancellationToken));
+
+            return rows
+                .Select(ToModel)
+                .GroupBy(attachment => attachment.OwnerId)
+                .ToDictionary(group => group.Key, group => (IReadOnlyList<Attachment>)group.ToList());
+        }
+
         var result = new Dictionary<long, IReadOnlyList<Attachment>>();
         foreach (var id in ids)
         {
@@ -462,6 +505,28 @@ public sealed partial class MonicaRepository(
         }
 
         await migrator.MigrateAsync(cancellationToken);
+        if (RuntimeFeature.IsDynamicCodeSupported && distinctIds.Length > 1)
+        {
+            await using var connection = connectionFactory.CreateConnection();
+            var rows = await connection.QueryAsync<PasswordHistoryEntryRow>(
+                new CommandDefinition(
+                    """
+                    SELECT id, entry_id, password, last_used_at
+                    FROM password_history_entries
+                    WHERE entry_id IN @EntryIds
+                    ORDER BY entry_id ASC, last_used_at DESC, id DESC
+                    """,
+                    new { EntryIds = distinctIds },
+                    cancellationToken: cancellationToken));
+            return rows
+                .Select(ToModel)
+                .Select(entry => _vaultDataProtector.Unprotect(entry))
+                .GroupBy(entry => entry.EntryId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => (IReadOnlyList<PasswordHistoryEntry>)group.ToList());
+        }
+
         var result = new Dictionary<long, IReadOnlyList<PasswordHistoryEntry>>();
         foreach (var id in distinctIds)
         {
