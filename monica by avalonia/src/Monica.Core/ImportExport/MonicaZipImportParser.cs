@@ -59,7 +59,7 @@ public static partial class MonicaZipImportParser
 
                 if (TryGetItemKind(name, out var kind))
                 {
-                    using var document = JsonDocument.Parse(bytes);
+                    using var document = ParseJson(bytes);
                     var root = document.RootElement;
                     switch (kind)
                     {
@@ -83,7 +83,7 @@ public static partial class MonicaZipImportParser
 
                 if (name.Equals("password_history.json", StringComparison.OrdinalIgnoreCase))
                 {
-                    using var document = JsonDocument.Parse(bytes);
+                    using var document = ParseJson(bytes);
                     var byEntry = new Dictionary<long, List<PasswordHistoryEntry>>();
                     if (document.RootElement.ValueKind == JsonValueKind.Array)
                     {
@@ -107,7 +107,7 @@ public static partial class MonicaZipImportParser
 
                 if (name.Equals("categories.json", StringComparison.OrdinalIgnoreCase))
                 {
-                    using var document = JsonDocument.Parse(bytes);
+                    using var document = ParseJson(bytes);
                     if (document.RootElement.ValueKind == JsonValueKind.Array)
                     {
                         foreach (var row in document.RootElement.EnumerateArray())

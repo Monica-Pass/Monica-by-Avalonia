@@ -95,7 +95,7 @@ public static partial class MonicaZipImportParser
 
     private static void ParseAttachmentManifest(byte[] bytes, ZipArchive zip, ICollection<PortableAttachment> output)
     {
-        using var document = JsonDocument.Parse(bytes);
+        using var document = ParseJson(bytes);
         if (!document.RootElement.TryGetProperty("entries", out var entries) || entries.ValueKind != JsonValueKind.Array)
             return;
         foreach (var row in entries.EnumerateArray())
@@ -217,6 +217,12 @@ public static partial class MonicaZipImportParser
         input.CopyTo(output);
         if (output.Length > MaximumEntryBytes) throw new MonicaJsonImportException(MonicaJsonImportError.ResourceLimitExceeded, "The Monica ZIP entry exceeds the safe size limit.");
         return output.ToArray();
+    }
+
+    private static JsonDocument ParseJson(byte[] bytes)
+    {
+        var start = bytes.AsSpan().StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }) ? 3 : 0;
+        return JsonDocument.Parse(bytes.AsMemory(start));
     }
 
     private static string String(JsonElement row, string name, string fallback = "") => row.TryGetProperty(name, out var value) ? value.ValueKind == JsonValueKind.String ? value.GetString() ?? fallback : value.ToString() : fallback;
