@@ -93,7 +93,7 @@ public static partial class MonicaZipImportParser
         return item;
     }
 
-    private static void ParseAttachmentManifest(byte[] bytes, ZipArchive zip, ICollection<PortableAttachment> output, ref long expandedBytes)
+    private static void ParseAttachmentManifest(byte[] bytes, ZipArchive zip, ICollection<PortableAttachment> output)
     {
         using var document = JsonDocument.Parse(bytes);
         if (!document.RootElement.TryGetProperty("entries", out var entries) || entries.ValueKind != JsonValueKind.Array)
@@ -103,7 +103,9 @@ public static partial class MonicaZipImportParser
             var payloadPath = String(row, "payloadPath").Replace('\\', '/');
             if (payloadPath.Length == 0 || payloadPath.Contains("..", StringComparison.Ordinal)) continue;
             var entry = zip.GetEntry(payloadPath);
-            if (entry is null || entry.Length < 0 || entry.Length > MaximumEntryBytes || (expandedBytes += entry.Length) > MaximumArchiveBytes)
+            // The outer archive loop already counts every payload entry toward
+            // the expanded-size budget. Do not count it twice here.
+            if (entry is null || entry.Length < 0 || entry.Length > MaximumEntryBytes)
                 throw new MonicaJsonImportException(MonicaJsonImportError.ResourceLimitExceeded, "The Monica ZIP attachment exceeds the safe size limit.");
             var payload = ReadEntry(entry);
             var attachment = new Attachment

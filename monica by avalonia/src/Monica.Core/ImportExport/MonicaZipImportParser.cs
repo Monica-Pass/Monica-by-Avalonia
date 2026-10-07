@@ -105,9 +105,30 @@ public static partial class MonicaZipImportParser
                     continue;
                 }
 
+                if (name.Equals("categories.json", StringComparison.OrdinalIgnoreCase))
+                {
+                    using var document = JsonDocument.Parse(bytes);
+                    if (document.RootElement.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var row in document.RootElement.EnumerateArray())
+                        {
+                            var categoryName = StringOrNull(row, "name")?.Trim();
+                            if (string.IsNullOrWhiteSpace(categoryName) || categoriesByName.ContainsKey(categoryName))
+                                continue;
+                            categoriesByName[categoryName] = new Category
+                            {
+                                Id = -(categoriesByName.Count + 1),
+                                Name = categoryName,
+                                SortOrder = Int(row, "sortOrder")
+                            };
+                        }
+                    }
+                    continue;
+                }
+
                 if (name.Equals("attachments_portable/attachments_portable.json", StringComparison.OrdinalIgnoreCase))
                 {
-                    ParseAttachmentManifest(bytes, zip, attachments, ref expandedBytes);
+                    ParseAttachmentManifest(bytes, zip, attachments);
                 }
             }
 
