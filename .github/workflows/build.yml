@@ -72,6 +72,26 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      - name: Cache NuGet packages
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-dotnet-${{ env.DOTNET_VERSION }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets', '**/NuGet.config') }}
+          restore-keys: |
+            ${{ runner.os }}-dotnet-${{ env.DOTNET_VERSION }}-nuget-
+
+      - name: Cache Rust and MDBX build outputs
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ env.PROJECT_DIR }}/crates/monica-crypto/target
+            ${{ env.PROJECT_DIR }}/artifacts/mdbx-native
+          key: ${{ runner.os }}-${{ matrix.rid }}-cargo-mdbx-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock', '**/rust-toolchain*', 'monica by avalonia/eng/mdbx/native-source.json', 'monica by avalonia/eng/mdbx/patches/**') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.rid }}-cargo-mdbx-
+
       - name: Install Linux NativeAOT dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
