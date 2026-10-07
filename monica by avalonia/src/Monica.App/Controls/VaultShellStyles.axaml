@@ -308,6 +308,10 @@
     </Style>
     <Style Selector="ScrollBar /template/ controls|SlimScrollBarThumb#slimThumb">
         <Setter Property="Background" Value="{DynamicResource SlimScrollBarThumbBrush}" />
+        <!-- Keep the hit strip available, but make the thumb transient. Avalonia's
+             auto-hide state is exposed through IsExpanded; the custom template must
+             mirror the default Fluent theme's expanded-state opacity explicitly. -->
+        <Setter Property="Opacity" Value="0" />
         <!-- FluentAvalonia's default theme squeezes its Thumb with scaleX(0.35) translateX(-2px),
              which lands on this template part too and would shrink the painted strip to a third
              of whatever width our margins declare. -->
@@ -316,6 +320,9 @@
                 <Border Background="{TemplateBinding Background}" CornerRadius="2" />
             </ControlTemplate>
         </Setter>
+    </Style>
+    <Style Selector="ScrollBar[IsExpanded=true] /template/ controls|SlimScrollBarThumb#slimThumb">
+        <Setter Property="Opacity" Value="1" />
     </Style>
     <Style Selector="ScrollBar:vertical /template/ controls|SlimScrollBarThumb#slimThumb:pointerover">
         <Setter Property="Margin" Value="2,0" />
