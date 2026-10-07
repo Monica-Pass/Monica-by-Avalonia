@@ -51,8 +51,12 @@ public sealed class MonicaZipImportParserTests
         {
             foreach (var (name, content) in entries)
             {
-                using var writer = new StreamWriter(zip.CreateEntry(name).Open(), Encoding.UTF8);
-                writer.Write(content);
+                using var stream = zip.CreateEntry(name).Open();
+                var encoding = name.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)
+                    ? new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)
+                    : new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
+                var bytes = encoding.GetBytes(content);
+                stream.Write(bytes);
             }
         }
 
