@@ -67,6 +67,21 @@ public sealed class SlimScrollBarStyleUiTests
     }
 
     [Fact]
+    public void Scroll_viewer_hides_the_indicator_when_not_interacting()
+    {
+        var window = OpenScrollableList(out _, out var scrollViewer);
+
+        try
+        {
+            Assert.True(scrollViewer.AllowAutoHide);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [Fact]
     public void Moving_the_slim_thumb_still_scrolls()
     {
         var window = OpenScrollableList(out var bar, out var scrollViewer);

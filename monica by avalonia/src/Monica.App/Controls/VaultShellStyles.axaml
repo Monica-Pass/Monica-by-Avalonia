@@ -19,8 +19,9 @@
         <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
     </Style>
 
-    <!-- Rail glyphs carry no accent of their own; they only move on the grey ramp,
-         so the selected destination is the single brightest mark in the pane. -->
+    <!-- Rail glyphs stay quiet until selected. The selected destination gets one
+         persistent accent rail, matching the navigation pattern used by Fluent and
+         Material side navigation without turning the whole row into a bright pill. -->
     <Style Selector="fa|FANavigationViewItem fa|FAImageIcon">
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
     </Style>
@@ -30,12 +31,19 @@
     <Style Selector="fa|FANavigationViewItem:selected fa|FAImageIcon">
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
     </Style>
-    <!-- The rail's accent bar would be a third accent on top of the list selection and the
-         per-screen primary command, and FluentAvalonia additionally leaves the previous pane's bar
-         faded-in when the selection crosses between the menu and footer panes. Selection still
-         reads through the grey pill and the brighter glyph, so the bar is dropped outright. -->
+    <!-- Keep the indicator hidden for unselected items and paint exactly the selected item.
+         Scoping the visible state to :selected also prevents a stale bar when selection moves
+         between the menu and footer panes. -->
     <Style Selector="fa|FANavigationViewItem /template/ fap|FANavigationViewItemPresenter /template/ Border#SelectionIndicator">
         <Setter Property="IsVisible" Value="False" />
+        <Setter Property="Width" Value="3" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+        <Setter Property="CornerRadius" Value="0,2,2,0" />
+    </Style>
+    <Style Selector="fa|FANavigationViewItem:selected /template/ fap|FANavigationViewItemPresenter /template/ Border#SelectionIndicator">
+        <Setter Property="IsVisible" Value="True" />
+        <Setter Property="Opacity" Value="1" />
     </Style>
 
     <Style Selector="ListBox.workspaceList ListBoxItem">
@@ -227,6 +235,12 @@
     <Style Selector="Border.workspaceNavItem.selected">
         <Setter Property="Background" Value="{DynamicResource AccentFillColorTertiaryBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+    </Style>
+
+    <!-- Scroll indicators auto-hide until the user scrolls or points at the edge. A
+         scrollbar is a transient affordance, not permanent chrome. -->
+    <Style Selector="ScrollViewer">
+        <Setter Property="AllowAutoHide" Value="True" />
     </Style>
 
     <!-- Slim floating scrollbars: a thumb over no track and no arrow buttons.

@@ -201,7 +201,7 @@ public sealed class UiArchitectureTests
                 .Select(item => item.Tag?.ToString()));
 
     [Fact]
-    public void Rail_paints_no_accent_indicator_even_when_the_section_moves_between_panes()
+    public void Rail_paints_one_accent_indicator_for_the_selected_item()
     {
         var window = new Monica.App.MainWindow();
         using var services = Monica.App.App.ConfigureServices(window);
@@ -223,7 +223,11 @@ public sealed class UiArchitectureTests
                 .Concat(navigation.FooterMenuItems)
                 .OfType<FANavigationViewItem>()
                 .ToArray();
-            Assert.DoesNotContain(railItems, IndicatorIsPainted);
+            Assert.Single(railItems, IndicatorIsPainted);
+            Assert.True(IndicatorIsPainted(railItems.Single(item => item.Tag?.ToString() == "Passwords")));
+            Assert.DoesNotContain(
+                railItems.Where(item => item.Tag?.ToString() != "Passwords"),
+                IndicatorIsPainted);
             Assert.Equal(["Passwords"], railItems.Where(item => item.IsSelected).Select(item => item.Tag?.ToString()));
         }
         finally
