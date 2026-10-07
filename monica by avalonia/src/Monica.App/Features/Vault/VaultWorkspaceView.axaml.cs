@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Threading;
 using Monica.App.Features.Authenticator;
 using Monica.App.Features.Notes;
 using Monica.App.Features.Passwords;
@@ -12,6 +13,13 @@ namespace Monica.App.Features.Vault;
 public partial class VaultWorkspaceView : UserControl
 {
     private readonly Dictionary<VaultSurface, Control> _surfaces = [];
+    // TOTP values are presentation state and are intentionally not persisted.  Keep the refresh
+    // loop on the visible vault workspace so the code/progress bar follows the clock while the
+    // authenticator surface is open, without waking a locked or background workspace.
+    private readonly DispatcherTimer _totpRefreshTimer = new()
+    {
+        Interval = TimeSpan.FromMilliseconds(250)
+    };
     private MainWindowViewModel? _viewModel;
 
     public VaultWorkspaceView()
@@ -20,6 +28,7 @@ public partial class VaultWorkspaceView : UserControl
         DataContextChanged += OnDataContextChanged;
         AttachedToVisualTree += OnAttachedToVisualTree;
         DetachedFromVisualTree += OnDetachedFromVisualTree;
+        _totpRefreshTimer.Tick += OnTotpRefreshTimerTick;
         VaultSurfaceHost.SizeChanged += (_, e) => ReportNoteViewportWidth(e.NewSize.Width);
     }
 
@@ -55,6 +64,8 @@ public partial class VaultWorkspaceView : UserControl
             previous.SetVaultTreeActive(false);
         }
 
+        _totpRefreshTimer.Stop();
+
         foreach (var surface in _surfaces.Values)
         {
             surface.DataContext = null;
@@ -70,8 +81,20 @@ public partial class VaultWorkspaceView : UserControl
 
         viewModel.SetVaultTreeActive(true);
         viewModel.PropertyChanged += ViewModelOnPropertyChanged;
+        _totpRefreshTimer.Start();
         ShowSurface(viewModel.SelectedVaultSurface);
         VaultEditorDialogWarmup.EnsureWarmedFor(viewModel.VaultGroup);
+    }
+
+    private void OnTotpRefreshTimerTick(object? sender, EventArgs e)
+    {
+        // The timer runs on Avalonia's UI dispatcher.  Refreshing the observable item properties
+        // here updates both the selected authenticator console and any visible list rows without
+        // rebuilding the vault tree on every tick.
+        if (_viewModel is { IsUnlocked: true } viewModel)
+        {
+            viewModel.RefreshTotpPresentations();
+        }
     }
 
     // A rail tap can change the preset while this page stays cached on screen, so the editors to

@@ -82,6 +82,37 @@ public sealed partial class AppSettingsTests
     }
 
     [Fact]
+    public async Task Totp_presentation_refresh_recalculates_code_and_progress()
+    {
+        var item = new SecureItem
+        {
+            ItemType = VaultItemType.Totp,
+            Title = "Live service",
+            ItemData = TotpDataResolver.ToItemData(new TotpData(
+                "JBSWY3DPEHPK3PXP",
+                "Example",
+                "live@example.com",
+                Period: 5))
+        };
+        var viewModel = CreateViewModel(GetTempPath(), totpService: new SequencedTotpService());
+        viewModel.TotpItems.Add(item);
+
+        viewModel.RefreshTotpPresentations();
+        var firstCode = item.TotpCode;
+        var firstRemaining = item.TotpTimeRemaining;
+        var firstProgress = item.TotpProgress;
+
+        await Task.Yield();
+        viewModel.RefreshTotpPresentations();
+
+        Assert.NotEqual("------", firstCode);
+        Assert.NotEqual("", firstRemaining);
+        Assert.True(item.TotpTimeRemaining != firstRemaining || item.TotpProgress != firstProgress,
+            "A presentation refresh should publish the current countdown/progress instead of leaving the initial value cached.");
+        Assert.NotEqual(firstCode, item.TotpCode);
+    }
+
+    [Fact]
     public async Task Hotp_next_code_increments_and_persists_counter_for_unbound_item()
     {
         var item = new SecureItem
@@ -146,5 +177,19 @@ public sealed partial class AppSettingsTests
             return Task.FromResult<TotpEditorViewModel?>(
                 item is null ? null : new TotpEditorViewModel(new LocalizationService(), item));
         }
+    }
+
+    private sealed class SequencedTotpService : ITotpService
+    {
+        private int _refreshCount;
+
+        public string GenerateCode(string secretKey, int period = 30, int digits = 6, string otpType = "TOTP", long counter = 0) =>
+            Interlocked.Increment(ref _refreshCount) == 1 ? "111111" : "222222";
+
+        public int GetRemainingSeconds(int period = 30, DateTimeOffset? now = null) =>
+            _refreshCount <= 1 ? 29 : 28;
+
+        public double GetProgress(int period = 30, DateTimeOffset? now = null) =>
+            _refreshCount <= 1 ? 10 : 20;
     }
 }

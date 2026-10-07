@@ -76,7 +76,9 @@ Name: "{group}\Monica"; Filename: "{app}\{#AppExeName}"
 Name: "{commondesktop}\Monica"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 [Tasks]
-Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
+; Keep the desktop shortcut enabled by default. Users can still clear this optional task in
+; the installer, but a normal install must provide the desktop entry reported by the issue.
+Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"
 
 [Registry]
 ; The application's own name for a KeePass database, and the one command Windows runs to open one. The

@@ -28,6 +28,14 @@ public sealed class MonicaJsonImportUseCase
     public async Task<MonicaJsonImportResult> ExecuteAsync(string json, CancellationToken cancellationToken = default)
     {
         var package = await Task.Run(() => _importExportService.ImportJson(json), cancellationToken);
+        return await ExecutePackageAsync(package, cancellationToken);
+    }
+
+    public async Task<MonicaJsonImportResult> ExecutePackageAsync(
+        MonicaExportPackage package,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         ValidatePasswordSecrets(package);
 
         var categoryIdMap = new Dictionary<long, long>();

@@ -1373,7 +1373,8 @@ public sealed partial class AppSettingsTests
         IClipboardService? clipboardService = null,
         IWindowPrivacyService? windowPrivacyService = null,
         ITotpEditorDialogService? totpEditorDialogService = null,
-        Monica.Data.Bitwarden.IBitwardenAccountStore? bitwardenAccountStore = null)
+        Monica.Data.Bitwarden.IBitwardenAccountStore? bitwardenAccountStore = null,
+        ITotpService? totpService = null)
     {
         var databasePath = TestTempPaths.CreateFilePath(".db");
         var factory = new SqliteConnectionFactory(databasePath);
@@ -1385,7 +1386,7 @@ public sealed partial class AppSettingsTests
             repository ?? new MonicaRepository(factory, migrator),
             new VaultCredentialStore(factory, migrator),
             crypto,
-            new TotpService(),
+            totpService ?? new TotpService(),
             new PasswordGeneratorService(),
             importExportService ?? new ImportExportService(),
             new PlatformCapabilityService(platformIntegrationService),

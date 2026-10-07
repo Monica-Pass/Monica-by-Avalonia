@@ -12,6 +12,10 @@ public sealed partial class MainWindowViewModel
     [
         new("Monica JSON", ["*.json"])
     ];
+    private static readonly PlatformFilePickerFileType[] MonicaZipFileTypes =
+    [
+        new("Monica backup ZIP", ["*.zip"])
+    ];
     private static readonly PlatformFilePickerFileType[] PasswordCsvFileTypes =
     [
         new("Password CSV", ["*.csv"])

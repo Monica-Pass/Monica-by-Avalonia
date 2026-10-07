@@ -14,6 +14,19 @@ public sealed partial class MainWindowViewModel
     public void RefreshTotpDisplay(SecureItem item)
         => TotpPresentationState.Refresh(item, _totpService);
 
+    internal void RefreshTotpPresentations()
+    {
+        if (TotpItems.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var item in TotpItems)
+        {
+            RefreshTotpDisplay(item);
+        }
+    }
+
     private void RaiseTotpSelectionState()
     {
         OnPropertyChanged(nameof(SelectedTotpCount));

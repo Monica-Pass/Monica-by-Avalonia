@@ -201,6 +201,12 @@
                                 <TextBlock Text="{Binding L.ImportFromFile}" />
                             </StackPanel>
                         </Button>
+                        <Button Classes="workspaceCommand" Command="{Binding ImportMonicaZipFileCommand}" IsEnabled="{Binding CanUseFilePicker}" ToolTip.Tip="Monica backup ZIP" Margin="0,0,8,8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="FolderZip" FontSize="18" />
+                                <TextBlock Text="ZIP" />
+                            </StackPanel>
+                        </Button>
                         <Button Classes="workspacePrimaryCommand" Command="{Binding ImportDataCommand}" Margin="0,0,0,8">
                             <TextBlock Text="{Binding L.Import}" />
                         </Button>

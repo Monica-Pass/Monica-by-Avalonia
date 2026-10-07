@@ -27,6 +27,8 @@
                     <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="ControlFillColorSecondaryBrush" Color="#F4F4F4" />
                     <SolidColorBrush x:Key="ControlFillColorTertiaryBrush" Color="#EAEAEA" />
+                    <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush" Color="#C6C6C6" />
+                    <SolidColorBrush x:Key="SubtleFillColorSecondaryBrush" Color="#F8F8F8" />
                     <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="#F0F6FC" />
                     <SolidColorBrush x:Key="ListViewItemBackgroundSelected" Color="#E7F2FF" />
                     <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPointerOver" Color="#DCEEFF" />
@@ -61,6 +63,8 @@
                     <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="#323232" />
                     <SolidColorBrush x:Key="ControlFillColorSecondaryBrush" Color="#383838" />
                     <SolidColorBrush x:Key="ControlFillColorTertiaryBrush" Color="#424242" />
+                    <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush" Color="#4A4A4A" />
+                    <SolidColorBrush x:Key="SubtleFillColorSecondaryBrush" Color="#292929" />
                     <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="#343434" />
                     <SolidColorBrush x:Key="ListViewItemBackgroundSelected" Color="#3A3A3A" />
                     <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPointerOver" Color="#414141" />
@@ -95,6 +99,8 @@
                     <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="ControlFillColorSecondaryBrush" Color="#F2F2F2" />
                     <SolidColorBrush x:Key="ControlFillColorTertiaryBrush" Color="#E0E0E0" />
+                    <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush" Color="#000000" />
+                    <SolidColorBrush x:Key="SubtleFillColorSecondaryBrush" Color="#F2F2F2" />
                     <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="#E6F7FF" />
                     <SolidColorBrush x:Key="ListViewItemBackgroundSelected" Color="#FFF200" />
                     <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPointerOver" Color="#FFE000" />

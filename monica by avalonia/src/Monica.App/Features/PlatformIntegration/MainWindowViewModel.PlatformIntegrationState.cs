@@ -115,6 +115,7 @@ public sealed partial class MainWindowViewModel
         OpenGitHubRepositoryCommand.NotifyCanExecuteChanged();
         OpenNoteReferenceCommand.NotifyCanExecuteChanged();
         ImportMonicaJsonFileCommand.NotifyCanExecuteChanged();
+        ImportMonicaZipFileCommand.NotifyCanExecuteChanged();
         ImportPasswordCsvFileCommand.NotifyCanExecuteChanged();
         ImportTotpCsvFileCommand.NotifyCanExecuteChanged();
         ImportNoteCsvFileCommand.NotifyCanExecuteChanged();
