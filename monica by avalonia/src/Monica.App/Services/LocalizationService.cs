@@ -293,6 +293,11 @@ public interface ILocalizationService : INotifyPropertyChanged
     string AegisImportUnsupportedKeySlot { get; }
     string AegisImportUnsafeParameters { get; }
     string AegisImportInvalidFormat { get; }
+    string ImportEncryptedArchiveTitle { get; }
+    string ImportEncryptedArchiveDescription { get; }
+    string ImportEncryptedArchiveAction { get; }
+    string ImportEncryptedArchiveWrongPassword { get; }
+    string ImportArchiveCancelled { get; }
     string ImportTotpCsv { get; }
     string ImportTotpCsvDescription { get; }
     string ImportTotpCsvWatermark { get; }
@@ -842,6 +847,11 @@ public sealed class LocalizationService : ILocalizationService
     public string AegisImportUnsupportedKeySlot => Text();
     public string AegisImportUnsafeParameters => Text();
     public string AegisImportInvalidFormat => Text();
+    public string ImportEncryptedArchiveTitle => Text();
+    public string ImportEncryptedArchiveDescription => Text();
+    public string ImportEncryptedArchiveAction => Text();
+    public string ImportEncryptedArchiveWrongPassword => Text();
+    public string ImportArchiveCancelled => Text();
     public string ImportTotpCsv => Text();
     public string ImportTotpCsvDescription => Text();
     public string ImportTotpCsvWatermark => Text();
@@ -1843,6 +1853,11 @@ public sealed class LocalizationService : ILocalizationService
         ["AegisImportUnsupportedKeySlot"] = "This Aegis backup does not contain a supported password key slot.",
         ["AegisImportUnsafeParameters"] = "This Aegis backup requests unsafe key-derivation resources and was rejected.",
         ["AegisImportInvalidFormat"] = "The Aegis backup format is invalid.",
+        ["ImportEncryptedArchiveTitle"] = "Encrypted Monica backup",
+        ["ImportEncryptedArchiveDescription"] = "This backup is protected with the export password set on the Android device. Enter that password to continue.",
+        ["ImportEncryptedArchiveAction"] = "Unlock and import",
+        ["ImportEncryptedArchiveWrongPassword"] = "The password is incorrect or the archive is damaged. Try again.",
+        ["ImportArchiveCancelled"] = "Import cancelled.",
         ["ImportTotpCsv"] = "Import TOTP CSV",
         ["ImportTotpCsvDescription"] = "Import Monica for Windows compatible TOTP secure-item CSV rows.",
         ["ImportTotpCsvWatermark"] = "Paste TOTP CSV here",
@@ -3764,6 +3779,11 @@ public sealed class LocalizationService : ILocalizationService
         ["AegisImportUnsupportedKeySlot"] = "此 Aegis 备份不包含受支持的密码密钥槽。",
         ["AegisImportUnsafeParameters"] = "此 Aegis 备份请求了不安全的密钥派生资源，已拒绝处理。",
         ["AegisImportInvalidFormat"] = "Aegis 备份格式无效。",
+        ["ImportEncryptedArchiveTitle"] = "加密的 Monica 备份",
+        ["ImportEncryptedArchiveDescription"] = "此备份使用在 Android 设备上设置的导出密码保护。请输入该密码以继续。",
+        ["ImportEncryptedArchiveAction"] = "解锁并导入",
+        ["ImportEncryptedArchiveWrongPassword"] = "密码不正确或归档已损坏。请重试。",
+        ["ImportArchiveCancelled"] = "已取消导入。",
         ["ImportTotpCsv"] = "导入 TOTP CSV",
         ["ImportTotpCsvDescription"] = "导入 Monica for Windows 兼容的 TOTP 安全项目 CSV 行。",
         ["ImportTotpCsvWatermark"] = "在此粘贴 TOTP CSV",

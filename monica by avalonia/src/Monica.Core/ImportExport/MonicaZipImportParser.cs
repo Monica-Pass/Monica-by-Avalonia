@@ -17,13 +17,21 @@ public static partial class MonicaZipImportParser
     private const long MaximumEntryBytes = 64L * 1024 * 1024;
     private const int MaximumEntries = 100_000;
 
-    public static MonicaExportPackage Import(ReadOnlyMemory<byte> archive)
+    public static MonicaExportPackage Import(ReadOnlyMemory<byte> archive, string? password = null)
     {
         if (archive.Length == 0)
             throw InvalidFormat();
         if (archive.Length > MaximumArchiveBytes)
             throw new MonicaJsonImportException(MonicaJsonImportError.ResourceLimitExceeded,
                 "The Monica ZIP import exceeds the safe size limit.");
+
+        if (MonicaEncryptedArchive.IsEncrypted(archive.Span))
+        {
+            if (string.IsNullOrEmpty(password))
+                throw new MonicaJsonImportException(MonicaJsonImportError.PasswordRequired,
+                    "The Monica backup is encrypted and requires its export password.");
+            archive = MonicaEncryptedArchive.Decrypt(archive, password);
+        }
 
         try
         {
@@ -64,10 +72,10 @@ public static partial class MonicaZipImportParser
                     switch (kind)
                     {
                         case ItemKind.Password:
-                            var password = ParsePassword(root, categoriesByName);
-                            passwords.Add(password.Entry);
-                            if (password.CustomFields.Count > 0)
-                                customFields.Add(new PasswordCustomFieldExportGroup(password.Entry.Id, password.CustomFields));
+                            var parsedPassword = ParsePassword(root, categoriesByName);
+                            passwords.Add(parsedPassword.Entry);
+                            if (parsedPassword.CustomFields.Count > 0)
+                                customFields.Add(new PasswordCustomFieldExportGroup(parsedPassword.Entry.Id, parsedPassword.CustomFields));
                             break;
                         case ItemKind.Note:
                         case ItemKind.Totp:

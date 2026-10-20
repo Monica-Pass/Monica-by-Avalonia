@@ -35,3 +35,14 @@ internal sealed class DisabledConfirmationDialogService : IConfirmationDialogSer
         CancellationToken cancellationToken = default) =>
         Task.FromResult(true);
 }
+
+internal sealed class DisabledPasswordPromptDialogService : IPasswordPromptDialogService
+{
+    public Task<string?> PromptAsync(
+        string title,
+        string description,
+        string action,
+        string? error = null,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<string?>(null);
+}
