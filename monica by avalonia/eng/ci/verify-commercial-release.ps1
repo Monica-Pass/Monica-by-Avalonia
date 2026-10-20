@@ -142,7 +142,7 @@ function Get-VulnerabilityCount {
 }
 
 function Assert-NoVulnerablePackages {
-    $auditOutput = @(& dotnet list $Solution package --vulnerable --include-transitive --format json)
+    $auditOutput = @(& dotnet list $Solution package --vulnerable --include-transitive --format json --no-restore)
     if ($LASTEXITCODE -ne 0) {
         throw 'NuGet vulnerability audit failed.'
     }
