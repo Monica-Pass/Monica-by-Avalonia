@@ -261,12 +261,12 @@ public sealed partial class MdbxVaultStore
             ((IMdbxNativeDevicePasswordAccess)_vault).ReadDeviceSyncProjectTagsAsync(id, token);
         public Task<System.Text.Json.Nodes.JsonArray> ReadDeviceSyncRelationsAsync(string id, CancellationToken token) =>
             ((IMdbxNativeDevicePasswordAccess)_vault).ReadDeviceSyncRelationsAsync(id, token);
-        public Task ResolveDeviceSyncRelationsAsync(CancellationToken token, IReadOnlyDictionary<string,string>? targets = null) =>
-            ((IMdbxNativeDevicePasswordAccess)_vault).ResolveDeviceSyncRelationsAsync(token,targets);
+        public Task ResolveDeviceSyncRelationsAsync(CancellationToken token, IReadOnlyDictionary<string, string>? targets = null) =>
+            ((IMdbxNativeDevicePasswordAccess)_vault).ResolveDeviceSyncRelationsAsync(token, targets);
         public Task<IReadOnlyList<DevicePasswordSnapshot>> ReadDeviceSyncRootMetadataAsync(CancellationToken token) =>
             ((IMdbxNativeDevicePasswordAccess)_vault).ReadDeviceSyncRootMetadataAsync(token);
-        public Task<string?> ApplyDeviceSyncRootMetadataAsync(string owner,string? expected,bool newBinding,bool deleted,JsonObject data,CancellationToken token) =>
-            ((IMdbxNativeDevicePasswordAccess)_vault).ApplyDeviceSyncRootMetadataAsync(owner,expected,newBinding,deleted,data,token);
+        public Task<string?> ApplyDeviceSyncRootMetadataAsync(string owner, string? expected, bool newBinding, bool deleted, JsonObject data, CancellationToken token) =>
+            ((IMdbxNativeDevicePasswordAccess)_vault).ApplyDeviceSyncRootMetadataAsync(owner, expected, newBinding, deleted, data, token);
         public Task<string> GetDeviceSyncGuardAsync(string id, CancellationToken token) =>
             ((IMdbxNativeDevicePasswordAccess)_vault).GetDeviceSyncGuardAsync(id, token);
         public Task<MdbxNativeObjectSummary?> CommitDeviceSyncObjectAsync(DeviceVaultWritePlan plan, CancellationToken token) =>

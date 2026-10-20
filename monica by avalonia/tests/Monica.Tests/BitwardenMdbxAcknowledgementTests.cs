@@ -29,13 +29,23 @@ public sealed class BitwardenMdbxAcknowledgementTests
         const string title = "Saved while upload was in flight";
         var entry = new PasswordEntry
         {
-            Id = 11, Title = title, Username = "synthetic-user", Password = "synthetic-new-password",
-            BitwardenVaultId = 17, BitwardenCipherId = "cipher", BitwardenRevisionDate = "r1"
+            Id = 11,
+            Title = title,
+            Username = "synthetic-user",
+            Password = "synthetic-new-password",
+            BitwardenVaultId = 17,
+            BitwardenCipherId = "cipher",
+            BitwardenRevisionDate = "r1"
         };
         var note = new SecureItem
         {
-            Id = 11, Title = title, ItemType = VaultItemType.Note, ItemData = "{\"content\":\"new note\"}",
-            BitwardenVaultId = 17, BitwardenCipherId = "cipher", BitwardenRevisionDate = "r1"
+            Id = 11,
+            Title = title,
+            ItemType = VaultItemType.Note,
+            ItemData = "{\"content\":\"new note\"}",
+            BitwardenVaultId = 17,
+            BitwardenCipherId = "cipher",
+            BitwardenRevisionDate = "r1"
         };
         CustomField[] fields = [new() { EntryId = 11, Title = "Recovery", Value = "synthetic-new-value", IsProtected = true }];
         PasswordHistoryEntry[] history = [new() { EntryId = 11, Password = "synthetic-history" }];
@@ -71,8 +81,13 @@ public sealed class BitwardenMdbxAcknowledgementTests
             var repository = new MdbxBackedMonicaRepository(new MonicaRepository(factory, new DatabaseMigrator(factory)), store);
             var database = new LocalMdbxDatabase
             {
-                Name = "Synthetic", FilePath = path, WorkingCopyPath = path, EncryptedPassword = vaultPassword,
-                IsDefault = true, StorageLocation = MdbxStorageLocation.Internal, IsOfflineAvailable = true
+                Name = "Synthetic",
+                FilePath = path,
+                WorkingCopyPath = path,
+                EncryptedPassword = vaultPassword,
+                IsDefault = true,
+                StorageLocation = MdbxStorageLocation.Internal,
+                IsOfflineAvailable = true
             };
             await repository.SaveMdbxDatabaseAsync(database);
             Assert.True(await repository.TryAcknowledgeBitwardenMutationAsync(new(

@@ -20,20 +20,34 @@ internal static class DevicePasskeyShape
     {
         var payload = new JsonObject
         {
-            ["kind"] = "passkey", ["credential_id"] = entry.CredentialId, ["rp_id"] = entry.RpId, ["rp_name"] = entry.RpName,
-            ["user_id"] = entry.UserId, ["user_name"] = entry.UserName, ["user_display_name"] = entry.UserDisplayName,
+            ["kind"] = "passkey",
+            ["credential_id"] = entry.CredentialId,
+            ["rp_id"] = entry.RpId,
+            ["rp_name"] = entry.RpName,
+            ["user_id"] = entry.UserId,
+            ["user_name"] = entry.UserName,
+            ["user_display_name"] = entry.UserDisplayName,
             ["public_key_algorithm"] = entry.PublicKeyAlgorithm,
             ["public_key"] = Convert.ToBase64String(PasskeyKeyMaterialGenerator.BuildCosePublicKey(entry.PublicKeyAlgorithm, entry.PublicKey)),
-            ["private_key_alias"] = key ?? "", ["key_status"] = string.IsNullOrEmpty(key) ? "reference" : "portable",
-            ["created_at"] = entry.CreatedAt.ToUnixTimeMilliseconds(), ["last_used_at"] = entry.LastUsedAt.ToUnixTimeMilliseconds(),
-            ["use_count"] = entry.UseCount, ["icon_url"] = entry.IconUrl, ["is_discoverable"] = entry.IsDiscoverable,
-            ["is_user_verification_required"] = entry.IsUserVerificationRequired, ["transports"] = entry.Transports,
-            ["aaguid"] = entry.Aaguid, ["sign_count"] = 0, ["notes"] = entry.Notes, ["passkey_mode"] = entry.PasskeyMode,
-            ["backup_eligible"] = entry.BackupEligible, ["backup_state"] = entry.BackupState
+            ["private_key_alias"] = key ?? "",
+            ["key_status"] = string.IsNullOrEmpty(key) ? "reference" : "portable",
+            ["created_at"] = entry.CreatedAt.ToUnixTimeMilliseconds(),
+            ["last_used_at"] = entry.LastUsedAt.ToUnixTimeMilliseconds(),
+            ["use_count"] = entry.UseCount,
+            ["icon_url"] = entry.IconUrl,
+            ["is_discoverable"] = entry.IsDiscoverable,
+            ["is_user_verification_required"] = entry.IsUserVerificationRequired,
+            ["transports"] = entry.Transports,
+            ["aaguid"] = entry.Aaguid,
+            ["sign_count"] = 0,
+            ["notes"] = entry.Notes,
+            ["passkey_mode"] = entry.PasskeyMode,
+            ["backup_eligible"] = entry.BackupEligible,
+            ["backup_state"] = entry.BackupState
         };
         var data = DeviceVaultShape.Normalize(payload.ToJsonString(), entry.RpName, "", "passkey");
         data["folder_path"] = new JsonArray(); data["labels"] = new JsonArray(); data["relations"] = new JsonArray(); data["assets"] = new JsonArray(); data["trashed"] = false;
-        if(verify) Verify(data);
+        if (verify) Verify(data);
         return data;
     }
 
@@ -67,15 +81,30 @@ internal static class DevicePasskeyShape
             ? cose!.ToSubjectPublicKeyInfoBase64() : Convert.ToBase64String(encoded);
         return new PasskeyEntry
         {
-            Id = id, CredentialId = Text("credential_id"), RpId = Text("rp_id"), RpName = Text("rp_name"), UserId = Text("user_id"),
-            UserName = Text("user_name"), UserDisplayName = Text("user_display_name"), PublicKeyAlgorithm = p["public_key_algorithm"]!.GetValue<int>(),
-            PublicKey = spki, PrivateKeyAlias = Text("private_key_alias"), Notes = Text("notes"), Transports = Text("transports", "internal"),
-            Aaguid = Text("aaguid"), PasskeyMode = Text("passkey_mode", "LEGACY"), IsDiscoverable = Flag("is_discoverable"),
-            IsUserVerificationRequired = Flag("is_user_verification_required"), SignCount = 0, IsBackedUp = Text("key_status") == "portable",
+            Id = id,
+            CredentialId = Text("credential_id"),
+            RpId = Text("rp_id"),
+            RpName = Text("rp_name"),
+            UserId = Text("user_id"),
+            UserName = Text("user_name"),
+            UserDisplayName = Text("user_display_name"),
+            PublicKeyAlgorithm = p["public_key_algorithm"]!.GetValue<int>(),
+            PublicKey = spki,
+            PrivateKeyAlias = Text("private_key_alias"),
+            Notes = Text("notes"),
+            Transports = Text("transports", "internal"),
+            Aaguid = Text("aaguid"),
+            PasskeyMode = Text("passkey_mode", "LEGACY"),
+            IsDiscoverable = Flag("is_discoverable"),
+            IsUserVerificationRequired = Flag("is_user_verification_required"),
+            SignCount = 0,
+            IsBackedUp = Text("key_status") == "portable",
             CreatedAt = DateTimeOffset.FromUnixTimeMilliseconds(p["created_at"]?.GetValue<long>() ?? 0),
-            LastUsedAt = DateTimeOffset.FromUnixTimeMilliseconds(p["last_used_at"]?.GetValue<long>() ?? 0), UseCount = p["use_count"]?.GetValue<int>() ?? 0,
+            LastUsedAt = DateTimeOffset.FromUnixTimeMilliseconds(p["last_used_at"]?.GetValue<long>() ?? 0),
+            UseCount = p["use_count"]?.GetValue<int>() ?? 0,
             IconUrl = Text("icon_url"),
-            BackupEligible = p["backup_eligible"]?.GetValue<bool>(), BackupState = p["backup_state"]?.GetValue<bool>()
+            BackupEligible = p["backup_eligible"]?.GetValue<bool>(),
+            BackupState = p["backup_state"]?.GetValue<bool>()
         };
     }
 

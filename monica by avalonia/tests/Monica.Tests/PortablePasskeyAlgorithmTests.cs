@@ -17,8 +17,12 @@ public sealed class PortablePasskeyAlgorithmTests
             algorithm == PasskeyAlgorithm.Ps256 ? PasskeyAlgorithm.Rs256 : algorithm);
         var entry = new PasskeyEntry
         {
-            CredentialId = "synthetic-credential", RpId = "example.test", RpName = "Android registration",
-            UserId = "Zml4dHVyZQ==", PublicKeyAlgorithm = algorithm, PublicKey = material.PublicKeySpkiBase64
+            CredentialId = "synthetic-credential",
+            RpId = "example.test",
+            RpName = "Android registration",
+            UserId = "Zml4dHVyZQ==",
+            PublicKeyAlgorithm = algorithm,
+            PublicKey = material.PublicKeySpkiBase64
         };
         var data = DevicePasskeyShape.Export(entry, material.PrivateKeyPkcs8Base64);
         // Android registration keeps SPKI in its store and in the sync payload.

@@ -68,8 +68,12 @@ public sealed class DeviceSyncCoordinatorSchedulingTests
     {
         var protector = new FixtureProtector();
         var path = Path.Combine(TestTempPaths.CreateDirectoryPath(), "peers.protected");
-        var original = new DeviceSyncPreferences { DeviceId = "a", Peers = [
-            new DeviceSyncPeer { DeviceId = "z", Name = "Peer", PairId = "pair", TrustedKey = new string('A',43) }] };
+        var original = new DeviceSyncPreferences
+        {
+            DeviceId = "a",
+            Peers = [
+            new DeviceSyncPeer { DeviceId = "z", Name = "Peer", PairId = "pair", TrustedKey = new string('A',43) }]
+        };
         var legacy = System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(original))!.AsObject();
         legacy.Remove("Mode");
         await File.WriteAllTextAsync(path, await protector.ProtectAsync(legacy.ToJsonString()));
@@ -271,13 +275,22 @@ public sealed class DeviceSyncCoordinatorSchedulingTests
             var store = new DeviceSyncPreferenceStore(protector, Path.Combine(TestTempPaths.CreateDirectoryPath(), "peers.protected"));
             await store.SaveAsync(new DeviceSyncPreferences
             {
-                DeviceId = host ? "z" : "a", IntervalSeconds = 300, Mode = mode,
+                DeviceId = host ? "z" : "a",
+                IntervalSeconds = 300,
+                Mode = mode,
                 Peers = [new DeviceSyncPeer { DeviceId = host ? "a" : "z", Name = "Peer", PairId = "pair", TrustedKey = new string('A', 43) }]
             });
             var data = new FakeData();
             var network = new FakeNetwork();
-            return new Fixture { Data = data, Network = network, Time = time, Session = session, Secrets = protector,
-                Sync = new DeviceSyncCoordinator(store, data, session, network, time, TestTempPaths.CreateDirectoryPath()) };
+            return new Fixture
+            {
+                Data = data,
+                Network = network,
+                Time = time,
+                Session = session,
+                Secrets = protector,
+                Sync = new DeviceSyncCoordinator(store, data, session, network, time, TestTempPaths.CreateDirectoryPath())
+            };
         }
 
         public async Task CompleteRoundAsync()
@@ -356,10 +369,13 @@ public sealed class DeviceSyncCoordinatorSchedulingTests
             switch (input.GetProperty("operation").GetString())
             {
                 case "discover":
-                    return JsonSerializer.SerializeToElement(new { devices = Offline ? Array.Empty<object>() : [
+                    return JsonSerializer.SerializeToElement(new
+                    {
+                        devices = Offline ? Array.Empty<object>() : [
                         new { device_id = "z", session = "pair", trusted = true, address = "127.0.0.1", port = 1234,
                             revision = $"remote-1:{RemoteVersion}:{RemoteWriter}:{RemoteRequest}" }
-                    ] });
+                    ]
+                    });
                 case "start":
                 case "connect":
                     LastStarted = input;
@@ -374,9 +390,17 @@ public sealed class DeviceSyncCoordinatorSchedulingTests
                         phase = _phases[input.GetProperty("handle").GetUInt64()],
                         peer = new
                         {
-                            device_id = "z", name = "Peer", content_type = "vault", vault_content_version = 2, revision = "remote-1",
-                            interval_seconds = RemoteInterval, settings_version = RemoteVersion, settings_writer = RemoteWriter,
-                            sync_request = RemoteRequest, receive_content = ReceiveContent, pairing = new { content_key = new string('A', 43) }
+                            device_id = "z",
+                            name = "Peer",
+                            content_type = "vault",
+                            vault_content_version = 2,
+                            revision = "remote-1",
+                            interval_seconds = RemoteInterval,
+                            settings_version = RemoteVersion,
+                            settings_writer = RemoteWriter,
+                            sync_request = RemoteRequest,
+                            receive_content = ReceiveContent,
+                            pairing = new { content_key = new string('A', 43) }
                         }
                     });
                 case "acknowledge":

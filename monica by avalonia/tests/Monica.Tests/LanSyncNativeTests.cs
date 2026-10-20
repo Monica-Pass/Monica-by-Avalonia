@@ -12,7 +12,9 @@ public sealed class LanSyncNativeTests
         var request = new
         {
             extra = new { operation = secret, password = secret },
-            operation = "replica_scan_batch", handle = -1, entries = Array.Empty<object>()
+            operation = "replica_scan_batch",
+            handle = -1,
+            entries = Array.Empty<object>()
         };
 
         var failure = Assert.Throws<LanSyncException>(() => LanSyncNative.Request(request));
@@ -38,7 +40,9 @@ public sealed class LanSyncNativeTests
     {
         var failure = Assert.Throws<LanSyncException>(() => LanSyncNative.Request(new
         {
-            operation = "replica_scan_batch", handle = 1, padding = new string('x', LanSyncNative.MaxRequestBytes)
+            operation = "replica_scan_batch",
+            handle = 1,
+            padding = new string('x', LanSyncNative.MaxRequestBytes)
         }));
         Assert.Equal("request_too_large", failure.Code);
         Assert.Equal("replica_scan_batch", failure.Operation);

@@ -10,7 +10,7 @@ internal sealed class DeviceAssetTransfer(string directory, string key)
     private Dictionary<string, long>? _offsets;
     public bool Contains(string id)
     {
-        if(!File.Exists(_path)) return false;
+        if (!File.Exists(_path)) return false;
         LoadIndex(); return _offsets!.ContainsKey(id);
     }
     private void LoadIndex() => _offsets ??= LanSyncNative.Request(new { operation = "asset_list", path = _path }).GetProperty("items").EnumerateArray()
@@ -23,8 +23,16 @@ internal sealed class DeviceAssetTransfer(string directory, string key)
         {
             token.ThrowIfCancellationRequested();
             var size = Math.Min(chunk, bytes.Length - start);
-            LanSyncNative.Request(new { operation = "asset_append", path = _path, key, id, index = start / chunk,
-                final = start + size == bytes.Length, data = Convert.ToBase64String(bytes, start, size) });
+            LanSyncNative.Request(new
+            {
+                operation = "asset_append",
+                path = _path,
+                key,
+                id,
+                index = start / chunk,
+                final = start + size == bytes.Length,
+                data = Convert.ToBase64String(bytes, start, size)
+            });
             progress?.Invoke(start + size);
         }
     }

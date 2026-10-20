@@ -24,8 +24,16 @@ public sealed class DevicePasswordSyncTests
     {
         await using var fixture = await Fixture.CreateAsync();
         var material = PasskeyKeyMaterialGenerator.Generate(PasskeyAlgorithm.Es256);
-        var entry = new PasskeyEntry { CredentialId = Guid.NewGuid().ToString(), RpId = "example.test", RpName = "Reference fixture",
-            UserId = "Zml4dHVyZQ==", PublicKey = material.PublicKeySpkiBase64, BackupEligible = false, BackupState = false };
+        var entry = new PasskeyEntry
+        {
+            CredentialId = Guid.NewGuid().ToString(),
+            RpId = "example.test",
+            RpName = "Reference fixture",
+            UserId = "Zml4dHVyZQ==",
+            PublicKey = material.PublicKeySpkiBase64,
+            BackupEligible = false,
+            BackupState = false
+        };
         await fixture.Passkeys.SaveAsync(entry, material.PrivateKeyPkcs8Base64);
         var previous = (await fixture.Passkeys.GetAsync(entry.Id))!;
         var data = DevicePasskeyShape.Export(previous, null, verify: false);
@@ -53,8 +61,14 @@ public sealed class DevicePasswordSyncTests
         await using var first = await Fixture.CreateAsync();
         await using var second = await Fixture.CreateAsync();
         var material = PasskeyKeyMaterialGenerator.Generate(PasskeyAlgorithm.Es256);
-        var entry = new PasskeyEntry { CredentialId = Guid.NewGuid().ToString(), RpId = "example.test", RpName = "Backup flag fixture",
-            UserId = "Zml4dHVyZQ==", PublicKey = material.PublicKeySpkiBase64 };
+        var entry = new PasskeyEntry
+        {
+            CredentialId = Guid.NewGuid().ToString(),
+            RpId = "example.test",
+            RpName = "Backup flag fixture",
+            UserId = "Zml4dHVyZQ==",
+            PublicKey = material.PublicKeySpkiBase64
+        };
         var payload = DevicePasskeyShape.Export(entry, material.PrivateKeyPkcs8Base64)["payload"]!.AsObject();
         payload["backup_eligible"] = eligible; payload["backup_state"] = state;
         var bridge = new MdbxUniffiNativeBridge();
@@ -76,8 +90,10 @@ public sealed class DevicePasswordSyncTests
         if (eligible is not null || state is not null)
         {
             // Emulate a projection written before these nullable columns existed.
-            await using var connection = new Microsoft.Data.Sqlite.SqliteConnection(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder {
-                DataSource = Path.Combine(Path.GetDirectoryName(second.Database.FilePath)!, "metadata.db") }.ToString());
+            await using var connection = new Microsoft.Data.Sqlite.SqliteConnection(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
+            {
+                DataSource = Path.Combine(Path.GetDirectoryName(second.Database.FilePath)!, "metadata.db")
+            }.ToString());
             await connection.OpenAsync();
             await using var command = connection.CreateCommand();
             command.CommandText = "UPDATE passkeys SET backup_eligible=NULL,backup_state=NULL WHERE id=@id";
@@ -102,8 +118,15 @@ public sealed class DevicePasswordSyncTests
         await using var fixture = await Fixture.CreateAsync();
         var material = PasskeyKeyMaterialGenerator.Generate(algorithm == PasskeyAlgorithm.Ps256 ? PasskeyAlgorithm.Rs256 : algorithm);
         var keyId = Guid.NewGuid().ToString();
-        var entry = new PasskeyEntry { CredentialId = Guid.NewGuid().ToString(), RpId = "example.test", RpName = "Native reference key",
-            UserId = "Zml4dHVyZQ==", PublicKeyAlgorithm = algorithm, PublicKey = material.PublicKeySpkiBase64 };
+        var entry = new PasskeyEntry
+        {
+            CredentialId = Guid.NewGuid().ToString(),
+            RpId = "example.test",
+            RpName = "Native reference key",
+            UserId = "Zml4dHVyZQ==",
+            PublicKeyAlgorithm = algorithm,
+            PublicKey = material.PublicKeySpkiBase64
+        };
         var bridge = new MdbxUniffiNativeBridge();
         using (var vault = await bridge.OpenVaultAsync(fixture.Database.FilePath, fixture.Database.EncryptedPassword!, "reference-fixture"))
         {
@@ -115,8 +138,9 @@ public sealed class DevicePasswordSyncTests
             await access.CreateDeviceSyncEntryAsync(keyId, root.ProjectId, "passkey", "Native reference key",
                 originalPayload.ToJsonString(), CancellationToken.None);
         }
-        var before = Assert.Single((await fixture.Vaults.ReadDevicePasswordsAsync(fixture.Database, CancellationToken.None))
-            .Where(s => s.Data["entry_type"]?.GetValue<string>() == "passkey"));
+        var before = Assert.Single(
+            await fixture.Vaults.ReadDevicePasswordsAsync(fixture.Database, CancellationToken.None),
+            s => s.Data["entry_type"]?.GetValue<string>() == "passkey");
         var reference = before.Data.DeepClone().AsObject();
         reference["payload"]!["private_key_alias"] = "";
         reference["payload"]!["key_status"] = "reference";
@@ -145,123 +169,173 @@ public sealed class DevicePasswordSyncTests
         await using var first = await Fixture.CreateAsync(); await using var second = await Fixture.CreateAsync();
         var bridge = new MdbxUniffiNativeBridge(); var keyId = Guid.NewGuid().ToString(); var owner = Guid.NewGuid().ToString();
         var material = PasskeyKeyMaterialGenerator.Generate(PasskeyAlgorithm.Es256);
-        var entry = new PasskeyEntry { CredentialId=Guid.NewGuid().ToString(),RpId="example.test",RpName="Native key",UserId="Zml4dHVyZQ==",UserName="fixture",
-            PublicKeyAlgorithm=PasskeyAlgorithm.Es256,PublicKey=material.PublicKeySpkiBase64,Notes="Native source" };
-        await first.Passkeys.SaveAsync(entry,material.PrivateKeyPkcs8Base64);
-        using(var native = await bridge.OpenVaultAsync(first.Database.FilePath,first.Database.EncryptedPassword!,"native-key-fixture")) {
-            var access=(IMdbxNativeDevicePasswordAccess)native; await access.EnsureDeviceSyncFoldersAsync(new JsonArray(),CancellationToken.None);
-            var root=(await access.ListDeviceSyncProjectsAsync(CancellationToken.None)).Single(p => MdbxAndroidRoot.IsRootTitle(p.Title));
-            var metadata=Assert.Single(await access.ReadDeviceSyncRootMetadataAsync(CancellationToken.None));
-            metadata.Data["payload"]!["tags"] = new JsonArray(new JsonObject { ["name"]="Root fixture",["payload"]="{\"kind\":\"monica-project-tag\",\"extra\":\"synthetic\"}",["version"]=1 });
-            await access.ApplyDeviceSyncRootMetadataAsync(root.ProjectId,metadata.Guard,false,false,metadata.Data,CancellationToken.None);
-            await access.CreateDeviceSyncEntryAsync(keyId,root.ProjectId,"passkey","Native key",DevicePasskeyShape.Export(entry,material.PrivateKeyPkcs8Base64)["payload"]!.ToJsonString(),CancellationToken.None);
-            await access.CreateDeviceSyncEntryAsync(owner,root.ProjectId,"api-token","Related token",new JsonObject { ["token"]="synthetic",
-                ["device_sync_pending_relations"]=new JsonArray(new JsonObject { ["target"]=keyId,["kind"]="com.monica.fixture.credential",["payload"]="{}",["version"]=1 }) }.ToJsonString(),CancellationToken.None);
+        var entry = new PasskeyEntry
+        {
+            CredentialId = Guid.NewGuid().ToString(),
+            RpId = "example.test",
+            RpName = "Native key",
+            UserId = "Zml4dHVyZQ==",
+            UserName = "fixture",
+            PublicKeyAlgorithm = PasskeyAlgorithm.Es256,
+            PublicKey = material.PublicKeySpkiBase64,
+            Notes = "Native source"
+        };
+        await first.Passkeys.SaveAsync(entry, material.PrivateKeyPkcs8Base64);
+        using (var native = await bridge.OpenVaultAsync(first.Database.FilePath, first.Database.EncryptedPassword!, "native-key-fixture"))
+        {
+            var access = (IMdbxNativeDevicePasswordAccess)native; await access.EnsureDeviceSyncFoldersAsync(new JsonArray(), CancellationToken.None);
+            var root = (await access.ListDeviceSyncProjectsAsync(CancellationToken.None)).Single(p => MdbxAndroidRoot.IsRootTitle(p.Title));
+            var metadata = Assert.Single(await access.ReadDeviceSyncRootMetadataAsync(CancellationToken.None));
+            metadata.Data["payload"]!["tags"] = new JsonArray(new JsonObject { ["name"] = "Root fixture", ["payload"] = "{\"kind\":\"monica-project-tag\",\"extra\":\"synthetic\"}", ["version"] = 1 });
+            await access.ApplyDeviceSyncRootMetadataAsync(root.ProjectId, metadata.Guard, false, false, metadata.Data, CancellationToken.None);
+            await access.CreateDeviceSyncEntryAsync(keyId, root.ProjectId, "passkey", "Native key", DevicePasskeyShape.Export(entry, material.PrivateKeyPkcs8Base64)["payload"]!.ToJsonString(), CancellationToken.None);
+            await access.CreateDeviceSyncEntryAsync(owner, root.ProjectId, "api-token", "Related token", new JsonObject
+            {
+                ["token"] = "synthetic",
+                ["device_sync_pending_relations"] = new JsonArray(new JsonObject { ["target"] = keyId, ["kind"] = "com.monica.fixture.credential", ["payload"] = "{}", ["version"] = 1 })
+            }.ToJsonString(), CancellationToken.None);
             await access.ResolveDeviceSyncRelationsAsync(CancellationToken.None);
         }
-        await ExchangeAsync(first,second);
-        var received=Assert.Single(await second.Passkeys.ListAllAsync());
-        Assert.Equal("Native source",received.Notes);
-        using(var native = await bridge.OpenVaultAsync(second.Database.FilePath,second.Database.EncryptedPassword!,"native-key-fixture")) {
-            var access=(IMdbxNativeDevicePasswordAccess)native;
-            Assert.Equal(keyId,(await access.ReadDeviceSyncRelationsAsync(owner,CancellationToken.None))[0]!["target"]!.GetValue<string>());
-            Assert.Contains(await access.ReadDeviceSyncRootMetadataAsync(CancellationToken.None),m => m.Data["payload"]?["tags"]?.ToJsonString().Contains("Root fixture") == true);
+        await ExchangeAsync(first, second);
+        var received = Assert.Single(await second.Passkeys.ListAllAsync());
+        Assert.Equal("Native source", received.Notes);
+        using (var native = await bridge.OpenVaultAsync(second.Database.FilePath, second.Database.EncryptedPassword!, "native-key-fixture"))
+        {
+            var access = (IMdbxNativeDevicePasswordAccess)native;
+            Assert.Equal(keyId, (await access.ReadDeviceSyncRelationsAsync(owner, CancellationToken.None))[0]!["target"]!.GetValue<string>());
+            Assert.Contains(await access.ReadDeviceSyncRootMetadataAsync(CancellationToken.None), m => m.Data["payload"]?["tags"]?.ToJsonString().Contains("Root fixture") == true);
         }
-        received.Notes="Changed on receiver";
+        received.Notes = "Changed on receiver";
         await second.Passkeys.SaveAsync(received);
-        await ExchangeAsync(second,first);
-        Assert.Equal("Changed on receiver",Assert.Single(await first.Passkeys.ListAllAsync()).Notes);
+        await ExchangeAsync(second, first);
+        Assert.Equal("Changed on receiver", Assert.Single(await first.Passkeys.ListAllAsync()).Notes);
         await second.Passkeys.DeleteAsync(received.Id);
-        await ExchangeAsync(second,first);
+        await ExchangeAsync(second, first);
         Assert.Empty(await first.Passkeys.ListAllAsync()); Assert.Empty(await second.Passkeys.ListAllAsync());
     }
 
     [Fact]
     public async Task Relation_targets_use_existing_local_aliases()
     {
-        await using var first=await Fixture.CreateAsync(); await using var second=await Fixture.CreateAsync();
-        var bridge=new MdbxUniffiNativeBridge(); var a="11111111-1111-4111-8111-111111111111"; var b="22222222-2222-4222-8222-222222222222"; var owner=Guid.NewGuid().ToString();
-        foreach(var (fixture,id) in new[] { (first,b),(second,a) }) using(var native=await bridge.OpenVaultAsync(fixture.Database.FilePath,fixture.Database.EncryptedPassword!,"alias-fixture")) {
-            var root=await native.CreateProjectWithIdentityAsync("33333333-3333-4333-8333-333333333333","Shared",null); var access=(IMdbxNativeDevicePasswordAccess)native;
-            await access.CreateDeviceSyncEntryAsync(id,root.ProjectId,"note","Same target","{\"kind\":\"note\",\"item_data\":\"{\\\"content\\\":\\\"synthetic\\\"}\"}",CancellationToken.None);
-            if(fixture==first) {
-                await access.CreateDeviceSyncEntryAsync(owner,root.ProjectId,"api-token","Owner",new JsonObject { ["token"]="synthetic",["device_sync_pending_relations"]=new JsonArray(new JsonObject {
-                    ["target"]=b,["kind"]="com.monica.fixture.related",["payload"]="{}",["version"]=1 }) }.ToJsonString(),CancellationToken.None);
+        await using var first = await Fixture.CreateAsync(); await using var second = await Fixture.CreateAsync();
+        var bridge = new MdbxUniffiNativeBridge(); var a = "11111111-1111-4111-8111-111111111111"; var b = "22222222-2222-4222-8222-222222222222"; var owner = Guid.NewGuid().ToString();
+        foreach (var (fixture, id) in new[] { (first, b), (second, a) }) using (var native = await bridge.OpenVaultAsync(fixture.Database.FilePath, fixture.Database.EncryptedPassword!, "alias-fixture"))
+        {
+            var root = await native.CreateProjectWithIdentityAsync("33333333-3333-4333-8333-333333333333", "Shared", null); var access = (IMdbxNativeDevicePasswordAccess)native;
+            await access.CreateDeviceSyncEntryAsync(id, root.ProjectId, "note", "Same target", "{\"kind\":\"note\",\"item_data\":\"{\\\"content\\\":\\\"synthetic\\\"}\"}", CancellationToken.None);
+            if (fixture == first)
+            {
+                await access.CreateDeviceSyncEntryAsync(owner, root.ProjectId, "api-token", "Owner", new JsonObject
+                {
+                    ["token"] = "synthetic",
+                    ["device_sync_pending_relations"] = new JsonArray(new JsonObject
+                    {
+                        ["target"] = b,
+                        ["kind"] = "com.monica.fixture.related",
+                        ["payload"] = "{}",
+                        ["version"] = 1
+                    })
+                }.ToJsonString(), CancellationToken.None);
                 await access.ResolveDeviceSyncRelationsAsync(CancellationToken.None);
             }
         }
         // Folder membership is part of the payload; give both targets the same portable folder.
-        var firstTarget=(await first.Vaults.ReadDevicePasswordsAsync(first.Database,CancellationToken.None)).Single(p => p.GlobalId==b);
-        var secondTarget=(await second.Vaults.ReadDevicePasswordsAsync(second.Database,CancellationToken.None)).Single(p => p.GlobalId==a);
-        secondTarget.Data["folder_path"]=firstTarget.Data["folder_path"]!.DeepClone();
-        await second.Vaults.TryApplyDevicePasswordAsync(second.Database,a,secondTarget.LocalId,secondTarget.Guard,false,secondTarget.Data,CancellationToken.None);
-        await ExchangeAsync(first,second);
-        using(var native=await bridge.OpenVaultAsync(second.Database.FilePath,second.Database.EncryptedPassword!,"alias-fixture")) {
-            Assert.Equal(a,(await ((IMdbxNativeDevicePasswordAccess)native).ReadDeviceSyncRelationsAsync(owner,CancellationToken.None))[0]!["target"]!.GetValue<string>());
+        var firstTarget = (await first.Vaults.ReadDevicePasswordsAsync(first.Database, CancellationToken.None)).Single(p => p.GlobalId == b);
+        var secondTarget = (await second.Vaults.ReadDevicePasswordsAsync(second.Database, CancellationToken.None)).Single(p => p.GlobalId == a);
+        secondTarget.Data["folder_path"] = firstTarget.Data["folder_path"]!.DeepClone();
+        await second.Vaults.TryApplyDevicePasswordAsync(second.Database, a, secondTarget.LocalId, secondTarget.Guard, false, secondTarget.Data, CancellationToken.None);
+        await ExchangeAsync(first, second);
+        using (var native = await bridge.OpenVaultAsync(second.Database.FilePath, second.Database.EncryptedPassword!, "alias-fixture"))
+        {
+            Assert.Equal(a, (await ((IMdbxNativeDevicePasswordAccess)native).ReadDeviceSyncRelationsAsync(owner, CancellationToken.None))[0]!["target"]!.GetValue<string>());
         }
     }
 
     [Fact]
     public void Asset_references_preserve_arbitrary_user_text()
     {
-        var data=new JsonObject { ["entry_type"]="note",["password_plain"]="mdbx:fixture",["notes"]="mdbx:fixture",["payload"]=new JsonObject {
-            ["image_paths"]="[\"mdbx:fixture\"]",["item_data"]="{\"content\":\"Text mdbx:fixture ![image](mdbx:fixture)\"}" } };
-        DeviceVaultShape.RemapAssetPath(data,"mdbx:fixture","device-asset:fixture");
-        Assert.Equal("mdbx:fixture",data["password_plain"]!.GetValue<string>()); Assert.Equal("mdbx:fixture",data["notes"]!.GetValue<string>());
-        Assert.Equal("[\"device-asset:fixture\"]",data["payload"]!["image_paths"]!.GetValue<string>());
-        Assert.Equal("Text mdbx:fixture ![image](device-asset:fixture)",JsonNode.Parse(data["payload"]!["item_data"]!.GetValue<string>())!["content"]!.GetValue<string>());
+        var data = new JsonObject
+        {
+            ["entry_type"] = "note",
+            ["password_plain"] = "mdbx:fixture",
+            ["notes"] = "mdbx:fixture",
+            ["payload"] = new JsonObject
+            {
+                ["image_paths"] = "[\"mdbx:fixture\"]",
+                ["item_data"] = "{\"content\":\"Text mdbx:fixture ![image](mdbx:fixture)\"}"
+            }
+        };
+        DeviceVaultShape.RemapAssetPath(data, "mdbx:fixture", "device-asset:fixture");
+        Assert.Equal("mdbx:fixture", data["password_plain"]!.GetValue<string>()); Assert.Equal("mdbx:fixture", data["notes"]!.GetValue<string>());
+        Assert.Equal("[\"device-asset:fixture\"]", data["payload"]!["image_paths"]!.GetValue<string>());
+        Assert.Equal("Text mdbx:fixture ![image](device-asset:fixture)", JsonNode.Parse(data["payload"]!["item_data"]!.GetValue<string>())!["content"]!.GetValue<string>());
     }
 
     [Fact]
     public async Task Copied_vault_identifiers_keep_independent_records()
     {
-        await using var first=await Fixture.CreateAsync(); await using var second=await Fixture.CreateAsync();
-        var bridge=new MdbxUniffiNativeBridge(); var copyPath=Path.Combine(TestTempPaths.CreateDirectoryPath(),"copy.mdbx");
-        await first.Repository.SavePasswordAsync(new PasswordEntry { Title="Original copy",Password="synthetic-original" });
-        var original=Assert.Single(await first.Repository.GetPasswordsAsync());
-        await ((IMdbxNativeSnapshotBridge)bridge).CreatePortableBackupAsync(first.Database.FilePath,copyPath,CancellationToken.None);
-        var copied=new LocalMdbxDatabase { Name="Copied",FilePath=copyPath,WorkingCopyPath=copyPath,EncryptedPassword=first.Database.EncryptedPassword,IsOfflineAvailable=true };
+        await using var first = await Fixture.CreateAsync(); await using var second = await Fixture.CreateAsync();
+        var bridge = new MdbxUniffiNativeBridge(); var copyPath = Path.Combine(TestTempPaths.CreateDirectoryPath(), "copy.mdbx");
+        await first.Repository.SavePasswordAsync(new PasswordEntry { Title = "Original copy", Password = "synthetic-original" });
+        var original = Assert.Single(await first.Repository.GetPasswordsAsync());
+        await ((IMdbxNativeSnapshotBridge)bridge).CreatePortableBackupAsync(first.Database.FilePath, copyPath, CancellationToken.None);
+        var copied = new LocalMdbxDatabase { Name = "Copied", FilePath = copyPath, WorkingCopyPath = copyPath, EncryptedPassword = first.Database.EncryptedPassword, IsOfflineAvailable = true };
         await first.Repository.SaveMdbxDatabaseAsync(copied);
-        var snapshot=(await first.Vaults.ReadDevicePasswordsAsync(copied,CancellationToken.None)).Single(p => p.Data["entry_type"]?.GetValue<string>() == "login");
-        snapshot.Data["password_plain"]="synthetic-copied"; snapshot.Data["title"]="Changed copy";
-        await first.Vaults.TryApplyDevicePasswordAsync(copied,snapshot.GlobalId,snapshot.LocalId,snapshot.Guard,false,snapshot.Data,CancellationToken.None);
-        await ExchangeAsync(first,second);
-        var received=await second.Repository.GetPasswordsAsync();
-        Assert.Equal(2,received.Count);
-        Assert.Contains(received,p => p.Password=="synthetic-original"); Assert.Contains(received,p => p.Password=="synthetic-copied");
-        Assert.Equal("synthetic-original",Assert.Single(await first.Repository.GetPasswordsAsync()).Password);
+        var snapshot = (await first.Vaults.ReadDevicePasswordsAsync(copied, CancellationToken.None)).Single(p => p.Data["entry_type"]?.GetValue<string>() == "login");
+        snapshot.Data["password_plain"] = "synthetic-copied"; snapshot.Data["title"] = "Changed copy";
+        await first.Vaults.TryApplyDevicePasswordAsync(copied, snapshot.GlobalId, snapshot.LocalId, snapshot.Guard, false, snapshot.Data, CancellationToken.None);
+        await ExchangeAsync(first, second);
+        var received = await second.Repository.GetPasswordsAsync();
+        Assert.Equal(2, received.Count);
+        Assert.Contains(received, p => p.Password == "synthetic-original"); Assert.Contains(received, p => p.Password == "synthetic-copied");
+        Assert.Equal("synthetic-original", Assert.Single(await first.Repository.GetPasswordsAsync()).Password);
     }
     [Fact]
     public async Task Legacy_wrapped_secure_item_keeps_its_data_notes_and_favorite()
     {
         await using var first = await Fixture.CreateAsync(); await using var second = await Fixture.CreateAsync();
         var bridge = new MdbxUniffiNativeBridge();
-        using(var native = await bridge.OpenVaultAsync(first.Database.FilePath,first.Database.EncryptedPassword!,"legacy-secure"))
+        using (var native = await bridge.OpenVaultAsync(first.Database.FilePath, first.Database.EncryptedPassword!, "legacy-secure"))
         {
             var project = await native.CreateProjectAsync("Legacy wallet");
-            await native.CreateEntryAsync(project.ProjectId,"card","Legacy card", JsonSerializer.Serialize(new {
-                kind = "item", schemaVersion = 1, data = new { item = new { id = 42, itemType = 2, notes = "synthetic-note", isFavorite = true,
-                    itemData = "{\"cardNumber\":\"synthetic-card\",\"extension\":true}", imagePaths = "[]" }, attachments = Array.Empty<object>() } }));
+            await native.CreateEntryAsync(project.ProjectId, "card", "Legacy card", JsonSerializer.Serialize(new
+            {
+                kind = "item",
+                schemaVersion = 1,
+                data = new
+                {
+                    item = new
+                    {
+                        id = 42,
+                        itemType = 2,
+                        notes = "synthetic-note",
+                        isFavorite = true,
+                        itemData = "{\"cardNumber\":\"synthetic-card\",\"extension\":true}",
+                        imagePaths = "[]"
+                    },
+                    attachments = Array.Empty<object>()
+                }
+            }));
         }
-        await ExchangeAsync(first,second);
+        await ExchangeAsync(first, second);
         var item = Assert.Single(await second.Repository.GetSecureItemsAsync());
-        Assert.Equal("synthetic-note",item.Notes); Assert.True(item.IsFavorite); Assert.Contains("synthetic-card",item.ItemData);
+        Assert.Equal("synthetic-note", item.Notes); Assert.True(item.IsFavorite); Assert.Contains("synthetic-card", item.ItemData);
     }
 
     [Fact]
     public async Task Corrupted_incoming_asset_keeps_the_existing_business_record()
     {
         await using var first = await Fixture.CreateAsync(); await using var second = await Fixture.CreateAsync();
-        await first.Repository.SavePasswordAsync(new PasswordEntry { Title = "Original",Password = "synthetic-old" });
-        await ExchangeAsync(first,second);
+        await first.Repository.SavePasswordAsync(new PasswordEntry { Title = "Original", Password = "synthetic-old" });
+        await ExchangeAsync(first, second);
         var changed = Assert.Single(await first.Repository.GetPasswordsAsync()); changed.Password = "synthetic-new";
         await first.Repository.SavePasswordAsync(changed);
         changed = Assert.Single(await first.Repository.GetPasswordsAsync());
-        await first.Vaults.SavePasswordAttachmentAsync(first.Database,changed,new Attachment { FileName = "corrupt.bin",ContentType="application/octet-stream" },RandomNumberGenerator.GetBytes(700000));
-        var snapshot = await first.Provider.PrepareAsync(TestTempPaths.CreateDirectoryPath(),CancellationToken.None);
-        var path = Path.Combine(snapshot.Directory,"assets.monica"); var bytes = await File.ReadAllBytesAsync(path); bytes[^1] ^= 1; await File.WriteAllBytesAsync(path,bytes);
-        await Assert.ThrowsAnyAsync<Exception>(() => second.Provider.ApplyAsync(snapshot.Directory,Peer(snapshot),CancellationToken.None));
-        Assert.Equal("synthetic-old",Assert.Single(await second.Repository.GetPasswordsAsync()).Password);
+        await first.Vaults.SavePasswordAttachmentAsync(first.Database, changed, new Attachment { FileName = "corrupt.bin", ContentType = "application/octet-stream" }, RandomNumberGenerator.GetBytes(700000));
+        var snapshot = await first.Provider.PrepareAsync(TestTempPaths.CreateDirectoryPath(), CancellationToken.None);
+        var path = Path.Combine(snapshot.Directory, "assets.monica"); var bytes = await File.ReadAllBytesAsync(path); bytes[^1] ^= 1; await File.WriteAllBytesAsync(path, bytes);
+        await Assert.ThrowsAnyAsync<Exception>(() => second.Provider.ApplyAsync(snapshot.Directory, Peer(snapshot), CancellationToken.None));
+        Assert.Equal("synthetic-old", Assert.Single(await second.Repository.GetPasswordsAsync()).Password);
     }
 
     [Fact]
@@ -269,28 +343,37 @@ public sealed class DevicePasswordSyncTests
     {
         await using var first = await Fixture.CreateAsync(); await using var second = await Fixture.CreateAsync();
         var bridge = new MdbxUniffiNativeBridge(); var a = Guid.NewGuid().ToString(); var b = Guid.NewGuid().ToString();
-        using(var native = await bridge.OpenVaultAsync(first.Database.FilePath,first.Database.EncryptedPassword!,"metadata-fixture"))
+        using (var native = await bridge.OpenVaultAsync(first.Database.FilePath, first.Database.EncryptedPassword!, "metadata-fixture"))
         {
             var root = await native.CreateProjectAsync("Metadata"); var access = (IMdbxNativeDevicePasswordAccess)native;
-            foreach(var (id,target) in new[] { (a,b),(b,a) })
+            foreach (var (id, target) in new[] { (a, b), (b, a) })
             {
-                await access.CreateDeviceSyncEntryAsync(id,root.ProjectId,"api-token","Synthetic token",
-                    new JsonObject { ["token"]="synthetic-token", ["device_sync_pending_relations"] = new JsonArray(new JsonObject {
-                        ["target"]=target,["kind"]="com.monica.fixture.related",["payload"]="{}",["version"]=1 }) }.ToJsonString(),CancellationToken.None);
+                await access.CreateDeviceSyncEntryAsync(id, root.ProjectId, "api-token", "Synthetic token",
+                    new JsonObject
+                    {
+                        ["token"] = "synthetic-token",
+                        ["device_sync_pending_relations"] = new JsonArray(new JsonObject
+                        {
+                            ["target"] = target,
+                            ["kind"] = "com.monica.fixture.related",
+                            ["payload"] = "{}",
+                            ["version"] = 1
+                        })
+                    }.ToJsonString(), CancellationToken.None);
             }
             await access.ResolveDeviceSyncRelationsAsync(CancellationToken.None);
-            var summary = await access.GetDeviceSyncSummaryAsync(a,CancellationToken.None);
-            var payload = (await access.ReadDeviceSyncObjectAsync(summary!,CancellationToken.None))!.PayloadJson;
-            var labels = new JsonArray(new JsonObject { ["name"]="monica:api-token:fields:v1",["payload"]="{\"fields\":[{\"title\":\"Extra\",\"value\":\"synthetic\"}]}",["version"]=1 });
-            await access.CommitDeviceSyncObjectAsync(new(a,root.ProjectId,"api-token","Synthetic token",payload,summary,false,[],[],labels),CancellationToken.None);
+            var summary = await access.GetDeviceSyncSummaryAsync(a, CancellationToken.None);
+            var payload = (await access.ReadDeviceSyncObjectAsync(summary!, CancellationToken.None))!.PayloadJson;
+            var labels = new JsonArray(new JsonObject { ["name"] = "monica:api-token:fields:v1", ["payload"] = "{\"fields\":[{\"title\":\"Extra\",\"value\":\"synthetic\"}]}", ["version"] = 1 });
+            await access.CommitDeviceSyncObjectAsync(new(a, root.ProjectId, "api-token", "Synthetic token", payload, summary, false, [], [], labels), CancellationToken.None);
         }
-        await ExchangeAsync(first,second);
-        using(var native = await bridge.OpenVaultAsync(second.Database.FilePath,second.Database.EncryptedPassword!,"metadata-fixture"))
+        await ExchangeAsync(first, second);
+        using (var native = await bridge.OpenVaultAsync(second.Database.FilePath, second.Database.EncryptedPassword!, "metadata-fixture"))
         {
             var access = (IMdbxNativeDevicePasswordAccess)native;
-            Assert.Equal(b,(await access.ReadDeviceSyncRelationsAsync(a,CancellationToken.None))[0]!["target"]!.GetValue<string>());
-            Assert.Equal(a,(await access.ReadDeviceSyncRelationsAsync(b,CancellationToken.None))[0]!["target"]!.GetValue<string>());
-            Assert.Contains("synthetic",(await access.ReadDeviceSyncLabelsAsync(a,CancellationToken.None))[0]!["payload"]!.GetValue<string>());
+            Assert.Equal(b, (await access.ReadDeviceSyncRelationsAsync(a, CancellationToken.None))[0]!["target"]!.GetValue<string>());
+            Assert.Equal(a, (await access.ReadDeviceSyncRelationsAsync(b, CancellationToken.None))[0]!["target"]!.GetValue<string>());
+            Assert.Contains("synthetic", (await access.ReadDeviceSyncLabelsAsync(a, CancellationToken.None))[0]!["payload"]!.GetValue<string>());
         }
     }
 
@@ -302,7 +385,7 @@ public sealed class DevicePasswordSyncTests
         var bridge = new MdbxUniffiNativeBridge();
         var parent = Guid.NewGuid().ToString(); var child = Guid.NewGuid().ToString(); var empty = Guid.NewGuid().ToString();
         var record = Guid.NewGuid().ToString();
-        using(var native = await bridge.OpenVaultAsync(first.Database.FilePath, first.Database.EncryptedPassword!, "folder-fixture"))
+        using (var native = await bridge.OpenVaultAsync(first.Database.FilePath, first.Database.EncryptedPassword!, "folder-fixture"))
         {
             await native.CreateProjectWithIdentityAsync(parent, "Parent", null);
             await native.CreateProjectWithIdentityAsync(child, "Child", parent);
@@ -312,7 +395,7 @@ public sealed class DevicePasswordSyncTests
             await native.DeleteEntryAsync(child, record);
         }
         await ExchangeAsync(first, second);
-        using(var native = await bridge.OpenVaultAsync(second.Database.FilePath, second.Database.EncryptedPassword!, "folder-fixture"))
+        using (var native = await bridge.OpenVaultAsync(second.Database.FilePath, second.Database.EncryptedPassword!, "folder-fixture"))
         {
             var projects = await ((IMdbxNativeDevicePasswordAccess)native).ListDeviceSyncProjectsAsync(CancellationToken.None);
             Assert.Equal(parent, Assert.Single(projects, p => p.ProjectId == child).ParentProjectId);
@@ -332,8 +415,16 @@ public sealed class DevicePasswordSyncTests
         await using var first = await Fixture.CreateAsync();
         await using var second = await Fixture.CreateAsync();
         var material = PasskeyKeyMaterialGenerator.Generate(algorithm == PasskeyAlgorithm.Ps256 ? PasskeyAlgorithm.Rs256 : algorithm);
-        var entry = new PasskeyEntry { CredentialId = Guid.NewGuid().ToString(), RpId = "example.com", RpName = "Fixture",
-            UserId = Convert.ToBase64String("fixture-user"u8.ToArray()), UserName = "fixture", PublicKeyAlgorithm = algorithm, PublicKey = material.PublicKeySpkiBase64 };
+        var entry = new PasskeyEntry
+        {
+            CredentialId = Guid.NewGuid().ToString(),
+            RpId = "example.com",
+            RpName = "Fixture",
+            UserId = Convert.ToBase64String("fixture-user"u8.ToArray()),
+            UserName = "fixture",
+            PublicKeyAlgorithm = algorithm,
+            PublicKey = material.PublicKeySpkiBase64
+        };
         await first.Passkeys.SaveAsync(entry, material.PrivateKeyPkcs8Base64);
         await ExchangeAsync(first, second);
         var received = Assert.Single(await second.Passkeys.ListAllAsync());
@@ -379,17 +470,27 @@ public sealed class DevicePasswordSyncTests
         await using var second = await Fixture.CreateAsync();
         var itemData = new JsonObject
         {
-            ["secret"] = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ", ["issuer"] = "Synthetic",
-            ["accountName"] = "fixture", ["digits"] = 8, ["period"] = 30, ["algorithm"] = "SHA1",
-            ["otpType"] = "TOTP", ["counter"] = 17, ["pin"] = "synthetic-pin",
-            ["steamIdentitySecret"] = "synthetic-recovery", ["extension"] = new JsonObject { ["preserve"] = true }
+            ["secret"] = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+            ["issuer"] = "Synthetic",
+            ["accountName"] = "fixture",
+            ["digits"] = 8,
+            ["period"] = 30,
+            ["algorithm"] = "SHA1",
+            ["otpType"] = "TOTP",
+            ["counter"] = 17,
+            ["pin"] = "synthetic-pin",
+            ["steamIdentitySecret"] = "synthetic-recovery",
+            ["extension"] = new JsonObject { ["preserve"] = true }
         }.ToJsonString();
         var types = new[] { VaultItemType.Totp, VaultItemType.Note, VaultItemType.BankCard,
             VaultItemType.Document, VaultItemType.BillingAddress, VaultItemType.PaymentAccount };
         foreach (var type in types)
             await first.Repository.SaveSecureItemAsync(new SecureItem
             {
-                ItemType = type, Title = $"Fixture {type}", Notes = "preserved note", ItemData = itemData
+                ItemType = type,
+                Title = $"Fixture {type}",
+                Notes = "preserved note",
+                ItemData = itemData
             });
 
         await ExchangeAsync(first, second);
@@ -398,7 +499,7 @@ public sealed class DevicePasswordSyncTests
         Assert.Equal(types.Length, received.Count);
         foreach (var type in types)
         {
-            var item = Assert.Single(received.Where(item => item.ItemType == type));
+            var item = Assert.Single(received, item => item.ItemType == type);
             Assert.Equal("preserved note", item.Notes);
             Assert.True(JsonNode.DeepEquals(JsonNode.Parse(itemData), JsonNode.Parse(item.ItemData)));
         }
@@ -413,7 +514,10 @@ public sealed class DevicePasswordSyncTests
         for (var i = 0; i < 16; i++)
             await first.Repository.SavePasswordAsync(new PasswordEntry
             {
-                Title = $"Batch {i}", Username = $"user-{i}", Password = $"synthetic-{i}", Notes = notes
+                Title = $"Batch {i}",
+                Username = $"user-{i}",
+                Password = $"synthetic-{i}",
+                Notes = notes
             });
 
         var outgoing = await first.Provider.PrepareAsync(TestTempPaths.CreateDirectoryPath(), CancellationToken.None);
@@ -533,7 +637,7 @@ public sealed class DevicePasswordSyncTests
         await using var fixture = await Fixture.CreateAsync();
         var entry = new PasswordEntry { Title = "Login", Password = "synthetic-old" };
         await fixture.Repository.SavePasswordAsync(entry);
-        var before = Assert.Single(await fixture.Vaults.ReadDevicePasswordsAsync(fixture.Database, CancellationToken.None),p => p.Data["entry_type"]?.GetValue<string>() == "login");
+        var before = Assert.Single(await fixture.Vaults.ReadDevicePasswordsAsync(fixture.Database, CancellationToken.None), p => p.Data["entry_type"]?.GetValue<string>() == "login");
         entry.Password = "synthetic-later-local";
         await fixture.Repository.SavePasswordAsync(entry);
         var incoming = before.Data.DeepClone().AsObject();
@@ -630,7 +734,7 @@ public sealed class DevicePasswordSyncTests
         Assert.Equal("synthetic-ssh-json", received.SshKeyData);
         var fields = await second.Repository.GetCustomFieldsAsync(received.Id);
         Assert.Contains(fields, field => field.Title == "Protected" && field.Value == "synthetic-field" && field.IsProtected);
-        var before = Assert.Single(await second.Vaults.ReadDevicePasswordsAsync(second.Database, CancellationToken.None),p => p.Data["entry_type"]?.GetValue<string>() is "login" or "ssh-key");
+        var before = Assert.Single(await second.Vaults.ReadDevicePasswordsAsync(second.Database, CancellationToken.None), p => p.Data["entry_type"]?.GetValue<string>() is "login" or "ssh-key");
         var malformed = before.Data.DeepClone().AsObject();
         malformed["password_plain"] = new JsonObject { ["unexpected"] = true };
         await Assert.ThrowsAsync<InvalidDataException>(() => second.Vaults.TryApplyDevicePasswordAsync(second.Database, before.GlobalId,
@@ -735,8 +839,12 @@ public sealed class DevicePasswordSyncTests
                     }
                     _offers[handle] = new
                     {
-                        device_id = device.GetProperty("device_id").GetString(), session = device.GetProperty("pair_id").GetString(),
-                        name = device.GetProperty("name").GetString(), trusted, address = "127.0.0.1", port,
+                        device_id = device.GetProperty("device_id").GetString(),
+                        session = device.GetProperty("pair_id").GetString(),
+                        name = device.GetProperty("name").GetString(),
+                        trusted,
+                        address = "127.0.0.1",
+                        port,
                         revision = input.GetProperty("revision").GetString()
                     };
                 }
@@ -786,10 +894,20 @@ public sealed class DevicePasswordSyncTests
             var project = await native.CreateProjectAsync("Legacy");
             var payload = JsonSerializer.Serialize(new
             {
-                kind = "password", schemaVersion = 1, data = new
+                kind = "password",
+                schemaVersion = 1,
+                data = new
                 {
-                    entry = new { id = 42, title = "Legacy", username = "legacy-user", password = "synthetic-legacy", loginType = 0,
-                        wifiMetadata = new { ssid = "synthetic-wifi" }, creditCardCVV = "synthetic-cvv" },
+                    entry = new
+                    {
+                        id = 42,
+                        title = "Legacy",
+                        username = "legacy-user",
+                        password = "synthetic-legacy",
+                        loginType = 0,
+                        wifiMetadata = new { ssid = "synthetic-wifi" },
+                        creditCardCVV = "synthetic-cvv"
+                    },
                     customFields = new[] { new { id = 1, entryId = 42, title = "Protected", value = "synthetic-field", isProtected = true, sortOrder = 0 } }
                 }
             });
@@ -824,8 +942,14 @@ public sealed class DevicePasswordSyncTests
         {
             var directory = TestTempPaths.CreateDirectoryPath();
             var bridge = new MdbxUniffiNativeBridge();
-            var database = new LocalMdbxDatabase { Name = "Personal", FilePath = Path.Combine(directory, "personal.mdbx"),
-                EncryptedPassword = "synthetic-native-password", IsDefault = true, IsOfflineAvailable = true };
+            var database = new LocalMdbxDatabase
+            {
+                Name = "Personal",
+                FilePath = Path.Combine(directory, "personal.mdbx"),
+                EncryptedPassword = "synthetic-native-password",
+                IsDefault = true,
+                IsOfflineAvailable = true
+            };
             database.WorkingCopyPath = database.FilePath;
             using (await bridge.CreateVaultAsync(database.FilePath, database.EncryptedPassword, Guid.NewGuid().ToString(), MdbxTigaMode.Multi)) { }
             var factory = new SqliteConnectionFactory(Path.Combine(directory, "metadata.db"));
@@ -838,8 +962,15 @@ public sealed class DevicePasswordSyncTests
             await repository.SaveMdbxDatabaseAsync(database);
             var settings = new DeviceSyncPreferenceStore(new FixtureProtector(), Path.Combine(directory, "peers.protected"));
             await settings.SaveAsync(new DeviceSyncPreferences());
-            return new Fixture { Repository = repository, Database = database, Vaults = vaults, Settings = settings, Passkeys = keys,
-                Provider = new DevicePasswordSyncProvider(repository, vaults, settings, Path.Combine(directory, "journal.replica"), keys) };
+            return new Fixture
+            {
+                Repository = repository,
+                Database = database,
+                Vaults = vaults,
+                Settings = settings,
+                Passkeys = keys,
+                Provider = new DevicePasswordSyncProvider(repository, vaults, settings, Path.Combine(directory, "journal.replica"), keys)
+            };
         }
         public async ValueTask DisposeAsync() { await Provider.PauseAsync(); Vaults.Dispose(); }
     }

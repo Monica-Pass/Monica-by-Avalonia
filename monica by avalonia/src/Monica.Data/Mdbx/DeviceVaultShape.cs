@@ -23,8 +23,14 @@ public static class DeviceVaultShape
         if (source["data"] is JsonObject wrapped)
         {
             source = (wrapped["item"] as JsonObject ?? wrapped).DeepClone().AsObject();
-            source["kind"] = type switch { "card" => "bank_card", "document-ref" or "identity" => "document",
-                "billing-address" => "billing_address", "payment-account" => "payment_account", _ => type };
+            source["kind"] = type switch
+            {
+                "card" => "bank_card",
+                "document-ref" or "identity" => "document",
+                "billing-address" => "billing_address",
+                "payment-account" => "payment_account",
+                _ => type
+            };
             foreach (var (camel, snake) in new[] { ("itemData", "item_data"), ("imagePaths", "image_paths"),
                 ("sortOrder", "sort_order"), ("isFavorite", "is_favorite") })
                 if (source[camel] is { } value) { source[snake] = value.DeepClone(); source.Remove(camel); }
@@ -64,11 +70,13 @@ public static class DeviceVaultShape
                 var state = BackupFlag(payload, "backup_state");
                 if (eligibility == false && state == true) throw new InvalidDataException("invalid_passkey_material");
             }
-            if (type is "folder" or "vault-metadata") {
-                if(type == "folder") ValidatePath(payload["path"]);
-                else if(payload["tags"] is not JsonArray) throw new InvalidDataException("invalid_vault_payload");
-                foreach (var tag in Objects(payload,"tags")) {
-                    Text(tag,"name"); Text(tag,"payload");
+            if (type is "folder" or "vault-metadata")
+            {
+                if (type == "folder") ValidatePath(payload["path"]);
+                else if (payload["tags"] is not JsonArray) throw new InvalidDataException("invalid_vault_payload");
+                foreach (var tag in Objects(payload, "tags"))
+                {
+                    Text(tag, "name"); Text(tag, "payload");
                     if (!uint.TryParse(tag["version"]?.ToJsonString(), out _)) throw new InvalidDataException("invalid_vault_payload");
                 }
             }
@@ -107,7 +115,7 @@ public static class DeviceVaultShape
         foreach (var item in path)
         {
             if (item is not JsonObject folder) throw new InvalidDataException("invalid_folder");
-            Text(folder,"id"); Text(folder,"title");
+            Text(folder, "id"); Text(folder, "title");
             var id = folder["id"]!.GetValue<string>();
             if (!Guid.TryParse(id, out _) || !seen.Add(id) || folder["title"]!.GetValue<string>().Length > 4096 ||
                 (folder["parent"] is { } parent && (!Guid.TryParse(parent.GetValue<string>(), out _) || parent.GetValue<string>() == id)))
@@ -127,19 +135,19 @@ public static class DeviceVaultShape
                     if (name is "image_paths" or "imagePaths" or "photoPaths")
                     {
                         if (text == from) map[name] = to;
-                        else if (text.StartsWith('[')) { var paths = JsonNode.Parse(text)!; Visit(paths,name); map[name] = paths.ToJsonString(); }
+                        else if (text.StartsWith('[')) { var paths = JsonNode.Parse(text)!; Visit(paths, name); map[name] = paths.ToJsonString(); }
                     }
                     else if (name is "storagePath" or "storage_path" or "localPath" or "local_path" or "imagePath" or "custom_icon_value" or "customIconValue") { if (text == from) map[name] = to; }
                     else if (name == "item_data" && text.StartsWith('{')) { var payload = JsonNode.Parse(text)!; Visit(payload); map[name] = payload.ToJsonString(); }
                     else if (note && name == "content") map[name] = System.Text.RegularExpressions.Regex.Replace(text,
                         @"(!\[[^\]]*\]\()([^\s)]+)(\))", match => match.Groups[2].Value == from ? match.Groups[1].Value + to + match.Groups[3].Value : match.Value);
                 }
-                else if (map[name] is { } child) Visit(child,name);
+                else if (map[name] is { } child) Visit(child, name);
             }
             else if (node is JsonArray list) for (var i = 0; i < list.Count; i++)
             {
                 if (key is "image_paths" or "imagePaths" or "photoPaths" && list[i] is JsonValue value && value.TryGetValue<string>(out var path)) { if (path == from) list[i] = to; }
-                else if (list[i] is { } child) Visit(child,key);
+                else if (list[i] is { } child) Visit(child, key);
             }
         }
         Visit(data);
@@ -151,18 +159,18 @@ public static class DeviceVaultShape
         RemapReferences(data, id => { result.Add(id); return id; });
         return result.ToArray();
     }
-    public static void RemapReferences(JsonObject data, Func<string,string> map)
+    public static void RemapReferences(JsonObject data, Func<string, string> map)
     {
         void Visit(JsonNode node, string? key = null)
         {
-            if(node is JsonObject item) foreach(var name in item.Select(p => p.Key).ToArray())
+            if (node is JsonObject item) foreach (var name in item.Select(p => p.Key).ToArray())
             {
                 if ((name is "bound_password_entry_id" or "bound_note_entry_id" or "sso_ref_entry_id" ||
                     (key is "folder_path" or "path" && name is "id" or "parent") || (key == "relations" && name == "target")) &&
                     item[name] is JsonValue value && value.TryGetValue<string>(out var id) && id.Length > 0) item[name] = map(id);
-                else if(item[name] is { } child) Visit(child,name);
+                else if (item[name] is { } child) Visit(child, name);
             }
-            else if(node is JsonArray list) foreach(var child in list) if(child is not null) Visit(child,key);
+            else if (node is JsonArray list) foreach (var child in list) if (child is not null) Visit(child, key);
         }
         Visit(data);
     }

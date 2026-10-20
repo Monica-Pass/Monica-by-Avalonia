@@ -73,9 +73,14 @@ public sealed class MdbxRepositoryTests
         {
             var entry = new PasswordEntry
             {
-                Title = "Bound login", Password = "synthetic secret", BitwardenVaultId = 17,
-                BitwardenCipherId = "cipher-login", BitwardenFolderId = "folder", BitwardenCipherType = 1,
-                BitwardenRevisionDate = "r1", BitwardenLocalModified = true
+                Title = "Bound login",
+                Password = "synthetic secret",
+                BitwardenVaultId = 17,
+                BitwardenCipherId = "cipher-login",
+                BitwardenFolderId = "folder",
+                BitwardenCipherType = 1,
+                BitwardenRevisionDate = "r1",
+                BitwardenLocalModified = true
             };
             await repository.SavePasswordAsync(entry);
             var read = Assert.Single(await repository.GetPasswordsAsync());
@@ -89,9 +94,14 @@ public sealed class MdbxRepositoryTests
         {
             var item = new SecureItem
             {
-                Title = "Bound note", ItemType = VaultItemType.Note, ItemData = "{}", BitwardenVaultId = 17,
-                BitwardenCipherId = "cipher-note", BitwardenFolderId = "folder",
-                BitwardenRevisionDate = "r1", BitwardenLocalModified = true
+                Title = "Bound note",
+                ItemType = VaultItemType.Note,
+                ItemData = "{}",
+                BitwardenVaultId = 17,
+                BitwardenCipherId = "cipher-note",
+                BitwardenFolderId = "folder",
+                BitwardenRevisionDate = "r1",
+                BitwardenLocalModified = true
             };
             await repository.SaveSecureItemAsync(item);
             var read = Assert.Single(await repository.GetSecureItemsAsync());

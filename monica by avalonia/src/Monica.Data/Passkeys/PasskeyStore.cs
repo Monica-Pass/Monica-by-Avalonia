@@ -41,8 +41,8 @@ public interface IPasskeyStore
 
     Task<bool> DeleteAsync(long id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<NativePasskeyProjection>> ListNativeProjectionsAsync(CancellationToken token) => Task.FromResult<IReadOnlyList<NativePasskeyProjection>>([]);
-    Task SaveNativeProjectionAsync(long recordId,long databaseId,string objectId,CancellationToken token) => Task.CompletedTask;
-    Task RemoveNativeProjectionAsync(long databaseId,string objectId,CancellationToken token) => Task.CompletedTask;
+    Task SaveNativeProjectionAsync(long recordId, long databaseId, string objectId, CancellationToken token) => Task.CompletedTask;
+    Task RemoveNativeProjectionAsync(long databaseId, string objectId, CancellationToken token) => Task.CompletedTask;
 }
 
 public sealed class PasskeyStore(
@@ -54,22 +54,22 @@ public sealed class PasskeyStore(
     public async Task<IReadOnlyList<NativePasskeyProjection>> ListNativeProjectionsAsync(CancellationToken token)
     {
         await migrator.MigrateAsync(token); await using var connection = connectionFactory.CreateConnection(); await connection.OpenAsync(token);
-        await connection.ExecuteAsync(new CommandDefinition(ProjectionTable,cancellationToken:token));
+        await connection.ExecuteAsync(new CommandDefinition(ProjectionTable, cancellationToken: token));
         return (await connection.QueryAsync<NativePasskeyProjection>(new CommandDefinition(
-            "SELECT record_id AS RecordId,database_id AS DatabaseId,object_id AS ObjectId FROM device_sync_native_passkeys",cancellationToken:token))).ToArray();
+            "SELECT record_id AS RecordId,database_id AS DatabaseId,object_id AS ObjectId FROM device_sync_native_passkeys", cancellationToken: token))).ToArray();
     }
-    public async Task SaveNativeProjectionAsync(long recordId,long databaseId,string objectId,CancellationToken token)
+    public async Task SaveNativeProjectionAsync(long recordId, long databaseId, string objectId, CancellationToken token)
     {
         await migrator.MigrateAsync(token); await using var connection = connectionFactory.CreateConnection(); await connection.OpenAsync(token);
-        await connection.ExecuteAsync(new CommandDefinition(ProjectionTable,cancellationToken:token));
+        await connection.ExecuteAsync(new CommandDefinition(ProjectionTable, cancellationToken: token));
         await connection.ExecuteAsync(new CommandDefinition("INSERT INTO device_sync_native_passkeys(database_id,object_id,record_id) VALUES(@DatabaseId,@ObjectId,@RecordId) ON CONFLICT(database_id,object_id) DO UPDATE SET record_id=excluded.record_id",
-            new { DatabaseId=databaseId,ObjectId=objectId,RecordId=recordId },cancellationToken:token));
+            new { DatabaseId = databaseId, ObjectId = objectId, RecordId = recordId }, cancellationToken: token));
     }
-    public async Task RemoveNativeProjectionAsync(long databaseId,string objectId,CancellationToken token)
+    public async Task RemoveNativeProjectionAsync(long databaseId, string objectId, CancellationToken token)
     {
         await migrator.MigrateAsync(token); await using var connection = connectionFactory.CreateConnection(); await connection.OpenAsync(token);
-        await connection.ExecuteAsync(new CommandDefinition(ProjectionTable,cancellationToken:token));
-        await connection.ExecuteAsync(new CommandDefinition("DELETE FROM device_sync_native_passkeys WHERE database_id=@DatabaseId AND object_id=@ObjectId",new { DatabaseId=databaseId,ObjectId=objectId },cancellationToken:token));
+        await connection.ExecuteAsync(new CommandDefinition(ProjectionTable, cancellationToken: token));
+        await connection.ExecuteAsync(new CommandDefinition("DELETE FROM device_sync_native_passkeys WHERE database_id=@DatabaseId AND object_id=@ObjectId", new { DatabaseId = databaseId, ObjectId = objectId }, cancellationToken: token));
     }
     private const string SelectColumns =
         """

@@ -495,8 +495,8 @@ public sealed partial class MdbxUniffiNativeBridge : IMdbxNativeBridge, IMdbxNat
                         FileName: fileName,
                         MediaType: string.IsNullOrWhiteSpace(mediaType) ? DefaultMediaType : mediaType);
                     var result = content.Length <= 512 * 1024
-                        ? vault.CreateAttachmentWithContent(Guid.NewGuid().ToString(),request,content,MdbxFfi.DefaultAttachmentContentLimits())
-                        : vault.CreateAttachmentWithExternalContent(Guid.NewGuid().ToString(),request,content,MdbxFfi.DefaultAttachmentContentLimits());
+                        ? vault.CreateAttachmentWithContent(Guid.NewGuid().ToString(), request, content, MdbxFfi.DefaultAttachmentContentLimits())
+                        : vault.CreateAttachmentWithExternalContent(Guid.NewGuid().ToString(), request, content, MdbxFfi.DefaultAttachmentContentLimits());
                     return ToAttachment(result.Attachment);
                 },
                 cancellationToken);
