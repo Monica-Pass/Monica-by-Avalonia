@@ -307,6 +307,9 @@ public partial class App : Application
             _.GetRequiredService<IVaultCredentialStore>(),
             _.GetRequiredService<ICryptoService>(),
             _.GetRequiredService<ILocalizationService>()));
+        services.AddSingleton<IPasswordPromptDialogService>(_ => new PasswordPromptDialogService(
+            () => mainWindow,
+            _.GetRequiredService<ILocalizationService>()));
         services.AddSingleton<ITotpEditorDialogService>(_ => new TotpEditorDialogService(
             () => mainWindow,
             _.GetRequiredService<ILocalizationService>(),

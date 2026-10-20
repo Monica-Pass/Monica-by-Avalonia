@@ -3,7 +3,9 @@ namespace Monica.Core.ImportExport;
 public enum MonicaJsonImportError
 {
     InvalidFormat,
-    ResourceLimitExceeded
+    ResourceLimitExceeded,
+    PasswordRequired,
+    DecryptionFailed
 }
 
 public sealed class MonicaJsonImportException : InvalidOperationException

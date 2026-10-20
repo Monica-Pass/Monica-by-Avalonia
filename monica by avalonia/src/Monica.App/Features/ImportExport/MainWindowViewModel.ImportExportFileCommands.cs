@@ -37,7 +37,12 @@ public sealed partial class MainWindowViewModel
                 if (file is null)
                     return;
 
-                var package = await Task.Run(() => MonicaZipImportParser.Import(file.Content));
+                var package = await ImportZipWithPasswordAsync(file.Content);
+                if (package is null)
+                {
+                    SetStatusNotice("ImportArchiveCancelled");
+                    return;
+                }
                 var result = await GetMonicaJsonImportUseCase().ExecutePackageAsync(package);
                 await LogOperationAsync(new OperationLog
                 {
@@ -117,4 +122,29 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     private Task ImportNoteCsvAsync() =>
         RunImportExportOperationAsync(() => ImportNoteCsvTextAsync(ImportNoteCsvText, clearEditorOnSuccess: true));
+
+    private async Task<MonicaExportPackage?> ImportZipWithPasswordAsync(ReadOnlyMemory<byte> content)
+    {
+        string? password = null;
+        while (true)
+        {
+            try
+            {
+                var attemptPassword = password;
+                return await Task.Run(() => MonicaZipImportParser.Import(content, attemptPassword));
+            }
+            catch (MonicaJsonImportException error) when (
+                error.Error is MonicaJsonImportError.PasswordRequired or MonicaJsonImportError.DecryptionFailed)
+            {
+                var isRetry = error.Error == MonicaJsonImportError.DecryptionFailed;
+                password = await _passwordPromptDialogService.PromptAsync(
+                    _localization.Get("ImportEncryptedArchiveTitle"),
+                    _localization.Get("ImportEncryptedArchiveDescription"),
+                    _localization.Get("ImportEncryptedArchiveAction"),
+                    isRetry ? _localization.Get("ImportEncryptedArchiveWrongPassword") : null);
+                if (password is null)
+                    return null;
+            }
+        }
+    }
 }

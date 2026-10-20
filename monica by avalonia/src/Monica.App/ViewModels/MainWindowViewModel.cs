@@ -42,6 +42,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IVaultSessionService _vaultSessionService;
     private readonly IWindowPrivacyService _windowPrivacyService;
     private readonly IExportAuthorizationService _exportAuthorizationService;
+    private readonly IPasswordPromptDialogService _passwordPromptDialogService;
     private readonly IMdbxUnknownEntryDiagnostics? _mdbxUnknownEntryDiagnostics;
     private int _vaultLoadVersion;
     public MainWindowViewModel(
@@ -92,7 +93,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IPasskeyStore? passkeyStore = null,
         IMdbxLanSyncStore? lanSyncStore = null,
         IMdbxNativeBridge? lanNativeBridge = null,
-        DeviceSyncCoordinator? deviceSyncCoordinator = null)
+        DeviceSyncCoordinator? deviceSyncCoordinator = null,
+        IPasswordPromptDialogService? passwordPromptDialogService = null)
     {
         _viewModelDispatcher = Dispatcher.CurrentDispatcher;
         _repository = repository;
@@ -105,6 +107,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _vaultSessionService = vaultSessionService ?? new VaultSessionService();
         _windowPrivacyService = windowPrivacyService ?? new DisabledWindowPrivacyService();
         _exportAuthorizationService = exportAuthorizationService ?? new SessionExportAuthorizationService(_cryptoService);
+        _passwordPromptDialogService = passwordPromptDialogService ?? new DisabledPasswordPromptDialogService();
         _webDavBackupService = webDavBackupService ?? new DisabledWebDavBackupService();
         _webDavBackupCryptoService = webDavBackupCryptoService ?? new WebDavBackupCryptoService();
         _oneDriveBackupService = oneDriveBackupService ?? new DisabledOneDriveBackupService();
