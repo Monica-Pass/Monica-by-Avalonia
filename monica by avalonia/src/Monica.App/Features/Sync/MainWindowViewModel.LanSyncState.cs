@@ -49,9 +49,15 @@ public sealed partial class MainWindowViewModel
                 display.Name = peer.Name;
                 display.Status = L.Get(peer.Status switch
                 {
-                    "syncing" => "DeviceSyncSyncing", "online" => "DeviceSyncOnline", "scheduled" => "DeviceSyncScheduled", "paused" => "DeviceSyncPaused",
-                    "locked" => "DeviceSyncLocked", "waiting" => "DeviceSyncWaiting", "first_sync_pending" => "DeviceSyncFirstPending",
-                    "preparation_failed" => "DeviceSyncPreparationFailed", _ => "DeviceSyncOffline"
+                    "syncing" => "DeviceSyncSyncing",
+                    "online" => "DeviceSyncOnline",
+                    "scheduled" => "DeviceSyncScheduled",
+                    "paused" => "DeviceSyncPaused",
+                    "locked" => "DeviceSyncLocked",
+                    "waiting" => "DeviceSyncWaiting",
+                    "first_sync_pending" => "DeviceSyncFirstPending",
+                    "preparation_failed" => "DeviceSyncPreparationFailed",
+                    _ => "DeviceSyncOffline"
                 });
                 display.LastSynced = peer.LastSyncedAt is { } time ? L.Format("DeviceSyncLast", time.ToLocalTime().ToString("g")) : "";
             }
@@ -71,12 +77,24 @@ public sealed partial class MainWindowViewModel
             LanStatusText = L.Get(state.Phase switch
             {
                 "waiting" when state.Pairing => "DeviceSyncScanOther",
-                "completed" => "DeviceSyncPaired", "locked" => "DeviceSyncLocked", "paused" => "DeviceSyncPaused",
-                "idle" => "", "failed" => "", "cancelled" => "LanCancelled", _ => "DeviceSyncSyncing"
+                "completed" => "DeviceSyncPaired",
+                "locked" => "DeviceSyncLocked",
+                "paused" => "DeviceSyncPaused",
+                "idle" => "",
+                "failed" => "",
+                "cancelled" => "LanCancelled",
+                _ => "DeviceSyncSyncing"
             });
             if (IsLanBusy && progress is not null)
-                LanStatusText = L.Get(progress.Stage switch { "preparing" => "DeviceSyncPreparing", "applying" => "DeviceSyncApplying",
-                    "sending" => "DeviceSyncSending", "receiving" => "DeviceSyncReceiving", "transferring" => "DeviceSyncTransferring", _ => "DeviceSyncSyncing" }) +
+                LanStatusText = L.Get(progress.Stage switch
+                {
+                    "preparing" => "DeviceSyncPreparing",
+                    "applying" => "DeviceSyncApplying",
+                    "sending" => "DeviceSyncSending",
+                    "receiving" => "DeviceSyncReceiving",
+                    "transferring" => "DeviceSyncTransferring",
+                    _ => "DeviceSyncSyncing"
+                }) +
                     (total <= 0 ? "" : progress.TotalBytes > 0 ? $" · {completed / 1048576.0:F1} / {total / 1048576.0:F1} MB" : $" · {completed:N0} / {total:N0}");
             LanErrorText = state.Error is null ? "" : DeviceSyncError(state.Error, state.FailureStage);
             LanDiagnosticText = state.Error is null ? "" : L.Format("DeviceSyncDiagnosticFormat", state.FailureStage, state.Error,
@@ -95,7 +113,9 @@ public sealed partial class MainWindowViewModel
         "peer_merge_failed" => "LanPeerFailed",
         "native_unavailable" or "device_sync_unavailable" => "LanUnavailable",
         "unsupported_protocol" or "invalid_invitation" => "DeviceSyncQrInvalid",
-        "pairing_expired" => "LanExpired", "same_device" => "DeviceSyncSameDevice", "too_many_devices" => "DeviceSyncLimit",
+        "pairing_expired" => "LanExpired",
+        "same_device" => "DeviceSyncSameDevice",
+        "too_many_devices" => "DeviceSyncLimit",
         "invalid_password_payload" or "invalid_record" => "DeviceSyncInvalidData",
         "sync_direction_conflict" => "DeviceSyncDirectionConflict",
         "sync_direction_unsupported" => "DeviceSyncDirectionUnsupported",

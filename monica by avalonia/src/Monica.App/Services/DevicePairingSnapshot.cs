@@ -19,12 +19,15 @@ internal static class DevicePairingSnapshot
         {
             handle = transport.Request(new
             {
-                operation = "replica_open", path = journal, device_id = deviceId,
+                operation = "replica_open",
+                path = journal,
+                device_id = deviceId,
                 key = Convert.ToBase64String(key).TrimEnd('=').Replace('+', '-').Replace('/', '_')
             }).GetProperty("handle").GetUInt64();
             var exported = transport.Request(new
             {
-                operation = "replica_export", handle = handle.Value,
+                operation = "replica_export",
+                handle = handle.Value,
                 path = Path.Combine(directory, "changes.mdbxsync")
             });
             return new DeviceSyncSnapshot("monica-passwords-v1", Revision, directory,

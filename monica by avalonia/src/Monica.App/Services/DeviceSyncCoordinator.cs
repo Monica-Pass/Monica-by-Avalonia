@@ -305,20 +305,31 @@ public sealed class DeviceSyncCoordinator(
             // Do not abandon a native handle when cancellation races creation.
             started = await Task.Run(() => _transport.Request(new
             {
-                operation = invitation is null ? "start" : "connect", protocol = 2, invitation,
+                operation = invitation is null ? "start" : "connect",
+                protocol = 2,
+                invitation,
                 name = Environment.MachineName,
                 device = new
                 {
-                    device_id = _preferences!.DeviceId, name = Environment.MachineName,
-                    pair_id = peer?.PairId ?? "", interval_seconds = _preferences.IntervalSeconds,
-                    settings_version = _preferences.SettingsVersion, settings_writer = _preferences.SettingsWriter,
-                    sync_request = _preferences.SyncRequest, revision = snapshot.Revision, content_type = "vault", vault_content_version = 2,
+                    device_id = _preferences!.DeviceId,
+                    name = Environment.MachineName,
+                    pair_id = peer?.PairId ?? "",
+                    interval_seconds = _preferences.IntervalSeconds,
+                    settings_version = _preferences.SettingsVersion,
+                    settings_writer = _preferences.SettingsWriter,
+                    sync_request = _preferences.SyncRequest,
+                    revision = snapshot.Revision,
+                    content_type = "vault",
+                    vault_content_version = 2,
                     sync_mode = (enrollment ? DeviceSyncMode.Bidirectional : _preferences.Mode).ToWire()
                 },
                 trusted_key = invitation is null ? peer?.TrustedKey : null,
-                expected_device_id = peer?.DeviceId, revision = advertisement,
-                vault_id = snapshot.VaultId, content_key = snapshot.ContentKey,
-                outgoing_directory = !enrollment && _preferences.Mode == DeviceSyncMode.ReceiveOnly ? null : snapshot.Directory, incoming_directory = directory
+                expected_device_id = peer?.DeviceId,
+                revision = advertisement,
+                vault_id = snapshot.VaultId,
+                content_key = snapshot.ContentKey,
+                outgoing_directory = !enrollment && _preferences.Mode == DeviceSyncMode.ReceiveOnly ? null : snapshot.Directory,
+                incoming_directory = directory
             }));
         }
         catch { DeleteOwned(directory); throw; }

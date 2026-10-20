@@ -14,14 +14,20 @@ public sealed partial class MdbxVaultStore : IMdbxDevicePasswordStore
         var reader = (IMdbxNativeObjectReader)vault;
         var projects = await access.ListDeviceSyncProjectsAsync(token);
         var result = new List<DevicePasswordSnapshot>();
-        result.AddRange((await access.ReadDeviceSyncRootMetadataAsync(token)).Select(item => item with { LocalId=$"mdbx:{database.Id}:"+item.LocalId,Scope=$"mdbx:{database.Id}" }));
+        result.AddRange((await access.ReadDeviceSyncRootMetadataAsync(token)).Select(item => item with { LocalId = $"mdbx:{database.Id}:" + item.LocalId, Scope = $"mdbx:{database.Id}" }));
         foreach (var project in projects)
         {
             var path = FolderPath(project, projects);
             if (path.Count > 0)
                 result.Add(new($"mdbx:{database.Id}:folder:" + project.ProjectId, project.ProjectId, $"mdbx:{database.Id}", project.Guard, project.Deleted,
-                    new JsonObject { ["title"] = project.Title, ["folder"] = "", ["entry_type"] = "folder", ["trashed"] = project.Deleted,
-                        ["payload"] = new JsonObject { ["path"] = path.DeepClone(), ["tags"] = await access.ReadDeviceSyncProjectTagsAsync(project.ProjectId,token) } }));
+                    new JsonObject
+                    {
+                        ["title"] = project.Title,
+                        ["folder"] = "",
+                        ["entry_type"] = "folder",
+                        ["trashed"] = project.Deleted,
+                        ["payload"] = new JsonObject { ["path"] = path.DeepClone(), ["tags"] = await access.ReadDeviceSyncProjectTagsAsync(project.ProjectId, token) }
+                    }));
             foreach (var summary in await reader.ListObjectSummariesAsync(project.ProjectId, true, token))
             {
                 if (!DeviceVaultShape.Supports(summary.EntryType) || summary.PayloadSchemaVersion != 1)
@@ -32,37 +38,50 @@ public sealed partial class MdbxVaultStore : IMdbxDevicePasswordStore
                 var source = JsonNode.Parse(payload)!.AsObject();
                 if (source["bitwarden_mode"]?.GetValue<bool>() == true || source["keepass_mode"]?.GetValue<bool>() == true) continue;
                 var purged = entry.Deleted && source["deleted_at"] is JsonValue deletedAt && deletedAt.TryGetValue<long>(out var deletedMillis) && deletedMillis == 0;
-                var data = purged ? entry.EntryType == "passkey" ? new JsonObject { ["entry_type"]="passkey",["payload"]=new JsonObject {
-                    ["credential_id"]=source["credential_id"]?.DeepClone(),["rp_id"]=source["rp_id"]?.DeepClone() } } : new JsonObject() : DeviceVaultShape.Normalize(payload, entry.Title,
+                var data = purged ? entry.EntryType == "passkey" ? new JsonObject
+                {
+                    ["entry_type"] = "passkey",
+                    ["payload"] = new JsonObject
+                    {
+                        ["credential_id"] = source["credential_id"]?.DeepClone(),
+                        ["rp_id"] = source["rp_id"]?.DeepClone()
+                    }
+                } : new JsonObject() : DeviceVaultShape.Normalize(payload, entry.Title,
                     MdbxAndroidRoot.IsRootTitle(project.Title) ? "" : project.Title, entry.EntryType);
                 var assets = new List<DeviceVaultAsset>();
                 if (!purged) { data["folder_path"] = path.DeepClone(); data["trashed"] = entry.Deleted; }
                 if (!purged)
                 {
                     data["labels"] = await access.ReadDeviceSyncLabelsAsync(entry.EntryId, token);
-                    data["relations"] = source["device_sync_pending_relations"]?.DeepClone() ?? await access.ReadDeviceSyncRelationsAsync(entry.EntryId,token);
+                    data["relations"] = source["device_sync_pending_relations"]?.DeepClone() ?? await access.ReadDeviceSyncRelationsAsync(entry.EntryId, token);
                     var descriptors = new JsonArray();
                     var savedAssets = source["device_sync_assets"] as JsonArray;
                     foreach (var attachment in (await vault.ListAttachmentsAsync(project.ProjectId, entry.EntryId, token)).Where(a => !a.Deleted).OrderBy(a => a.ContentHash).ThenBy(a => a.FileName))
                     {
                         var hash = attachment.ContentHash.ToLowerInvariant();
                         var saved = savedAssets?.OfType<JsonObject>().FirstOrDefault(d => d["local_id"]?.GetValue<string>() == attachment.AttachmentId);
-                        var descriptor = new JsonObject { ["id"] = hash, ["attachment_id"] = saved?["attachment_id"]?.DeepClone() ?? JsonValue.Create(attachment.AttachmentId),
-                            ["file_name"] = attachment.FileName, ["media_type"] = attachment.MediaType ?? "application/octet-stream", ["size"] = checked((long)attachment.OriginalSize) };
-                        if(saved?["image"] is { } image) descriptor["image"] = image.DeepClone();
-                        if(saved?["icon"] is { } icon) descriptor["icon"] = icon.DeepClone();
+                        var descriptor = new JsonObject
+                        {
+                            ["id"] = hash,
+                            ["attachment_id"] = saved?["attachment_id"]?.DeepClone() ?? JsonValue.Create(attachment.AttachmentId),
+                            ["file_name"] = attachment.FileName,
+                            ["media_type"] = attachment.MediaType ?? "application/octet-stream",
+                            ["size"] = checked((long)attachment.OriginalSize)
+                        };
+                        if (saved?["image"] is { } image) descriptor["image"] = image.DeepClone();
+                        if (saved?["icon"] is { } icon) descriptor["icon"] = icon.DeepClone();
                         descriptors.Add(descriptor);
                         DeviceVaultShape.RemapAssetPath(data, $"mdbx:{attachment.AttachmentId}", $"device-asset:{hash}");
                         assets.Add(new(hash, attachment.AttachmentId, database.Id, checked((long)attachment.OriginalSize)));
                     }
                     data["assets"] = descriptors;
-                    if(source["attachments"] is JsonArray legacyAttachments)
+                    if (source["attachments"] is JsonArray legacyAttachments)
                     {
-                        foreach(var attachment in legacyAttachments.OfType<JsonObject>())
+                        foreach (var attachment in legacyAttachments.OfType<JsonObject>())
                         {
-                            var legacy = System.Text.Json.JsonSerializer.Deserialize<Attachment>(attachment.ToJsonString(),new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                            if(legacy is null || string.IsNullOrEmpty(legacy.StoragePath) || legacy.StoragePath.StartsWith("mdbx:",StringComparison.Ordinal)) continue;
-                            assets.Add(new("", "", database.Id,legacy.SizeBytes,legacy));
+                            var legacy = System.Text.Json.JsonSerializer.Deserialize<Attachment>(attachment.ToJsonString(), new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                            if (legacy is null || string.IsNullOrEmpty(legacy.StoragePath) || legacy.StoragePath.StartsWith("mdbx:", StringComparison.Ordinal)) continue;
+                            assets.Add(new("", "", database.Id, legacy.SizeBytes, legacy));
                         }
                     }
                 }
@@ -84,10 +103,11 @@ public sealed partial class MdbxVaultStore : IMdbxDevicePasswordStore
         if (vault.IsReadOnly) throw new InvalidOperationException("device_sync_read_only");
         var reader = (IMdbxNativeObjectReader)vault;
         var access = (IMdbxNativeDevicePasswordAccess)vault;
-        if(localId?.StartsWith("metadata:",StringComparison.Ordinal) == true || ((!deleted || retainedTrash) && data["entry_type"]?.GetValue<string>() == "vault-metadata")) {
+        if (localId?.StartsWith("metadata:", StringComparison.Ordinal) == true || ((!deleted || retainedTrash) && data["entry_type"]?.GetValue<string>() == "vault-metadata"))
+        {
             var owner = localId?.Substring(9) ?? globalId;
-            var guard = await access.ApplyDeviceSyncRootMetadataAsync(owner,expectedGuard,localId is null,deleted,data,token);
-            return guard is null ? null : new($"mdbx:{database.Id}:metadata:"+owner,globalId,$"mdbx:{database.Id}",guard,deleted,data);
+            var guard = await access.ApplyDeviceSyncRootMetadataAsync(owner, expectedGuard, localId is null, deleted, data, token);
+            return guard is null ? null : new($"mdbx:{database.Id}:metadata:" + owner, globalId, $"mdbx:{database.Id}", guard, deleted, data);
         }
         if (localId?.StartsWith("folder:", StringComparison.Ordinal) == true || ((!deleted || retainedTrash) && data["entry_type"]?.GetValue<string>() == "folder"))
         {
@@ -118,16 +138,23 @@ public sealed partial class MdbxVaultStore : IMdbxDevicePasswordStore
         }
         if (deleted && !retainedTrash)
         {
-            var empty = new JsonObject { ["kind"] = current!.EntryType is "login" or "ssh-key" ? "password" : current.EntryType,
-                ["password_plain"] = "", ["item_data"] = "", ["deleted_at"] = 0, ["monica_entry_id"] = id };
-            if(current.EntryType == "passkey" && existingPayload is not null) {
+            var empty = new JsonObject
+            {
+                ["kind"] = current!.EntryType is "login" or "ssh-key" ? "password" : current.EntryType,
+                ["password_plain"] = "",
+                ["item_data"] = "",
+                ["deleted_at"] = 0,
+                ["monica_entry_id"] = id
+            };
+            if (current.EntryType == "passkey" && existingPayload is not null)
+            {
                 var prior = JsonNode.Parse(existingPayload)!.AsObject();
                 empty["credential_id"] = prior["credential_id"]?.DeepClone(); empty["rp_id"] = prior["rp_id"]?.DeepClone();
                 empty["device_sync_key_projection"] = true;
             }
-            var attachments = (await vault.ListAttachmentsAsync(current.ProjectId,id,token)).Where(a => !a.Deleted).Select(a => a.AttachmentId).ToArray();
-            var afterDelete = await access.CommitDeviceSyncObjectAsync(new(id,current.ProjectId,current.EntryType,current.Title,empty.ToJsonString(),current,true,[],attachments,[],currentGuard),token);
-            return afterDelete is null ? null : new($"mdbx:{database.Id}:" + id, globalId, $"mdbx:{database.Id}", await access.GetDeviceSyncGuardAsync(id,token), true, new JsonObject());
+            var attachments = (await vault.ListAttachmentsAsync(current.ProjectId, id, token)).Where(a => !a.Deleted).Select(a => a.AttachmentId).ToArray();
+            var afterDelete = await access.CommitDeviceSyncObjectAsync(new(id, current.ProjectId, current.EntryType, current.Title, empty.ToJsonString(), current, true, [], attachments, [], currentGuard), token);
+            return afterDelete is null ? null : new($"mdbx:{database.Id}:" + id, globalId, $"mdbx:{database.Id}", await access.GetDeviceSyncGuardAsync(id, token), true, new JsonObject());
         }
         var folder = data["folder"]?.GetValue<string>() ?? "";
         var root = MdbxAndroidRoot.ProjectIdFor((await vault.GetInfoAsync(token)).VaultId);
@@ -153,8 +180,8 @@ public sealed partial class MdbxVaultStore : IMdbxDevicePasswordStore
         var type = data["entry_type"]?.GetValue<string>() ?? "login";
         if (!DeviceVaultShape.Supports(type)) throw new InvalidDataException("invalid_password_type");
         var materialized = DeviceVaultShape.Apply(data, existingPayload, id, projectId == root ? null : projectId);
-        if(type == "passkey") materialized["device_sync_key_projection"] = true;
-        if(data["relations"] is JsonArray relations) materialized["device_sync_pending_relations"] = relations.DeepClone();
+        if (type == "passkey") materialized["device_sync_key_projection"] = true;
+        if (data["relations"] is JsonArray relations) materialized["device_sync_pending_relations"] = relations.DeepClone();
         var writes = new List<DeviceVaultAttachmentWrite>();
         var removedAttachments = new List<string>();
         try
@@ -185,7 +212,7 @@ public sealed partial class MdbxVaultStore : IMdbxDevicePasswordStore
                 writes, removedAttachments, data["labels"] as JsonArray, currentGuard), token);
             return after is null ? null : new($"mdbx:{database.Id}:" + id, globalId, $"mdbx:{database.Id}", await access.GetDeviceSyncGuardAsync(id, token), deleted, data);
         }
-        finally { foreach(var write in writes) CryptographicOperations.ZeroMemory(write.Content); }
+        finally { foreach (var write in writes) CryptographicOperations.ZeroMemory(write.Content); }
     }
 
     private static JsonArray FolderPath(MdbxNativeProjectRecord project, IReadOnlyList<MdbxNativeProjectRecord> projects)
@@ -195,8 +222,12 @@ public sealed partial class MdbxVaultStore : IMdbxDevicePasswordStore
         {
             if (!seen.Add(current.ProjectId) || result.Count >= 128) throw new InvalidDataException("invalid_folder");
             var parent = projects.FirstOrDefault(p => p.ProjectId == current.ParentProjectId);
-            result.Add(new JsonObject { ["id"] = current.ProjectId, ["title"] = current.Title,
-                ["parent"] = parent is null || MdbxAndroidRoot.IsRootTitle(parent.Title) ? null : current.ParentProjectId });
+            result.Add(new JsonObject
+            {
+                ["id"] = current.ProjectId,
+                ["title"] = current.Title,
+                ["parent"] = parent is null || MdbxAndroidRoot.IsRootTitle(parent.Title) ? null : current.ParentProjectId
+            });
             if (parent is null) break; current = parent;
         }
         result.Reverse(); return new JsonArray(result.ToArray());
@@ -214,46 +245,46 @@ public sealed partial class MdbxVaultStore : IMdbxDevicePasswordStore
 
     public async Task<IReadOnlyList<string>> DeviceSyncRelationTargetsAsync(LocalMdbxDatabase database, CancellationToken token)
     {
-        var snapshots = await ReadDevicePasswordsAsync(database,token);
+        var snapshots = await ReadDevicePasswordsAsync(database, token);
         return snapshots.SelectMany(p => p.Data["relations"]?.AsArray().OfType<JsonObject>().Select(r => r["target"]!.GetValue<string>()) ?? []).Distinct().ToArray();
     }
-    public async Task<bool> DeviceSyncObjectExistsAsync(LocalMdbxDatabase database,string id,CancellationToken token)
+    public async Task<bool> DeviceSyncObjectExistsAsync(LocalMdbxDatabase database, string id, CancellationToken token)
     {
-        using var vault = await OpenAsync(database,token);
-        return await ((IMdbxNativeDevicePasswordAccess)vault).GetDeviceSyncSummaryAsync(id,token) is not null;
+        using var vault = await OpenAsync(database, token);
+        return await ((IMdbxNativeDevicePasswordAccess)vault).GetDeviceSyncSummaryAsync(id, token) is not null;
     }
-    public async Task<string> DeviceSyncGuardAsync(LocalMdbxDatabase database,string id,CancellationToken token)
+    public async Task<string> DeviceSyncGuardAsync(LocalMdbxDatabase database, string id, CancellationToken token)
     {
-        using var vault = await OpenAsync(database,token);
-        return await ((IMdbxNativeDevicePasswordAccess)vault).GetDeviceSyncGuardAsync(id,token);
+        using var vault = await OpenAsync(database, token);
+        return await ((IMdbxNativeDevicePasswordAccess)vault).GetDeviceSyncGuardAsync(id, token);
     }
-    public async Task DeleteDeviceSyncPasskeyProjectionAsync(LocalMdbxDatabase database,string id,CancellationToken token)
+    public async Task DeleteDeviceSyncPasskeyProjectionAsync(LocalMdbxDatabase database, string id, CancellationToken token)
     {
-        using var vault = await OpenAsync(database,token); var access = (IMdbxNativeDevicePasswordAccess)vault;
-        var current = await access.GetDeviceSyncSummaryAsync(id,token);
-        if(current is null || current.Deleted) return;
-        if(current.EntryType != "passkey") throw new InvalidDataException("password_identity_collision");
-        var record = await access.ReadDeviceSyncObjectAsync(current,token) ?? throw new InvalidDataException("passwords_changing");
+        using var vault = await OpenAsync(database, token); var access = (IMdbxNativeDevicePasswordAccess)vault;
+        var current = await access.GetDeviceSyncSummaryAsync(id, token);
+        if (current is null || current.Deleted) return;
+        if (current.EntryType != "passkey") throw new InvalidDataException("password_identity_collision");
+        var record = await access.ReadDeviceSyncObjectAsync(current, token) ?? throw new InvalidDataException("passwords_changing");
         var old = JsonNode.Parse(record.PayloadJson)!.AsObject();
-        var empty = new JsonObject { ["kind"]="passkey",["credential_id"]=old["credential_id"]?.DeepClone(),["rp_id"]=old["rp_id"]?.DeepClone(),["deleted_at"]=0 };
-        var removed = (await vault.ListAttachmentsAsync(current.ProjectId,id,token)).Where(a => !a.Deleted).Select(a => a.AttachmentId).ToArray();
-        if(await access.CommitDeviceSyncObjectAsync(new(id,current.ProjectId,"passkey",current.Title,empty.ToJsonString(),current,true,[],removed,[],await access.GetDeviceSyncGuardAsync(id,token)),token) is null)
+        var empty = new JsonObject { ["kind"] = "passkey", ["credential_id"] = old["credential_id"]?.DeepClone(), ["rp_id"] = old["rp_id"]?.DeepClone(), ["deleted_at"] = 0 };
+        var removed = (await vault.ListAttachmentsAsync(current.ProjectId, id, token)).Where(a => !a.Deleted).Select(a => a.AttachmentId).ToArray();
+        if (await access.CommitDeviceSyncObjectAsync(new(id, current.ProjectId, "passkey", current.Title, empty.ToJsonString(), current, true, [], removed, [], await access.GetDeviceSyncGuardAsync(id, token)), token) is null)
             throw new InvalidDataException("passwords_changing");
     }
-    public async Task CompleteDeviceSyncKeyProjectionAsync(LocalMdbxDatabase database,string id,CancellationToken token)
+    public async Task CompleteDeviceSyncKeyProjectionAsync(LocalMdbxDatabase database, string id, CancellationToken token)
     {
-        using var vault = await OpenAsync(database,token); var access = (IMdbxNativeDevicePasswordAccess)vault;
-        var summary = await access.GetDeviceSyncSummaryAsync(id,token) ?? throw new InvalidDataException("passwords_changing");
-        var record = await access.ReadDeviceSyncObjectAsync(summary,token) ?? throw new InvalidDataException("passwords_changing");
-        var payload = JsonNode.Parse(record.PayloadJson)!.AsObject(); if(!payload.Remove("device_sync_key_projection")) return;
-        var guard = await access.GetDeviceSyncGuardAsync(id,token);
-        if(await access.CommitDeviceSyncObjectAsync(new(id,summary.ProjectId,"passkey",summary.Title,payload.ToJsonString(),summary,summary.Deleted,[],[],null,guard),token) is null)
+        using var vault = await OpenAsync(database, token); var access = (IMdbxNativeDevicePasswordAccess)vault;
+        var summary = await access.GetDeviceSyncSummaryAsync(id, token) ?? throw new InvalidDataException("passwords_changing");
+        var record = await access.ReadDeviceSyncObjectAsync(summary, token) ?? throw new InvalidDataException("passwords_changing");
+        var payload = JsonNode.Parse(record.PayloadJson)!.AsObject(); if (!payload.Remove("device_sync_key_projection")) return;
+        var guard = await access.GetDeviceSyncGuardAsync(id, token);
+        if (await access.CommitDeviceSyncObjectAsync(new(id, summary.ProjectId, "passkey", summary.Title, payload.ToJsonString(), summary, summary.Deleted, [], [], null, guard), token) is null)
             throw new InvalidDataException("passwords_changing");
     }
-    public async Task ResolveDeviceSyncRelationsAsync(LocalMdbxDatabase database, CancellationToken token, IReadOnlyDictionary<string,string>? targets = null)
+    public async Task ResolveDeviceSyncRelationsAsync(LocalMdbxDatabase database, CancellationToken token, IReadOnlyDictionary<string, string>? targets = null)
     {
-        using var vault = await OpenAsync(database,token);
-        await ((IMdbxNativeDevicePasswordAccess)vault).ResolveDeviceSyncRelationsAsync(token,targets);
+        using var vault = await OpenAsync(database, token);
+        await ((IMdbxNativeDevicePasswordAccess)vault).ResolveDeviceSyncRelationsAsync(token, targets);
     }
 
     private static string DevicePasswordPayload(string payload, string title)

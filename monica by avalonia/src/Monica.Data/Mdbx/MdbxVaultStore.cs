@@ -479,12 +479,12 @@ public sealed partial class MdbxVaultStore(
 
             var nativeAttachments = (await vault.ListAttachmentsAsync(item.Record.ProjectId, item.Record.EntryId, cancellationToken)).Where(a => !a.Deleted).ToArray();
             var syncAssets = item.Record.PayloadJson.Contains("\"device_sync_assets\"", StringComparison.Ordinal);
-            if(!syncAssets && payload.Attachments is { Count: > 0 })
-                result[payload.Entry.Id] = NormalizeAttachments(payload.Entry.Id,payload.Attachments).ToList();
-            else if(nativeAttachments.Length > 0)
+            if (!syncAssets && payload.Attachments is { Count: > 0 })
+                result[payload.Entry.Id] = NormalizeAttachments(payload.Entry.Id, payload.Attachments).ToList();
+            else if (nativeAttachments.Length > 0)
             {
                 var attachments = NormalizeSecureItemNativeAttachments(payload.Entry.Id, nativeAttachments).ToArray();
-                foreach(var attachment in attachments) attachment.OwnerType = "PASSWORD";
+                foreach (var attachment in attachments) attachment.OwnerType = "PASSWORD";
                 result[payload.Entry.Id] = attachments;
             }
             else result[payload.Entry.Id] = [];

@@ -2086,8 +2086,13 @@ public sealed class BitwardenLocalChangeQueueTests
             repository = new MdbxBackedMonicaRepository(repository, nativeStore);
             await repository.SaveMdbxDatabaseAsync(new LocalMdbxDatabase
             {
-                Name = "Synthetic", FilePath = path, WorkingCopyPath = path, EncryptedPassword = "native-sync-fixture",
-                IsDefault = true, IsOfflineAvailable = true, StorageLocation = MdbxStorageLocation.Internal
+                Name = "Synthetic",
+                FilePath = path,
+                WorkingCopyPath = path,
+                EncryptedPassword = "native-sync-fixture",
+                IsDefault = true,
+                IsOfflineAvailable = true,
+                StorageLocation = MdbxStorageLocation.Internal
             });
         }
         var accountStore = new BitwardenAccountStore(factory, migrator, crypto);

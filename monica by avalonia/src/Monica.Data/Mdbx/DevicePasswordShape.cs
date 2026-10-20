@@ -110,9 +110,9 @@ public interface IMdbxNativeDevicePasswordAccess
     Task<System.Text.Json.Nodes.JsonArray> ReadDeviceSyncLabelsAsync(string id, CancellationToken token);
     Task<JsonArray> ReadDeviceSyncProjectTagsAsync(string id, CancellationToken token);
     Task<JsonArray> ReadDeviceSyncRelationsAsync(string id, CancellationToken token);
-    Task ResolveDeviceSyncRelationsAsync(CancellationToken token, IReadOnlyDictionary<string,string>? targets = null);
+    Task ResolveDeviceSyncRelationsAsync(CancellationToken token, IReadOnlyDictionary<string, string>? targets = null);
     Task<IReadOnlyList<DevicePasswordSnapshot>> ReadDeviceSyncRootMetadataAsync(CancellationToken token);
-    Task<string?> ApplyDeviceSyncRootMetadataAsync(string owner,string? expected,bool newBinding,bool deleted,JsonObject data,CancellationToken token);
+    Task<string?> ApplyDeviceSyncRootMetadataAsync(string owner, string? expected, bool newBinding, bool deleted, JsonObject data, CancellationToken token);
     Task<string> GetDeviceSyncGuardAsync(string id, CancellationToken token);
     Task<MdbxNativeObjectSummary?> CommitDeviceSyncObjectAsync(DeviceVaultWritePlan plan, CancellationToken token);
     Task<string?> ApplyDeviceSyncFolderAsync(string id, string? expectedGuard, bool newBinding, bool deleted, JsonObject data, CancellationToken token);
