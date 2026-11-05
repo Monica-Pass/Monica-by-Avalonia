@@ -19,7 +19,7 @@
                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
         <StackPanel Grid.Row="2" Spacing="{DynamicResource SpacingSmall}">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource SpacingSmall}">
-                <TextBox x:Name="PasskeySearchBox" Text="{Binding SearchText}"
+                <TextBox x:Name="PasskeySearchBox" Classes="workspaceSearchBox" Text="{Binding SearchText}"
                          PlaceholderText="{Binding L[PasskeySearchHint]}" AutomationProperties.Name="{Binding L[PasskeySearchHint]}" />
                 <!-- Like every other search field, the way out only appears once there is a query. -->
                 <Button Grid.Column="1" Classes="workspaceCommand" Command="{Binding ClearSearchCommand}"

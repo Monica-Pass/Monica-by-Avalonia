@@ -1,9 +1,10 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- Three text sizes carry the workspaces. Hierarchy comes from colour and weight, not from
-         more steps. Avalonia's implicit default is 12px, so the app opts into FontSizeBody as its
-         base size (see App.axaml). Settings pages add one display size for their page titles. -->
+    <!-- The Windows type ramp: caption 12, body 14, subtitle 20, title 28. Hierarchy otherwise
+         comes from colour and weight, not from more steps. Avalonia's implicit default is 12px, so
+         the app opts into FontSizeBody as its base size (see App.axaml). Every page title, in a
+         workspace or in settings, uses the display size; FontSizePageTitle is for item headings. -->
     <x:Double x:Key="FontSizePageTitle">20</x:Double>
     <x:Double x:Key="FontSizeBody">14</x:Double>
     <x:Double x:Key="FontSizeMeta">12</x:Double>

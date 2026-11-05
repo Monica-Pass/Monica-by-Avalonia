@@ -35,9 +35,8 @@
                     <SolidColorBrush x:Key="ListViewItemBackgroundPressed" Color="#D4E7FB" />
                     <SolidColorBrush x:Key="MonicaAccentFillPressedBrush" Color="#00539A" />
                     <SolidColorBrush x:Key="MonicaSubtleFillHoverBrush" Color="#0F000000" />
+                    <SolidColorBrush x:Key="MonicaNavItemSelectedBrush" Color="#0F000000" />
                     <SolidColorBrush x:Key="MonicaSubtleFillPressedBrush" Color="#1A000000" />
-                    <SolidColorBrush x:Key="MonicaIconTileBrush" Color="#E3EEFA" />
-                    <SolidColorBrush x:Key="MonicaIconTileForegroundBrush" Color="#0067C2" />
                     <SolidColorBrush x:Key="MonicaStatusPositiveBrush" Color="#0F7B0F" />
                     <SolidColorBrush x:Key="MonicaStatusCautionBrush" Color="#9D5D00" />
                     <SolidColorBrush x:Key="MonicaStatusNeutralBrush" Color="#6E6E6E" />
@@ -61,18 +60,21 @@
                     <SolidColorBrush x:Key="MonicaAvatarForegroundBrush" Color="#FFFFFF" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
+                    <!-- Dark surfaces step up in lightness: window #202020, content layer #282828,
+                         cards #2F2F2F, controls on cards #373737. A card one step above the layer
+                         is what keeps separate setting cards readable without leaning on borders. -->
                     <SolidColorBrush x:Key="LayerFillColorDefaultBrush" Color="#202020" />
                     <SolidColorBrush x:Key="LayerFillColorAltBrush" Color="#1B1B1B" />
                     <SolidColorBrush x:Key="LayerFillColorSubtleBrush" Color="#242424" />
-                    <SolidColorBrush x:Key="CardBackgroundBrush" Color="#2B2B2B" />
+                    <SolidColorBrush x:Key="CardBackgroundBrush" Color="#2F2F2F" />
                     <SolidColorBrush x:Key="CardBorderBrush" Color="#3A3A3A" />
-                    <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#2B2B2B" />
+                    <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#2F2F2F" />
                     <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="#252525" />
                     <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="#3A3A3A" />
                     <SolidColorBrush x:Key="DividerStrokeColorDefaultBrush" Color="#343434" />
-                    <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="#323232" />
-                    <SolidColorBrush x:Key="ControlFillColorSecondaryBrush" Color="#383838" />
-                    <SolidColorBrush x:Key="ControlFillColorTertiaryBrush" Color="#424242" />
+                    <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="#373737" />
+                    <SolidColorBrush x:Key="ControlFillColorSecondaryBrush" Color="#3D3D3D" />
+                    <SolidColorBrush x:Key="ControlFillColorTertiaryBrush" Color="#454545" />
                     <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush" Color="#4A4A4A" />
                     <SolidColorBrush x:Key="SubtleFillColorSecondaryBrush" Color="#292929" />
                     <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="#343434" />
@@ -81,9 +83,8 @@
                     <SolidColorBrush x:Key="ListViewItemBackgroundPressed" Color="#474747" />
                     <SolidColorBrush x:Key="MonicaAccentFillPressedBrush" Color="#2E8FC0" />
                     <SolidColorBrush x:Key="MonicaSubtleFillHoverBrush" Color="#15FFFFFF" />
+                    <SolidColorBrush x:Key="MonicaNavItemSelectedBrush" Color="#15FFFFFF" />
                     <SolidColorBrush x:Key="MonicaSubtleFillPressedBrush" Color="#0BFFFFFF" />
-                    <SolidColorBrush x:Key="MonicaIconTileBrush" Color="#1F3A4D" />
-                    <SolidColorBrush x:Key="MonicaIconTileForegroundBrush" Color="#60CDFF" />
                     <SolidColorBrush x:Key="MonicaStatusPositiveBrush" Color="#6CCB5F" />
                     <SolidColorBrush x:Key="MonicaStatusCautionBrush" Color="#F2C14E" />
                     <SolidColorBrush x:Key="MonicaStatusNeutralBrush" Color="#A0A0A0" />
@@ -127,9 +128,8 @@
                     <SolidColorBrush x:Key="ListViewItemBackgroundPressed" Color="#FFE000" />
                     <SolidColorBrush x:Key="MonicaAccentFillPressedBrush" Color="#00FFFF" />
                     <SolidColorBrush x:Key="MonicaSubtleFillHoverBrush" Color="#E6F7FF" />
+                    <SolidColorBrush x:Key="MonicaNavItemSelectedBrush" Color="#FFF200" />
                     <SolidColorBrush x:Key="MonicaSubtleFillPressedBrush" Color="#CCEFFF" />
-                    <SolidColorBrush x:Key="MonicaIconTileBrush" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="MonicaIconTileForegroundBrush" Color="#000000" />
                     <SolidColorBrush x:Key="MonicaStatusPositiveBrush" Color="#000000" />
                     <SolidColorBrush x:Key="MonicaStatusCautionBrush" Color="#000000" />
                     <SolidColorBrush x:Key="MonicaStatusNeutralBrush" Color="#000000" />

@@ -7,7 +7,7 @@
              x:DataType="vm:MainWindowViewModel">
     <StackPanel Margin="14,12,14,8" Spacing="8">
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-            <TextBox x:Name="SecurityIssueSearchBox"
+            <TextBox x:Name="SecurityIssueSearchBox" Classes="workspaceSearchBox"
                      Text="{Binding SecurityIssueSearchText}"
                      PlaceholderText="{Binding L[SecurityIssueSearchPlaceholder]}"
                      AutomationProperties.Name="{Binding L[SecurityIssueSearchPlaceholder]}" />

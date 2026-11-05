@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:fa="using:FluentAvalonia.UI.Controls"
         xmlns:fap="using:FluentAvalonia.UI.Controls.Primitives"
+        xmlns:ic="using:FluentIcons.Avalonia"
         xmlns:controls="using:Monica.App.Controls">
 
     <!-- Surfaces carry no fill and no stroke: the window paints exactly one
@@ -229,32 +230,51 @@
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
+    <!-- Same selection language as the main navigation pane: a neutral fill plus the accent rail,
+         so the two menus on a Settings or Sync screen never disagree about what "selected" looks
+         like. High contrast swaps the neutral fill for its strong selection colour. -->
     <Style Selector="Button.workspaceNavItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundPointerOver}" />
+        <Setter Property="Background" Value="{DynamicResource MonicaSubtleFillHoverBrush}" />
     </Style>
     <Style Selector="Button.workspaceNavItem:pressed /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundPressed}" />
+        <Setter Property="Background" Value="{DynamicResource MonicaSubtleFillPressedBrush}" />
     </Style>
     <Style Selector="Button.workspaceNavItem:disabled /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="Transparent" />
     </Style>
-    <Style Selector="Button.workspaceNavItem.selected /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
-    </Style>
-    <Style Selector="Button.workspaceNavItem.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.workspaceNavItem.selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelectedPointerOver}" />
-    </Style>
-    <Style Selector="Button.workspaceNavItem.selected:disabled /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
+    <Style Selector="Button.workspaceNavItem.selected /template/ ContentPresenter#PART_ContentPresenter, Button.workspaceNavItem.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.workspaceNavItem.selected:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.workspaceNavItem.selected:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource MonicaNavItemSelectedBrush}" />
     </Style>
     <Style Selector="Button.workspaceNavItem.selected /template/ Border#NavItemIndicator">
         <Setter Property="IsVisible" Value="True" />
     </Style>
 
+    <!-- Every page opens on the same title size as the settings pages, so moving between the
+         rail's destinations never changes how big "where am I" is printed. Item headings inside
+         a page (the selected entry's name) stay one step smaller. -->
     <Style Selector="TextBlock.workspacePageTitle">
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeDisplayTitle}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <Style Selector="TextBlock.workspaceItemHeading">
         <Setter Property="FontSize" Value="{DynamicResource FontSizePageTitle}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <!-- Search fields carry the magnifier, so they read as search before anything is typed. -->
+    <Style Selector="TextBox.workspaceSearchBox">
+        <Setter Property="InnerRightContent">
+            <Template>
+                <ic:FluentIcon Icon="Search"
+                               FontSize="14"
+                               Margin="0,0,10,0"
+                               VerticalAlignment="Center"
+                               IsHitTestVisible="False"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </Template>
+        </Setter>
     </Style>
     <Style Selector="TextBlock.workspaceItemTitle">
         <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}" />

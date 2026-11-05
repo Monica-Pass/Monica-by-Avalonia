@@ -19,7 +19,7 @@
                 <TextBlock Text="{Binding DeletedPasswordCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
             </StackPanel>
             <Grid x:Name="RecycleBinSearchRegion" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="6" VerticalAlignment="Center">
-                <TextBox x:Name="RecycleBinSearchBox" PlaceholderText="{Binding L.Search}" Text="{Binding RecycleBinSearchText}" AutomationProperties.Name="{Binding L.Search}" />
+                <TextBox x:Name="RecycleBinSearchBox" Classes="workspaceSearchBox" PlaceholderText="{Binding L.Search}" Text="{Binding RecycleBinSearchText}" AutomationProperties.Name="{Binding L.Search}" />
                 <Button x:Name="RecycleBinSearchClearButton" Grid.Column="1" Classes="workspaceCommand" Command="{Binding ClearRecycleBinSearchCommand}" IsVisible="{Binding HasRecycleBinSearchText}" ToolTip.Tip="{Binding L[ClearSearch]}" AutomationProperties.Name="{Binding L[ClearSearch]}" Width="36" Height="36" Padding="0">
                     <ic:FluentIcon Icon="Dismiss" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
