@@ -74,37 +74,64 @@ public static class DeviceSyncCadence
         force || (changed && elapsed >= TimeSpan.FromSeconds(intervalSeconds == 0 ? 2 : intervalSeconds));
 }
 
-/// <summary>Pairing keys stay outside synchronized vault data, protected by the OS credential service.</summary>
+/// <summary>
+/// Pairing keys stay outside synchronized vault data, protected by the OS credential service. Where no
+/// such service is wired up (Linux and macOS today) they are never written to disk: they live in this
+/// process only, so pairing works for the session instead of failing on every save.
+/// </summary>
 public sealed class DeviceSyncPreferenceStore(ISecretProtector protector, string? path = null)
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly string _path = path ?? MonicaAppDataPaths.GetPath("device-sync/peers.protected");
+    private string? _sessionOnlyJson;
+
+    /// <summary>False when pairings only last until the app exits.</summary>
+    public bool PersistsAcrossRestarts => protector.Capability.IsUsable;
 
     public async Task<DeviceSyncPreferences> LoadAsync(CancellationToken token = default)
     {
         await _gate.WaitAsync(token);
         try
         {
+            if (!PersistsAcrossRestarts)
+            {
+                return _sessionOnlyJson is null ? new DeviceSyncPreferences() : Parse(_sessionOnlyJson);
+            }
+
             if (!File.Exists(_path)) return new DeviceSyncPreferences();
             var protectedText = await File.ReadAllTextAsync(_path, token);
             var plain = await protector.UnprotectAsync(protectedText, token);
-            var settings = JsonSerializer.Deserialize<DeviceSyncPreferences>(plain) ?? throw new InvalidDataException("device_sync_preferences_invalid");
-            if (settings.Version != 1 || settings.Peers.Count > 8 || settings.DeviceId.Length > 64 || !Enum.IsDefined(settings.Mode) ||
-                (settings.IntervalSeconds != 0 && settings.IntervalSeconds is not (>= 60 and <= 86400)))
-                throw new InvalidDataException("device_sync_preferences_invalid");
-            foreach (var peer in settings.Peers)
-            {
-                if (peer.DeviceId.Length is < 1 or > 64 || peer.PairId.Length is < 1 or > 64 ||
-                    LanPairingInvitation.Parse($"monica-lan:1:127.0.0.1:1:{peer.TrustedKey}") is null)
-                    throw new InvalidDataException("device_sync_preferences_invalid");
-            }
-            return settings;
+            return Parse(plain);
         }
         finally { _gate.Release(); }
     }
 
+    private static DeviceSyncPreferences Parse(string plain)
+    {
+        var settings = JsonSerializer.Deserialize<DeviceSyncPreferences>(plain) ?? throw new InvalidDataException("device_sync_preferences_invalid");
+        if (settings.Version != 1 || settings.Peers.Count > 8 || settings.DeviceId.Length > 64 || !Enum.IsDefined(settings.Mode) ||
+            (settings.IntervalSeconds != 0 && settings.IntervalSeconds is not (>= 60 and <= 86400)))
+            throw new InvalidDataException("device_sync_preferences_invalid");
+        foreach (var peer in settings.Peers)
+        {
+            if (peer.DeviceId.Length is < 1 or > 64 || peer.PairId.Length is < 1 or > 64 ||
+                LanPairingInvitation.Parse($"monica-lan:1:127.0.0.1:1:{peer.TrustedKey}") is null)
+                throw new InvalidDataException("device_sync_preferences_invalid");
+        }
+        return settings;
+    }
+
     public async Task SaveAsync(DeviceSyncPreferences settings, CancellationToken token = default)
     {
+        if (!PersistsAcrossRestarts)
+        {
+            var json = JsonSerializer.Serialize(settings);
+            await _gate.WaitAsync(token);
+            try { _sessionOnlyJson = json; }
+            finally { _gate.Release(); }
+            return;
+        }
+
         var protectedText = await protector.ProtectAsync(JsonSerializer.Serialize(settings), token);
         await _gate.WaitAsync(token);
         var temporary = _path + "." + Guid.NewGuid().ToString("N") + ".tmp";

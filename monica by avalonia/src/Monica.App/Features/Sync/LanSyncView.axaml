@@ -1,11 +1,13 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Monica.App.ViewModels"
+             xmlns:fa="using:FluentAvalonia.UI.Controls"
              x:Class="Monica.App.Features.Sync.LanSyncView"
              x:DataType="vm:MainWindowViewModel">
         <StackPanel Spacing="12" Margin="4,12">
             <TextBlock x:Name="LanSyncTitle" Text="{Binding L[LanTitle]}" FontSize="24" FontWeight="SemiBold" />
             <TextBlock Text="{Binding L[DeviceSyncDescription]}" TextWrapping="Wrap" />
+            <fa:FAInfoBar x:Name="DeviceSyncSessionOnlyInfoBar" IsOpen="{Binding AreSyncSecretsSessionOnly}" IsClosable="False" Severity="Informational" Title="{Binding L[SessionOnlySecretsTitle]}" Message="{Binding L[DeviceSyncSessionOnlyMessage]}" />
             <ToggleSwitch x:Name="DeviceSyncEnabledToggle" Content="{Binding L[DeviceSyncAutomatic]}" IsChecked="{Binding DeviceSyncEnabled}" />
             <TextBlock Text="{Binding L[DeviceSyncDirection]}" FontWeight="SemiBold" />
             <ComboBox x:Name="DeviceSyncModeBox" ItemsSource="{Binding DeviceSyncModes}" SelectedItem="{Binding SelectedDeviceSyncMode}" IsEnabled="{Binding !IsDeviceSyncPairing}" HorizontalAlignment="Stretch">

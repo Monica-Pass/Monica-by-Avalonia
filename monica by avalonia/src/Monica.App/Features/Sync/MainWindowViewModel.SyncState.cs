@@ -8,6 +8,12 @@ public sealed partial class MainWindowViewModel
 {
     private int _webDavOperationActive;
 
+    /// <summary>
+    /// True where no operating-system secret store is wired up (Linux and macOS today): WebDAV
+    /// passwords and device pairings then live for the session only, and the sync pages say so.
+    /// </summary>
+    public bool AreSyncSecretsSessionOnly => !_settingsService.CanPersistSecrets;
+
     private bool TryBeginWebDavOperation(bool isLoading)
     {
         if (IsMdbxBusy)
