@@ -1,42 +1,45 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsGeneralView" x:DataType="vm:MainWindowViewModel">
-    <StackPanel IsVisible="{Binding IsSettingsGeneralSelected}">
-    <TextBlock x:Name="SettingsGeneralPageTitle" Classes="settingsPageTitle" Text="{Binding L.General}" />
-    <Border Classes="settingsFlatGroup">
-        <StackPanel>
-            <fa:FASettingsExpanderItem Content="{Binding L.Language}" Description="{Binding L.LanguageDescription}">
-                <fa:FASettingsExpanderItem.Footer>
-                    <ComboBox MinWidth="200" MaxWidth="320" ItemsSource="{Binding LanguageOptions}" SelectedValue="{Binding SettingsLanguage}" SelectedValueBinding="{Binding Value}">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate x:DataType="vm:SettingsChoice">
-                                <TextBlock Text="{Binding Label}" />
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-                </fa:FASettingsExpanderItem.Footer>
-            </fa:FASettingsExpanderItem>
-            <fa:FASettingsExpanderItem Content="{Binding L.Theme}" Description="{Binding L.ThemeDescription}">
-                <fa:FASettingsExpanderItem.Footer>
-                    <ComboBox MinWidth="200" MaxWidth="320" ItemsSource="{Binding ThemeOptions}" SelectedValue="{Binding SettingsTheme}" SelectedValueBinding="{Binding Value}">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate x:DataType="vm:SettingsChoice">
-                                <TextBlock Text="{Binding Label}" />
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-                </fa:FASettingsExpanderItem.Footer>
-            </fa:FASettingsExpanderItem>
-            <fa:FASettingsExpanderItem Content="{Binding L.StartupView}" Description="{Binding L.StartupViewDescription}">
-                <fa:FASettingsExpanderItem.Footer>
-                    <ComboBox MinWidth="200" MaxWidth="320" ItemsSource="{Binding StartupSectionOptions}" SelectedValue="{Binding StartupSection}" SelectedValueBinding="{Binding Value}">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate x:DataType="vm:SettingsChoice">
-                                <TextBlock Text="{Binding Label}" />
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-                </fa:FASettingsExpanderItem.Footer>
-            </fa:FASettingsExpanderItem>
+    <StackPanel Classes="settingsPage" IsVisible="{Binding IsSettingsGeneralSelected}">
+        <StackPanel Classes="settingsPageHeader">
+            <TextBlock x:Name="SettingsGeneralPageTitle" Classes="settingsPageTitle" Text="{Binding L.General}" />
+            <TextBlock Classes="settingsPageDescription" Text="{Binding L[SettingsGeneralDescription]}" />
         </StackPanel>
-    </Border>
+        <Border Classes="settingsFlatGroup">
+            <StackPanel>
+                <fa:FASettingsExpanderItem Content="{Binding L.Language}" Description="{Binding L.LanguageDescription}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <ComboBox Classes="settingsField" ItemsSource="{Binding LanguageOptions}" SelectedValue="{Binding SettingsLanguage}" SelectedValueBinding="{Binding Value}" AutomationProperties.Name="{Binding L.Language}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SettingsChoice">
+                                    <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+                <fa:FASettingsExpanderItem Content="{Binding L.Theme}" Description="{Binding L.ThemeDescription}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <ComboBox Classes="settingsField" ItemsSource="{Binding ThemeOptions}" SelectedValue="{Binding SettingsTheme}" SelectedValueBinding="{Binding Value}" AutomationProperties.Name="{Binding L.Theme}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SettingsChoice">
+                                    <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+                <fa:FASettingsExpanderItem Content="{Binding L.StartupView}" Description="{Binding L.StartupViewDescription}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <ComboBox Classes="settingsField" ItemsSource="{Binding StartupSectionOptions}" SelectedValue="{Binding StartupSection}" SelectedValueBinding="{Binding Value}" AutomationProperties.Name="{Binding L.StartupView}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SettingsChoice">
+                                    <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+            </StackPanel>
+        </Border>
     </StackPanel>
 </UserControl>

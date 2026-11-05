@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 
 namespace Monica.App.Features.Settings;
@@ -29,9 +30,12 @@ public partial class SettingsWorkspaceView : UserControl
             SettingsWorkspaceLayoutGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
             Grid.SetColumn(SettingsContentRegion, 0);
             Grid.SetRow(SettingsContentRegion, 1);
+            // Stacked above the page, the sidebar's hairline belongs under it rather than beside it.
+            SettingsSidebarRegion.BorderThickness = new Thickness(0, 0, 0, 1);
             return;
         }
 
+        SettingsSidebarRegion.BorderThickness = new Thickness(0, 0, 1, 0);
         SettingsWorkspaceLayoutGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(IsMediumLayout ? 216 : 248)));
         SettingsWorkspaceLayoutGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
         SettingsWorkspaceLayoutGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));

@@ -5,12 +5,12 @@
              xmlns:vm="using:Monica.App.ViewModels"
              x:Class="Monica.App.Features.Settings.SettingsBrowserPairingSectionView"
              x:DataType="vm:MainWindowViewModel">
-    <StackPanel x:Name="BrowserExtensionPairingSection" Spacing="10">
+    <StackPanel x:Name="BrowserExtensionPairingSection" Classes="settingsSection">
         <Grid Classes="settingsSectionHeader" ColumnDefinitions="Auto,*" ColumnSpacing="12">
             <Border Classes="settingsSectionIcon">
-                <ic:FluentIcon Icon="Link" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <ic:FluentIcon Icon="Link" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
-            <StackPanel Grid.Column="1" Spacing="2">
+            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                 <TextBlock Classes="settingsSectionTitle" Text="{Binding L[BrowserExtensionPairing]}" />
                 <TextBlock Classes="settingsSectionDescription"
                            Text="{Binding L[BrowserExtensionPairingDescription]}" />
@@ -79,8 +79,7 @@
                                            Description="{Binding L.BrowserIntegrationPortDescription}">
                     <fa:FASettingsExpanderItem.Footer>
                         <NumericUpDown x:Name="BrowserIntegrationPortInput"
-                                       MinWidth="180"
-                                       MaxWidth="320"
+                                       Classes="settingsField"
                                        Minimum="1024"
                                        Maximum="65535"
                                        Increment="1"
@@ -96,6 +95,7 @@
 
         <fa:FAInfoBar x:Name="BrowserPairingSecurityNotice"
                       IsOpen="True"
+                      IsClosable="False"
                       Severity="Informational"
                       Title="{Binding L[BrowserPairingSecurityNoticeTitle]}"
                       Message="{Binding L[BrowserPairingSecurityNoticeMessage]}" />

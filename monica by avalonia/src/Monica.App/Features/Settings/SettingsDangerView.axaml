@@ -1,31 +1,34 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsDangerView" x:DataType="vm:MainWindowViewModel">
-    <StackPanel IsVisible="{Binding IsSettingsDangerSelected}">
-    <TextBlock x:Name="SettingsDangerPageTitle" Classes="settingsPageTitle" Text="{Binding DangerZoneTitle}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
-    <Border Classes="settingsFlatGroup">
-        <StackPanel>
-            <fa:FASettingsExpanderItem Content="{Binding ClearVaultDataTitle}" Description="{Binding ClearVaultDataDescription}">
-                <fa:FASettingsExpanderItem.Footer>
-                    <StackPanel Spacing="10" Margin="16,0,0,0" MaxWidth="520">
-                        <TextBlock Text="{Binding ClearVaultConfirmationInstructionText}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
-                        <WrapPanel HorizontalAlignment="Right">
-                            <Button x:Name="ClearPasswordsButton" Command="{Binding ClearVaultDataCommand}" CommandParameter="Passwords" IsEnabled="{Binding CanClearVaultData}" Margin="0,0,8,8">
-                                <TextBlock Text="{Binding ClearPasswordsOnlyText}" />
-                            </Button>
-                            <Button Command="{Binding ClearVaultDataCommand}" CommandParameter="SecureItems" IsEnabled="{Binding CanClearVaultData}" Margin="0,0,8,8">
-                                <TextBlock Text="{Binding ClearSecureItemsOnlyText}" />
-                            </Button>
-                            <Button x:Name="ClearAllVaultDataButton" Background="{DynamicResource SystemFillColorCriticalBrush}" Command="{Binding ClearVaultDataCommand}" CommandParameter="All" IsEnabled="{Binding CanClearVaultData}" Margin="0,0,0,8">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <ic:FluentIcon Icon="Delete" FontSize="18" />
-                                    <TextBlock Text="{Binding ClearAllVaultDataText}" />
-                                </StackPanel>
-                            </Button>
-                        </WrapPanel>
-                        <ProgressBar IsVisible="{Binding IsClearingVaultData}" IsIndeterminate="True" />
-                    </StackPanel>
-                </fa:FASettingsExpanderItem.Footer>
-            </fa:FASettingsExpanderItem>
+    <StackPanel Classes="settingsPage" IsVisible="{Binding IsSettingsDangerSelected}">
+        <StackPanel Classes="settingsPageHeader">
+            <TextBlock x:Name="SettingsDangerPageTitle" Classes="settingsPageTitle" Text="{Binding DangerZoneTitle}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
+            <TextBlock Classes="settingsPageDescription" Text="{Binding L[SettingsDangerDescription]}" />
         </StackPanel>
-    </Border>
+        <Border Classes="settingsFlatGroup">
+            <Border Classes="settingsFormRow">
+                <StackPanel Spacing="12">
+                    <StackPanel Spacing="2">
+                        <TextBlock Classes="settingsRowTitle" Text="{Binding ClearVaultDataTitle}" />
+                        <TextBlock Classes="settingsRowDescription" Text="{Binding ClearVaultDataDescription}" />
+                        <TextBlock Classes="settingsRowDescription" Text="{Binding ClearVaultConfirmationInstructionText}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
+                    </StackPanel>
+                    <WrapPanel>
+                        <Button x:Name="ClearPasswordsButton" Command="{Binding ClearVaultDataCommand}" CommandParameter="Passwords" IsEnabled="{Binding CanClearVaultData}" Margin="0,0,8,8">
+                            <TextBlock Text="{Binding ClearPasswordsOnlyText}" />
+                        </Button>
+                        <Button Command="{Binding ClearVaultDataCommand}" CommandParameter="SecureItems" IsEnabled="{Binding CanClearVaultData}" Margin="0,0,8,8">
+                            <TextBlock Text="{Binding ClearSecureItemsOnlyText}" />
+                        </Button>
+                        <Button x:Name="ClearAllVaultDataButton" Classes="settingsDangerCommand" Command="{Binding ClearVaultDataCommand}" CommandParameter="All" IsEnabled="{Binding CanClearVaultData}" Margin="0,0,0,8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:FluentIcon Icon="Delete" FontSize="16" />
+                                <TextBlock Text="{Binding ClearAllVaultDataText}" />
+                            </StackPanel>
+                        </Button>
+                    </WrapPanel>
+                    <ProgressBar IsVisible="{Binding IsClearingVaultData}" IsIndeterminate="True" />
+                </StackPanel>
+            </Border>
+        </Border>
     </StackPanel>
 </UserControl>

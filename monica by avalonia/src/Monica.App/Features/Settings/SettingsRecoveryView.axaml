@@ -1,100 +1,130 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsRecoveryView" x:DataType="vm:MainWindowViewModel">
-    <StackPanel IsVisible="{Binding IsSettingsSecurityRecoverySelected}">
-    <TextBlock x:Name="SettingsRecoveryPageTitle" Classes="settingsPageTitle" Text="{Binding SecurityRecoveryTitle}" />
-    <Border Classes="settingsFlatGroup">
-        <StackPanel>
-            <fa:FASettingsExpanderItem Content="{Binding SecurityRecoveryEnabledText}" Description="{Binding SecurityRecoveryStatusText}">
-                <fa:FASettingsExpanderItem.Footer>
-                    <ToggleSwitch IsChecked="{Binding SecurityRecoveryEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
-                </fa:FASettingsExpanderItem.Footer>
-            </fa:FASettingsExpanderItem>
-            <fa:FASettingsExpanderItem Content="{Binding SecurityQuestion1Text}" Description="{Binding SecurityRecoveryDescription}">
-                <fa:FASettingsExpanderItem.Footer>
-                    <StackPanel Spacing="8" Margin="16,0,0,0" MinWidth="260" MaxWidth="440">
-                        <ComboBox ItemsSource="{Binding SecurityQuestionOptions}" SelectedValue="{Binding SecurityQuestion1Id}" SelectedValueBinding="{Binding Value}">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:SettingsChoice">
-                                    <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                        <TextBox IsVisible="{Binding IsSecurityQuestion1Custom}" PlaceholderText="{Binding CustomSecurityQuestionText}" Text="{Binding SecurityQuestion1CustomText}" />
-                        <TextBox PasswordChar="*" PlaceholderText="{Binding SecurityQuestionAnswerText}" Text="{Binding SecurityQuestion1Answer}" AutomationProperties.Name="{Binding SecurityQuestionAnswerText}" />
+    <StackPanel Classes="settingsPage" IsVisible="{Binding IsSettingsSecurityRecoverySelected}">
+        <StackPanel Classes="settingsPageHeader">
+            <TextBlock x:Name="SettingsRecoveryPageTitle" Classes="settingsPageTitle" Text="{Binding SecurityRecoveryTitle}" />
+            <TextBlock Classes="settingsPageDescription" Text="{Binding L[SettingsRecoveryDescription]}" />
+        </StackPanel>
+
+        <!-- Security questions: set them up, then use them to reset the master password. -->
+        <Border Classes="settingsFlatGroup">
+            <StackPanel>
+                <fa:FASettingsExpanderItem Content="{Binding SecurityRecoveryEnabledText}" Description="{Binding SecurityRecoveryStatusText}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <ToggleSwitch IsChecked="{Binding SecurityRecoveryEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" AutomationProperties.Name="{Binding SecurityRecoveryEnabledText}" />
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+                <Border Classes="settingsFormRow">
+                    <StackPanel>
+                        <TextBlock Classes="settingsRowTitle" Text="{Binding SecurityQuestion1Text}" />
+                        <TextBlock Classes="settingsRowDescription" Text="{Binding SecurityRecoveryDescription}" />
+                        <StackPanel Classes="settingsFormFields">
+                            <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding SecurityQuestionOptions}" SelectedValue="{Binding SecurityQuestion1Id}" SelectedValueBinding="{Binding Value}" AutomationProperties.Name="{Binding SecurityQuestion1Text}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:SettingsChoice">
+                                        <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBox IsVisible="{Binding IsSecurityQuestion1Custom}" PlaceholderText="{Binding CustomSecurityQuestionText}" Text="{Binding SecurityQuestion1CustomText}" AutomationProperties.Name="{Binding CustomSecurityQuestionText}" />
+                            <TextBox PasswordChar="*" PlaceholderText="{Binding SecurityQuestionAnswerText}" Text="{Binding SecurityQuestion1Answer}" AutomationProperties.Name="{Binding SecurityQuestionAnswerText}" />
+                        </StackPanel>
                     </StackPanel>
-                </fa:FASettingsExpanderItem.Footer>
-            </fa:FASettingsExpanderItem>
-            <fa:FASettingsExpanderItem Content="{Binding SecurityQuestion2Text}" Description="{Binding SecurityRecoveryDescription}">
-                <fa:FASettingsExpanderItem.Footer>
-                    <StackPanel Spacing="8" Margin="16,0,0,0" MinWidth="260" MaxWidth="440">
-                        <ComboBox ItemsSource="{Binding SecurityQuestionOptions}" SelectedValue="{Binding SecurityQuestion2Id}" SelectedValueBinding="{Binding Value}">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:SettingsChoice">
-                                    <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                        <TextBox IsVisible="{Binding IsSecurityQuestion2Custom}" PlaceholderText="{Binding CustomSecurityQuestionText}" Text="{Binding SecurityQuestion2CustomText}" />
-                        <TextBox PasswordChar="*" PlaceholderText="{Binding SecurityQuestionAnswerText}" Text="{Binding SecurityQuestion2Answer}" AutomationProperties.Name="{Binding SecurityQuestionAnswerText}" />
+                </Border>
+                <Border Classes="settingsFormRow">
+                    <StackPanel>
+                        <TextBlock Classes="settingsRowTitle" Text="{Binding SecurityQuestion2Text}" />
+                        <TextBlock Classes="settingsRowDescription" Text="{Binding SecurityRecoveryDescription}" />
+                        <StackPanel Classes="settingsFormFields">
+                            <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding SecurityQuestionOptions}" SelectedValue="{Binding SecurityQuestion2Id}" SelectedValueBinding="{Binding Value}" AutomationProperties.Name="{Binding SecurityQuestion2Text}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:SettingsChoice">
+                                        <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBox IsVisible="{Binding IsSecurityQuestion2Custom}" PlaceholderText="{Binding CustomSecurityQuestionText}" Text="{Binding SecurityQuestion2CustomText}" AutomationProperties.Name="{Binding CustomSecurityQuestionText}" />
+                            <TextBox PasswordChar="*" PlaceholderText="{Binding SecurityQuestionAnswerText}" Text="{Binding SecurityQuestion2Answer}" AutomationProperties.Name="{Binding SecurityQuestionAnswerText}" />
+                        </StackPanel>
                     </StackPanel>
-                </fa:FASettingsExpanderItem.Footer>
-            </fa:FASettingsExpanderItem>
-            <fa:FASettingsExpanderItem Content="{Binding SaveSecurityQuestionsText}" Description="{Binding SecurityRecoveryStatusText}">
-                <fa:FASettingsExpanderItem.Footer>
-                    <StackPanel Spacing="8">
-                        <Button Command="{Binding SaveSecurityQuestionsCommand}" IsEnabled="{Binding !IsSecurityMaintenanceBusy}">
+                </Border>
+                <!-- Both questions are saved together, so the action closes the card instead of
+                     repeating its own label as a row heading. -->
+                <Border Classes="settingsFormRow">
+                    <StackPanel Spacing="8" HorizontalAlignment="Left">
+                        <Button Classes="workspacePrimaryCommand" Command="{Binding SaveSecurityQuestionsCommand}" IsEnabled="{Binding !IsSecurityMaintenanceBusy}" AutomationProperties.Name="{Binding SaveSecurityQuestionsText}">
                             <TextBlock Text="{Binding SaveSecurityQuestionsText}" />
                         </Button>
                         <ProgressBar IsVisible="{Binding IsSavingSecurityQuestions}" IsIndeterminate="True" />
                     </StackPanel>
-                </fa:FASettingsExpanderItem.Footer>
-            </fa:FASettingsExpanderItem>
-            <fa:FASettingsExpanderItem Content="{Binding ResetMasterPasswordTitle}" Description="{Binding ResetMasterPasswordDescription}">
-                <fa:FASettingsExpanderItem.Footer>
-                    <StackPanel Spacing="8" Margin="16,0,0,0" MinWidth="260" MaxWidth="460">
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="settingsFlatGroup">
+            <Border Classes="settingsFormRow">
+                <StackPanel>
+                    <TextBlock Classes="settingsRowTitle" Text="{Binding ResetMasterPasswordTitle}" />
+                    <TextBlock Classes="settingsRowDescription" Text="{Binding ResetMasterPasswordDescription}" />
+                    <StackPanel Classes="settingsFormFields">
                         <TextBlock Text="{Binding SecurityRecoveryQuestion1PromptText}" TextWrapping="Wrap" FontWeight="SemiBold" />
-                        <TextBox x:Name="RecoveryAnswer1Box" PasswordChar="*" PlaceholderText="{Binding SecurityQuestionAnswerText}" Text="{Binding SecurityRecoveryAnswer1}" IsEnabled="{Binding CanRunResetMasterPassword}" />
+                        <TextBox x:Name="RecoveryAnswer1Box" PasswordChar="*" PlaceholderText="{Binding SecurityQuestionAnswerText}" Text="{Binding SecurityRecoveryAnswer1}" IsEnabled="{Binding CanRunResetMasterPassword}" AutomationProperties.Name="{Binding SecurityRecoveryQuestion1PromptText}" />
                         <TextBlock Text="{Binding SecurityRecoveryQuestion2PromptText}" TextWrapping="Wrap" FontWeight="SemiBold" />
-                        <TextBox PasswordChar="*" PlaceholderText="{Binding SecurityQuestionAnswerText}" Text="{Binding SecurityRecoveryAnswer2}" IsEnabled="{Binding CanRunResetMasterPassword}" />
-                        <TextBox PasswordChar="*" PlaceholderText="{Binding NewMasterPasswordText}" Text="{Binding RecoveryNewMasterPassword}" IsEnabled="{Binding CanRunResetMasterPassword}" />
-                        <TextBox PasswordChar="*" PlaceholderText="{Binding ConfirmNewMasterPasswordText}" Text="{Binding RecoveryConfirmNewMasterPassword}" IsEnabled="{Binding CanRunResetMasterPassword}" />
-                        <Button Command="{Binding ResetMasterPasswordWithSecurityQuestionsCommand}" IsEnabled="{Binding CanRunResetMasterPassword}" HorizontalAlignment="Right">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <ic:FluentIcon Icon="Key" FontSize="18" />
-                                <TextBlock Text="{Binding ResetMasterPasswordActionText}" />
-                            </StackPanel>
-                        </Button>
+                        <TextBox PasswordChar="*" PlaceholderText="{Binding SecurityQuestionAnswerText}" Text="{Binding SecurityRecoveryAnswer2}" IsEnabled="{Binding CanRunResetMasterPassword}" AutomationProperties.Name="{Binding SecurityRecoveryQuestion2PromptText}" />
+                        <TextBox PasswordChar="*" PlaceholderText="{Binding NewMasterPasswordText}" Text="{Binding RecoveryNewMasterPassword}" IsEnabled="{Binding CanRunResetMasterPassword}" AutomationProperties.Name="{Binding NewMasterPasswordText}" />
+                        <TextBox PasswordChar="*" PlaceholderText="{Binding ConfirmNewMasterPasswordText}" Text="{Binding RecoveryConfirmNewMasterPassword}" IsEnabled="{Binding CanRunResetMasterPassword}" AutomationProperties.Name="{Binding ConfirmNewMasterPasswordText}" />
+                        <StackPanel Classes="settingsFormActions">
+                            <Button Classes="workspacePrimaryCommand" Command="{Binding ResetMasterPasswordWithSecurityQuestionsCommand}" IsEnabled="{Binding CanRunResetMasterPassword}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <ic:FluentIcon Icon="Key" FontSize="16" />
+                                    <TextBlock Text="{Binding ResetMasterPasswordActionText}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                         <ProgressBar IsVisible="{Binding IsResettingMasterPassword}" IsIndeterminate="True" />
                     </StackPanel>
-                </fa:FASettingsExpanderItem.Footer>
-            </fa:FASettingsExpanderItem>
-            <fa:FASettingsExpanderItem Content="{Binding EmergencyKitTitle}" Description="{Binding EmergencyKitDescription}">
-                <fa:FASettingsExpanderItem.Footer>
-                    <StackPanel Spacing="8" Margin="16,0,0,0" MinWidth="260" MaxWidth="440">
-                        <TextBlock Text="{Binding EmergencyKitStatusText}" TextWrapping="Wrap" Opacity="0.8" />
-                        <TextBox x:Name="EmergencyKitPassphraseBox" PasswordChar="*" PlaceholderText="{Binding EmergencyKitPassphraseText}" Text="{Binding EmergencyKitPassphrase}" IsEnabled="{Binding CanRunEmergencyKit}" AutomationProperties.Name="{Binding EmergencyKitPassphraseText}" />
-                        <TextBox x:Name="EmergencyKitConfirmPassphraseBox" PasswordChar="*" PlaceholderText="{Binding EmergencyKitPassphraseConfirmText}" Text="{Binding EmergencyKitPassphraseConfirm}" IsEnabled="{Binding CanRunEmergencyKit}" AutomationProperties.Name="{Binding EmergencyKitPassphraseConfirmText}" />
-                        <Button x:Name="CreateEmergencyKitButton" Command="{Binding CreateEmergencyKitCommand}" IsEnabled="{Binding CanRunEmergencyKit}" HorizontalAlignment="Right">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <ic:FluentIcon Icon="Vault" FontSize="18" />
-                                <TextBlock Text="{Binding EmergencyKitCreateActionText}" />
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- The emergency kit is sealed with a passphrase Monica never stores. -->
+        <Border Classes="settingsFlatGroup">
+            <StackPanel>
+                <Border Classes="settingsFormRow">
+                    <StackPanel>
+                        <TextBlock Classes="settingsRowTitle" Text="{Binding EmergencyKitTitle}" />
+                        <TextBlock Classes="settingsRowDescription" Text="{Binding EmergencyKitDescription}" />
+                        <TextBlock Classes="settingsRowDescription" Text="{Binding EmergencyKitStatusText}" Margin="0,4,0,0" />
+                        <StackPanel Classes="settingsFormFields">
+                            <TextBox x:Name="EmergencyKitPassphraseBox" PasswordChar="*" PlaceholderText="{Binding EmergencyKitPassphraseText}" Text="{Binding EmergencyKitPassphrase}" IsEnabled="{Binding CanRunEmergencyKit}" AutomationProperties.Name="{Binding EmergencyKitPassphraseText}" />
+                            <TextBox x:Name="EmergencyKitConfirmPassphraseBox" PasswordChar="*" PlaceholderText="{Binding EmergencyKitPassphraseConfirmText}" Text="{Binding EmergencyKitPassphraseConfirm}" IsEnabled="{Binding CanRunEmergencyKit}" AutomationProperties.Name="{Binding EmergencyKitPassphraseConfirmText}" />
+                            <StackPanel Classes="settingsFormActions">
+                                <Button x:Name="CreateEmergencyKitButton" Classes="workspacePrimaryCommand" Command="{Binding CreateEmergencyKitCommand}" IsEnabled="{Binding CanRunEmergencyKit}">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <ic:FluentIcon Icon="Vault" FontSize="16" />
+                                        <TextBlock Text="{Binding EmergencyKitCreateActionText}" />
+                                    </StackPanel>
+                                </Button>
                             </StackPanel>
-                        </Button>
-                        <ProgressBar IsVisible="{Binding IsCreatingEmergencyKit}" IsIndeterminate="True" />
+                            <ProgressBar IsVisible="{Binding IsCreatingEmergencyKit}" IsIndeterminate="True" />
+                        </StackPanel>
                     </StackPanel>
-                </fa:FASettingsExpanderItem.Footer>
-            </fa:FASettingsExpanderItem>
-            <fa:FASettingsExpanderItem Content="{Binding EmergencyKitRestoreActionText}" Description="{Binding EmergencyKitRestoreDescription}">
-                <fa:FASettingsExpanderItem.Footer>
-                    <StackPanel Spacing="8" Margin="16,0,0,0" MinWidth="260" MaxWidth="440">
-                        <TextBox x:Name="EmergencyKitRestorePassphraseBox" PasswordChar="*" PlaceholderText="{Binding EmergencyKitPassphraseText}" Text="{Binding EmergencyKitRestorePassphrase}" IsEnabled="{Binding CanRunEmergencyKit}" AutomationProperties.Name="{Binding EmergencyKitPassphraseText}" />
-                        <Button x:Name="RestoreEmergencyKitButton" Command="{Binding RestoreEmergencyKitCommand}" IsEnabled="{Binding CanRunEmergencyKit}" HorizontalAlignment="Right">
-                            <TextBlock Text="{Binding EmergencyKitRestoreActionText}" />
-                        </Button>
-                        <ProgressBar IsVisible="{Binding IsRestoringEmergencyKit}" IsIndeterminate="True" />
+                </Border>
+                <Border Classes="settingsFormRow">
+                    <StackPanel>
+                        <TextBlock Classes="settingsRowTitle" Text="{Binding EmergencyKitRestoreActionText}" />
+                        <TextBlock Classes="settingsRowDescription" Text="{Binding EmergencyKitRestoreDescription}" />
+                        <StackPanel Classes="settingsFormFields">
+                            <TextBox x:Name="EmergencyKitRestorePassphraseBox" PasswordChar="*" PlaceholderText="{Binding EmergencyKitPassphraseText}" Text="{Binding EmergencyKitRestorePassphrase}" IsEnabled="{Binding CanRunEmergencyKit}" AutomationProperties.Name="{Binding EmergencyKitPassphraseText}" />
+                            <StackPanel Classes="settingsFormActions">
+                                <Button x:Name="RestoreEmergencyKitButton" Command="{Binding RestoreEmergencyKitCommand}" IsEnabled="{Binding CanRunEmergencyKit}">
+                                    <TextBlock Text="{Binding EmergencyKitRestoreActionText}" />
+                                </Button>
+                            </StackPanel>
+                            <ProgressBar IsVisible="{Binding IsRestoringEmergencyKit}" IsIndeterminate="True" />
+                        </StackPanel>
                     </StackPanel>
-                </fa:FASettingsExpanderItem.Footer>
-            </fa:FASettingsExpanderItem>
-        </StackPanel>
-    </Border>
+                </Border>
+            </StackPanel>
+        </Border>
     </StackPanel>
 </UserControl>
