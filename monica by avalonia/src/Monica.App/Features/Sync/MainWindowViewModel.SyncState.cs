@@ -82,9 +82,11 @@ public sealed partial class MainWindowViewModel
             _localization.Get("BackupHistory"),
             WebDavBackupHistoryCountText,
             SyncRecoverySummaryText));
+        // A tile's value is a status word like its neighbours'; the connect prompt is a sentence
+        // and belongs on the OneDrive page, not in a two-line slot where it lost its ending.
         SyncHealthItems.Add(new SyncHealthDisplayItem(
             _localization.OneDrive,
-            OneDriveConnectionStatusText,
+            HasOneDriveAccount ? OneDriveAccountDisplayName : _localization.Get("NotConfigured"),
             _localization.Get("OneDriveBoundaryDescription")));
         SyncHealthItems.Add(new SyncHealthDisplayItem(
             "Bitwarden",

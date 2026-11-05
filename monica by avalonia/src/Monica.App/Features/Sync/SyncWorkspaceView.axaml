@@ -52,7 +52,7 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <TextBlock Text="{Binding SyncRecoverySummaryText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,6,0,0" />
+                        <!-- No recovery summary under the strip: the backup tile already prints it. -->
                     </StackPanel>
                 </ScrollViewer>
             </Grid>
