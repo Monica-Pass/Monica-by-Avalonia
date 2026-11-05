@@ -21,7 +21,9 @@
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource SpacingSmall}">
                 <TextBox x:Name="PasskeySearchBox" Text="{Binding SearchText}"
                          PlaceholderText="{Binding L[PasskeySearchHint]}" AutomationProperties.Name="{Binding L[PasskeySearchHint]}" />
+                <!-- Like every other search field, the way out only appears once there is a query. -->
                 <Button Grid.Column="1" Classes="workspaceCommand" Command="{Binding ClearSearchCommand}"
+                        IsVisible="{Binding SearchText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                         Content="{Binding L.ClearSearch}" AutomationProperties.Name="{Binding L.ClearSearch}" />
             </Grid>
             <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" />

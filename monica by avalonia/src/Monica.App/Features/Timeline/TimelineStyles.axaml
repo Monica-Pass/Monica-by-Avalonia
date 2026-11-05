@@ -28,6 +28,6 @@
 <Style Selector="Border.timelineInspector">
     <Setter Property="CornerRadius" Value="0" />
     <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="Background" Value="{DynamicResource LayerFillColorDefaultBrush}" />
+    <Setter Property="Background" Value="Transparent" />
 </Style>
 </Styles>
