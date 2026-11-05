@@ -120,7 +120,8 @@ public sealed class KeePassRecentVaultRegistryTests
         KeePassRecentVaultRegistry.Remember(vaults, FirstPath, null, opened);
         KeePassRecentVaultRegistry.Remember(vaults, SecondPath, null, opened.AddMinutes(1));
 
-        KeePassRecentVaultRegistry.Forget(vaults, @"D:\VAULTS\ledger.kdbx");
+        // Windows paths are case-insensitive, so a different spelling must still find the row there.
+        KeePassRecentVaultRegistry.Forget(vaults, OperatingSystem.IsWindows() ? @"D:\VAULTS\ledger.kdbx" : FirstPath);
 
         var remaining = Assert.Single(KeePassRecentVaultRegistry.Ordered(vaults));
         Assert.Equal(SecondPath, remaining.Path);
