@@ -560,11 +560,15 @@ public sealed class LocalizationService : ILocalizationService
 
     private const string PlatformReasonPrefix = "PlatformReason.";
 
-    private static readonly Lazy<IReadOnlyDictionary<string, string>> PlatformReasonKeys = new(() =>
+    // A method rather than an inline lambda: the English table is declared further down, and a
+    // static initializer that names it reads as touching a field that is not yet assigned.
+    private static readonly Lazy<IReadOnlyDictionary<string, string>> PlatformReasonKeys = new(BuildPlatformReasonKeys);
+
+    private static IReadOnlyDictionary<string, string> BuildPlatformReasonKeys() =>
         English
             .Where(entry => entry.Key.StartsWith(PlatformReasonPrefix, StringComparison.Ordinal))
             .GroupBy(entry => entry.Value, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.First().Key, StringComparer.Ordinal));
+            .ToDictionary(group => group.Key, group => group.First().Key, StringComparer.Ordinal);
 
     /// <summary>
     /// The platform layer explains a limitation in English because it has no localization of its own.
