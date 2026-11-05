@@ -25,6 +25,7 @@ public sealed class TrayHintUiTests
     [Fact]
     public void First_minimize_explains_the_tray_and_the_next_one_does_not()
     {
+        DesktopIntegrationPlatform.RequireWindows();
         var (window, _, settings, services) = Boot();
         try
         {
@@ -60,6 +61,7 @@ public sealed class TrayHintUiTests
     [Fact]
     public void Close_to_tray_explains_where_the_window_went()
     {
+        DesktopIntegrationPlatform.RequireWindows();
         var (window, _, settings, services) = Boot();
         try
         {
@@ -81,6 +83,7 @@ public sealed class TrayHintUiTests
     [Fact]
     public void Taking_the_hint_back_to_the_window_closes_the_hint()
     {
+        DesktopIntegrationPlatform.RequireWindows();
         var (window, viewModel, _, services) = Boot();
         try
         {
@@ -106,6 +109,7 @@ public sealed class TrayHintUiTests
     [Fact]
     public async Task The_hint_retires_itself_once_its_dwell_has_elapsed()
     {
+        DesktopIntegrationPlatform.RequireWindows();
         var (window, _, _, services) = Boot();
         try
         {
@@ -137,6 +141,7 @@ public sealed class TrayHintUiTests
     [Fact]
     public async Task A_settings_reload_mid_run_does_not_earn_the_explanation_back()
     {
+        DesktopIntegrationPlatform.RequireWindows();
         var (window, viewModel, settings, services) = Boot();
         try
         {
