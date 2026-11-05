@@ -1,3 +1,4 @@
+using Monica.App.Services;
 using Monica.Core.Models;
 using Monica.Platform.Services;
 
@@ -87,7 +88,7 @@ public sealed partial class MainWindowViewModel
                 _localization.Get($"Integration.{capability.Key}.Title"),
                 localizedDescription == descriptionKey ? capability.Description : localizedDescription,
                 LocalizeFeatureStatus(capability.Status),
-                capability.UnsupportedReason ?? "",
+                LocalizePlatformReason(capability.UnsupportedReason),
                 capability.Status));
         }
 
@@ -104,6 +105,8 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(CanUseBrowserBridgeIntegration));
         OnPropertyChanged(nameof(CanOpenExternalLinks));
         OnPropertyChanged(nameof(CanUseFilePicker));
+        OnPropertyChanged(nameof(CanUseWindowCaptureProtection));
+        OnPropertyChanged(nameof(WindowCaptureProtectionDescriptionText));
         OnPropertyChanged(nameof(TrayIntegrationStatusText));
         OnPropertyChanged(nameof(GlobalHotkeyIntegrationStatusText));
         OnPropertyChanged(nameof(AutoTypeIntegrationStatusText));
@@ -147,8 +150,9 @@ public sealed partial class MainWindowViewModel
                 canToggle,
                 _localization.FeatureEnabled,
                 _localization.FeatureDisabled,
-                capability.UnsupportedReason ?? "",
-                UpdateFeatureToggle));
+                LocalizePlatformReason(capability.UnsupportedReason),
+                UpdateFeatureToggle,
+                capability.Status));
         }
     }
 
@@ -182,9 +186,10 @@ public sealed partial class MainWindowViewModel
     {
         var capability = GetPlatformIntegration(key);
         var status = LocalizeFeatureStatus(capability.Status);
-        var baseStatus = string.IsNullOrWhiteSpace(capability.UnsupportedReason)
+        var reason = LocalizePlatformReason(capability.UnsupportedReason);
+        var baseStatus = reason.Length == 0
             ? status
-            : $"{status}: {capability.UnsupportedReason}";
+            : _localization.Format("PlatformStatusWithReasonFormat", status, reason);
         if (string.Equals(key, PlatformFeatureKeys.GlobalHotkey, StringComparison.OrdinalIgnoreCase) &&
             !string.IsNullOrWhiteSpace(GlobalHotkeyRegistrationError))
         {
@@ -217,6 +222,14 @@ public sealed partial class MainWindowViewModel
 
         return baseStatus;
     }
+
+    // The platform layer words its limitations in English; the UI shows them in the user's language.
+    private string LocalizePlatformReason(string? reason) =>
+        string.IsNullOrWhiteSpace(reason)
+            ? ""
+            : LocalizationService.FindPlatformReasonKey(reason) is { } key
+                ? _localization.Get(key)
+                : reason;
 
     private PlatformIntegrationCapability GetPlatformIntegration(string key) =>
         _sourcePlatformIntegrationCapabilities.FirstOrDefault(

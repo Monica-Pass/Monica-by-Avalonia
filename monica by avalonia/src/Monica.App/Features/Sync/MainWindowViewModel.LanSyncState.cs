@@ -59,7 +59,7 @@ public sealed partial class MainWindowViewModel
                     "preparation_failed" => "DeviceSyncPreparationFailed",
                     _ => "DeviceSyncOffline"
                 });
-                display.LastSynced = peer.LastSyncedAt is { } time ? L.Format("DeviceSyncLast", time.ToLocalTime().ToString("g")) : "";
+                display.LastSynced = peer.LastSyncedAt is { } time ? L.Format("DeviceSyncLast", time.ToLocalTime().ToString("g", _localization.Culture)) : "";
             }
             IsLanBusy = state.Pairing || state.Phase is "preparing" or "sending" or "receiving" or "transferring" or "applying" or "authenticating" or "connecting" or "checking" or "confirming";
             var progress = state.Progress;

@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Monica.App.Controls"
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:local="using:Monica.App"
              xmlns:recycle="using:Monica.App.Features.RecycleBin"
@@ -228,7 +229,7 @@
                         <TextBlock Grid.Row="1" Classes="workspaceDetailLabel" Text="{Binding L[Source]}" />
                         <TextBlock Grid.Row="1" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedRecycleBinItem.Source}" />
                         <TextBlock Grid.Row="2" Classes="workspaceDetailLabel" Text="{Binding L.RecycleBin}" />
-                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedRecycleBinItem.DeletedAt, StringFormat='{}{0:g}'}" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedRecycleBinItem.DeletedAt, Converter={x:Static controls:LocalTimeConverter.General}}" />
                         <TextBlock Grid.Row="3" Classes="workspaceDetailLabel" Text="{Binding L[RecycleBinRetention]}" />
                         <TextBlock Grid.Row="3" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedRecycleBinItem.RetentionText}" />
                     </Grid>

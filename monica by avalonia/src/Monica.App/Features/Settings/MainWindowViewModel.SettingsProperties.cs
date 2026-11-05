@@ -9,7 +9,9 @@ namespace Monica.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
-    public const string GitHubRepositoryUrl = "https://github.com/JoyinJoester/Monica";
+    // This desktop app's repository, where its issues belong. It used to point at the Android project
+    // under that project's pre-transfer name (JoyinJoester/Monica).
+    public const string GitHubRepositoryUrl = "https://github.com/Monica-Pass/Monica-by-Avalonia";
 
     private readonly IMasterPasswordMaintenanceService _masterPasswordMaintenanceService;
     private readonly IAppSettingsService _settingsService;
@@ -80,8 +82,12 @@ public sealed partial class MainWindowViewModel
     public string ResetMasterPasswordTitle => _localization.Get("ResetMasterPassword");
     public string ResetMasterPasswordDescription => _localization.Get("ResetMasterPasswordDescription");
     public string ResetMasterPasswordActionText => _localization.Get("ResetMasterPasswordAction");
-    public string SecurityRecoveryQuestion1PromptText => _settingsService.Current.SecurityRecovery.Question1Text;
-    public string SecurityRecoveryQuestion2PromptText => _settingsService.Current.SecurityRecovery.Question2Text;
+    public string SecurityRecoveryQuestion1PromptText => LocalizeSecurityQuestion(
+        _settingsService.Current.SecurityRecovery.Question1Id,
+        _settingsService.Current.SecurityRecovery.Question1Text);
+    public string SecurityRecoveryQuestion2PromptText => LocalizeSecurityQuestion(
+        _settingsService.Current.SecurityRecovery.Question2Id,
+        _settingsService.Current.SecurityRecovery.Question2Text);
     public bool IsSecurityQuestion1Custom => SecurityQuestion1Id == SecurityQuestionService.CustomQuestionId;
     public bool IsSecurityQuestion2Custom => SecurityQuestion2Id == SecurityQuestionService.CustomQuestionId;
     public bool CanResetMasterPasswordWithSecurityQuestions =>

@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Monica.App.Controls"
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:local="using:Monica.App"
              xmlns:models="using:Monica.Core.Models"
@@ -193,11 +194,11 @@
                         <TextBlock Grid.Row="1" Classes="workspaceDetailLabel" Text="{Binding L.Website}" />
                         <TextBlock Grid.Row="1" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedArchivedPassword.Website}" />
                         <TextBlock Grid.Row="2" Classes="workspaceDetailLabel" Text="{Binding L.CreatedAt}" />
-                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedArchivedPassword.CreatedAt, StringFormat='{}{0:g}'}" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedArchivedPassword.CreatedAt, Converter={x:Static controls:LocalTimeConverter.General}}" />
                         <TextBlock Grid.Row="3" Classes="workspaceDetailLabel" Text="{Binding L.UpdatedAt}" />
-                        <TextBlock Grid.Row="3" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedArchivedPassword.UpdatedAt, StringFormat='{}{0:g}'}" />
+                        <TextBlock Grid.Row="3" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedArchivedPassword.UpdatedAt, Converter={x:Static controls:LocalTimeConverter.General}}" />
                         <TextBlock Grid.Row="4" Classes="workspaceDetailLabel" Text="{Binding L.Archive}" />
-                        <TextBlock Grid.Row="4" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedArchivedPassword.ArchivedAt, StringFormat='{}{0:g}'}" />
+                        <TextBlock Grid.Row="4" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedArchivedPassword.ArchivedAt, Converter={x:Static controls:LocalTimeConverter.General}}" />
                     </Grid>
                 </StackPanel>
                 </ScrollViewer>
