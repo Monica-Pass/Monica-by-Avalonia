@@ -8,15 +8,10 @@
         <!-- Each row: what the capability is and, when it is limited, why - in the user's language -
              with the verdict as a short status on the right, so the right column always lines up. -->
         <StackPanel Classes="settingsSection">
-            <Grid Classes="settingsSectionHeader" ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                <Border Classes="settingsSectionIcon">
-                    <ic:FluentIcon Icon="Desktop" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="settingsSectionTitle" Text="{Binding L[PlatformIntegrationsSectionTitle]}" />
-                    <TextBlock Classes="settingsSectionDescription" Text="{Binding L[PlatformIntegrationsSectionDescription]}" />
-                </StackPanel>
-            </Grid>
+            <StackPanel Classes="settingsSectionHeader">
+                <TextBlock Classes="settingsSectionTitle" Text="{Binding L[PlatformIntegrationsSectionTitle]}" />
+                <TextBlock Classes="settingsSectionDescription" Text="{Binding L[PlatformIntegrationsSectionDescription]}" />
+            </StackPanel>
             <Border Classes="settingsFlatGroup">
                 <ItemsControl Classes="settingsRows" ItemsSource="{Binding PlatformIntegrationCapabilities}">
                     <ItemsControl.ItemTemplate>
@@ -43,15 +38,10 @@
         </StackPanel>
 
         <StackPanel Classes="settingsSection">
-            <Grid Classes="settingsSectionHeader" ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                <Border Classes="settingsSectionIcon">
-                    <ic:FluentIcon Icon="Phone" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="settingsSectionTitle" Text="{Binding L.DesktopEquivalents}" />
-                    <TextBlock Classes="settingsSectionDescription" Text="{Binding L.DesktopEquivalentsMessage}" />
-                </StackPanel>
-            </Grid>
+            <StackPanel Classes="settingsSectionHeader">
+                <TextBlock Classes="settingsSectionTitle" Text="{Binding L.DesktopEquivalents}" />
+                <TextBlock Classes="settingsSectionDescription" Text="{Binding L.DesktopEquivalentsMessage}" />
+            </StackPanel>
             <Border Classes="settingsFlatGroup">
                 <ItemsControl Classes="settingsRows" ItemsSource="{Binding Capabilities}">
                     <ItemsControl.ItemTemplate>

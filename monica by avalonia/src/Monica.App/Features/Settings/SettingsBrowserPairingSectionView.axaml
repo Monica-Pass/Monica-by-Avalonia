@@ -6,16 +6,11 @@
              x:Class="Monica.App.Features.Settings.SettingsBrowserPairingSectionView"
              x:DataType="vm:MainWindowViewModel">
     <StackPanel x:Name="BrowserExtensionPairingSection" Classes="settingsSection">
-        <Grid Classes="settingsSectionHeader" ColumnDefinitions="Auto,*" ColumnSpacing="12">
-            <Border Classes="settingsSectionIcon">
-                <ic:FluentIcon Icon="Link" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
-            </Border>
-            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                <TextBlock Classes="settingsSectionTitle" Text="{Binding L[BrowserExtensionPairing]}" />
-                <TextBlock Classes="settingsSectionDescription"
-                           Text="{Binding L[BrowserExtensionPairingDescription]}" />
-            </StackPanel>
-        </Grid>
+        <StackPanel Classes="settingsSectionHeader">
+            <TextBlock Classes="settingsSectionTitle" Text="{Binding L[BrowserExtensionPairing]}" />
+            <TextBlock Classes="settingsSectionDescription"
+                       Text="{Binding L[BrowserExtensionPairingDescription]}" />
+        </StackPanel>
 
         <fa:FAInfoBar x:Name="BrowserBridgeUnavailableStatus"
                       IsOpen="True"

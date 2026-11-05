@@ -20,16 +20,11 @@
         </StackPanel>
 
         <StackPanel x:Name="DesktopBackgroundBehaviorSection" Classes="settingsSection">
-            <Grid Classes="settingsSectionHeader" ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                <Border Classes="settingsSectionIcon">
-                    <ic:FluentIcon Icon="Desktop" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="settingsSectionTitle" Text="{Binding L[DesktopBackgroundBehavior]}" />
-                    <TextBlock Classes="settingsSectionDescription"
-                               Text="{Binding L[DesktopBackgroundBehaviorDescription]}" />
-                </StackPanel>
-            </Grid>
+            <StackPanel Classes="settingsSectionHeader">
+                <TextBlock Classes="settingsSectionTitle" Text="{Binding L[DesktopBackgroundBehavior]}" />
+                <TextBlock Classes="settingsSectionDescription"
+                           Text="{Binding L[DesktopBackgroundBehaviorDescription]}" />
+            </StackPanel>
             <Border Classes="settingsFlatGroup">
                 <!-- The footer holds the switch alone, so it lines up with every other switch; what the
                      setting currently does is the row's description. -->
@@ -50,16 +45,11 @@
         </StackPanel>
 
         <StackPanel x:Name="DesktopQuickAccessSection" Classes="settingsSection">
-            <Grid Classes="settingsSectionHeader" ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                <Border Classes="settingsSectionIcon">
-                    <ic:FluentIcon Icon="Keyboard" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="settingsSectionTitle" Text="{Binding L[DesktopQuickAccess]}" />
-                    <TextBlock Classes="settingsSectionDescription"
-                               Text="{Binding L[DesktopQuickAccessDescription]}" />
-                </StackPanel>
-            </Grid>
+            <StackPanel Classes="settingsSectionHeader">
+                <TextBlock Classes="settingsSectionTitle" Text="{Binding L[DesktopQuickAccess]}" />
+                <TextBlock Classes="settingsSectionDescription"
+                           Text="{Binding L[DesktopQuickAccessDescription]}" />
+            </StackPanel>
             <Border Classes="settingsFlatGroup">
                 <StackPanel>
                     <fa:FASettingsExpanderItem Content="{Binding L.QuickSearch}"
@@ -173,16 +163,11 @@
         <settings:SettingsBrowserPairingSectionView x:Name="BrowserPairingSectionHost" />
 
         <StackPanel x:Name="DesktopAppearanceSection" Classes="settingsSection">
-            <Grid Classes="settingsSectionHeader" ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                <Border Classes="settingsSectionIcon">
-                    <ic:FluentIcon Icon="TextBulletList" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="settingsSectionTitle" Text="{Binding L[DesktopDensityAndAppearance]}" />
-                    <TextBlock Classes="settingsSectionDescription"
-                               Text="{Binding L[DesktopDensityAndAppearanceDescription]}" />
-                </StackPanel>
-            </Grid>
+            <StackPanel Classes="settingsSectionHeader">
+                <TextBlock Classes="settingsSectionTitle" Text="{Binding L[DesktopDensityAndAppearance]}" />
+                <TextBlock Classes="settingsSectionDescription"
+                           Text="{Binding L[DesktopDensityAndAppearanceDescription]}" />
+            </StackPanel>
             <Border Classes="settingsFlatGroup">
                 <StackPanel>
                     <fa:FASettingsExpanderItem Content="{Binding L.CompactPasswordList}"

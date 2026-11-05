@@ -3,11 +3,12 @@
         xmlns:fa="using:FluentAvalonia.UI.Controls"
         xmlns:ic="using:FluentIcons.Avalonia">
 
-<!-- One vocabulary for every settings page: a page header, sections with an icon tile, and cards
-     whose rows are separated by hairlines. The card owns the surface, the stroke and the corners;
-     rows are not buttons, so they carry no hover fill of their own. Every right-hand control sits
-     in the row footer at one width, and status text lives in the description or an info bar,
-     never stacked above the control (which is what pushed the tray toggle out of line). -->
+<!-- One vocabulary for every settings page, following the Windows settings pattern: a page
+     header, sections headed by a short strong label, and one card per setting with a 4px gap
+     between cards. Rows are not buttons, so they carry no hover fill of their own. Every
+     right-hand control sits in the row footer at one width, and status text lives in the
+     description or an info bar, never stacked above the control (which is what pushed the tray
+     toggle out of line). -->
 
 <Style Selector="StackPanel.settingsPage">
     <Setter Property="Spacing" Value="{DynamicResource SpacingLarge}" />
@@ -26,24 +27,14 @@
 </Style>
 
 <Style Selector="StackPanel.settingsSection">
-    <Setter Property="Spacing" Value="10" />
+    <Setter Property="Spacing" Value="8" />
 </Style>
-<Style Selector="Grid.settingsSectionHeader">
+<Style Selector="StackPanel.settingsSectionHeader">
+    <Setter Property="Spacing" Value="2" />
     <Setter Property="HorizontalAlignment" Value="Stretch" />
 </Style>
-<Style Selector="Border.settingsSectionIcon">
-    <Setter Property="Width" Value="32" />
-    <Setter Property="Height" Value="32" />
-    <Setter Property="CornerRadius" Value="{DynamicResource RadiusCard}" />
-    <Setter Property="Background" Value="{DynamicResource MonicaIconTileBrush}" />
-    <Setter Property="HorizontalAlignment" Value="Left" />
-    <Setter Property="VerticalAlignment" Value="Top" />
-</Style>
-<Style Selector="Border.settingsSectionIcon ic|FluentIcon">
-    <Setter Property="Foreground" Value="{DynamicResource MonicaIconTileForegroundBrush}" />
-</Style>
 <Style Selector="TextBlock.settingsSectionTitle">
-    <Setter Property="FontSize" Value="{DynamicResource FontSizeSectionTitle}" />
+    <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}" />
     <Setter Property="FontWeight" Value="SemiBold" />
 </Style>
 <Style Selector="TextBlock.settingsSectionDescription">
@@ -52,28 +43,32 @@
     <Setter Property="TextWrapping" Value="Wrap" />
 </Style>
 
+<!-- A group is a column of cards, not a card itself. -->
 <Style Selector="Border.settingsFlatGroup">
-    <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="{DynamicResource RadiusCard}" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Padding" Value="0" />
-    <Setter Property="ClipToBounds" Value="True" />
+</Style>
+<Style Selector="Border.settingsFlatGroup > StackPanel">
+    <Setter Property="Spacing" Value="4" />
+</Style>
+<Style Selector="ItemsControl.settingsRows ContentPresenter:not(:nth-child(1))">
+    <Setter Property="Margin" Value="0,4,0,0" />
 </Style>
 
 <!-- Rows. FluentAvalonia's item would otherwise paint its own translucent fill, a hover fill and,
-     after some focus transitions, an accent edge. -->
+     after some focus transitions, an accent edge; each row instead keeps one card surface. -->
 <Style Selector="fa|FASettingsExpanderItem">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
-    <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
     <Setter Property="Padding" Value="{DynamicResource PaddingCardRow}" />
-    <Setter Property="MinHeight" Value="60" />
+    <Setter Property="MinHeight" Value="64" />
 </Style>
 <Style Selector="fa|FASettingsExpanderItem:pointerover, fa|FASettingsExpanderItem:focus">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
+    <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
 </Style>
 <Style Selector="fa|FASettingsExpanderItem /template/ TextBlock#DescriptionText">
     <Setter Property="FontSize" Value="{DynamicResource FontSizeMeta}" />
@@ -82,25 +77,15 @@
 
 <!-- A row that needs more than one control (a password change, a recovery question) puts its
      fields under the heading instead of cramming them into the footer column. -->
-<Style Selector="Border.settingsFormRow">
+<Style Selector="Border.settingsFormRow, Border.settingsListRow">
     <Setter Property="Padding" Value="{DynamicResource PaddingCardRow}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
+    <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
 </Style>
 <Style Selector="Border.settingsListRow">
-    <Setter Property="Padding" Value="{DynamicResource PaddingCardRow}" />
-    <Setter Property="MinHeight" Value="60" />
-    <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
-</Style>
-
-<!-- One hairline between consecutive rows of a card. -->
-<Style Selector="Border.settingsFlatGroup > StackPanel > fa|FASettingsExpanderItem:not(:nth-child(1))">
-    <Setter Property="BorderThickness" Value="0,1,0,0" />
-</Style>
-<Style Selector="Border.settingsFlatGroup > StackPanel > Border.settingsFormRow:not(:nth-child(1))">
-    <Setter Property="BorderThickness" Value="0,1,0,0" />
-</Style>
-<Style Selector="ItemsControl.settingsRows ContentPresenter:not(:nth-child(1)) > Border.settingsListRow">
-    <Setter Property="BorderThickness" Value="0,1,0,0" />
+    <Setter Property="MinHeight" Value="64" />
 </Style>
 
 <Style Selector="TextBlock.settingsRowTitle">
