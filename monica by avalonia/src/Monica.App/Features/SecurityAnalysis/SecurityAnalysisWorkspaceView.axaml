@@ -13,9 +13,12 @@
             <Grid x:Name="SecurityHeaderGrid" RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto" ColumnSpacing="12" RowSpacing="10">
                 <StackPanel MinWidth="0" VerticalAlignment="Top">
                     <TextBlock Classes="workspacePageTitle" Text="{Binding L.SecurityAnalysis}" />
+                    <!-- Left-aligned: a capped, stretched block is centred in a wide column, which
+                         left the subtitle floating to the right of the page title. -->
                     <TextBlock Classes="workspacePageSubtitle"
                                Text="{Binding L.SecurityAnalysisSubtitle}"
                                MaxWidth="760"
+                               HorizontalAlignment="Left"
                                TextWrapping="Wrap" />
                 </StackPanel>
                 <views:SecurityAnalysisCommandBarView x:Name="SecurityAnalysisCommandBar" Grid.Column="1" MinWidth="280" />
@@ -26,11 +29,11 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:SecuritySummaryItem">
-                                <Border Width="156" MinHeight="64" Margin="0,0,8,0" Padding="12,8" CornerRadius="4" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,1,0" Background="Transparent">
+                                <Border Width="176" MinHeight="64" Margin="0,0,8,0" Padding="12,8" CornerRadius="4" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,1,0" Background="Transparent" ToolTip.Tip="{Binding Detail}">
                                     <StackPanel Spacing="3">
-                                        <TextBlock Text="{Binding Label}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="12" />
-                                        <TextBlock Text="{Binding Value}" FontSize="20" FontWeight="SemiBold" FontFamily="Consolas" />
-                                        <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" FontSize="12" MaxLines="2" />
+                                        <TextBlock Text="{Binding Label}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" FontSize="{DynamicResource FontSizeMeta}" />
+                                        <TextBlock Text="{Binding Value}" FontSize="20" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" FontSize="{DynamicResource FontSizeMeta}" MaxLines="3" />
                                     </StackPanel>
                                 </Border>
                             </DataTemplate>

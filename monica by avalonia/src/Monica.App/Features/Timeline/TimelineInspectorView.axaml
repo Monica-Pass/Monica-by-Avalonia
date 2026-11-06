@@ -21,8 +21,8 @@
                 </Grid>
                 <TextBlock Text="{Binding SelectedTimelineEntry.Description}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                 <WrapPanel Orientation="Horizontal">
-                    <Border Classes="workspaceStatusChip" Margin="0,0,8,8"><TextBlock Text="{Binding SelectedTimelineEntry.OperationType}" FontWeight="SemiBold" /></Border>
-                    <Border Classes="workspaceStatusChip" Margin="0,0,8,8"><TextBlock Text="{Binding SelectedTimelineEntry.ItemType}" /></Border>
+                    <Border Classes="workspaceStatusChip" Margin="0,0,8,8"><TextBlock Text="{Binding SelectedTimelineEntry.OperationDisplay}" FontWeight="SemiBold" /></Border>
+                    <Border Classes="workspaceStatusChip" Margin="0,0,8,8"><TextBlock Text="{Binding SelectedTimelineEntry.ItemTypeDisplay}" /></Border>
                 </WrapPanel>
             </StackPanel>
             <StackPanel Classes="workspaceEmptyState" IsVisible="{Binding !HasSelectedTimelineEntry}" Spacing="10" Width="260" Margin="24" HorizontalAlignment="Left" VerticalAlignment="Top">

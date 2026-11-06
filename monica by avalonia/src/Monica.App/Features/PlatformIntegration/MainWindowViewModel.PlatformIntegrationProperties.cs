@@ -31,6 +31,14 @@ public sealed partial class MainWindowViewModel
         IsPlatformIntegrationUsable(PlatformFeatureKeys.AutoType) && CanUseGlobalHotkeyIntegration;
     public bool CanOpenExternalLinks => IsPlatformIntegrationUsable(PlatformFeatureKeys.ExternalLinks);
     public bool CanUseFilePicker => _fileSystemPickerService.Capability.IsUsable;
+
+    // Keeping a window out of screenshots needs a platform adapter that only Windows has today; the
+    // switch used to stay live elsewhere and silently do nothing.
+    public bool CanUseWindowCaptureProtection => IsPlatformIntegrationUsable(PlatformFeatureKeys.WindowSecurity);
+
+    public string WindowCaptureProtectionDescriptionText => CanUseWindowCaptureProtection
+        ? _localization.Get("WindowCaptureProtectionDescription")
+        : FormatPlatformIntegrationStatus(PlatformFeatureKeys.WindowSecurity);
     public string TrayIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.Tray);
     public string GlobalHotkeyIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.GlobalHotkey);
     public string AutoTypeIntegrationStatusText => FormatPlatformIntegrationStatus(PlatformFeatureKeys.AutoType);

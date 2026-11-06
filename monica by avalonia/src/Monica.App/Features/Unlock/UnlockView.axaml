@@ -50,9 +50,28 @@
             <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
             <Setter Property="BorderThickness" Value="0" />
         </Style>
-        <Style Selector="Button.unlockPrimaryCommand:pointerover, Button.unlockPrimaryCommand:pressed">
-            <Setter Property="Background" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+        <!-- FluentAvalonia paints hover, press and disabled fills onto the template's presenter, which
+             outranks the Button's own Background: without these the accent button turned
+             white-on-white under the pointer. -->
+        <Style Selector="Button.unlockPrimaryCommand /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+        </Style>
+        <Style Selector="Button.unlockPrimaryCommand:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+        </Style>
+        <Style Selector="Button.unlockPrimaryCommand:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource MonicaAccentFillPressedBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource MonicaAccentFillPressedBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+        </Style>
+        <Style Selector="Button.unlockPrimaryCommand:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
         </Style>
         <Style Selector="Button.unlockPrimaryCommand TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
@@ -65,17 +84,37 @@
             <Setter Property="Opacity" Value="1" />
         </Style>
         <Style Selector="Button.unlockPrimaryCommand:disabled TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
         </Style>
+        <!-- The card that holds the whole access flow, so it reads as one surface on the window. -->
+        <Style Selector="Border.unlockCard">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="BoxShadow" Value="0 8 28 0 #14000000" />
+        </Style>
+        <!-- The neutral status line ("vault locked") is quiet text; only a failure earns a surface. -->
         <Style Selector="Border.unlockFeedback">
-            <Setter Property="Padding" Value="12,10" />
-            <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Background" Value="{DynamicResource LayerFillColorSubtleBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="BorderThickness" Value="1" />
         </Style>
+        <Style Selector="Border.unlockFeedback TextBlock.unlockDescription">
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeMeta}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
+        </Style>
         <Style Selector="Border.unlockFeedback.error">
+            <Setter Property="Background" Value="{DynamicResource MonicaCriticalBackgroundBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+        </Style>
+        <Style Selector="Border.unlockFeedback.error TextBlock.unlockDescription">
+            <Setter Property="TextAlignment" Value="Left" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
         </Style>
         <Style Selector="Border.unlockRequirements">
             <Setter Property="Padding" Value="12,10" />
@@ -97,12 +136,16 @@
     <Grid x:Name="VaultAccessSurface" Classes="unlockSurface"
           Background="{DynamicResource LayerFillColorDefaultBrush}"
           ClipToBounds="True">
+        <Border x:Name="VaultAccessCard"
+                Classes="unlockCard"
+                Margin="16"
+                MaxWidth="480"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center">
         <StackPanel x:Name="VaultAccessPanel"
-                    MaxWidth="440"
+                    MaxWidth="400"
                     Margin="32,24"
-                    Spacing="16"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
+                    Spacing="16">
             <Image Source="/Assets/Logo.png"
                    Width="56"
                    Height="56"
@@ -148,7 +191,7 @@
                         <TextBox x:Name="MasterPasswordInput"
                                  Classes="unlockInput"
                                  PasswordChar="{Binding MasterPasswordMaskChar}"
-                                 PlaceholderText="{Binding L.MasterPasswordWatermark}"
+                                 PlaceholderText="{Binding L[MasterPasswordPlaceholder]}"
                                  Text="{Binding MasterPassword, Mode=TwoWay}"
                                  IsEnabled="{Binding !IsUnlocking}"
                                  AutomationProperties.Name="{Binding L.MasterPasswordWatermark}"
@@ -172,7 +215,7 @@
                         <TextBox x:Name="ConfirmMasterPasswordInput"
                                  Classes="unlockInput"
                                  PasswordChar="{Binding ConfirmMasterPasswordMaskChar}"
-                                 PlaceholderText="{Binding L.ConfirmMasterPasswordWatermark}"
+                                 PlaceholderText="{Binding L[ConfirmMasterPasswordPlaceholder]}"
                                  Text="{Binding ConfirmMasterPassword, Mode=TwoWay}"
                                  IsEnabled="{Binding !IsUnlocking}"
                                  AutomationProperties.Name="{Binding L.ConfirmMasterPasswordWatermark}" />
@@ -235,11 +278,11 @@
                     <TextBlock x:Name="VaultAccessFeedbackText"
                                Classes="unlockDescription"
                                Text="{Binding StatusMessage}"
-                               TextAlignment="Left"
                                AutomationProperties.Name="{Binding StatusMessage}"
                                AutomationProperties.LiveSetting="Assertive" />
                 </Border>
             </StackPanel>
         </StackPanel>
+        </Border>
     </Grid>
 </UserControl>

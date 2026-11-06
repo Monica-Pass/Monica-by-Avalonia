@@ -1,58 +1,58 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ic="using:FluentIcons.Avalonia" xmlns:local="using:Monica.App" xmlns:settings="using:Monica.App.Features.Settings" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsWorkspaceView" x:DataType="vm:MainWindowViewModel">
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ic="using:FluentIcons.Avalonia" xmlns:local="using:Monica.App" xmlns:settings="using:Monica.App.Features.Settings" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsWorkspaceView" x:DataType="vm:MainWindowViewModel">
     <UserControl.Styles>
         <StyleInclude Source="/Features/Settings/SettingsStyles.axaml" />
     </UserControl.Styles>
     <Grid IsVisible="{Binding SelectedSection, Converter={x:Static local:StringConverters.IsSettings}}" IsEnabled="{Binding !IsMdbxBusy}" RowDefinitions="*" HorizontalAlignment="Stretch" ClipToBounds="True">
         <Grid x:Name="SettingsWorkspaceLayoutGrid" ColumnDefinitions="248,*" RowDefinitions="*" MinWidth="0">
-            <Border x:Name="SettingsSidebarRegion" Classes="workspaceSidebar" Padding="14" ClipToBounds="True" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,1,0">
+            <Border x:Name="SettingsSidebarRegion" Classes="workspaceSidebar" Padding="12,16" ClipToBounds="True" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,1,0">
                 <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel Spacing="8">
+                    <StackPanel Spacing="2">
                         <Button Classes="workspaceNavItem" Classes.selected="{Binding IsSettingsGeneralSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="General" AutomationProperties.Name="{Binding L.General}">
-                            <StackPanel Orientation="Horizontal" Spacing="10">
-                                <ic:FluentIcon Icon="Settings" FontSize="17" />
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <ic:FluentIcon Icon="Settings" FontSize="16" />
                                 <TextBlock Text="{Binding L.General}" />
                             </StackPanel>
                         </Button>
                         <Button Classes="workspaceNavItem" Classes.selected="{Binding IsSettingsSecuritySelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Security" AutomationProperties.Name="{Binding L.Security}">
-                            <StackPanel Orientation="Horizontal" Spacing="10">
-                                <ic:FluentIcon Icon="Shield" FontSize="17" />
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <ic:FluentIcon Icon="Shield" FontSize="16" />
                                 <TextBlock Text="{Binding L.Security}" />
                             </StackPanel>
                         </Button>
                         <Button Classes="workspaceNavItem" Classes.selected="{Binding IsSettingsSecurityRecoverySelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="SecurityRecovery" AutomationProperties.Name="{Binding SecurityRecoveryTitle}">
-                            <StackPanel Orientation="Horizontal" Spacing="10">
-                                <ic:FluentIcon Icon="Key" FontSize="17" />
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <ic:FluentIcon Icon="Key" FontSize="16" />
                                 <TextBlock Text="{Binding SecurityRecoveryTitle}" />
                             </StackPanel>
                         </Button>
                         <Button Classes="workspaceNavItem" Classes.selected="{Binding IsSettingsDataSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Data" AutomationProperties.Name="{Binding L.DataManagement}">
-                            <StackPanel Orientation="Horizontal" Spacing="10">
-                                <ic:FluentIcon Icon="Save" FontSize="17" />
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <ic:FluentIcon Icon="Save" FontSize="16" />
                                 <TextBlock Text="{Binding L.DataManagement}" />
                             </StackPanel>
                         </Button>
                         <Button Classes="workspaceNavItem" Classes.selected="{Binding IsSettingsDesktopSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Desktop" AutomationProperties.Name="{Binding L.Desktop}">
-                            <StackPanel Orientation="Horizontal" Spacing="10">
-                                <ic:FluentIcon Icon="Desktop" FontSize="17" />
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <ic:FluentIcon Icon="Desktop" FontSize="16" />
                                 <TextBlock Text="{Binding L.Desktop}" />
                             </StackPanel>
                         </Button>
                         <Button Classes="workspaceNavItem" Classes.selected="{Binding IsSettingsIntegrationsSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Integrations" AutomationProperties.Name="{Binding PlatformIntegrationsTitle}">
-                            <StackPanel Orientation="Horizontal" Spacing="10">
-                                <ic:FluentIcon Icon="Link" FontSize="17" />
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <ic:FluentIcon Icon="Link" FontSize="16" />
                                 <TextBlock Text="{Binding PlatformIntegrationsTitle}" />
                             </StackPanel>
                         </Button>
                         <Button Classes="workspaceNavItem" Classes.selected="{Binding IsSettingsAboutSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="About" AutomationProperties.Name="{Binding AboutTitle}">
-                            <StackPanel Orientation="Horizontal" Spacing="10">
-                                <ic:FluentIcon Icon="Info" FontSize="17" />
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <ic:FluentIcon Icon="Info" FontSize="16" />
                                 <TextBlock Text="{Binding AboutTitle}" />
                             </StackPanel>
                         </Button>
-                        <Separator Margin="4,4" />
+                        <Separator Margin="4,8" />
                         <Button Classes="workspaceNavItem" Classes.selected="{Binding IsSettingsDangerSelected}" Command="{Binding SelectSettingsPageCommand}" CommandParameter="Danger" AutomationProperties.Name="{Binding DangerZoneTitle}">
-                            <StackPanel Orientation="Horizontal" Spacing="10">
-                                <ic:FluentIcon Icon="Delete" FontSize="17" />
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <ic:FluentIcon Icon="Warning" FontSize="16" Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
                                 <TextBlock Text="{Binding DangerZoneTitle}" />
                             </StackPanel>
                         </Button>
@@ -60,7 +60,14 @@
                 </ScrollViewer>
             </Border>
             <ScrollViewer x:Name="SettingsContentRegion" Grid.Column="1" HorizontalScrollBarVisibility="Disabled" ClipToBounds="True">
-                <settings:SettingsPageHostView x:Name="SettingsPageHost" MaxWidth="800" HorizontalAlignment="Stretch" Margin="32,24,24,32" />
+                <!-- Left-aligned next to the sidebar and capped, the way desktop settings read; a
+                     centred column left a gutter wider than the sidebar on every wide window. -->
+                <Grid Margin="40,28,32,40">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" MaxWidth="880" />
+                    </Grid.ColumnDefinitions>
+                    <settings:SettingsPageHostView x:Name="SettingsPageHost" HorizontalAlignment="Stretch" />
+                </Grid>
             </ScrollViewer>
         </Grid>
     </Grid>

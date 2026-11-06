@@ -16,8 +16,11 @@ public static class VaultTreeBuilder
         IReadOnlyList<PasswordEntry> passwords,
         IReadOnlyList<SecureItem> secureItems,
         IReadOnlyCollection<string> collapsedFolderKeys,
-        VaultTreeFilter filter)
+        VaultTreeFilter filter,
+        Func<VaultEntryKind, string>? kindLabel = null)
     {
+        // The shell passes the localized names; the builder stays free of view-model access.
+        kindLabel ??= VaultEntryKinds.LabelFor;
         var roots = new List<FolderNode>();
         var nodes = new Dictionary<string, FolderNode>(StringComparer.OrdinalIgnoreCase);
         var folderPathByCategoryId = new Dictionary<long, string>();
@@ -33,14 +36,14 @@ public static class VaultTreeBuilder
             AddEntry(entriesByPath, folderPathByCategoryId, entry.CategoryId, VaultTreeKey.Password(entry.Id),
                 entry.Title, VaultEntryKinds.FromPassword(entry),
                 entry.Username.Length > 0 ? entry.Username : entry.Website,
-                password: entry);
+                kindLabel, password: entry);
         }
 
         foreach (var item in secureItems.Where(filter.MatchesSecureItem))
         {
             var kind = VaultEntryKinds.FromSecureItem(item)!.Value;
             AddEntry(entriesByPath, folderPathByCategoryId, item.CategoryId, VaultTreeKey.SecureItem(item.Id),
-                item.Title, kind, VaultEntryKinds.LabelFor(kind), item: item);
+                item.Title, kind, kindLabel(kind), kindLabel, item: item);
         }
 
         foreach (var root in roots)
@@ -111,6 +114,7 @@ public static class VaultTreeBuilder
         string title,
         VaultEntryKind kind,
         string detail,
+        Func<VaultEntryKind, string> kindLabel,
         PasswordEntry? password = null,
         SecureItem? item = null)
     {
@@ -128,7 +132,7 @@ public static class VaultTreeBuilder
         {
             Key = key,
             Kind = kind,
-            Label = string.IsNullOrWhiteSpace(title) ? VaultEntryKinds.LabelFor(kind) : title.Trim(),
+            Label = string.IsNullOrWhiteSpace(title) ? kindLabel(kind) : title.Trim(),
             Indent = FolderTreeLayout.IndentFor(Depth(path)),
             EntryDetail = detail,
             Password = password,

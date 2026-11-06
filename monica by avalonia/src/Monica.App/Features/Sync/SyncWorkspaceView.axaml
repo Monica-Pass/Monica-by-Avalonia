@@ -40,17 +40,19 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:SyncHealthDisplayItem">
-                                    <Border Width="180" MinHeight="64" Margin="0,0,8,0" Padding="12,8" CornerRadius="4" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,1,0" Background="Transparent">
+                                    <!-- Status sentences wrap to a second line instead of losing their ending; the
+                                         whole sentence stays one hover away. -->
+                                    <Border Width="196" MinHeight="64" Margin="0,0,8,0" Padding="12,8" CornerRadius="4" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,1,0" Background="Transparent" ToolTip.Tip="{Binding Detail}">
                                         <StackPanel Spacing="2">
-                                            <TextBlock Text="{Binding Label}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding Value}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding Detail}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Label}" FontSize="{DynamicResource FontSizeMeta}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Value}" FontSize="{DynamicResource FontSizeSectionTitle}" FontWeight="SemiBold" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2" />
+                                            <TextBlock Text="{Binding Detail}" FontSize="{DynamicResource FontSizeMeta}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2" />
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <TextBlock Text="{Binding SyncRecoverySummaryText}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,6,0,0" />
+                        <!-- No recovery summary under the strip: the backup tile already prints it. -->
                     </StackPanel>
                 </ScrollViewer>
             </Grid>
@@ -59,41 +61,41 @@
             <Border x:Name="SyncSidebarRegion" Classes="workspaceSidebar" Padding="14" ClipToBounds="True" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,1,0">
                 <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="14">
-                        <StackPanel Spacing="8">
-                            <TextBlock Classes="workspaceSectionLabel" Text="{Binding L.SyncAndBackup}" />
+                        <!-- No rail heading: it only repeated the page title right above it. -->
+                        <StackPanel Spacing="2">
                             <Button x:Name="NearbyDevicesNavigationButton" Classes="workspaceNavItem" Classes.selected="{Binding IsSyncDevicesSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Devices">
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <ic:FluentIcon Icon="Phone" FontSize="17" />
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <ic:FluentIcon Icon="Phone" FontSize="16" />
                                     <TextBlock Text="{Binding L[LanTitle]}" />
                                 </StackPanel>
                             </Button>
                             <Button Classes="workspaceNavItem" Classes.selected="{Binding IsSyncConfigurationSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Configuration">
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <ic:FluentIcon Icon="ArrowSync" FontSize="17" />
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <ic:FluentIcon Icon="ArrowSync" FontSize="16" />
                                     <TextBlock Text="{Binding L.SyncConfiguration}" />
                                 </StackPanel>
                             </Button>
                             <Button Classes="workspaceNavItem" Classes.selected="{Binding IsSyncBackupSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Backup">
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <ic:FluentIcon Icon="Save" FontSize="17" />
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <ic:FluentIcon Icon="Save" FontSize="16" />
                                     <TextBlock Text="{Binding L.BackupHistory}" />
                                 </StackPanel>
                             </Button>
                             <Button Classes="workspaceNavItem" Classes.selected="{Binding IsSyncSourcesSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Sources">
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <ic:FluentIcon Icon="Database" FontSize="17" />
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <ic:FluentIcon Icon="Database" FontSize="16" />
                                     <TextBlock Text="{Binding L.CloudAndLocalVaults}" />
                                 </StackPanel>
                             </Button>
                             <Button Classes="workspaceNavItem" Classes.selected="{Binding IsSyncImportSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Import">
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <ic:FluentIcon Icon="ArrowUpload" FontSize="17" />
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <ic:FluentIcon Icon="ArrowUpload" FontSize="16" />
                                     <TextBlock Text="{Binding L.ImportData}" />
                                 </StackPanel>
                             </Button>
                             <Button Classes="workspaceNavItem" Classes.selected="{Binding IsSyncExportSelected}" Command="{Binding SelectSyncPageCommand}" CommandParameter="Export">
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <ic:FluentIcon Icon="ArrowDownload" FontSize="17" />
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <ic:FluentIcon Icon="ArrowDownload" FontSize="16" />
                                     <TextBlock Text="{Binding L.ExportData}" />
                                 </StackPanel>
                             </Button>

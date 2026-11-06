@@ -264,16 +264,59 @@ public sealed partial class AppSettingsTests
         Assert.Equal("secret-backup-password", second.Current.WebDavBackupEncryptionPassword);
     }
 
+    /// <summary>
+    /// Linux and macOS have no secret store adapter yet. A secret must still never reach disk, in the
+    /// clear or otherwise, but it also must not take every other setting down with it: throwing here
+    /// used to fail the whole file, so one WebDAV password stopped theme, language and lock settings
+    /// from persisting.
+    /// </summary>
     [Fact]
     public async Task Security_baseline_app_settings_refuses_plaintext_secret_fallback()
     {
         var path = GetTempPath();
         var settings = new AppSettingsService(path, new ThrowingSecretProtector());
         settings.Current.WebDavPassword = "must-not-reach-disk";
+        settings.Current.WebDavBackupEncryptionPassword = "backup-must-not-reach-disk";
+        settings.Current.Theme = "dark";
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => settings.SaveAsync());
+        Assert.False(settings.CanPersistSecrets);
+        await settings.SaveAsync();
 
-        Assert.False(File.Exists(path));
+        var rawJson = await File.ReadAllTextAsync(path);
+        Assert.DoesNotContain("must-not-reach-disk", rawJson);
+        Assert.DoesNotContain("secret:v1:", rawJson);
+        Assert.Equal("must-not-reach-disk", settings.Current.WebDavPassword);
+
+        var reloaded = new AppSettingsService(path, new ThrowingSecretProtector());
+        await reloaded.LoadAsync();
+        Assert.Equal("dark", reloaded.Current.Theme);
+        Assert.Equal("", reloaded.Current.WebDavPassword);
+        Assert.Equal("", reloaded.Current.WebDavBackupEncryptionPassword);
+    }
+
+    /// <summary>
+    /// Settings load before the unlock screen is usable, so a value sealed for another user or machine
+    /// (a data directory restored onto a new install) must not block Vault Access.
+    /// </summary>
+    [Fact]
+    public async Task A_protected_setting_that_cannot_be_opened_loads_empty_instead_of_failing()
+    {
+        var path = GetTempPath();
+        var writer = new AppSettingsService(path, new ReversingSecretProtector());
+        await writer.LoadAsync();
+        writer.Current.WebDavPassword = "sealed-elsewhere";
+        writer.Current.Language = "zh-CN";
+        await writer.SaveAsync();
+
+        var foreignMachine = new AppSettingsService(path, new CorruptingSecretProtector());
+        await foreignMachine.LoadAsync();
+        Assert.Equal("", foreignMachine.Current.WebDavPassword);
+        Assert.Equal("zh-CN", foreignMachine.Current.Language);
+
+        var unsupportedPlatform = new AppSettingsService(path, new ThrowingSecretProtector());
+        await unsupportedPlatform.LoadAsync();
+        Assert.Equal("", unsupportedPlatform.Current.WebDavPassword);
+        Assert.Equal("zh-CN", unsupportedPlatform.Current.Language);
     }
 
     [Fact]
@@ -1541,6 +1584,19 @@ public sealed partial class AppSettingsTests
     {
         public Task<bool> AuthorizeAsync(bool requireMasterPassword, CancellationToken cancellationToken = default) =>
             Task.FromResult(true);
+    }
+
+    private sealed class CorruptingSecretProtector : ISecretProtector
+    {
+        public PlatformIntegrationCapability Capability { get; } = PlatformIntegrationService.Available(
+            PlatformFeatureKeys.SecretProtection,
+            "Test secret protection is available.");
+
+        public Task<string> ProtectAsync(string plainText, CancellationToken cancellationToken = default) =>
+            Task.FromResult(plainText);
+
+        public Task<string> UnprotectAsync(string protectedText, CancellationToken cancellationToken = default) =>
+            throw new System.Security.Cryptography.CryptographicException("Key not valid for use in specified state.");
     }
 
     private sealed class ThrowingSecretProtector : ISecretProtector

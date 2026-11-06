@@ -599,6 +599,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(NoteEditorStatusText));
         OnPropertyChanged(nameof(NoteReferenceItems));
         OnPropertyChanged(nameof(VaultEmptyStateText));
+        RefreshVaultTreeLanguage();
         OnPropertyChanged(nameof(VaultCreateLabel));
         OnPropertyChanged(nameof(VaultMoreButtonTip));
         OnPropertyChanged(nameof(VaultSearchHelpText));

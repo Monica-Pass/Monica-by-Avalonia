@@ -7,11 +7,17 @@
              x:Class="Monica.App.Features.UnlockedShellView"
              x:DataType="vm:MainWindowViewModel">
 
-    <Grid RowDefinitions="*,Auto">
+    <Grid>
+        <!-- Fifteen destinations are too many to tell apart by glyph alone, so a window with room
+             for it shows the labelled, grouped pane (the Windows navigation pattern) and narrower
+             windows fall back to the icon rail. The threshold is set by the densest page, Sync's
+             KeePass import (its own 260px menu, a 320px browse rail and a detail pane): below
+             1400px the labelled pane costs that page its list. The rail never collapses to a bare
+             hamburger: the window's minimum width always leaves room for it. -->
         <fa:FANavigationView x:Name="VaultNavigationView"
-                             Grid.Row="0"
-                             PaneDisplayMode="LeftCompact"
-                             IsPaneOpen="False"
+                             PaneDisplayMode="Auto"
+                             CompactModeThresholdWidth="0"
+                             ExpandedModeThresholdWidth="1400"
                              IsBackButtonVisible="False"
                              IsSettingsVisible="False"
                              CompactPaneLength="48"
@@ -19,44 +25,47 @@
                              Background="Transparent"
                              SelectionChanged="NavigationView_OnSelectionChanged"
                              ItemInvoked="NavigationView_OnItemInvoked">
-            <Grid Margin="16" RowDefinitions="Auto,*">
-                <Border Grid.Row="0" Classes="workspaceFailureStatus" IsVisible="{Binding HasFailedStatusMessage}">
-                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
-                        <ic:FluentIcon Icon="Warning" FontSize="16" Foreground="{DynamicResource SystemFillColorCautionBrush}" VerticalAlignment="Top" Margin="0,2,0,0" />
-                        <TextBlock Grid.Column="1" Text="{Binding StatusMessage}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                        <Button Grid.Column="2" Classes="workspaceCommand" Command="{Binding LoadCommand}" ToolTip.Tip="{Binding L.Refresh}" AutomationProperties.Name="{Binding L.Refresh}" VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <ic:FluentIcon Icon="ArrowClockwise" FontSize="14" />
-                                <TextBlock Text="{Binding L.Refresh}" />
-                            </StackPanel>
-                        </Button>
-                    </Grid>
-                </Border>
+            <!-- The status line belongs to the page, not to the window: the pane runs the full
+                 height of the window, and the line sits at the foot of the content layer. -->
+            <Grid RowDefinitions="*,Auto">
+                <Grid Margin="16" RowDefinitions="Auto,*">
+                    <Border Grid.Row="0" Classes="workspaceFailureStatus" IsVisible="{Binding HasFailedStatusMessage}">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                            <ic:FluentIcon Icon="Warning" FontSize="16" Foreground="{DynamicResource SystemFillColorCautionBrush}" VerticalAlignment="Top" Margin="0,2,0,0" />
+                            <TextBlock Grid.Column="1" Text="{Binding StatusMessage}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                            <Button Grid.Column="2" Classes="workspaceCommand" Command="{Binding LoadCommand}" ToolTip.Tip="{Binding L.Refresh}" AutomationProperties.Name="{Binding L.Refresh}" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <ic:FluentIcon Icon="ArrowClockwise" FontSize="14" />
+                                    <TextBlock Text="{Binding L.Refresh}" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </Border>
 
-                <ContentControl x:Name="WorkspaceHostSlot" Grid.Row="1" />
+                    <ContentControl x:Name="WorkspaceHostSlot" Grid.Row="1" />
+                </Grid>
+
+                <Border Grid.Row="1"
+                        BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
+                        BorderThickness="0,1,0,0">
+                    <StackPanel Spacing="4"
+                                Margin="16,6"
+                                VerticalAlignment="Center"
+                                ClipToBounds="True">
+                        <TextBlock Text="{Binding StatusMessage}"
+                                   FontSize="{DynamicResource FontSizeMeta}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextTrimming="CharacterEllipsis" />
+                        <StackPanel Spacing="4" IsVisible="{Binding IsDeletingPasswords}">
+                            <TextBlock Text="{Binding PasswordDeleteProgressText}" />
+                            <ProgressBar Minimum="0" Maximum="{Binding PasswordDeleteTotal}" Value="{Binding PasswordDeleteProcessed}" Height="4" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
             </Grid>
         </fa:FANavigationView>
 
-        <Border Grid.Row="1"
-                BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
-                BorderThickness="0,1,0,0">
-            <StackPanel Spacing="4"
-                        Margin="12,5"
-                        VerticalAlignment="Center"
-                        ClipToBounds="True">
-                <TextBlock Text="{Binding StatusMessage}"
-                           FontSize="{DynamicResource FontSizeMeta}"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                           TextTrimming="CharacterEllipsis" />
-                <StackPanel Spacing="4" IsVisible="{Binding IsDeletingPasswords}">
-                    <TextBlock Text="{Binding PasswordDeleteProgressText}" />
-                    <ProgressBar Minimum="0" Maximum="{Binding PasswordDeleteTotal}" Value="{Binding PasswordDeleteProcessed}" Height="4" />
-                </StackPanel>
-            </StackPanel>
-        </Border>
-
-        <Border Grid.RowSpan="2"
-                IsVisible="{Binding IsLoadingVault}"
+        <Border IsVisible="{Binding IsLoadingVault}"
                 Background="{DynamicResource OverlayFillColorDefaultBrush}"
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Stretch"

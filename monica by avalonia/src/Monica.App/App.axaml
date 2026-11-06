@@ -22,7 +22,7 @@
                     <SolidColorBrush x:Key="CardBorderBrush" Color="#C6C6C6" />
                     <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="#F4F4F4" />
-                    <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="#C6C6C6" />
+                    <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="#E0E0E0" />
                     <SolidColorBrush x:Key="DividerStrokeColorDefaultBrush" Color="#D2D2D2" />
                     <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="ControlFillColorSecondaryBrush" Color="#F4F4F4" />
@@ -32,6 +32,15 @@
                     <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="#F0F6FC" />
                     <SolidColorBrush x:Key="ListViewItemBackgroundSelected" Color="#E7F2FF" />
                     <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPointerOver" Color="#DCEEFF" />
+                    <SolidColorBrush x:Key="ListViewItemBackgroundPressed" Color="#D4E7FB" />
+                    <SolidColorBrush x:Key="MonicaAccentFillPressedBrush" Color="#00539A" />
+                    <SolidColorBrush x:Key="MonicaSubtleFillHoverBrush" Color="#0F000000" />
+                    <SolidColorBrush x:Key="MonicaNavItemSelectedBrush" Color="#0F000000" />
+                    <SolidColorBrush x:Key="MonicaSubtleFillPressedBrush" Color="#1A000000" />
+                    <SolidColorBrush x:Key="MonicaStatusPositiveBrush" Color="#0F7B0F" />
+                    <SolidColorBrush x:Key="MonicaStatusCautionBrush" Color="#9D5D00" />
+                    <SolidColorBrush x:Key="MonicaStatusNeutralBrush" Color="#6E6E6E" />
+                    <SolidColorBrush x:Key="MonicaCriticalBackgroundBrush" Color="#FDE7E9" />
                     <SolidColorBrush x:Key="TextFillColorPrimaryBrush" Color="#191919" />
                     <SolidColorBrush x:Key="TextFillColorSecondaryBrush" Color="#464646" />
                     <SolidColorBrush x:Key="TextFillColorTertiaryBrush" Color="#5E5E5E" />
@@ -51,23 +60,35 @@
                     <SolidColorBrush x:Key="MonicaAvatarForegroundBrush" Color="#FFFFFF" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
+                    <!-- Dark surfaces step up in lightness: window #202020, content layer #282828,
+                         cards #2F2F2F, controls on cards #373737. A card one step above the layer
+                         is what keeps separate setting cards readable without leaning on borders. -->
                     <SolidColorBrush x:Key="LayerFillColorDefaultBrush" Color="#202020" />
                     <SolidColorBrush x:Key="LayerFillColorAltBrush" Color="#1B1B1B" />
                     <SolidColorBrush x:Key="LayerFillColorSubtleBrush" Color="#242424" />
-                    <SolidColorBrush x:Key="CardBackgroundBrush" Color="#2B2B2B" />
+                    <SolidColorBrush x:Key="CardBackgroundBrush" Color="#2F2F2F" />
                     <SolidColorBrush x:Key="CardBorderBrush" Color="#3A3A3A" />
-                    <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#2B2B2B" />
+                    <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#2F2F2F" />
                     <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="#252525" />
                     <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="#3A3A3A" />
                     <SolidColorBrush x:Key="DividerStrokeColorDefaultBrush" Color="#343434" />
-                    <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="#323232" />
-                    <SolidColorBrush x:Key="ControlFillColorSecondaryBrush" Color="#383838" />
-                    <SolidColorBrush x:Key="ControlFillColorTertiaryBrush" Color="#424242" />
+                    <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="#373737" />
+                    <SolidColorBrush x:Key="ControlFillColorSecondaryBrush" Color="#3D3D3D" />
+                    <SolidColorBrush x:Key="ControlFillColorTertiaryBrush" Color="#454545" />
                     <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush" Color="#4A4A4A" />
                     <SolidColorBrush x:Key="SubtleFillColorSecondaryBrush" Color="#292929" />
                     <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="#343434" />
                     <SolidColorBrush x:Key="ListViewItemBackgroundSelected" Color="#3A3A3A" />
                     <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPointerOver" Color="#414141" />
+                    <SolidColorBrush x:Key="ListViewItemBackgroundPressed" Color="#474747" />
+                    <SolidColorBrush x:Key="MonicaAccentFillPressedBrush" Color="#2E8FC0" />
+                    <SolidColorBrush x:Key="MonicaSubtleFillHoverBrush" Color="#15FFFFFF" />
+                    <SolidColorBrush x:Key="MonicaNavItemSelectedBrush" Color="#15FFFFFF" />
+                    <SolidColorBrush x:Key="MonicaSubtleFillPressedBrush" Color="#0BFFFFFF" />
+                    <SolidColorBrush x:Key="MonicaStatusPositiveBrush" Color="#6CCB5F" />
+                    <SolidColorBrush x:Key="MonicaStatusCautionBrush" Color="#F2C14E" />
+                    <SolidColorBrush x:Key="MonicaStatusNeutralBrush" Color="#A0A0A0" />
+                    <SolidColorBrush x:Key="MonicaCriticalBackgroundBrush" Color="#442726" />
                     <SolidColorBrush x:Key="TextFillColorPrimaryBrush" Color="#F3F3F3" />
                     <SolidColorBrush x:Key="TextFillColorSecondaryBrush" Color="#C9C9C9" />
                     <SolidColorBrush x:Key="TextFillColorTertiaryBrush" Color="#9D9D9D" />
@@ -104,6 +125,15 @@
                     <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="#E6F7FF" />
                     <SolidColorBrush x:Key="ListViewItemBackgroundSelected" Color="#FFF200" />
                     <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPointerOver" Color="#FFE000" />
+                    <SolidColorBrush x:Key="ListViewItemBackgroundPressed" Color="#FFE000" />
+                    <SolidColorBrush x:Key="MonicaAccentFillPressedBrush" Color="#00FFFF" />
+                    <SolidColorBrush x:Key="MonicaSubtleFillHoverBrush" Color="#E6F7FF" />
+                    <SolidColorBrush x:Key="MonicaNavItemSelectedBrush" Color="#FFF200" />
+                    <SolidColorBrush x:Key="MonicaSubtleFillPressedBrush" Color="#CCEFFF" />
+                    <SolidColorBrush x:Key="MonicaStatusPositiveBrush" Color="#000000" />
+                    <SolidColorBrush x:Key="MonicaStatusCautionBrush" Color="#000000" />
+                    <SolidColorBrush x:Key="MonicaStatusNeutralBrush" Color="#000000" />
+                    <SolidColorBrush x:Key="MonicaCriticalBackgroundBrush" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="TextFillColorPrimaryBrush" Color="#000000" />
                     <SolidColorBrush x:Key="TextFillColorSecondaryBrush" Color="#000000" />
                     <SolidColorBrush x:Key="TextFillColorTertiaryBrush" Color="#1A1A1A" />
@@ -127,11 +157,16 @@
     </Application.Resources>
 
     <Application.Styles>
+        <!-- The app paints its own accent surfaces from the brand blue below, so FluentAvalonia's
+             controls (switches, focus rings, sliders) take the same colour instead of the system
+             accent; mixing the two left blue buttons beside purple switches on Linux and macOS, and
+             beside whatever accent a Windows user picked. -->
         <styling:FluentAvaloniaTheme PreferSystemTheme="False"
-                                     PreferUserAccentColor="True" />
+                                     PreferUserAccentColor="False"
+                                     CustomAccentColor="#0067C2" />
 
         <Style Selector="Window">
-            <Setter Property="FontFamily" Value="Segoe UI, Microsoft YaHei UI, Noto Sans CJK SC" />
+            <Setter Property="FontFamily" Value="{StaticResource MonicaFontFamily}" />
             <Setter Property="Background" Value="{DynamicResource LayerFillColorDefaultBrush}" />
         </Style>
 
@@ -211,8 +246,21 @@
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
         </Style>
 
-        <Style Selector="Button.StatusBarButton:pointerover">
-            <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
+        <!-- FluentAvalonia's Button theme paints its own hover and press fills straight onto the
+             template's content presenter, which outranks a Background set on the Button itself.
+             Quiet buttons therefore style that part, or their hover state never shows. -->
+        <Style Selector="Button.StatusBarButton /template/ ContentPresenter#PART_ContentPresenter, Button.IconButton /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.StatusBarButton:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.IconButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource MonicaSubtleFillHoverBrush}" />
+        </Style>
+        <Style Selector="Button.StatusBarButton:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.IconButton:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource MonicaSubtleFillPressedBrush}" />
+        </Style>
+        <Style Selector="Button.StatusBarButton:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.IconButton:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
         </Style>
 
         <Style Selector="Button.IconButton">
@@ -226,7 +274,6 @@
         </Style>
 
         <Style Selector="Button.IconButton:pointerover">
-            <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
         </Style>
 

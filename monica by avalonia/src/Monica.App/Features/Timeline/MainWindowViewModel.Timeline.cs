@@ -6,7 +6,21 @@ using Monica.Platform.Services;
 
 namespace Monica.App.ViewModels;
 
-public sealed record TimelineEntry(string Title, string Description, string TimestampText, string OperationType, string ItemType);
+/// <param name="OperationType">The stored operation code; exports keep it machine-readable.</param>
+/// <param name="OperationLabel">The operation in the UI language, when the shell resolved one.</param>
+public sealed record TimelineEntry(
+    string Title,
+    string Description,
+    string TimestampText,
+    string OperationType,
+    string ItemType,
+    string? OperationLabel = null,
+    string? ItemTypeLabel = null)
+{
+    public string OperationDisplay => OperationLabel ?? OperationType;
+
+    public string ItemTypeDisplay => ItemTypeLabel ?? ItemType;
+}
 
 public sealed partial class MainWindowViewModel
 {
@@ -136,7 +150,9 @@ public sealed partial class MainWindowViewModel
             entry.Title.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
             entry.Description.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
             entry.OperationType.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-            entry.ItemType.Contains(query, StringComparison.OrdinalIgnoreCase);
+            entry.ItemType.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+            entry.OperationDisplay.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
+            entry.ItemTypeDisplay.Contains(query, StringComparison.CurrentCultureIgnoreCase);
     }
 
     private void RefreshTimelineSearchState()
@@ -151,17 +167,35 @@ public sealed partial class MainWindowViewModel
             FilteredTimelineEntries.FirstOrDefault();
     }
 
-    private TimelineEntry CreateTimelineEntry(OperationLog log) =>
-        new(
+    private TimelineEntry CreateTimelineEntry(OperationLog log)
+    {
+        var operation = LocalizeOperationType(log.OperationType);
+        var itemType = LocalizeTimelineItemType(log.ItemType);
+        return new(
             string.IsNullOrWhiteSpace(log.ItemTitle) ? _localization.Get("Untitled") : log.ItemTitle,
-            _localization.Format(
-                "TimelineEntryDescriptionFormat",
-                LocalizeOperationType(log.OperationType),
-                log.ItemType,
-                log.DeviceName),
+            _localization.Format("TimelineEntryDescriptionFormat", operation, itemType, log.DeviceName),
             log.Timestamp.LocalDateTime.ToString("g", _localization.Culture),
             log.OperationType,
-            log.ItemType);
+            log.ItemType,
+            operation,
+            itemType);
+    }
+
+    // Stored item types are upper-case codes ("PASSWORD", "BANKCARD"); a person reads the word.
+    private string LocalizeTimelineItemType(string itemType) => itemType.ToUpperInvariant() switch
+    {
+        "PASSWORD" => _localization.Get("TimelineItemPassword"),
+        "NOTE" => _localization.Get("TimelineItemNote"),
+        "TOTP" => _localization.Get("TimelineItemTotp"),
+        "WALLET" => _localization.Get("TimelineItemWallet"),
+        "BANKCARD" => _localization.Get("TimelineItemBankCard"),
+        "DOCUMENT" => _localization.Get("TimelineItemDocument"),
+        "BILLINGADDRESS" => _localization.Get("TimelineItemBillingAddress"),
+        "PAYMENTACCOUNT" => _localization.Get("TimelineItemPaymentAccount"),
+        "VAULT" => _localization.Get("TimelineItemVault"),
+        "CATEGORY" => _localization.Get("TimelineItemCategory"),
+        _ => itemType
+    };
 
     [RelayCommand]
     private async Task ExportTimelineAsync()

@@ -1,6 +1,8 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Sync.SyncBackupView" x:Name="SyncBackupRoot" x:DataType="vm:MainWindowViewModel" IsVisible="{Binding IsSyncBackupSelected}">
     <Grid x:Name="BackupWorkspaceLayoutGrid" ColumnDefinitions="0.95*,1.05*" ColumnSpacing="16" MinWidth="0">
         <Border x:Name="BackupOptionsRegion" MinWidth="0">
+        <StackPanel Spacing="12">
+        <fa:FAInfoBar x:Name="BackupSessionOnlySecretsInfoBar" IsOpen="{Binding AreSyncSecretsSessionOnly}" IsClosable="False" Severity="Informational" Title="{Binding L[SessionOnlySecretsTitle]}" Message="{Binding L[SessionOnlySecretsMessage]}" />
         <fa:FASettingsExpander Header="{Binding L.WebDavBackupOptions}" Description="{Binding WebDavBackupOptionsSummaryText}" IsExpanded="True">
             <fa:FASettingsExpander.IconSource>
                 <fa:FASymbolIconSource Symbol="Save" />
@@ -58,6 +60,7 @@
                 </fa:FASettingsExpanderItem>
             </fa:FASettingsExpander.Items>
         </fa:FASettingsExpander>
+        </StackPanel>
         </Border>
         <Border x:Name="BackupHistoryRegion" Grid.Column="1" MinWidth="0" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundBrush}">
             <Grid RowDefinitions="Auto,Auto,*" MinHeight="260">

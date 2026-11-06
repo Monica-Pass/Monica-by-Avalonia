@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using Monica.Data;
 
@@ -112,9 +113,16 @@ public sealed partial class AppSettingsService
             return value;
         }
 
-        var protector = _secretProtector
-            ?? throw new InvalidOperationException("Sensitive settings require operating-system secret protection.");
-        return ProtectedSettingPrefix + await protector.ProtectAsync(value, cancellationToken);
+        if (!CanPersistSecrets)
+        {
+            // Without an operating-system secret store the value is never written, in the clear or
+            // otherwise; it stays in memory for this session. Throwing here instead used to fail the
+            // whole file, so on Linux and macOS one saved WebDAV password stopped every other setting
+            // from persisting, and the lock path then discarded those unsaved changes.
+            return "";
+        }
+
+        return ProtectedSettingPrefix + await _secretProtector!.ProtectAsync(value, cancellationToken);
     }
 
     private async Task<string> UnprotectSettingAsync(string value, CancellationToken cancellationToken)
@@ -124,9 +132,24 @@ public sealed partial class AppSettingsService
             return value;
         }
 
-        var protector = _secretProtector
-            ?? throw new InvalidOperationException("Protected settings cannot be opened without operating-system secret protection.");
-        return await protector.UnprotectAsync(value[ProtectedSettingPrefix.Length..], cancellationToken);
+        if (!CanPersistSecrets)
+        {
+            AppDiagnostics.Info("A protected setting was skipped: no secret store is available on this platform.");
+            return "";
+        }
+
+        try
+        {
+            return await _secretProtector!.UnprotectAsync(value[ProtectedSettingPrefix.Length..], cancellationToken);
+        }
+        catch (Exception ex) when (ex is CryptographicException or FormatException)
+        {
+            // A value sealed for another user or machine (a data directory restored onto a new
+            // install) can never be opened here. Failing the load would block Vault Access itself,
+            // because settings load before the unlock screen is usable; the user re-enters it instead.
+            AppDiagnostics.Error("A protected setting could not be opened and was cleared", ex);
+            return "";
+        }
     }
 
     private static string GetDefaultSettingsPath() => MonicaAppDataPaths.GetPath("settings.json");

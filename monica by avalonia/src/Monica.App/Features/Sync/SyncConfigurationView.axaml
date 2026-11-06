@@ -1,5 +1,12 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Sync.SyncConfigurationView" x:DataType="vm:MainWindowViewModel">
-    <fa:FASettingsExpander Header="{Binding L.SyncConfiguration}" Description="{Binding SyncConfigurationSummaryText}" IsExpanded="True" IsVisible="{Binding IsSyncConfigurationSelected}">
+  <StackPanel Spacing="12" IsVisible="{Binding IsSyncConfigurationSelected}">
+    <fa:FAInfoBar x:Name="WebDavSessionOnlySecretsInfoBar"
+                  IsOpen="{Binding AreSyncSecretsSessionOnly}"
+                  IsClosable="False"
+                  Severity="Informational"
+                  Title="{Binding L[SessionOnlySecretsTitle]}"
+                  Message="{Binding L[SessionOnlySecretsMessage]}" />
+    <fa:FASettingsExpander Header="{Binding L.SyncConfiguration}" Description="{Binding SyncConfigurationSummaryText}" IsExpanded="True">
         <fa:FASettingsExpander.IconSource>
             <fa:FASymbolIconSource Symbol="Sync" />
         </fa:FASettingsExpander.IconSource>
@@ -52,4 +59,5 @@
             </fa:FASettingsExpanderItem>
         </fa:FASettingsExpander.Items>
     </fa:FASettingsExpander>
+  </StackPanel>
 </UserControl>

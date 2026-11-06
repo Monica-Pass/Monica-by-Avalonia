@@ -63,7 +63,7 @@ public class SingleInstanceGateTests
             SingleInstanceGate.BuildInstanceKey(plain + Path.DirectorySeparatorChar));
         Assert.Equal(
             SingleInstanceGate.BuildInstanceKey(plain),
-            SingleInstanceGate.BuildInstanceKey(Path.GetFullPath(plain + "\\..\\monica-vault-a")));
+            SingleInstanceGate.BuildInstanceKey(Path.GetFullPath(Path.Combine(plain, "..", "monica-vault-a"))));
 
         if (OperatingSystem.IsWindows())
         {
@@ -120,32 +120,42 @@ public class SingleInstanceGateTests
     }
 
     /// <summary>
-    /// Runs the real named primitives, because everything above trusts that a second handle to the
-    /// same name is refused. If the operating system ever answers differently, this is where it shows.
+    /// Runs the real primitives of the platform under test, because everything above trusts that a
+    /// second holder of the same lock is refused. If the operating system ever answers differently,
+    /// this is where it shows. Linux and macOS used to throw PlatformNotSupportedException here, which
+    /// is the same call that made the app exit at startup on those platforms.
     /// </summary>
     [Fact]
     public void A_second_real_lock_on_one_key_is_refused_and_reaches_the_first_listener()
     {
-        var key = "test." + Guid.NewGuid().ToString("N");
-        using var owner = new NamedSyncSingleInstanceChannel();
-        var rival = new NamedSyncSingleInstanceChannel();
-        Assert.True(owner.TryAcquire(key));
-        Assert.False(rival.TryAcquire(key));
+        var directory = NewStateDirectory();
+        try
+        {
+            var key = "test." + Guid.NewGuid().ToString("N");
+            using var owner = SingleInstanceChannels.CreateDefault(directory);
+            var rival = SingleInstanceChannels.CreateDefault(directory);
+            Assert.True(owner.TryAcquire(key));
+            Assert.False(rival.TryAcquire(key));
 
-        var delivered = new ManualResetEventSlim(false);
-        using var listener = owner.Listen(key, () => delivered.Set());
+            var delivered = new ManualResetEventSlim(false);
+            using var listener = owner.Listen(key, () => delivered.Set());
 
-        Assert.True(rival.Signal(key));
-        Assert.True(delivered.Wait(TimeSpan.FromSeconds(5)));
+            Assert.True(rival.Signal(key));
+            Assert.True(delivered.Wait(TimeSpan.FromSeconds(5)));
 
-        // Nobody owns the directory any more, so the next ask must not look like it reached someone.
-        // A real second launch is its own process and its handle dies with it; inside one process the
-        // name stays alive while any handle is open, so that handle has to go first.
-        listener.Dispose();
-        owner.Release();
-        rival.Dispose();
-        using var afterRelease = new NamedSyncSingleInstanceChannel();
-        Assert.True(afterRelease.TryAcquire(key));
+            // Nobody owns the directory any more, so the next ask must not look like it reached someone.
+            // A real second launch is its own process and its handle dies with it; inside one process the
+            // name stays alive while any handle is open, so that handle has to go first.
+            listener.Dispose();
+            owner.Release();
+            rival.Dispose();
+            using var afterRelease = SingleInstanceChannels.CreateDefault(directory);
+            Assert.True(afterRelease.TryAcquire(key));
+        }
+        finally
+        {
+            DeleteStateDirectory(directory);
+        }
     }
 
     /// <summary>
@@ -155,16 +165,107 @@ public class SingleInstanceGateTests
     [Fact]
     public void A_reopen_that_arrives_before_anyone_is_listening_is_still_delivered()
     {
-        var key = "test." + Guid.NewGuid().ToString("N");
-        using var owner = new NamedSyncSingleInstanceChannel();
-        Assert.True(owner.TryAcquire(key));
+        var directory = NewStateDirectory();
+        try
+        {
+            var key = "test." + Guid.NewGuid().ToString("N");
+            using var owner = SingleInstanceChannels.CreateDefault(directory);
+            Assert.True(owner.TryAcquire(key));
 
-        using var sender = new NamedSyncSingleInstanceChannel();
-        Assert.True(sender.Signal(key));
+            using var sender = SingleInstanceChannels.CreateDefault(directory);
+            Assert.True(sender.Signal(key));
 
-        var delivered = new ManualResetEventSlim(false);
-        using var listener = owner.Listen(key, () => delivered.Set());
-        Assert.True(delivered.Wait(TimeSpan.FromSeconds(5)));
+            var delivered = new ManualResetEventSlim(false);
+            using var listener = owner.Listen(key, () => delivered.Set());
+            Assert.True(delivered.Wait(TimeSpan.FromSeconds(5)));
+        }
+        finally
+        {
+            DeleteStateDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public void A_handoff_to_a_directory_nobody_owns_is_reported_as_not_landing()
+    {
+        var directory = NewStateDirectory();
+        try
+        {
+            using var sender = SingleInstanceChannels.CreateDefault(directory);
+            Assert.False(sender.Signal("test." + Guid.NewGuid().ToString("N")));
+        }
+        finally
+        {
+            DeleteStateDirectory(directory);
+        }
+    }
+
+    /// <summary>
+    /// A Unix socket path has to fit in sun_path (about 100 bytes), and a custom MONICA_APPDATA_DIR
+    /// can easily be deeper than that. The lock still lives in the directory; only the socket moves.
+    /// </summary>
+    [Fact]
+    public void A_data_directory_too_deep_for_a_socket_path_still_hands_off()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = NewStateDirectory();
+        var directory = Path.Combine(root, new string('d', 60), new string('e', 60));
+        try
+        {
+            var key = "test." + Guid.NewGuid().ToString("N")[..12];
+            using var owner = SingleInstanceChannels.CreateDefault(directory);
+            Assert.True(owner.TryAcquire(key));
+            var delivered = new ManualResetEventSlim(false);
+            using var listener = owner.Listen(key, () => delivered.Set());
+
+            using var sender = SingleInstanceChannels.CreateDefault(directory);
+            Assert.False(sender.TryAcquire(key));
+            Assert.True(sender.Signal(key));
+            Assert.True(delivered.Wait(TimeSpan.FromSeconds(5)));
+        }
+        finally
+        {
+            DeleteStateDirectory(root);
+        }
+    }
+
+    /// <summary>
+    /// Refusing to start because the locking machinery broke is the failure this gate once had on every
+    /// non-Windows desktop. The guard is a convenience; the application is not.
+    /// </summary>
+    [Fact]
+    public void A_broken_lock_starts_the_application_unguarded_instead_of_refusing_to_start()
+    {
+        var channel = new FakeChannel { AcquireFailure = new PlatformNotSupportedException("no named events") };
+
+        var gate = SingleInstanceGate.TryStartAsPrimary(Path.Combine(Path.GetTempPath(), "monica-vault-a"), channel);
+
+        Assert.NotNull(gate);
+        Assert.True(channel.Released);
+        gate!.ListenForReopen(() => { });
+        gate.Dispose();
+        Assert.Null(SingleInstanceGate.Active);
+    }
+
+    private static string NewStateDirectory() =>
+        Path.Combine(Path.GetTempPath(), "monica-gate-" + Guid.NewGuid().ToString("N")[..12]);
+
+    private static void DeleteStateDirectory(string directory)
+    {
+        try
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+        catch (DirectoryNotFoundException)
+        {
+        }
+        catch (IOException)
+        {
+        }
     }
 
     /// <summary>
@@ -209,6 +310,8 @@ public class SingleInstanceGateTests
 
         public bool GrantsForeground { get; init; } = true;
 
+        public Exception? AcquireFailure { get; init; }
+
         public string? GrantedKey { get; private set; }
 
         /// <summary>Position in the order the handoff made its calls, so the sequence is assertable.</summary>
@@ -222,6 +325,11 @@ public class SingleInstanceGateTests
 
         public bool TryAcquire(string key)
         {
+            if (AcquireFailure is not null)
+            {
+                throw AcquireFailure;
+            }
+
             if (AcquiredKey is not null)
             {
                 return false;

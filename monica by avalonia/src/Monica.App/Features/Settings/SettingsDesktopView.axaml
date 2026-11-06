@@ -1,4 +1,4 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:fa="using:FluentAvalonia.UI.Controls"
              xmlns:ic="using:FluentIcons.Avalonia"
@@ -8,63 +8,48 @@
              x:Class="Monica.App.Features.Settings.SettingsDesktopView"
              x:DataType="vm:MainWindowViewModel">
     <StackPanel x:Name="DesktopSettingsTaskPage"
-                IsVisible="{Binding IsSettingsDesktopSelected}"
-                Spacing="24">
-        <StackPanel Spacing="4">
+                Classes="settingsPage"
+                IsVisible="{Binding IsSettingsDesktopSelected}">
+        <StackPanel Classes="settingsPageHeader">
             <TextBlock x:Name="SettingsDesktopPageTitle"
                        Classes="settingsPageTitle"
-                       Margin="0"
                        Text="{Binding L.Desktop}" />
             <TextBlock x:Name="DesktopSettingsPageDescription"
                        Classes="settingsPageDescription"
                        Text="{Binding L[DesktopSettingsDescription]}" />
         </StackPanel>
 
-        <StackPanel x:Name="DesktopBackgroundBehaviorSection" Spacing="10">
-            <Grid Classes="settingsSectionHeader" ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                <Border Classes="settingsSectionIcon">
-                    <ic:FluentIcon Icon="Desktop" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-                <StackPanel Grid.Column="1" Spacing="2">
-                    <TextBlock Classes="settingsSectionTitle" Text="{Binding L[DesktopBackgroundBehavior]}" />
-                    <TextBlock Classes="settingsSectionDescription"
-                               Text="{Binding L[DesktopBackgroundBehaviorDescription]}" />
-                </StackPanel>
-            </Grid>
+        <StackPanel x:Name="DesktopBackgroundBehaviorSection" Classes="settingsSection">
+            <StackPanel Classes="settingsSectionHeader">
+                <TextBlock Classes="settingsSectionTitle" Text="{Binding L[DesktopBackgroundBehavior]}" />
+                <TextBlock Classes="settingsSectionDescription"
+                           Text="{Binding L[DesktopBackgroundBehaviorDescription]}" />
+            </StackPanel>
             <Border Classes="settingsFlatGroup">
+                <!-- The footer holds the switch alone, so it lines up with every other switch; what the
+                     setting currently does is the row's description. -->
                 <fa:FASettingsExpanderItem Content="{Binding L.MinimizeToTray}"
-                                           Description="{Binding L.MinimizeToTrayDescription}">
+                                           Description="{Binding TrayIntegrationTaskStatusText}">
                     <fa:FASettingsExpanderItem.Footer>
-                        <StackPanel Spacing="7" MaxWidth="360">
-                            <TextBlock Text="{Binding TrayIntegrationTaskStatusText}"
-                                       FontSize="12"
-                                       TextWrapping="Wrap"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                            <ToggleSwitch x:Name="MinimizeToTrayToggle"
-                                          IsChecked="{Binding MinimizeToTray}"
-                                          IsEnabled="{Binding CanUseTrayIntegration}"
-                                          OnContent="{Binding L.FeatureEnabled}"
-                                          OffContent="{Binding L.FeatureDisabled}"
-                                          ToolTip.Tip="{Binding TrayIntegrationTaskStatusText}"
-                                          AutomationProperties.Name="{Binding L.MinimizeToTray}"
-                                          AutomationProperties.HelpText="{Binding TrayIntegrationTaskStatusText}" />
-                        </StackPanel>
+                        <ToggleSwitch x:Name="MinimizeToTrayToggle"
+                                      IsChecked="{Binding MinimizeToTray}"
+                                      IsEnabled="{Binding CanUseTrayIntegration}"
+                                      OnContent="{Binding L.FeatureEnabled}"
+                                      OffContent="{Binding L.FeatureDisabled}"
+                                      ToolTip.Tip="{Binding L.MinimizeToTrayDescription}"
+                                      AutomationProperties.Name="{Binding L.MinimizeToTray}"
+                                      AutomationProperties.HelpText="{Binding TrayIntegrationTaskStatusText}" />
                     </fa:FASettingsExpanderItem.Footer>
                 </fa:FASettingsExpanderItem>
             </Border>
         </StackPanel>
 
-        <StackPanel x:Name="DesktopQuickAccessSection" Spacing="10">
-            <Grid Classes="settingsSectionHeader" ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                <Border Classes="settingsSectionIcon">
-                    <ic:FluentIcon Icon="Key" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-                <StackPanel Grid.Column="1" Spacing="2">
-                    <TextBlock Classes="settingsSectionTitle" Text="{Binding L[DesktopQuickAccess]}" />
-                    <TextBlock Classes="settingsSectionDescription"
-                               Text="{Binding L[DesktopQuickAccessDescription]}" />
-                </StackPanel>
-            </Grid>
+        <StackPanel x:Name="DesktopQuickAccessSection" Classes="settingsSection">
+            <StackPanel Classes="settingsSectionHeader">
+                <TextBlock Classes="settingsSectionTitle" Text="{Binding L[DesktopQuickAccess]}" />
+                <TextBlock Classes="settingsSectionDescription"
+                           Text="{Binding L[DesktopQuickAccessDescription]}" />
+            </StackPanel>
             <Border Classes="settingsFlatGroup">
                 <StackPanel>
                     <fa:FASettingsExpanderItem Content="{Binding L.QuickSearch}"
@@ -84,6 +69,7 @@
                                                Description="{Binding L.QuickSearchHotkeyDescription}">
                         <fa:FASettingsExpanderItem.Footer>
                             <ctrl:HotkeyRecorder x:Name="QuickSearchHotkeyBox"
+                                                 Width="{DynamicResource SettingsFieldWidth}"
                                                  Gesture="{Binding QuickSearchHotkey, Mode=TwoWay}"
                                                  PromptText="{Binding L[HotkeyRecorderPrompt]}"
                                                  InvalidText="{Binding L[HotkeyRecorderInvalid]}"
@@ -110,6 +96,7 @@
                                                Description="{Binding L[AutoTypeHotkeyDescription]}">
                         <fa:FASettingsExpanderItem.Footer>
                             <ctrl:HotkeyRecorder x:Name="AutoTypeHotkeyBox"
+                                                 Width="{DynamicResource SettingsFieldWidth}"
                                                  Gesture="{Binding AutoTypeHotkey, Mode=TwoWay}"
                                                  PromptText="{Binding L[HotkeyRecorderPrompt]}"
                                                  InvalidText="{Binding L[HotkeyRecorderInvalid]}"
@@ -122,7 +109,7 @@
                     <fa:FASettingsExpanderItem Content="{Binding L[AutoTypeSequence]}"
                                                Description="{Binding L[AutoTypeSequenceDescription]}">
                         <fa:FASettingsExpanderItem.Footer>
-                            <StackPanel Width="280"
+                            <StackPanel Width="{DynamicResource SettingsFieldWidth}"
                                         Spacing="4">
                                 <TextBox x:Name="AutoTypeSequenceBox"
                                          Text="{Binding AutoTypeSequence, Mode=TwoWay}"
@@ -131,7 +118,7 @@
                                 <TextBlock x:Name="AutoTypeSequenceErrorText"
                                            IsVisible="{Binding HasAutoTypeSequenceError}"
                                            Text="{Binding AutoTypeSequenceErrorText}"
-                                           FontSize="12"
+                                           FontSize="{DynamicResource FontSizeMeta}"
                                            TextWrapping="Wrap"
                                            Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
                             </StackPanel>
@@ -141,6 +128,7 @@
             </Border>
             <fa:FAInfoBar x:Name="QuickSearchStatusInfoBar"
                           IsOpen="True"
+                          IsClosable="False"
                           IsVisible="{Binding !HasGlobalHotkeyRegistrationError}"
                           Severity="Informational"
                           Title="{Binding GlobalQuickSearchStatusTitleText}"
@@ -148,6 +136,7 @@
                           AutomationProperties.LiveSetting="Polite" />
             <fa:FAInfoBar x:Name="QuickSearchErrorInfoBar"
                           IsOpen="True"
+                          IsClosable="False"
                           IsVisible="{Binding HasGlobalHotkeyRegistrationError}"
                           Severity="Error"
                           Title="{Binding GlobalQuickSearchStatusTitleText}"
@@ -155,6 +144,7 @@
                           AutomationProperties.LiveSetting="Polite" />
             <fa:FAInfoBar x:Name="AutoTypeStatusInfoBar"
                           IsOpen="True"
+                          IsClosable="False"
                           IsVisible="{Binding !HasAutoTypeRegistrationError}"
                           Severity="Informational"
                           Title="{Binding AutoTypeStatusTitleText}"
@@ -162,6 +152,7 @@
                           AutomationProperties.LiveSetting="Polite" />
             <fa:FAInfoBar x:Name="AutoTypeErrorInfoBar"
                           IsOpen="True"
+                          IsClosable="False"
                           IsVisible="{Binding HasAutoTypeRegistrationError}"
                           Severity="Error"
                           Title="{Binding AutoTypeStatusTitleText}"
@@ -171,42 +162,37 @@
 
         <settings:SettingsBrowserPairingSectionView x:Name="BrowserPairingSectionHost" />
 
-        <StackPanel x:Name="DesktopAppearanceSection" Spacing="10">
-            <Grid Classes="settingsSectionHeader" ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                <Border Classes="settingsSectionIcon">
-                    <ic:FluentIcon Icon="TextBulletList" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-                <StackPanel Grid.Column="1" Spacing="2">
-                    <TextBlock Classes="settingsSectionTitle" Text="{Binding L[DesktopDensityAndAppearance]}" />
-                    <TextBlock Classes="settingsSectionDescription"
-                               Text="{Binding L[DesktopDensityAndAppearanceDescription]}" />
+        <StackPanel x:Name="DesktopAppearanceSection" Classes="settingsSection">
+            <StackPanel Classes="settingsSectionHeader">
+                <TextBlock Classes="settingsSectionTitle" Text="{Binding L[DesktopDensityAndAppearance]}" />
+                <TextBlock Classes="settingsSectionDescription"
+                           Text="{Binding L[DesktopDensityAndAppearanceDescription]}" />
+            </StackPanel>
+            <Border Classes="settingsFlatGroup">
+                <StackPanel>
+                    <fa:FASettingsExpanderItem Content="{Binding L.CompactPasswordList}"
+                                               Description="{Binding L.CompactPasswordListDescription}">
+                        <fa:FASettingsExpanderItem.Footer>
+                            <ToggleSwitch x:Name="CompactPasswordListToggle"
+                                          IsChecked="{Binding CompactPasswordList}"
+                                          OnContent="{Binding L.FeatureEnabled}"
+                                          OffContent="{Binding L.FeatureDisabled}"
+                                          AutomationProperties.Name="{Binding L.CompactPasswordList}"
+                                          AutomationProperties.HelpText="{Binding L.CompactPasswordListDescription}" />
+                        </fa:FASettingsExpanderItem.Footer>
+                    </fa:FASettingsExpanderItem>
+                    <fa:FASettingsExpanderItem Content="{Binding L.ShowWebsiteIcons}"
+                                               Description="{Binding L.ShowWebsiteIconsDescription}">
+                        <fa:FASettingsExpanderItem.Footer>
+                            <ToggleSwitch x:Name="ShowWebsiteIconsToggle"
+                                          IsChecked="{Binding ShowWebsiteIcons}"
+                                          OnContent="{Binding L.FeatureEnabled}"
+                                          OffContent="{Binding L.FeatureDisabled}"
+                                          AutomationProperties.Name="{Binding L.ShowWebsiteIcons}"
+                                          AutomationProperties.HelpText="{Binding L.ShowWebsiteIconsDescription}" />
+                        </fa:FASettingsExpanderItem.Footer>
+                    </fa:FASettingsExpanderItem>
                 </StackPanel>
-            </Grid>
-            <Border Classes="settingsFlatGroup">
-                <fa:FASettingsExpanderItem Content="{Binding L.CompactPasswordList}"
-                                           Description="{Binding L.CompactPasswordListDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <ToggleSwitch x:Name="CompactPasswordListToggle"
-                                      IsChecked="{Binding CompactPasswordList}"
-                                      OnContent="{Binding L.FeatureEnabled}"
-                                      OffContent="{Binding L.FeatureDisabled}"
-                                      AutomationProperties.Name="{Binding L.CompactPasswordList}"
-                                      AutomationProperties.HelpText="{Binding L.CompactPasswordListDescription}" />
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
-            </Border>
-            <Border Classes="settingsFlatGroup">
-                <fa:FASettingsExpanderItem Content="{Binding L.ShowWebsiteIcons}"
-                                           Description="{Binding L.ShowWebsiteIconsDescription}">
-                    <fa:FASettingsExpanderItem.Footer>
-                        <ToggleSwitch x:Name="ShowWebsiteIconsToggle"
-                                      IsChecked="{Binding ShowWebsiteIcons}"
-                                      OnContent="{Binding L.FeatureEnabled}"
-                                      OffContent="{Binding L.FeatureDisabled}"
-                                      AutomationProperties.Name="{Binding L.ShowWebsiteIcons}"
-                                      AutomationProperties.HelpText="{Binding L.ShowWebsiteIconsDescription}" />
-                    </fa:FASettingsExpanderItem.Footer>
-                </fa:FASettingsExpanderItem>
             </Border>
         </StackPanel>
     </StackPanel>
