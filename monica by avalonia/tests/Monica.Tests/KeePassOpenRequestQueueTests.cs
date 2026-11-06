@@ -11,17 +11,20 @@ namespace Monica.Tests;
 /// </summary>
 public sealed class KeePassOpenRequestQueueTests
 {
-    private const string LedgerPath = @"D:\vaults\ledger.kdbx";
-    private const string WorkPath = @"D:\vaults\work.kdbx";
+    // Absolute on whichever platform runs the suite; a drive-letter path is relative on Linux and macOS.
+    private static readonly string VaultsRoot = OperatingSystem.IsWindows() ? @"D:\vaults" : "/vaults";
+    private static readonly string LedgerPath = Path.Combine(VaultsRoot, "ledger.kdbx");
+    private static readonly string WorkPath = Path.Combine(VaultsRoot, "work.kdbx");
 
     [Fact]
     public void A_double_clicked_file_arrives_as_the_only_argument()
     {
         Assert.Equal(LedgerPath, KeePassOpenRequestQueue.TryReadCommandLinePath([LedgerPath]));
         // The association passes the extension in whatever case the file on disk happens to have.
+        var upperCaseExtension = Path.Combine(VaultsRoot, "work.KDBX");
         Assert.Equal(
-            @"D:\vaults\work.KDBX",
-            KeePassOpenRequestQueue.TryReadCommandLinePath([@"D:\vaults\work.KDBX"]));
+            upperCaseExtension,
+            KeePassOpenRequestQueue.TryReadCommandLinePath([upperCaseExtension]));
     }
 
     [Fact]

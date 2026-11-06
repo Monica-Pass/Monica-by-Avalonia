@@ -9,8 +9,11 @@ namespace Monica.Tests;
 /// </summary>
 public sealed class KeePassRecentVaultRegistryTests
 {
-    private const string FirstPath = @"D:\vaults\ledger.kdbx";
-    private const string SecondPath = @"D:\vaults\work.kdbx";
+    // Absolute on whichever platform runs the suite: Path.GetFileName only splits on this platform's
+    // separators, so a Windows path on Linux is one long "file name".
+    private static readonly string VaultsRoot = OperatingSystem.IsWindows() ? @"D:\vaults" : "/vaults";
+    private static readonly string FirstPath = Path.Combine(VaultsRoot, "ledger.kdbx");
+    private static readonly string SecondPath = Path.Combine(VaultsRoot, "work.kdbx");
 
     [Fact]
     public void Remembering_a_path_twice_keeps_one_row_and_moves_it_to_the_front()
@@ -117,7 +120,8 @@ public sealed class KeePassRecentVaultRegistryTests
         KeePassRecentVaultRegistry.Remember(vaults, FirstPath, null, opened);
         KeePassRecentVaultRegistry.Remember(vaults, SecondPath, null, opened.AddMinutes(1));
 
-        KeePassRecentVaultRegistry.Forget(vaults, @"D:\VAULTS\ledger.kdbx");
+        // Windows paths are case-insensitive, so a different spelling must still find the row there.
+        KeePassRecentVaultRegistry.Forget(vaults, OperatingSystem.IsWindows() ? @"D:\VAULTS\ledger.kdbx" : FirstPath);
 
         var remaining = Assert.Single(KeePassRecentVaultRegistry.Ordered(vaults));
         Assert.Equal(SecondPath, remaining.Path);

@@ -22,6 +22,7 @@ public sealed class DesktopIntegrationUiTests
     [Fact]
     public async Task Desktop_integrations_follow_settings_and_report_hotkey_registration_failure()
     {
+        DesktopIntegrationPlatform.RequireWindows();
         var tray = new RecordingTrayService();
         var hotkey = new RecordingGlobalHotkeyService();
         var window = new Monica.App.MainWindow();
@@ -66,6 +67,7 @@ public sealed class DesktopIntegrationUiTests
     [Fact]
     public async Task Auto_type_registers_its_own_slot_and_refuses_a_shared_gesture()
     {
+        DesktopIntegrationPlatform.RequireWindows();
         var hotkey = new RecordingGlobalHotkeyService();
         var window = new Monica.App.MainWindow();
         using var services = Monica.App.App.ConfigureServices(window, collection =>
@@ -108,6 +110,7 @@ public sealed class DesktopIntegrationUiTests
     [Fact]
     public async Task Recording_a_hotkey_in_settings_replaces_the_registered_gesture()
     {
+        DesktopIntegrationPlatform.RequireWindows();
         var hotkey = new RecordingGlobalHotkeyService();
         var window = new Monica.App.MainWindow();
         using var services = Monica.App.App.ConfigureServices(window, collection =>
@@ -451,6 +454,7 @@ public sealed class DesktopIntegrationUiTests
     [Fact]
     public async Task Auto_type_press_asks_the_operating_system_who_owns_the_foreground_window()
     {
+        DesktopIntegrationPlatform.RequireWindows();
         var hotkey = new RecordingGlobalHotkeyService();
         var autoType = new RecordingAutoTypeService
         {
@@ -501,6 +505,7 @@ public sealed class DesktopIntegrationUiTests
     [Fact]
     public async Task Auto_type_press_surfaces_a_picker_whose_rows_hold_no_password()
     {
+        DesktopIntegrationPlatform.RequireWindows();
         var hotkey = new RecordingGlobalHotkeyService();
         var autoType = new RecordingAutoTypeService
         {
@@ -583,6 +588,7 @@ public sealed class DesktopIntegrationUiTests
     [Fact]
     public async Task Auto_type_picker_filters_and_escapes_without_ever_typing()
     {
+        DesktopIntegrationPlatform.RequireWindows();
         var hotkey = new RecordingGlobalHotkeyService();
         var autoType = new RecordingAutoTypeService
         {
@@ -668,6 +674,7 @@ public sealed class DesktopIntegrationUiTests
     [Fact]
     public async Task The_Enter_that_commits_an_input_method_composition_picks_the_row_it_narrowed_to()
     {
+        DesktopIntegrationPlatform.RequireWindows();
         var hotkey = new RecordingGlobalHotkeyService();
         var autoType = new RecordingAutoTypeService { ForegroundTitle = "Sign in to Contoso" };
         var window = new Monica.App.MainWindow();
@@ -739,6 +746,7 @@ public sealed class DesktopIntegrationUiTests
     [Fact]
     public async Task Auto_type_press_while_the_picker_is_up_takes_it_down()
     {
+        DesktopIntegrationPlatform.RequireWindows();
         var hotkey = new RecordingGlobalHotkeyService();
         var autoType = new RecordingAutoTypeService
         {
@@ -812,6 +820,7 @@ public sealed class DesktopIntegrationUiTests
     [Fact]
     public void Desktop_settings_enable_operational_browser_bridge_capability()
     {
+        DesktopIntegrationPlatform.RequireWindows();
         var capability = new PlatformIntegrationService().GetCapability(PlatformFeatureKeys.BrowserBridge);
 
         Assert.Equal(Monica.Core.Models.PlatformFeatureStatus.Available, capability.Status);
@@ -821,6 +830,7 @@ public sealed class DesktopIntegrationUiTests
     [Fact]
     public async Task Minimize_to_tray_hides_window_and_explicit_exit_closes_it()
     {
+        DesktopIntegrationPlatform.RequireWindows();
         var window = new Monica.App.MainWindow();
         using var services = Monica.App.App.ConfigureServices(window);
         var viewModel = services.GetRequiredService<MainWindowViewModel>();
@@ -849,6 +859,7 @@ public sealed class DesktopIntegrationUiTests
     [Fact]
     public async Task Browser_bridge_follows_enable_unlock_and_lock_lifecycle()
     {
+        DesktopIntegrationPlatform.RequireWindows();
         var bridge = new RecordingBrowserBridgeService();
         var window = new Monica.App.MainWindow();
         using var services = Monica.App.App.ConfigureServices(window, collection =>

@@ -1,33 +1,35 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsAboutView" x:DataType="vm:MainWindowViewModel">
-    <StackPanel IsVisible="{Binding IsSettingsAboutSelected}">
-    <TextBlock x:Name="SettingsAboutPageTitle" Classes="settingsPageTitle" Text="{Binding AboutTitle}" />
-    <Border Classes="settingsFlatGroup">
-        <StackPanel>
-            <fa:FASettingsExpanderItem Content="Monica" Description="{Binding AppVersionText}">
-                <fa:FASettingsExpanderItem.Footer>
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                        <Image Source="/Assets/Logo.png" Width="44" Height="44" />
-                        <StackPanel Grid.Column="1" Spacing="2">
-                            <TextBlock Text="{Binding AppVersionLabel}" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding AppVersionText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+    <StackPanel Classes="settingsPage" IsVisible="{Binding IsSettingsAboutSelected}">
+        <StackPanel Classes="settingsPageHeader">
+            <TextBlock x:Name="SettingsAboutPageTitle" Classes="settingsPageTitle" Text="{Binding AboutTitle}" />
+            <TextBlock Classes="settingsPageDescription" Text="{Binding L[SettingsAboutDescription]}" />
+        </StackPanel>
+        <Border Classes="settingsFlatGroup">
+            <StackPanel>
+                <Border Classes="settingsFormRow">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                        <Image Source="/Assets/Logo.png" Width="48" Height="48" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Monica" FontSize="{DynamicResource FontSizeSectionTitle}" FontWeight="SemiBold" />
+                            <TextBlock Classes="settingsRowDescription">
+                                <Run Text="{Binding AppVersionLabel}" />
+                                <Run Text=" " />
+                                <Run Text="{Binding AppVersionText}" />
+                            </TextBlock>
                         </StackPanel>
                     </Grid>
-                </fa:FASettingsExpanderItem.Footer>
-            </fa:FASettingsExpanderItem>
-            <fa:FASettingsExpanderItem Content="{Binding GitHubRepositoryLabel}" Description="{Binding RepositoryUrlText}">
-                <fa:FASettingsExpanderItem.Footer>
-                    <StackPanel Spacing="6" MaxWidth="380">
-                        <TextBlock Text="{Binding ExternalLinksIntegrationStatusText}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                        <Button Command="{Binding OpenGitHubRepositoryCommand}" IsEnabled="{Binding CanOpenExternalLinks}" ToolTip.Tip="{Binding ExternalLinksIntegrationStatusText}" HorizontalAlignment="Left">
+                </Border>
+                <fa:FASettingsExpanderItem Content="{Binding GitHubRepositoryLabel}" Description="{Binding RepositoryUrlText}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <Button Command="{Binding OpenGitHubRepositoryCommand}" IsEnabled="{Binding CanOpenExternalLinks}" ToolTip.Tip="{Binding ExternalLinksIntegrationStatusText}" AutomationProperties.Name="{Binding OpenRepositoryText}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <ic:FluentIcon Icon="Link" FontSize="18" />
+                                <ic:FluentIcon Icon="Link" FontSize="16" />
                                 <TextBlock Text="{Binding OpenRepositoryText}" />
                             </StackPanel>
                         </Button>
-                    </StackPanel>
-                </fa:FASettingsExpanderItem.Footer>
-            </fa:FASettingsExpanderItem>
-        </StackPanel>
-    </Border>
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+            </StackPanel>
+        </Border>
     </StackPanel>
 </UserControl>

@@ -1,38 +1,77 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsIntegrationsView" x:DataType="vm:MainWindowViewModel" IsVisible="{Binding IsSettingsIntegrationsSelected}">
-    <StackPanel Spacing="14">
-        <TextBlock x:Name="SettingsIntegrationsPageTitle" Classes="settingsPageTitle" Text="{Binding PlatformIntegrationsTitle}" Margin="0,0,0,2" />
-        <ItemsControl Classes="settingsFlatGroup" ItemsSource="{Binding PlatformIntegrationCapabilities}">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:LocalizedPlatformIntegrationCapability">
-                    <fa:FASettingsExpanderItem Content="{Binding Title}" Description="{Binding Description}">
-                        <fa:FASettingsExpanderItem.Footer>
-                            <StackPanel Spacing="2" MinWidth="160" MaxWidth="360">
-                                <TextBlock Text="{Binding Status}" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding UnsupportedReason}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding HasUnsupportedReason}" />
-                            </StackPanel>
-                        </fa:FASettingsExpanderItem.Footer>
-                    </fa:FASettingsExpanderItem>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        <fa:FAInfoBar IsOpen="True" Severity="Informational" Title="{Binding L.DesktopEquivalents}" Message="{Binding L.DesktopEquivalentsMessage}" />
-        <ItemsControl Classes="settingsFlatGroup" ItemsSource="{Binding Capabilities}">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:LocalizedPlatformCapability">
-                    <fa:FASettingsExpanderItem Content="{Binding Title}" Description="{Binding Description}">
-                        <fa:FASettingsExpanderItem.Footer>
-                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" MaxWidth="440">
-                                <StackPanel Spacing="2">
-                                    <TextBlock Text="{Binding Status}" FontWeight="SemiBold" />
-                                    <TextBlock Text="{Binding ToggleStatus}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                    <TextBlock Text="{Binding UnsupportedReason}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding HasUnsupportedReason}" />
-                                </StackPanel>
-                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsEnabled, Mode=TwoWay}" IsEnabled="{Binding CanToggle}" ToolTip.Tip="{Binding ToggleStatus}" AutomationProperties.Name="{Binding Title}" />
-                            </Grid>
-                        </fa:FASettingsExpanderItem.Footer>
-                    </fa:FASettingsExpanderItem>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsIntegrationsView" x:DataType="vm:MainWindowViewModel" IsVisible="{Binding IsSettingsIntegrationsSelected}">
+    <StackPanel Classes="settingsPage">
+        <StackPanel Classes="settingsPageHeader">
+            <TextBlock x:Name="SettingsIntegrationsPageTitle" Classes="settingsPageTitle" Text="{Binding PlatformIntegrationsTitle}" />
+            <TextBlock Classes="settingsPageDescription" Text="{Binding PlatformIntegrationSummaryText}" />
+        </StackPanel>
+
+        <!-- Each row: what the capability is and, when it is limited, why - in the user's language -
+             with the verdict as a short status on the right, so the right column always lines up. -->
+        <StackPanel Classes="settingsSection">
+            <StackPanel Classes="settingsSectionHeader">
+                <TextBlock Classes="settingsSectionTitle" Text="{Binding L[PlatformIntegrationsSectionTitle]}" />
+                <TextBlock Classes="settingsSectionDescription" Text="{Binding L[PlatformIntegrationsSectionDescription]}" />
+            </StackPanel>
+            <Border Classes="settingsFlatGroup">
+                <ItemsControl Classes="settingsRows" ItemsSource="{Binding PlatformIntegrationCapabilities}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LocalizedPlatformIntegrationCapability">
+                            <Border Classes="settingsListRow">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Classes="settingsRowTitle" Text="{Binding Title}" />
+                                        <TextBlock Classes="settingsRowDescription" Text="{Binding Description}" />
+                                        <TextBlock Classes="settingsRowNote" Text="{Binding UnsupportedReason}" IsVisible="{Binding HasUnsupportedReason}" />
+                                    </StackPanel>
+                                    <Border Grid.Column="1" Classes="settingsStatusPill" Classes.usable="{Binding IsUsable}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <Ellipse />
+                                            <TextBlock Text="{Binding Status}" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+        </StackPanel>
+
+        <StackPanel Classes="settingsSection">
+            <StackPanel Classes="settingsSectionHeader">
+                <TextBlock Classes="settingsSectionTitle" Text="{Binding L.DesktopEquivalents}" />
+                <TextBlock Classes="settingsSectionDescription" Text="{Binding L.DesktopEquivalentsMessage}" />
+            </StackPanel>
+            <Border Classes="settingsFlatGroup">
+                <ItemsControl Classes="settingsRows" ItemsSource="{Binding Capabilities}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LocalizedPlatformCapability">
+                            <Border Classes="settingsListRow">
+                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="16">
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Classes="settingsRowTitle" Text="{Binding Title}" />
+                                        <TextBlock Classes="settingsRowDescription" Text="{Binding Description}" />
+                                        <TextBlock Classes="settingsRowNote" Text="{Binding UnsupportedReason}" IsVisible="{Binding HasUnsupportedReason}" />
+                                    </StackPanel>
+                                    <Border Grid.Column="1" Classes="settingsStatusPill" Classes.usable="{Binding IsUsable}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <Ellipse />
+                                            <TextBlock Text="{Binding Status}" />
+                                        </StackPanel>
+                                    </Border>
+                                    <ToggleSwitch Grid.Column="2"
+                                                  IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                                  IsEnabled="{Binding CanToggle}"
+                                                  OnContent="{Binding ToggleStatus}"
+                                                  OffContent="{Binding ToggleStatus}"
+                                                  VerticalAlignment="Center"
+                                                  AutomationProperties.Name="{Binding Title}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+        </StackPanel>
     </StackPanel>
 </UserControl>

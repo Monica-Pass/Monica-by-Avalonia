@@ -70,8 +70,22 @@ public sealed partial class MainWindowViewModel
         ReplaceOptions(
             SecurityQuestionOptions,
             _securityQuestionService.PredefinedQuestions
-                .Select(question => new SettingsChoice(question.Id, question.Text))
+                .Select(question => new SettingsChoice(question.Id, LocalizeSecurityQuestion(question.Id, question.Text)))
                 .ToArray());
+    }
+
+    // Predefined questions are stored by id with their English text, as Android stores them; the UI
+    // shows them in its own language. A custom question is shown exactly as the user wrote it.
+    private string LocalizeSecurityQuestion(int questionId, string storedText)
+    {
+        if (questionId == SecurityQuestionService.CustomQuestionId && !string.IsNullOrWhiteSpace(storedText))
+        {
+            return storedText;
+        }
+
+        var key = $"SecurityQuestionPreset.{questionId}";
+        var localized = _localization.Get(key);
+        return string.Equals(localized, key, StringComparison.Ordinal) ? storedText : localized;
     }
 
     private void RaiseAboutText()

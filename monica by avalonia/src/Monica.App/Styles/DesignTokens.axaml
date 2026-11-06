@@ -1,23 +1,36 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- Three text sizes only. Hierarchy comes from colour and weight, not from
-         more steps. Avalonia's implicit default is 12px, so the app opts into
-         FontSizeBody as its base size (see App.axaml). -->
+    <!-- The Windows type ramp: caption 12, body 14, subtitle 20, title 28. Hierarchy otherwise
+         comes from colour and weight, not from more steps. Avalonia's implicit default is 12px, so
+         the app opts into FontSizeBody as its base size (see App.axaml). Every page title, in a
+         workspace or in settings, uses the display size; FontSizePageTitle is for item headings. -->
     <x:Double x:Key="FontSizePageTitle">20</x:Double>
     <x:Double x:Key="FontSizeBody">14</x:Double>
     <x:Double x:Key="FontSizeMeta">12</x:Double>
+    <x:Double x:Key="FontSizeSectionTitle">16</x:Double>
+    <x:Double x:Key="FontSizeDisplayTitle">28</x:Double>
+
+    <!-- Windows uses Segoe UI and Microsoft YaHei UI; macOS falls through to PingFang SC and Linux to
+         the Noto/Source Han CJK families, so Chinese text never lands on a fallback face. -->
+    <FontFamily x:Key="MonicaFontFamily">Segoe UI, Microsoft YaHei UI, PingFang SC, Hiragino Sans GB, Noto Sans CJK SC, Noto Sans SC, Source Han Sans SC, WenQuanYi Micro Hei</FontFamily>
 
     <CornerRadius x:Key="RadiusControl">4</CornerRadius>
+    <CornerRadius x:Key="RadiusCard">8</CornerRadius>
 
     <!-- Single source of truth for row height and command height. -->
     <x:Double x:Key="ListRowHeight">52</x:Double>
     <x:Double x:Key="ControlHeight">32</x:Double>
+    <x:Double x:Key="NavItemHeight">36</x:Double>
+    <x:Double x:Key="SettingsFieldWidth">260</x:Double>
+    <x:Double x:Key="SettingsFormWidth">380</x:Double>
 
     <Thickness x:Key="PaddingListRow">8,6</Thickness>
     <Thickness x:Key="PaddingPane">12,8</Thickness>
+    <Thickness x:Key="PaddingCardRow">16,12</Thickness>
     <x:Double x:Key="SpacingSmall">8</x:Double>
     <x:Double x:Key="SpacingMedium">12</x:Double>
+    <x:Double x:Key="SpacingLarge">24</x:Double>
     <Thickness x:Key="PaddingSection">12</Thickness>
     <x:Double x:Key="ConnectionQrSize">280</x:Double>
 

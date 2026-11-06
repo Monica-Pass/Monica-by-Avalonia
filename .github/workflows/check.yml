@@ -81,3 +81,91 @@ jobs:
           name: check-test-results
           path: ${{ env.PROJECT_DIR }}/TestResults/**/*.trx
           if-no-files-found: ignore
+
+  # Linux and macOS ship from the Build workflow, but until now no test ever ran off Windows: the
+  # artifact smoke there only exercises the CLI subcommands, which is how a desktop build that
+  # crashed in Program.Main on every Linux and macOS launch kept passing. The commercial gates
+  # (format, audit, perf budgets) stay on the Windows job; this one proves the suites hold here.
+  linux:
+    name: Linux build and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Checkout MDBX engine
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Monica-Pass/Mdbx
+          ref: 90005c8c608c952093a4522ffa507a562e2e39a4
+          path: mdbx
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-dotnet-${{ env.DOTNET_VERSION }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets', '**/NuGet.config') }}
+          restore-keys: |
+            ${{ runner.os }}-dotnet-${{ env.DOTNET_VERSION }}-nuget-
+
+      - name: Cache Rust and MDBX build outputs
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ env.PROJECT_DIR }}/crates/monica-crypto/target
+            ${{ env.PROJECT_DIR }}/artifacts/mdbx-native
+          key: ${{ runner.os }}-linux-x64-cargo-mdbx-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock', '**/rust-toolchain*', 'monica by avalonia/eng/mdbx/native-source.json', 'monica by avalonia/eng/mdbx/patches/**') }}
+          restore-keys: |
+            ${{ runner.os }}-linux-x64-cargo-mdbx-
+
+      - name: Build native engines
+        shell: pwsh
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          ./crates/monica-crypto/build.ps1 -Configuration release -RuntimeIdentifier linux-x64
+          ./eng/mdbx/build-native.ps1 -MdbxRepo "$env:GITHUB_WORKSPACE/mdbx" -RuntimeIdentifier linux-x64
+
+      - name: Build
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          dotnet restore "${{ env.SOLUTION_FILE }}"
+          dotnet build "${{ env.SOLUTION_FILE }}" --configuration Release --no-restore --warnaserror
+
+      - name: Core tests
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: >
+          dotnet test tests/Monica.Tests/Monica.Tests.csproj
+          --configuration Release --no-restore --no-build
+          --filter "Category!=perf-budget"
+          --results-directory TestResults/Monica.Tests
+          --logger "trx;LogFileName=Monica.Tests.trx"
+
+      - name: Headless UI tests
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          mkdir -p TestResults/Monica.UiTests
+          dotnet tests/Monica.UiTests/bin/Release/net10.0/Monica.UiTests.dll \
+            -filter "/[Category!=perf-budget]" \
+            -reporter quiet -noColor \
+            -trx TestResults/Monica.UiTests/Monica.UiTests.trx
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: check-test-results-linux
+          path: ${{ env.PROJECT_DIR }}/TestResults/**/*.trx
+          if-no-files-found: ignore

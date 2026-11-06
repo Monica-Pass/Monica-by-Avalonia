@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:fa="using:FluentAvalonia.UI.Controls"
         xmlns:fap="using:FluentAvalonia.UI.Controls.Primitives"
+        xmlns:ic="using:FluentIcons.Avalonia"
         xmlns:controls="using:Monica.App.Controls">
 
     <!-- Surfaces carry no fill and no stroke: the window paints exactly one
@@ -81,10 +82,22 @@
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="VerticalContentAlignment" Value="Stretch" />
     </Style>
-    <Style Selector="Button.workspaceListRowButton:pointerover">
+    <!-- FluentAvalonia's Button theme paints hover, press and disabled fills straight onto the
+         template's PART_ContentPresenter. That outranks any Background set on the Button, so every
+         stateful button below styles the presenter instead. Styling the Button left a selected
+         settings or sync item unhighlighted under the pointer (issue #54), and turned primary
+         buttons white-on-white on hover. -->
+    <Style Selector="Button.workspaceListRowButton /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.workspaceListRowButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="Transparent" />
     </Style>
-    <Style Selector="Button.workspaceListRowButton:pressed">
+    <Style Selector="Button.workspaceListRowButton:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.workspaceListRowButton:disabled /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="Transparent" />
     </Style>
 
@@ -143,10 +156,28 @@
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
-    <Style Selector="Button.workspaceFilterChip:pointerover">
+    <Style Selector="Button.workspaceFilterChip /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.workspaceFilterChip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundPointerOver}" />
     </Style>
-    <Style Selector="Button.workspaceFilterChip.selected">
+    <Style Selector="Button.workspaceFilterChip:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundPressed}" />
+    </Style>
+    <Style Selector="Button.workspaceFilterChip:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.workspaceFilterChip.selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+    </Style>
+    <Style Selector="Button.workspaceFilterChip.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.workspaceFilterChip.selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelectedPointerOver}" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+    </Style>
+    <Style Selector="Button.workspaceFilterChip.selected:disabled /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
     </Style>
 
@@ -160,26 +191,90 @@
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
     </Style>
 
+    <!-- Sidebar items of the Settings and Sync workspaces. The selected item keeps its fill under
+         the pointer, while pressed and while the page is busy, and carries the same accent rail as
+         the main navigation, so "where am I" never depends on where the mouse happens to rest. -->
     <Style Selector="Button.workspaceNavItem">
-        <Setter Property="MinHeight" Value="{DynamicResource ControlHeight}" />
-        <Setter Property="Padding" Value="10,6" />
+        <Setter Property="MinHeight" Value="{DynamicResource NavItemHeight}" />
+        <Setter Property="Padding" Value="12,7" />
         <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Panel>
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      Background="{TemplateBinding Background}"
+                                      CornerRadius="{TemplateBinding CornerRadius}"
+                                      Padding="{TemplateBinding Padding}"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    <Border Name="NavItemIndicator"
+                            Width="3"
+                            Height="16"
+                            CornerRadius="2"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            IsVisible="False"
+                            Background="{DynamicResource AccentFillColorDefaultBrush}" />
+                </Panel>
+            </ControlTemplate>
+        </Setter>
     </Style>
-    <Style Selector="Button.workspaceNavItem:pointerover">
-        <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundPointerOver}" />
+    <Style Selector="Button.workspaceNavItem /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
-    <Style Selector="Button.workspaceNavItem.selected">
-        <Setter Property="Background" Value="{DynamicResource ListViewItemBackgroundSelected}" />
+    <!-- Same selection language as the main navigation pane: a neutral fill plus the accent rail,
+         so the two menus on a Settings or Sync screen never disagree about what "selected" looks
+         like. High contrast swaps the neutral fill for its strong selection colour. -->
+    <Style Selector="Button.workspaceNavItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource MonicaSubtleFillHoverBrush}" />
+    </Style>
+    <Style Selector="Button.workspaceNavItem:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource MonicaSubtleFillPressedBrush}" />
+    </Style>
+    <Style Selector="Button.workspaceNavItem:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.workspaceNavItem.selected /template/ ContentPresenter#PART_ContentPresenter, Button.workspaceNavItem.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.workspaceNavItem.selected:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.workspaceNavItem.selected:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource MonicaNavItemSelectedBrush}" />
+    </Style>
+    <Style Selector="Button.workspaceNavItem.selected /template/ Border#NavItemIndicator">
+        <Setter Property="IsVisible" Value="True" />
     </Style>
 
+    <!-- Every page opens on the same title size as the settings pages, so moving between the
+         rail's destinations never changes how big "where am I" is printed. Item headings inside
+         a page (the selected entry's name) stay one step smaller. -->
     <Style Selector="TextBlock.workspacePageTitle">
+        <Setter Property="FontSize" Value="{DynamicResource FontSizeDisplayTitle}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <Style Selector="TextBlock.workspaceItemHeading">
         <Setter Property="FontSize" Value="{DynamicResource FontSizePageTitle}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <!-- Search fields carry the magnifier, so they read as search before anything is typed. -->
+    <Style Selector="TextBox.workspaceSearchBox">
+        <Setter Property="InnerRightContent">
+            <Template>
+                <ic:FluentIcon Icon="Search"
+                               FontSize="14"
+                               Margin="0,0,10,0"
+                               VerticalAlignment="Center"
+                               IsHitTestVisible="False"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </Template>
+        </Setter>
     </Style>
     <Style Selector="TextBlock.workspaceItemTitle">
         <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}" />
@@ -211,12 +306,31 @@
         <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
     </Style>
-    <Style Selector="Button.workspacePrimaryCommand:pointerover">
-        <Setter Property="Background" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+    <Style Selector="Button.workspacePrimaryCommand /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
         <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+    </Style>
+    <Style Selector="Button.workspacePrimaryCommand:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+    </Style>
+    <Style Selector="Button.workspacePrimaryCommand:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource MonicaAccentFillPressedBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource MonicaAccentFillPressedBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+    </Style>
+    <Style Selector="Button.workspacePrimaryCommand:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ControlFillColorTertiaryBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ControlFillColorTertiaryBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
     </Style>
     <Style Selector="Button.workspacePrimaryCommand TextBlock">
         <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+    </Style>
+    <Style Selector="Button.workspacePrimaryCommand:disabled TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
     </Style>
     <Style Selector="ListBox.workspaceList ListBoxItem:pointerover">
         <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />

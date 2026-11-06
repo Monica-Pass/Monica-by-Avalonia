@@ -60,6 +60,10 @@ public static class VaultEntryKinds
         _ => Symbol.Key
     };
 
+    /// <summary>The localization key the shell resolves for <paramref name="kind"/>.</summary>
+    public static string LocalizationKeyFor(VaultEntryKind kind) => "VaultKind" + kind;
+
+    /// <summary>English fallback for callers without a localization service (tests, tools).</summary>
     public static string LabelFor(VaultEntryKind kind) => kind switch
     {
         VaultEntryKind.ApiKey => "API key",

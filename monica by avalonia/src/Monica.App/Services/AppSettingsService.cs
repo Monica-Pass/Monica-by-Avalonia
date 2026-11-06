@@ -73,6 +73,13 @@ public interface IAppSettingsService
     Task LoadAsync(CancellationToken cancellationToken = default);
     Task SaveAsync(CancellationToken cancellationToken = default);
     Task ClearSensitiveCacheAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Whether WebDAV credentials survive a restart. False where no operating-system secret store is
+    /// wired up (Linux and macOS today): those values are then kept for the current session only.
+    /// </summary>
+    bool CanPersistSecrets => true;
+
     IReadOnlyDictionary<string, bool> GetFeatureToggles();
     bool IsFeatureEnabled(string featureKey);
     void SetFeatureEnabled(string featureKey, bool isEnabled);
@@ -93,6 +100,8 @@ public sealed partial class AppSettingsService : IAppSettingsService
     private readonly ISecretProtector? _secretProtector;
     private readonly SemaphoreSlim _saveGate = new(1, 1);
     private bool _sensitiveCacheCleared;
+
+    public bool CanPersistSecrets => _secretProtector?.Capability.IsUsable == true;
 
     public AppSettingsService(string? settingsPath = null, ISecretProtector? secretProtector = null)
     {

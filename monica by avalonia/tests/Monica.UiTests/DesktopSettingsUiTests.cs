@@ -112,6 +112,7 @@ public sealed class DesktopSettingsUiTests
     [Fact]
     public async Task Browser_pairing_states_mask_the_token_and_copy_it_only_through_sensitive_clipboard()
     {
+        DesktopIntegrationPlatform.RequireWindows();
         var bridge = new RecordingSettingsBrowserBridgeService();
         var clipboard = new RecordingSensitiveClipboardService();
         var window = new Monica.App.MainWindow();
@@ -168,6 +169,7 @@ public sealed class DesktopSettingsUiTests
     [Fact]
     public void Browser_pairing_error_is_distinct_and_never_exposes_a_token()
     {
+        DesktopIntegrationPlatform.RequireWindows();
         var bridge = new RecordingSettingsBrowserBridgeService { StartSucceeds = false };
         var window = new Monica.App.MainWindow();
         using var services = Monica.App.App.ConfigureServices(window, collection =>

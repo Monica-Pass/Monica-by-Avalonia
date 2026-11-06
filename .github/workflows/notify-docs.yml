@@ -9,7 +9,10 @@ permissions:
   contents: read
 jobs:
   notify:
+    # Only the organization's repository holds DOCS_REPO_TOKEN. A fork has no such secret, so the
+    # dispatch failed with "Input required and not supplied: github-token" on every push to main.
     if: >-
+      github.repository_owner == 'Monica-Pass' &&
       github.repository != 'Monica-Pass/MonicaDocs' &&
       ((github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) ||
        github.event_name == 'release')

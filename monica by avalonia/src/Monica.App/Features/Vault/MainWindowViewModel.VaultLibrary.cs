@@ -126,6 +126,17 @@ public sealed partial class MainWindowViewModel
 
     public bool IsVaultTotpPreset => VaultGroup == VaultEntryGroup.Totp;
 
+    // The four type sections are presets of this one page, so its title names the slice on screen,
+    // the same word the navigation rail uses, instead of saying "Library" over a list of notes.
+    public string VaultHeaderTitle => _localization.Get(VaultGroup switch
+    {
+        VaultEntryGroup.Passwords => "Passwords",
+        VaultEntryGroup.Notes => "SecureNotes",
+        VaultEntryGroup.Totp => "Totp",
+        VaultEntryGroup.Cards => "Cards",
+        _ => "Library"
+    });
+
     public bool HasVaultQuickFilters => CurrentVaultQuickFilters().IsOn;
 
     public string VaultMoreButtonTip =>
@@ -268,9 +279,25 @@ public sealed partial class MainWindowViewModel
 
     // A section switch can change the preset while the library stays on screen, because the four
     // type sections resolve to this page; the shell calls this after it raises SelectedSection.
+    // The language the row badges were last built in. Settings are re-applied on every unlock, so the
+    // tree is only rebuilt when the language actually changed under it.
+    private string? _vaultTreeLabelLanguage;
+
+    private void RefreshVaultTreeLanguage()
+    {
+        OnPropertyChanged(nameof(VaultHeaderTitle));
+        if (_isVaultTreeAttached &&
+            _vaultTreeLabelLanguage is not null &&
+            !string.Equals(_vaultTreeLabelLanguage, _localization.Culture.Name, StringComparison.Ordinal))
+        {
+            RebuildVaultTree();
+        }
+    }
+
     public void RefreshVaultPreset()
     {
         OnPropertyChanged(nameof(VaultEmptyStateText));
+        OnPropertyChanged(nameof(VaultHeaderTitle));
         if (_isVaultTreeAttached)
         {
             RebuildVaultTree();
@@ -407,13 +434,15 @@ public sealed partial class MainWindowViewModel
 
     private void RebuildVaultTree()
     {
+        _vaultTreeLabelLanguage = _localization.Culture.Name;
         var selectedKey = SelectedVaultRow?.Key;
         var rows = VaultTreeBuilder.Build(
             Categories.ToArray(),
             Passwords.ToArray(),
             VaultSecureItems(),
             _collapsedVaultFolderKeys,
-            CurrentVaultFilter());
+            CurrentVaultFilter(),
+            kind => _localization.Get(VaultEntryKinds.LocalizationKeyFor(kind)));
 
         DetachVaultEntryObservers();
         var rebuilt = new ObservableCollection<IVaultTreeRow>();

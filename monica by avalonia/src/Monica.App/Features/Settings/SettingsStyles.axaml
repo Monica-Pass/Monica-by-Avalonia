@@ -1,76 +1,179 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:fa="using:FluentAvalonia.UI.Controls">
-<!-- Keep settings rows on the same neutral surface in every state. The upstream
-     SettingsExpander template otherwise falls back to the platform accent for
-     one of its implicit brushes, which made a blue strip appear only after some
-     focus/pointer transitions. -->
-<Style Selector="fa|FASettingsExpanderItem">
-    <Setter Property="Background" Value="{DynamicResource LayerFillColorDefaultBrush}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
+        xmlns:fa="using:FluentAvalonia.UI.Controls"
+        xmlns:ic="using:FluentIcons.Avalonia">
+
+<!-- One vocabulary for every settings page, following the Windows settings pattern: a page
+     header, sections headed by a short strong label, and one card per setting with a 4px gap
+     between cards. Rows are not buttons, so they carry no hover fill of their own. Every
+     right-hand control sits in the row footer at one width, and status text lives in the
+     description or an info bar, never stacked above the control (which is what pushed the tray
+     toggle out of line). -->
+
+<Style Selector="StackPanel.settingsPage">
+    <Setter Property="Spacing" Value="{DynamicResource SpacingLarge}" />
 </Style>
-<Style Selector="fa|FASettingsExpanderItem:pointerover">
-    <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
-</Style>
-<Style Selector="fa|FASettingsExpanderItem:focus">
-    <Setter Property="Background" Value="{DynamicResource LayerFillColorDefaultBrush}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
-</Style>
-<Style Selector="Border.settingsFlatGroup">
-    <Setter Property="Background" Value="{DynamicResource LayerFillColorDefaultBrush}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="8" />
-    <Setter Property="Padding" Value="0" />
+<Style Selector="StackPanel.settingsPageHeader">
+    <Setter Property="Spacing" Value="4" />
 </Style>
 <Style Selector="TextBlock.settingsPageTitle">
-    <Setter Property="FontSize" Value="28" />
+    <Setter Property="FontSize" Value="{DynamicResource FontSizeDisplayTitle}" />
     <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="Margin" Value="0,0,0,16" />
+    <Setter Property="TextWrapping" Value="Wrap" />
 </Style>
 <Style Selector="TextBlock.settingsPageDescription">
-    <Setter Property="FontSize" Value="14" />
     <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
     <Setter Property="TextWrapping" Value="Wrap" />
 </Style>
-<Style Selector="Grid.settingsSectionHeader">
+
+<Style Selector="StackPanel.settingsSection">
+    <Setter Property="Spacing" Value="8" />
+</Style>
+<Style Selector="StackPanel.settingsSectionHeader">
+    <Setter Property="Spacing" Value="2" />
     <Setter Property="HorizontalAlignment" Value="Stretch" />
 </Style>
-<Style Selector="Border.settingsSectionIcon">
-    <Setter Property="Width" Value="36" />
-    <Setter Property="Height" Value="36" />
-    <Setter Property="CornerRadius" Value="7" />
-    <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
-    <Setter Property="HorizontalAlignment" Value="Left" />
-    <Setter Property="VerticalAlignment" Value="Top" />
-</Style>
 <Style Selector="TextBlock.settingsSectionTitle">
-    <Setter Property="FontSize" Value="18" />
+    <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}" />
     <Setter Property="FontWeight" Value="SemiBold" />
 </Style>
 <Style Selector="TextBlock.settingsSectionDescription">
-    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontSize" Value="{DynamicResource FontSizeMeta}" />
     <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
     <Setter Property="TextWrapping" Value="Wrap" />
 </Style>
-<Style Selector="Border.settingsPairingTokenSurface">
-    <Setter Property="Background" Value="{DynamicResource LayerFillColorSubtleBrush}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+
+<!-- A group is a column of cards, not a card itself. -->
+<Style Selector="Border.settingsFlatGroup">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+</Style>
+<Style Selector="Border.settingsFlatGroup > StackPanel">
+    <Setter Property="Spacing" Value="4" />
+</Style>
+<Style Selector="ItemsControl.settingsRows ContentPresenter:not(:nth-child(1))">
+    <Setter Property="Margin" Value="0,4,0,0" />
+</Style>
+
+<!-- Rows. FluentAvalonia's item would otherwise paint its own translucent fill, a hover fill and,
+     after some focus transitions, an accent edge; each row instead keeps one card surface. -->
+<Style Selector="fa|FASettingsExpanderItem">
+    <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="Padding" Value="{DynamicResource PaddingCardRow}" />
+    <Setter Property="MinHeight" Value="64" />
+</Style>
+<Style Selector="fa|FASettingsExpanderItem:pointerover, fa|FASettingsExpanderItem:focus">
+    <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+</Style>
+<Style Selector="fa|FASettingsExpanderItem /template/ TextBlock#DescriptionText">
+    <Setter Property="FontSize" Value="{DynamicResource FontSizeMeta}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+</Style>
+
+<!-- A row that needs more than one control (a password change, a recovery question) puts its
+     fields under the heading instead of cramming them into the footer column. -->
+<Style Selector="Border.settingsFormRow, Border.settingsListRow">
+    <Setter Property="Padding" Value="{DynamicResource PaddingCardRow}" />
+    <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+</Style>
+<Style Selector="Border.settingsListRow">
+    <Setter Property="MinHeight" Value="64" />
+</Style>
+
+<Style Selector="TextBlock.settingsRowTitle">
+    <Setter Property="TextWrapping" Value="Wrap" />
+</Style>
+<Style Selector="TextBlock.settingsRowDescription">
+    <Setter Property="FontSize" Value="{DynamicResource FontSizeMeta}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+</Style>
+<Style Selector="TextBlock.settingsRowNote">
+    <Setter Property="FontSize" Value="{DynamicResource FontSizeMeta}" />
+    <Setter Property="Foreground" Value="{DynamicResource MonicaStatusCautionBrush}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+</Style>
+<Style Selector="StackPanel.settingsFormFields">
+    <Setter Property="Spacing" Value="8" />
+    <Setter Property="Width" Value="{DynamicResource SettingsFormWidth}" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="Margin" Value="0,12,0,0" />
+</Style>
+<Style Selector="StackPanel.settingsFormActions">
+    <Setter Property="Orientation" Value="Horizontal" />
+    <Setter Property="Spacing" Value="8" />
+    <Setter Property="Margin" Value="0,4,0,0" />
+</Style>
+
+<!-- Right-hand controls share one width, so the column lines up from row to row. -->
+<Style Selector="ComboBox.settingsField, TextBox.settingsField, NumericUpDown.settingsField">
+    <Setter Property="Width" Value="{DynamicResource SettingsFieldWidth}" />
+</Style>
+
+<!-- Capability status: a dot and a word, never a paragraph in the footer column. -->
+<Style Selector="Border.settingsStatusPill">
+    <Setter Property="Padding" Value="8,3" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Background" Value="{DynamicResource MonicaSubtleFillHoverBrush}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+</Style>
+<Style Selector="Border.settingsStatusPill TextBlock">
+    <Setter Property="FontSize" Value="{DynamicResource FontSizeMeta}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+</Style>
+<Style Selector="Border.settingsStatusPill Ellipse">
+    <Setter Property="Width" Value="7" />
+    <Setter Property="Height" Value="7" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Fill" Value="{DynamicResource MonicaStatusCautionBrush}" />
+</Style>
+<Style Selector="Border.settingsStatusPill.usable Ellipse">
+    <Setter Property="Fill" Value="{DynamicResource MonicaStatusPositiveBrush}" />
+</Style>
+
+<Style Selector="Border.settingsPairingTokenSurface">
+    <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusCard}" />
     <Setter Property="Padding" Value="16" />
 </Style>
 <Style Selector="Border.settingsTokenMask">
     <Setter Property="MinHeight" Value="38" />
     <Setter Property="Padding" Value="12,7" />
-    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
     <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
     <Setter Property="BorderThickness" Value="1" />
 </Style>
-<Style Selector="ItemsControl.settingsFlatGroup">
-    <Setter Property="MaxWidth" Value="760" />
-    <Setter Property="HorizontalAlignment" Value="Stretch" />
+
+<Style Selector="Button.settingsDangerCommand /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+</Style>
+<Style Selector="Button.settingsDangerCommand:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.settingsDangerCommand:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+</Style>
+<Style Selector="Button.settingsDangerCommand:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource ControlFillColorTertiaryBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ControlFillColorTertiaryBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
+</Style>
+<Style Selector="Button.settingsDangerCommand TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+</Style>
+<Style Selector="Button.settingsDangerCommand:disabled TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
 </Style>
 </Styles>

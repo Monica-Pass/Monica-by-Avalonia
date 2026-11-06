@@ -1,71 +1,85 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:fa="using:FluentAvalonia.UI.Controls" xmlns:ic="using:FluentIcons.Avalonia" xmlns:vm="using:Monica.App.ViewModels" x:Class="Monica.App.Features.Settings.SettingsSecurityView" x:DataType="vm:MainWindowViewModel">
-    <StackPanel IsVisible="{Binding IsSettingsSecuritySelected}">
-    <TextBlock x:Name="SettingsSecurityPageTitle" Classes="settingsPageTitle" Text="{Binding L.Security}" />
-    <Border Classes="settingsFlatGroup">
-        <StackPanel>
-            <fa:FASettingsExpanderItem Content="{Binding L.WindowCaptureProtection}" Description="{Binding L.WindowCaptureProtectionDescription}">
-                <fa:FASettingsExpanderItem.Footer>
-                    <ToggleSwitch x:Name="WindowCaptureProtectionToggle"
-                                  IsChecked="{Binding WindowCaptureProtectionEnabled}"
-                                  OnContent="{Binding L.FeatureEnabled}"
-                                  OffContent="{Binding L.FeatureDisabled}"
-                                  AutomationProperties.Name="{Binding L.WindowCaptureProtection}" />
-                </fa:FASettingsExpanderItem.Footer>
-            </fa:FASettingsExpanderItem>
-            <fa:FASettingsExpanderItem Content="{Binding L.AutoLock}" Description="{Binding L.AutoLockDescription}">
-                <fa:FASettingsExpanderItem.Footer>
-                    <ToggleSwitch IsChecked="{Binding AutoLockEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
-                </fa:FASettingsExpanderItem.Footer>
-            </fa:FASettingsExpanderItem>
-            <fa:FASettingsExpanderItem Content="{Binding L.AutoLockAfter}" Description="{Binding L.AutoLockAfterDescription}">
-                <fa:FASettingsExpanderItem.Footer>
-                    <ComboBox MinWidth="180" ItemsSource="{Binding AutoLockMinuteOptions}" SelectedValue="{Binding AutoLockMinutes}" SelectedValueBinding="{Binding Value}">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate x:DataType="vm:SettingsChoice">
-                                <TextBlock Text="{Binding Label}" />
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-                </fa:FASettingsExpanderItem.Footer>
-            </fa:FASettingsExpanderItem>
-            <fa:FASettingsExpanderItem Content="{Binding L.ClearClipboard}" Description="{Binding L.ClearClipboardDescription}">
-                <fa:FASettingsExpanderItem.Footer>
-                    <ToggleSwitch IsChecked="{Binding ClearClipboardEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
-                </fa:FASettingsExpanderItem.Footer>
-            </fa:FASettingsExpanderItem>
-            <fa:FASettingsExpanderItem Content="{Binding L.ClearClipboardAfter}" Description="{Binding L.ClearClipboardAfterDescription}">
-                <fa:FASettingsExpanderItem.Footer>
-                    <ComboBox MinWidth="180" ItemsSource="{Binding ClipboardSecondOptions}" SelectedValue="{Binding ClipboardClearSeconds}" SelectedValueBinding="{Binding Value}">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate x:DataType="vm:SettingsChoice">
-                                <TextBlock Text="{Binding Label}" />
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-                </fa:FASettingsExpanderItem.Footer>
-            </fa:FASettingsExpanderItem>
-            <fa:FASettingsExpanderItem Content="{Binding L.RequirePasswordBeforeExport}" Description="{Binding L.RequirePasswordBeforeExportDescription}">
-                <fa:FASettingsExpanderItem.Footer>
-                    <ToggleSwitch IsChecked="{Binding RequirePasswordBeforeExport}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" />
-                </fa:FASettingsExpanderItem.Footer>
-            </fa:FASettingsExpanderItem>
-            <fa:FASettingsExpanderItem Content="{Binding ChangeMasterPasswordTitle}" Description="{Binding ChangeMasterPasswordDescription}">
-                <fa:FASettingsExpanderItem.Footer>
-                    <StackPanel Spacing="8" Margin="16,0,0,0" MinWidth="260" MaxWidth="440">
+    <StackPanel Classes="settingsPage" IsVisible="{Binding IsSettingsSecuritySelected}">
+        <StackPanel Classes="settingsPageHeader">
+            <TextBlock x:Name="SettingsSecurityPageTitle" Classes="settingsPageTitle" Text="{Binding L.Security}" />
+            <TextBlock Classes="settingsPageDescription" Text="{Binding L[SettingsSecurityDescription]}" />
+        </StackPanel>
+
+        <Border Classes="settingsFlatGroup">
+            <StackPanel>
+                <fa:FASettingsExpanderItem Content="{Binding L.AutoLock}" Description="{Binding L.AutoLockDescription}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <ToggleSwitch IsChecked="{Binding AutoLockEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" AutomationProperties.Name="{Binding L.AutoLock}" />
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+                <fa:FASettingsExpanderItem Content="{Binding L.AutoLockAfter}" Description="{Binding L.AutoLockAfterDescription}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <ComboBox Classes="settingsField" ItemsSource="{Binding AutoLockMinuteOptions}" SelectedValue="{Binding AutoLockMinutes}" SelectedValueBinding="{Binding Value}" IsEnabled="{Binding AutoLockEnabled}" AutomationProperties.Name="{Binding L.AutoLockAfter}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SettingsChoice">
+                                    <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+                <fa:FASettingsExpanderItem Content="{Binding L.ClearClipboard}" Description="{Binding L.ClearClipboardDescription}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <ToggleSwitch IsChecked="{Binding ClearClipboardEnabled}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" AutomationProperties.Name="{Binding L.ClearClipboard}" />
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+                <fa:FASettingsExpanderItem Content="{Binding L.ClearClipboardAfter}" Description="{Binding L.ClearClipboardAfterDescription}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <ComboBox Classes="settingsField" ItemsSource="{Binding ClipboardSecondOptions}" SelectedValue="{Binding ClipboardClearSeconds}" SelectedValueBinding="{Binding Value}" IsEnabled="{Binding ClearClipboardEnabled}" AutomationProperties.Name="{Binding L.ClearClipboardAfter}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SettingsChoice">
+                                    <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+                <fa:FASettingsExpanderItem Content="{Binding L.RequirePasswordBeforeExport}" Description="{Binding L.RequirePasswordBeforeExportDescription}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <ToggleSwitch IsChecked="{Binding RequirePasswordBeforeExport}" OnContent="{Binding L.FeatureEnabled}" OffContent="{Binding L.FeatureDisabled}" AutomationProperties.Name="{Binding L.RequirePasswordBeforeExport}" />
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+                <!-- Only Windows can keep a window out of screenshots; elsewhere the switch says why
+                     it is off instead of silently doing nothing. -->
+                <fa:FASettingsExpanderItem Content="{Binding L.WindowCaptureProtection}" Description="{Binding WindowCaptureProtectionDescriptionText}">
+                    <fa:FASettingsExpanderItem.Footer>
+                        <ToggleSwitch x:Name="WindowCaptureProtectionToggle"
+                                      IsChecked="{Binding WindowCaptureProtectionEnabled}"
+                                      IsEnabled="{Binding CanUseWindowCaptureProtection}"
+                                      OnContent="{Binding L.FeatureEnabled}"
+                                      OffContent="{Binding L.FeatureDisabled}"
+                                      AutomationProperties.Name="{Binding L.WindowCaptureProtection}" />
+                    </fa:FASettingsExpanderItem.Footer>
+                </fa:FASettingsExpanderItem>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="settingsFlatGroup">
+            <Border Classes="settingsFormRow">
+                <StackPanel>
+                    <TextBlock Classes="settingsRowTitle" Text="{Binding ChangeMasterPasswordTitle}" />
+                    <TextBlock Classes="settingsRowDescription" Text="{Binding ChangeMasterPasswordDescription}" />
+                    <StackPanel Classes="settingsFormFields">
                         <TextBox x:Name="CurrentMasterPasswordBox" PasswordChar="*" PlaceholderText="{Binding CurrentMasterPasswordText}" Text="{Binding CurrentMasterPassword}" IsEnabled="{Binding !IsSecurityMaintenanceBusy}" AutomationProperties.Name="{Binding CurrentMasterPasswordText}" />
                         <TextBox x:Name="NewMasterPasswordBox" PasswordChar="*" PlaceholderText="{Binding NewMasterPasswordText}" Text="{Binding NewMasterPassword}" IsEnabled="{Binding !IsSecurityMaintenanceBusy}" AutomationProperties.Name="{Binding NewMasterPasswordText}" />
                         <TextBox PasswordChar="*" PlaceholderText="{Binding ConfirmNewMasterPasswordText}" Text="{Binding ConfirmNewMasterPassword}" IsEnabled="{Binding !IsSecurityMaintenanceBusy}" AutomationProperties.Name="{Binding ConfirmNewMasterPasswordText}" />
-                        <Button Command="{Binding ChangeMasterPasswordCommand}" IsEnabled="{Binding CanChangeMasterPassword}" HorizontalAlignment="Right">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <ic:FluentIcon Icon="Key" FontSize="18" />
-                                <TextBlock Text="{Binding ChangeMasterPasswordActionText}" />
-                            </StackPanel>
-                        </Button>
+                        <StackPanel Classes="settingsFormActions">
+                            <Button Classes="workspacePrimaryCommand" Command="{Binding ChangeMasterPasswordCommand}" IsEnabled="{Binding CanChangeMasterPassword}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <ic:FluentIcon Icon="Key" FontSize="16" />
+                                    <TextBlock Text="{Binding ChangeMasterPasswordActionText}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                         <ProgressBar IsVisible="{Binding IsChangingMasterPassword}" IsIndeterminate="True" />
                     </StackPanel>
-                </fa:FASettingsExpanderItem.Footer>
-            </fa:FASettingsExpanderItem>
-        </StackPanel>
-    </Border>
+                </StackPanel>
+            </Border>
+        </Border>
     </StackPanel>
 </UserControl>

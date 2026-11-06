@@ -5,7 +5,11 @@
              x:Name="Root">
 
     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+        <!-- Sized like a search box rather than to its placeholder: at its natural width the empty
+             field shrank to the word "Search…" and read as a button. -->
         <TextBox x:Name="SearchBox"
+                 Classes="workspaceSearchBox"
+                 MinWidth="240"
                  Text="{Binding #Root.Text, Mode=TwoWay}"
                  PlaceholderText="{Binding #Root.PlaceholderText}"
                  MinHeight="{DynamicResource ControlHeight}"

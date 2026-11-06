@@ -8,8 +8,9 @@ namespace Monica.App.Services;
 
 /// <summary>
 /// The cross-process primitives the gate needs, separated so the orchestration can be tested
-/// without two real processes: on Windows these names are session-local, and .NET emulates them
-/// with files elsewhere, so the same code runs on every desktop platform.
+/// without two real processes. Windows uses session-local named kernel objects; Linux and macOS
+/// have no named events in .NET, so they use a lock file and a Unix domain socket instead
+/// (see <see cref="UnixDomainSocketSingleInstanceChannel"/>).
 /// </summary>
 internal interface ISingleInstanceChannel : IDisposable
 {
@@ -47,9 +48,25 @@ internal sealed class SingleInstanceGate(ISingleInstanceChannel channel, string 
     /// </summary>
     public static SingleInstanceGate? TryStartAsPrimary(string dataRootDirectory, ISingleInstanceChannel? channel = null)
     {
-        var ownedChannel = channel ?? new NamedSyncSingleInstanceChannel();
+        var ownedChannel = channel ?? SingleInstanceChannels.CreateDefault(dataRootDirectory);
         var key = BuildInstanceKey(dataRootDirectory);
-        if (!ownedChannel.TryAcquire(key))
+        bool acquired;
+        try
+        {
+            acquired = ownedChannel.TryAcquire(key);
+        }
+        catch (Exception ex) when (SingleInstanceChannels.IsInfrastructureFailure(ex))
+        {
+            // The gate exists to keep a second window off the same vault. It must never be the reason
+            // the first window cannot open: on Linux and macOS the named reopen event used to throw
+            // PlatformNotSupportedException right here, and the app exited before showing anything.
+            ownedChannel.Dispose();
+            AppDiagnostics.Error("Single instance guard is unavailable; starting without it", ex);
+            ownedChannel = new UnguardedSingleInstanceChannel();
+            acquired = ownedChannel.TryAcquire(key);
+        }
+
+        if (!acquired)
         {
             ownedChannel.Dispose();
             return null;
@@ -67,7 +84,7 @@ internal sealed class SingleInstanceGate(ISingleInstanceChannel channel, string 
     /// </summary>
     public static HandoffResult NotifyExistingInstance(string dataRootDirectory, ISingleInstanceChannel? channel = null)
     {
-        var ownedChannel = channel ?? new NamedSyncSingleInstanceChannel();
+        var ownedChannel = channel ?? SingleInstanceChannels.CreateDefault(dataRootDirectory);
         try
         {
             var key = BuildInstanceKey(dataRootDirectory);
@@ -121,6 +138,59 @@ internal sealed class SingleInstanceGate(ISingleInstanceChannel channel, string 
 
         channel.Release();
         channel.Dispose();
+    }
+}
+
+internal static class SingleInstanceChannels
+{
+    /// <summary>
+    /// The real primitives for this operating system. <paramref name="dataRootDirectory"/> is where the
+    /// Unix lock file and socket live; Windows names its kernel objects from the key instead.
+    /// </summary>
+    public static ISingleInstanceChannel CreateDefault(string dataRootDirectory) =>
+        OperatingSystem.IsWindows()
+            ? new NamedSyncSingleInstanceChannel()
+            : new UnixDomainSocketSingleInstanceChannel(dataRootDirectory);
+
+    /// <summary>
+    /// Failures of the locking machinery itself, as opposed to "another instance holds the lock",
+    /// which every channel reports by returning false.
+    /// </summary>
+    public static bool IsInfrastructureFailure(Exception exception) =>
+        exception is IOException
+            or UnauthorizedAccessException
+            or PlatformNotSupportedException
+            or WaitHandleCannotBeOpenedException
+            or System.Net.Sockets.SocketException;
+}
+
+/// <summary>
+/// Stands in when the operating system refuses the real primitives, so startup degrades to "no
+/// single-instance protection" instead of "no application".
+/// </summary>
+internal sealed class UnguardedSingleInstanceChannel : ISingleInstanceChannel
+{
+    public bool TryAcquire(string key) => true;
+
+    public void Release()
+    {
+    }
+
+    public bool Signal(string key) => false;
+
+    public IDisposable Listen(string key, Action onSignal) => new NoListener();
+
+    public bool TryGrantForegroundToOwner(string key) => false;
+
+    public void Dispose()
+    {
+    }
+
+    private sealed class NoListener : IDisposable
+    {
+        public void Dispose()
+        {
+        }
     }
 }
 

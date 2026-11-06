@@ -33,8 +33,10 @@ public sealed class LocalizedPlatformCapability : ObservableObject
         string enabledText,
         string disabledText,
         string unsupportedReason,
-        Action<string, bool> setFeatureEnabled)
+        Action<string, bool> setFeatureEnabled,
+        PlatformFeatureStatus statusValue = PlatformFeatureStatus.Available)
     {
+        StatusValue = statusValue;
         Key = key;
         Title = title;
         Description = description;
@@ -54,6 +56,8 @@ public sealed class LocalizedPlatformCapability : ObservableObject
     public bool CanToggle { get; }
     public string UnsupportedReason { get; }
     public bool HasUnsupportedReason => !string.IsNullOrWhiteSpace(UnsupportedReason);
+    public PlatformFeatureStatus StatusValue { get; }
+    public bool IsUsable => StatusValue is PlatformFeatureStatus.Available or PlatformFeatureStatus.DesktopEquivalent;
     public string ToggleStatus => IsEnabled ? _enabledText : _disabledText;
 
     public bool IsEnabled

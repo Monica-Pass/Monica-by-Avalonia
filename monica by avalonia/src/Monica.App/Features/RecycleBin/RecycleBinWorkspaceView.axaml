@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Monica.App.Controls"
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:local="using:Monica.App"
              xmlns:recycle="using:Monica.App.Features.RecycleBin"
@@ -18,7 +19,7 @@
                 <TextBlock Text="{Binding DeletedPasswordCountText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
             </StackPanel>
             <Grid x:Name="RecycleBinSearchRegion" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="6" VerticalAlignment="Center">
-                <TextBox x:Name="RecycleBinSearchBox" PlaceholderText="{Binding L.Search}" Text="{Binding RecycleBinSearchText}" AutomationProperties.Name="{Binding L.Search}" />
+                <TextBox x:Name="RecycleBinSearchBox" Classes="workspaceSearchBox" PlaceholderText="{Binding L.Search}" Text="{Binding RecycleBinSearchText}" AutomationProperties.Name="{Binding L.Search}" />
                 <Button x:Name="RecycleBinSearchClearButton" Grid.Column="1" Classes="workspaceCommand" Command="{Binding ClearRecycleBinSearchCommand}" IsVisible="{Binding HasRecycleBinSearchText}" ToolTip.Tip="{Binding L[ClearSearch]}" AutomationProperties.Name="{Binding L[ClearSearch]}" Width="36" Height="36" Padding="0">
                     <ic:FluentIcon Icon="Dismiss" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
@@ -228,7 +229,7 @@
                         <TextBlock Grid.Row="1" Classes="workspaceDetailLabel" Text="{Binding L[Source]}" />
                         <TextBlock Grid.Row="1" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedRecycleBinItem.Source}" />
                         <TextBlock Grid.Row="2" Classes="workspaceDetailLabel" Text="{Binding L.RecycleBin}" />
-                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedRecycleBinItem.DeletedAt, StringFormat='{}{0:g}'}" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedRecycleBinItem.DeletedAt, Converter={x:Static controls:LocalTimeConverter.General}}" />
                         <TextBlock Grid.Row="3" Classes="workspaceDetailLabel" Text="{Binding L[RecycleBinRetention]}" />
                         <TextBlock Grid.Row="3" Grid.Column="1" Classes="workspaceDetailValue" Text="{Binding SelectedRecycleBinItem.RetentionText}" />
                     </Grid>
