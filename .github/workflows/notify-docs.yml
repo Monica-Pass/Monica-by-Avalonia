@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Notify documentation repository
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           SOURCE_TOKEN: ${{ github.token }}
         with:
