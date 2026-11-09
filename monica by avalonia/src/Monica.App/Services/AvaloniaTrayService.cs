@@ -54,6 +54,20 @@ internal sealed class AvaloniaTrayService(
             IsVisible = false
         };
         _trayIcon.Clicked += TrayIcon_OnClicked;
+        // Avalonia 12 creates the native icon only when a TrayIcon joins the application's
+        // TrayIcon.Icons collection; one that is merely constructed never reaches the shell, and
+        // every IsVisible change after that is a no-op.
+        if (Application.Current is { } application)
+        {
+            var icons = TrayIcon.GetIcons(application);
+            if (icons is null)
+            {
+                icons = new TrayIcons();
+                TrayIcon.SetIcons(application, icons);
+            }
+
+            icons.Add(_trayIcon);
+        }
         localization.PropertyChanged += Localization_OnPropertyChanged;
         RefreshLabels();
     }
@@ -75,6 +89,11 @@ internal sealed class AvaloniaTrayService(
         if (_trayIcon is not null)
         {
             _trayIcon.Clicked -= TrayIcon_OnClicked;
+            if (Application.Current is { } application)
+            {
+                TrayIcon.GetIcons(application)?.Remove(_trayIcon);
+            }
+
             _trayIcon.IsVisible = false;
             _trayIcon.Dispose();
             _trayIcon = null;
